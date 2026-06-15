@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard,
@@ -28,67 +28,63 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen((open) => !open);
-  };
-
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false);
-  };
-
-  // Estado para almacenar los datos reales del usuario logueado
   const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const toggleMobileMenu = () => setMobileMenuOpen((open) => !open);
+  const closeMobileMenu = () => setMobileMenuOpen(false);
+
   useEffect(() => {
-    const getActiveSession = async () => {
+    const checkSession = async () => {
       try {
         const {
-          data: { user },
+          data: { session },
           error,
-        } = await supabase.auth.getUser();
-        if (error) throw error;
-        setCurrentUser(user);
+        } = await supabase.auth.getSession();
+
+        if (error || !session) {
+          window.location.href = "/";
+          return;
+        }
+
+        setCurrentUser(session.user);
       } catch (err) {
-        console.error("Error obteniendo el usuario en el Layout:", err);
-        router.push("/"); // Si no hay sesión válida, redirigimos afuera
+        console.error("Error de autenticación:", err);
+        window.location.href = "/";
       } finally {
         setLoading(false);
       }
     };
 
-    getActiveSession();
+    checkSession();
 
-    // Escuchamos cambios de estado de autenticación por si expira o cambia la sesión
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setCurrentUser(session?.user ?? null);
-      if (!session) {
-        router.push("/");
-        router.refresh();
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        window.location.href = "/";
+      } else {
+        setCurrentUser(session?.user ?? null);
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, router]);
+  }, [supabase]);
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-
-      console.log("Sesión finalizada.");
-      router.push("/");
-      router.refresh(); // Crucial para limpiar las cookies de SSR y las rutas del servidor
+      setLoading(true);
+      await supabase.auth.signOut();
     } catch (err) {
-      console.error("Error al cerrar sesión:", err);
+      console.error("Error crítico al cerrar sesión:", err);
+    } finally {
+      // Forzamos recarga total para limpiar estado y caché
+      window.location.href = "/";
     }
   };
 
@@ -108,27 +104,57 @@ export default function DashboardLayout({
     { name: "Chat interno", icon: MessageSquare, href: "/dashboard/chat" },
   ];
 
-  // Extraemos un nombre legible basado en los datos del usuario
   const displayName =
     currentUser?.user_metadata?.full_name ||
     currentUser?.email?.split("@")[0] ||
     "Admin";
 
+  // LOADER PROFESIONAL
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#111111]">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="flex flex-col items-center gap-6"
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="size-16 bg-padel-4 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(204,255,0,0.2)]"
+          >
+            <span className="text-[#111] font-bold text-4xl">∞</span>
+          </motion.div>
+          <div className="w-32 h-1 bg-white/5 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-padel-4"
+              initial={{ width: "0%" }}
+              animate={{ width: "100%" }}
+              transition={{ duration: 1.5, ease: "easeInOut" }}
+            />
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (!currentUser) return null;
+
   return (
-    <div className="flex h-screen bg-padel-1 text-white font-sans overflow-hidden">
-      {/* Barra Lateral (Sidebar) */}
+    <div className="flex h-screen bg-[#0a0a0a] text-white font-sans overflow-hidden">
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-72 transform bg-padel-1 flex flex-col shrink-0 border-r border-padel-3 shadow-xl transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-30 w-72 transform bg-[#111111] flex flex-col shrink-0 border-r border-white/5 shadow-2xl transition-transform duration-300 md:relative md:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
-        <div className="h-28 px-6 flex items-center justify-between gap-3 border-b border-white/10 md:border-none">
+        <div className="h-28 px-8 flex items-center justify-between gap-3 border-b border-white/5 md:border-none">
           <div className="flex items-center gap-3">
             <div className="size-10 bg-padel-4 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(204,255,0,0.15)]">
-              <span className="text-padel-1 font-bold text-2xl leading-none">
+              <span className="text-[#111] font-bold text-2xl leading-none">
                 ∞
               </span>
             </div>
             <div className="flex flex-col justify-center mt-1">
-              <span className="text-base md:text-xl tracking-tight text-white flex items-baseline">
+              <span className="text-xl tracking-tight text-white">
                 <span className="font-extrabold">padel</span>
                 <span className="font-light">nexus</span>
               </span>
@@ -139,15 +165,13 @@ export default function DashboardLayout({
           </div>
           <button
             onClick={closeMobileMenu}
-            className="md:hidden p-2 rounded-full text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
-            aria-label="Cerrar menú"
+            className="md:hidden p-2 rounded-full text-gray-400 hover:text-white"
           >
             <X className="size-5" />
           </button>
         </div>
 
-        {/* Navegación */}
-        <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto scrollbar-none">
+        <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -157,89 +181,64 @@ export default function DashboardLayout({
                 className="block relative group"
               >
                 <motion.div
-                  className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
-                    isActive
-                      ? "bg-padel-4 text-padel-1 font-bold"
-                      : "text-gray-400 hover:bg-padel-5 hover:text-white"
-                  }`}
-                  whileHover={!isActive ? { x: 4 } : {}}
+                  className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${isActive ? "bg-padel-4 text-[#111] font-bold" : "text-gray-400 hover:bg-white/5"}`}
                 >
-                  <item.icon
-                    className={`size-5 ${isActive ? "stroke-[2.5]" : "stroke-2"}`}
-                  />
-                  <span className="text-[15px] tracking-wide">{item.name}</span>
+                  <item.icon className="size-5" />
+                  <span className="text-[14px]">{item.name}</span>
                 </motion.div>
               </Link>
             );
           })}
         </nav>
 
-        {/* Perfil Inferior Dinámico con Datos de Supabase */}
-        <div className="p-5 border-t border-padel-3 bg-padel-1 flex items-center gap-3">
-          <div className="size-10 rounded-full bg-padel-5 flex items-center justify-center shrink-0 border border-padel-2">
+        <div className="p-6 border-t border-white/5 bg-[#111111] flex items-center gap-3">
+          <div className="size-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
             <User className="size-5 text-gray-400" />
           </div>
-
           <div className="flex flex-col flex-1 overflow-hidden">
-            {loading ? (
-              <div className="h-4 bg-padel-2 rounded w-24 animate-pulse"></div>
-            ) : (
-              <span className="text-sm font-bold text-white truncate capitalize">
-                {displayName}
-              </span>
-            )}
-            {loading ? (
-              <div className="h-3 bg-padel-2 rounded w-32 mt-1.5 animate-pulse"></div>
-            ) : (
-              <span className="text-[11px] text-gray-500 truncate">
-                {currentUser?.email}
-              </span>
-            )}
+            <span className="text-[13px] font-bold text-white truncate">
+              {displayName}
+            </span>
+            <span className="text-[11px] text-gray-500 truncate">
+              {currentUser.email}
+            </span>
           </div>
-
           <button
             onClick={handleLogout}
-            className="p-2 text-gray-500 hover:text-white transition-colors rounded-lg hover:bg-padel-5 shrink-0"
-            title="Cerrar sesión"
+            className="p-2.5 text-gray-500 hover:text-red-500 transition-colors rounded-xl"
           >
-            <LogOut className="size-5" />
+            <LogOut className="size-4" />
           </button>
         </div>
       </aside>
 
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-20 bg-black/40 md:hidden"
+          className="fixed inset-0 z-20 bg-black/60 md:hidden"
           onClick={closeMobileMenu}
         ></div>
       )}
 
-      {/* Contenedor Principal */}
-      <main className="flex-1 overflow-y-auto bg-padel-1 scrollbar-thin scrollbar-thumb-padel-2 scrollbar-track-transparent">
-        <div className="md:hidden sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 bg-padel-1 px-4 py-3">
+      <main className="flex-1 overflow-y-auto bg-[#0a0a0a]">
+        <div className="md:hidden sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-[#111111]/80 backdrop-blur-md">
           <button
             onClick={toggleMobileMenu}
-            className="p-2 rounded-xl bg-padel-5 text-padel-1 hover:bg-padel-4 transition-colors"
-            aria-label="Abrir menú"
+            className="p-2.5 rounded-xl bg-white/5"
           >
             <Menu className="size-5" />
           </button>
-          <div className="flex-1 min-w-0 flex items-center gap-3 justify-center">
-            <div className="size-10 bg-padel-4 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(204,255,0,0.15)]">
-              <span className="text-padel-1 font-bold text-lg">∞</span>
-            </div>
-            <div className="min-w-0 text-center">
-              <div className="text-sm font-black uppercase tracking-[0.35em] text-white leading-none">
-                padel nexus
-              </div>
-              <div className="text-[10px] font-semibold text-padel-4 uppercase tracking-[0.25em]">
-                admin crm
-              </div>
-            </div>
+          <div className="text-[13px] font-black uppercase tracking-[0.35em] text-white">
+            PADEL NEXUS
           </div>
           <div className="w-10" />
         </div>
-        {children}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          {children}
+        </motion.div>
       </main>
     </div>
   );
