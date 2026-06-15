@@ -39,11 +39,11 @@ export default function TorneosPage() {
   const [saving, setSaving] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [editingId, setEditingId] = useState<string | number | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<FormTorneoState>(ESTADO_INICIAL);
 
-  // Estado para el modal universal de feedback/confirmación
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
     isOpen: false,
     title: "",
@@ -91,7 +91,7 @@ export default function TorneosPage() {
       nombre: torneo.nombre,
       subtitulo: torneo.subtitulo || "",
       club_id: String(torneo.club_id || ""),
-      fecha: torneo.fecha || "",
+      fecha: torneo.fecha ? String(torneo.fecha) : "",
       nivel: torneo.nivel || "5ª",
       categoria: torneo.categoria || "Masculino",
       estado: torneo.estado || "Borrador",
@@ -103,17 +103,26 @@ export default function TorneosPage() {
       premio_2: torneo.premio_2 || "",
       premio_3: torneo.premio_3 || "",
     });
-    setEditingId(torneo.id);
+    setEditingId(String(torneo.id));
     setIsModalOpen(true);
   };
 
   const handleSaveTorneo = async () => {
     try {
       setSaving(true);
+      // Validar que si no se seleccionó club, se envíe null para evitar error de foreign key
+      const payloadToSave = {
+        ...formData,
+        club_id: formData.club_id === "" ? null : formData.club_id,
+      };
+
       if (editingId) {
-        await TorneosService.update(editingId, formData);
+        await TorneosService.update(
+          editingId,
+          payloadToSave as FormTorneoState,
+        );
       } else {
-        await TorneosService.create(formData);
+        await TorneosService.create(payloadToSave as FormTorneoState);
       }
 
       setIsModalOpen(false);
@@ -131,9 +140,7 @@ export default function TorneosPage() {
     }
   };
 
-  const handleDeleteRequest = (id: string | number) => {
-    const idToDelete = id;
-
+  const handleDeleteRequest = (id: string) => {
     setFeedbackModal({
       isOpen: true,
       type: "danger",
@@ -146,7 +153,7 @@ export default function TorneosPage() {
       onConfirm: () => {
         setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
 
-        TorneosService.delete(idToDelete)
+        TorneosService.delete(id)
           .then(() => {
             setFeedbackModal({
               isOpen: true,
@@ -207,9 +214,8 @@ export default function TorneosPage() {
         </button>
       </div>
 
-      {/* FILTROS Y TABS (Corregido visualmente) */}
+      {/* FILTROS Y TABS */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-        {/* Contenedor Inline-flex para que abrace los tabs y no se estire */}
         <div className="inline-flex bg-[#111111] p-1.5 rounded-xl border border-white/5 overflow-x-auto w-full sm:w-auto">
           {TABS.map((tab) => (
             <button
@@ -335,7 +341,6 @@ export default function TorneosPage() {
 
                       <td className="py-4 px-6">
                         <div className="text-[14px] font-bold text-gray-200">
-                          {/* Ahora t.clubes.nombre existe gracias al JOIN en el backend */}
                           {t.clubes?.nombre || "Sede a confirmar"}
                         </div>
                         <div className="text-[13px] text-gray-500 mt-0.5">
@@ -370,7 +375,7 @@ export default function TorneosPage() {
                                   ? "bg-[#ffb800]"
                                   : t.estado === "Finalizado"
                                     ? "bg-blue-500"
-                                    : "bg-gray-500" // Color gris para Borrador
+                                    : "bg-gray-500"
                             }`}
                           ></span>
                           <span

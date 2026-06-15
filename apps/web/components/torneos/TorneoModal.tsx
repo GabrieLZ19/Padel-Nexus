@@ -1,4 +1,3 @@
-// apps/web/components/torneos/TorneoModal.tsx
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,7 +13,7 @@ interface TorneoModalProps {
   setFormData: (data: FormTorneoState) => void;
   clubs: Club[];
   isSaving: boolean;
-  editingId: string | number | null;
+  editingId: string | null;
 }
 
 export default function TorneoModal({
@@ -46,7 +45,6 @@ export default function TorneoModal({
     { value: "Finalizado", label: "Finalizado" },
   ];
 
-  // --- NUEVAS OPCIONES ---
   const opcionesModalidad = [
     { value: "Duplas", label: "Duplas (2 vs 2)" },
     { value: "Individual", label: "Individual (1 vs 1)" },
@@ -131,7 +129,7 @@ export default function TorneoModal({
                     placeholder={
                       clubs.length === 0
                         ? "No hay clubes creados"
-                        : "Seleccionar complejo..."
+                        : "Sede a confirmar..."
                     }
                     disabled={clubs.length === 0}
                   />
@@ -324,7 +322,7 @@ export default function TorneoModal({
               </div>
 
               <button
-                disabled={isSaving || !formData.nombre || !formData.club_id}
+                disabled={isSaving || !formData.nombre} // CORRECCIÓN 2: Permitimos guardar sin club_id (Sede a confirmar)
                 onClick={onSave}
                 className="w-full bg-[#212b06] disabled:opacity-50 border border-padel-4/10 hover:border-padel-4/30 hover:bg-[#2c3a08] text-padel-4 font-bold py-4 rounded-xl mt-4 flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(204,255,0,0.05)]"
               >

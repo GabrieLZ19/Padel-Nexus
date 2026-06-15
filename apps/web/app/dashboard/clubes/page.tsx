@@ -34,7 +34,7 @@ export default function GestionClubesPage() {
   // Estados del Modal
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
-  const [editingId, setEditingId] = useState<string | number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<FormClubState>(ESTADO_INICIAL);
 
@@ -91,16 +91,32 @@ export default function GestionClubesPage() {
         setEditingId(null);
         setLoading(true);
         setRefreshKey((prev) => prev + 1);
+
+        // Opcional: Mostrar modal de éxito
+        setFeedbackModal({
+          isOpen: true,
+          type: "success",
+          title: "¡Club guardado!",
+          description: "El complejo deportivo se guardó correctamente.",
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
       })
       .catch((error) => {
-        alert(
-          "Error al guardar: " +
-            (error.response?.data?.message || error.message || "Desconocido"),
-        );
+        const mensajeError =
+          error.response?.data?.message || error.message || "Error desconocido";
+
+        setFeedbackModal({
+          isOpen: true,
+          type: "danger",
+          title: "Acceso denegado",
+          description: `No pudimos guardar el club. Detalle: ${mensajeError}`,
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
       })
       .finally(() => setSaving(false));
   };
-
   // Manejador: Eliminar
   const handleDelete = () => {
     if (!editingId) return;
@@ -238,14 +254,25 @@ export default function GestionClubesPage() {
                   </div>
                 </div>
               </div>
-
               <div className="flex items-center justify-between mt-6 pt-6 border-t border-white/5">
                 <div className="flex items-center gap-2 ">
                   <span
-                    className={`w-2 h-2 rounded-full ${club.estado === "Pendiente" ? "bg-orange-500" : "bg-green-500"}`}
+                    className={`w-2 h-2 rounded-full ${
+                      club.estado === "Pendiente"
+                        ? "bg-orange-500"
+                        : club.estado === "Inactivo"
+                          ? "bg-red-500"
+                          : "bg-green-500"
+                    }`}
                   ></span>
                   <span
-                    className={`text-sm font-bold ${club.estado === "Pendiente" ? "text-orange-500" : "text-green-500"}`}
+                    className={`text-sm font-bold ${
+                      club.estado === "Pendiente"
+                        ? "text-orange-500"
+                        : club.estado === "Inactivo"
+                          ? "text-red-500"
+                          : "text-green-500"
+                    }`}
                   >
                     {club.estado || "Activo"}
                   </span>

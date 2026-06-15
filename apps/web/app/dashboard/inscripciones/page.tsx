@@ -64,9 +64,9 @@ export default function GestionInscripcionesPage() {
     };
   }, [refreshKey]);
 
-  // Cambiar Estado con tipado estricto
+  // CORRECCIÓN: Tipado estricto a string (UUID)
   const handleCambiarEstado = (
-    id: string | number,
+    id: string,
     nuevoEstado: "Confirmado" | "Rechazado",
   ) => {
     const accion = nuevoEstado === "Confirmado" ? "aprobar" : "rechazar";
@@ -95,7 +95,6 @@ export default function GestionInscripcionesPage() {
             setRefreshKey((prev) => prev + 1);
           })
           .catch((error: unknown) => {
-            // Manejo de errores estricto para TS
             let mensajeError =
               "Ocurrió un error inesperado al procesar la solicitud.";
             if (error instanceof Error) {
@@ -128,13 +127,21 @@ export default function GestionInscripcionesPage() {
     setDetalleModalOpen(true);
   };
 
-  // Filtrado
+  // CORRECCIÓN: Filtrado con blindaje contra valores Nulos/Indefinidos
   const filteredInscripciones = inscripciones.filter((i) => {
     const term = search.toLowerCase();
+    const nombreJ1 = (i.jugador1_nombre || "").toLowerCase();
+    const nombreJ2 = (i.jugador2_nombre || "").toLowerCase();
+    const nombreTorneo = (
+      i.torneo_nombre ||
+      i.cancha_nombre ||
+      ""
+    ).toLowerCase();
+
     const matchSearch =
-      i.jugador1_nombre.toLowerCase().includes(term) ||
-      (i.jugador2_nombre || "").toLowerCase().includes(term) ||
-      i.torneo_nombre.toLowerCase().includes(term);
+      nombreJ1.includes(term) ||
+      nombreJ2.includes(term) ||
+      nombreTorneo.includes(term);
 
     const matchTab =
       activeTab === "Todas" ||
@@ -157,7 +164,7 @@ export default function GestionInscripcionesPage() {
   ).length;
   const recaudacionTotal = inscripciones
     .filter((i) => i.estado_pago === "Confirmado")
-    .reduce((acc, curr) => acc + Number(curr.monto), 0);
+    .reduce((acc, curr) => acc + Number(curr.monto || 0), 0);
 
   const formatMoney = (amount: number) => {
     if (amount >= 1000000)
@@ -167,7 +174,7 @@ export default function GestionInscripcionesPage() {
     return `$ ${amount.toLocaleString("es-AR")}`;
   };
 
-  // --- EXPORTAR A EXCEL (CSV) ---
+  // --- EXPORTAR A EXCEL (CSV) BLINDADO ---
   const handleExportarExcel = () => {
     const headers = [
       "ID",
@@ -179,16 +186,19 @@ export default function GestionInscripcionesPage() {
       "Monto",
       "Estado",
     ];
-    const escapeCSV = (str: string | number) =>
-      `"${String(str).replace(/"/g, '""')}"`;
+    // Aseguramos que si viene un null/undefined, lo convierta a string vacío
+    const escapeCSV = (str: string | number | undefined | null) =>
+      `"${String(str || "").replace(/"/g, '""')}"`;
 
     const csvData = filteredInscripciones.map((ins) => [
       escapeCSV(ins.id),
       escapeCSV(ins.jugador1_nombre),
       escapeCSV(ins.jugador2_nombre || "-"),
-      escapeCSV(ins.torneo_nombre),
+      escapeCSV(ins.torneo_nombre || ins.cancha_nombre),
       escapeCSV(ins.categoria),
-      escapeCSV(new Date(ins.created_at).toLocaleDateString("es-AR")),
+      escapeCSV(
+        new Date(ins.created_at || new Date()).toLocaleDateString("es-AR"),
+      ),
       escapeCSV(ins.monto),
       escapeCSV(ins.estado_pago),
     ]);
@@ -410,7 +420,7 @@ export default function GestionInscripcionesPage() {
                           )}
                           <div>
                             <div className="font-bold text-white text-[14px]">
-                              {ins.jugador1_nombre}
+                              {ins.jugador1_nombre || "Jugador Desconocido"}
                               {esDupla && (
                                 <span className="text-gray-400 font-medium">
                                   {" "}
@@ -433,8 +443,8 @@ export default function GestionInscripcionesPage() {
                             <Trophy className="size-3.5 text-gray-500" />
                           )}
                           {ins.tipo === "Reserva cancha"
-                            ? ins.cancha_nombre
-                            : ins.torneo_nombre}
+                            ? ins.cancha_nombre || "Cancha no asignada"
+                            : ins.torneo_nombre || "Torneo no asignado"}
                         </div>
                         {ins.categoria && ins.categoria !== "-" && (
                           <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
@@ -445,7 +455,9 @@ export default function GestionInscripcionesPage() {
 
                       <td className="py-4 px-6 text-[13px] text-gray-400 flex items-center gap-2">
                         <Clock className="size-3.5" />
-                        {new Date(ins.created_at).toLocaleDateString("es-AR", {
+                        {new Date(
+                          ins.created_at || new Date(),
+                        ).toLocaleDateString("es-AR", {
                           day: "2-digit",
                           month: "short",
                         })}
@@ -468,7 +480,7 @@ export default function GestionInscripcionesPage() {
 
                       <td className="py-4 px-6 font-bold text-white flex items-center gap-1.5 text-[14px]">
                         <CreditCard className="size-4 text-gray-500" />$
-                        {Number(ins.monto).toLocaleString("es-AR")}
+                        {Number(ins.monto || 0).toLocaleString("es-AR")}
                       </td>
 
                       <td className="py-4 px-8 text-right">
@@ -477,7 +489,10 @@ export default function GestionInscripcionesPage() {
                             <>
                               <button
                                 onClick={() =>
-                                  handleCambiarEstado(ins.id, "Confirmado")
+                                  handleCambiarEstado(
+                                    String(ins.id),
+                                    "Confirmado",
+                                  )
                                 }
                                 className="p-2.5 bg-green-500/10 hover:bg-green-500/20 text-[#00ff88] rounded-xl transition-all border border-green-500/20"
                                 title="Aprobar Inscripción"
@@ -486,7 +501,10 @@ export default function GestionInscripcionesPage() {
                               </button>
                               <button
                                 onClick={() =>
-                                  handleCambiarEstado(ins.id, "Rechazado")
+                                  handleCambiarEstado(
+                                    String(ins.id),
+                                    "Rechazado",
+                                  )
                                 }
                                 className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-[#ff4444] rounded-xl transition-all border border-red-500/20"
                                 title="Rechazar Inscripción"

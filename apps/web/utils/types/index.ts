@@ -1,11 +1,12 @@
 export interface Club {
-  id: string | number;
+  id: string; // En la DB es uuid
   nombre: string;
-  provincia?: string;
-  localidad?: string;
-  canchas?: number;
-  torneos_count?: number; // Para mostrar en la estadística de la tarjeta
-  estado?: "Activo" | "Pendiente" | "Inactivo";
+  provincia?: string | null;
+  localidad?: string | null;
+  canchas: number;
+  estado?: string | null;
+  created_at?: string | null;
+  torneos_count?: number;
 }
 
 export interface FormClubState {
@@ -17,24 +18,25 @@ export interface FormClubState {
 }
 
 export interface Torneo {
-  id: string | number;
+  id: string;
+  created_at?: string | null;
   nombre: string;
   subtitulo?: string | null;
+  club_id?: string | null;
+  fecha?: string | null;
+  estado?: string | null;
+  cupos_maximos?: number | null;
+  cupos_actuales?: number | null;
   nivel?: string | null;
   categoria?: string | null;
-  fecha: string | number;
-  estado: string;
-  cupos_actuales?: number;
-  cupos_maximos?: number;
+  modalidad?: string | null;
+  precio_inscripcion?: number | null;
+  formato?: string | null;
+  premio_1?: string | null;
+  premio_2?: string | null;
+  premio_3?: string | null;
+  formato_torneo?: string | null;
   clubes?: Club | null;
-  club_id?: string | number;
-  modalidad?: string;
-  precio_inscripcion?: number;
-  premios?: string;
-  formato?: string;
-  premio_1?: string;
-  premio_2?: string;
-  premio_3?: string;
 }
 
 export interface FormTorneoState {
@@ -44,12 +46,11 @@ export interface FormTorneoState {
   nivel: string;
   categoria: string;
   estado: string;
-  fecha: string | number;
+  fecha: string;
   cupos_actuales?: number;
   cupos_maximos?: number;
   modalidad?: string;
   precio_inscripcion?: number;
-  premios?: string;
   formato?: string;
   premio_1?: string;
   premio_2?: string;

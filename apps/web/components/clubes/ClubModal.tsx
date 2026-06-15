@@ -13,25 +13,41 @@ interface ClubModalProps {
   formData: FormClubState;
   setFormData: (data: FormClubState) => void;
   isSaving: boolean;
-  editingId: string | number | null;
+  editingId: string | null;
 }
 
 const PROVINCIAS = [
   "Buenos Aires",
-  "Córdoba",
-  "Santa Fe",
-  "Mendoza",
-  "Tucumán",
-  "Entre Ríos",
-  "Salta",
-  "Misiones",
+  "CABA",
+  "Catamarca",
   "Chaco",
+  "Chubut",
+  "Córdoba",
   "Corrientes",
+  "Entre Ríos",
+  "Formosa",
+  "Jujuy",
+  "La Pampa",
+  "La Rioja",
+  "Mendoza",
+  "Misiones",
+  "Neuquén",
+  "Río Negro",
+  "Salta",
+  "San Juan",
+  "San Luis",
+  "Santa Cruz",
+  "Santa Fe",
+  "Santiago del Estero",
+  "Tierra del Fuego",
+  "Tucumán",
 ].map((p) => ({ value: p, label: p }));
 
+// CORRECCIÓN: Agregado el estado Inactivo según la interfaz
 const ESTADOS = [
   { value: "Activo", label: "Activo" },
   { value: "Pendiente", label: "Pendiente" },
+  { value: "Inactivo", label: "Inactivo" },
 ];
 
 export default function ClubModal({
@@ -129,7 +145,7 @@ export default function ClubModal({
                     type="number"
                     min="1"
                     className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
-                    value={formData.canchas || ""} // El || "" permite que se vacíe al borrar
+                    value={formData.canchas || ""}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
@@ -168,7 +184,7 @@ export default function ClubModal({
                 <button
                   disabled={isSaving || !formData.nombre || !formData.localidad}
                   onClick={onSave}
-                  className="flex-2 bg-padel-4 disabled:bg-padel-2 disabled:text-gray-500 text-padel-1 font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(204,255,0,0.15)]"
+                  className="flex-2 w-full bg-padel-4 disabled:bg-padel-2 disabled:text-gray-500 text-padel-1 font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(204,255,0,0.15)]"
                 >
                   {isSaving ? (
                     "Procesando..."
