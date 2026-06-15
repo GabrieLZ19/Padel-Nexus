@@ -5,17 +5,16 @@ import {
   updateClub,
   deleteClub,
 } from "../controllers/clubes.controller";
+import { authenticate, authorizeAdmin } from "../middleware/auth";
 
 const router = Router();
 
-// GET /api/clubes
-router.get("/", getAllClubes);
+router.get("/", authenticate, getAllClubes);
 
-// POST /api/clubes
-router.post("/", createClub);
+router.post("/", authenticate, authorizeAdmin, createClub);
 
-router.put("/:id", updateClub);
+router.put("/:id", authenticate, authorizeAdmin, updateClub);
 
-router.delete("/:id", deleteClub);
+router.delete("/:id", authenticate, authorizeAdmin, deleteClub);
 
 export default router;

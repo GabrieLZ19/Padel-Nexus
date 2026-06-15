@@ -8,23 +8,20 @@ export const getAllTorneos = async (req: Request, res: Response) => {
       .select("*, clubes(nombre, provincia)")
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("❌ ERROR GET TORNEOS:", error.message);
-      throw error;
-    }
-
+    if (error) throw error;
     res.status(200).json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
     res
       .status(500)
-      .json({ message: "Error al obtener torneos", error: error.message });
+      .json({ message: "Error al obtener torneos", error: message });
   }
 };
 
 export const getTorneoById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-
     const { data, error } = await supabase
       .from("torneos")
       .select("*, clubes(nombre, provincia)")
@@ -32,23 +29,21 @@ export const getTorneoById = async (req: Request, res: Response) => {
       .single();
 
     if (error) throw error;
-
-    if (!data) {
-      return res.status(404).json({ message: "Torneo no encontrado" });
-    }
+    if (!data) return res.status(404).json({ message: "Torneo no encontrado" });
 
     res.status(200).json(data);
-  } catch (error: any) {
-    console.error("❌ ERROR GET TORNEO BY ID:", error.message);
-    res.status(500).json({
-      message: "Error al obtener el detalle del torneo",
-      error: error.message,
-    });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    res
+      .status(500)
+      .json({ message: "Error al obtener detalle del torneo", error: message });
   }
 };
 
 export const createTorneo = async (req: Request, res: Response) => {
   try {
+    // Destructuring con valores por defecto para mayor seguridad
     const {
       nombre,
       subtitulo,
@@ -76,92 +71,66 @@ export const createTorneo = async (req: Request, res: Response) => {
           fecha: fecha || null,
           estado,
           cupos_maximos,
+          cupos_actuales: 0, // Iniciamos en cero
           nivel,
           categoria,
           modalidad: modalidad || "Duplas",
           precio_inscripcion: precio_inscripcion || 0,
           formato: formato || "Eliminatoria Directa",
-          premio_1: premio_1 || null,
-          premio_2: premio_2 || null,
-          premio_3: premio_3 || null,
+          premio_1,
+          premio_2,
+          premio_3,
         },
       ])
       .select();
 
     if (error) throw error;
     res.status(201).json(data[0]);
-  } catch (error: any) {
-    res
-      .status(500)
-      .json({ message: "Error al crear torneo", error: error.message });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    res.status(500).json({ message: "Error al crear torneo", error: message });
   }
 };
 
 export const updateTorneo = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const {
-      nombre,
-      subtitulo,
-      club_id,
-      fecha,
-      estado,
-      cupos_maximos,
-      nivel,
-      categoria,
-      modalidad,
-      precio_inscripcion,
-      formato,
-      premio_1,
-      premio_2,
-      premio_3,
-    } = req.body;
+    const updateData = req.body; // Enviamos todo el body directamente para flexibilidad
 
     const { data, error } = await supabase
       .from("torneos")
-      .update({
-        nombre,
-        subtitulo,
-        club_id: club_id || null,
-        fecha: fecha || null,
-        estado,
-        cupos_maximos,
-        nivel,
-        categoria,
-        modalidad,
-        precio_inscripcion,
-        formato,
-        premio_1,
-        premio_2,
-        premio_3,
-      })
+      .update(updateData)
       .eq("id", id)
       .select();
 
     if (error) throw error;
     res.status(200).json(data[0]);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
     res
       .status(500)
-      .json({ message: "Error al actualizar torneo", error: error.message });
+      .json({ message: "Error al actualizar torneo", error: message });
   }
 };
 
 export const deleteTorneo = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-
     const { error } = await supabase.from("torneos").delete().eq("id", id);
 
     if (error) throw error;
     res.status(200).json({ message: "Torneo eliminado correctamente" });
-  } catch (error: any) {
-    console.error("❌ ERROR DELETE TORNEOS:", error.message);
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
     res
       .status(500)
-      .json({ message: "Error al eliminar torneo", error: error.message });
+      .json({ message: "Error al eliminar torneo", error: message });
   }
 };
+
 export const getPartidosByTorneo = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -173,9 +142,11 @@ export const getPartidosByTorneo = async (req: Request, res: Response) => {
 
     if (error) throw error;
     res.status(200).json(data);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
     res
       .status(500)
-      .json({ message: "Error al obtener partidos", error: error.message });
+      .json({ message: "Error al obtener partidos", error: message });
   }
 };
