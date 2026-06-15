@@ -21,6 +21,12 @@ const ESTADO_INICIAL: FormTorneoState = {
   categoria: "Masculino",
   estado: "Borrador",
   cupos_maximos: 16,
+  modalidad: "Duplas",
+  formato: "Eliminatoria Directa",
+  precio_inscripcion: 0,
+  premio_1: "",
+  premio_2: "",
+  premio_3: "",
 };
 
 export default function TorneosPage() {
@@ -83,12 +89,19 @@ export default function TorneosPage() {
   const handleOpenEdit = (torneo: Torneo) => {
     setFormData({
       nombre: torneo.nombre,
+      subtitulo: torneo.subtitulo || "",
       club_id: String(torneo.club_id || ""),
       fecha: torneo.fecha || "",
       nivel: torneo.nivel || "5ª",
       categoria: torneo.categoria || "Masculino",
       estado: torneo.estado || "Borrador",
       cupos_maximos: torneo.cupos_maximos || 16,
+      modalidad: torneo.modalidad || "Duplas",
+      formato: torneo.formato || "Eliminatoria Directa",
+      precio_inscripcion: torneo.precio_inscripcion || 0,
+      premio_1: torneo.premio_1 || "",
+      premio_2: torneo.premio_2 || "",
+      premio_3: torneo.premio_3 || "",
     });
     setEditingId(torneo.id);
     setIsModalOpen(true);

@@ -37,16 +37,23 @@ export default function TorneoModal({
     { value: "Mixto", label: "Mixto" },
   ];
   const opcionesNivel = ["1ª", "2ª", "3ª", "4ª", "5ª", "6ª", "7ª", "8ª"].map(
-    (n) => ({
-      value: n,
-      label: n,
-    }),
+    (n) => ({ value: n, label: n }),
   );
   const opcionesEstado = [
     { value: "Borrador", label: "Borrador (Oculto)" },
     { value: "Inscripción", label: "Inscripción Abierta" },
     { value: "En curso", label: "En Curso" },
     { value: "Finalizado", label: "Finalizado" },
+  ];
+
+  // --- NUEVAS OPCIONES ---
+  const opcionesModalidad = [
+    { value: "Duplas", label: "Duplas (2 vs 2)" },
+    { value: "Individual", label: "Individual (1 vs 1)" },
+  ];
+  const opcionesFormato = [
+    { value: "Eliminatoria Directa", label: "Eliminatoria Directa" },
+    { value: "Fase de Grupos", label: "Fase de Grupos + Llave" },
   ];
 
   return (
@@ -58,15 +65,16 @@ export default function TorneoModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.2 }}
-            className="bg-[#1a1a1a] p-8 rounded-4xl border border-white/5 w-full max-w-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] my-8 relative"
+            className="bg-[#1a1a1a] p-8 rounded-4xl border border-white/5 w-full max-w-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] my-8 relative"
           >
-            <div className="flex justify-between items-start mb-8">
+            <div className="flex justify-between items-start mb-8 border-b border-white/10 pb-6">
               <div>
                 <h2 className="text-[26px] font-bold text-white tracking-tight leading-none mb-2">
                   {editingId ? "Editar Torneo" : "Configurar Torneo"}
                 </h2>
                 <p className="text-gray-400 text-sm">
-                  Completá los datos para publicar la competencia
+                  Definí los detalles técnicos, financieros y operativos de la
+                  competencia.
                 </p>
               </div>
               <button
@@ -78,6 +86,7 @@ export default function TorneoModal({
             </div>
 
             <div className="space-y-6">
+              {/* FILA 1: Nombre y Fecha */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
@@ -107,6 +116,7 @@ export default function TorneoModal({
                 </div>
               </div>
 
+              {/* FILA 2: Sede y Estado */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
@@ -121,7 +131,7 @@ export default function TorneoModal({
                     placeholder={
                       clubs.length === 0
                         ? "No hay clubes creados"
-                        : "Seleccionar un club adherido"
+                        : "Seleccionar complejo..."
                     }
                     disabled={clubs.length === 0}
                   />
@@ -141,7 +151,21 @@ export default function TorneoModal({
                 </div>
               </div>
 
+              {/* FILA 3: Modalidad, Rama y Nivel */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    Modalidad
+                  </label>
+                  <CustomDropdown
+                    value={formData.modalidad || "Duplas"}
+                    onChange={(val) =>
+                      setFormData({ ...formData, modalidad: val })
+                    }
+                    options={opcionesModalidad}
+                    placeholder="Seleccionar..."
+                  />
+                </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
                     Rama / Categoría
@@ -166,9 +190,30 @@ export default function TorneoModal({
                     placeholder="Seleccionar..."
                   />
                 </div>
+              </div>
+
+              {/* FILA 4: Fases, Cupos y Precio */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Cupos (Duplas)
+                    Formato de Fases
+                  </label>
+                  <CustomDropdown
+                    value={formData.formato || "Eliminatoria Directa"}
+                    onChange={(val) =>
+                      setFormData({ ...formData, formato: val })
+                    }
+                    options={opcionesFormato}
+                    placeholder="Seleccionar..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    Cupos Máximos (
+                    {formData.modalidad === "Individual"
+                      ? "Jugadores"
+                      : "Duplas"}
+                    )
                   </label>
                   <input
                     type="number"
@@ -183,6 +228,98 @@ export default function TorneoModal({
                       })
                     }
                   />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    Precio Inscripción ($)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Ej: 24000"
+                    className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-semibold"
+                    value={formData.precio_inscripcion || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        precio_inscripcion:
+                          e.target.value === ""
+                            ? 0
+                            : parseFloat(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* FILA 5: Premios (1º, 2º y 3º) */}
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">
+                  Estructura de Premios (Dejar en blanco si no hay premios)
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  {/* 1er Puesto */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-5 h-5 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center font-black text-[10px] border border-yellow-500/30">
+                        1º
+                      </span>
+                      <span className="text-[11px] font-bold text-gray-400">
+                        Campeón
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Ej: $180.000 + Trofeo"
+                      className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
+                      value={formData.premio_1 || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, premio_1: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  {/* 2do Puesto */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-5 h-5 rounded-full bg-gray-400/20 text-gray-400 flex items-center justify-center font-black text-[10px] border border-gray-400/30">
+                        2º
+                      </span>
+                      <span className="text-[11px] font-bold text-gray-400">
+                        Subcampeón (Opcional)
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Ej: $80.000 + Medalla"
+                      className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
+                      value={formData.premio_2 || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, premio_2: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  {/* 3er Puesto */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-5 h-5 rounded-full bg-amber-700/20 text-amber-600 flex items-center justify-center font-black text-[10px] border border-amber-700/30">
+                        3º
+                      </span>
+                      <span className="text-[11px] font-bold text-gray-400">
+                        Tercer Puesto (Opcional)
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Ej: Inscripción gratis"
+                      className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
+                      value={formData.premio_3 || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, premio_3: e.target.value })
+                      }
+                    />
+                  </div>
                 </div>
               </div>
 

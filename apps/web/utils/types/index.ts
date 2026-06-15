@@ -28,10 +28,18 @@ export interface Torneo {
   cupos_maximos?: number;
   clubes?: Club | null;
   club_id?: string | number;
+  modalidad?: string;
+  precio_inscripcion?: number;
+  premios?: string;
+  formato?: string;
+  premio_1?: string;
+  premio_2?: string;
+  premio_3?: string;
 }
 
 export interface FormTorneoState {
   nombre: string;
+  subtitulo?: string | null;
   club_id: string;
   nivel: string;
   categoria: string;
@@ -39,6 +47,13 @@ export interface FormTorneoState {
   fecha: string | number;
   cupos_actuales?: number;
   cupos_maximos?: number;
+  modalidad?: string;
+  precio_inscripcion?: number;
+  premios?: string;
+  formato?: string;
+  premio_1?: string;
+  premio_2?: string;
+  premio_3?: string;
 }
 
 export interface RankingJugador {
@@ -67,16 +82,16 @@ export interface Equipo {
 
 export interface Partido {
   id: string;
-  ronda: "CUARTOS" | "SEMIS" | "FINAL";
-  equipoA: Equipo | null;
-  equipoB: Equipo | null;
-  set1A?: number;
-  set1B?: number;
-  set2A?: number;
-  set2B?: number;
-  set3A?: number;
-  set3B?: number;
-  ganador_id?: string;
+  torneo_id?: string;
+  ronda: string;
+  orden: number;
+  equipo_a_j1: string | null;
+  equipo_a_j2: string | null;
+  equipo_b_j1: string | null;
+  equipo_b_j2: string | null;
+  set1_a: number | null;
+  set1_b: number | null;
+  ganador: "A" | "B" | null;
 }
 
 export interface Licencia {

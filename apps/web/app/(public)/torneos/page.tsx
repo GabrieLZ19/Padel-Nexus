@@ -2,7 +2,16 @@
 
 import { useState, useEffect, Suspense, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Search, MapPin, Calendar, Trophy, ChevronDown, X } from "lucide-react";
+import Link from "next/link";
+import {
+  Search,
+  MapPin,
+  Calendar,
+  Trophy,
+  ChevronDown,
+  X,
+  Filter,
+} from "lucide-react";
 import { TorneosService } from "../../../utils/services/torneos";
 import { Torneo } from "../../../utils/types";
 
@@ -16,16 +25,17 @@ function TorneosContent() {
   // --- ESTADOS DE FILTROS ---
   const [search, setSearch] = useState<string>(initialQuery);
   const [activeProvincia, setActiveProvincia] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string | null>("5ª");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [activeStatus, setActiveStatus] = useState<string | null>(
     "Inscripción",
   );
 
-  // --- ESTADOS DE ORDENAMIENTO (Dropdown) ---
-  const [sortBy, setSortBy] = useState<string>("recientes"); // 'recientes' | 'alfabetico'
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  // --- ESTADO RESPONSIVE ---
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
-  // Referencia para cerrar el dropdown al hacer clic afuera (UX premium)
+  // --- ESTADOS DE ORDENAMIENTO ---
+  const [sortBy, setSortBy] = useState<string>("recientes");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,7 +44,7 @@ function TorneosContent() {
     TorneosService.getAll()
       .then((data) => {
         if (isMounted) {
-          setTournaments(data);
+          setTournaments(data || []);
           setLoading(false);
         }
       })
@@ -43,7 +53,6 @@ function TorneosContent() {
         if (isMounted) setLoading(false);
       });
 
-    // Listener para cerrar dropdown
     const handleClickOutside = (event: MouseEvent) => {
       if (
         dropdownRef.current &&
@@ -60,23 +69,60 @@ function TorneosContent() {
     };
   }, []);
 
+  useEffect(() => {
+    if (isMobileFiltersOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+  }, [isMobileFiltersOpen]);
+
+  // ==========================================
+  // ⚡ GENERACIÓN DINÁMICA DE FILTROS ⚡
+  // ==========================================
+
+  // 1. Extraemos todas las provincias únicas de los clubes de los torneos cargados
+  const PROVINCIAS_DINAMICAS = Array.from(
+    new Set(tournaments.map((t) => t.clubes?.provincia).filter(Boolean)),
+  ).sort() as string[];
+
+  // 2. Extraemos todos los niveles/categorías únicos de los torneos cargados
+  const CATEGORIAS_DINAMICAS = Array.from(
+    new Set(tournaments.map((t) => t.nivel).filter(Boolean)),
+  ).sort() as string[];
+
+  // Los estados sí los dejamos fijos porque definen los colores de la UI
+  const ESTADOS = [
+    {
+      id: "Inscripción",
+      label: "Inscripciones Abiertas",
+      color: "bg-[#00ff88]",
+      shadow: "shadow-[0_0_8px_rgba(0,255,136,0.6)]",
+    },
+    {
+      id: "En curso",
+      label: "En Curso",
+      color: "bg-[#ffb800]",
+      shadow: "shadow-[0_0_8px_rgba(255,184,0,0.6)]",
+    },
+    {
+      id: "Finalizado",
+      label: "Finalizado",
+      color: "bg-blue-500",
+      shadow: "shadow-none",
+    },
+  ];
+
   // --- LÓGICA DE FILTRADO CRUZADO ---
   const filteredTournaments = tournaments.filter((t) => {
-    // 1. Búsqueda por texto
     const matchesSearch =
       t.nombre.toLowerCase().includes(search.toLowerCase()) ||
       (t.clubes?.nombre || "").toLowerCase().includes(search.toLowerCase());
 
-    // 2. Filtro Provincia (Asumimos que si no hay provincia en BD, mostramos igual si no hay filtro activo)
     const matchesProvincia =
       !activeProvincia || t.clubes?.provincia === activeProvincia;
-
-    // 3. Filtro Categoría (Comparamos el primer caracter ej: '5' para coincidir '5ª Caballeros' con '5ª')
-    const matchesCategory =
-      !activeCategory || (t.nivel && t.nivel.includes(activeCategory[0]));
-
-    // 4. Filtro Estado
-    const matchesStatus = !activeStatus || t.estado.includes(activeStatus);
+    const matchesCategory = !activeCategory || t.nivel === activeCategory; // Ahora es coincidencia exacta
+    const matchesStatus = !activeStatus || t.estado === activeStatus;
 
     return (
       matchesSearch && matchesProvincia && matchesCategory && matchesStatus
@@ -86,7 +132,6 @@ function TorneosContent() {
   // --- LÓGICA DE ORDENAMIENTO ---
   const sortedTournaments = [...filteredTournaments].sort((a, b) => {
     if (sortBy === "recientes") {
-      // Como no tenemos fecha de creación en el mock, ordenamos por ID de mayor a menor simulando "más recientes"
       return Number(b.id) - Number(a.id);
     }
     if (sortBy === "alfabetico") {
@@ -95,7 +140,6 @@ function TorneosContent() {
     return 0;
   });
 
-  // --- ACCIÓN LIMPIAR FILTROS ---
   const handleClearFilters = () => {
     setSearch("");
     setActiveProvincia(null);
@@ -103,121 +147,126 @@ function TorneosContent() {
     setActiveStatus(null);
   };
 
-  // --- CONSTANTES PARA UI ---
-  const PROVINCIAS = ["Buenos Aires", "Córdoba", "Santa Fe", "Mendoza"];
-  const CATEGORIAS = ["3ª", "4ª", "5ª", "6ª"];
-  const ESTADOS = [
-    {
-      id: "Inscripción",
-      label: "Inscripción abierta",
-      color: "bg-green-500",
-      shadow: "shadow-[0_0_8px_rgba(34,197,94,0.6)]",
-    },
-    {
-      id: "En curso",
-      label: "En curso",
-      color: "bg-orange-500",
-      shadow: "shadow-[0_0_8px_rgba(249,115,22,0.6)]",
-    },
-    {
-      id: "Finalizado",
-      label: "Finalizado",
-      color: "bg-gray-500",
-      shadow: "shadow-none",
-    },
-  ];
+  const formatFecha = (fechaVal?: string | number | null) => {
+    if (!fechaVal) return "Fecha a confirmar";
+
+    const date = new Date(String(fechaVal));
+
+    // Ajuste de zona horaria para que no atrase un día
+    date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
+
+    return date.toLocaleDateString("es-AR", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-padel-1 text-white font-sans selection:bg-padel-4 selection:text-padel-1 flex flex-col">
-      <div className="flex flex-1 max-w-[1600px] w-full mx-auto">
+    <div className="min-h-screen bg-padel-1 text-white font-sans selection:bg-padel-4 selection:text-padel-1 flex flex-col pt-20">
+      <div className="flex flex-1 max-w-[1600px] w-full mx-auto relative">
+        {/* OVERLAY PARA MÓVIL */}
+        {isMobileFiltersOpen && (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+            onClick={() => setIsMobileFiltersOpen(false)}
+          />
+        )}
+
         {/* SIDEBAR DE FILTROS */}
-        <aside className="w-64 border-r border-white/5 p-8 space-y-10 shrink-0">
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 w-72 bg-[#161616] border-r border-white/5 p-8 space-y-8 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:w-72 lg:bg-transparent overflow-y-auto ${
+            isMobileFiltersOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-lg">Filtros</h2>
-            <button
-              onClick={handleClearFilters}
-              className="text-padel-4 text-xs font-semibold hover:underline"
-            >
-              Limpiar
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleClearFilters}
+                className="text-padel-4 text-xs font-semibold hover:underline"
+              >
+                Limpiar
+              </button>
+              <button
+                onClick={() => setIsMobileFiltersOpen(false)}
+                className="lg:hidden text-gray-400 hover:text-white"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
           </div>
 
-          {/* Búsqueda rápida local */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 size-4" />
             <input
               type="text"
-              placeholder="Buscar torneo..."
+              placeholder="Buscar torneo o club..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 bg-padel-5 border border-white/10 rounded-lg text-sm text-white focus:border-padel-4 focus:outline-none transition-colors"
+              className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:border-padel-4 focus:outline-none transition-colors"
             />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
-              >
-                <X className="size-4" />
-              </button>
-            )}
           </div>
 
-          {/* Filtro Provincia */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-              Provincia
-            </h3>
-            <div className="space-y-3">
-              {PROVINCIAS.map((prov) => (
-                <label
-                  key={prov}
-                  className="flex items-center gap-3 cursor-pointer group"
-                  onClick={() =>
-                    setActiveProvincia(activeProvincia === prov ? null : prov)
-                  }
-                >
-                  <div
-                    className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${activeProvincia === prov ? "border-padel-4 bg-padel-4" : "border-white/20 group-hover:border-padel-4"}`}
+          {/* FILTRO PROVINCIA (Dinámico) */}
+          {PROVINCIAS_DINAMICAS.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                Provincia
+              </h3>
+              <div className="space-y-3">
+                {PROVINCIAS_DINAMICAS.map((prov) => (
+                  <label
+                    key={prov}
+                    className="flex items-center gap-3 cursor-pointer group"
+                    onClick={() =>
+                      setActiveProvincia(activeProvincia === prov ? null : prov)
+                    }
                   >
-                    {activeProvincia === prov && (
-                      <div className="w-2.5 h-2.5 bg-padel-1 rounded-sm"></div>
-                    )}
-                  </div>
-                  <span
-                    className={`text-sm font-medium transition-colors ${activeProvincia === prov ? "text-white" : "text-gray-400 group-hover:text-white"}`}
+                    <div
+                      className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${activeProvincia === prov ? "border-padel-4 bg-padel-4" : "border-white/20 group-hover:border-padel-4"}`}
+                    >
+                      {activeProvincia === prov && (
+                        <div className="w-2.5 h-2.5 bg-padel-1 rounded-sm"></div>
+                      )}
+                    </div>
+                    <span
+                      className={`text-sm font-medium transition-colors ${activeProvincia === prov ? "text-white" : "text-gray-400 group-hover:text-white"}`}
+                    >
+                      {prov}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* FILTRO CATEGORÍA/NIVEL (Dinámico) */}
+          {CATEGORIAS_DINAMICAS.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                Nivel
+              </h3>
+              <div className="flex gap-2 flex-wrap">
+                {CATEGORIAS_DINAMICAS.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() =>
+                      setActiveCategory(activeCategory === cat ? null : cat)
+                    }
+                    className={`px-4 h-10 rounded-xl text-sm font-bold transition-all border ${
+                      activeCategory === cat
+                        ? "bg-padel-4 border-padel-4 text-padel-1 shadow-[0_0_15px_rgba(204,255,0,0.2)]"
+                        : "border-white/10 text-gray-400 hover:border-padel-4/50 hover:text-white bg-white/5"
+                    }`}
                   >
-                    {prov}
-                  </span>
-                </label>
-              ))}
+                    {cat}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Filtro Categoría */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-              Categoría
-            </h3>
-            <div className="flex gap-2 flex-wrap">
-              {CATEGORIAS.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() =>
-                    setActiveCategory(activeCategory === cat ? null : cat)
-                  }
-                  className={`w-10 h-10 rounded-xl text-sm font-bold transition-all border ${
-                    activeCategory === cat
-                      ? "bg-padel-4 border-padel-4 text-padel-1 shadow-[0_0_15px_rgba(204,255,0,0.2)]"
-                      : "border-white/10 text-gray-400 hover:border-padel-4/50 hover:text-white bg-padel-5"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Filtro Estado */}
           <div className="space-y-4">
             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
               Estado
@@ -242,7 +291,7 @@ function TorneosContent() {
                     className={`text-sm flex items-center gap-2 ${activeStatus === est.id ? "text-white" : "text-gray-400"}`}
                   >
                     <span
-                      className={`w-1.5 h-1.5 rounded-full ${est.color} ${activeStatus === est.id ? est.shadow : ""}`}
+                      className={`w-2 h-2 rounded-full ${est.color} ${activeStatus === est.id ? est.shadow : ""}`}
                     ></span>
                     {est.label}
                   </span>
@@ -253,94 +302,110 @@ function TorneosContent() {
         </aside>
 
         {/* GRILLA PRINCIPAL */}
-        <main className="flex-1 p-10 relative">
-          <div className="flex justify-between items-end mb-10">
+        <main className="flex-1 p-6 lg:p-10 w-full overflow-x-hidden">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-[40px] font-bold leading-tight tracking-tight">
+              <h1 className="text-[32px] md:text-[40px] font-bold leading-tight tracking-tight">
                 Explorá torneos
               </h1>
-              <p className="text-gray-400 mt-2">
+              <p className="text-gray-400 mt-1 md:mt-2 text-sm md:text-base">
                 {sortedTournaments.length} torneos encontrados
                 {activeProvincia && <span> en {activeProvincia}</span>}
-                {activeCategory && <span> · Categoría {activeCategory}</span>}
+                {activeCategory && <span> · Nivel {activeCategory}</span>}
               </p>
             </div>
 
-            {/* DROPDOWN FUNCIONAL */}
-            <div className="relative" ref={dropdownRef}>
+            <div className="flex items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
               <button
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-sm font-medium hover:bg-padel-5 transition-colors bg-padel-1"
+                onClick={() => setIsMobileFiltersOpen(true)}
+                className="lg:hidden flex-1 flex justify-center items-center gap-2 px-4 py-3 rounded-xl border border-white/10 text-sm font-medium hover:bg-white/5 transition-colors bg-[#161616]"
               >
-                {sortBy === "recientes" ? "Más recientes" : "Orden alfabético"}
-                <ChevronDown
-                  className={`size-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
-                />
+                <Filter className="size-4" /> Filtros
               </button>
 
-              {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-padel-5 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20 py-1">
-                  <button
-                    onClick={() => {
-                      setSortBy("recientes");
-                      setIsDropdownOpen(false);
-                    }}
-                    className={`block w-full text-left px-4 py-2.5 text-sm transition-colors ${sortBy === "recientes" ? "bg-white/10 text-white font-bold" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}
-                  >
-                    Más recientes
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSortBy("alfabetico");
-                      setIsDropdownOpen(false);
-                    }}
-                    className={`block w-full text-left px-4 py-2.5 text-sm transition-colors ${sortBy === "alfabetico" ? "bg-white/10 text-white font-bold" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}
-                  >
-                    Orden alfabético
-                  </button>
-                </div>
-              )}
+              <div className="relative flex-1 md:flex-none" ref={dropdownRef}>
+                <button
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-white/10 text-sm font-medium hover:bg-white/5 transition-colors bg-[#161616]"
+                >
+                  {sortBy === "recientes"
+                    ? "Más recientes"
+                    : "Orden alfabético"}
+                  <ChevronDown
+                    className={`size-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {isDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-full md:w-48 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden z-20 py-1">
+                    <button
+                      onClick={() => {
+                        setSortBy("recientes");
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`block w-full text-left px-4 py-3 text-sm transition-colors ${sortBy === "recientes" ? "bg-white/10 text-white font-bold border-l-2 border-padel-4" : "text-gray-400 hover:bg-white/5 hover:text-white border-l-2 border-transparent"}`}
+                    >
+                      Más recientes
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSortBy("alfabetico");
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`block w-full text-left px-4 py-3 text-sm transition-colors ${sortBy === "alfabetico" ? "bg-white/10 text-white font-bold border-l-2 border-padel-4" : "text-gray-400 hover:bg-white/5 hover:text-white border-l-2 border-transparent"}`}
+                    >
+                      Orden alfabético
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {loading ? (
-            <div className="w-full py-20 text-center text-gray-500 animate-pulse font-medium">
-              Cargando ecosistema...
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-pulse">
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white/5 border border-white/5 rounded-3xl h-70"
+                ></div>
+              ))}
             </div>
           ) : sortedTournaments.length === 0 ? (
-            <div className="w-full py-32 flex flex-col items-center justify-center border border-dashed border-white/10 rounded-3xl bg-white/2">
+            <div className="w-full py-32 flex flex-col items-center justify-center border border-dashed border-white/10 rounded-3xl bg-white/5">
               <Trophy className="size-12 text-gray-600 mb-4" />
               <h3 className="text-xl font-bold text-white mb-2">
                 No se encontraron torneos
               </h3>
-              <p className="text-gray-400 text-sm mb-6 max-w-sm text-center">
-                Modificá los filtros de la barra lateral o intentá con otra
-                palabra clave para encontrar lo que buscás.
+              <p className="text-gray-400 text-sm mb-6 max-w-sm text-center px-4">
+                Modificá los filtros o intentá con otra palabra clave para
+                encontrar lo que buscás.
               </p>
               <button
                 onClick={handleClearFilters}
-                className="bg-padel-5 border border-white/10 text-white font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-white/10 transition-colors"
+                className="bg-white/10 border border-white/10 text-white font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-white/20 transition-colors"
               >
                 Limpiar filtros
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {sortedTournaments.map((t) => {
                 const isAbierto =
                   t.estado === "Inscripción" || t.estado === "Borrador";
                 return (
                   <div
                     key={t.id}
-                    className="group bg-padel-5 border border-white/5 hover:border-padel-4/40 rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_0_25px_rgba(204,255,0,0.05)] h-62.5"
+                    className="group bg-[#161616] border border-white/5 hover:border-padel-4/40 rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_0_25px_rgba(204,255,0,0.05)] h-70"
                   >
+                    {/* ENCABEZADO DE LA CARD (Pill y Trofeo) */}
                     <div className="flex justify-between items-start">
-                      <div className="bg-padel-4 text-padel-1 text-xs font-black px-3 py-1.5 rounded-full uppercase tracking-wide shadow-[0_0_15px_rgba(204,255,0,0.2)]">
+                      <div className="bg-padel-4 text-[#111] text-xs font-black px-3 py-1.5 rounded-full uppercase tracking-wide">
                         {t.nivel || "5ª"} {t.categoria || "Caballeros"}
                       </div>
                       <Trophy className="size-5 text-gray-600 group-hover:text-padel-4 transition-colors" />
                     </div>
 
+                    {/* CUERPO DE LA CARD */}
                     <div className="mt-auto mb-6">
                       <h3 className="text-xl font-bold text-white mb-3 line-clamp-1">
                         {t.nombre}
@@ -349,37 +414,46 @@ function TorneosContent() {
                         <div className="flex items-center gap-2 text-sm text-gray-400">
                           <MapPin className="size-4 text-gray-500 shrink-0" />
                           <span className="truncate">
-                            {t.clubes?.nombre || "Sede a confirmar"}
+                            {t.clubes?.nombre || "Sede a confirmar"}{" "}
+                            {t.clubes?.provincia
+                              ? `· ${t.clubes.provincia}`
+                              : ""}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-gray-400">
                           <Calendar className="size-4 text-gray-500 shrink-0" />
-                          Sáb 14 Mar · 09:00
+                          <span className="capitalize">
+                            {formatFecha(t.fecha)}
+                          </span>
                         </div>
                       </div>
                     </div>
 
+                    {/* FOOTER DE LA CARD (Estado y Botón) */}
                     <div className="flex items-center justify-between pt-4 border-t border-white/5">
                       <div className="flex items-center gap-2">
                         <span
-                          className={`w-2 h-2 rounded-full ${isAbierto ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : t.estado === "Finalizado" ? "bg-gray-500" : "bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]"}`}
+                          className={`w-2.5 h-2.5 rounded-full ${isAbierto ? "bg-[#00ff88] shadow-[0_0_8px_rgba(0,255,136,0.6)]" : t.estado === "Finalizado" ? "bg-gray-500" : "bg-[#ffb800] shadow-[0_0_8px_rgba(255,184,0,0.6)]"}`}
                         ></span>
                         <span
-                          className={`text-sm font-bold ${isAbierto ? "text-green-500" : t.estado === "Finalizado" ? "text-gray-400" : "text-orange-500"}`}
+                          className={`text-sm font-bold ${isAbierto ? "text-[#00ff88]" : t.estado === "Finalizado" ? "text-gray-400" : "text-[#ffb800]"}`}
                         >
                           {isAbierto ? "Abierto" : t.estado}
                         </span>
                       </div>
-
-                      <button className="bg-padel-4 text-padel-1 font-bold px-6 py-2.5 rounded-xl text-sm hover:opacity-90 transition-opacity">
+                      <Link
+                        href={`/torneos/${t.id}`}
+                        className="bg-padel-4 text-[#111] font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-[#b3e600] transition-colors"
+                      >
                         Inscribirme
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
+          {/* ... Resto del código ... */}
         </main>
       </div>
     </div>

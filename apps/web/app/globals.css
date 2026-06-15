@@ -20,3 +20,27 @@
     @apply bg-padel-1 text-white;
   }
 }
+
+@layer utilities {
+  @keyframes navbar-menu-open {
+    from {
+      opacity: 0;
+      transform: translateY(-16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes navbar-menu-close {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-16px);
+    }
+  }
+}

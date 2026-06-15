@@ -18,12 +18,15 @@ interface ClubModalProps {
 
 const PROVINCIAS = [
   "Buenos Aires",
-  "CABA",
   "Córdoba",
-  "La Rioja",
-  "Mendoza",
   "Santa Fe",
+  "Mendoza",
   "Tucumán",
+  "Entre Ríos",
+  "Salta",
+  "Misiones",
+  "Chaco",
+  "Corrientes",
 ].map((p) => ({ value: p, label: p }));
 
 const ESTADOS = [

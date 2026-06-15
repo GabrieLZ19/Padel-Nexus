@@ -1,11 +1,16 @@
 import { api } from "../api";
-import { Torneo, FormTorneoState } from "../types";
+import { Torneo, FormTorneoState, Partido } from "../types";
 
 export const TorneosService = {
   async getAll(): Promise<Torneo[]> {
     const response = await api.get<Torneo[]>("/torneos");
     return response.data;
   },
+  async getById(id: string | number): Promise<Torneo> {
+    const response = await api.get<Torneo>(`/torneos/${id}`);
+    return response.data;
+  },
+
   async create(torneoData: FormTorneoState): Promise<Torneo> {
     const response = await api.post<Torneo>("/torneos", torneoData);
     return response.data;
@@ -20,5 +25,10 @@ export const TorneosService = {
   },
   async delete(id: string | number): Promise<void> {
     await api.delete(`/torneos/${id}`);
+  },
+
+  async getPartidos(torneoId: string | number): Promise<Partido[]> {
+    const response = await api.get<Partido[]>(`/torneos/${torneoId}/partidos`);
+    return response.data;
   },
 };
