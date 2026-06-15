@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { TorneosService } from "../../../../utils/services/torneos";
 import { Partido, Torneo } from "../../../../utils/types/index";
+import InscripcionModal from "@/components/torneos/InscripcionModal";
 
 const MatchCard = ({ partido }: { partido: Partido }) => {
   const isA = partido.ganador === "A";
@@ -67,6 +68,7 @@ export default function TorneoDetallePage() {
   const [partidos, setPartidos] = useState<Partido[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [inscribiendo, setInscribiendo] = useState<boolean>(false);
+  const [isInscripcionOpen, setIsInscripcionModalOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -104,11 +106,7 @@ export default function TorneoDetallePage() {
   };
 
   const handleInscripcion = () => {
-    setInscribiendo(true);
-    setTimeout(() => {
-      alert("Flujo de pago e inscripción en construcción (Fase 2)");
-      setInscribiendo(false);
-    }, 1000);
+    setIsInscripcionModalOpen(true);
   };
 
   // --- ESTADOS DE CARGA (SKELETON PREMIUM) ---
@@ -452,6 +450,13 @@ export default function TorneoDetallePage() {
           </div>
         </div>
       </div>
+      {torneo && (
+        <InscripcionModal
+          isOpen={isInscripcionOpen}
+          onClose={() => setIsInscripcionModalOpen(false)}
+          torneo={torneo}
+        />
+      )}
     </div>
   );
 }

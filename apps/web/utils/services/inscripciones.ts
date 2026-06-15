@@ -16,4 +16,14 @@ export const InscripcionesService = {
     });
     return response.data;
   },
+  async inscribir(data: {
+    jugador1_nombre: string;
+    jugador2_nombre: string;
+    torneo_nombre: string;
+    categoria: string;
+    monto: number;
+  }) {
+    const response = await api.post("/inscripciones", data);
+    return response.data;
+  },
 };

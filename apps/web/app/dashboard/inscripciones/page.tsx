@@ -1,4 +1,3 @@
-// apps/web/app/dashboard/inscripciones/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -46,7 +45,7 @@ export default function GestionInscripcionesPage() {
   const [selectedInscripcion, setSelectedInscripcion] =
     useState<Inscripcion | null>(null);
 
-  // Carga de datos
+  // Carga de datos reales desde la API
   useEffect(() => {
     let isMounted = true;
     InscripcionesService.getAll()
@@ -65,7 +64,7 @@ export default function GestionInscripcionesPage() {
     };
   }, [refreshKey]);
 
-  // Cambiar Estado
+  // Cambiar Estado con tipado estricto
   const handleCambiarEstado = (
     id: string | number,
     nuevoEstado: "Confirmado" | "Rechazado",
@@ -95,14 +94,27 @@ export default function GestionInscripcionesPage() {
             });
             setRefreshKey((prev) => prev + 1);
           })
-          .catch((error) => {
+          .catch((error: unknown) => {
+            // Manejo de errores estricto para TS
+            let mensajeError =
+              "Ocurrió un error inesperado al procesar la solicitud.";
+            if (error instanceof Error) {
+              mensajeError = error.message;
+            }
+
+            interface ApiError {
+              response?: { data?: { message?: string } };
+            }
+            const apiError = error as ApiError;
+            if (apiError.response?.data?.message) {
+              mensajeError = apiError.response.data.message;
+            }
+
             setFeedbackModal({
               isOpen: true,
               type: "warning",
-              title: "Hubo un error",
-              description:
-                "No pudimos actualizar el estado: " +
-                (error.response?.data?.message || error.message),
+              title: "Hubo un problema",
+              description: "No pudimos actualizar el estado: " + mensajeError,
               onClose: () =>
                 setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
             });
@@ -121,7 +133,7 @@ export default function GestionInscripcionesPage() {
     const term = search.toLowerCase();
     const matchSearch =
       i.jugador1_nombre.toLowerCase().includes(term) ||
-      i.jugador2_nombre.toLowerCase().includes(term) ||
+      (i.jugador2_nombre || "").toLowerCase().includes(term) ||
       i.torneo_nombre.toLowerCase().includes(term);
 
     const matchTab =
@@ -133,7 +145,7 @@ export default function GestionInscripcionesPage() {
     return matchSearch && matchTab;
   });
 
-  // --- CÁLCULO DE MÉTRICAS ---
+  // --- CÁLCULO DE MÉTRICAS REALES ---
   const kpiPendientes = inscripciones.filter(
     (i) => i.estado_pago === "Pendiente",
   ).length;
@@ -173,7 +185,7 @@ export default function GestionInscripcionesPage() {
     const csvData = filteredInscripciones.map((ins) => [
       escapeCSV(ins.id),
       escapeCSV(ins.jugador1_nombre),
-      escapeCSV(ins.jugador2_nombre),
+      escapeCSV(ins.jugador2_nombre || "-"),
       escapeCSV(ins.torneo_nombre),
       escapeCSV(ins.categoria),
       escapeCSV(new Date(ins.created_at).toLocaleDateString("es-AR")),
@@ -275,7 +287,7 @@ export default function GestionInscripcionesPage() {
               onClick={() => setActiveTab(tab)}
               className={`whitespace-nowrap rounded-lg px-5 py-2 text-sm font-bold transition-all ${
                 activeTab === tab
-                  ? "bg-padel-4 text-padel-1 shadow-[0_0_10px_rgba(204,255,0,0.15)]"
+                  ? "bg-padel-4 text-[#111] shadow-[0_0_10px_rgba(204,255,0,0.15)]"
                   : "text-gray-400 hover:text-white"
               }`}
             >
@@ -369,7 +381,6 @@ export default function GestionInscripcionesPage() {
             <table className="w-full text-left border-collapse min-w-250">
               <thead>
                 <tr className="border-b border-white/5 text-gray-400 text-xs font-bold uppercase tracking-wider bg-black/20">
-                  {/* CAMBIO DE ENCABEZADOS */}
                   <th className="py-4 px-8">Jugador / Dupla</th>
                   <th className="py-4 px-6">Torneo / Cancha</th>
                   <th className="py-4 px-6">Fecha Req.</th>
@@ -380,7 +391,6 @@ export default function GestionInscripcionesPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filteredInscripciones.map((ins) => {
-                  // Lógica Dinámica: Determina si hay dupla válida o es jugador individual
                   const esDupla =
                     ins.jugador2_nombre &&
                     ins.jugador2_nombre.trim() !== "" &&
@@ -391,7 +401,6 @@ export default function GestionInscripcionesPage() {
                       key={ins.id}
                       className="hover:bg-white/2 transition-colors group"
                     >
-                      {/* COLUMNA 1: JUGADOR / DUPLA */}
                       <td className="py-4 px-8">
                         <div className="flex items-center gap-3 mb-1">
                           {esDupla ? (
@@ -402,7 +411,6 @@ export default function GestionInscripcionesPage() {
                           <div>
                             <div className="font-bold text-white text-[14px]">
                               {ins.jugador1_nombre}
-                              {/* Si es dupla, agregamos el Jugador 2 en la misma línea */}
                               {esDupla && (
                                 <span className="text-gray-400 font-medium">
                                   {" "}
@@ -417,7 +425,6 @@ export default function GestionInscripcionesPage() {
                         </div>
                       </td>
 
-                      {/* COLUMNA 2: TORNEO / CANCHA */}
                       <td className="py-4 px-6">
                         <div className="font-semibold text-gray-200 mb-1 flex items-center gap-2 text-[14px]">
                           {ins.tipo === "Reserva cancha" ? (
@@ -425,13 +432,10 @@ export default function GestionInscripcionesPage() {
                           ) : (
                             <Trophy className="size-3.5 text-gray-500" />
                           )}
-                          {/* Mostramos la cancha si es reserva, si no el torneo */}
                           {ins.tipo === "Reserva cancha"
                             ? ins.cancha_nombre
                             : ins.torneo_nombre}
                         </div>
-
-                        {/* Solo mostramos la categoría si no es un guión vacío */}
                         {ins.categoria && ins.categoria !== "-" && (
                           <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
                             {ins.categoria}
@@ -509,7 +513,10 @@ export default function GestionInscripcionesPage() {
         )}
       </div>
 
-      <FeedbackModal {...feedbackModal} />
+      <div className="relative z-50">
+        <FeedbackModal {...feedbackModal} />
+      </div>
+
       <InscripcionDetalleModal
         isOpen={detalleModalOpen}
         onClose={() => setDetalleModalOpen(false)}
