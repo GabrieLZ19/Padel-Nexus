@@ -3,9 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+    request: { headers: request.headers },
   });
 
   const supabase = createServerClient(
@@ -20,9 +18,7 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             request.cookies.set(name, value),
           );
-          supabaseResponse = NextResponse.next({
-            request,
-          });
+          supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
           );
@@ -31,32 +27,37 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  // 1. Verificamos la sesión
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const { pathname } = request.nextUrl;
 
-  // 2. Lógica de protección:
-  // Si intenta acceder a /dashboard y NO está logueado, lo mandamos al login (/)
-  if (request.nextUrl.pathname.startsWith("/dashboard") && !user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
+  // Extraemos el rol de la metadata de Supabase (blindaje de seguridad)
+  const userRole = user?.app_metadata?.rol || "usuario";
+  const isAdminOrMod = userRole === "admin" || userRole === "moderador";
+
+  // --- REGLAS DE ACCESO ---
+
+  // 1. Si intenta entrar a /dashboard sin ser admin -> Redirigir a landing
+  if (pathname.startsWith("/dashboard")) {
+    if (!user || !isAdminOrMod) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
   }
 
-  // 3. Opcional: Si ya está logueado y entra al login (/), mandalo al dashboard
-  if (request.nextUrl.pathname === "/" && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+  // 2. Si es admin y está en la landing "/", enviarlo al dashboard
+  if (pathname === "/" && user && isAdminOrMod) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
+
+  // 3. Si es usuario normal logueado y está en "/", no hacer nada (cargar landing)
+  // Eliminamos cualquier redirección circular aquí.
 
   return supabaseResponse;
 }
 
 export const config = {
   matcher: [
-    // Esto excluye archivos estáticos para que el middleware sea rápido
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

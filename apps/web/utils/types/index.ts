@@ -130,3 +130,14 @@ export interface Inscripcion {
   tipo?: string;
   cancha_nombre?: string;
 }
+
+export interface Reserva {
+  id: string | number;
+  cancha_id: string | number;
+  fecha: string; // ISO date
+  hora_inicio: string; // formato HH:MM
+  duracion: number; // minutos
+  usuario_id?: string | number;
+  estado?: "Activa" | "Cancelada" | "Completada";
+  created_at?: string;
+}
