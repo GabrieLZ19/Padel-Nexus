@@ -3,18 +3,21 @@ import { supabase } from "../config/supabase";
 
 export const getAllClubes = async (req: Request, res: Response) => {
   try {
-    const { data, error } = await supabase
-      .from("clubes")
-      .select(
-        `
-        id, nombre, provincia, localidad, estado,
-        canchas(id, nombre, tipo_suelo, techada, activa)
-      `,
-      )
-      .eq("estado", "activo");
+    const { data, error } = await supabase.from("clubes").select(`
+        *,
+        torneos (count)
+      `);
 
     if (error) throw error;
-    res.status(200).json(data);
+
+    // 3. Mapeamos la respuesta para que el frontend reciba "torneos_count" como lo espera
+    const formattedData = data.map((club: any) => ({
+      ...club,
+      torneos_count:
+        club.torneos && club.torneos.length > 0 ? club.torneos[0].count : 0,
+    }));
+
+    res.status(200).json(formattedData);
   } catch (error) {
     res.status(500).json({ message: "Error al obtener clubes", error });
   }
@@ -22,15 +25,23 @@ export const getAllClubes = async (req: Request, res: Response) => {
 
 export const createClub = async (req: Request, res: Response) => {
   try {
-    const { nombre, provincia, localidad } = req.body;
+    // AHORA SÍ: Extraemos 'canchas' y 'estado' del body
+    const { nombre, provincia, localidad, canchas, estado } = req.body;
 
-    // Validamos datos mínimos
     if (!nombre)
       return res.status(400).json({ message: "El nombre es obligatorio" });
 
     const { data, error } = await supabase
       .from("clubes")
-      .insert([{ nombre, provincia, localidad, estado: "activo" }])
+      .insert([
+        {
+          nombre,
+          provincia,
+          localidad,
+          canchas: Number(canchas) || 0, // Aseguramos que sea número
+          estado: estado || "Activo", // Respetamos el estado que manda el Modal
+        },
+      ])
       .select();
 
     if (error) throw error;
@@ -43,11 +54,18 @@ export const createClub = async (req: Request, res: Response) => {
 export const updateClub = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { nombre, provincia, localidad, estado } = req.body;
+    // AHORA SÍ: Extraemos 'canchas' del body
+    const { nombre, provincia, localidad, estado, canchas } = req.body;
 
     const { data, error } = await supabase
       .from("clubes")
-      .update({ nombre, provincia, localidad, estado })
+      .update({
+        nombre,
+        provincia,
+        localidad,
+        estado,
+        canchas: Number(canchas) || 0,
+      })
       .eq("id", id)
       .select();
 
@@ -62,11 +80,10 @@ export const deleteClub = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    // Profesional: en lugar de borrar físicamente (hard delete),
-    // preferimos marcar como inactivo (soft delete) para mantener integridad histórica.
+    // Soft delete: Excelente práctica para no romper FKs (reservas, torneos, etc)
     const { error } = await supabase
       .from("clubes")
-      .update({ estado: "inactivo" })
+      .update({ estado: "Inactivo" }) // Capitalizado para que coincida con tu Modal
       .eq("id", id);
 
     if (error) throw error;
@@ -76,7 +93,6 @@ export const deleteClub = async (req: Request, res: Response) => {
   }
 };
 
-// Nueva función para gestionar canchas específicamente
 export const updateCancha = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
