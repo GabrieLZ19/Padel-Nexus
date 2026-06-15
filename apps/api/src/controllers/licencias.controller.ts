@@ -54,12 +54,10 @@ export const LicenciasController = {
         data: data ? data[0] : null,
       });
     } catch (error: any) {
-      return res
-        .status(500)
-        .json({
-          message: "Error al actualizar licencia",
-          error: error.message,
-        });
+      return res.status(500).json({
+        message: "Error al actualizar licencia",
+        error: error.message,
+      });
     }
   },
 
@@ -88,6 +86,26 @@ export const LicenciasController = {
       return res
         .status(500)
         .json({ message: "Error al solicitar licencia", error: error.message });
+    }
+  },
+
+  async obtenerDatosVerificacion(req: Request, res: Response) {
+    try {
+      const { usuario_id } = req.params;
+
+      const { data, error } = await supabase
+        .from("licencias")
+        .select("estado, nro_licencia, perfiles(nombre_completo)")
+        .eq("usuario_id", usuario_id)
+        .single();
+
+      if (error || !data) {
+        return res.status(404).json({ message: "Licencia no encontrada" });
+      }
+
+      res.status(200).json(data);
+    } catch (error) {
+      res.status(500).json({ message: "Error al verificar" });
     }
   },
 };

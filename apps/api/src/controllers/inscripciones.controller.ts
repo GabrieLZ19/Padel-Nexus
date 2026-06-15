@@ -24,6 +24,20 @@ export const createInscripcion = async (req: Request, res: Response) => {
   try {
     const { torneo_id, usuario_id, jugador2_nombre, monto } = req.body;
 
+    // 1. VALIDACIÓN: ¿Tiene licencia activa? (Requisito fundamental)
+    const { data: licencia, error: licError } = await supabase
+      .from("licencias")
+      .select("estado")
+      .eq("usuario_id", usuario_id)
+      .single();
+
+    if (licError || !licencia || licencia.estado !== "Activa") {
+      return res.status(403).json({
+        message: "Para inscribirte, debes tener una licencia vigente y activa.",
+      });
+    }
+
+    // 2. VALIDACIÓN: ¿Ya está inscrito? (Evitar duplicados)
     const { data: existingInscripcion } = await supabase
       .from("inscripciones")
       .select("id")
@@ -37,27 +51,25 @@ export const createInscripcion = async (req: Request, res: Response) => {
         .json({ message: "Ya te encuentras inscrito en este torneo." });
     }
 
-    // 1. Verificación: Obtener torneo y manejar posibles errores
+    // 3. VALIDACIÓN: Cupos disponibles
     const { data: torneo, error: torneoError } = await supabase
       .from("torneos")
       .select("cupos_maximos, cupos_actuales")
       .eq("id", torneo_id)
       .single();
 
-    // Si hay error o no existe el torneo, lanzamos error
     if (torneoError || !torneo) {
-      return res.status(404).json({ message: "Torneo no encontrado" });
+      return res.status(404).json({ message: "Torneo no encontrado." });
     }
 
-    // 2. Validación de cupos (ahora TypeScript sabe que torneo NO es null)
     if (torneo.cupos_actuales >= torneo.cupos_maximos) {
       return res
         .status(400)
-        .json({ message: "El torneo ya no tiene cupos disponibles" });
+        .json({ message: "El torneo ya no tiene cupos disponibles." });
     }
 
-    // 3. Insertar inscripción
-    const { data, error } = await supabase
+    // 4. Inserción de la Inscripción
+    const { data: nuevaInscripcion, error: insError } = await supabase
       .from("inscripciones")
       .insert([
         {
@@ -68,11 +80,12 @@ export const createInscripcion = async (req: Request, res: Response) => {
           estado_pago: "Pendiente",
         },
       ])
-      .select();
+      .select()
+      .single();
 
-    if (error) throw error;
+    if (insError) throw insError;
 
-    // 4. Incrementar cupos
+    // 5. Atomicidad: Incrementar cupos en tabla torneos
     const { error: updateError } = await supabase
       .from("torneos")
       .update({ cupos_actuales: torneo.cupos_actuales + 1 })
@@ -80,11 +93,16 @@ export const createInscripcion = async (req: Request, res: Response) => {
 
     if (updateError) throw updateError;
 
-    res.status(201).json(data[0]);
+    res.status(201).json(nuevaInscripcion);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";
-    res.status(500).json({ message: "Error al inscribirse", error: message });
+    res
+      .status(500)
+      .json({
+        message: "Error interno al procesar inscripción",
+        error: message,
+      });
   }
 };
 
