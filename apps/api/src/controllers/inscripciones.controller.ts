@@ -3,14 +3,31 @@ import { supabase } from "../config/supabase";
 
 export const getAllInscripciones = async (req: Request, res: Response) => {
   try {
-    // Nota: Si necesitas los datos del torneo, podrías usar un .select("*, torneos(*)")
     const { data, error } = await supabase
       .from("inscripciones")
-      .select("*")
+      .select(
+        `
+        *,
+        perfiles (nombre_completo),
+        torneos (nombre, categoria)
+      `,
+      )
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    res.status(200).json(data);
+
+    const formattedData = data.map((ins: any) => ({
+      ...ins,
+
+      jugador1_nombre: ins.perfiles?.nombre_completo || "Usuario Desconocido",
+
+      torneo_nombre: ins.torneos?.nombre || "Torneo no asignado",
+      categoria: ins.torneos?.categoria || "-",
+
+      tipo: ins.tipo || "Inscripción torneo",
+    }));
+
+    res.status(200).json(formattedData);
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";
@@ -97,12 +114,10 @@ export const createInscripcion = async (req: Request, res: Response) => {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";
-    res
-      .status(500)
-      .json({
-        message: "Error interno al procesar inscripción",
-        error: message,
-      });
+    res.status(500).json({
+      message: "Error interno al procesar inscripción",
+      error: message,
+    });
   }
 };
 
