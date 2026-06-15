@@ -4,12 +4,12 @@ import {
   createInscripcion,
   updateEstadoPago,
 } from "../controllers/inscripciones.controller";
-import { authenticate, authorizeAdmin } from "../middleware/auth";
+import { authenticate, authorize } from "../middleware/auth";
 
 const router = Router();
 
-router.get("/", authenticate, authorizeAdmin, getAllInscripciones); // El admin ve todo
-router.post("/", authenticate, createInscripcion); // El usuario normal se inscribe
-router.put("/:id/estado", authenticate, authorizeAdmin, updateEstadoPago); // Solo admin aprueba
+router.get("/", authenticate, authorize(["admin"]), getAllInscripciones);
+router.post("/", authenticate, createInscripcion);
+router.put("/:id/estado", authenticate, authorize(["admin"]), updateEstadoPago);
 
 export default router;

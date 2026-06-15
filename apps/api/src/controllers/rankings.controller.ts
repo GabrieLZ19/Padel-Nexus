@@ -1,22 +1,19 @@
 import { Request, Response } from "express";
-import { createClient } from "@supabase/supabase-js";
-import { env } from "../config/env.config";
-
-const supabase = createClient(env.SUPABASE.URL, env.SUPABASE.SERVICE_KEY);
+import { supabase } from "../config/supabase";
 
 export const RankingsController = {
-  // Trae la lista de jugadores ordenada por puntos (para armar el podio #1, #2, #3 de tu landing)
+  // Obtiene el ranking global con la posición calculada mediante la vista de SQL
   async obtenerRankingGlobal(req: Request, res: Response) {
     try {
       const { categoria, rama } = req.query;
 
       let query = supabase
-        .from("rankings")
-        .select("*, perfiles(nombre_completo, avatar_url)") // Ajustá al nombre real de tu columna en perfiles
-        .order("puntos", { ascending: false });
+        .from("vista_ranking_posiciones")
+        .select("*, perfiles(nombre_completo, avatar_url)")
+        .order("posicion", { ascending: true });
 
       if (categoria) query = query.eq("categoria", categoria);
-      if (rama) query = query.eq("rama", rama);
+      // Nota: Si 'rama' no está en la vista, asegúrate de incluirla en la vista de SQL
 
       const { data, error } = await query;
       if (error) throw error;
@@ -27,16 +24,16 @@ export const RankingsController = {
     }
   },
 
-  // Endpoint clave para cuando un administrador cargue los resultados de un torneo en el CRM
+  // Método transaccional: Actualiza ranking y registra historial
   async actualizarPuntosJugador(req: Request, res: Response) {
     try {
-      const { usuario_id, puntos_a_sumar, categoria } = req.body;
+      const { usuario_id, puntos_a_sumar, categoria, torneo_id } = req.body;
 
-      if (!usuario_id || puntos_a_sumar === undefined) {
+      if (!usuario_id || puntos_a_sumar === undefined || !torneo_id) {
         return res.status(400).json({ message: "Faltan datos obligatorios." });
       }
 
-      // 1. Buscamos el registro actual del jugador
+      // 1. Obtener puntos actuales
       const { data: rankingActual } = await supabase
         .from("rankings")
         .select("puntos")
@@ -44,26 +41,40 @@ export const RankingsController = {
         .eq("categoria", categoria)
         .single();
 
-      const nuevosPuntos = (rankingActual?.puntos || 0) + puntos_a_sumar;
+      const puntosAnteriores = rankingActual?.puntos || 0;
+      const nuevosPuntos = puntosAnteriores + puntos_a_sumar;
 
-      // 2. Upsert (inserta o actualiza los puntos dinámicamente)
-      const { data, error } = await supabase
-        .from("rankings")
-        .upsert(
+      // 2. Actualizar tabla rankings
+      const { error: rankError } = await supabase.from("rankings").upsert(
+        {
+          usuario_id,
+          puntos: nuevosPuntos,
+          categoria,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "usuario_id,categoria" },
+      );
+
+      if (rankError) throw rankError;
+
+      // 3. Registrar en historial (Auditoría)
+      const { error: histError } = await supabase
+        .from("historial_ranking")
+        .insert([
           {
             usuario_id,
-            puntos: nuevosPuntos,
-            categoria,
-            actualizado_hace: "Hace instantes",
+            torneo_id,
+            puntos_anteriores: puntosAnteriores,
+            puntos_nuevos: nuevosPuntos,
           },
-          { onConflict: "usuario_id,categoria" },
-        )
-        .select();
+        ]);
 
-      if (error) throw error;
-      return res
-        .status(200)
-        .json({ message: "Ranking actualizado con éxito", data });
+      if (histError) throw histError;
+
+      return res.status(200).json({
+        message: "Ranking e historial actualizados",
+        nuevosPuntos,
+      });
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
     }

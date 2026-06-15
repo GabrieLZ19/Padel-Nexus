@@ -7,15 +7,22 @@ import {
   deleteTorneo,
   getPartidosByTorneo,
 } from "../controllers/torneos.controller";
-import { authenticate, authorizeAdmin } from "../middleware/auth";
+import { authenticate, authorize } from "../middleware/auth";
 
 const router = Router();
 
 router.get("/", getAllTorneos);
 router.get("/:id", getTorneoById);
 router.get("/:id/partidos", getPartidosByTorneo);
-router.post("/", authenticate, authorizeAdmin, createTorneo);
-router.put("/:id", authenticate, authorizeAdmin, updateTorneo);
-router.delete("/:id", authenticate, authorizeAdmin, deleteTorneo);
+
+// Rutas protegidas: 'admin' hace todo, 'moderador' solo gestiona datos
+router.post("/", authenticate, authorize(["admin"]), createTorneo);
+router.put(
+  "/:id",
+  authenticate,
+  authorize(["admin", "moderador"]),
+  updateTorneo,
+);
+router.delete("/:id", authenticate, authorize(["admin"]), deleteTorneo);
 
 export default router;

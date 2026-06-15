@@ -1,64 +1,61 @@
 import { Request, Response, NextFunction } from "express";
 import { supabase } from "../config/supabase";
 
-// Extendemos la interfaz de Request para que Express sepa que existe 'user'
 declare global {
   namespace Express {
     interface Request {
-      user?: { id: string; email?: string };
+      user?: { id: string; email?: string; rol?: string };
     }
   }
 }
 
+// Middleware de Autenticación Base
 export const authenticate = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    return res
-      .status(401)
-      .json({ message: "No se proporcionó token de autenticación" });
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Formato de token inválido" });
   }
 
-  const token = authHeader.split(" ")[1]; // Esperamos "Bearer <token>"
-
+  const token = authHeader.split(" ")[1];
   const {
     data: { user },
     error,
   } = await supabase.auth.getUser(token);
 
   if (error || !user) {
-    return res.status(401).json({ message: "Token inválido o expirado" });
+    return res.status(401).json({ message: "No autorizado" });
   }
 
-  // Inyectamos el usuario en el objeto req
-  req.user = { id: user.id, email: user.email };
-  next();
-};
-
-export const authorizeAdmin = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  // Primero debe haber pasado por 'authenticate'
-  if (!req.user) return res.status(401).json({ message: "No autenticado" });
-
-  // Verificamos el rol en la tabla 'perfiles'
+  // Obtenemos el rol desde la base de datos de una vez
   const { data: perfil } = await supabase
     .from("perfiles")
     .select("rol")
-    .eq("id", req.user.id)
+    .eq("id", user.id)
     .single();
 
-  if (perfil?.rol !== "admin") {
-    return res
-      .status(403)
-      .json({ message: "Acceso denegado: Requiere rol de administrador" });
-  }
-
+  req.user = { id: user.id, email: user.email, rol: perfil?.rol };
   next();
+};
+
+// Middleware de Autorización Flexible
+export const authorize = (rolesPermitidos: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user || !req.user.rol) {
+      return res.status(403).json({ message: "Acceso denegado" });
+    }
+
+    if (!rolesPermitidos.includes(req.user.rol)) {
+      return res
+        .status(403)
+        .json({
+          message: `Requiere uno de estos roles: ${rolesPermitidos.join(", ")}`,
+        });
+    }
+
+    next();
+  };
 };
