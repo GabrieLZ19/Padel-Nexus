@@ -8,6 +8,7 @@ import {
   generarCuadros,
   actualizarResultado,
   getPartidosByTorneo,
+  updateTorneoEstado,
 } from "../controllers/torneos.controller";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -25,6 +26,12 @@ router.put(
   authenticate,
   authorize(["admin", "moderador"]),
   updateTorneo,
+);
+router.put(
+  "/:id/estado",
+  authenticate,
+  authorize(["admin", "moderador"]),
+  updateTorneoEstado,
 );
 router.delete("/:id", authenticate, authorize(["admin"]), deleteTorneo);
 

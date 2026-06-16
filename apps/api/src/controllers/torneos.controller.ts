@@ -108,7 +108,39 @@ export const createTorneo = async (req: Request, res: Response) => {
 export const updateTorneo = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const updateData = req.body; // Enviamos todo el body directamente para flexibilidad
+    // Solo permitimos actualizar campos específicos
+    const {
+      nombre,
+      subtitulo,
+      club_id,
+      fecha,
+      cupos_maximos,
+      nivel,
+      categoria,
+      modalidad,
+      precio_inscripcion,
+      formato,
+      premios,
+    } = req.body;
+
+    const updateData: any = {
+      nombre,
+      subtitulo,
+      club_id,
+      fecha,
+      cupos_maximos,
+      nivel,
+      categoria,
+      modalidad,
+      precio_inscripcion,
+      formato,
+    };
+
+    if (premios) {
+      updateData.premio_1 = premios.uno;
+      updateData.premio_2 = premios.dos;
+      updateData.premio_3 = premios.tres;
+    }
 
     const { data, error } = await supabase
       .from("torneos")
@@ -118,12 +150,33 @@ export const updateTorneo = async (req: Request, res: Response) => {
 
     if (error) throw error;
     res.status(200).json(data[0]);
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Error desconocido";
+  } catch (error: any) {
     res
       .status(500)
-      .json({ message: "Error al actualizar torneo", error: message });
+      .json({ message: "Error al actualizar torneo", error: error.message });
+  }
+};
+
+export const updateTorneoEstado = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { estado } = req.body;
+
+    if (!estado)
+      return res.status(400).json({ message: "El estado es requerido" });
+
+    const { data, error } = await supabase
+      .from("torneos")
+      .update({ estado })
+      .eq("id", id)
+      .select();
+
+    if (error) throw error;
+    res.status(200).json(data[0]);
+  } catch (error: any) {
+    res
+      .status(500)
+      .json({ message: "Error al actualizar estado", error: error.message });
   }
 };
 
