@@ -146,57 +146,72 @@ export const deleteTorneo = async (req: Request, res: Response) => {
 export const getPartidosByTorneo = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { data, error } = await supabase
+    console.log("Buscando partidos para torneo:", id); // LOG DE CONTROL
+
+    const { data: partidos, error: partidosError } = await supabase
       .from("partidos")
-      .select(
-        `
-        *,
-        equipo_a:inscripciones!equipo_a_id(jugador2_nombre),
-        equipo_b:inscripciones!equipo_b_id(jugador2_nombre)
-      `,
-      )
+      .select("*") // Quitamos cualquier JOIN complejo por ahora
       .eq("torneo_id", id)
       .order("orden", { ascending: true });
 
-    if (error) throw error;
-    res.status(200).json(data);
-  } catch (error: unknown) {
-    res.status(500).json({ message: "Error al obtener partidos", error });
+    if (partidosError) {
+      console.error("Error en query de Supabase:", partidosError);
+      throw partidosError;
+    }
+
+    res.status(200).json(partidos || []);
+  } catch (error: any) {
+    console.error("Error completo en getPartidosByTorneo:", error); // ESTO VERÁS EN LA TERMINAL
+    res.status(500).json({
+      message: "Error al obtener partidos",
+      error: error.message || error,
+    });
   }
 };
 
 export const generarCuadros = async (req: Request, res: Response) => {
   try {
-    const { torneo_id } = req.body;
+    const { id } = req.params;
 
-    // 1. Obtener todos los inscritos en el torneo
+    // 1. Obtener SOLO inscritos CONFIRMADOS
     const { data: inscripciones, error: inscError } = await supabase
       .from("inscripciones")
       .select("id, usuario_id")
-      .eq("torneo_id", torneo_id);
+      .eq("torneo_id", id)
+      .eq("estado_pago", "Confirmado");
 
-    if (inscError || !inscripciones || inscripciones.length < 2) {
+    if (inscError || !inscripciones || inscripciones.length < 4) {
       return res.status(400).json({
-        message: "Se necesitan al menos 2 inscritos para generar el cuadro",
+        message:
+          "Se necesitan al menos 4 inscritos confirmados para generar el cuadro",
       });
     }
 
-    // 2. Algoritmo simple de emparejamiento (Eliminatoria Directa)
+    // 2. Limpiar partidos anteriores (Si el admin le dio a "Regenerar")
+    await supabase.from("partidos").delete().eq("torneo_id", id);
 
+    // 3. Mezclar (Shuffle) aleatoriamente para que los cruces no sean predecibles
+    const shuffled = inscripciones.sort(() => 0.5 - Math.random());
+
+    // 4. Algoritmo de emparejamiento (Eliminatoria Directa)
     const partidos = [];
-    for (let i = 0; i < inscripciones.length; i += 2) {
-      if (inscripciones[i + 1]) {
-        partidos.push({
-          torneo_id,
-          equipo_a_id: inscripciones[i].id,
-          equipo_b_id: inscripciones[i + 1].id,
-          ronda: "1/8 Final", // Por defecto
-          estado_partido: "Programado",
-        });
-      }
+    let orden = 1;
+
+    for (let i = 0; i < shuffled.length; i += 2) {
+      const equipoA = shuffled[i];
+      const equipoB = shuffled[i + 1];
+
+      partidos.push({
+        torneo_id: id,
+        equipo_a_id: equipoA.id,
+        equipo_b_id: equipoB ? equipoB.id : null, // Si es impar, queda esperando rival (BYE)
+        ronda: "Ronda 1",
+        orden: orden++,
+        estado_partido: "Programado",
+      });
     }
 
-    // 3. Insertar todos los partidos de una sola vez
+    // 5. Insertar todos los partidos de una sola vez
     const { error: insertError } = await supabase
       .from("partidos")
       .insert(partidos);
@@ -204,7 +219,7 @@ export const generarCuadros = async (req: Request, res: Response) => {
     if (insertError) throw insertError;
 
     res.status(200).json({
-      message: "Cuadros generados exitosamente",
+      message: "Cuadro generado exitosamente",
       partidosCount: partidos.length,
     });
   } catch (error) {

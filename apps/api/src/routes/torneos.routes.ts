@@ -5,12 +5,15 @@ import {
   createTorneo,
   updateTorneo,
   deleteTorneo,
+  generarCuadros,
+  actualizarResultado,
   getPartidosByTorneo,
 } from "../controllers/torneos.controller";
 import { authenticate, authorize } from "../middleware/auth";
 
 const router = Router();
 
+// Rutas públicas (Lectura)
 router.get("/", getAllTorneos);
 router.get("/:id", getTorneoById);
 router.get("/:id/partidos", getPartidosByTorneo);
@@ -24,5 +27,19 @@ router.put(
   updateTorneo,
 );
 router.delete("/:id", authenticate, authorize(["admin"]), deleteTorneo);
+
+// Solo admins y moderadores pueden generar/alterar los cuadros
+router.post(
+  "/:id/generar-cuadro",
+  authenticate,
+  authorize(["admin", "moderador"]),
+  generarCuadros,
+);
+router.put(
+  "/partidos/:partido_id/resultado",
+  authenticate,
+  authorize(["admin", "moderador"]),
+  actualizarResultado,
+);
 
 export default router;
