@@ -78,9 +78,10 @@ export default function LicenciaModal({
 
     const loadClubes = async () => {
       try {
-        const data = await ClubesService.getAll();
+        const response = await ClubesService.getAll();
+
         if (isMounted) {
-          setAllClubes(data || []);
+          setAllClubes(response.data || []);
           setHasFetched(true);
         }
       } catch (err) {

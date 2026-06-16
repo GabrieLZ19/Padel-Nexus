@@ -1,9 +1,13 @@
 import { api } from "../api";
 import { Club, FormClubState } from "../types";
+export interface ApiResponse {
+  data: Club[];
+  total: number;
+}
 
 export const ClubesService = {
-  async getAll(): Promise<Club[]> {
-    const response = await api.get<Club[]>("/clubes");
+  async getAll(): Promise<ApiResponse> {
+    const response = await api.get<ApiResponse>("/clubes");
     return response.data;
   },
 

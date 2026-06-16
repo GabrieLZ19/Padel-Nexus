@@ -42,9 +42,11 @@ export default function GestionClubesPage() {
   useEffect(() => {
     let isMounted = true;
     ClubesService.getAll()
-      .then((data) => {
+      .then((response) => {
+        // Recibimos el objeto de respuesta
         if (isMounted) {
-          setClubes(data || []);
+          // Accedemos a response.data (donde están tus clubes)
+          setClubes(response.data);
           setLoading(false);
         }
       })
