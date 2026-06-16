@@ -58,32 +58,28 @@ export const LicenciasController = {
 
   async solicitarLicencia(req: Request, res: Response) {
     try {
-      // Obtenemos el ID del usuario del middleware de autenticación (req.user)
       const usuario_id = req.user?.id;
-
-      if (!usuario_id)
-        return res.status(401).json({ message: "No autorizado" });
-
-      const nro_licencia = `PAD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      // Extraemos los datos que vienen desde el frontend
+      const { nombre_completo, documento, club } = req.body;
 
       const { data, error } = await supabase
         .from("licencias")
         .insert([
           {
             usuario_id,
-            nro_licencia,
             estado: "Pendiente",
+            nro_licencia: `PAD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+            // Guardamos todo en la nueva columna JSONB
+            datos_solicitud: { nombre_completo, documento, club },
             fecha_emision: new Date().toISOString(),
           },
         ])
         .select();
 
       if (error) throw error;
-      return res
-        .status(201)
-        .json({ message: "Solicitud enviada a revisión", data: data[0] });
+      res.status(201).json({ message: "Solicitud enviada", data: data[0] });
     } catch (error: any) {
-      return res
+      res
         .status(500)
         .json({ message: "Error al solicitar", error: error.message });
     }
