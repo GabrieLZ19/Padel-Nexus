@@ -18,4 +18,10 @@ router.patch(
 );
 router.post("/solicitar", authenticate, LicenciasController.solicitarLicencia);
 
+router.get(
+  "/verificacion/:usuario_id",
+  authenticate,
+  LicenciasController.obtenerDatosVerificacion,
+);
+
 export default router;
