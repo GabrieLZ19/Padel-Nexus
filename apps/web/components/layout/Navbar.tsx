@@ -70,11 +70,7 @@ export default function Navbar() {
   ];
 
   // Extraer nombre e iniciales
-  const userName =
-    profile?.nombre_completo ||
-    user?.user_metadata?.nombre_completo ||
-    user?.user_metadata?.full_name ||
-    "Usuario";
+  const userName = profile?.nombre_completo || "Cargando...";
   const userInitials = userName.substring(0, 2).toUpperCase();
   const avatarUrl = user?.user_metadata?.avatar_url;
 
@@ -132,8 +128,10 @@ export default function Navbar() {
                   {avatarUrl ? (
                     <Image
                       src={avatarUrl}
-                      alt={userName}
-                      className="size-7 rounded-full object-cover"
+                      alt="Perfil"
+                      fill
+                      className="rounded-full object-cover"
+                      sizes="40px"
                     />
                   ) : (
                     <div className="size-7 rounded-full bg-padel-4 text-padel-1 flex items-center justify-center text-xs font-bold">

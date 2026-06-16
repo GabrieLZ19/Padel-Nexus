@@ -6,7 +6,7 @@ interface Props {
   usuarioId: string;
 }
 
-export default function CredencialQR({ usuarioId }: Props) {
+export default function CredencialDigital({ usuarioId }: Props) {
   const verificationUrl = `${window.location.origin}/verificar/${usuarioId}`;
 
   return (

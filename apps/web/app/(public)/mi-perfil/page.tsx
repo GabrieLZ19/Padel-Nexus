@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Trophy, CreditCard, Users, ClipboardList } from "lucide-react";
-import { LicenciasService } from "@/utils/services/licencias";
 import { useProfileStore } from "@/store/useProfileStore";
-import CredencialQR from "@/components/perfil/CredencialDigital";
+import CredencialDigital from "@/components/perfil/CredencialDigital";
+import LicenciaModal from "@/components/perfil/LicencialModal";
 
 const Skeleton = () => (
   <div className="animate-pulse bg-white/5 rounded-3xl h-40" />
@@ -13,19 +13,11 @@ const Skeleton = () => (
 
 export default function PlayerDashboard() {
   const { profile, fetchProfile } = useProfileStore();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
-
-  const handleSolicitarLicencia = async () => {
-    try {
-      await LicenciasService.solicitarAlta();
-      await fetchProfile();
-    } catch (error) {
-      console.error("No se pudo enviar la solicitud", error);
-    }
-  };
 
   return (
     <main className="max-w-7xl mx-auto p-6 md:p-10 space-y-10">
@@ -65,7 +57,7 @@ export default function PlayerDashboard() {
               </h2>
             </div>
 
-            {/* Licencia Dinámica con QR */}
+            {/* Licencia Dinámica */}
             <div className="bg-[#161616] p-8 rounded-3xl border border-white/5 flex flex-col items-center text-center">
               <CreditCard className="text-padel-4 mb-4 self-start" />
               <p className="text-sm text-gray-400 self-start">Licencia</p>
@@ -73,7 +65,7 @@ export default function PlayerDashboard() {
               {profile.licencias && profile.licencias.length > 0 ? (
                 profile.licencias[0].estado === "activa" ? (
                   <div className="mt-4 flex flex-col items-center">
-                    <CredencialQR usuarioId={profile.id} />
+                    <CredencialDigital usuarioId={profile.id} />
                     <h2 className="text-lg font-bold mt-3">
                       {profile.licencias[0].nro_licencia}
                     </h2>
@@ -90,8 +82,8 @@ export default function PlayerDashboard() {
                 )
               ) : (
                 <button
-                  onClick={handleSolicitarLicencia}
-                  className="mt-4 text-xs font-bold text-padel-4 border border-padel-4/30 px-3 py-2 rounded-lg hover:bg-padel-4/10"
+                  onClick={() => setIsModalOpen(true)}
+                  className="mt-4 w-full bg-padel-4 text-black font-bold py-2 px-4 rounded-xl hover:bg-white transition-colors"
                 >
                   Solicitar Alta
                 </button>
@@ -120,6 +112,11 @@ export default function PlayerDashboard() {
           </>
         )}
       </section>
+
+      <LicenciaModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </main>
   );
 }

@@ -1,6 +1,12 @@
 import { api } from "../api";
 import { Licencia } from "../types";
 
+interface DatosSolicitud {
+  nombre_completo: string;
+  documento: string;
+  club: string;
+}
+
 export const LicenciasService = {
   // Para el Admin
   async getAll(): Promise<Licencia[]> {
@@ -9,8 +15,8 @@ export const LicenciasService = {
   },
 
   // Para el Usuario (Solicitud)
-  async solicitarAlta(): Promise<Licencia> {
-    const response = await api.post<Licencia>("/licencias/solicitar");
+  async solicitarAlta(data: DatosSolicitud): Promise<Licencia> {
+    const response = await api.post<Licencia>("/licencias/solicitar", data);
     return response.data;
   },
 
