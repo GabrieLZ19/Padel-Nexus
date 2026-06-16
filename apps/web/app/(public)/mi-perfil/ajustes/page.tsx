@@ -4,27 +4,10 @@ import { useState, useEffect } from "react";
 import { PerfilService } from "@/utils/services/perfil";
 import { Perfil } from "@/utils/types";
 import { Save, User, Swords, Loader2, Mail } from "lucide-react";
-import CustomDropdown from "@/components/ui/CustomDropdown"; // Asegura la ruta correcta
+import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { useProfileStore } from "@/store/useProfileStore";
-
-const CATEGORIAS = [
-  { value: "1ra", label: "1ra" },
-  { value: "2da", label: "2da" },
-  { value: "3ra", label: "3ra" },
-  { value: "4ta", label: "4ta" },
-  { value: "5ta", label: "5ta" },
-  { value: "6ta", label: "6ta" },
-  { value: "7ma", label: "7ma" },
-  { value: "8va", label: "8va" },
-  { value: "Iniciante", label: "Iniciante" },
-];
-
-const LADOS = [
-  { value: "Drive", label: "Drive (Derecha)" },
-  { value: "Revés", label: "Revés (Izquierda)" },
-  { value: "Ambos", label: "Ambos" },
-];
+import { NIVELES_PADEL, LADOS_PADEL } from "@/utils/constants/padelConfig";
 
 export const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-white/5 rounded-2xl ${className}`} />
@@ -41,23 +24,16 @@ export default function ProfileSettings() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return; // 'profile' viene de tu useState local
+    if (!profile) return;
 
     setSaving(true);
     try {
-      // 1. Llamamos al backend para persistir los cambios
       const updatedProfile = await PerfilService.updateMe(profile);
-
-      // 2. Actualizamos el estado local (para mantener el formulario sincronizado)
       setProfile(updatedProfile);
-
-      // 3. Actualizamos el store global para que el Navbar se entere al instante
       useProfileStore.getState().setProfile(updatedProfile);
-
       setShowModal(true);
     } catch (error) {
       console.error("Error al actualizar:", error);
-      // Aquí podrías agregar un modal de error también
     } finally {
       setSaving(false);
     }
@@ -88,7 +64,6 @@ export default function ProfileSettings() {
             <User size={20} className="text-padel-4" /> Datos Personales
           </h3>
           <div className="grid md:grid-cols-2 gap-6">
-            {/* NUEVO CAMPO: Email (Solo lectura) */}
             <div className="space-y-2">
               <label className="text-xs text-gray-400 font-medium">
                 Email (Credencial de acceso)
@@ -132,7 +107,7 @@ export default function ProfileSettings() {
           </div>
         </section>
 
-        {/* Preferencias de Juego con CustomDropdown */}
+        {/* Preferencias de Juego con Centralización Absoluta */}
         <section className="bg-[#161616] p-8 rounded-3xl border border-white/5">
           <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
             <Swords size={20} className="text-padel-4" /> Preferencias de Juego
@@ -147,7 +122,7 @@ export default function ProfileSettings() {
                 onChange={(val) =>
                   setProfile({ ...profile, categoria_padel: val })
                 }
-                options={CATEGORIAS}
+                options={NIVELES_PADEL} // <-- Pasado directamente de manera limpia
                 placeholder="Seleccionar categoría"
               />
             </div>
@@ -160,7 +135,7 @@ export default function ProfileSettings() {
                 onChange={(val) =>
                   setProfile({ ...profile, lado_preferido: val })
                 }
-                options={LADOS}
+                options={LADOS_PADEL} // <-- Pasado directamente de manera limpia
                 placeholder="Seleccionar lado"
               />
             </div>

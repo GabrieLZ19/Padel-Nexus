@@ -17,10 +17,10 @@ export const InscripcionesService = {
     return response.data;
   },
   async inscribir(data: {
+    torneo_id: string;
+    usuario_id: string;
     jugador1_nombre: string;
     jugador2_nombre: string;
-    torneo_nombre: string;
-    categoria: string;
     monto: number;
   }) {
     const response = await api.post("/inscripciones", data);

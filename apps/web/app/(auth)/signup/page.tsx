@@ -13,10 +13,11 @@ import {
   EyeOff,
   User,
   Phone,
-  Swords,
-  Medal,
 } from "lucide-react";
-import { createClient } from "../../../utils/supabase/client";
+import { createClient } from "@/utils/supabase/client";
+import { NIVELES_PADEL, LADOS_PADEL } from "@/utils/constants/padelConfig";
+// --- IMPORTAMOS EL COMPONENTE CUSTOM DROPDOWN ---
+import CustomDropdown from "@/components/ui/CustomDropdown"; // Ajustá la ruta según tu estructura
 
 export default function SignUpPage() {
   // Estados del perfil
@@ -99,8 +100,6 @@ export default function SignUpPage() {
     "[&:-webkit-autofill]:[-webkit-box-shadow:0_0_0px_1000px_#161616_inset_!important] " +
     "[&:-webkit-autofill]:[-webkit-text-fill-color:white_!important] " +
     "caret-white";
-  const selectStyles =
-    "w-full pl-12 pr-10 py-3.5 bg-padel-5 rounded-xl border border-white/5 text-white focus:outline-none focus:border-padel-4 focus:ring-1 focus:ring-padel-4 transition-all appearance-none";
 
   return (
     <div className="flex min-h-screen bg-padel-1 text-white font-sans relative">
@@ -252,78 +251,30 @@ export default function SignUpPage() {
                     </div>
                   </div>
 
-                  {/* Fila 2: Categoría y Lado */}
+                  {/* Fila 2: Categoría y Lado (MIGRADOS A CUSTOM DROPDOWN) */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-2">
                         Categoría
                       </label>
-                      <div className="relative group">
-                        <Medal className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-padel-4 transition-colors size-4" />
-                        <select
-                          value={categoria}
-                          onChange={(e) => setCategoria(e.target.value)}
-                          className={selectStyles}
-                        >
-                          <option value="" disabled>
-                            Seleccionar...
-                          </option>
-                          {[
-                            "1ra",
-                            "2da",
-                            "3ra",
-                            "4ta",
-                            "5ta",
-                            "6ta",
-                            "7ma",
-                            "8va",
-                            "Iniciante",
-                          ].map((cat) => (
-                            <option
-                              key={cat}
-                              value={cat}
-                              className="bg-padel-1 text-white"
-                            >
-                              {cat}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <CustomDropdown
+                        value={categoria}
+                        onChange={(val) => setCategoria(val)}
+                        options={NIVELES_PADEL}
+                        placeholder="Seleccionar categoría..."
+                      />
                     </div>
+
                     <div>
                       <label className="block text-xs font-medium text-gray-400 mb-2">
                         Lado preferido
                       </label>
-                      <div className="relative group">
-                        <Swords className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-padel-4 transition-colors size-4" />
-                        <select
-                          value={ladoPreferido}
-                          onChange={(e) => setLadoPreferido(e.target.value)}
-                          className={selectStyles}
-                        >
-                          <option value="" disabled>
-                            Seleccionar...
-                          </option>
-                          <option
-                            value="Drive"
-                            className="bg-padel-1 text-white"
-                          >
-                            Drive (Derecha)
-                          </option>
-                          <option
-                            value="Revés"
-                            className="bg-padel-1 text-white"
-                          >
-                            Revés (Izquierda)
-                          </option>
-                          <option
-                            value="Ambos"
-                            className="bg-padel-1 text-white"
-                          >
-                            Ambos
-                          </option>
-                        </select>
-                      </div>
+                      <CustomDropdown
+                        value={ladoPreferido}
+                        onChange={(val) => setLadoPreferido(val)}
+                        options={LADOS_PADEL}
+                        placeholder="Seleccionar lado..."
+                      />
                     </div>
                   </div>
 
@@ -383,7 +334,7 @@ export default function SignUpPage() {
                       <span className="animate-pulse">Creando cuenta...</span>
                     ) : (
                       <>
-                        Crear cuenta <ArrowRight className="size-5" />
+                        Creando cuenta <ArrowRight className="size-5" />
                       </>
                     )}
                   </button>

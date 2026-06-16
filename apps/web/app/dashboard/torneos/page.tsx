@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-// 1. Agregamos useRouter y el nuevo ícono (LayoutDashboard)
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -68,14 +67,16 @@ export default function TorneosPage() {
 
     const fetchData = async () => {
       try {
-        const [torneosData, clubesData] = await Promise.all([
+        const [torneosData, clubesResponse] = await Promise.all([
           TorneosService.getAll(),
-          ClubesService.getAll().catch(() => [] as Club[]),
+
+          ClubesService.getAll().catch(() => ({ data: [], total: 0 })),
         ]);
 
         if (isMounted) {
           setTournaments(torneosData || []);
-          setClubs(clubesData || []);
+
+          setClubs(clubesResponse?.data || []);
         }
       } catch (error: unknown) {
         console.error("Error al conectar con la API:", error);
@@ -100,7 +101,7 @@ export default function TorneosPage() {
 
   const handleOpenEdit = (torneo: Torneo) => {
     setFormData({
-      nombre: torneo.nombre,
+      nombre: torneo.nombre || "",
       subtitulo: torneo.subtitulo || "",
       club_id: String(torneo.club_id || ""),
       fecha: torneo.fecha ? String(torneo.fecha) : "",
@@ -111,9 +112,9 @@ export default function TorneosPage() {
       modalidad: torneo.modalidad || "Duplas",
       formato: torneo.formato || "Eliminatoria Directa",
       precio_inscripcion: torneo.precio_inscripcion || 0,
-      premio_1: torneo.premio_1 || "",
-      premio_2: torneo.premio_2 || "",
-      premio_3: torneo.premio_3 || "",
+      premio_1: torneo.premio_1 ?? "",
+      premio_2: torneo.premio_2 ?? "",
+      premio_3: torneo.premio_3 ?? "",
     });
     setEditingId(String(torneo.id));
     setIsModalOpen(true);
@@ -122,30 +123,34 @@ export default function TorneosPage() {
   const handleSaveTorneo = async () => {
     try {
       setSaving(true);
-      const payloadToSave = {
+
+      // Creamos el objeto limpio que espera tu backend
+      const payloadToSave: FormTorneoState = {
         ...formData,
         club_id: formData.club_id === "" ? null : formData.club_id,
+        // Construimos el objeto premios que el backend procesa
+        premios: {
+          uno: formData.premio_1 || "",
+          dos: formData.premio_2 || "",
+          tres: formData.premio_3 || "",
+        },
+        // Eliminamos los campos planos para no enviar basura al backend
+        premio_1: undefined,
+        premio_2: undefined,
+        premio_3: undefined,
       };
 
       if (editingId) {
-        await TorneosService.update(
-          editingId,
-          payloadToSave as FormTorneoState,
-        );
+        await TorneosService.update(editingId, payloadToSave);
       } else {
-        await TorneosService.create(payloadToSave as FormTorneoState);
+        await TorneosService.create(payloadToSave);
       }
 
       setIsModalOpen(false);
-      setFormData(ESTADO_INICIAL);
-      setEditingId(null);
-      setLoading(true);
       setRefreshKey((prev) => prev + 1);
-    } catch (error: unknown) {
-      alert(
-        "Error al guardar: " +
-          (typeof error === "string" ? error : "Desconocido"),
-      );
+    } catch (error) {
+      console.error("Error al guardar:", error);
+      alert("Error al guardar torneo.");
     } finally {
       setSaving(false);
     }

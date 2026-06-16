@@ -13,6 +13,7 @@ import {
 import { Torneo } from "../../utils/types";
 import { InscripcionesService } from "../../utils/services/inscripciones";
 import FeedbackModal, { FeedbackModalProps } from "../ui/FeedbackModal";
+import { useProfileStore } from "@/store/useProfileStore";
 
 interface InscripcionModalProps {
   isOpen: boolean;
@@ -31,6 +32,10 @@ export default function InscripcionModal({
     jugador1: "",
     jugador2: torneo.modalidad === "Individual" ? "-" : "",
   });
+  const { profile } = useProfileStore();
+  const userLevel = profile?.categoria_padel || "";
+  const requiredLevel = torneo.nivel || "";
+  const isLevelValid = userLevel === requiredLevel;
 
   // Estado para el modal de errores
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
@@ -41,18 +46,22 @@ export default function InscripcionModal({
   });
 
   const isIndividual = torneo.modalidad === "Individual";
-  const canSubmit = isIndividual
-    ? formData.jugador1.length > 3
-    : formData.jugador1.length > 3 && formData.jugador2.length > 3;
+  const canSubmit =
+    (isIndividual
+      ? formData.jugador1.length > 3
+      : formData.jugador1.length > 3 && formData.jugador2.length > 3) &&
+    isLevelValid;
 
   const handleSubmit = async () => {
+    if (!profile) return; // O manejar error si no hay usuario
+
     setLoading(true);
     try {
       await InscripcionesService.inscribir({
+        torneo_id: torneo.id,
+        usuario_id: profile.id,
         jugador1_nombre: formData.jugador1,
         jugador2_nombre: formData.jugador2,
-        torneo_nombre: torneo.nombre,
-        categoria: `${torneo.nivel} ${torneo.categoria}`,
         monto: Number(torneo.precio_inscripcion),
       });
       setStep("success");
@@ -204,6 +213,17 @@ export default function InscripcionModal({
                         club.
                       </p>
                     </div>
+
+                    {!isLevelValid && (
+                      <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-center gap-3 mb-4">
+                        <X className="size-5 text-red-500 shrink-0" />
+                        <p className="text-[12px] text-red-200">
+                          Tu categoría actual ({userLevel || "sin definir"}) no
+                          coincide con la categoría requerida para este torneo (
+                          {requiredLevel}).
+                        </p>
+                      </div>
+                    )}
 
                     <button
                       disabled={!canSubmit || loading}

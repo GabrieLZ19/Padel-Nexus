@@ -14,9 +14,11 @@ import {
 } from "lucide-react";
 import { TorneosService } from "../../../utils/services/torneos";
 import { Torneo } from "../../../utils/types";
+import { useProfileStore } from "@/store/useProfileStore";
 
 function TorneosContent() {
   const searchParams = useSearchParams();
+  const { profile } = useProfileStore();
   const initialQuery = searchParams.get("q") || "";
 
   const [tournaments, setTournaments] = useState<Torneo[]>([]);
@@ -423,6 +425,9 @@ function TorneosContent() {
               {sortedTournaments.map((t) => {
                 const isAbierto =
                   t.estado === "Inscripción" || t.estado === "Borrador";
+                const isEnrolled =
+                  profile &&
+                  t.inscripciones?.some((ins) => ins.usuario_id === profile.id);
                 return (
                   <div
                     key={t.id}
@@ -477,10 +482,24 @@ function TorneosContent() {
                         </span>
                       </div>
                       <Link
-                        href={`/torneos/${t.id}`}
-                        className="bg-padel-4 text-[#111] font-bold px-5 py-2.5 rounded-xl text-sm hover:bg-[#b3e600] transition-colors"
+                        href={
+                          !profile
+                            ? "/login"
+                            : isEnrolled
+                              ? "/mis-inscripciones"
+                              : `/torneos/${t.id}`
+                        }
+                        className={`font-bold px-5 py-2.5 rounded-xl text-sm transition-colors ${
+                          isEnrolled
+                            ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                            : "bg-padel-4 text-[#111] hover:bg-[#b3e600]"
+                        }`}
                       >
-                        Inscribirme
+                        {!profile
+                          ? "Ingresar"
+                          : isEnrolled
+                            ? "Ver inscripción"
+                            : "Inscribirme"}
                       </Link>
                     </div>
                   </div>
@@ -488,7 +507,6 @@ function TorneosContent() {
               })}
             </div>
           )}
-          {/* ... Resto del código ... */}
         </main>
       </div>
     </div>

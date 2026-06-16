@@ -8,7 +8,6 @@ import {
   Users,
   User,
   Trophy,
-  ArrowRight,
   ShieldCheck,
   CreditCard,
   ChevronLeft,
@@ -16,6 +15,7 @@ import {
 import { TorneosService } from "../../../../utils/services/torneos";
 import { Partido, Torneo } from "../../../../utils/types/index";
 import InscripcionModal from "@/components/torneos/InscripcionModal";
+import { useProfileStore } from "@/store/useProfileStore";
 
 const MatchCard = ({ partido }: { partido: Partido }) => {
   const isA = partido.ganador === "A";
@@ -69,6 +69,11 @@ export default function TorneoDetallePage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [inscribiendo, setInscribiendo] = useState<boolean>(false);
   const [isInscripcionOpen, setIsInscripcionModalOpen] = useState(false);
+  const { profile } = useProfileStore();
+
+  const isAlreadyEnrolled =
+    profile &&
+    torneo?.inscripciones?.some((ins) => ins.usuario_id === profile.id);
 
   useEffect(() => {
     let isMounted = true;
@@ -106,7 +111,15 @@ export default function TorneoDetallePage() {
   };
 
   const handleInscripcion = () => {
-    setIsInscripcionModalOpen(true);
+    if (!profile) {
+      router.push("/login"); // Redirige a login si no está logueado
+      return;
+    }
+    if (isAlreadyEnrolled) {
+      router.push("/mis-inscripciones"); // Redirige a inscripciones si ya es usuario
+      return;
+    }
+    setIsInscripcionModalOpen(true); // Abre modal si es usuario y no está inscrito
   };
 
   // --- ESTADOS DE CARGA (SKELETON PREMIUM) ---
@@ -307,17 +320,18 @@ export default function TorneoDetallePage() {
           </div>
           <button
             onClick={handleInscripcion}
-            disabled={inscribiendo || !isAbierto}
+            disabled={
+              inscribiendo || (isAbierto && !profile ? false : !isAbierto)
+            }
             className="relative z-10 shrink-0 w-full lg:w-auto bg-padel-4 hover:bg-[#b3e600] text-[#111] px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-[0_0_30px_rgba(204,255,0,0.2)] flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none"
           >
-            {inscribiendo ? (
-              "Procesando..."
-            ) : (
-              <>
-                {isIndividual ? "Inscribirme" : "Inscribir mi dupla"}{" "}
-                <ArrowRight className="size-5" />
-              </>
-            )}
+            {!profile
+              ? "Ingresar para inscribirte"
+              : isAlreadyEnrolled
+                ? "Ver mi inscripción"
+                : torneo?.modalidad === "Individual"
+                  ? "Inscribirme"
+                  : "Inscribir mi dupla"}
           </button>
         </div>
 

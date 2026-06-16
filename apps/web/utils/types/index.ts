@@ -37,21 +37,29 @@ export interface Torneo {
   premio_3?: string | null;
   formato_torneo?: string | null;
   clubes?: Club | null;
+  inscripciones?: { usuario_id: string }[] | null;
 }
 
+// En tu archivo utils/types.ts
 export interface FormTorneoState {
   nombre: string;
   subtitulo?: string | null;
-  club_id: string;
+  club_id: string | null;
+  fecha: string;
+  estado: string;
+  cupos_maximos?: number;
+  cupos_actuales?: number;
   nivel: string;
   categoria: string;
-  estado: string;
-  fecha: string;
-  cupos_actuales?: number;
-  cupos_maximos?: number;
-  modalidad?: string;
+  modalidad: string;
   precio_inscripcion?: number;
-  formato?: string;
+  formato: string;
+  premios?: {
+    uno: string;
+    dos: string;
+    tres: string;
+  };
+
   premio_1?: string;
   premio_2?: string;
   premio_3?: string;

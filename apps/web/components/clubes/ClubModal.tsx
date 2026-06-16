@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Save, Trash2 } from "lucide-react";
 import CustomDropdown from "../ui/CustomDropdown";
 import { FormClubState } from "../../utils/types";
+import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
 
 interface ClubModalProps {
   isOpen: boolean;
@@ -16,34 +17,6 @@ interface ClubModalProps {
   editingId: string | null;
 }
 
-const PROVINCIAS = [
-  "Buenos Aires",
-  "CABA",
-  "Catamarca",
-  "Chaco",
-  "Chubut",
-  "Córdoba",
-  "Corrientes",
-  "Entre Ríos",
-  "Formosa",
-  "Jujuy",
-  "La Pampa",
-  "La Rioja",
-  "Mendoza",
-  "Misiones",
-  "Neuquén",
-  "Río Negro",
-  "Salta",
-  "San Juan",
-  "San Luis",
-  "Santa Cruz",
-  "Santa Fe",
-  "Santiago del Estero",
-  "Tierra del Fuego",
-  "Tucumán",
-].map((p) => ({ value: p, label: p }));
-
-// CORRECCIÓN: Agregado el estado Inactivo según la interfaz
 const ESTADOS = [
   { value: "Activo", label: "Activo" },
   { value: "Pendiente", label: "Pendiente" },
@@ -105,7 +78,7 @@ export default function ClubModal({
                 />
               </div>
 
-              {/* FILA 2: PROVINCIA Y LOCALIDAD */}
+              {/* FILA 2: PROVINCIA Y LOCALIDAD (MIGRADOS A CONSTANTE GLOBAL) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
@@ -116,7 +89,7 @@ export default function ClubModal({
                     onChange={(val) =>
                       setFormData({ ...formData, provincia: val })
                     }
-                    options={PROVINCIAS}
+                    options={PROVINCIAS_ARG} // <-- Pasado directamente sin duplicar lógica
                     placeholder="Seleccionar..."
                   />
                 </div>

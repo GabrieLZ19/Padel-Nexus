@@ -5,6 +5,14 @@ import { X, Save } from "lucide-react";
 import CustomDropdown from "../ui/CustomDropdown";
 import { Club, FormTorneoState } from "../../utils/types";
 
+import {
+  NIVELES_PADEL,
+  CATEGORIAS_TORNEO,
+  ESTADOS_TORNEO,
+  MODALIDADES_TORNEO,
+  FORMATOS_TORNEO,
+} from "@/utils/constants/padelConfig";
+
 interface TorneoModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -31,33 +39,11 @@ export default function TorneoModal({
     .toISOString()
     .split("T")[0];
 
+  // El mapeo de clubes dinámicos se mantiene porque viene de la base de datos
   const opcionesClubes = clubs.map((c) => ({
     value: String(c.id),
     label: c.nombre,
   }));
-  const opcionesCategoria = [
-    { value: "Masculino", label: "Masculino" },
-    { value: "Femenino", label: "Femenino" },
-    { value: "Mixto", label: "Mixto" },
-  ];
-  const opcionesNivel = ["1ª", "2ª", "3ª", "4ª", "5ª", "6ª", "7ª", "8ª"].map(
-    (n) => ({ value: n, label: n }),
-  );
-  const opcionesEstado = [
-    { value: "Borrador", label: "Borrador (Oculto)" },
-    { value: "Inscripción", label: "Inscripción Abierta" },
-    { value: "En curso", label: "En Curso" },
-    { value: "Finalizado", label: "Finalizado" },
-  ];
-
-  const opcionesModalidad = [
-    { value: "Duplas", label: "Duplas (2 vs 2)" },
-    { value: "Individual", label: "Individual (1 vs 1)" },
-  ];
-  const opcionesFormato = [
-    { value: "Eliminatoria Directa", label: "Eliminatoria Directa" },
-    { value: "Fase de Grupos", label: "Fase de Grupos + Llave" },
-  ];
 
   return (
     <AnimatePresence>
@@ -127,7 +113,7 @@ export default function TorneoModal({
                     Sede / Club
                   </label>
                   <CustomDropdown
-                    value={formData.club_id}
+                    value={formData.club_id ?? ""}
                     onChange={(val) =>
                       setFormData({ ...formData, club_id: val })
                     }
@@ -149,7 +135,7 @@ export default function TorneoModal({
                     onChange={(val) =>
                       setFormData({ ...formData, estado: val })
                     }
-                    options={opcionesEstado}
+                    options={ESTADOS_TORNEO} // <-- Centralizado
                     placeholder="Seleccionar..."
                   />
                 </div>
@@ -166,7 +152,7 @@ export default function TorneoModal({
                     onChange={(val) =>
                       setFormData({ ...formData, modalidad: val })
                     }
-                    options={opcionesModalidad}
+                    options={MODALIDADES_TORNEO} // <-- Centralizado
                     placeholder="Seleccionar..."
                   />
                 </div>
@@ -179,7 +165,7 @@ export default function TorneoModal({
                     onChange={(val) =>
                       setFormData({ ...formData, categoria: val })
                     }
-                    options={opcionesCategoria}
+                    options={CATEGORIAS_TORNEO} // <-- Centralizado
                     placeholder="Seleccionar..."
                   />
                 </div>
@@ -190,7 +176,7 @@ export default function TorneoModal({
                   <CustomDropdown
                     value={formData.nivel}
                     onChange={(val) => setFormData({ ...formData, nivel: val })}
-                    options={opcionesNivel}
+                    options={NIVELES_PADEL} // <-- Centralizado
                     placeholder="Seleccionar..."
                   />
                 </div>
@@ -207,7 +193,7 @@ export default function TorneoModal({
                     onChange={(val) =>
                       setFormData({ ...formData, formato: val })
                     }
-                    options={opcionesFormato}
+                    options={FORMATOS_TORNEO} // <-- Centralizado
                     placeholder="Seleccionar..."
                   />
                 </div>
@@ -238,20 +224,18 @@ export default function TorneoModal({
                     Precio Inscripción ($)
                   </label>
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
                     placeholder="Ej: 24000"
                     className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-semibold"
-                    value={formData.precio_inscripcion || ""}
-                    onChange={(e) =>
+                    value={formData.precio_inscripcion ?? ""}
+                    onChange={(e) => {
+                      const soloNumeros = e.target.value.replace(/[^0-9]/g, "");
                       setFormData({
                         ...formData,
                         precio_inscripcion:
-                          e.target.value === ""
-                            ? 0
-                            : parseFloat(e.target.value),
-                      })
-                    }
+                          soloNumeros === "" ? undefined : Number(soloNumeros),
+                      });
+                    }}
                   />
                 </div>
               </div>
@@ -328,7 +312,7 @@ export default function TorneoModal({
               </div>
 
               <button
-                disabled={isSaving || !formData.nombre} // CORRECCIÓN 2: Permitimos guardar sin club_id (Sede a confirmar)
+                disabled={isSaving || !formData.nombre}
                 onClick={onSave}
                 className="w-full bg-[#212b06] disabled:opacity-50 border border-padel-4/10 hover:border-padel-4/30 hover:bg-[#2c3a08] text-padel-4 font-bold py-4 rounded-xl mt-4 flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(204,255,0,0.05)]"
               >

@@ -6,37 +6,7 @@ import { ClubesService } from "@/utils/services/clubes";
 import { Club, Perfil } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal from "@/components/ui/FeedbackModal";
-
-const PROVINCIAS = [
-  "Buenos Aires",
-  "Catamarca",
-  "Chaco",
-  "Chubut",
-  "Córdoba",
-  "Corrientes",
-  "Entre Ríos",
-  "Formosa",
-  "Jujuy",
-  "La Pampa",
-  "La Rioja",
-  "Mendoza",
-  "Misiones",
-  "Neuquén",
-  "Río Negro",
-  "Salta",
-  "San Juan",
-  "San Luis",
-  "Santa Cruz",
-  "Santa Fe",
-  "Santiago del Estero",
-  "Tierra del Fuego",
-  "Tucumán",
-];
-
-const provinciaOptions = PROVINCIAS.map((prov) => ({
-  value: prov,
-  label: prov,
-}));
+import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
 
 interface LicenciaModalProps {
   isOpen: boolean;
@@ -144,7 +114,6 @@ export default function LicenciaModal({
         provincia: provincia,
       });
 
-      // Refrescamos los datos del usuario tras el éxito
       fetchProfile();
 
       setFeedback({
@@ -220,7 +189,7 @@ export default function LicenciaModal({
                   setProvincia(val);
                   setSelectedClub("");
                 }}
-                options={provinciaOptions}
+                options={PROVINCIAS_ARG} // <-- Pasado de forma limpia y tipada
                 placeholder="Seleccioná tu provincia..."
               />
             </div>

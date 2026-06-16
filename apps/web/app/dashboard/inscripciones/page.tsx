@@ -50,6 +50,7 @@ export default function GestionInscripcionesPage() {
     let isMounted = true;
     InscripcionesService.getAll()
       .then((data) => {
+        console.log("Respuesta de la API (Inscripciones):", data);
         if (isMounted) {
           setInscripciones(data || []);
           setLoading(false);

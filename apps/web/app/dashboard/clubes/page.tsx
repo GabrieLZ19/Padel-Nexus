@@ -13,7 +13,7 @@ import ClubModal from "../../../components/clubes/ClubModal";
 
 const ESTADO_INICIAL: FormClubState = {
   nombre: "",
-  provincia: "La Rioja", // Tu default
+  provincia: "Buenos Aires",
   localidad: "",
   canchas: 2,
   estado: "Activo",
