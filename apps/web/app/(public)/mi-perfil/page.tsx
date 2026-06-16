@@ -1,0 +1,88 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Trophy, CreditCard, Users, ClipboardList } from "lucide-react";
+import { PerfilService } from "@/utils/services/perfil";
+import { Perfil } from "@/utils/types";
+
+const Skeleton = () => (
+  <div className="animate-pulse bg-white/5 rounded-3xl h-40" />
+);
+
+export default function PlayerDashboard() {
+  const [profile, setProfile] = useState<Perfil | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    PerfilService.getMe()
+      .then(setProfile)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <main className="max-w-7xl mx-auto p-6 md:p-10 space-y-10">
+      <header className="flex justify-between items-end border-b border-white/5 pb-8">
+        <div>
+          <h1 className="text-4xl font-bold">
+            Hola,{" "}
+            <span className="text-padel-4">
+              {profile?.nombre_completo?.split(" ")[0]}
+            </span>
+          </h1>
+          <p className="text-gray-400">
+            Gestioná tu perfil, torneos y reservas.
+          </p>
+        </div>
+        <Link
+          href="/reservar"
+          className="bg-white text-black px-6 py-3 rounded-xl font-bold hover:bg-gray-200"
+        >
+          Nueva Reserva
+        </Link>
+      </header>
+
+      <section className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {loading ? (
+          Array(4)
+            .fill(0)
+            .map((_, i) => <Skeleton key={i} />)
+        ) : (
+          <>
+            <div className="bg-[#161616] p-8 rounded-3xl border border-white/5">
+              <Trophy className="text-padel-4 mb-4" />
+              <p className="text-sm text-gray-400">Categoría</p>
+              <h2 className="text-2xl font-bold">
+                {profile?.categoria_padel || "S/C"}
+              </h2>
+            </div>
+            <div className="bg-[#161616] p-8 rounded-3xl border border-white/5">
+              <CreditCard className="text-padel-4 mb-4" />
+              <p className="text-sm text-gray-400">Licencia</p>
+              <h2 className="text-2xl font-bold">
+                {profile?.licencias?.[0]?.nro_licencia || "No registrada"}
+              </h2>
+            </div>
+            <Link
+              href="/torneos"
+              className="bg-[#161616] p-8 rounded-3xl border border-white/5 hover:border-padel-4/50 transition-all"
+            >
+              <ClipboardList className="text-padel-4 mb-4" />
+              <p className="text-sm text-gray-400">Mis Torneos</p>
+              <h2 className="text-2xl font-bold">Historial</h2>
+            </Link>
+            <Link
+              href="/partidos"
+              className="bg-[#161616] p-8 rounded-3xl border border-white/5 hover:border-padel-4/50 transition-all"
+            >
+              <Users className="text-padel-4 mb-4" />
+              <p className="text-sm text-gray-400">Partidos</p>
+              <h2 className="text-2xl font-bold">Buscar cuarto</h2>
+            </Link>
+          </>
+        )}
+      </section>
+    </main>
+  );
+}

@@ -142,3 +142,18 @@ export interface Reserva {
   estado?: "Activa" | "Cancelada" | "Completada";
   created_at?: string;
 }
+
+export interface Perfil {
+  id: string;
+  nombre_completo: string | null;
+  telefono: string | null;
+  categoria_padel: string | null;
+  lado_preferido: string | null;
+  rol: string;
+  avatar_url: string | null;
+  licencias?: {
+    estado: string;
+    nro_licencia: string;
+    fecha_vencimiento: string;
+  }[];
+}

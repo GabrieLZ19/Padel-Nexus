@@ -32,6 +32,8 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
+  const isPlayerRoute = pathname.startsWith("/mi-perfil");
+
   // Extraemos el rol de la metadata de Supabase (blindaje de seguridad)
   const userRole = user?.app_metadata?.rol || "usuario";
   const isAdminOrMod = userRole === "admin" || userRole === "moderador";
@@ -42,6 +44,10 @@ export async function middleware(request: NextRequest) {
   const isDashboardRoute = pathname.startsWith("/dashboard");
 
   // --- REGLAS DE ACCESO ---
+
+  if (!user && isPlayerRoute) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
 
   // 1. Si NO está logueado e intenta entrar al dashboard -> Mandarlo a /login
   if (!user && isDashboardRoute) {
