@@ -2,14 +2,14 @@ import { Request, Response } from "express";
 import { supabase } from "../config/supabase";
 
 export const LicenciasController = {
-  // Lista licencias con datos del perfil para el admin
+  // 1. GET /api/licencias (Listar)
   async listarLicencias(req: Request, res: Response) {
     try {
       const { data, error } = await supabase
         .from("licencias")
         .select(
           `
-          id,usuario_id, nro_licencia, estado, fecha_emision, fecha_vencimiento, datos_solicitud,
+          *,
           perfiles(nombre_completo, telefono, email, categoria_padel)
         `,
         )
@@ -20,71 +20,84 @@ export const LicenciasController = {
     } catch (error: any) {
       return res
         .status(500)
-        .json({ message: "Error al listar licencias", error: error.message });
+        .json({ message: "Error al listar", error: error.message });
     }
   },
 
-  // Gestión profesional del estado con validación de fechas
-  async cambiarEstadoLicencia(req: Request, res: Response) {
+  // 2. GET /api/licencias/:usuario_id (Obtener del usuario)
+  async obtenerLicenciaPorUsuario(req: Request, res: Response) {
     try {
-      const { id } = req.params;
-      const { estado } = req.body; // 'activa', 'suspendida', 'vencida'
-
-      const updateData: any = { estado };
-
-      // Lógica de negocio: Si se aprueba, calculamos vencimiento a 1 año
-      if (estado === "Activa") {
-        const fechaVencimiento = new Date();
-        fechaVencimiento.setFullYear(fechaVencimiento.getFullYear() + 1);
-        updateData.fecha_vencimiento = fechaVencimiento.toISOString();
-      }
-
+      const { usuario_id } = req.params;
       const { data, error } = await supabase
         .from("licencias")
-        .update(updateData)
-        .eq("id", id)
-        .select();
+        .select("*")
+        .eq("usuario_id", usuario_id)
+        .single();
 
-      if (error) throw error;
-      return res
-        .status(200)
-        .json({ message: "Estado actualizado", data: data ? data[0] : null });
+      if (error)
+        return res.status(404).json({ message: "Licencia no encontrada" });
+      return res.status(200).json(data);
     } catch (error: any) {
       return res
         .status(500)
-        .json({ message: "Error al actualizar", error: error.message });
+        .json({ message: "Error al obtener", error: error.message });
     }
   },
 
-  async solicitarLicencia(req: Request, res: Response) {
+  // 3. POST /api/licencias (Crear - Admin)
+  async crearLicenciaAdmin(req: Request, res: Response) {
     try {
-      const usuario_id = req.user?.id;
-      // Actualizamos los campos que esperamos recibir del Frontend
-      const { nombre_completo, documento, provincia, club_id } = req.body;
-
+      const { usuario_id, nro_licencia, estado } = req.body;
       const { data, error } = await supabase
         .from("licencias")
         .insert([
           {
             usuario_id,
-            estado: "Pendiente",
-            nro_licencia: `PAD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-            // Guardamos el JSONB con la estructura correcta
-            datos_solicitud: { nombre_completo, documento, provincia, club_id },
+            nro_licencia,
+            estado: estado || "Activa",
             fecha_emision: new Date().toISOString(),
           },
         ])
         .select();
 
       if (error) throw error;
-      res.status(201).json({ message: "Solicitud enviada", data: data[0] });
+      return res.status(201).json(data[0]);
     } catch (error: any) {
-      res
+      return res
         .status(500)
-        .json({ message: "Error al solicitar", error: error.message });
+        .json({ message: "Error al crear licencia", error: error.message });
     }
   },
 
+  // 4. PUT /api/licencias/:id (Renovar)
+  async renovarLicencia(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const nuevaFechaVencimiento = new Date();
+      nuevaFechaVencimiento.setFullYear(
+        nuevaFechaVencimiento.getFullYear() + 1,
+      );
+
+      const { data, error } = await supabase
+        .from("licencias")
+        .update({
+          fecha_vencimiento: nuevaFechaVencimiento.toISOString(),
+          estado: "Activa",
+        })
+        .eq("id", id)
+        .select();
+
+      if (error) throw error;
+      return res
+        .status(200)
+        .json({ message: "Licencia renovada", data: data[0] });
+    } catch (error: any) {
+      return res
+        .status(500)
+        .json({ message: "Error al renovar", error: error.message });
+    }
+  },
+  // 5. GET /api/licencias/verificacion/:usuario_id
   async obtenerDatosVerificacion(req: Request, res: Response) {
     try {
       const { usuario_id } = req.params;
@@ -99,15 +112,59 @@ export const LicenciasController = {
       if (error || !data)
         return res.status(404).json({ message: "Licencia no encontrada" });
 
-      // Validación en tiempo real antes de responder
+      // Lógica de validación dinámica en servidor
       const esVencida = new Date(data.fecha_vencimiento) < new Date();
-      if (esVencida && data.estado === "activa") {
-        data.estado = "vencida"; // Validamos el estado real al vuelo
+      if (esVencida && data.estado === "Activa") {
+        data.estado = "Vencida";
       }
 
       res.status(200).json(data);
     } catch (error) {
-      res.status(500).json({ message: "Error al verificar" });
+      res.status(500).json({ message: "Error al verificar licencia" });
+    }
+  },
+
+  // MÉTODOS EXISTENTES
+  async cambiarEstadoLicencia(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { estado } = req.body;
+      const { data, error } = await supabase
+        .from("licencias")
+        .update({ estado })
+        .eq("id", id)
+        .select();
+      if (error) throw error;
+      return res.status(200).json(data[0]);
+    } catch (error: any) {
+      return res
+        .status(500)
+        .json({ message: "Error al actualizar", error: error.message });
+    }
+  },
+
+  async solicitarLicencia(req: Request, res: Response) {
+    try {
+      const usuario_id = req.user?.id;
+      const { nombre_completo, documento, provincia, club_id } = req.body;
+      const { data, error } = await supabase
+        .from("licencias")
+        .insert([
+          {
+            usuario_id,
+            estado: "Pendiente",
+            nro_licencia: `PAD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+            datos_solicitud: { nombre_completo, documento, provincia, club_id },
+          },
+        ])
+        .select();
+
+      if (error) throw error;
+      res.status(201).json(data[0]);
+    } catch (error: any) {
+      res
+        .status(500)
+        .json({ message: "Error al solicitar", error: error.message });
     }
   },
 };
