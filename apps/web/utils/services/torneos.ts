@@ -2,8 +2,10 @@ import { api } from "../api";
 import { Torneo, FormTorneoState, Partido } from "../types";
 
 export const TorneosService = {
-  async getAll(): Promise<Torneo[]> {
-    const response = await api.get<Torneo[]>("/torneos");
+  async getAll(options?: { limit?: number }): Promise<Torneo[]> {
+    const response = await api.get<Torneo[]>("/torneos", {
+      params: { limit: options?.limit },
+    });
     return response.data;
   },
 

@@ -1,12 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Trophy, TrendingUp, Play } from "lucide-react";
+import { Search, Trophy, TrendingUp, Play, Calendar } from "lucide-react";
+import { TorneosService } from "@/utils/services/torneos";
+import { RankingsService } from "@/utils/services/ranking";
+import { Torneo, RankingJugador } from "@/utils/types";
 
 export default function LandingPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Estados para los widgets
+  const [tournaments, setTournaments] = useState<Torneo[]>([]);
+  const [rankings, setRankings] = useState<RankingJugador[]>([]);
+
+  useEffect(() => {
+    // Carga de datos reales
+    Promise.all([TorneosService.getAll(), RankingsService.getGlobal()])
+      .then(([tData, rData]) => {
+        setTournaments(tData.slice(0, 4));
+        setRankings(rData.slice(0, 5));
+      })
+      .catch(console.error);
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,6 +36,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-padel-4 selection:text-black">
+      {/* --- HERO SECTION ORIGINAL --- */}
       <main className="max-w-[1600px] mx-auto px-6 sm:px-10 pt-20 pb-16 sm:pb-20 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
         <div className="space-y-8 z-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-padel-4/30 bg-padel-4/10 text-padel-4 text-[11px] font-bold tracking-wider whitespace-nowrap">
@@ -90,7 +108,7 @@ export default function LandingPage() {
                 ∞
               </span>
             </div>
-
+            {/* ... Elementos flotantes ... */}
             <div className="absolute inset-x-0 top-6 sm:top-12 px-6 sm:px-0">
               <div className="mx-auto max-w-sm sm:max-w-xs bg-[#1a1a1a] border border-white/10 px-5 py-4 rounded-2xl flex items-center gap-4 shadow-2xl sm:transform sm:-translate-x-8">
                 <div className="bg-white/5 p-2.5 rounded-xl border border-white/5">
@@ -106,26 +124,86 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-
-            <div className="absolute inset-x-0 bottom-6 sm:bottom-12 px-6 sm:px-0">
-              <div className="mx-auto max-w-sm sm:max-w-xs bg-[#1a1a1a] border border-white/10 px-5 py-4 rounded-2xl flex items-center gap-4 shadow-2xl sm:transform sm:translate-x-8">
-                <div className="bg-white/5 p-2.5 rounded-xl border border-white/5">
-                  <TrendingUp className="size-5 text-padel-4" />
-                </div>
-                <div>
-                  <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
-                    Tu ranking
-                  </div>
-                  <div className="text-sm font-bold text-white mt-0.5">
-                    #12 · +3 esta semana
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </main>
 
+      {/* --- WIDGETS INTEGRADOS (Torneos y Ranking) --- */}
+      <section className="max-w-[1600px] mx-auto px-6 sm:px-10 py-16 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+          <h2 className="text-2xl font-bold">Próximos Torneos</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {tournaments.map((t) => (
+              <div
+                key={t.id}
+                className="bg-[#161616] p-5 rounded-2xl border border-white/5 hover:border-padel-4/30 transition-all"
+              >
+                <div className="flex gap-4">
+                  <div className="bg-padel-4/10 p-3 rounded-xl h-fit">
+                    <Calendar className="size-6 text-padel-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white">{t.nombre}</h3>
+                    <p className="text-xs text-padel-4 font-bold mt-2">
+                      {t.fecha
+                        ? new Date(t.fecha).toLocaleDateString()
+                        : "Fecha a confirmar"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-[#161616] p-8 rounded-3xl border border-white/5 space-y-6">
+          <div className="flex items-center gap-2 text-padel-4">
+            <TrendingUp className="size-5" />
+            <h2 className="text-xl font-bold text-white">Top 5 Ranking</h2>
+          </div>
+          <div className="space-y-4">
+            {rankings.map((r, i) => (
+              <div
+                key={r.usuario_id}
+                className="flex items-center justify-between border-b border-white/5 pb-3"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="font-black text-gray-600">0{i + 1}</span>
+                  <span className="text-sm font-medium">
+                    {r.perfiles?.nombre_completo || "Jugador"}
+                  </span>
+                </div>
+                <span className="text-padel-4 font-bold">{r.puntos} pts</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* --- NEWSLETTER CTA --- */}
+      <section className="max-w-[1600px] mx-auto px-6 sm:px-10 pb-16">
+        <div className="bg-[#161616] border border-white/5 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-8">
+          <div>
+            <h2 className="text-2xl font-bold mb-2">
+              Suscribite al Newsletter
+            </h2>
+            <p className="text-gray-400">
+              Recibí las últimas novedades de torneos y ranking.
+            </p>
+          </div>
+          <div className="w-full md:w-auto flex gap-2 bg-[#1a1a1a] p-2 rounded-2xl border border-white/10">
+            <input
+              placeholder="Tu email"
+              className="bg-transparent px-4 py-3 outline-none w-full"
+            />
+            <button className="bg-padel-4 text-black font-bold px-6 py-3 rounded-xl hover:bg-padel-3 transition-colors">
+              Suscribirse
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER STATS ORIGINAL */}
       <section className="border-t border-white/5 bg-[#0d0d0d]">
         <div className="max-w-[1600px] mx-auto px-6 sm:px-10 py-12 sm:py-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 text-center divide-y divide-white/5 sm:divide-y-0 sm:divide-x">
           <div className="space-y-3 py-6">
