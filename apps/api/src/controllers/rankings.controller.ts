@@ -2,18 +2,44 @@ import { Request, Response } from "express";
 import { supabase } from "../config/supabase";
 
 export const RankingsController = {
+  async obtenerPerfilRanking(req: Request, res: Response) {
+    try {
+      const { usuario_id } = req.params;
+
+      const { data, error } = await supabase
+        .from("rankings")
+        .select(
+          `
+          *, 
+          perfiles(nombre_completo, categoria_padel),
+          historial_ranking(torneo_id, puntos_nuevos, created_at)
+        `,
+        )
+        .eq("usuario_id", usuario_id)
+        .order("created_at", {
+          referencedTable: "historial_ranking",
+          ascending: false,
+        });
+
+      if (error) throw error;
+      return res.status(200).json(data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  },
+
   // Obtiene el ranking global con la posición calculada mediante la vista de SQL
   async obtenerRankingGlobal(req: Request, res: Response) {
     try {
-      const { categoria, rama } = req.query;
+      const { categoria } = req.query;
 
       let query = supabase
         .from("vista_ranking_posiciones")
         .select("*, perfiles(nombre_completo, avatar_url)")
-        .order("posicion", { ascending: true });
+        .order("posicion", { ascending: true })
+        .limit(50); // Límite solicitado
 
       if (categoria) query = query.eq("categoria", categoria);
-      // Nota: Si 'rama' no está en la vista, asegúrate de incluirla en la vista de SQL
 
       const { data, error } = await query;
       if (error) throw error;

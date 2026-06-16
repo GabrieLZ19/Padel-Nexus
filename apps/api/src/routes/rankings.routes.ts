@@ -4,8 +4,11 @@ import { authenticate, authorize } from "../middleware/auth";
 
 const router = Router();
 
+// Rutas Públicas
 router.get("/", RankingsController.obtenerRankingGlobal);
-// Solo un admin o un proceso interno debe poder actualizar puntos
+router.get("/:usuario_id", RankingsController.obtenerPerfilRanking);
+
+// Rutas Admin
 router.post(
   "/actualizar-puntos",
   authenticate,
