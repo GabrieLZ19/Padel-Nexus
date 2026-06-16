@@ -10,6 +10,7 @@ import clubesRoutes from "./routes/clubes.routes";
 import inscripcionesRoutes from "./routes/inscripciones.routes";
 import partidosRoutes from "./routes/partidos.routes";
 import reservasRoutes from "./routes/reservas.routes";
+import perfilRoutes from "./routes/perfil.routes";
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use("/api/clubes", clubesRoutes);
 app.use("/api/inscripciones", inscripcionesRoutes);
 app.use("/api/partidos", partidosRoutes);
 app.use("/api/reservas", reservasRoutes);
+app.use("/api/perfil", perfilRoutes);
 
 // Manejador global de errores (Debe ir después de todas las rutas)
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
