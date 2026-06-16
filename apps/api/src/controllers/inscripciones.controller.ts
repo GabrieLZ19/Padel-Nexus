@@ -143,3 +143,50 @@ export const updateEstadoPago = async (req: Request, res: Response) => {
       .json({ message: "Error al actualizar estado", error: message });
   }
 };
+
+export const deleteInscripcion = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Obtener el torneo_id antes de borrar para actualizar cupos
+    const { data: inscripcion, error: fetchError } = await supabase
+      .from("inscripciones")
+      .select("torneo_id")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !inscripcion) {
+      return res.status(404).json({ message: "Inscripción no encontrada" });
+    }
+
+    // 2. Eliminar la inscripción
+    const { error: delError } = await supabase
+      .from("inscripciones")
+      .delete()
+      .eq("id", id);
+
+    if (delError) throw delError;
+
+    // 3. Decrementar cupos en el torneo
+    const { data: torneo } = await supabase
+      .from("torneos")
+      .select("cupos_actuales")
+      .eq("id", inscripcion.torneo_id)
+      .single();
+
+    if (torneo) {
+      await supabase
+        .from("torneos")
+        .update({ cupos_actuales: Math.max(0, torneo.cupos_actuales - 1) })
+        .eq("id", inscripcion.torneo_id);
+    }
+
+    res.status(200).json({ message: "Inscripción cancelada y cupo liberado" });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    res
+      .status(500)
+      .json({ message: "Error al cancelar inscripción", error: message });
+  }
+};
