@@ -5,6 +5,7 @@ interface DatosSolicitud {
   nombre_completo: string;
   documento: string;
   club: string;
+  provincia: string;
 }
 
 export const LicenciasService = {

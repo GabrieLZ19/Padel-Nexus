@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { PerfilService } from "@/utils/services/perfil";
 import { Perfil } from "@/utils/types";
-import { Save, User, Swords, Loader2 } from "lucide-react";
+import { Save, User, Swords, Loader2, Mail } from "lucide-react";
 import CustomDropdown from "@/components/ui/CustomDropdown"; // Asegura la ruta correcta
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { useProfileStore } from "@/store/useProfileStore";
@@ -88,6 +88,22 @@ export default function ProfileSettings() {
             <User size={20} className="text-padel-4" /> Datos Personales
           </h3>
           <div className="grid md:grid-cols-2 gap-6">
+            {/* NUEVO CAMPO: Email (Solo lectura) */}
+            <div className="space-y-2">
+              <label className="text-xs text-gray-400 font-medium">
+                Email (Credencial de acceso)
+              </label>
+              <div className="relative group">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 size-4" />
+                <input
+                  className="w-full bg-[#111] pl-12 pr-4 py-4 rounded-xl border border-white/5 text-gray-500 cursor-not-allowed outline-none"
+                  value={profile.email || ""}
+                  disabled
+                  title="Para cambiar tu email debes ir a la configuración de seguridad."
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <label className="text-xs text-gray-400 font-medium">
                 Nombre completo
@@ -100,6 +116,7 @@ export default function ProfileSettings() {
                 }
               />
             </div>
+
             <div className="space-y-2">
               <label className="text-xs text-gray-400 font-medium">
                 Teléfono

@@ -11,4 +11,8 @@ export const PerfilService = {
     const response = await api.put<Perfil>("/perfil/me", perfilData);
     return response.data;
   },
+  async getById(id: string): Promise<Perfil> {
+    const response = await api.get<Perfil>(`/perfil/${id}`);
+    return response.data;
+  },
 };

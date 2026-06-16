@@ -35,7 +35,7 @@ export default function PlayerDashboard() {
         </div>
         <Link
           href="/reservar"
-          className="bg-white text-black px-6 py-3 rounded-xl font-bold hover:bg-gray-200"
+          className="bg-white text-black px-6 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors"
         >
           Nueva Reserva
         </Link>
@@ -63,21 +63,23 @@ export default function PlayerDashboard() {
               <p className="text-sm text-gray-400 self-start">Licencia</p>
 
               {profile.licencias && profile.licencias.length > 0 ? (
-                profile.licencias[0].estado === "activa" ? (
+                profile.licencias[0].estado === "Activa" ? (
                   <div className="mt-4 flex flex-col items-center">
                     <CredencialDigital usuarioId={profile.id} />
                     <h2 className="text-lg font-bold mt-3">
                       {profile.licencias[0].nro_licencia}
                     </h2>
-                    <p className="text-[10px] text-padel-4 uppercase">Activa</p>
+                    <p className="text-[10px] text-padel-4 uppercase font-bold">
+                      Activa
+                    </p>
                   </div>
                 ) : profile.licencias[0].estado === "Pendiente" ? (
                   <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-500 text-xs">
                     En revisión administrativa
                   </div>
                 ) : (
-                  <h2 className="text-xl font-bold mt-2 text-red-500">
-                    Vencida
+                  <h2 className="text-xl font-bold mt-4 text-red-500 uppercase">
+                    {profile.licencias[0].estado}
                   </h2>
                 )
               ) : (
@@ -113,9 +115,12 @@ export default function PlayerDashboard() {
         )}
       </section>
 
+      {/* Al pasar fetchProfile, el modal avisará al dashboard que refresque datos al cerrar */}
       <LicenciaModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        userProfile={profile}
+        fetchProfile={fetchProfile}
       />
     </main>
   );

@@ -103,9 +103,15 @@ export interface Licencia {
   estado: "Pendiente" | "Activa" | "Vencida" | "Suspendida";
   fecha_emision?: string | null;
   fecha_vencimiento?: string | null;
+  datos_solicitud?: {
+    documento: string;
+    provincia: string;
+    club_id: string;
+  } | null;
   perfiles?: {
-    nombre_completo: string;
-    email: string;
+    nombre_completo: string | null;
+    email: string | null;
+    categoria_padel: string | null;
   } | null;
 }
 
@@ -147,6 +153,7 @@ export interface Perfil {
   id: string;
   nombre_completo: string | null;
   telefono: string | null;
+  email: string;
   categoria_padel: string | null;
   lado_preferido: string | null;
   rol: string;

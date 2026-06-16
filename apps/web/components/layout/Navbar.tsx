@@ -70,7 +70,8 @@ export default function Navbar() {
   ];
 
   // Extraer nombre e iniciales
-  const userName = profile?.nombre_completo || "Cargando...";
+  const userName =
+    profile?.nombre_completo || user?.user_metadata?.full_name || "Cargando...";
   const userInitials = userName.substring(0, 2).toUpperCase();
   const avatarUrl = user?.user_metadata?.avatar_url;
 

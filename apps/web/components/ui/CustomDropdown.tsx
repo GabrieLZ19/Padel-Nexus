@@ -76,7 +76,12 @@ export default function CustomDropdown({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 right-0 top-full mt-2 bg-padel-1 border border-white/10 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-60 overflow-hidden max-h-60 overflow-y-auto"
+            className="absolute left-0 right-0 top-full mt-2 bg-padel-1 border border-white/10 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-60 overflow-hidden max-h-60 overflow-y-auto 
+            [&::-webkit-scrollbar]:w-2 
+            [&::-webkit-scrollbar-track]:bg-transparent 
+            [&::-webkit-scrollbar-thumb]:bg-white/10 
+            [&::-webkit-scrollbar-thumb]:rounded-full 
+            hover:[&::-webkit-scrollbar-thumb]:bg-white/20"
           >
             {options.length === 0 ? (
               <div className="p-4 text-sm text-gray-500 text-center">
