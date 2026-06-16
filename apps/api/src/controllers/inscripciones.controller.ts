@@ -3,37 +3,39 @@ import { supabase } from "../config/supabase";
 
 export const getAllInscripciones = async (req: Request, res: Response) => {
   try {
+    // Definimos el "path" explícito: tabla!nombre_fk(campos)
     const { data, error } = await supabase
       .from("inscripciones")
       .select(
         `
-        *,
-        perfiles (nombre_completo),
-        torneos (nombre, categoria)
+        id, 
+        torneo_id, 
+        usuario_id, 
+        jugador2_nombre, 
+        monto, 
+        estado_pago, 
+        tipo, 
+        created_at,
+        perfiles!fk_inscripciones_usuario(nombre_completo),
+        torneos!fk_inscripciones_torneo(nombre, categoria)
       `,
       )
       .order("created_at", { ascending: false });
 
     if (error) throw error;
 
-    const formattedData = data.map((ins: any) => ({
+    // Transformación limpia
+    const formattedData = (data || []).map((ins: any) => ({
       ...ins,
-
       jugador1_nombre: ins.perfiles?.nombre_completo || "Usuario Desconocido",
-
       torneo_nombre: ins.torneos?.nombre || "Torneo no asignado",
       categoria: ins.torneos?.categoria || "-",
-
-      tipo: ins.tipo || "Inscripción torneo",
     }));
 
     res.status(200).json(formattedData);
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Error desconocido";
-    res
-      .status(500)
-      .json({ message: "Error al obtener inscripciones", error: message });
+  } catch (error: any) {
+    console.error("Error crítico en inscripciones:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
@@ -41,7 +43,7 @@ export const createInscripcion = async (req: Request, res: Response) => {
   try {
     const { torneo_id, usuario_id, jugador2_nombre, monto } = req.body;
 
-    // 1. VALIDACIÓN: ¿Tiene licencia activa? (Requisito fundamental)
+    // 1. VALIDACIÓN: ¿Tiene licencia activa?
     const { data: licencia, error: licError } = await supabase
       .from("licencias")
       .select("estado")
@@ -54,7 +56,7 @@ export const createInscripcion = async (req: Request, res: Response) => {
       });
     }
 
-    // 2. VALIDACIÓN: ¿Ya está inscrito? (Evitar duplicados)
+    // 2. VALIDACIÓN: ¿Ya está inscrito?
     const { data: existingInscripcion } = await supabase
       .from("inscripciones")
       .select("id")
@@ -68,10 +70,10 @@ export const createInscripcion = async (req: Request, res: Response) => {
         .json({ message: "Ya te encuentras inscrito en este torneo." });
     }
 
-    // 3. VALIDACIÓN: Cupos disponibles
+    // 3. VALIDACIÓN: Cupos disponibles y Nivel
     const { data: torneo, error: torneoError } = await supabase
       .from("torneos")
-      .select("cupos_maximos, cupos_actuales")
+      .select("cupos_maximos, cupos_actuales, nivel") // Agregamos nivel
       .eq("id", torneo_id)
       .single();
 
@@ -85,6 +87,25 @@ export const createInscripcion = async (req: Request, res: Response) => {
         .json({ message: "El torneo ya no tiene cupos disponibles." });
     }
 
+    // 3.5. VALIDACIÓN PROFESIONAL: Nivel del jugador vs Nivel Torneo
+    const { data: perfil, error: perfilError } = await supabase
+      .from("perfiles")
+      .select("categoria_padel")
+      .eq("id", usuario_id)
+      .single();
+
+    if (perfilError || !perfil) {
+      return res
+        .status(404)
+        .json({ message: "Perfil de jugador no encontrado." });
+    }
+
+    if (perfil.categoria_padel !== torneo.nivel) {
+      return res.status(403).json({
+        message: `Tu categoría (${perfil.categoria_padel}) no coincide con la requerida (${torneo.nivel}).`,
+      });
+    }
+
     // 4. Inserción de la Inscripción
     const { data: nuevaInscripcion, error: insError } = await supabase
       .from("inscripciones")
@@ -95,6 +116,7 @@ export const createInscripcion = async (req: Request, res: Response) => {
           jugador2_nombre,
           monto,
           estado_pago: "Pendiente",
+          tipo: "Inscripción torneo",
         },
       ])
       .select()
@@ -112,6 +134,7 @@ export const createInscripcion = async (req: Request, res: Response) => {
 
     res.status(201).json(nuevaInscripcion);
   } catch (error) {
+    console.error("Error en createInscripcion:", error);
     const message =
       error instanceof Error ? error.message : "Error desconocido";
     res.status(500).json({

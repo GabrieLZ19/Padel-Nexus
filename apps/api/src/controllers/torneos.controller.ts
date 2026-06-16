@@ -5,7 +5,13 @@ export const getAllTorneos = async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
       .from("torneos")
-      .select("*, clubes(nombre, provincia)")
+      .select(
+        `
+    *, 
+    clubes(nombre, provincia),
+    inscripciones(usuario_id) 
+  `,
+      )
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -24,7 +30,13 @@ export const getTorneoById = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { data, error } = await supabase
       .from("torneos")
-      .select("*, clubes(nombre, provincia)")
+      .select(
+        `
+        *, 
+        clubes(nombre, provincia),
+        inscripciones(usuario_id)
+      `,
+      )
       .eq("id", id)
       .single();
 
