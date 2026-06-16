@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, Pencil, Trash2, Trophy } from "lucide-react";
+// 1. Agregamos useRouter y el nuevo ícono (LayoutDashboard)
+import { useRouter } from "next/navigation";
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Trophy,
+  LayoutDashboard,
+} from "lucide-react";
 import { TorneosService } from "../../../utils/services/torneos";
 import { ClubesService } from "../../../utils/services/clubes";
 import { Torneo, Club, FormTorneoState } from "../../../utils/types";
@@ -30,6 +39,9 @@ const ESTADO_INICIAL: FormTorneoState = {
 };
 
 export default function TorneosPage() {
+  // 2. Inicializamos el router
+  const router = useRouter();
+
   const [activeTab, setActiveTab] = useState<string>("Todos");
   const [search, setSearch] = useState<string>("");
   const [tournaments, setTournaments] = useState<Torneo[]>([]);
@@ -110,7 +122,6 @@ export default function TorneosPage() {
   const handleSaveTorneo = async () => {
     try {
       setSaving(true);
-      // Validar que si no se seleccionó club, se envíe null para evitar error de foreign key
       const payloadToSave = {
         ...formData,
         club_id: formData.club_id === "" ? null : formData.club_id,
@@ -396,6 +407,17 @@ export default function TorneosPage() {
 
                       <td className="py-4 px-8 text-right">
                         <div className="flex justify-end gap-2 items-center">
+                          {/* 3. Nuevo Botón de Centro de Control */}
+                          <button
+                            onClick={() =>
+                              router.push(`/dashboard/torneos/${t.id}`)
+                            }
+                            className="p-2 bg-padel-4/10 hover:bg-padel-4/20 text-padel-4 border border-transparent hover:border-padel-4/30 rounded-lg transition-colors"
+                            title="Centro de Control (Cuadros y Llaves)"
+                          >
+                            <LayoutDashboard className="size-4" />
+                          </button>
+
                           <button
                             onClick={() => handleOpenEdit(t)}
                             className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"

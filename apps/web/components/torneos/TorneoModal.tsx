@@ -26,6 +26,11 @@ export default function TorneoModal({
   isSaving,
   editingId,
 }: TorneoModalProps) {
+  const hoy = new Date();
+  const fechaLocal = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
+
   const opcionesClubes = clubs.map((c) => ({
     value: String(c.id),
     label: c.nombre,
@@ -105,6 +110,7 @@ export default function TorneoModal({
                   </label>
                   <input
                     type="date"
+                    min={!editingId ? fechaLocal : undefined}
                     className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors scheme-dark"
                     value={formData.fecha}
                     onChange={(e) =>

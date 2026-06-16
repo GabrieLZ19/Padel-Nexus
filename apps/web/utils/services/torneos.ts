@@ -30,4 +30,25 @@ export const TorneosService = {
     const response = await api.get<Partido[]>(`/torneos/${torneoId}/partidos`);
     return response.data;
   },
+
+  async getInscripcionesConfirmadas(torneoId: string) {
+    const response = await api.get(`/torneos/${torneoId}/inscripciones`);
+    return response.data;
+  },
+
+  async generarCuadro(torneoId: string) {
+    const response = await api.post(`/torneos/${torneoId}/generar-cuadro`);
+    return response.data;
+  },
+
+  async actualizarResultado(
+    partidoId: string,
+    payload: { ganador_id: string; set1_a: number; set1_b: number },
+  ) {
+    const response = await api.put(
+      `/torneos/partidos/${partidoId}/resultado`,
+      payload,
+    );
+    return response.data;
+  },
 };

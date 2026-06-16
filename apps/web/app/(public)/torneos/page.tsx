@@ -29,6 +29,7 @@ function TorneosContent() {
   const [activeStatus, setActiveStatus] = useState<string | null>(
     "Inscripción",
   );
+  const [activeModalidad, setActiveModalidad] = useState<string | null>(null);
 
   // --- ESTADO RESPONSIVE ---
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
@@ -121,11 +122,17 @@ function TorneosContent() {
 
     const matchesProvincia =
       !activeProvincia || t.clubes?.provincia === activeProvincia;
-    const matchesCategory = !activeCategory || t.nivel === activeCategory; // Ahora es coincidencia exacta
+    const matchesCategory = !activeCategory || t.nivel === activeCategory;
     const matchesStatus = !activeStatus || t.estado === activeStatus;
+    const matchesModalidad =
+      !activeModalidad || t.modalidad === activeModalidad; // NUEVO
 
     return (
-      matchesSearch && matchesProvincia && matchesCategory && matchesStatus
+      matchesSearch &&
+      matchesProvincia &&
+      matchesCategory &&
+      matchesStatus &&
+      matchesModalidad
     );
   });
 
@@ -145,6 +152,7 @@ function TorneosContent() {
     setActiveProvincia(null);
     setActiveCategory(null);
     setActiveStatus(null);
+    setActiveModalidad(null);
   };
 
   const formatFecha = (fechaVal?: string | number | null) => {
@@ -299,6 +307,29 @@ function TorneosContent() {
               ))}
             </div>
           </div>
+
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Modalidad
+            </h3>
+            <div className="flex gap-2">
+              {["Duplas", "Individual"].map((mod) => (
+                <button
+                  key={mod}
+                  onClick={() =>
+                    setActiveModalidad(activeModalidad === mod ? null : mod)
+                  }
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
+                    activeModalidad === mod
+                      ? "bg-padel-4 text-padel-1"
+                      : "bg-white/5 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  {mod}
+                </button>
+              ))}
+            </div>
+          </div>
         </aside>
 
         {/* GRILLA PRINCIPAL */}
@@ -398,11 +429,15 @@ function TorneosContent() {
                     className="group bg-[#161616] border border-white/5 hover:border-padel-4/40 rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_0_25px_rgba(204,255,0,0.05)] h-70"
                   >
                     {/* ENCABEZADO DE LA CARD (Pill y Trofeo) */}
-                    <div className="flex justify-between items-start">
-                      <div className="bg-padel-4 text-[#111] text-xs font-black px-3 py-1.5 rounded-full uppercase tracking-wide">
+
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <div className="bg-padel-4 text-[#111] text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide">
                         {t.nivel || "5ª"} {t.categoria || "Caballeros"}
                       </div>
-                      <Trophy className="size-5 text-gray-600 group-hover:text-padel-4 transition-colors" />
+                      {/* Badge de Modalidad */}
+                      <div className="bg-white/10 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                        {t.modalidad || "Duplas"}
+                      </div>
                     </div>
 
                     {/* CUERPO DE LA CARD */}
