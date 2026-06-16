@@ -13,6 +13,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { createClient } from "../../../utils/supabase/client";
+import Link from "next/link";
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -72,7 +73,11 @@ export default function AuthPage() {
   };
 
   const inputStyles =
-    "w-full pl-12 pr-12 py-3.5 bg-padel-5 rounded-xl border border-white/5 text-white placeholder-gray-500 focus:outline-none focus:border-padel-4 focus:ring-1 focus:ring-padel-4 transition-all [&:-webkit-autofill]:bg-padel-5 [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[transition:background-color_5000s_ease-in-out_0s]";
+    "w-full pl-12 pr-4 py-3.5 bg-[#161616] rounded-xl border border-white/5 text-white placeholder-gray-500 " +
+    "focus:outline-none focus:border-padel-4 focus:ring-1 focus:ring-padel-4 transition-all " +
+    "[&:-webkit-autofill]:[-webkit-box-shadow:0_0_0px_1000px_#161616_inset_!important] " +
+    "[&:-webkit-autofill]:[-webkit-text-fill-color:white_!important] " +
+    "caret-white";
 
   return (
     <div className="flex min-h-screen bg-padel-1 text-white font-sans relative">
@@ -241,12 +246,12 @@ export default function AuthPage() {
                   </div>
                   Recordarme
                 </label>
-                <a
-                  href="#"
+                <Link
+                  href="/forgot-password"
                   className="font-medium text-padel-4 hover:underline"
                 >
                   ¿Olvidaste tu contraseña?
-                </a>
+                </Link>
               </div>
 
               <button
@@ -258,11 +263,23 @@ export default function AuthPage() {
                   <span className="animate-pulse">Verificando...</span>
                 ) : (
                   <>
-                    Acceder al panel <ArrowRight className="size-5" />
+                    Iniciar Sesion <ArrowRight className="size-5" />
                   </>
                 )}
               </button>
             </form>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-white/5 text-center">
+            <p className="text-gray-400">
+              ¿No tenés una cuenta?{" "}
+              <Link
+                href="/signup"
+                className="text-padel-4 font-bold hover:underline"
+              >
+                Registrate gratis
+              </Link>
+            </p>
           </div>
 
           <div className="mt-10 pt-8 border-t border-white/5 flex items-center justify-center gap-3">

@@ -1,10 +1,11 @@
-// apps/web/app/callback/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "../../../utils/supabase/server";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+
+  const next = searchParams.get("next");
 
   if (code) {
     const supabase = await createClient();
@@ -14,14 +15,16 @@ export async function GET(request: Request) {
     } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && session) {
-      // 1. Consultar el perfil del usuario para saber su rol
+      if (next) {
+        return NextResponse.redirect(`${origin}${next}`);
+      }
+
       const { data: perfil } = await supabase
         .from("perfiles")
         .select("rol")
         .eq("id", session.user.id)
         .single();
 
-      // 2. Redirección condicional
       if (perfil?.rol === "admin" || perfil?.rol === "moderador") {
         return NextResponse.redirect(`${origin}/dashboard`);
       } else {
@@ -30,5 +33,8 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/?error=auth_failed`);
+  // Si falla el código (expiró o ya se usó)
+  return NextResponse.redirect(
+    `${origin}/login?error=El enlace de recuperación ha expirado o no es válido.`,
+  );
 }
