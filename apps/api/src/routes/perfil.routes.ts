@@ -1,8 +1,18 @@
 import { Router } from "express";
-import { getPerfil, updatePerfil } from "../controllers/perfil.controller";
-import { authenticate } from "../middleware/auth";
+import {
+  getMiPerfil,
+  getPerfilById,
+  updatePerfil,
+} from "../controllers/perfil.controller";
+import { authenticate, authorize } from "../middleware/auth";
 
 const router = Router();
-router.get("/me", authenticate, getPerfil);
+
+// Rutas del usuario autenticado
+router.get("/me", authenticate, getMiPerfil);
 router.put("/me", authenticate, updatePerfil);
+
+// Rutas del admin
+router.get("/:id", authenticate, authorize(["admin"]), getPerfilById);
+
 export default router;

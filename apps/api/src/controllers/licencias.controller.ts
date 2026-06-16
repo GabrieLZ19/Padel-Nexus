@@ -9,8 +9,8 @@ export const LicenciasController = {
         .from("licencias")
         .select(
           `
-          id, nro_licencia, estado, fecha_emision, fecha_vencimiento,
-          perfiles(nombre_completo, telefono)
+          id,usuario_id, nro_licencia, estado, fecha_emision, fecha_vencimiento, datos_solicitud,
+          perfiles(nombre_completo, telefono, email, categoria_padel)
         `,
         )
         .order("created_at", { ascending: false });
@@ -33,7 +33,7 @@ export const LicenciasController = {
       const updateData: any = { estado };
 
       // Lógica de negocio: Si se aprueba, calculamos vencimiento a 1 año
-      if (estado === "activa") {
+      if (estado === "Activa") {
         const fechaVencimiento = new Date();
         fechaVencimiento.setFullYear(fechaVencimiento.getFullYear() + 1);
         updateData.fecha_vencimiento = fechaVencimiento.toISOString();
@@ -59,8 +59,8 @@ export const LicenciasController = {
   async solicitarLicencia(req: Request, res: Response) {
     try {
       const usuario_id = req.user?.id;
-      // Extraemos los datos que vienen desde el frontend
-      const { nombre_completo, documento, club } = req.body;
+      // Actualizamos los campos que esperamos recibir del Frontend
+      const { nombre_completo, documento, provincia, club_id } = req.body;
 
       const { data, error } = await supabase
         .from("licencias")
@@ -69,8 +69,8 @@ export const LicenciasController = {
             usuario_id,
             estado: "Pendiente",
             nro_licencia: `PAD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-            // Guardamos todo en la nueva columna JSONB
-            datos_solicitud: { nombre_completo, documento, club },
+            // Guardamos el JSONB con la estructura correcta
+            datos_solicitud: { nombre_completo, documento, provincia, club_id },
             fecha_emision: new Date().toISOString(),
           },
         ])
