@@ -3,7 +3,6 @@ import { supabase } from "../config/supabase";
 
 export const getAllInscripciones = async (req: Request, res: Response) => {
   try {
-    // Definimos el "path" explícito: tabla!nombre_fk(campos)
     const { data, error } = await supabase
       .from("inscripciones")
       .select(
@@ -11,6 +10,7 @@ export const getAllInscripciones = async (req: Request, res: Response) => {
         id, 
         torneo_id, 
         usuario_id, 
+        jugador1_nombre,
         jugador2_nombre, 
         monto, 
         estado_pago, 
@@ -24,10 +24,14 @@ export const getAllInscripciones = async (req: Request, res: Response) => {
 
     if (error) throw error;
 
-    // Transformación limpia
+    // Transformación limpia con prioridad al formulario
     const formattedData = (data || []).map((ins: any) => ({
       ...ins,
-      jugador1_nombre: ins.perfiles?.nombre_completo || "Usuario Desconocido",
+      // Si el usuario llenó un nombre personalizado en la inscripción lo usamos,
+      // si no, cae al del perfil, y si no hay ninguno, "Usuario Desconocido"
+      jugador1_nombre: ins.jugador1_nombre?.trim()
+        ? ins.jugador1_nombre
+        : ins.perfiles?.nombre_completo || "Usuario Desconocido",
       torneo_nombre: ins.torneos?.nombre || "Torneo no asignado",
       categoria: ins.torneos?.categoria || "-",
     }));
@@ -41,7 +45,8 @@ export const getAllInscripciones = async (req: Request, res: Response) => {
 
 export const createInscripcion = async (req: Request, res: Response) => {
   try {
-    const { torneo_id, usuario_id, jugador2_nombre, monto } = req.body;
+    const { torneo_id, usuario_id, jugador1_nombre, jugador2_nombre, monto } =
+      req.body;
 
     // 1. VALIDACIÓN: ¿Tiene licencia activa?
     const { data: licencia, error: licError } = await supabase
@@ -73,7 +78,7 @@ export const createInscripcion = async (req: Request, res: Response) => {
     // 3. VALIDACIÓN: Cupos disponibles y Nivel
     const { data: torneo, error: torneoError } = await supabase
       .from("torneos")
-      .select("cupos_maximos, cupos_actuales, nivel") // Agregamos nivel
+      .select("cupos_maximos, cupos_actuales, nivel")
       .eq("id", torneo_id)
       .single();
 
@@ -106,13 +111,14 @@ export const createInscripcion = async (req: Request, res: Response) => {
       });
     }
 
-    // 4. Inserción de la Inscripción
+    // 4. Inserción de la Inscripción con la data mapeada del Formulario
     const { data: nuevaInscripcion, error: insError } = await supabase
       .from("inscripciones")
       .insert([
         {
           torneo_id,
           usuario_id,
+          jugador1_nombre,
           jugador2_nombre,
           monto,
           estado_pago: "Pendiente",
@@ -143,7 +149,6 @@ export const createInscripcion = async (req: Request, res: Response) => {
     });
   }
 };
-
 export const updateEstadoPago = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
