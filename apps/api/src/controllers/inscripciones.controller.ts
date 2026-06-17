@@ -3,43 +3,40 @@ import { supabase } from "../config/supabase";
 
 export const getAllInscripciones = async (req: Request, res: Response) => {
   try {
-    const { data, error } = await supabase
+    const { torneo_id, page = "1", limit = "10" } = req.query;
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const from = (pageNum - 1) * limitNum;
+    const to = from + limitNum - 1;
+
+    let query = supabase
       .from("inscripciones")
       .select(
-        `
-        id, 
-        torneo_id, 
-        usuario_id, 
-        jugador1_nombre,
-        jugador2_nombre, 
-        monto, 
-        estado_pago, 
-        tipo, 
-        created_at,
-        perfiles!fk_inscripciones_usuario(nombre_completo),
-        torneos!fk_inscripciones_torneo(nombre, categoria)
-      `,
+        `*, perfiles!fk_inscripciones_usuario(nombre_completo), torneos!fk_inscripciones_torneo(nombre, categoria)`,
+        { count: "exact" },
       )
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
+    if (torneo_id) {
+      query = query.eq("torneo_id", torneo_id);
+    }
+
+    const { data, error, count } = await query;
     if (error) throw error;
 
-    // Transformación limpia con prioridad al formulario
     const formattedData = (data || []).map((ins: any) => ({
       ...ins,
-      // Si el usuario llenó un nombre personalizado en la inscripción lo usamos,
-      // si no, cae al del perfil, y si no hay ninguno, "Usuario Desconocido"
-      jugador1_nombre: ins.jugador1_nombre?.trim()
-        ? ins.jugador1_nombre
-        : ins.perfiles?.nombre_completo || "Usuario Desconocido",
+      jugador1_nombre:
+        ins.jugador1_nombre?.trim() ||
+        ins.perfiles?.nombre_completo ||
+        "Usuario Desconocido",
       torneo_nombre: ins.torneos?.nombre || "Torneo no asignado",
-      categoria: ins.torneos?.categoria || "-",
     }));
 
-    res.status(200).json(formattedData);
+    res.status(200).json({ data: formattedData, total: count });
   } catch (error: any) {
-    console.error("Error crítico en inscripciones:", error);
-    res.status(500).json({ message: "Error interno del servidor" });
+    res.status(500).json({ message: "Error al obtener inscripciones" });
   }
 };
 
