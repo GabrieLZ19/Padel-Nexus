@@ -11,53 +11,13 @@ import {
   ShieldCheck,
   CreditCard,
   ChevronLeft,
+  CheckCircle2,
 } from "lucide-react";
 import { TorneosService } from "../../../../utils/services/torneos";
 import { Partido, Torneo } from "../../../../utils/types/index";
 import InscripcionModal from "@/components/torneos/InscripcionModal";
 import { useProfileStore } from "@/store/useProfileStore";
-
-const MatchCard = ({ partido }: { partido: Partido }) => {
-  const isA = partido.ganador === "A";
-  const isB = partido.ganador === "B";
-
-  const renderEquipo = (j1: string | null, j2: string | null) => {
-    if (!j1) return "-";
-    if (!j2 || j2 === "-") return j1;
-    return `${j1}/${j2}`;
-  };
-
-  return (
-    <div className="bg-[#1a1a1a] border border-white/5 rounded-xl overflow-hidden flex flex-col w-full text-sm shadow-md">
-      <div
-        className={`flex justify-between items-center p-2.5 border-b border-white/5`}
-      >
-        <span
-          className={`font-semibold truncate pr-2 ${isA ? "text-white" : "text-gray-400"}`}
-        >
-          {renderEquipo(partido.equipo_a_j1, partido.equipo_a_j2)}
-        </span>
-        <span
-          className={`w-6 h-6 shrink-0 flex items-center justify-center rounded text-xs font-black ${isA ? "bg-padel-4 text-black" : "bg-[#252525] text-gray-500"}`}
-        >
-          {partido.set1_a ?? "-"}
-        </span>
-      </div>
-      <div className={`flex justify-between items-center p-2.5`}>
-        <span
-          className={`font-semibold truncate pr-2 ${isB ? "text-white" : "text-gray-400"}`}
-        >
-          {renderEquipo(partido.equipo_b_j1, partido.equipo_b_j2)}
-        </span>
-        <span
-          className={`w-6 h-6 shrink-0 flex items-center justify-center rounded text-xs font-black ${isB ? "bg-padel-4 text-black" : "bg-[#252525] text-gray-500"}`}
-        >
-          {partido.set1_b ?? "-"}
-        </span>
-      </div>
-    </div>
-  );
-};
+import { MatchCard } from "@/components/torneos/MatchCard";
 
 export default function TorneoDetallePage() {
   const params = useParams();
@@ -69,6 +29,8 @@ export default function TorneoDetallePage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [inscribiendo, setInscribiendo] = useState<boolean>(false);
   const [isInscripcionOpen, setIsInscripcionModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState<number>(0);
+
   const { profile } = useProfileStore();
 
   const isAlreadyEnrolled =
@@ -97,7 +59,7 @@ export default function TorneoDetallePage() {
     return () => {
       isMounted = false;
     };
-  }, [torneoId]);
+  }, [torneoId, refreshKey]);
 
   const formatFecha = (fechaVal?: string | number | null) => {
     if (!fechaVal) return "Fecha a confirmar";
@@ -266,7 +228,9 @@ export default function TorneoDetallePage() {
   const partidosCuartos = getRoundMatches("CUARTOS", 4);
   const partidosSemis = getRoundMatches("SEMIS", 2);
   const partidoFinal = getRoundMatches("FINAL", 1);
-
+  const estadoBase = (torneo?.estado || "").toLowerCase().trim();
+  const isEnCurso = estadoBase === "en curso";
+  const isFinalizado = estadoBase === "finalizado";
   const isAbierto =
     torneo.estado === "Inscripción" || torneo.estado === "Borrador";
   const isIndividual = torneo.modalidad === "Individual";
@@ -342,10 +306,15 @@ export default function TorneoDetallePage() {
               <h2 className="text-2xl font-bold text-white">
                 Cuadro principal
               </h2>
-              {partidos.length > 0 && (
+              {isEnCurso && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold rounded-full uppercase tracking-wider">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>{" "}
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
                   En vivo
+                </div>
+              )}
+              {isFinalizado && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold rounded-full uppercase tracking-wider">
+                  <CheckCircle2 className="size-3" /> Torneo Finalizado
                 </div>
               )}
             </div>
@@ -415,13 +384,28 @@ export default function TorneoDetallePage() {
                   total o 50% parcial
                 </li>
               </ul>
-              <button
-                onClick={handleInscripcion}
-                disabled={inscribiendo || !isAbierto}
-                className="w-full bg-padel-4 hover:bg-[#b3e600] text-[#111] py-4 rounded-xl font-bold text-lg transition-all shadow-[0_0_20px_rgba(204,255,0,0.2)] disabled:opacity-50 disabled:shadow-none"
-              >
-                {isIndividual ? "Inscribirme" : "Inscribir mi dupla"}
-              </button>
+              {isAbierto ? (
+                <button
+                  onClick={handleInscripcion}
+                  disabled={inscribiendo}
+                  className="w-full bg-padel-4 hover:bg-[#b3e600] text-[#111] py-4 rounded-xl font-bold text-lg transition-all shadow-[0_0_20px_rgba(204,255,0,0.2)] disabled:opacity-50 disabled:shadow-none"
+                >
+                  {!profile
+                    ? "Ingresar para inscribirte"
+                    : isAlreadyEnrolled
+                      ? "Ver mi inscripción"
+                      : isIndividual
+                        ? "Inscribirme"
+                        : "Inscribir mi dupla"}
+                </button>
+              ) : (
+                <div className="w-full bg-white/5 border border-white/10 text-gray-500 py-4 rounded-xl font-bold text-center cursor-not-allowed flex flex-col items-center justify-center">
+                  <span className="text-white">Inscripciones Cerradas</span>
+                  <span className="text-xs font-normal mt-1">
+                    El torneo se encuentra {torneo.estado?.toLowerCase()}.
+                  </span>
+                </div>
+              )}
             </div>
 
             {hasPremios && (
@@ -467,7 +451,11 @@ export default function TorneoDetallePage() {
       {torneo && (
         <InscripcionModal
           isOpen={isInscripcionOpen}
-          onClose={() => setIsInscripcionModalOpen(false)}
+          onClose={() => {
+            setIsInscripcionModalOpen(false);
+            router.refresh();
+            setRefreshKey((prev) => prev + 1);
+          }}
           torneo={torneo}
         />
       )}

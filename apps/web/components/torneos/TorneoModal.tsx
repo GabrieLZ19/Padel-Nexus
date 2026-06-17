@@ -39,10 +39,16 @@ export default function TorneoModal({
     .toISOString()
     .split("T")[0];
 
-  // El mapeo de clubes dinámicos se mantiene porque viene de la base de datos
   const opcionesClubes = clubs.map((c) => ({
     value: String(c.id),
     label: c.nombre,
+  }));
+
+  // --- GENERACIÓN DINÁMICA DE CUPOS ---
+  // Obligamos a que el torneo tenga estructura geométrica válida para llaves
+  const opcionesCupos = [4, 8, 16, 32, 64].map((num) => ({
+    value: String(num),
+    label: `${num} ${formData.modalidad === "Individual" ? "Jugadores" : "Duplas"}`,
   }));
 
   return (
@@ -135,7 +141,7 @@ export default function TorneoModal({
                     onChange={(val) =>
                       setFormData({ ...formData, estado: val })
                     }
-                    options={ESTADOS_TORNEO} // <-- Centralizado
+                    options={ESTADOS_TORNEO}
                     placeholder="Seleccionar..."
                   />
                 </div>
@@ -152,7 +158,7 @@ export default function TorneoModal({
                     onChange={(val) =>
                       setFormData({ ...formData, modalidad: val })
                     }
-                    options={MODALIDADES_TORNEO} // <-- Centralizado
+                    options={MODALIDADES_TORNEO}
                     placeholder="Seleccionar..."
                   />
                 </div>
@@ -165,7 +171,7 @@ export default function TorneoModal({
                     onChange={(val) =>
                       setFormData({ ...formData, categoria: val })
                     }
-                    options={CATEGORIAS_TORNEO} // <-- Centralizado
+                    options={CATEGORIAS_TORNEO}
                     placeholder="Seleccionar..."
                   />
                 </div>
@@ -176,7 +182,7 @@ export default function TorneoModal({
                   <CustomDropdown
                     value={formData.nivel}
                     onChange={(val) => setFormData({ ...formData, nivel: val })}
-                    options={NIVELES_PADEL} // <-- Centralizado
+                    options={NIVELES_PADEL}
                     placeholder="Seleccionar..."
                   />
                 </div>
@@ -193,32 +199,29 @@ export default function TorneoModal({
                     onChange={(val) =>
                       setFormData({ ...formData, formato: val })
                     }
-                    options={FORMATOS_TORNEO} // <-- Centralizado
+                    options={FORMATOS_TORNEO}
                     placeholder="Seleccionar..."
                   />
                 </div>
+
+                {/* MODIFICACIÓN: Dropdown de Cupos Blindado */}
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Cupos Máximos (
-                    {formData.modalidad === "Individual"
-                      ? "Jugadores"
-                      : "Duplas"}
-                    )
+                    Cupos Máximos
                   </label>
-                  <input
-                    type="number"
-                    min="4"
-                    className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
-                    value={formData.cupos_maximos || ""}
-                    onChange={(e) =>
+                  <CustomDropdown
+                    value={String(formData.cupos_maximos || 16)}
+                    onChange={(val) =>
                       setFormData({
                         ...formData,
-                        cupos_maximos:
-                          e.target.value === "" ? 0 : parseInt(e.target.value),
+                        cupos_maximos: Number(val),
                       })
                     }
+                    options={opcionesCupos}
+                    placeholder="Elegir cupos..."
                   />
                 </div>
+
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
                     Precio Inscripción ($)

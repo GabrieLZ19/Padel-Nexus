@@ -118,7 +118,10 @@ export default function PlayerDashboard() {
       {/* Al pasar fetchProfile, el modal avisará al dashboard que refresque datos al cerrar */}
       <LicenciaModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          fetchProfile();
+        }}
         userProfile={profile}
         fetchProfile={fetchProfile}
       />

@@ -94,6 +94,8 @@ export interface Partido {
   torneo_id?: string;
   ronda: string;
   orden: number;
+  equipo_a_id?: string | null;
+  equipo_b_id?: string | null;
   equipo_a_j1: string | null;
   equipo_a_j2: string | null;
   equipo_b_j1: string | null;

@@ -8,45 +8,25 @@ import {
   GitMerge,
   Trophy,
   LayoutDashboard,
-  CheckCircle2,
-  User,
-  Loader2,
   TrendingUp,
   Activity,
-  Save,
+  AlertTriangle,
+  CheckCircle2,
+  User,
 } from "lucide-react";
 import { TorneosService } from "../../../../utils/services/torneos";
-import { Torneo, Inscripcion } from "../../../../utils/types";
-
-// Interfaces Estrictas
-interface PerfilSimple {
-  nombre_completo: string;
-}
-
-interface EquipoInscripcion {
-  id: string;
-  jugador2_nombre: string | null;
-  perfiles: PerfilSimple | null;
-}
-
-interface PartidoPopulated {
-  id: string;
-  torneo_id: string;
-  ronda: string;
-  orden: number;
-  estado_partido: string;
-  set1_a: number | null;
-  set1_b: number | null;
-  ganador: string | null;
-  equipo_a: EquipoInscripcion | null;
-  equipo_b: EquipoInscripcion | null;
-}
+import { Torneo, Inscripcion, Partido } from "../../../../utils/types";
+import FeedbackModal, {
+  FeedbackModalProps,
+} from "../../../../components/ui/FeedbackModal";
+import { MatchCard } from "@/components/torneos/MatchCard";
+import { LiveArbitrajeRow } from "@/components/torneos/LiveArbitrajeRow";
 
 const TABS = [
   { id: "resumen", label: "Resumen", icon: LayoutDashboard },
   { id: "inscritos", label: "Inscritos Aprobados", icon: Users },
   { id: "cuadros", label: "Cuadros y Llaves", icon: GitMerge },
-  { id: "resultados", label: "Carga de Resultados", icon: Trophy },
+  { id: "resultados", label: "Arbitraje en Vivo", icon: Trophy },
 ];
 
 export default function TorneoDetallePage() {
@@ -56,20 +36,34 @@ export default function TorneoDetallePage() {
 
   const [torneo, setTorneo] = useState<Torneo | null>(null);
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
-  const [partidos, setPartidos] = useState<PartidoPopulated[]>([]);
+  const [partidos, setPartidos] = useState<Partido[]>([]);
 
   const [activeTab, setActiveTab] = useState<string>("resumen");
   const [loading, setLoading] = useState<boolean>(true);
   const [generando, setGenerando] = useState<boolean>(false);
   const [refreshKey, setRefreshKey] = useState<number>(0);
 
-  // Estado para manejar los inputs de los sets en la tabla de resultados
-  const [resultadosEdit, setResultadosEdit] = useState<
-    Record<string, { set1_a: number | ""; set1_b: number | "" }>
-  >({});
   const [guardandoPartidoId, setGuardandoPartidoId] = useState<string | null>(
     null,
   );
+
+  const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "info",
+    onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+  });
+
+  const showErrorModal = (msg: string) => {
+    setFeedbackModal({
+      isOpen: true,
+      type: "warning",
+      title: "Atención",
+      description: msg,
+      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+    });
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -78,34 +72,23 @@ export default function TorneoDetallePage() {
     const fetchTorneoData = async () => {
       try {
         if (isMounted) setLoading(true);
-
         const [dataTorneo, dataInscripciones, dataPartidos] = await Promise.all(
           [
             TorneosService.getById(id),
-            TorneosService.getInscripcionesConfirmadas(id).catch(() => []),
-            TorneosService.getPartidos(id).catch(() => []),
+            TorneosService.getInscripcionesConfirmadas(id).catch(
+              () => [] as Inscripcion[],
+            ),
+            TorneosService.getPartidos(id).catch(() => [] as Partido[]),
           ],
         );
 
         if (isMounted) {
           setTorneo(dataTorneo);
-          const inscripcionesConfirmadas = (
-            dataInscripciones as Inscripcion[]
-          ).filter((i: Inscripcion) => i.estado_pago === "Confirmado");
-          setInscripciones(inscripcionesConfirmadas);
-          setPartidos(dataPartidos as unknown as PartidoPopulated[]);
-
-          // Inicializamos los inputs de resultados con valores vacíos para los partidos pendientes
-          const initialEditState: Record<
-            string,
-            { set1_a: number | ""; set1_b: number | "" }
-          > = {};
-          (dataPartidos as unknown as PartidoPopulated[]).forEach((p) => {
-            if (p.estado_partido !== "Finalizado") {
-              initialEditState[p.id] = { set1_a: "", set1_b: "" };
-            }
-          });
-          setResultadosEdit(initialEditState);
+          const confirmados = (dataInscripciones as Inscripcion[]).filter(
+            (i) => i.estado_pago === "Confirmado",
+          );
+          setInscripciones(confirmados);
+          setPartidos(dataPartidos as Partido[]);
         }
       } catch (error) {
         console.error("Error al cargar los datos del torneo:", error);
@@ -113,9 +96,7 @@ export default function TorneoDetallePage() {
         if (isMounted) setLoading(false);
       }
     };
-
     void fetchTorneoData();
-
     return () => {
       isMounted = false;
     };
@@ -123,93 +104,152 @@ export default function TorneoDetallePage() {
 
   const handleGenerarCuadro = async () => {
     if (inscripciones.length < 4) {
-      alert(
-        "Se necesitan al menos 4 inscripciones confirmadas para poder armar las llaves.",
-      );
+      setFeedbackModal({
+        isOpen: true,
+        type: "warning",
+        title: "Cupos insuficientes",
+        description: `Se necesitan al menos 4 inscripciones confirmadas para armar llaves. Actual: ${inscripciones.length}.`,
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
       return;
     }
 
-    if (
-      window.confirm(
-        "¿Estás seguro? Esto creará los cruces de partidos automáticamente. Si ya existe un fixture configurado, se sobrescribirá por completo.",
-      )
-    ) {
-      try {
-        setGenerando(true);
-        await TorneosService.generarCuadro(id);
-        setRefreshKey((prev) => prev + 1);
-        alert("¡Cuadro generado exitosamente!");
-        setActiveTab("cuadros");
-      } catch (error: unknown) {
-        let errorMsg = "No se pudo procesar la solicitud.";
-        if (error instanceof Error) errorMsg = error.message;
-        alert("Error al generar el cuadro: " + errorMsg);
-      } finally {
-        setGenerando(false);
-      }
-    }
+    setFeedbackModal({
+      isOpen: true,
+      type: "danger",
+      title: "¡Atención! Acción destructiva",
+      description:
+        "¿Estás completamente seguro de regenerar el cuadro? Esto borrará el fixture actual y todos los resultados cargados. Los cruces se generarán aleatoriamente de nuevo.",
+      confirmText: "Sí, Borrar y Regenerar",
+      cancelText: "Cancelar",
+      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      onConfirm: async () => {
+        try {
+          setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+          setGenerando(true);
+          await TorneosService.generarCuadro(id);
+
+          router.refresh();
+          setRefreshKey((prev) => prev + 1);
+          setActiveTab("cuadros");
+
+          setFeedbackModal({
+            isOpen: true,
+            type: "success",
+            title: "¡Cuadro Generado!",
+            description: "El fixture automático se ha estructurado con éxito.",
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        } catch (error: unknown) {
+          const errMsg =
+            error instanceof Error
+              ? error.message
+              : "No se pudo procesar la generación de llaves.";
+          setFeedbackModal({
+            isOpen: true,
+            type: "danger",
+            title: "Error operativo",
+            description: errMsg,
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        } finally {
+          setGenerando(false);
+        }
+      },
+    });
   };
 
-  const handleGuardarResultado = async (partido: PartidoPopulated) => {
-    const form = resultadosEdit[partido.id];
-    if (!form || form.set1_a === "" || form.set1_b === "") {
-      alert("Debes completar los games ganados por ambos equipos.");
-      return;
-    }
-
-    if (form.set1_a === form.set1_b) {
-      alert("En el pádel no puede haber empates en un set definido.");
-      return;
-    }
-
-    if (!partido.equipo_a || !partido.equipo_b) {
-      alert(
-        "No puedes cargar resultado de un partido sin rivales confirmados.",
-      );
-      return;
-    }
-
-    const ganador_id =
-      form.set1_a > form.set1_b ? partido.equipo_a.id : partido.equipo_b.id;
-
+  const handleGuardarResultadoLive = async (
+    partidoId: string,
+    setA: number,
+    setB: number,
+    ganadorId: string,
+  ) => {
     try {
-      setGuardandoPartidoId(partido.id);
-      await TorneosService.actualizarResultado(partido.id, {
-        ganador_id,
-        set1_a: Number(form.set1_a),
-        set1_b: Number(form.set1_b),
+      setGuardandoPartidoId(partidoId);
+      await TorneosService.actualizarResultado(partidoId, {
+        ganador_id: ganadorId,
+        set1_a: setA,
+        set1_b: setB,
       });
-      alert("¡Resultado cargado! El ganador ha avanzado de ronda.");
+
+      router.refresh();
       setRefreshKey((prev) => prev + 1);
+
+      setFeedbackModal({
+        isOpen: true,
+        type: "success",
+        title: "¡Set Finalizado!",
+        description:
+          "El marcador fue guardado y el ganador avanzó en la llave.",
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
     } catch (error: unknown) {
-      let errorMsg = "Ocurrió un error al guardar el resultado.";
-      if (error instanceof Error) errorMsg = error.message;
-      alert(errorMsg);
+      const errMsg =
+        error instanceof Error
+          ? error.message
+          : "Error al impactar el marcador.";
+      setFeedbackModal({
+        isOpen: true,
+        type: "danger",
+        title: "Error al guardar",
+        description: errMsg,
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
     } finally {
       setGuardandoPartidoId(null);
     }
   };
 
+  // =============================================================
+  // 1. SKELETON PREMIUM (Reemplaza el "Cargando centro de control")
+  // =============================================================
   if (loading) {
     return (
-      <div className="w-full h-96 flex items-center justify-center text-white">
-        <Loader2 className="size-8 animate-spin text-padel-4 mr-3" />
-        <span className="font-medium">Cargando centro de control...</span>
+      <div className="w-full max-w-[1600px] mx-auto px-4 py-6 md:px-10 md:py-10 animate-pulse min-h-screen bg-[#111111]">
+        <div className="w-32 h-6 bg-white/5 rounded-md mb-8"></div>
+        <div className="bg-[#161616] rounded-3xl p-8 lg:p-12 mb-8 border border-white/5">
+          <div className="w-48 h-6 bg-white/10 rounded-full mb-6"></div>
+          <div className="w-3/4 h-12 bg-white/10 rounded-xl mb-4"></div>
+          <div className="flex gap-4">
+            <div className="w-32 h-4 bg-white/10 rounded-md"></div>
+            <div className="w-32 h-4 bg-white/10 rounded-md"></div>
+          </div>
+        </div>
+        <div className="flex gap-6 mb-8 border-b border-white/10 pb-4">
+          <div className="w-24 h-6 bg-white/10 rounded-md"></div>
+          <div className="w-32 h-6 bg-white/10 rounded-md"></div>
+          <div className="w-32 h-6 bg-white/10 rounded-md"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="h-40 bg-[#161616] rounded-3xl border border-white/5"></div>
+          <div className="h-40 bg-[#161616] rounded-3xl border border-white/5"></div>
+          <div className="h-40 bg-[#161616] rounded-3xl border border-white/5"></div>
+        </div>
       </div>
     );
   }
 
   if (!torneo) {
     return (
-      <div className="p-10 text-white text-center font-bold">
-        Torneo no encontrado o ID inválido.
+      <div className="w-full h-screen flex flex-col items-center justify-center text-center px-4 bg-[#111111]">
+        <Trophy className="size-16 text-gray-600 mb-4" />
+        <h2 className="text-2xl font-bold text-white mb-2">
+          Torneo no encontrado
+        </h2>
+        <button
+          onClick={() => router.push("/dashboard/torneos")}
+          className="bg-white/10 px-6 py-2.5 rounded-xl font-semibold mt-6"
+        >
+          Volver
+        </button>
       </div>
     );
   }
 
-  const esDupla = torneo.modalidad !== "Individual";
-
-  // KPIs para la pestaña Resumen
+  // --- VARIABLES DE ESTADO Y FILTRADO ---
   const totalRecaudado = inscripciones.reduce(
     (acc, curr) => acc + Number(curr.monto || 0),
     0,
@@ -217,21 +257,47 @@ export default function TorneoDetallePage() {
   const porcentajeOcupacion = Math.round(
     (inscripciones.length / (torneo.cupos_maximos || 1)) * 100,
   );
-  const partidosJugados = partidos.filter(
-    (p) => p.estado_partido === "Finalizado",
-  ).length;
+  const partidosJugados = partidos.filter((p) => p.ganador !== null).length;
   const progresoTorneo =
     partidos.length > 0
       ? Math.round((partidosJugados / partidos.length) * 100)
       : 0;
 
-  // Filtrado de Partidos
   const partidosJugables = partidos.filter(
-    (p) => p.equipo_a && p.equipo_b && p.estado_partido !== "Finalizado",
+    (p) => p.equipo_a_id && p.equipo_b_id && p.ganador === null,
   );
-  const partidosFinalizados = partidos.filter(
-    (p) => p.estado_partido === "Finalizado",
-  );
+
+  const getRoundMatches = (round: string, requiredCount: number): Partido[] => {
+    const found = partidos
+      .filter((p) => p.ronda === round)
+      .sort((a, b) => a.orden - b.orden);
+    const result: Partido[] = [];
+    for (let i = 0; i < requiredCount; i++) {
+      if (found[i]) result.push(found[i]);
+      else {
+        result.push({
+          id: `empty-${round}-${i}`,
+          torneo_id: id,
+          ronda: round,
+          orden: i + 1,
+          equipo_a_id: null,
+          equipo_a_j1: null,
+          equipo_a_j2: null,
+          equipo_b_id: null,
+          equipo_b_j1: null,
+          equipo_b_j2: null,
+          set1_a: null,
+          set1_b: null,
+          ganador: null,
+        });
+      }
+    }
+    return result;
+  };
+
+  const partidosCuartos = getRoundMatches("CUARTOS", 4);
+  const partidosSemis = getRoundMatches("SEMIS", 2);
+  const partidoFinal = getRoundMatches("FINAL", 1);
 
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 space-y-6 md:px-10 md:py-10">
@@ -258,21 +324,16 @@ export default function TorneoDetallePage() {
         </div>
       </div>
 
-      {/* SISTEMA DE PESTAÑAS (TABS) */}
+      {/* TABS */}
       <div className="border-b border-white/10">
         <div className="flex gap-6 overflow-x-auto">
           {TABS.map((tab) => {
             const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 pb-4 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${
-                  isActive
-                    ? "border-padel-4 text-padel-4"
-                    : "border-transparent text-gray-500 hover:text-gray-300"
-                }`}
+                className={`flex items-center gap-2 pb-4 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${activeTab === tab.id ? "border-padel-4 text-padel-4" : "border-transparent text-gray-500 hover:text-gray-300"}`}
               >
                 <Icon className="size-4" />
                 {tab.label}
@@ -284,61 +345,42 @@ export default function TorneoDetallePage() {
 
       {/* CONTENIDO DINÁMICO */}
       <div className="pt-4">
-        {/* PESTAÑA: RESUMEN */}
+        {/* RESUMEN */}
         {activeTab === "resumen" && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 relative overflow-hidden group">
-              <div className="absolute -right-8 -top-8 w-32 h-32 bg-padel-4/10 rounded-full blur-3xl"></div>
+            <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 relative overflow-hidden">
               <TrendingUp className="size-8 text-padel-4 mb-4" />
-              <div className="text-4xl font-black text-white leading-none mb-2">
+              <div className="text-4xl font-black text-white mb-2">
                 ${totalRecaudado.toLocaleString("es-AR")}
               </div>
               <div className="text-sm font-medium text-gray-400">
                 Total Recaudado (Aprobado)
               </div>
             </div>
-
-            <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 relative overflow-hidden group">
-              <div className="absolute -right-8 -top-8 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl"></div>
+            <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 relative overflow-hidden">
               <Users className="size-8 text-blue-500 mb-4" />
-              <div className="text-4xl font-black text-white leading-none mb-2">
+              <div className="text-4xl font-black text-white mb-2">
                 {porcentajeOcupacion}%
               </div>
               <div className="text-sm font-medium text-gray-400">
-                Ocupación de Cupos ({inscripciones.length} de{" "}
-                {torneo.cupos_maximos})
-              </div>
-              <div className="w-full bg-white/5 h-2 rounded-full mt-4 overflow-hidden">
-                <div
-                  className="bg-blue-500 h-full rounded-full transition-all"
-                  style={{ width: `${Math.min(porcentajeOcupacion, 100)}%` }}
-                ></div>
+                Ocupación ({inscripciones.length} de {torneo.cupos_maximos})
               </div>
             </div>
-
-            <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 relative overflow-hidden group">
-              <div className="absolute -right-8 -top-8 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl"></div>
+            <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 relative overflow-hidden">
               <Activity className="size-8 text-purple-500 mb-4" />
-              <div className="text-4xl font-black text-white leading-none mb-2">
+              <div className="text-4xl font-black text-white mb-2">
                 {progresoTorneo}%
               </div>
               <div className="text-sm font-medium text-gray-400">
-                Progreso del Torneo ({partidosJugados} de {partidos.length}{" "}
-                partidos)
-              </div>
-              <div className="w-full bg-white/5 h-2 rounded-full mt-4 overflow-hidden">
-                <div
-                  className="bg-purple-500 h-full rounded-full transition-all"
-                  style={{ width: `${progresoTorneo}%` }}
-                ></div>
+                Progreso ({partidosJugados} de {partidos.length} partidos)
               </div>
             </div>
           </div>
         )}
 
-        {/* PESTAÑA: INSCRITOS */}
+        {/* 2. PESTAÑA INSCRITOS CORREGIDA (Con Empty State Hermoso) */}
         {activeTab === "inscritos" && (
-          <div className="bg-[#111111] rounded-3xl border border-white/5 overflow-hidden">
+          <div className="bg-[#111111] rounded-3xl border border-white/5 overflow-hidden shadow-xl">
             <div className="p-6 border-b border-white/5 flex justify-between items-center bg-black/20">
               <h3 className="font-bold text-white flex items-center gap-2">
                 <CheckCircle2 className="size-5 text-[#00ff88]" />
@@ -347,18 +389,24 @@ export default function TorneoDetallePage() {
               </h3>
             </div>
             {inscripciones.length === 0 ? (
-              <div className="p-10 text-center text-gray-500">
-                Aún no existen duplas o jugadores con estado de pago confirmado
-                para esta competencia.
+              <div className="p-16 flex flex-col items-center justify-center text-center">
+                <Users className="size-12 text-gray-600 mb-4" />
+                <h3 className="text-xl font-bold text-white mb-2">
+                  Aún no hay inscritos
+                </h3>
+                <p className="text-gray-500 text-sm max-w-sm">
+                  No existen jugadores o duplas con estado de pago confirmado
+                  para esta competencia.
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="bg-white/5 text-xs uppercase text-gray-400">
+                  <thead className="bg-white/5 text-xs text-gray-400 uppercase tracking-wider">
                     <tr>
-                      <th className="px-6 py-4">Código Ref.</th>
-                      <th className="px-6 py-4">Participante / Dupla</th>
-                      <th className="px-6 py-4 text-right">
+                      <th className="px-8 py-5">Código Ref.</th>
+                      <th className="px-6 py-5">Participante / Dupla</th>
+                      <th className="px-8 py-5 text-right">
                         Fecha Confirmación
                       </th>
                     </tr>
@@ -369,23 +417,27 @@ export default function TorneoDetallePage() {
                         key={ins.id}
                         className="hover:bg-white/5 transition-colors"
                       >
-                        <td className="px-6 py-4 text-sm font-mono text-gray-500">
+                        <td className="px-8 py-5 font-mono text-gray-500 text-sm">
                           {String(ins.id).slice(0, 8).toUpperCase()}
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-white flex items-center gap-2">
-                            {esDupla ? (
-                              <Users className="size-4 text-padel-4" />
-                            ) : (
+                        <td className="px-6 py-5">
+                          <div className="font-bold text-white flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-padel-4/10 flex items-center justify-center shrink-0">
                               <User className="size-4 text-padel-4" />
-                            )}
-                            {ins.jugador1_nombre}{" "}
-                            {esDupla && ins.jugador2_nombre
-                              ? `/ ${ins.jugador2_nombre}`
-                              : ""}
+                            </div>
+                            <div>
+                              {ins.jugador1_nombre || "Desconocido"}
+                              {ins.jugador2_nombre &&
+                                ins.jugador2_nombre !== "-" && (
+                                  <span className="text-gray-400 font-medium">
+                                    {" "}
+                                    / {ins.jugador2_nombre}
+                                  </span>
+                                )}
+                            </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-400">
+                        <td className="px-8 py-5 text-right text-gray-400 text-sm">
                           {new Date(ins.created_at).toLocaleDateString("es-AR")}
                         </td>
                       </tr>
@@ -397,263 +449,108 @@ export default function TorneoDetallePage() {
           </div>
         )}
 
-        {/* PESTAÑA: CUADROS Y LLAVES */}
+        {/* CUADROS */}
         {activeTab === "cuadros" && (
           <div>
             {partidos.length === 0 ? (
-              <div className="bg-[#111111] border border-white/5 rounded-3xl p-10 flex flex-col items-center justify-center text-center min-h-100">
+              <div className="bg-[#111111] border border-white/5 rounded-3xl p-10 flex flex-col items-center justify-center text-center">
                 <GitMerge className="size-16 text-gray-600 mb-6" />
-                <h2 className="text-2xl font-bold text-white mb-2">
+                <h2 className="text-2xl font-bold mb-2">
                   Generador de Cuadros
                 </h2>
                 <p className="text-gray-400 max-w-md mb-8">
-                  Actualmente dispones de{" "}
-                  <strong>{inscripciones.length}</strong> duplas confirmadas. El
-                  sistema requiere un mínimo de 4 para estructurar un árbol de
-                  llaves.
+                  Dispones de <strong>{inscripciones.length}</strong>{" "}
+                  confirmados. Requiere mínimo 4.
                 </p>
                 <button
                   onClick={handleGenerarCuadro}
-                  disabled={generando || inscripciones.length < 4}
-                  className="bg-padel-4 text-[#111] disabled:opacity-40 hover:bg-[#b3e600] px-8 py-3 rounded-xl font-black transition-all shadow-[0_0_20px_rgba(204,255,0,0.15)] flex items-center gap-2"
+                  className="bg-padel-4 text-[#111] px-8 py-3 rounded-xl font-black shadow-lg hover:bg-[#b3e600] transition-colors disabled:opacity-50"
                 >
-                  {generando ? (
-                    <>
-                      <Loader2 className="size-5 animate-spin" /> Procesando
-                      llaves...
-                    </>
-                  ) : (
-                    "Generar Cuadro Automático"
-                  )}
+                  Generar Cuadro Automático
                 </button>
               </div>
             ) : (
-              <div className="bg-[#111111] border border-white/5 rounded-3xl p-6">
-                <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
-                  <h3 className="font-bold text-xl text-white">
+              <div className="bg-[#111111] border border-white/5 rounded-3xl p-8 overflow-x-auto">
+                <div className="flex justify-between items-center mb-8 border-b border-white/5 pb-6 min-w-200">
+                  <h3 className="font-bold text-2xl text-white">
                     Fixture del Torneo
                   </h3>
                   <button
                     onClick={handleGenerarCuadro}
-                    disabled={generando || partidosJugados > 0}
-                    className="text-xs text-red-400 hover:text-red-300 font-semibold underline transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                    title={
-                      partidosJugados > 0
-                        ? "No puedes regenerar si ya hay partidos jugados"
-                        : ""
-                    }
+                    disabled={partidosJugados > 0}
+                    className="flex items-center gap-2 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 px-4 py-2 rounded-lg font-bold transition-colors disabled:opacity-30"
                   >
-                    Regenerar Cruces (Borrará el fixture actual)
+                    <AlertTriangle className="size-4" /> Regenerar Cruces
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {partidos.map((partido, idx) => {
-                    const nombreA = partido.equipo_a
-                      ? `${partido.equipo_a.perfiles?.nombre_completo || "Desconocido"} ${partido.equipo_a.jugador2_nombre ? `/ ${partido.equipo_a.jugador2_nombre}` : ""}`
-                      : "Esperando rival...";
-
-                    const nombreB = partido.equipo_b
-                      ? `${partido.equipo_b.perfiles?.nombre_completo || "Desconocido"} ${partido.equipo_b.jugador2_nombre ? `/ ${partido.equipo_b.jugador2_nombre}` : ""}`
-                      : "Esperando rival...";
-
-                    return (
-                      <div
-                        key={partido.id || idx}
-                        className="bg-black/30 border border-white/5 p-5 rounded-2xl space-y-3"
-                      >
-                        <div className="flex justify-between items-center">
-                          <div className="text-[11px] text-padel-4 font-black uppercase tracking-widest bg-padel-4/5 px-2.5 py-1 rounded-md inline-block">
-                            {partido.ronda} · Partido {partido.orden}
-                          </div>
-                          {partido.estado_partido === "Finalizado" && (
-                            <CheckCircle2 className="size-4 text-[#00ff88]" />
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                          <div
-                            className={`px-4 py-3 rounded-xl text-sm font-bold transition-all ${partido.equipo_a ? "bg-white/5 text-white border border-white/5" : "bg-white/2 text-gray-600 border border-dashed border-white/5"}`}
-                          >
-                            {nombreA}{" "}
-                            {partido.estado_partido === "Finalizado" &&
-                              partido.ganador === partido.equipo_a?.id &&
-                              "🏆"}
-                          </div>
-                          <div className="text-center text-gray-700 text-[10px] font-black tracking-widest uppercase">
-                            {partido.estado_partido === "Finalizado"
-                              ? `${partido.set1_a} - ${partido.set1_b}`
-                              : "VS"}
-                          </div>
-                          <div
-                            className={`px-4 py-3 rounded-xl text-sm font-bold transition-all ${partido.equipo_b ? "bg-white/5 text-white border border-white/5" : "bg-white/2 text-gray-600 border border-dashed border-white/5"}`}
-                          >
-                            {nombreB}{" "}
-                            {partido.estado_partido === "Finalizado" &&
-                              partido.ganador === partido.equipo_b?.id &&
-                              "🏆"}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="flex gap-8 lg:gap-12 min-w-150 pb-4">
+                  <div className="flex-1 flex flex-col justify-around gap-6">
+                    <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4">
+                      Cuartos
+                    </h3>
+                    {partidosCuartos.map((p) => (
+                      <MatchCard key={p.id} partido={p} />
+                    ))}
+                  </div>
+                  <div className="flex-1 flex flex-col justify-around gap-16 relative">
+                    <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4 absolute top-0 w-full">
+                      Semis
+                    </h3>
+                    <div className="mt-12 space-y-24">
+                      {partidosSemis.map((p) => (
+                        <MatchCard key={p.id} partido={p} />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex-1 flex flex-col justify-center relative">
+                    <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4 absolute top-0 w-full">
+                      Final
+                    </h3>
+                    {partidoFinal.map((p) => (
+                      <MatchCard key={p.id} partido={p} />
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {/* PESTAÑA: RESULTADOS */}
+        {/* ARBITRAJE EN VIVO */}
         {activeTab === "resultados" && (
-          <div className="space-y-8">
+          <div className="space-y-4">
             <div className="bg-[#111111] rounded-3xl border border-white/5 p-6">
-              <h3 className="font-bold text-xl text-white mb-2">
-                Planilla de Arbitraje
+              <h3 className="font-bold text-xl mb-2">
+                Consola de Arbitraje en Vivo
               </h3>
               <p className="text-gray-400 text-sm mb-6">
-                Ingresa los juegos ganados por cada equipo. El sistema avanzará
-                automáticamente al ganador a la siguiente ronda.
+                Suma los puntos de cada Partido. El sistema llevará la cuenta y
+                cuando finalices el partido, avanzará la llave.
               </p>
-
               {partidosJugables.length === 0 ? (
                 <div className="text-center p-8 border border-dashed border-white/10 rounded-2xl text-gray-500">
-                  No hay partidos listos para cargar resultados en este momento.
+                  No hay partidos listos para arbitrar en este momento.
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {partidosJugables.map((partido) => {
-                    const nombreA = partido.equipo_a
-                      ? `${partido.equipo_a.perfiles?.nombre_completo || "Desconocido"} ${partido.equipo_a.jugador2_nombre ? `/ ${partido.equipo_a.jugador2_nombre}` : ""}`
-                      : "Equipo A";
-
-                    const nombreB = partido.equipo_b
-                      ? `${partido.equipo_b.perfiles?.nombre_completo || "Desconocido"} ${partido.equipo_b.jugador2_nombre ? `/ ${partido.equipo_b.jugador2_nombre}` : ""}`
-                      : "Equipo B";
-
-                    return (
-                      <div
-                        key={partido.id}
-                        className="bg-black/30 border border-white/10 rounded-xl p-4 flex flex-col md:flex-row items-center gap-6"
-                      >
-                        <div className="text-[11px] text-gray-500 font-bold uppercase tracking-widest w-24 shrink-0 text-center md:text-left">
-                          {partido.ronda}
-                        </div>
-
-                        <div className="flex-1 flex flex-col md:flex-row items-center gap-4 w-full">
-                          <div className="flex-1 text-sm font-bold text-white text-right w-full">
-                            {nombreA}
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <input
-                              type="number"
-                              min="0"
-                              max="7"
-                              className="w-12 h-12 bg-white/5 border border-white/10 rounded-lg text-center text-lg font-black text-white focus:outline-none focus:border-padel-4 transition-colors"
-                              value={resultadosEdit[partido.id]?.set1_a ?? ""}
-                              onChange={(e) =>
-                                setResultadosEdit((prev) => ({
-                                  ...prev,
-                                  [partido.id]: {
-                                    ...prev[partido.id],
-                                    set1_a:
-                                      e.target.value === ""
-                                        ? ""
-                                        : Number(e.target.value),
-                                  },
-                                }))
-                              }
-                            />
-                            <span className="text-gray-600 font-bold">-</span>
-                            <input
-                              type="number"
-                              min="0"
-                              max="7"
-                              className="w-12 h-12 bg-white/5 border border-white/10 rounded-lg text-center text-lg font-black text-white focus:outline-none focus:border-padel-4 transition-colors"
-                              value={resultadosEdit[partido.id]?.set1_b ?? ""}
-                              onChange={(e) =>
-                                setResultadosEdit((prev) => ({
-                                  ...prev,
-                                  [partido.id]: {
-                                    ...prev[partido.id],
-                                    set1_b:
-                                      e.target.value === ""
-                                        ? ""
-                                        : Number(e.target.value),
-                                  },
-                                }))
-                              }
-                            />
-                          </div>
-                          <div className="flex-1 text-sm font-bold text-white text-left w-full">
-                            {nombreB}
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => handleGuardarResultado(partido)}
-                          disabled={guardandoPartidoId === partido.id}
-                          className="shrink-0 bg-padel-4/10 hover:bg-padel-4/20 text-padel-4 border border-padel-4/20 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 w-full md:w-auto justify-center"
-                        >
-                          {guardandoPartidoId === partido.id ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <Save className="size-4" />
-                          )}
-                          Guardar
-                        </button>
-                      </div>
-                    );
-                  })}
+                <div className="space-y-6">
+                  {partidosJugables.map((partido) => (
+                    <LiveArbitrajeRow
+                      key={partido.id}
+                      partido={partido}
+                      onSave={handleGuardarResultadoLive}
+                      isSaving={guardandoPartidoId === partido.id}
+                      onError={showErrorModal}
+                    />
+                  ))}
                 </div>
               )}
             </div>
-
-            {partidosFinalizados.length > 0 && (
-              <div className="bg-[#111111] rounded-3xl border border-white/5 p-6">
-                <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-                  <CheckCircle2 className="size-5 text-[#00ff88]" />
-                  Resultados Finalizados
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {partidosFinalizados.map((partido) => {
-                    const nombreA =
-                      partido.equipo_a?.perfiles?.nombre_completo || "Equipo A";
-                    const nombreB =
-                      partido.equipo_b?.perfiles?.nombre_completo || "Equipo B";
-                    return (
-                      <div
-                        key={partido.id}
-                        className="bg-white/5 rounded-lg p-3 flex justify-between items-center border border-white/5"
-                      >
-                        <div className="text-xs font-medium text-gray-400 truncate max-w-[40%]">
-                          {partido.ganador === partido.equipo_a?.id ? (
-                            <span className="text-white font-bold">
-                              {nombreA} 🏆
-                            </span>
-                          ) : (
-                            nombreA
-                          )}
-                        </div>
-                        <div className="text-sm font-black text-padel-4 px-2 tracking-widest bg-black/40 rounded">
-                          {partido.set1_a} - {partido.set1_b}
-                        </div>
-                        <div className="text-xs font-medium text-gray-400 truncate max-w-[40%] text-right">
-                          {partido.ganador === partido.equipo_b?.id ? (
-                            <span className="text-white font-bold">
-                              🏆 {nombreB}
-                            </span>
-                          ) : (
-                            nombreB
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
+
+      <FeedbackModal {...feedbackModal} />
     </div>
   );
 }

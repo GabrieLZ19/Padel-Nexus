@@ -14,6 +14,7 @@ import { Torneo } from "../../utils/types";
 import { InscripcionesService } from "../../utils/services/inscripciones";
 import FeedbackModal, { FeedbackModalProps } from "../ui/FeedbackModal";
 import { useProfileStore } from "@/store/useProfileStore";
+import { useRouter } from "next/navigation";
 
 interface InscripcionModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export default function InscripcionModal({
   onClose,
   torneo,
 }: InscripcionModalProps) {
+  const router = useRouter();
   const [step, setStep] = useState<"form" | "success">("form");
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -53,7 +55,7 @@ export default function InscripcionModal({
     isLevelValid;
 
   const handleSubmit = async () => {
-    if (!profile) return; // O manejar error si no hay usuario
+    if (!profile) return;
 
     setLoading(true);
     try {
@@ -64,6 +66,10 @@ export default function InscripcionModal({
         jugador2_nombre: formData.jugador2,
         monto: Number(torneo.precio_inscripcion),
       });
+
+      // --- CRÍTICO: Invalida la caché de Next.js en segundo plano ---
+      router.refresh();
+
       setStep("success");
     } catch (error: unknown) {
       console.error(error);
@@ -81,7 +87,6 @@ export default function InscripcionModal({
         };
       }
 
-      // 3. Hacemos el cast seguro
       const apiError = error as ApiError;
 
       if (apiError.response?.data?.message) {

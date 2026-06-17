@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Search,
@@ -17,6 +17,7 @@ import { Torneo } from "../../../utils/types";
 import { useProfileStore } from "@/store/useProfileStore";
 
 function TorneosContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { profile } = useProfileStore();
   const initialQuery = searchParams.get("q") || "";
@@ -83,18 +84,14 @@ function TorneosContent() {
   // ==========================================
   // ⚡ GENERACIÓN DINÁMICA DE FILTROS ⚡
   // ==========================================
-
-  // 1. Extraemos todas las provincias únicas de los clubes de los torneos cargados
   const PROVINCIAS_DINAMICAS = Array.from(
     new Set(tournaments.map((t) => t.clubes?.provincia).filter(Boolean)),
   ).sort() as string[];
 
-  // 2. Extraemos todos los niveles/categorías únicos de los torneos cargados
   const CATEGORIAS_DINAMICAS = Array.from(
     new Set(tournaments.map((t) => t.nivel).filter(Boolean)),
   ).sort() as string[];
 
-  // Los estados sí los dejamos fijos porque definen los colores de la UI
   const ESTADOS = [
     {
       id: "Inscripción",
@@ -125,9 +122,12 @@ function TorneosContent() {
     const matchesProvincia =
       !activeProvincia || t.clubes?.provincia === activeProvincia;
     const matchesCategory = !activeCategory || t.nivel === activeCategory;
-    const matchesStatus = !activeStatus || t.estado === activeStatus;
+    // Hacemos el matcheo de estado insensible a mayúsculas
+    const matchesStatus =
+      !activeStatus ||
+      (t.estado || "").toLowerCase() === activeStatus.toLowerCase();
     const matchesModalidad =
-      !activeModalidad || t.modalidad === activeModalidad; // NUEVO
+      !activeModalidad || t.modalidad === activeModalidad;
 
     return (
       matchesSearch &&
@@ -140,12 +140,8 @@ function TorneosContent() {
 
   // --- LÓGICA DE ORDENAMIENTO ---
   const sortedTournaments = [...filteredTournaments].sort((a, b) => {
-    if (sortBy === "recientes") {
-      return Number(b.id) - Number(a.id);
-    }
-    if (sortBy === "alfabetico") {
-      return a.nombre.localeCompare(b.nombre);
-    }
+    if (sortBy === "recientes") return Number(b.id) - Number(a.id);
+    if (sortBy === "alfabetico") return a.nombre.localeCompare(b.nombre);
     return 0;
   });
 
@@ -159,12 +155,8 @@ function TorneosContent() {
 
   const formatFecha = (fechaVal?: string | number | null) => {
     if (!fechaVal) return "Fecha a confirmar";
-
     const date = new Date(String(fechaVal));
-
-    // Ajuste de zona horaria para que no atrase un día
     date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
-
     return date.toLocaleDateString("es-AR", {
       weekday: "short",
       day: "2-digit",
@@ -218,7 +210,7 @@ function TorneosContent() {
             />
           </div>
 
-          {/* FILTRO PROVINCIA (Dinámico) */}
+          {/* FILTRO PROVINCIA */}
           {PROVINCIAS_DINAMICAS.length > 0 && (
             <div className="space-y-4">
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -251,7 +243,7 @@ function TorneosContent() {
             </div>
           )}
 
-          {/* FILTRO CATEGORÍA/NIVEL (Dinámico) */}
+          {/* FILTRO NIVEL */}
           {CATEGORIAS_DINAMICAS.length > 0 && (
             <div className="space-y-4">
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -277,6 +269,7 @@ function TorneosContent() {
             </div>
           )}
 
+          {/* FILTRO ESTADO */}
           <div className="space-y-4">
             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
               Estado
@@ -310,6 +303,7 @@ function TorneosContent() {
             </div>
           </div>
 
+          {/* FILTRO MODALIDAD */}
           <div className="space-y-4">
             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
               Modalidad
@@ -423,23 +417,62 @@ function TorneosContent() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {sortedTournaments.map((t) => {
+                // NORMALIZACIÓN DE ESTADOS (Blindaje contra mayúsculas/minúsculas)
+                const estadoStr = (t.estado || "").toLowerCase().trim();
                 const isAbierto =
-                  t.estado === "Inscripción" || t.estado === "Borrador";
+                  estadoStr === "inscripción" || estadoStr === "borrador";
+                const isEnCurso = estadoStr === "en curso";
+                const isFinalizado = estadoStr === "finalizado";
+
                 const isEnrolled =
                   profile &&
                   t.inscripciones?.some((ins) => ins.usuario_id === profile.id);
+
+                // --- LÓGICA DINÁMICA DEL BOTÓN SEGÚN ESTADO ---
+                let btnText = "Inscribirme";
+                let btnHref = `/torneos/${t.id}`;
+                let btnClass = "bg-padel-4 text-[#111] hover:bg-[#b3e600]";
+
+                if (isEnCurso) {
+                  btnText = "Ver en vivo";
+                  btnHref = `/torneos/${t.id}`;
+                  btnClass =
+                    "bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20";
+                } else if (isFinalizado) {
+                  btnText = "Ver resultados";
+                  btnHref = `/torneos/${t.id}`;
+                  btnClass =
+                    "bg-white/10 text-white hover:bg-white/20 border border-white/10";
+                } else {
+                  if (!profile) {
+                    btnText = "Ingresar";
+                    btnHref = "/login";
+                  } else if (isEnrolled) {
+                    btnText = "Ver inscripción";
+                    btnHref = "/mis-inscripciones";
+                    btnClass = "bg-gray-800 text-gray-300 hover:bg-gray-700";
+                  }
+                }
+
+                // Definimos el label visual del estado (con Capitalización correcta)
+                const labelEstado = isAbierto
+                  ? "Abierto"
+                  : isEnCurso
+                    ? "En curso"
+                    : isFinalizado
+                      ? "Finalizado"
+                      : t.estado;
+
                 return (
                   <div
                     key={t.id}
                     className="group bg-[#161616] border border-white/5 hover:border-padel-4/40 rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_0_25px_rgba(204,255,0,0.05)] h-70"
                   >
-                    {/* ENCABEZADO DE LA CARD (Pill y Trofeo) */}
-
+                    {/* ENCABEZADO DE LA CARD */}
                     <div className="flex flex-wrap gap-2 mb-4">
                       <div className="bg-padel-4 text-[#111] text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide">
                         {t.nivel || "5ª"} {t.categoria || "Caballeros"}
                       </div>
-                      {/* Badge de Modalidad */}
                       <div className="bg-white/10 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                         {t.modalidad || "Duplas"}
                       </div>
@@ -447,7 +480,10 @@ function TorneosContent() {
 
                     {/* CUERPO DE LA CARD */}
                     <div className="mt-auto mb-6">
-                      <h3 className="text-xl font-bold text-white mb-3 line-clamp-1">
+                      <h3
+                        className="text-xl font-bold text-white mb-3 line-clamp-1"
+                        title={t.nombre}
+                      >
                         {t.nombre}
                       </h3>
                       <div className="space-y-2">
@@ -469,37 +505,27 @@ function TorneosContent() {
                       </div>
                     </div>
 
-                    {/* FOOTER DE LA CARD (Estado y Botón) */}
-                    <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                      <div className="flex items-center gap-2">
+                    {/* FOOTER DE LA CARD BLINDADO CON FLEXBOX */}
+                    <div className="flex items-center justify-between pt-4 border-t border-white/5 gap-3">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span
-                          className={`w-2.5 h-2.5 rounded-full ${isAbierto ? "bg-[#00ff88] shadow-[0_0_8px_rgba(0,255,136,0.6)]" : t.estado === "Finalizado" ? "bg-gray-500" : "bg-[#ffb800] shadow-[0_0_8px_rgba(255,184,0,0.6)]"}`}
+                          className={`w-2.5 h-2.5 rounded-full ${isAbierto ? "bg-[#00ff88] shadow-[0_0_8px_rgba(0,255,136,0.6)]" : isFinalizado ? "bg-gray-500" : "bg-red-500 shadow-[0_0_8px_rgba(255,0,0,0.6)]"}`}
                         ></span>
                         <span
-                          className={`text-sm font-bold ${isAbierto ? "text-[#00ff88]" : t.estado === "Finalizado" ? "text-gray-400" : "text-[#ffb800]"}`}
+                          className={`text-sm font-bold truncate ${isAbierto ? "text-[#00ff88]" : isFinalizado ? "text-gray-400" : "text-red-500"}`}
                         >
-                          {isAbierto ? "Abierto" : t.estado}
+                          {labelEstado}
                         </span>
                       </div>
+
                       <Link
-                        href={
-                          !profile
-                            ? "/login"
-                            : isEnrolled
-                              ? "/mis-inscripciones"
-                              : `/torneos/${t.id}`
-                        }
-                        className={`font-bold px-5 py-2.5 rounded-xl text-sm transition-colors ${
-                          isEnrolled
-                            ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                            : "bg-padel-4 text-[#111] hover:bg-[#b3e600]"
-                        }`}
+                        href={btnHref}
+                        onClick={() => {
+                          setTimeout(() => router.refresh(), 100);
+                        }}
+                        className={`font-bold px-4 py-2.5 rounded-xl text-[13px] transition-colors whitespace-nowrap shrink-0 text-center ${btnClass}`}
                       >
-                        {!profile
-                          ? "Ingresar"
-                          : isEnrolled
-                            ? "Ver inscripción"
-                            : "Inscribirme"}
+                        {btnText}
                       </Link>
                     </div>
                   </div>

@@ -147,6 +147,8 @@ export default function TorneosPage() {
       }
 
       setIsModalOpen(false);
+      router.refresh();
+
       setRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error("Error al guardar:", error);

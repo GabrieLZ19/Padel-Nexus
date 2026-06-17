@@ -421,8 +421,9 @@ export default function GestionInscripcionesPage() {
                           )}
                           <div>
                             <div className="font-bold text-white text-[14px]">
+                              {/* Eliminamos ins.perfiles porque el backend ya inyectó el nombre dentro de jugador1_nombre */}
                               {ins.jugador1_nombre || "Jugador Desconocido"}
-                              {esDupla && (
+                              {esDupla && ins.jugador2_nombre && (
                                 <span className="text-gray-400 font-medium">
                                   {" "}
                                   / {ins.jugador2_nombre}
