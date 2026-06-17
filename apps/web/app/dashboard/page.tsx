@@ -12,6 +12,9 @@ import {
   TrendingUp,
   CalendarCheck,
   ShoppingBag,
+  Clock,
+  CheckCircle2,
+  Activity,
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { InscripcionesService } from "@/utils/services/inscripciones";
@@ -59,7 +62,9 @@ export default function DashboardHome() {
 
   // 1. Torneos y Reservas Activas
   const torneosActivos = torneos.filter(
-    (t) => t.estado === "Inscripción" || t.estado === "En curso",
+    (t) =>
+      (t.estado || "").toLowerCase() === "inscripción" ||
+      (t.estado || "").toLowerCase() === "en curso",
   ).length;
   const inscripcionesTorneo = inscripciones.filter(
     (i) => !i.tipo || i.tipo === "Inscripción torneo",
@@ -68,7 +73,11 @@ export default function DashboardHome() {
     (i) => i.tipo === "Reserva cancha",
   );
 
-  // 2. Ingresos (Solo contamos lo que está "Confirmado")
+  const inscripcionesConfirmadas = inscripcionesTorneo.filter(
+    (i) => i.estado_pago === "Confirmado",
+  ).length;
+
+  // 2. Ingresos
   const ingresosTorneos = inscripcionesTorneo
     .filter((i) => i.estado_pago === "Confirmado")
     .reduce((a, b) => a + Number(b.monto), 0);
@@ -76,6 +85,11 @@ export default function DashboardHome() {
     .filter((i) => i.estado_pago === "Confirmado")
     .reduce((a, b) => a + Number(b.monto), 0);
   const ingresosTotales = ingresosTorneos + ingresosReservas;
+
+  // Ingresos pendientes (para el badge dinámico)
+  const ingresosPendientes = inscripciones
+    .filter((i) => i.estado_pago === "Pendiente")
+    .reduce((a, b) => a + Number(b.monto), 0);
 
   // 3. Usuarios Únicos (Aproximación leyendo los nombres de jugadores en inscripciones)
   const uniqueUsers = new Set();
@@ -121,7 +135,7 @@ export default function DashboardHome() {
 
   // Contamos inscripciones por mes
   inscripciones.forEach((ins) => {
-    const d = new Date(ins.created_at);
+    const d = new Date(ins.created_at || new Date());
     const m = d.getMonth();
     const y = d.getFullYear();
     const targetMonth = last7Months.find(
@@ -134,6 +148,7 @@ export default function DashboardHome() {
 
   const barChartData = last7Months.map((m, index) => ({
     month: m.label,
+    count: m.count,
     height: `${Math.max((m.count / maxCount) * 100, 10)}%`, // Altura dinámica (minimo 10% para que se vea la barra)
     active: index === 6, // El mes actual siempre es el último y está activo
   }));
@@ -143,14 +158,16 @@ export default function DashboardHome() {
   const progressData = [
     {
       label: "Inscripciones torneos",
+      value: ingresosTorneos,
       percentage: Math.round((ingresosTorneos / totalCalc) * 100),
     },
     {
       label: "Reservas de canchas",
+      value: ingresosReservas,
       percentage: Math.round((ingresosReservas / totalCalc) * 100),
     },
-    { label: "Marketplace", percentage: 0 },
-    { label: "Licencias", percentage: 0 },
+    { label: "Marketplace", value: 0, percentage: 0 },
+    { label: "Licencias", value: 0, percentage: 0 },
   ];
 
   // ==========================================
@@ -169,38 +186,50 @@ export default function DashboardHome() {
     {
       title: "Jugadores en la red",
       value: usuariosActivos.toString(),
-      change: "+12%",
+      change: "Únicos totales",
       icon: Users,
+      trendIcon: Users,
+      trendColor: "text-padel-4",
     },
     {
       title: "Torneos activos",
       value: torneosActivos.toString(),
-      change: "En curso",
+      change: `De ${torneos.length} creados`,
       icon: Trophy,
+      trendIcon: Activity,
+      trendColor: "text-padel-4",
     },
     {
       title: "Inscripciones a torneos",
       value: inscripcionesTorneo.length.toString(),
-      change: "Totales",
+      change: `${inscripcionesConfirmadas} Confirmadas`,
       icon: ClipboardList,
+      trendIcon: CheckCircle2,
+      trendColor: "text-padel-4",
     },
     {
       title: "Reservas del mes",
       value: reservasCancha.length.toString(),
-      change: "Canchas",
+      change: "Global",
       icon: CalendarCheck,
+      trendIcon: Calendar,
+      trendColor: "text-padel-4",
     },
     {
       title: "Ventas marketplace",
       value: "$0",
-      change: "Fase 2",
+      change: "Próximamente",
       icon: ShoppingBag,
+      trendIcon: Clock,
+      trendColor: "text-gray-400",
     },
     {
       title: "Ingresos netos",
       value: formatMoney(ingresosTotales),
-      change: "+15%",
+      change: `${formatMoney(ingresosPendientes)} Pendiente`,
       icon: BadgeDollarSign,
+      trendIcon: TrendingUp,
+      trendColor: "text-[#ffb800]",
     },
   ];
 
@@ -258,35 +287,37 @@ export default function DashboardHome() {
 
       {/* TARJETAS DE MÉTRICAS (KPIs) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-        {metrics.map((metric, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1, duration: 0.4 }}
-            className="bg-[#151515] p-6 rounded-2xl border border-white/5 flex flex-col justify-between min-h-55 hover:border-white/10 transition-colors"
-          >
-            <div className="flex items-start justify-between">
-              <div className="size-12 bg-[#2a3614] rounded-xl flex items-center justify-center border border-padel-4/10">
-                <metric.icon className="size-6 text-padel-4 stroke-[1.5]" />
+        {metrics.map((metric, index) => {
+          const TrendIcon = metric.trendIcon;
+          return (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1, duration: 0.4 }}
+              className="bg-[#151515] p-6 rounded-2xl border border-white/5 flex flex-col justify-between min-h-55 hover:border-white/10 transition-colors"
+            >
+              <div className="flex items-start justify-between">
+                <div className="size-12 bg-[#2a3614] rounded-xl flex items-center justify-center border border-padel-4/10">
+                  <metric.icon className="size-6 text-padel-4 stroke-[1.5]" />
+                </div>
+                {/* BADGE DINÁMICO E INFORMATIVO */}
+                <div className="flex items-center gap-1.5 bg-[#1c2e0e] text-gray-300 px-3 py-1.5 rounded-full text-[11px] font-bold border border-padel-4/20 tracking-wide">
+                  <TrendIcon className={`size-3.5 ${metric.trendColor}`} />
+                  {metric.change}
+                </div>
               </div>
-              <div className="flex items-center gap-1 bg-[#1c2e0e] text-padel-4 px-2.5 py-1 rounded-full text-[11px] font-bold border border-padel-4/20 uppercase tracking-widest">
-                {metric.change.includes("%") && (
-                  <TrendingUp className="size-3.5 stroke-3" />
-                )}
-                {metric.change}
+              <div className="mt-6">
+                <p className="text-5xl font-bold text-white mb-1 tracking-tight">
+                  {metric.value}
+                </p>
+                <h3 className="text-gray-400 font-medium text-sm">
+                  {metric.title}
+                </h3>
               </div>
-            </div>
-            <div className="mt-6">
-              <p className="text-5xl font-bold text-white mb-1 tracking-tight">
-                {metric.value}
-              </p>
-              <h3 className="text-gray-400 font-medium text-sm">
-                {metric.title}
-              </h3>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* SECCIÓN INFERIOR: GRÁFICOS */}
@@ -308,21 +339,20 @@ export default function DashboardHome() {
           </div>
 
           <div className="overflow-x-auto pb-4">
-            <div className="min-w-120 grid grid-cols-7 gap-3 md:grid-cols-7 md:min-w-0">
+            <div className="min-w-120 grid grid-cols-7 gap-3 md:grid-cols-7 md:min-w-0 mt-8">
               {barChartData.map((data, index) => (
                 <div
                   key={index}
-                  className="flex flex-col items-center w-full group relative"
+                  className="flex flex-col items-center w-full relative"
                 >
-                  {/* Tooltip con el valor real */}
-                  <div className="opacity-0 group-hover:opacity-100 absolute -top-8 text-xs font-bold bg-white text-black px-2 py-1 rounded transition-opacity pointer-events-none">
-                    {data.height === "10%" && last7Months[index].count === 0
-                      ? "0"
-                      : last7Months[index].count}{" "}
-                    req.
-                  </div>
+                  <div className="w-full relative flex flex-col justify-end h-48 md:h-64 items-center">
+                    {/* NÚMERO VISIBLE PERMANENTEMENTE SOBRE LA BARRA */}
+                    <div
+                      className={`mb-2 text-sm font-black transition-colors ${data.active ? "text-padel-4 drop-shadow-[0_0_8px_rgba(204,255,0,0.5)]" : "text-gray-400"}`}
+                    >
+                      {data.count}
+                    </div>
 
-                  <div className="w-full relative flex justify-center h-40 md:h-60 items-end">
                     <motion.div
                       initial={{ height: 0 }}
                       animate={{ height: data.height }}
@@ -334,12 +364,12 @@ export default function DashboardHome() {
                       className={`w-full max-w-17.5 rounded-t-xl transition-all duration-300 ${
                         data.active
                           ? "bg-padel-4 shadow-[0_0_30px_rgba(204,255,0,0.25)]"
-                          : "bg-[#33421b] group-hover:bg-[#435723]"
+                          : "bg-[#33421b] hover:bg-[#435723]"
                       }`}
                     />
                   </div>
                   <span
-                    className={`text-sm font-medium mt-6 ${data.active ? "text-padel-4 font-bold" : "text-gray-400"}`}
+                    className={`text-sm font-medium mt-4 ${data.active ? "text-padel-4 font-bold" : "text-gray-400"}`}
                   >
                     {data.month}
                   </span>
@@ -367,9 +397,15 @@ export default function DashboardHome() {
                   <span className="text-sm font-medium text-gray-300">
                     {item.label}
                   </span>
-                  <span className="text-sm font-bold text-gray-400">
-                    {item.percentage}%
-                  </span>
+                  {/* MONTO EN DINERO VISIBLE JUNTO AL PORCENTAJE */}
+                  <div className="text-right">
+                    <span className="text-sm font-black text-white block">
+                      {formatMoney(item.value)}
+                    </span>
+                    <span className="text-xs font-bold text-gray-500">
+                      {item.percentage}%
+                    </span>
+                  </div>
                 </div>
                 <div className="w-full h-3 bg-[#222222] rounded-full overflow-hidden">
                   <motion.div
