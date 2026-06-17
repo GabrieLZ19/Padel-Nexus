@@ -3,13 +3,80 @@ import { supabase } from "../config/supabase";
 
 export const getAllTorneos = async (req: Request, res: Response) => {
   try {
-    const { data, error } = await supabase
+    const { page, limit, search, estado } = req.query;
+    const hasPage = typeof page !== "undefined";
+    const hasLimit = typeof limit !== "undefined";
+
+    let query = supabase
       .from("torneos")
-      .select(`*, clubes(nombre, provincia), inscripciones(usuario_id)`)
+      .select(`*, clubes(nombre, provincia), inscripciones(usuario_id)`, {
+        count: "exact",
+      })
       .order("created_at", { ascending: false });
 
+    if (search) {
+      query = query.ilike("nombre", `%${search}%`);
+    }
+
+    if (estado) {
+      const estados = String(estado)
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      if (estados.length === 1) {
+        query = query.eq("estado", estados[0]);
+      } else if (estados.length > 1) {
+        query = query.in("estado", estados);
+      }
+    }
+
+    if (hasPage) {
+      const pageNum = Number(page);
+      const limitNum = Number(limit || "10");
+      const from = (pageNum - 1) * limitNum;
+      const to = from + limitNum - 1;
+
+      const { data, error, count } = (await query.range(from, to)) as any;
+
+      if (error) throw error;
+
+      const formattedData = (data || []).map((torneo: any) => ({
+        ...torneo,
+        cupos_actuales: torneo.cupos_actuales || 0,
+        cupos_maximos: torneo.cupos_maximos || 0,
+      }));
+
+      return res.status(200).json({ data: formattedData, total: count || 0 });
+    }
+
+    if (hasLimit) {
+      const limitNum = Number(limit || "10");
+      const { data, error } = await query
+        .select(`*, clubes(nombre, provincia), inscripciones(usuario_id)`)
+        .order("created_at", { ascending: false })
+        .range(0, limitNum - 1);
+      if (error) throw error;
+      const formattedData = (data || []).map((torneo: any) => ({
+        ...torneo,
+        cupos_actuales: torneo.cupos_actuales || 0,
+        cupos_maximos: torneo.cupos_maximos || 0,
+      }));
+      return res.status(200).json(formattedData);
+    }
+
+    const { data, error } = await query
+      .select(`*, clubes(nombre, provincia), inscripciones(usuario_id)`)
+      .order("created_at", { ascending: false });
     if (error) throw error;
-    res.status(200).json(data);
+
+    const formattedData = (data || []).map((torneo: any) => ({
+      ...torneo,
+      cupos_actuales: torneo.cupos_actuales || 0,
+      cupos_maximos: torneo.cupos_maximos || 0,
+    }));
+
+    res.status(200).json(formattedData);
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";
