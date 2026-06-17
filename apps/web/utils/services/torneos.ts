@@ -1,12 +1,43 @@
 import { api } from "../api";
 import { Torneo, FormTorneoState, Partido } from "../types";
 
+export interface PaginatedTorneos {
+  data: Torneo[];
+  total: number;
+}
+
 export const TorneosService = {
   async getAll(options?: { limit?: number }): Promise<Torneo[]> {
-    const response = await api.get<Torneo[]>("/torneos", {
-      params: { limit: options?.limit },
+    const params: Record<string, unknown> = {};
+    if (options?.limit !== undefined) {
+      params.limit = options.limit;
+    }
+
+    const response = await api.get<Torneo[] | PaginatedTorneos>("/torneos", {
+      params,
     });
-    return response.data;
+    const payload = response.data as Torneo[] | PaginatedTorneos;
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+    return Array.isArray(payload.data) ? payload.data : [];
+  },
+  async getByPage(
+    page: number,
+    limit: number,
+    search?: string,
+    estado?: string,
+  ): Promise<PaginatedTorneos> {
+    const response = await api.get<PaginatedTorneos | Torneo[]>("/torneos", {
+      params: { page, limit, search, estado },
+    });
+
+    const payload = response.data as PaginatedTorneos | Torneo[];
+    if (Array.isArray(payload)) {
+      return { data: payload, total: payload.length };
+    }
+
+    return payload;
   },
 
   async getById(id: string): Promise<Torneo> {

@@ -33,7 +33,7 @@ export default function Pagination({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mt-4">
       <div className="text-sm text-gray-400">
-        Mostrando {currentCount} de {total} inscripciones
+        Mostrando {currentCount} de {total} resultados
       </div>
 
       <div className="inline-flex flex-wrap items-center gap-2">

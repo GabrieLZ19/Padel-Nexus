@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { TorneosService } from "../../../utils/services/torneos";
 import { ClubesService } from "../../../utils/services/clubes";
+import Pagination from "../../../components/ui/Pagination";
 import { Torneo, Club, FormTorneoState } from "../../../utils/types";
 
 import TorneoModal from "../../../components/torneos/TorneoModal";
@@ -37,6 +38,8 @@ const ESTADO_INICIAL: FormTorneoState = {
   premio_3: "",
 };
 
+const PAGE_SIZE = 5;
+
 export default function TorneosPage() {
   // 2. Inicializamos el router
   const router = useRouter();
@@ -44,12 +47,14 @@ export default function TorneosPage() {
   const [activeTab, setActiveTab] = useState<string>("Todos");
   const [search, setSearch] = useState<string>("");
   const [tournaments, setTournaments] = useState<Torneo[]>([]);
+  const [total, setTotal] = useState(0);
   const [clubs, setClubs] = useState<Club[]>([]);
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [page, setPage] = useState<number>(1);
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -67,15 +72,23 @@ export default function TorneosPage() {
 
     const fetchData = async () => {
       try {
-        const [torneosData, clubesResponse] = await Promise.all([
-          TorneosService.getAll(),
+        const estadoParam =
+          activeTab === "Activos"
+            ? "Inscripción,En curso"
+            : activeTab === "Borradores"
+              ? "Borrador"
+              : activeTab === "Finalizados"
+                ? "Finalizado"
+                : undefined;
 
+        const [torneosData, clubesResponse] = await Promise.all([
+          TorneosService.getByPage(page, PAGE_SIZE, search, estadoParam),
           ClubesService.getAll().catch(() => ({ data: [], total: 0 })),
         ]);
 
         if (isMounted) {
-          setTournaments(torneosData || []);
-
+          setTournaments(torneosData.data || []);
+          setTotal(torneosData.total || 0);
           setClubs(clubesResponse?.data || []);
         }
       } catch (error: unknown) {
@@ -90,12 +103,13 @@ export default function TorneosPage() {
     return () => {
       isMounted = false;
     };
-  }, [refreshKey]);
+  }, [refreshKey, page, search, activeTab]);
 
   // --- MANEJADORES DE ACCIONES ---
   const handleOpenCreate = () => {
     setFormData(ESTADO_INICIAL);
     setEditingId(null);
+    setPage(1);
     setIsModalOpen(true);
   };
 
@@ -200,18 +214,6 @@ export default function TorneosPage() {
     });
   };
 
-  // --- FILTROS ---
-  const filteredTournaments = tournaments.filter((t) => {
-    const matchesTab =
-      activeTab === "Todos" ||
-      (activeTab === "Activos" &&
-        (t.estado === "Inscripción" || t.estado === "En curso")) ||
-      (activeTab === "Borradores" && t.estado === "Borrador") ||
-      (activeTab === "Finalizados" && t.estado === "Finalizado");
-    const matchesSearch = t.nombre.toLowerCase().includes(search.toLowerCase());
-    return matchesTab && matchesSearch;
-  });
-
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 space-y-8 md:px-10 md:py-10">
       {/* HEADER */}
@@ -220,9 +222,7 @@ export default function TorneosPage() {
           <h1 className="text-3xl font-bold text-white tracking-tight">
             Gestión de torneos
           </h1>
-          <p className="text-gray-400 mt-1">
-            {tournaments.length} torneos en total
-          </p>
+          <p className="text-gray-400 mt-1">{total} torneos en total</p>
         </div>
         <button
           onClick={handleOpenCreate}
@@ -238,7 +238,10 @@ export default function TorneosPage() {
           {TABS.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                setPage(1);
+              }}
               className={`whitespace-nowrap rounded-lg px-5 py-2 text-sm font-bold transition-all ${
                 activeTab === tab
                   ? "bg-padel-4 text-padel-1 shadow-[0_0_10px_rgba(204,255,0,0.15)]"
@@ -256,7 +259,10 @@ export default function TorneosPage() {
             type="text"
             placeholder="Buscar torneo..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="w-full pl-11 pr-4 py-2.5 bg-[#111111] rounded-xl border border-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-padel-4/50 transition-colors"
           />
         </div>
@@ -328,7 +334,7 @@ export default function TorneosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {filteredTournaments.length === 0 ? (
+                {tournaments.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="p-20 text-center">
                       <div className="flex flex-col items-center justify-center text-gray-500">
@@ -343,7 +349,7 @@ export default function TorneosPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredTournaments.map((t) => (
+                  tournaments.map((t) => (
                     <tr
                       key={t.id}
                       className="hover:bg-white/2 transition-colors group"
@@ -449,6 +455,14 @@ export default function TorneosPage() {
           </div>
         )}
       </div>
+
+      <Pagination
+        page={page}
+        total={total}
+        pageSize={PAGE_SIZE}
+        currentCount={tournaments.length}
+        onPageChange={setPage}
+      />
 
       <TorneoModal
         isOpen={isModalOpen}
