@@ -12,10 +12,15 @@ import {
 import { LicenciasService } from "@/utils/services/licencias";
 import { Licencia } from "@/utils/types";
 import FeedbackModal from "@/components/ui/FeedbackModal";
+import Pagination from "@/components/ui/Pagination";
 import Link from "next/link";
+
+const PAGE_SIZE = 5;
 
 export default function JugadoresLicenciasPage() {
   const [licencias, setLicencias] = useState<Licencia[]>([]);
+  const [total, setTotal] = useState<number>(0);
+  const [page, setPage] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>("");
 
@@ -33,27 +38,38 @@ export default function JugadoresLicenciasPage() {
   );
   const [procesando, setProcesando] = useState(false);
 
-  const fetchLicencias = useCallback(async (isMounted: boolean) => {
-    try {
-      const data = await LicenciasService.getAll();
-      if (isMounted) setLicencias(data || []);
-    } catch (error) {
-      console.error("Error al cargar licencias:", error);
-    } finally {
-      if (isMounted) setLoading(false);
-    }
-  }, []);
+  const fetchLicencias = useCallback(
+    async (isMounted: boolean, pageNumber: number, query?: string) => {
+      try {
+        const response = await LicenciasService.getByPage(
+          pageNumber,
+          PAGE_SIZE,
+          query,
+        );
+
+        if (isMounted) {
+          setLicencias(response.data || []);
+          setTotal(response.total || 0);
+        }
+      } catch (error) {
+        console.error("Error al cargar licencias:", error);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     let isMounted = true;
     const defer = setTimeout(() => {
-      fetchLicencias(isMounted);
+      void fetchLicencias(isMounted, page, search);
     }, 0);
     return () => {
       isMounted = false;
       clearTimeout(defer);
     };
-  }, [fetchLicencias]);
+  }, [fetchLicencias, page, search]);
 
   // Acción REAL para validar o rechazar
   const confirmarEstadoLicencia = async (
@@ -80,7 +96,7 @@ export default function JugadoresLicenciasPage() {
       });
 
       setLicenciaAVerificar(null); // Cerramos el modal de verificación
-      await fetchLicencias(true); // Recargamos la tabla
+      await fetchLicencias(true, page, search); // Recargamos la tabla
     } catch (error) {
       console.error("Error al procesar licencia:", error);
       setFeedback({
@@ -94,14 +110,7 @@ export default function JugadoresLicenciasPage() {
     }
   };
 
-  const filteredLicencias = licencias.filter((l) => {
-    const term = search.toLowerCase();
-    return (
-      (l.perfiles?.nombre_completo || "").toLowerCase().includes(term) ||
-      (l.perfiles?.email || "").toLowerCase().includes(term) ||
-      (l.nro_licencia || "").toLowerCase().includes(term)
-    );
-  });
+  const filteredLicencias = licencias;
 
   const formatVencimiento = (dateString?: string | null) => {
     if (!dateString) return "—";
@@ -118,9 +127,9 @@ export default function JugadoresLicenciasPage() {
             Jugadores y licencias
           </h1>
           <p className="text-gray-400 mt-1">
-            {licencias.length} solicitudes en total ·{" "}
+            Mostrando {licencias.length} de {total} solicitudes ·{" "}
             {licencias.filter((l) => l.estado === "Pendiente").length}{" "}
-            pendientes
+            pendientes en esta página
           </p>
         </div>
 
@@ -139,8 +148,49 @@ export default function JugadoresLicenciasPage() {
       {/* TABLA PRINCIPAL */}
       <div className="bg-padel-5 rounded-3xl border border-white/5 overflow-hidden shadow-xl">
         {loading ? (
-          <div className="p-10 text-center text-gray-500 animate-pulse">
-            Cargando licencias...
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-225">
+              <thead>
+                <tr className="border-b border-white/5 text-gray-400 text-xs font-bold uppercase tracking-wider bg-black/20">
+                  <th className="py-5 px-8">Jugador</th>
+                  <th className="py-5 px-6">Categoría</th>
+                  <th className="py-5 px-6">N° Licencia</th>
+                  <th className="py-5 px-6">Estado</th>
+                  <th className="py-5 px-6">Vence</th>
+                  <th className="py-5 px-8">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 animate-pulse">
+                {[...Array(5)].map((_, index) => (
+                  <tr key={index}>
+                    <td className="py-4 px-8">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse" />
+                        <div className="space-y-2">
+                          <div className="h-4 w-40 bg-white/10 rounded" />
+                          <div className="h-3 w-32 bg-white/5 rounded" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="h-4 w-24 bg-white/10 rounded" />
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="h-4 w-28 bg-white/10 rounded" />
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="h-4 w-20 bg-white/10 rounded" />
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="h-4 w-16 bg-white/10 rounded" />
+                    </td>
+                    <td className="py-4 px-8">
+                      <div className="h-10 w-full bg-white/10 rounded-lg" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : filteredLicencias.length === 0 ? (
           <div className="p-20 text-center text-gray-500 font-medium">
@@ -261,6 +311,14 @@ export default function JugadoresLicenciasPage() {
           </div>
         )}
       </div>
+
+      <Pagination
+        page={page}
+        total={total}
+        pageSize={PAGE_SIZE}
+        currentCount={licencias.length}
+        onPageChange={setPage}
+      />
 
       {/* --- MODAL DE VERIFICACIÓN PREVIA --- */}
       {licenciaAVerificar && (

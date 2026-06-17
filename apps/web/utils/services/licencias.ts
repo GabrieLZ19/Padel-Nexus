@@ -8,11 +8,36 @@ interface DatosSolicitud {
   provincia: string;
 }
 
+export interface PaginatedLicencias {
+  data: Licencia[];
+  total: number;
+}
+
 export const LicenciasService = {
   // Para el Admin
   async getAll(): Promise<Licencia[]> {
     const response = await api.get<Licencia[]>("/licencias");
     return response.data;
+  },
+
+  async getByPage(
+    page: number,
+    limit: number,
+    search?: string,
+  ): Promise<PaginatedLicencias> {
+    const response = await api.get<PaginatedLicencias | Licencia[]>(
+      "/licencias",
+      {
+        params: { page, limit, search },
+      },
+    );
+
+    const payload = response.data as PaginatedLicencias | Licencia[];
+    if (Array.isArray(payload)) {
+      return { data: payload, total: payload.length };
+    }
+
+    return payload;
   },
 
   // Para el Usuario (Solicitud)
