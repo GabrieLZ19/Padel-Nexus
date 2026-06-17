@@ -19,22 +19,31 @@ import {
   MapPin,
 } from "lucide-react";
 import { InscripcionesService } from "../../../utils/services/inscripciones";
-import { Inscripcion } from "../../../utils/types";
+import { Inscripcion, Torneo } from "../../../utils/types";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "../../../components/ui/FeedbackModal";
 import InscripcionDetalleModal from "../../../components/inscripciones/InscripcionDetalleModal";
+import CustomDropdown from "../../../components/ui/CustomDropdown";
+import Pagination from "../../../components/ui/Pagination";
+import { TorneosService } from "@/utils/services";
 
 const TABS = ["Todas", "Pendientes", "Confirmadas", "Rechazadas"];
 
+const PAGE_SIZE = 5;
+
 export default function GestionInscripcionesPage() {
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
+  const [torneos, setTorneos] = useState<Torneo[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState<boolean>(true);
+
+  const [page, setPage] = useState<number>(1);
+  const [filterTorneo, setFilterTorneo] = useState<string>("");
   const [search, setSearch] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>("Todas");
   const [refreshKey, setRefreshKey] = useState<number>(0);
 
-  // Estados de Modales
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
     isOpen: false,
     title: "",
@@ -45,25 +54,31 @@ export default function GestionInscripcionesPage() {
   const [selectedInscripcion, setSelectedInscripcion] =
     useState<Inscripcion | null>(null);
 
-  // Carga de datos reales desde la API
   useEffect(() => {
-    let isMounted = true;
-    InscripcionesService.getAll()
-      .then((data) => {
-        console.log("Respuesta de la API (Inscripciones):", data);
-        if (isMounted) {
-          setInscripciones(data || []);
-          setLoading(false);
-        }
-      })
-      .catch((error) => {
-        console.error("Error al cargar inscripciones:", error);
-        if (isMounted) setLoading(false);
-      });
-    return () => {
-      isMounted = false;
+    TorneosService.getAll().then(setTorneos).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const res = await InscripcionesService.getByPage(
+          filterTorneo,
+          page,
+          PAGE_SIZE,
+        );
+        setInscripciones(Array.isArray(res.data) ? res.data : []);
+        setTotal(res.total || 0);
+      } catch (err) {
+        console.error("Error al cargar:", err);
+        setInscripciones([]);
+      } finally {
+        setLoading(false);
+      }
     };
-  }, [refreshKey]);
+
+    void loadData();
+  }, [filterTorneo, page, refreshKey]);
 
   // CORRECCIÓN: Tipado estricto a string (UUID)
   const handleCambiarEstado = (
@@ -128,7 +143,6 @@ export default function GestionInscripcionesPage() {
     setDetalleModalOpen(true);
   };
 
-  // CORRECCIÓN: Filtrado con blindaje contra valores Nulos/Indefinidos
   const filteredInscripciones = inscripciones.filter((i) => {
     const term = search.toLowerCase();
     const nombreJ1 = (i.jugador1_nombre || "").toLowerCase();
@@ -291,6 +305,22 @@ export default function GestionInscripcionesPage() {
 
       {/* BARRA DE FILTROS Y BÚSQUEDA */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 pt-4">
+        <div className="w-full xl:w-[320px]">
+          <CustomDropdown
+            value={filterTorneo}
+            onChange={(value) => {
+              setFilterTorneo(value);
+              setPage(1);
+            }}
+            placeholder="Todos los torneos"
+            options={[
+              { value: "", label: "Todos los torneos" },
+              ...torneos.map((t) => ({ value: t.id, label: t.nombre })),
+            ]}
+            disabled={loading}
+          />
+        </div>
+
         <div className="inline-flex bg-[#111111] p-1.5 rounded-xl border border-white/5 overflow-x-auto w-full sm:w-auto">
           {TABS.map((tab) => (
             <button
@@ -533,6 +563,13 @@ export default function GestionInscripcionesPage() {
         )}
       </div>
 
+      <Pagination
+        page={page}
+        total={total}
+        pageSize={PAGE_SIZE}
+        currentCount={filteredInscripciones.length}
+        onPageChange={setPage}
+      />
       <div className="relative z-50">
         <FeedbackModal {...feedbackModal} />
       </div>
