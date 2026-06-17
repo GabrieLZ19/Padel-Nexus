@@ -5,18 +5,34 @@ export const LicenciasController = {
   // 1. GET /api/licencias (Listar)
   async listarLicencias(req: Request, res: Response) {
     try {
-      const { data, error } = await supabase
+      const { page = "1", limit = "10", search } = req.query;
+      const pageNum = Number(page);
+      const limitNum = Number(limit);
+      const from = (pageNum - 1) * limitNum;
+      const to = from + limitNum - 1;
+
+      let query = supabase
         .from("licencias")
         .select(
           `
           *,
           perfiles(nombre_completo, telefono, email, categoria_padel)
         `,
+          { count: "exact" },
         )
         .order("created_at", { ascending: false });
 
+      if (search) {
+        const term = `%${String(search).trim()}%`;
+        query = query.or(
+          `nro_licencia.ilike.${term},perfiles.nombre_completo.ilike.${term},perfiles.email.ilike.${term}`,
+        );
+      }
+
+      const { data, error, count } = await query.range(from, to);
       if (error) throw error;
-      return res.status(200).json(data);
+
+      return res.status(200).json({ data: data || [], total: count || 0 });
     } catch (error: any) {
       return res
         .status(500)
