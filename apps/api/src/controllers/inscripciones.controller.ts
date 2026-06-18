@@ -42,8 +42,30 @@ export const getAllInscripciones = async (req: Request, res: Response) => {
 
 export const createInscripcion = async (req: Request, res: Response) => {
   try {
-    const { torneo_id, usuario_id, jugador1_nombre, jugador2_nombre, monto } =
-      req.body;
+    const {
+      torneo_id,
+      usuario_id,
+      jugador1_nombre,
+      jugador2_nombre,
+      usuario2_email,
+      monto,
+    } = req.body;
+
+    let usuario2_id = null;
+
+    if (usuario2_email) {
+      const { data: user2, error: user2Error } = await supabase
+        .from("perfiles")
+        .select("id")
+        .eq("email", usuario2_email)
+        .single();
+
+      if (user2Error)
+        return res
+          .status(404)
+          .json({ message: "El email del compañero no está registrado." });
+      usuario2_id = user2.id;
+    }
 
     // 1. VALIDACIÓN: ¿Tiene licencia activa?
     const { data: licencia, error: licError } = await supabase
@@ -89,6 +111,27 @@ export const createInscripcion = async (req: Request, res: Response) => {
         .json({ message: "El torneo ya no tiene cupos disponibles." });
     }
 
+    // 3.4. VALIDACIÓN PROFESIONAL: Nivel del Jugador 2 vs Nivel Torneo
+    if (usuario2_id) {
+      const { data: perfil2, error: perfil2Error } = await supabase
+        .from("perfiles")
+        .select("categoria_padel")
+        .eq("id", usuario2_id)
+        .single();
+
+      if (perfil2Error || !perfil2) {
+        return res
+          .status(404)
+          .json({ message: "Perfil del jugador 2 no encontrado." });
+      }
+
+      if (perfil2.categoria_padel !== torneo.nivel) {
+        return res.status(403).json({
+          message: `El Jugador 2 tiene categoría (${perfil2.categoria_padel}) y no coincide con el torneo (${torneo.nivel}).`,
+        });
+      }
+    }
+
     // 3.5. VALIDACIÓN PROFESIONAL: Nivel del jugador vs Nivel Torneo
     const { data: perfil, error: perfilError } = await supabase
       .from("perfiles")
@@ -115,6 +158,7 @@ export const createInscripcion = async (req: Request, res: Response) => {
         {
           torneo_id,
           usuario_id,
+          usuario2_id,
           jugador1_nombre,
           jugador2_nombre,
           monto,

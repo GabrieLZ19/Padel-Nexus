@@ -11,7 +11,12 @@ export const RankingsController = {
         .select(
           `
           *, 
-          perfiles(nombre_completo, categoria_padel, avatar_url),
+          perfiles(
+            nombre_completo, 
+            categoria_padel, 
+            avatar_url,
+            clubes(nombre, provincia)
+          ),
           historial_ranking(torneo_id, puntos_nuevos, created_at)
         `,
         )
@@ -37,13 +42,16 @@ export const RankingsController = {
         .select(
           `
           *, 
-          perfiles!inner(nombre_completo, avatar_url)
+          perfiles!inner(
+            nombre_completo, 
+            avatar_url,
+            clubes(nombre, provincia)
+          )
         `,
         )
-        .order("puntos", { ascending: false }) // Ordenamos por el que tiene más puntos
+        .order("puntos", { ascending: false })
         .limit(100);
 
-      // Si se filtra por categoría (Ej: "5ª")
       if (categoria && categoria !== "Todas") {
         query = query.eq("categoria", categoria);
       }
@@ -51,7 +59,6 @@ export const RankingsController = {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Inyectamos la posición real y aseguramos que PJ y PG existan
       const rankingCalculado = (data || []).map((jugador, index) => ({
         ...jugador,
         posicion_actual: index + 1,
@@ -66,7 +73,6 @@ export const RankingsController = {
     }
   },
 
-  // Método manual para que el Admin corrija puntos si es necesario
   async actualizarPuntosJugador(req: Request, res: Response) {
     try {
       const { usuario_id, puntos_a_sumar, categoria, torneo_id } = req.body;

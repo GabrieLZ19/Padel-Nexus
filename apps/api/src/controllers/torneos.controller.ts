@@ -443,11 +443,11 @@ export const actualizarResultado = async (req: Request, res: Response) => {
         string,
         { ganador?: number; perdedor: number }
       > = {
-        "16AVOS": { perdedor: 45 },
-        OCTAVOS: { perdedor: 90 },
-        CUARTOS: { perdedor: 180 },
-        SEMIS: { perdedor: 360 },
-        FINAL: { ganador: 1000, perdedor: 600 }, // La final da puntos a ambos
+        "16AVOS": { ganador: 45, perdedor: 10 },
+        OCTAVOS: { ganador: 90, perdedor: 45 },
+        CUARTOS: { ganador: 180, perdedor: 90 },
+        SEMIS: { ganador: 360, perdedor: 180 },
+        FINAL: { ganador: 1000, perdedor: 600 },
       };
 
       const rondaNormalizada = partido.ronda.toUpperCase().trim();
@@ -463,15 +463,24 @@ export const actualizarResultado = async (req: Request, res: Response) => {
 
         const { data: inscripcion } = await supabase
           .from("inscripciones")
-          .select("usuario_id")
+          .select("usuario_id, usuario2_id")
           .eq("id", inscripcionId)
           .single();
 
-        if (inscripcion && inscripcion.usuario_id) {
+        if (!inscripcion) return;
+
+        const idsJugadores = [
+          inscripcion.usuario_id,
+          inscripcion.usuario2_id,
+        ].filter(Boolean);
+
+        if (idsJugadores.length === 0) return;
+
+        for (const userId of idsJugadores) {
           const { data: rank } = await supabase
             .from("rankings")
             .select("puntos, pj, pg")
-            .eq("usuario_id", inscripcion.usuario_id)
+            .eq("usuario_id", userId)
             .eq("categoria", torneoInfo.nivel)
             .single();
 
@@ -479,25 +488,30 @@ export const actualizarResultado = async (req: Request, res: Response) => {
           const pjAnt = rank?.pj || 0;
           const pgAnt = rank?.pg || 0;
 
-          // ACTUALIZACIÓN MAESTRA DE ESTADÍSTICAS EN TIEMPO REAL
-          await supabase.from("rankings").upsert(
+          const { error: upsertError } = await supabase.from("rankings").upsert(
             {
-              usuario_id: inscripcion.usuario_id,
+              usuario_id: userId,
               categoria: torneoInfo.nivel,
               rama: torneoInfo.categoria,
               puntos: pAnt + puntosASumar,
-              pj: pjAnt + 1, // Suma 1 Partido Jugado siempre
-              pg: isGanador ? pgAnt + 1 : pgAnt, // Suma 1 Ganado solo si ganó
-              updated_at: new Date().toISOString(),
+              pj: pjAnt + 1,
+              pg: isGanador ? pgAnt + 1 : pgAnt,
             },
             { onConflict: "usuario_id,categoria" },
           );
 
-          // Guardar historial de ranking (solo si sumó puntos por llegar lejos)
+          if (upsertError) {
+            console.error(
+              "Error al actualizar la tabla rankings:",
+              upsertError,
+            );
+            throw upsertError;
+          }
+
           if (puntosASumar > 0) {
             await supabase.from("historial_ranking").insert([
               {
-                usuario_id: inscripcion.usuario_id,
+                usuario_id: userId,
                 torneo_id: partido.torneo_id,
                 puntos_anteriores: pAnt,
                 puntos_nuevos: pAnt + puntosASumar,
@@ -519,11 +533,7 @@ export const actualizarResultado = async (req: Request, res: Response) => {
 
       // 3.2 Asignar puntos y stats al GANADOR
       if (ganador_id) {
-        // El ganador recibe puntos SOLO en la final. Pero en cada ronda, SIEMPRE suma 1 PJ y 1 PG
-        const puntosGanador =
-          rondaNormalizada === "FINAL" && puntosRonda?.ganador
-            ? puntosRonda.ganador
-            : 0;
+        const puntosGanador = puntosRonda?.ganador || 0;
         await darPuntosAInscripcion(ganador_id, puntosGanador, true);
       }
     }
