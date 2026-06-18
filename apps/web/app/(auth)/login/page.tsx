@@ -40,7 +40,6 @@ export default function AuthPage() {
 
       if (authError) throw authError;
 
-      // Lógica de rememberMe opcional aquí si es necesario.
       console.log("Sesión iniciada correctamente. Recordarme:", rememberMe);
       router.push("/dashboard");
     } catch (err: unknown) {
@@ -63,7 +62,6 @@ export default function AuthPage() {
         },
       });
       if (authError) throw authError;
-      // El navegador redirigirá automáticamente a Google
     } catch (err: unknown) {
       const error = err as Error;
       console.error("Error al iniciar sesión con Google:", error.message);
@@ -80,8 +78,9 @@ export default function AuthPage() {
     "caret-white";
 
   return (
-    <div className="flex min-h-screen bg-padel-1 text-white font-sans relative">
-      {/* Columna Izquierda - Manteniendo el diseño visual original */}
+    // Cambiamos min-h-screen por min-h-[100dvh] para que en iOS no se corte por la barra de navegación
+    <div className="flex min-h-dvh bg-padel-1 text-white font-sans relative">
+      {/* Columna Izquierda - Escritorio */}
       <div className="hidden lg:flex lg:w-1/2 bg-padel-3 flex-col justify-center px-20 border-r border-padel-2 relative z-10">
         <div className="mb-10 relative size-24">
           <div className="absolute inset-0 bg-padel-4 rounded-3xl blur-2xl opacity-40"></div>
@@ -119,22 +118,23 @@ export default function AuthPage() {
         </ul>
       </div>
 
-      {/* Columna Derecha - Formulario con el nuevo diseño de login universal */}
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-8 bg-padel-1 relative z-10">
-        <div className="w-full max-w-md bg-transparent p-8">
-          <div className="mb-10">
-            <h2 className="text-4xl font-bold text-white mb-2 tracking-tight">
+      {/* Columna Derecha - Optimizada para Móvil */}
+      {/* Quitamos el p-8 forzado y pusimos p-4 sm:p-8 para no ahogar el celu */}
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-4 sm:p-8 bg-padel-1 relative z-10">
+        <div className="w-full max-w-md bg-transparent">
+          <div className="mb-8 sm:mb-10 mt-6 sm:mt-0">
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-2 tracking-tight">
               Bienvenido
             </h2>
-            <p className="text-lg text-gray-400">
+            <p className="text-base sm:text-lg text-gray-400">
               Elegí cómo querés iniciar sesión.
             </p>
           </div>
 
-          <div className="space-y-7">
+          <div className="space-y-6 sm:space-y-7">
             {error && (
-              <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-lg flex items-center gap-3 text-sm">
-                <AlertCircle className="size-5 shrink-0" />
+              <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-3 text-sm">
+                <AlertCircle className="size-5 shrink-0 mt-0.5 sm:mt-0" />
                 <p>{error}</p>
               </div>
             )}
@@ -143,15 +143,13 @@ export default function AuthPage() {
             <button
               onClick={handleGoogleLogin}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 py-4 bg-white text-black font-semibold rounded-xl border border-white/20 hover:bg-gray-100 transition-all shadow-sm shadow-black/10 disabled:cursor-not-allowed disabled:opacity-70"
+              className="w-full flex items-center justify-center gap-3 py-3.5 sm:py-4 bg-white text-black font-semibold rounded-xl border border-white/20 hover:bg-gray-100 transition-all shadow-sm shadow-black/10 disabled:cursor-not-allowed disabled:opacity-70 text-sm sm:text-base"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm shadow-black/5">
+              <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white shadow-sm shadow-black/5">
                 <svg
-                  className="h-5 w-5"
+                  className="h-4 w-4 sm:h-5 sm:w-5"
                   viewBox="0 0 533.5 544.3"
                   xmlns="http://www.w3.org/2000/svg"
-                  role="img"
-                  aria-label="Google"
                 >
                   <path
                     d="M533.5 278.4c0-17.4-1.4-34.1-4.1-50.3H272v95.1h146.9c-6.4 34.6-25.8 63.9-55 83.5v69.4h88.9c52.1-48 81.7-118.4 81.7-197.7z"
@@ -175,15 +173,21 @@ export default function AuthPage() {
             </button>
 
             <div className="flex items-center gap-4 text-gray-600 text-sm">
-              <div className="flex-1 border-t border-white/5"></div>o con email
-              y contraseña
+              <div className="flex-1 border-t border-white/5"></div>
+              {/* Le agregamos whitespace-nowrap para que el texto no se rompa en dos renglones */}
+              <span className="whitespace-nowrap">
+                o con email y contraseña
+              </span>
               <div className="flex-1 border-t border-white/5"></div>
             </div>
 
-            <form onSubmit={handleEmailLogin} className="space-y-7">
+            <form
+              onSubmit={handleEmailLogin}
+              className="space-y-6 sm:space-y-7"
+            >
               {/* Input de Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2.5">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Email corporativo
                 </label>
                 <div className="relative group">
@@ -201,7 +205,7 @@ export default function AuthPage() {
 
               {/* Input de Contraseña */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2.5">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Contraseña
                 </label>
                 <div className="relative group">
@@ -214,7 +218,6 @@ export default function AuthPage() {
                     className={inputStyles}
                     required
                   />
-                  {/* Botón para alternar visibilidad */}
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
@@ -229,8 +232,9 @@ export default function AuthPage() {
                 </div>
               </div>
 
-              {/* Fila de Recordarme / Olvidaste Contraseña */}
-              <div className="flex items-center justify-between text-sm pt-2">
+              {/* Fila de Recordarme / Olvidaste Contraseña optimizada */}
+              {/* En móviles (por defecto) es flex-col, en escritorio es flex-row */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm pt-1 gap-4 sm:gap-0">
                 <label className="flex items-center gap-3 cursor-pointer text-gray-400 group">
                   <div className="relative flex items-center justify-center size-5">
                     <input
@@ -257,13 +261,13 @@ export default function AuthPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-padel-4 hover:bg-[#b3e600] disabled:bg-padel-2 disabled:text-gray-500 text-padel-1 font-bold py-4 rounded-xl transition-colors flex justify-center items-center gap-2.5 text-lg shadow-[0_0_20px_rgba(204,255,0,0.15)] hover:shadow-[0_0_25px_rgba(204,255,0,0.3)]"
+                className="w-full bg-padel-4 hover:bg-[#b3e600] disabled:bg-padel-2 disabled:text-gray-500 text-padel-1 font-bold py-3.5 sm:py-4 rounded-xl transition-colors flex justify-center items-center gap-2.5 text-base sm:text-lg shadow-[0_0_20px_rgba(204,255,0,0.15)] hover:shadow-[0_0_25px_rgba(204,255,0,0.3)]"
               >
                 {loading ? (
                   <span className="animate-pulse">Verificando...</span>
                 ) : (
                   <>
-                    Iniciar Sesion <ArrowRight className="size-5" />
+                    Iniciar Sesión <ArrowRight className="size-5" />
                   </>
                 )}
               </button>
@@ -271,7 +275,7 @@ export default function AuthPage() {
           </div>
 
           <div className="mt-8 pt-6 border-t border-white/5 text-center">
-            <p className="text-gray-400">
+            <p className="text-gray-400 text-sm sm:text-base">
               ¿No tenés una cuenta?{" "}
               <Link
                 href="/signup"
@@ -282,12 +286,12 @@ export default function AuthPage() {
             </p>
           </div>
 
-          <div className="mt-10 pt-8 border-t border-white/5 flex items-center justify-center gap-3">
-            <div className="relative size-6 flex items-center justify-center">
+          <div className="mt-8 pt-6 sm:mt-10 sm:pt-8 border-t border-white/5 flex items-center justify-center gap-3">
+            <div className="relative size-6 flex items-center justify-center shrink-0">
               <div className="absolute inset-0 bg-blue-500 rounded-full blur-lg opacity-30"></div>
               <ShieldCheck className="text-blue-500 relative size-5" />
             </div>
-            <p className="text-sm text-gray-500">
+            <p className="text-xs sm:text-sm text-gray-500">
               Acceso protegido con autenticación en dos pasos (2FA).
             </p>
           </div>

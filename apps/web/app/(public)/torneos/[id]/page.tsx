@@ -87,11 +87,11 @@ export default function TorneoDetallePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#111111] text-white">
-        <div className="max-w-350 mx-auto px-6 lg:px-10 py-8 animate-pulse">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8 animate-pulse">
           <div className="w-32 h-4 bg-white/5 rounded-md mb-8"></div>
-          <div className="bg-[#161616] rounded-4xl p-8 lg:p-12 mb-8 h-80 lg:h-60"></div>
+          <div className="bg-[#161616] rounded-3xl p-8 lg:p-12 mb-8 h-80 lg:h-60"></div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            <div className="lg:col-span-2 bg-[#161616] border border-white/5 rounded-3xl p-6 h-125"></div>
+            <div className="lg:col-span-2 bg-[#161616] border border-white/5 rounded-3xl p-6 h-150"></div>
             <div className="space-y-6">
               <div className="bg-[#161616] border border-white/5 rounded-3xl p-8 h-64"></div>
               <div className="bg-[#161616] border border-white/5 rounded-3xl p-8 h-48"></div>
@@ -144,7 +144,6 @@ export default function TorneoDetallePage() {
     btnClass =
       "bg-white/10 text-white hover:bg-white/20 border border-white/20";
   } else if (!isAbierto) {
-    // Si NO está abierto (En curso o Finalizado), anulamos "Cupos Agotados"
     btnText = "Inscripciones Cerradas";
     btnClass =
       "bg-white/5 text-gray-500 border border-white/10 cursor-not-allowed opacity-80 shadow-none";
@@ -164,7 +163,7 @@ export default function TorneoDetallePage() {
       "bg-padel-4 hover:bg-[#b3e600] text-[#111] shadow-[0_0_30px_rgba(204,255,0,0.2)]";
   }
 
-  // --- LÓGICA DINÁMICA DEL CUADRO (SE ADAPTA A LOS CUPOS MÁXIMOS) ---
+  // --- LÓGICA DINÁMICA DEL CUADRO ---
   const RONDAS_CONFIG = [
     { id: "16AVOS", label: "16avos", required: 16 },
     { id: "OCTAVOS", label: "Octavos", required: 8 },
@@ -173,7 +172,6 @@ export default function TorneoDetallePage() {
     { id: "FINAL", label: "Final", required: 1 },
   ];
 
-  // Filtramos para dibujar solo las rondas matemáticas válidas para el torneo
   const rondasToShow = RONDAS_CONFIG.filter(
     (r) => r.required <= cuposMaximos / 2,
   );
@@ -208,26 +206,26 @@ export default function TorneoDetallePage() {
 
   return (
     <div className="min-h-screen bg-[#111111] text-white">
-      <div className="max-w-350 mx-auto px-6 lg:px-10 py-8">
+      <div className="max-w-7xl mx-auto px-5 lg:px-10 py-6 lg:py-8">
         <button
           onClick={() => router.push("/torneos")}
-          className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm font-semibold mb-8"
+          className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm font-semibold mb-6 lg:mb-8"
         >
           <ChevronLeft className="size-4" /> Volver a torneos
         </button>
 
         {/* ENCABEZADO DEL TORNEO */}
-        <div className="bg-linear-to-r from-[#212b06] to-padel-1 rounded-3xl p-8 lg:p-12 mb-8 relative overflow-hidden flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 border border-white/5">
+        <div className="bg-linear-to-r from-[#212b06] to-padel-1 rounded-3xl p-6 lg:p-12 mb-8 relative overflow-hidden flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 border border-white/5">
           <div className="absolute top-0 right-0 w-125 h-125 bg-padel-4/10 blur-[120px] rounded-full pointer-events-none transform translate-x-1/4 -translate-y-1/4"></div>
-          <div className="relative z-10 space-y-5 flex-1">
+          <div className="relative z-10 space-y-4 lg:space-y-5 flex-1">
             <div className="inline-flex items-center gap-2 bg-padel-4 text-[#111] px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">
               {torneo.nivel} {torneo.categoria} ·{" "}
               {isAbierto ? "Inscripción Abierta" : torneo.estado}
             </div>
-            <h1 className="text-4xl lg:text-5xl xl:text-6xl font-black text-white tracking-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-black text-white tracking-tight">
               {torneo.nombre}
             </h1>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-medium text-gray-300">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-x-6 gap-y-3 text-sm font-medium text-gray-300">
               <span className="flex items-center gap-2">
                 <MapPin className="size-4 text-padel-4" />{" "}
                 {torneo.clubes?.nombre || "Sede a confirmar"}
@@ -260,120 +258,128 @@ export default function TorneoDetallePage() {
             </div>
           </div>
 
-          {/* BOTÓN PRINCIPAL (HERO) */}
           <button
             onClick={handleInscripcion}
             disabled={inscribiendo || isDisabled}
-            className={`relative z-10 shrink-0 w-full lg:w-auto px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 ${btnClass}`}
+            className={`relative z-10 shrink-0 w-full lg:w-auto px-8 py-4 rounded-xl font-bold text-base lg:text-lg transition-all flex items-center justify-center gap-2 ${btnClass}`}
           >
             {btnText}
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          {/* COLUMNA IZQUIERDA: CUADRO PRINCIPAL DINÁMICO */}
-          <div className="lg:col-span-2 bg-[#161616] border border-white/5 rounded-3xl p-6 lg:p-10 overflow-x-auto shadow-xl">
-            <div className="flex justify-between items-center mb-16 min-w-150">
-              <h2 className="text-2xl font-bold text-white">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
+          {/* COLUMNA IZQUIERDA: CUADRO PRINCIPAL */}
+          <div className="lg:col-span-2 bg-[#161616] border border-white/5 rounded-3xl p-5 lg:p-10 shadow-xl flex flex-col overflow-hidden">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 lg:mb-12">
+              <h2 className="text-xl md:text-2xl font-bold text-white">
                 Cuadro principal
               </h2>
-              {isEnCurso && (
-                <div className="flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold rounded-full uppercase tracking-wider">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                  En vivo
-                </div>
-              )}
-              {isFinalizado && (
-                <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold rounded-full uppercase tracking-wider">
-                  <CheckCircle2 className="size-3" /> Torneo Finalizado
-                </div>
-              )}
-            </div>
-
-            {/* GENERADOR DE COLUMNAS FLEXIBLE (Se adapta a 4, 8 o 16 cupos) */}
-            <div className="flex gap-8 lg:gap-12 min-w-150 h-137.5 pb-4">
-              {rondasToShow.map((rondaInfo) => {
-                const roundMatches = getRoundMatches(
-                  rondaInfo.id,
-                  rondaInfo.required,
-                );
-
-                return (
-                  <div
-                    key={rondaInfo.id}
-                    className="flex-1 flex flex-col relative h-full"
-                  >
-                    <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4 absolute -top-10 w-full">
-                      {rondaInfo.label}
-                    </h3>
-
-                    {/* Justify-around reparte las tarjetas matemáticamente perfecto a lo alto */}
-                    <div className="flex flex-col justify-around h-full w-full">
-                      {roundMatches.map((p) => (
-                        <div
-                          key={p.id}
-                          className="relative w-full flex items-center justify-center"
-                        >
-                          <MatchCard partido={p} />
-                          {/* Dibuja la línea conectora hacia la derecha, excepto en la columna Final */}
-                        </div>
-                      ))}
-                    </div>
+              <div className="flex gap-2">
+                {isEnCurso && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold rounded-full uppercase tracking-wider">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                    En vivo
                   </div>
-                );
-              })}
+                )}
+                {isFinalizado && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold rounded-full uppercase tracking-wider">
+                    <CheckCircle2 className="size-3" /> Finalizado
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* CONTENEDOR SCROLLABLE UNIVERSAL (Movil y PC) */}
+            <div className="w-full overflow-x-auto pb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+              {/* MAGIA: w-max permite crecer infinito. min-w-full asegura que al menos ocupe el 100% */}
+              <div className="flex gap-6 lg:gap-8 w-max min-w-full h-125 lg:h-150 px-2 lg:px-0">
+                {rondasToShow.map((rondaInfo) => {
+                  const roundMatches = getRoundMatches(
+                    rondaInfo.id,
+                    rondaInfo.required,
+                  );
+
+                  return (
+                    <div
+                      key={rondaInfo.id}
+                      // Forzamos anchos mínimos en todas las pantallas. flex-1 reparte equitativamente.
+                      className="min-w-50 lg:min-w-60 flex-1 flex flex-col relative h-full"
+                    >
+                      <h3 className="text-center text-[11px] lg:text-xs font-black text-padel-4 uppercase tracking-widest mb-4 absolute -top-8 lg:-top-10 w-full">
+                        {rondaInfo.label}
+                      </h3>
+
+                      <div className="flex flex-col justify-around h-full w-full">
+                        {roundMatches.map((p) => (
+                          <div
+                            key={p.id}
+                            className="relative w-full flex items-center justify-center"
+                          >
+                            <MatchCard partido={p} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Aviso visible en todas las pantallas */}
+            <p className="text-center text-xs text-gray-500 mt-2 flex items-center justify-center gap-2 opacity-70">
+              ↔ Deslizá para ver todas las rondas
+            </p>
           </div>
 
           {/* COLUMNA DERECHA: INSCRIPCIÓN Y PREMIOS */}
           <div className="space-y-6">
-            <div className="bg-[#181d0a] border border-padel-4/30 rounded-3xl p-8 shadow-[0_0_40px_rgba(204,255,0,0.05)]">
+            <div className="bg-[#181d0a] border border-padel-4/30 rounded-3xl p-6 lg:p-8 shadow-[0_0_40px_rgba(204,255,0,0.05)]">
               <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
                 Inscripción
               </div>
               <div className="flex items-end gap-2 mb-6">
-                <span className="text-5xl font-black text-padel-4 tracking-tight">
+                <span className="text-4xl lg:text-5xl font-black text-padel-4 tracking-tight">
                   $
                   {Number(torneo.precio_inscripcion || 0).toLocaleString(
                     "es-AR",
                   )}
                 </span>
-                <span className="text-gray-400 font-semibold mb-1">
+                <span className="text-gray-400 font-semibold mb-1 text-sm lg:text-base">
                   / {isIndividual ? "jugador" : "dupla"}
                 </span>
               </div>
-              <ul className="space-y-4 mb-8">
-                <li className="flex items-center gap-3 text-sm font-medium text-gray-300">
+              <ul className="space-y-3 lg:space-y-4 mb-8">
+                <li className="flex items-center gap-3 text-xs lg:text-sm font-medium text-gray-300">
                   {isIndividual ? (
-                    <User className="size-5 text-padel-4 shrink-0" />
+                    <User className="size-4 lg:size-5 text-padel-4 shrink-0" />
                   ) : (
-                    <Users className="size-5 text-padel-4 shrink-0" />
+                    <Users className="size-4 lg:size-5 text-padel-4 shrink-0" />
                   )}
                   Inscripción {isIndividual ? "individual" : "por dupla"}
                 </li>
-                <li className="flex items-center gap-3 text-sm font-medium text-gray-300">
-                  <ShieldCheck className="size-5 text-padel-4 shrink-0" />{" "}
+                <li className="flex items-center gap-3 text-xs lg:text-sm font-medium text-gray-300">
+                  <ShieldCheck className="size-4 lg:size-5 text-padel-4 shrink-0" />{" "}
                   Formato: {torneo.formato || "Eliminatoria"}
                 </li>
-                <li className="flex items-center gap-3 text-sm font-medium text-gray-300">
-                  <CreditCard className="size-5 text-padel-4 shrink-0" /> Pago
-                  total o 50% parcial
+                <li className="flex items-center gap-3 text-xs lg:text-sm font-medium text-gray-300">
+                  <CreditCard className="size-4 lg:size-5 text-padel-4 shrink-0" />{" "}
+                  Pago total o 50% parcial
                 </li>
               </ul>
 
-              {/* LÓGICA CONDICIONAL DE LA SIDEBAR (AHORA USA LAS MISMAS VARIABLES DEL HERO) */}
               {isAbierto ? (
                 <button
                   onClick={handleInscripcion}
                   disabled={inscribiendo || isDisabled}
-                  className={`w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center ${btnClass}`}
+                  className={`w-full py-3.5 lg:py-4 rounded-xl font-bold text-base lg:text-lg transition-all flex items-center justify-center ${btnClass}`}
                 >
                   {btnText}
                 </button>
               ) : (
-                <div className="w-full bg-white/5 border border-white/10 text-gray-500 py-4 rounded-xl font-bold text-center cursor-not-allowed flex flex-col items-center justify-center">
-                  <span className="text-white">Inscripciones Cerradas</span>
-                  <span className="text-xs font-normal mt-1">
+                <div className="w-full bg-white/5 border border-white/10 text-gray-500 py-3.5 lg:py-4 rounded-xl font-bold text-center cursor-not-allowed flex flex-col items-center justify-center">
+                  <span className="text-white text-sm lg:text-base">
+                    Inscripciones Cerradas
+                  </span>
+                  <span className="text-[10px] lg:text-xs font-normal mt-1">
                     El torneo se encuentra {torneo.estado?.toLowerCase()}.
                   </span>
                 </div>
@@ -381,35 +387,37 @@ export default function TorneoDetallePage() {
             </div>
 
             {hasPremios && (
-              <div className="bg-[#161616] border border-white/5 rounded-3xl p-8">
-                <h3 className="text-lg font-bold text-white mb-6">Premios</h3>
-                <div className="space-y-5">
+              <div className="bg-[#161616] border border-white/5 rounded-3xl p-6 lg:p-8">
+                <h3 className="text-base lg:text-lg font-bold text-white mb-5 lg:mb-6">
+                  Premios
+                </h3>
+                <div className="space-y-4 lg:space-y-5">
                   {torneo.premio_1 && (
-                    <div className="flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-full bg-yellow-500/10 text-yellow-500 flex items-center justify-center font-black text-sm border border-yellow-500/20 shrink-0">
+                    <div className="flex items-center gap-3 lg:gap-4">
+                      <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-full bg-yellow-500/10 text-yellow-500 flex items-center justify-center font-black text-xs lg:text-sm border border-yellow-500/20 shrink-0">
                         1º
                       </div>
-                      <div className="font-semibold text-gray-300 text-sm">
+                      <div className="font-semibold text-gray-300 text-xs lg:text-sm">
                         {torneo.premio_1}
                       </div>
                     </div>
                   )}
                   {torneo.premio_2 && (
-                    <div className="flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-full bg-gray-400/10 text-gray-400 flex items-center justify-center font-black text-sm border border-gray-400/20 shrink-0">
+                    <div className="flex items-center gap-3 lg:gap-4">
+                      <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-full bg-gray-400/10 text-gray-400 flex items-center justify-center font-black text-xs lg:text-sm border border-gray-400/20 shrink-0">
                         2º
                       </div>
-                      <div className="font-semibold text-gray-300 text-sm">
+                      <div className="font-semibold text-gray-300 text-xs lg:text-sm">
                         {torneo.premio_2}
                       </div>
                     </div>
                   )}
                   {torneo.premio_3 && (
-                    <div className="flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-full bg-amber-700/10 text-amber-600 flex items-center justify-center font-black text-sm border border-amber-700/20 shrink-0">
+                    <div className="flex items-center gap-3 lg:gap-4">
+                      <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-full bg-amber-700/10 text-amber-600 flex items-center justify-center font-black text-xs lg:text-sm border border-amber-700/20 shrink-0">
                         3º
                       </div>
-                      <div className="font-semibold text-gray-300 text-sm">
+                      <div className="font-semibold text-gray-300 text-xs lg:text-sm">
                         {torneo.premio_3}
                       </div>
                     </div>

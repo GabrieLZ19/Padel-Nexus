@@ -7,8 +7,9 @@ import { useProfileStore } from "@/store/useProfileStore";
 import CredencialDigital from "@/components/perfil/CredencialDigital";
 import LicenciaModal from "@/components/perfil/LicencialModal";
 
-const Skeleton = () => (
-  <div className="animate-pulse bg-white/5 rounded-3xl h-40" />
+// Ajustamos el skeleton para que acompañe el nuevo diseño asimétrico
+const Skeleton = ({ className }: { className?: string }) => (
+  <div className={`animate-pulse bg-white/5 rounded-3xl ${className}`} />
 );
 
 export default function PlayerDashboard() {
@@ -20,102 +21,149 @@ export default function PlayerDashboard() {
   }, [fetchProfile]);
 
   return (
-    <main className="max-w-7xl mx-auto p-6 md:p-10 space-y-10">
-      <header className="flex justify-between items-end border-b border-white/5 pb-8">
+    <main className="max-w-6xl mx-auto p-5 md:p-10 space-y-8 md:space-y-10">
+      {/* HEADER */}
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-5 border-b border-white/5 pb-6 md:pb-8">
         <div>
-          <h1 className="text-4xl font-bold">
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
             Hola,{" "}
             <span className="text-padel-4">
               {profile?.nombre_completo?.split(" ")[0] || "Jugador"}
             </span>
           </h1>
-          <p className="text-gray-400">
+          <p className="text-sm md:text-lg text-gray-400 mt-1 md:mt-2">
             Gestioná tu perfil, torneos y reservas.
           </p>
         </div>
         <Link
           href="/reservar"
-          className="bg-white text-black px-6 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+          className="w-full md:w-auto text-center bg-white text-black px-6 py-3.5 md:py-4 rounded-xl font-bold hover:bg-gray-200 transition-colors shadow-sm md:text-lg"
         >
           Nueva Reserva
         </Link>
       </header>
 
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* BENTO GRID MAESTRO */}
+      {/* En móvil: 2 columnas. En escritorio: 3 columnas. */}
+      <section className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 md:auto-rows-[1fr]">
         {!profile ? (
-          Array(4)
-            .fill(0)
-            .map((_, i) => <Skeleton key={i} />)
+          <>
+            <Skeleton className="order-4 md:order-1 col-span-2 md:col-span-1 md:row-span-2 min-h-80" />
+            <Skeleton className="order-1 md:order-2 col-span-2 md:col-span-2 min-h-35" />
+            <Skeleton className="order-2 md:order-3 col-span-1 min-h-40" />
+            <Skeleton className="order-3 md:order-4 col-span-1 min-h-40" />
+          </>
         ) : (
           <>
-            {/* Categoría */}
-            <div className="bg-[#161616] p-8 rounded-3xl border border-white/5">
-              <Trophy className="text-padel-4 mb-4" />
-              <p className="text-sm text-gray-400">Categoría</p>
-              <h2 className="text-2xl font-bold">
-                {profile.categoria_padel || "S/C"}
-              </h2>
-            </div>
+            {/* 1. Licencia - Tarjeta Vertical Alta (Escritorio: Izquierda / Móvil: Abajo) */}
+            <div className="order-4 md:order-1 col-span-2 md:col-span-1 md:row-span-2 bg-[#161616] p-6 md:p-8 rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center gap-6 group hover:border-white/10 transition-colors relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-32 bg-linear-to-b from-padel-4/5 to-transparent"></div>
 
-            {/* Licencia Dinámica */}
-            <div className="bg-[#161616] p-8 rounded-3xl border border-white/5 flex flex-col items-center text-center">
-              <CreditCard className="text-padel-4 mb-4 self-start" />
-              <p className="text-sm text-gray-400 self-start">Licencia</p>
+              <div className="flex flex-col items-center w-full relative z-10">
+                <div className="p-3 bg-padel-4/10 rounded-2xl mb-3">
+                  <CreditCard className="text-padel-4 size-6 md:size-8" />
+                </div>
+                <p className="text-sm font-medium text-gray-400">
+                  Licencia Federativa
+                </p>
+              </div>
 
-              {profile.licencias && profile.licencias.length > 0 ? (
-                profile.licencias[0].estado === "Activa" ? (
-                  <div className="mt-4 flex flex-col items-center">
-                    <CredencialDigital usuarioId={profile.id} />
-                    <h2 className="text-lg font-bold mt-3">
-                      {profile.licencias[0].nro_licencia}
+              <div className="w-full flex flex-col items-center relative z-10">
+                {profile.licencias && profile.licencias.length > 0 ? (
+                  profile.licencias[0].estado === "Activa" ? (
+                    <div className="flex flex-col items-center w-full">
+                      <div className="w-full max-w-50 md:max-w-55 flex justify-center drop-shadow-xl">
+                        <CredencialDigital usuarioId={profile.id} />
+                      </div>
+                      <h2 className="text-xl md:text-2xl font-bold mt-5 text-white tracking-wider">
+                        {profile.licencias[0].nro_licencia}
+                      </h2>
+                      <p className="text-xs md:text-sm text-padel-4 uppercase font-black tracking-widest mt-1">
+                        Estado: Activa
+                      </p>
+                    </div>
+                  ) : profile.licencias[0].estado === "Pendiente" ? (
+                    <div className="w-full p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-500 text-sm font-medium text-center">
+                      En revisión administrativa
+                    </div>
+                  ) : (
+                    <h2 className="text-xl font-bold mt-2 text-red-500 uppercase">
+                      {profile.licencias[0].estado}
                     </h2>
-                    <p className="text-[10px] text-padel-4 uppercase font-bold">
-                      Activa
-                    </p>
-                  </div>
-                ) : profile.licencias[0].estado === "Pendiente" ? (
-                  <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-500 text-xs">
-                    En revisión administrativa
-                  </div>
+                  )
                 ) : (
-                  <h2 className="text-xl font-bold mt-4 text-red-500 uppercase">
-                    {profile.licencias[0].estado}
-                  </h2>
-                )
-              ) : (
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="mt-4 w-full bg-padel-4 text-black font-bold py-2 px-4 rounded-xl hover:bg-white transition-colors"
-                >
-                  Solicitar Alta
-                </button>
-              )}
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="w-full max-w-60 bg-padel-4 text-padel-1 font-bold py-3.5 px-4 rounded-xl hover:bg-padel-3 transition-colors shadow-sm"
+                  >
+                    Solicitar Alta
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Mis Torneos */}
+            {/* 2. Categoría - Banner Horizontal (Escritorio: Arriba Derecha / Móvil: Arriba) */}
+            <div className="order-1 md:order-2 col-span-2 md:col-span-2 bg-[#161616] p-6 md:p-8 rounded-3xl border border-white/5 flex items-center justify-between group hover:border-white/10 transition-colors overflow-hidden relative">
+              <div className="flex items-center gap-4 md:gap-6 relative z-10">
+                <div className="p-4 bg-padel-4/10 rounded-2xl">
+                  <Trophy className="text-padel-4 size-7 md:size-10" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs md:text-sm font-medium text-gray-400 mb-0.5 md:mb-1">
+                    Nivel de Juego
+                  </p>
+                  <h2 className="text-3xl md:text-5xl font-black tracking-tight text-white">
+                    {profile.categoria_padel || "S/C"}
+                  </h2>
+                </div>
+              </div>
+              {/* Marca de agua decorativa en escritorio */}
+              <div className="hidden md:flex absolute -right-6 top-1/2 -translate-y-1/2 opacity-5 select-none pointer-events-none">
+                <span className="font-black text-[120px] italic">
+                  {profile.categoria_padel || "S/C"}
+                </span>
+              </div>
+            </div>
+
+            {/* 3. Mis Torneos - Cuadrado (Escritorio: Abajo Centro / Móvil: Centro Izquierda) */}
             <Link
               href="/torneos"
-              className="bg-[#161616] p-8 rounded-3xl border border-white/5 hover:border-padel-4/50 transition-all"
+              className="order-2 md:order-3 col-span-1 bg-[#161616] p-5 md:p-8 rounded-3xl border border-white/5 hover:border-padel-4/50 transition-all flex flex-col items-center justify-center text-center gap-4 group"
             >
-              <ClipboardList className="text-padel-4 mb-4" />
-              <p className="text-sm text-gray-400">Mis Torneos</p>
-              <h2 className="text-2xl font-bold">Historial</h2>
+              <div className="p-4 bg-white/5 rounded-2xl group-hover:bg-padel-4/10 transition-colors">
+                <ClipboardList className="text-white group-hover:text-padel-4 size-7 md:size-10 transition-colors" />
+              </div>
+              <div>
+                <h2 className="text-lg md:text-2xl font-bold text-white">
+                  Historial
+                </h2>
+                <p className="text-[11px] md:text-sm text-gray-400 mt-1">
+                  Mis Torneos
+                </p>
+              </div>
             </Link>
 
-            {/* Partidos */}
+            {/* 4. Partidos - Cuadrado (Escritorio: Abajo Derecha / Móvil: Centro Derecha) */}
             <Link
               href="/partidos"
-              className="bg-[#161616] p-8 rounded-3xl border border-white/5 hover:border-padel-4/50 transition-all"
+              className="order-3 md:order-4 col-span-1 bg-[#161616] p-5 md:p-8 rounded-3xl border border-white/5 hover:border-padel-4/50 transition-all flex flex-col items-center justify-center text-center gap-4 group"
             >
-              <Users className="text-padel-4 mb-4" />
-              <p className="text-sm text-gray-400">Partidos</p>
-              <h2 className="text-2xl font-bold">Buscar cuarto</h2>
+              <div className="p-4 bg-white/5 rounded-2xl group-hover:bg-padel-4/10 transition-colors">
+                <Users className="text-white group-hover:text-padel-4 size-7 md:size-10 transition-colors" />
+              </div>
+              <div>
+                <h2 className="text-lg md:text-2xl font-bold text-white">
+                  Buscar 4to
+                </h2>
+                <p className="text-[11px] md:text-sm text-gray-400 mt-1">
+                  Partidos
+                </p>
+              </div>
             </Link>
           </>
         )}
       </section>
 
-      {/* Al pasar fetchProfile, el modal avisará al dashboard que refresque datos al cerrar */}
       <LicenciaModal
         isOpen={isModalOpen}
         onClose={() => {
