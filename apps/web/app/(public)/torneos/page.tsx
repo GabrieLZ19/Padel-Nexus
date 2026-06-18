@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Search,
@@ -11,13 +11,13 @@ import {
   ChevronDown,
   X,
   Filter,
+  Users,
 } from "lucide-react";
 import { TorneosService } from "../../../utils/services/torneos";
 import { Torneo } from "../../../utils/types";
 import { useProfileStore } from "@/store/useProfileStore";
 
 function TorneosContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { profile } = useProfileStore();
   const initialQuery = searchParams.get("q") || "";
@@ -122,7 +122,6 @@ function TorneosContent() {
     const matchesProvincia =
       !activeProvincia || t.clubes?.provincia === activeProvincia;
     const matchesCategory = !activeCategory || t.nivel === activeCategory;
-    // Hacemos el matcheo de estado insensible a mayúsculas
     const matchesStatus =
       !activeStatus ||
       (t.estado || "").toLowerCase() === activeStatus.toLowerCase();
@@ -155,9 +154,9 @@ function TorneosContent() {
 
   const formatFecha = (fechaVal?: string | number | null) => {
     if (!fechaVal) return "Fecha a confirmar";
-    const date = new Date(String(fechaVal));
-    date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
-    return date.toLocaleDateString("es-AR", {
+    // FIX del UTC Midnight Bug (igual que hicimos antes)
+    const fechaLimpia = String(fechaVal).split("T")[0];
+    return new Date(`${fechaLimpia}T12:00:00`).toLocaleDateString("es-AR", {
       weekday: "short",
       day: "2-digit",
       month: "short",
@@ -417,7 +416,7 @@ function TorneosContent() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {sortedTournaments.map((t) => {
-                // NORMALIZACIÓN DE ESTADOS (Blindaje contra mayúsculas/minúsculas)
+                // NORMALIZACIÓN DE ESTADOS
                 const estadoStr = (t.estado || "").toLowerCase().trim();
                 const isAbierto =
                   estadoStr === "inscripción" || estadoStr === "borrador";
@@ -428,19 +427,22 @@ function TorneosContent() {
                   profile &&
                   t.inscripciones?.some((ins) => ins.usuario_id === profile.id);
 
-                // --- LÓGICA DINÁMICA DEL BOTÓN SEGÚN ESTADO ---
+                // --- LÓGICA DE CUPOS AGOTADOS ---
+                const cuposActuales = t.cupos_actuales || 0;
+                const cuposMaximos = t.cupos_maximos || 16;
+                const isLleno = cuposActuales >= cuposMaximos;
+
+                // --- CONFIGURACIÓN DINÁMICA DEL BOTÓN ---
                 let btnText = "Inscribirme";
                 let btnHref = `/torneos/${t.id}`;
                 let btnClass = "bg-padel-4 text-[#111] hover:bg-[#b3e600]";
 
                 if (isEnCurso) {
                   btnText = "Ver en vivo";
-                  btnHref = `/torneos/${t.id}`;
                   btnClass =
                     "bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20";
                 } else if (isFinalizado) {
                   btnText = "Ver resultados";
-                  btnHref = `/torneos/${t.id}`;
                   btnClass =
                     "bg-white/10 text-white hover:bg-white/20 border border-white/10";
                 } else {
@@ -449,12 +451,16 @@ function TorneosContent() {
                     btnHref = "/login";
                   } else if (isEnrolled) {
                     btnText = "Ver inscripción";
-                    btnHref = "/mis-inscripciones";
                     btnClass = "bg-gray-800 text-gray-300 hover:bg-gray-700";
+                  } else if (isLleno) {
+                    // Si está lleno y NO está inscripto
+                    btnText = "Cupos Agotados";
+                    btnClass =
+                      "bg-red-500/10 text-red-500 border border-red-500/20 opacity-80 cursor-not-allowed";
                   }
                 }
 
-                // Definimos el label visual del estado (con Capitalización correcta)
+                // Label Visual del Estado
                 const labelEstado = isAbierto
                   ? "Abierto"
                   : isEnCurso
@@ -469,12 +475,29 @@ function TorneosContent() {
                     className="group bg-[#161616] border border-white/5 hover:border-padel-4/40 rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_0_25px_rgba(204,255,0,0.05)] h-70"
                   >
                     {/* ENCABEZADO DE LA CARD */}
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      <div className="bg-padel-4 text-[#111] text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide">
-                        {t.nivel || "5ª"} {t.categoria || "Caballeros"}
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                      <div className="flex gap-2">
+                        <div className="bg-padel-4 text-[#111] text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide">
+                          {t.nivel || "5ª"} {t.categoria || "Caballeros"}
+                        </div>
+                        <div className="bg-white/10 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                          {t.modalidad || "Duplas"}
+                        </div>
                       </div>
-                      <div className="bg-white/10 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                        {t.modalidad || "Duplas"}
+
+                      {/* CONTADOR DE INSCRIPTOS (Se pinta de rojo si está lleno) */}
+                      <div
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs font-black transition-colors ${
+                          isLleno
+                            ? "bg-red-500/10 border-red-500/20 text-red-500"
+                            : "bg-white/5 border-white/10 text-white"
+                        }`}
+                      >
+                        <Users className="size-3 opacity-70" />
+                        {cuposActuales}{" "}
+                        <span className="text-gray-500 font-bold">
+                          / {cuposMaximos}
+                        </span>
                       </div>
                     </div>
 
@@ -505,7 +528,7 @@ function TorneosContent() {
                       </div>
                     </div>
 
-                    {/* FOOTER DE LA CARD BLINDADO CON FLEXBOX */}
+                    {/* FOOTER DE LA CARD */}
                     <div className="flex items-center justify-between pt-4 border-t border-white/5 gap-3">
                       <div className="flex items-center gap-2 shrink-0">
                         <span
@@ -520,9 +543,6 @@ function TorneosContent() {
 
                       <Link
                         href={btnHref}
-                        onClick={() => {
-                          setTimeout(() => router.refresh(), 100);
-                        }}
                         className={`font-bold px-4 py-2.5 rounded-xl text-[13px] transition-colors whitespace-nowrap shrink-0 text-center ${btnClass}`}
                       >
                         {btnText}

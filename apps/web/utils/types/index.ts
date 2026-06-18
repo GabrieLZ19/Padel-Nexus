@@ -66,19 +66,24 @@ export interface FormTorneoState {
 }
 
 export interface RankingJugador {
-  id: string | number;
+  id: string;
+  created_at?: string;
   usuario_id: string;
   puntos: number;
-  posicion_actual: number;
+  posicion: number;
   categoria: string;
   rama: string;
-  actualizado_hace: string;
-  pj?: number; // Partidos Jugados
-  pg?: number; // Partidos Ganados
-  club_nombre?: string; // Nombre del club al que representa
-  tendencia?: number; // Variación de puestos (+3, -1, 0)
+  actualizado_hace?: string;
+
+  pj?: number; // Partidos Jugados (desde la vista SQL)
+  pg?: number; // Partidos Ganados (desde la vista SQL)
+  tendencia?: number;
+
+  club_nombre?: string;
+  provincia?: string;
+
   perfiles?: {
-    nombre_completo: string;
+    nombre_completo: string | null;
     avatar_url: string | null;
   } | null;
 }

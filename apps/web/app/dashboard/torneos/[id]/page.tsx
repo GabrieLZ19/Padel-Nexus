@@ -114,51 +114,69 @@ export default function TorneoDetallePage() {
       return;
     }
 
-    setFeedbackModal({
-      isOpen: true,
-      type: "danger",
-      title: "¡Atención! Acción destructiva",
-      description:
-        "¿Estás completamente seguro de regenerar el cuadro? Esto borrará el fixture actual y todos los resultados cargados. Los cruces se generarán aleatoriamente de nuevo.",
-      confirmText: "Sí, Borrar y Regenerar",
-      cancelText: "Cancelar",
-      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
-      onConfirm: async () => {
-        try {
-          setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
-          setGenerando(true);
-          await TorneosService.generarCuadro(id);
+    const isPrimeraVez = partidos.length === 0;
 
-          router.refresh();
-          setRefreshKey((prev) => prev + 1);
-          setActiveTab("cuadros");
+    const executeGeneration = async () => {
+      try {
+        setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+        setGenerando(true);
+        await TorneosService.generarCuadro(id);
 
-          setFeedbackModal({
-            isOpen: true,
-            type: "success",
-            title: "¡Cuadro Generado!",
-            description: "El fixture automático se ha estructurado con éxito.",
-            onClose: () =>
-              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
-          });
-        } catch (error: unknown) {
-          const errMsg =
-            error instanceof Error
-              ? error.message
-              : "No se pudo procesar la generación de llaves.";
-          setFeedbackModal({
-            isOpen: true,
-            type: "danger",
-            title: "Error operativo",
-            description: errMsg,
-            onClose: () =>
-              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
-          });
-        } finally {
-          setGenerando(false);
-        }
-      },
-    });
+        router.refresh();
+        setRefreshKey((prev) => prev + 1);
+        setActiveTab("cuadros");
+
+        setFeedbackModal({
+          isOpen: true,
+          type: "success",
+          title: "¡Cuadro Generado!",
+          description: "El fixture automático se ha estructurado con éxito.",
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+      } catch (error: unknown) {
+        const errMsg =
+          error instanceof Error ? error.message : "Fallo la generación.";
+        setFeedbackModal({
+          isOpen: true,
+          type: "danger",
+          title: "Error operativo",
+          description: errMsg,
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+      } finally {
+        setGenerando(false);
+      }
+    };
+
+    if (isPrimeraVez) {
+      // Modal amigable para la primera vez
+      setFeedbackModal({
+        isOpen: true,
+        type: "info",
+        title: "Generar Fixture",
+        description:
+          "Se crearán los cruces aleatorios basados en las inscripciones confirmadas. El torneo pasará automáticamente a estado 'En curso'.",
+        confirmText: "Generar Cuadro",
+        cancelText: "Cancelar",
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        onConfirm: executeGeneration,
+      });
+    } else {
+      // Modal de peligro si están queriendo pisar un cuadro ya existente
+      setFeedbackModal({
+        isOpen: true,
+        type: "danger",
+        title: "¡Atención! Acción destructiva",
+        description:
+          "¿Estás completamente seguro de regenerar el cuadro? Esto borrará el fixture actual y todos los resultados cargados.",
+        confirmText: "Sí, Borrar y Regenerar",
+        cancelText: "Cancelar",
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        onConfirm: executeGeneration,
+      });
+    }
   };
 
   const handleGuardarResultadoLive = async (
@@ -267,6 +285,18 @@ export default function TorneoDetallePage() {
     (p) => p.equipo_a_id && p.equipo_b_id && p.ganador === null,
   );
 
+  // --- MOTOR DINÁMICO DE CUADROS ---
+  const RONDAS_CONFIG = [
+    { id: "OCTAVOS", label: "Octavos", required: 8 },
+    { id: "CUARTOS", label: "Cuartos", required: 4 },
+    { id: "SEMIS", label: "Semis", required: 2 },
+    { id: "FINAL", label: "Final", required: 1 },
+  ];
+
+  const rondasToShow = RONDAS_CONFIG.filter(
+    (r) => r.required <= (torneo.cupos_maximos || 16) / 2,
+  );
+
   const getRoundMatches = (round: string, requiredCount: number): Partido[] => {
     const found = partidos
       .filter((p) => p.ronda === round)
@@ -294,10 +324,6 @@ export default function TorneoDetallePage() {
     }
     return result;
   };
-
-  const partidosCuartos = getRoundMatches("CUARTOS", 4);
-  const partidosSemis = getRoundMatches("SEMIS", 2);
-  const partidoFinal = getRoundMatches("FINAL", 1);
 
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 space-y-6 md:px-10 md:py-10">
@@ -484,33 +510,29 @@ export default function TorneoDetallePage() {
                   </button>
                 </div>
 
-                <div className="flex gap-8 lg:gap-12 min-w-150 pb-4">
-                  <div className="flex-1 flex flex-col justify-around gap-6">
-                    <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4">
-                      Cuartos
-                    </h3>
-                    {partidosCuartos.map((p) => (
-                      <MatchCard key={p.id} partido={p} />
-                    ))}
-                  </div>
-                  <div className="flex-1 flex flex-col justify-around gap-16 relative">
-                    <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4 absolute top-0 w-full">
-                      Semis
-                    </h3>
-                    <div className="mt-12 space-y-24">
-                      {partidosSemis.map((p) => (
-                        <MatchCard key={p.id} partido={p} />
-                      ))}
+                <div className="flex gap-8 lg:gap-12 min-w-150 h-137.5 pb-4">
+                  {rondasToShow.map((rondaInfo) => (
+                    <div
+                      key={rondaInfo.id}
+                      className="flex-1 flex flex-col relative justify-center"
+                    >
+                      <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4 absolute -top-10 w-full">
+                        {rondaInfo.label}
+                      </h3>
+                      <div className="flex flex-col justify-around h-full space-y-8">
+                        {getRoundMatches(rondaInfo.id, rondaInfo.required).map(
+                          (p) => (
+                            <div
+                              key={p.id}
+                              className="relative flex items-center"
+                            >
+                              <MatchCard partido={p} />
+                            </div>
+                          ),
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-1 flex flex-col justify-center relative">
-                    <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4 absolute top-0 w-full">
-                      Final
-                    </h3>
-                    {partidoFinal.map((p) => (
-                      <MatchCard key={p.id} partido={p} />
-                    ))}
-                  </div>
+                  ))}
                 </div>
               </div>
             )}

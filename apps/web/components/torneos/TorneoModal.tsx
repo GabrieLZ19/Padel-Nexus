@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Save } from "lucide-react";
+import { X, Save, Lock } from "lucide-react";
 import CustomDropdown from "../ui/CustomDropdown";
 import { Club, FormTorneoState } from "../../utils/types";
 
@@ -34,22 +34,38 @@ export default function TorneoModal({
   isSaving,
   editingId,
 }: TorneoModalProps) {
+  // 1. Obtenemos el día actual estrictamente en la zona horaria local del usuario
   const hoy = new Date();
   const fechaLocal = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60000)
     .toISOString()
     .split("T")[0];
+
+  // 2. Lógica inteligente para la fecha mínima
+  const fechaFormulario = formData.fecha ? formData.fecha.split("T")[0] : "";
+  const minDate =
+    editingId && fechaFormulario && fechaFormulario < fechaLocal
+      ? fechaFormulario
+      : fechaLocal;
 
   const opcionesClubes = clubs.map((c) => ({
     value: String(c.id),
     label: c.nombre,
   }));
 
-  // --- GENERACIÓN DINÁMICA DE CUPOS ---
-  // Obligamos a que el torneo tenga estructura geométrica válida para llaves
   const opcionesCupos = [4, 8, 16, 32, 64].map((num) => ({
     value: String(num),
     label: `${num} ${formData.modalidad === "Individual" ? "Jugadores" : "Duplas"}`,
   }));
+
+  // Lógica de estados automáticos: si ya tiene llaves generadas, se bloquea la edición de estado.
+  const estadoNormalizado = (formData.estado || "").toLowerCase().trim();
+  const isAutoManaged =
+    estadoNormalizado === "en curso" || estadoNormalizado === "finalizado";
+
+  // Usamos la constante ESTADOS_TORNEO que pediste
+  const opcionesEstado = isAutoManaged
+    ? [{ value: formData.estado, label: formData.estado.toUpperCase() }]
+    : ESTADOS_TORNEO;
 
   return (
     <AnimatePresence>
@@ -102,12 +118,18 @@ export default function TorneoModal({
                   </label>
                   <input
                     type="date"
-                    min={!editingId ? fechaLocal : undefined}
+                    min={minDate}
                     className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors scheme-dark"
-                    value={formData.fecha}
-                    onChange={(e) =>
-                      setFormData({ ...formData, fecha: e.target.value })
-                    }
+                    value={fechaFormulario}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      // MAGIA ANTI-ZONA HORARIA: Inyectamos mediodía con huso horario argentino (-03:00)
+                      // Esto garantiza que en la base de datos caiga exactamente en el día que elegiste.
+                      setFormData({
+                        ...formData,
+                        fecha: val ? `${val}T12:00:00-03:00` : "",
+                      });
+                    }}
                   />
                 </div>
               </div>
@@ -133,17 +155,35 @@ export default function TorneoModal({
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Estado de publicación
+                  <label className="flex items-center justify-between text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    <span>Estado de publicación</span>
+                    {isAutoManaged && (
+                      <span className="flex items-center gap-1 text-padel-4">
+                        <Lock className="size-3" /> Auto
+                      </span>
+                    )}
                   </label>
-                  <CustomDropdown
-                    value={formData.estado}
-                    onChange={(val) =>
-                      setFormData({ ...formData, estado: val })
+                  <div
+                    className={
+                      isAutoManaged ? "opacity-60 cursor-not-allowed" : ""
                     }
-                    options={ESTADOS_TORNEO}
-                    placeholder="Seleccionar..."
-                  />
+                  >
+                    <CustomDropdown
+                      value={formData.estado}
+                      onChange={(val) =>
+                        setFormData({ ...formData, estado: val })
+                      }
+                      options={opcionesEstado}
+                      placeholder="Seleccionar..."
+                      disabled={isAutoManaged}
+                    />
+                  </div>
+                  {isAutoManaged && (
+                    <p className="text-[10px] text-gray-500 mt-1.5">
+                      El sistema gestiona este estado porque el torneo ya tiene
+                      llaves generadas.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -204,7 +244,6 @@ export default function TorneoModal({
                   />
                 </div>
 
-                {/* MODIFICACIÓN: Dropdown de Cupos Blindado */}
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
                     Cupos Máximos
@@ -249,7 +288,6 @@ export default function TorneoModal({
                   Estructura de Premios (Dejar en blanco si no hay premios)
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  {/* 1er Puesto */}
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-5 h-5 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center font-black text-[10px] border border-yellow-500/30">
@@ -270,7 +308,6 @@ export default function TorneoModal({
                     />
                   </div>
 
-                  {/* 2do Puesto */}
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-5 h-5 rounded-full bg-gray-400/20 text-gray-400 flex items-center justify-center font-black text-[10px] border border-gray-400/30">
@@ -291,7 +328,6 @@ export default function TorneoModal({
                     />
                   </div>
 
-                  {/* 3er Puesto */}
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="w-5 h-5 rounded-full bg-amber-700/20 text-amber-600 flex items-center justify-center font-black text-[10px] border border-amber-700/30">

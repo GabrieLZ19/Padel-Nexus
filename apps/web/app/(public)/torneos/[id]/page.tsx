@@ -74,100 +74,27 @@ export default function TorneoDetallePage() {
 
   const handleInscripcion = () => {
     if (!profile) {
-      router.push("/login"); // Redirige a login si no está logueado
+      router.push("/login");
       return;
     }
     if (isAlreadyEnrolled) {
-      router.push("/mis-inscripciones"); // Redirige a inscripciones si ya es usuario
+      router.push("/mis-inscripciones");
       return;
     }
-    setIsInscripcionModalOpen(true); // Abre modal si es usuario y no está inscrito
+    setIsInscripcionModalOpen(true);
   };
 
-  // --- ESTADOS DE CARGA (SKELETON PREMIUM) ---
   if (loading) {
     return (
       <div className="min-h-screen bg-[#111111] text-white">
         <div className="max-w-350 mx-auto px-6 lg:px-10 py-8 animate-pulse">
-          {/* Back button skeleton */}
           <div className="w-32 h-4 bg-white/5 rounded-md mb-8"></div>
-
-          {/* HERO SKELETON */}
-          <div className="bg-[#161616] rounded-4xl p-8 lg:p-12 mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 border border-white/5 h-80 lg:h-60">
-            <div className="space-y-6 flex-1 w-full">
-              <div className="w-48 h-6 bg-white/10 rounded-full"></div>
-              <div className="w-3/4 lg:w-1/2 h-12 lg:h-14 bg-white/10 rounded-xl"></div>
-              <div className="flex flex-wrap gap-4 pt-2">
-                <div className="w-32 h-4 bg-white/10 rounded-md"></div>
-                <div className="w-32 h-4 bg-white/10 rounded-md"></div>
-                <div className="w-32 h-4 bg-white/10 rounded-md"></div>
-              </div>
-            </div>
-            <div className="w-full lg:w-56 h-14 bg-white/10 rounded-xl shrink-0"></div>
-          </div>
-
+          <div className="bg-[#161616] rounded-4xl p-8 lg:p-12 mb-8 h-80 lg:h-60"></div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            {/* BRACKET SKELETON */}
-            <div className="lg:col-span-2 bg-[#161616] border border-white/5 rounded-3xl p-6 lg:p-8 overflow-hidden">
-              <div className="w-48 h-8 bg-white/10 rounded-lg mb-10"></div>
-
-              <div className="flex gap-8 lg:gap-12 pb-4 opacity-50">
-                {/* Cuartos */}
-                <div className="flex-1 flex flex-col gap-6">
-                  <div className="w-16 h-3 bg-white/10 rounded mx-auto mb-4"></div>
-                  {[1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className="h-20 bg-white/10 rounded-xl w-full"
-                    ></div>
-                  ))}
-                </div>
-                {/* Semis */}
-                <div className="flex-1 flex flex-col justify-around gap-16 relative">
-                  <div className="w-16 h-3 bg-white/10 rounded mx-auto mb-4 absolute top-0 left-1/2 -translate-x-1/2"></div>
-                  <div className="mt-12 space-y-24">
-                    {[1, 2].map((i) => (
-                      <div
-                        key={i}
-                        className="h-20 bg-white/10 rounded-xl w-full"
-                      ></div>
-                    ))}
-                  </div>
-                </div>
-                {/* Final */}
-                <div className="flex-1 flex flex-col justify-center relative">
-                  <div className="w-16 h-3 bg-white/10 rounded mx-auto mb-4 absolute top-0 left-1/2 -translate-x-1/2"></div>
-                  <div className="h-20 bg-white/10 rounded-xl w-full"></div>
-                </div>
-              </div>
-            </div>
-
-            {/* SIDEBAR SKELETON */}
+            <div className="lg:col-span-2 bg-[#161616] border border-white/5 rounded-3xl p-6 h-125"></div>
             <div className="space-y-6">
-              {/* Inscription Card Skeleton */}
-              <div className="bg-[#161616] border border-white/5 rounded-3xl p-8">
-                <div className="w-24 h-3 bg-white/10 rounded-md mb-6"></div>
-                <div className="w-48 h-12 bg-white/10 rounded-lg mb-8"></div>
-                <div className="space-y-4 mb-8">
-                  <div className="w-full h-4 bg-white/10 rounded-md"></div>
-                  <div className="w-5/6 h-4 bg-white/10 rounded-md"></div>
-                  <div className="w-4/5 h-4 bg-white/10 rounded-md"></div>
-                </div>
-                <div className="w-full h-14 bg-white/10 rounded-xl"></div>
-              </div>
-
-              {/* Prizes Card Skeleton */}
-              <div className="bg-[#161616] border border-white/5 rounded-3xl p-8">
-                <div className="w-24 h-6 bg-white/10 rounded-lg mb-6"></div>
-                <div className="space-y-5">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-full bg-white/10 shrink-0"></div>
-                      <div className="w-32 h-4 bg-white/10 rounded-md"></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <div className="bg-[#161616] border border-white/5 rounded-3xl p-8 h-64"></div>
+              <div className="bg-[#161616] border border-white/5 rounded-3xl p-8 h-48"></div>
             </div>
           </div>
         </div>
@@ -195,8 +122,62 @@ export default function TorneoDetallePage() {
     );
   }
 
-  // --- LÓGICA DINÁMICA DEL CUADRO ---
-  // Si la DB no devuelve partidos para una ronda, rellenamos con vacíos para que la UI no se rompa
+  // --- VARIABLES DE ESTADO Y CUPOS ---
+  const estadoBase = (torneo?.estado || "").toLowerCase().trim();
+  const isEnCurso = estadoBase === "en curso";
+  const isFinalizado = estadoBase === "finalizado";
+  const isAbierto = estadoBase === "inscripción" || estadoBase === "borrador";
+  const isIndividual = torneo.modalidad === "Individual";
+  const hasPremios = torneo.premio_1 || torneo.premio_2 || torneo.premio_3;
+
+  const cuposActuales = torneo.cupos_actuales || 0;
+  const cuposMaximos = torneo.cupos_maximos || 16;
+  const isLleno = cuposActuales >= cuposMaximos;
+
+  // --- LÓGICA CONDICIONAL DE BOTONES UNIFICADA ---
+  let btnText = "";
+  let btnClass = "";
+  let isDisabled = false;
+
+  if (isAlreadyEnrolled) {
+    btnText = "Ver mi inscripción";
+    btnClass =
+      "bg-white/10 text-white hover:bg-white/20 border border-white/20";
+  } else if (!isAbierto) {
+    // Si NO está abierto (En curso o Finalizado), anulamos "Cupos Agotados"
+    btnText = "Inscripciones Cerradas";
+    btnClass =
+      "bg-white/5 text-gray-500 border border-white/10 cursor-not-allowed opacity-80 shadow-none";
+    isDisabled = true;
+  } else if (isLleno) {
+    btnText = "Cupos Agotados";
+    btnClass =
+      "bg-red-500/20 text-red-500 border border-red-500/20 cursor-not-allowed opacity-80 shadow-none";
+    isDisabled = true;
+  } else if (!profile) {
+    btnText = "Ingresar para inscribirte";
+    btnClass =
+      "bg-padel-4 hover:bg-[#b3e600] text-[#111] shadow-[0_0_30px_rgba(204,255,0,0.2)]";
+  } else {
+    btnText = isIndividual ? "Inscribirme" : "Inscribir mi dupla";
+    btnClass =
+      "bg-padel-4 hover:bg-[#b3e600] text-[#111] shadow-[0_0_30px_rgba(204,255,0,0.2)]";
+  }
+
+  // --- LÓGICA DINÁMICA DEL CUADRO (SE ADAPTA A LOS CUPOS MÁXIMOS) ---
+  const RONDAS_CONFIG = [
+    { id: "16AVOS", label: "16avos", required: 16 },
+    { id: "OCTAVOS", label: "Octavos", required: 8 },
+    { id: "CUARTOS", label: "Cuartos", required: 4 },
+    { id: "SEMIS", label: "Semis", required: 2 },
+    { id: "FINAL", label: "Final", required: 1 },
+  ];
+
+  // Filtramos para dibujar solo las rondas matemáticas válidas para el torneo
+  const rondasToShow = RONDAS_CONFIG.filter(
+    (r) => r.required <= cuposMaximos / 2,
+  );
+
   const getRoundMatches = (round: string, requiredCount: number): Partido[] => {
     const found = partidos
       .filter((p) => p.ronda === round)
@@ -224,17 +205,6 @@ export default function TorneoDetallePage() {
     }
     return result;
   };
-
-  const partidosCuartos = getRoundMatches("CUARTOS", 4);
-  const partidosSemis = getRoundMatches("SEMIS", 2);
-  const partidoFinal = getRoundMatches("FINAL", 1);
-  const estadoBase = (torneo?.estado || "").toLowerCase().trim();
-  const isEnCurso = estadoBase === "en curso";
-  const isFinalizado = estadoBase === "finalizado";
-  const isAbierto =
-    torneo.estado === "Inscripción" || torneo.estado === "Borrador";
-  const isIndividual = torneo.modalidad === "Individual";
-  const hasPremios = torneo.premio_1 || torneo.premio_2 || torneo.premio_3;
 
   return (
     <div className="min-h-screen bg-[#111111] text-white">
@@ -266,14 +236,21 @@ export default function TorneoDetallePage() {
                 <Calendar className="size-4 text-padel-4" />{" "}
                 {formatFecha(torneo.fecha)}
               </span>
-              <span className="flex items-center gap-2">
+              <span
+                className={`flex items-center gap-2 ${isAbierto && isLleno ? "text-red-400" : ""}`}
+              >
                 {isIndividual ? (
-                  <User className="size-4 text-padel-4" />
+                  <User
+                    className={`size-4 ${isAbierto && isLleno ? "text-red-400" : "text-padel-4"}`}
+                  />
                 ) : (
-                  <Users className="size-4 text-padel-4" />
+                  <Users
+                    className={`size-4 ${isAbierto && isLleno ? "text-red-400" : "text-padel-4"}`}
+                  />
                 )}
-                {torneo.cupos_actuales || 0}/{torneo.cupos_maximos || 16}{" "}
+                {cuposActuales}/{cuposMaximos}{" "}
                 {isIndividual ? "jugadores" : "duplas"}
+                {isAbierto && isLleno && " (Agotado)"}
               </span>
               {hasPremios && (
                 <span className="flex items-center gap-2">
@@ -282,27 +259,21 @@ export default function TorneoDetallePage() {
               )}
             </div>
           </div>
+
+          {/* BOTÓN PRINCIPAL (HERO) */}
           <button
             onClick={handleInscripcion}
-            disabled={
-              inscribiendo || (isAbierto && !profile ? false : !isAbierto)
-            }
-            className="relative z-10 shrink-0 w-full lg:w-auto bg-padel-4 hover:bg-[#b3e600] text-[#111] px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-[0_0_30px_rgba(204,255,0,0.2)] flex items-center justify-center gap-2 disabled:opacity-50 disabled:shadow-none"
+            disabled={inscribiendo || isDisabled}
+            className={`relative z-10 shrink-0 w-full lg:w-auto px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 ${btnClass}`}
           >
-            {!profile
-              ? "Ingresar para inscribirte"
-              : isAlreadyEnrolled
-                ? "Ver mi inscripción"
-                : torneo?.modalidad === "Individual"
-                  ? "Inscribirme"
-                  : "Inscribir mi dupla"}
+            {btnText}
           </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          {/* COLUMNA IZQUIERDA: CUADRO PRINCIPAL */}
-          <div className="lg:col-span-2 bg-[#161616] border border-white/5 rounded-3xl p-6 lg:p-8 overflow-x-auto shadow-xl">
-            <div className="flex justify-between items-center mb-10 min-w-150">
+          {/* COLUMNA IZQUIERDA: CUADRO PRINCIPAL DINÁMICO */}
+          <div className="lg:col-span-2 bg-[#161616] border border-white/5 rounded-3xl p-6 lg:p-10 overflow-x-auto shadow-xl">
+            <div className="flex justify-between items-center mb-16 min-w-150">
               <h2 className="text-2xl font-bold text-white">
                 Cuadro principal
               </h2>
@@ -319,33 +290,38 @@ export default function TorneoDetallePage() {
               )}
             </div>
 
-            <div className="flex gap-8 lg:gap-12 min-w-150 pb-4">
-              <div className="flex-1 flex flex-col justify-around gap-6">
-                <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4">
-                  Cuartos
-                </h3>
-                {partidosCuartos.map((p) => (
-                  <MatchCard key={p.id} partido={p} />
-                ))}
-              </div>
-              <div className="flex-1 flex flex-col justify-around gap-16 relative">
-                <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4 absolute top-0 w-full">
-                  Semis
-                </h3>
-                <div className="mt-12 space-y-24">
-                  {partidosSemis.map((p) => (
-                    <MatchCard key={p.id} partido={p} />
-                  ))}
-                </div>
-              </div>
-              <div className="flex-1 flex flex-col justify-center relative">
-                <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4 absolute top-0 w-full">
-                  Final
-                </h3>
-                {partidoFinal.map((p) => (
-                  <MatchCard key={p.id} partido={p} />
-                ))}
-              </div>
+            {/* GENERADOR DE COLUMNAS FLEXIBLE (Se adapta a 4, 8 o 16 cupos) */}
+            <div className="flex gap-8 lg:gap-12 min-w-150 h-137.5 pb-4">
+              {rondasToShow.map((rondaInfo, index) => {
+                const roundMatches = getRoundMatches(
+                  rondaInfo.id,
+                  rondaInfo.required,
+                );
+
+                return (
+                  <div
+                    key={rondaInfo.id}
+                    className="flex-1 flex flex-col relative h-full"
+                  >
+                    <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4 absolute -top-10 w-full">
+                      {rondaInfo.label}
+                    </h3>
+
+                    {/* Justify-around reparte las tarjetas matemáticamente perfecto a lo alto */}
+                    <div className="flex flex-col justify-around h-full w-full">
+                      {roundMatches.map((p) => (
+                        <div
+                          key={p.id}
+                          className="relative w-full flex items-center justify-center"
+                        >
+                          <MatchCard partido={p} />
+                          {/* Dibuja la línea conectora hacia la derecha, excepto en la columna Final */}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -384,19 +360,15 @@ export default function TorneoDetallePage() {
                   total o 50% parcial
                 </li>
               </ul>
+
+              {/* LÓGICA CONDICIONAL DE LA SIDEBAR (AHORA USA LAS MISMAS VARIABLES DEL HERO) */}
               {isAbierto ? (
                 <button
                   onClick={handleInscripcion}
-                  disabled={inscribiendo}
-                  className="w-full bg-padel-4 hover:bg-[#b3e600] text-[#111] py-4 rounded-xl font-bold text-lg transition-all shadow-[0_0_20px_rgba(204,255,0,0.2)] disabled:opacity-50 disabled:shadow-none"
+                  disabled={inscribiendo || isDisabled}
+                  className={`w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center ${btnClass}`}
                 >
-                  {!profile
-                    ? "Ingresar para inscribirte"
-                    : isAlreadyEnrolled
-                      ? "Ver mi inscripción"
-                      : isIndividual
-                        ? "Inscribirme"
-                        : "Inscribir mi dupla"}
+                  {btnText}
                 </button>
               ) : (
                 <div className="w-full bg-white/5 border border-white/10 text-gray-500 py-4 rounded-xl font-bold text-center cursor-not-allowed flex flex-col items-center justify-center">

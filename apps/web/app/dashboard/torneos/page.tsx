@@ -369,7 +369,9 @@ export default function TorneosPage() {
                         </div>
                         <div className="text-[13px] text-gray-500 mt-0.5">
                           {t.fecha
-                            ? new Date(t.fecha).toLocaleDateString("es-AR", {
+                            ? new Date(
+                                `${t.fecha.split("T")[0]}T12:00:00`,
+                              ).toLocaleDateString("es-AR", {
                                 day: "2-digit",
                                 month: "short",
                                 year: "numeric",
