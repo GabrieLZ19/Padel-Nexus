@@ -222,29 +222,6 @@ export const updateTorneo = async (req: Request, res: Response) => {
   }
 };
 
-// export const updateTorneoEstado = async (req: Request, res: Response) => {
-//   try {
-//     const { id } = req.params;
-//     const { estado } = req.body;
-
-//     if (!estado)
-//       return res.status(400).json({ message: "El estado es requerido" });
-
-//     const { data, error } = await supabase
-//       .from("torneos")
-//       .update({ estado })
-//       .eq("id", id)
-//       .select();
-
-//     if (error) throw error;
-//     res.status(200).json(data[0]);
-//   } catch (error: any) {
-//     res
-//       .status(500)
-//       .json({ message: "Error al actualizar estado", error: error.message });
-//   }
-// };
-
 export const deleteTorneo = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -330,7 +307,7 @@ export const getPartidosByTorneo = async (req: Request, res: Response) => {
 };
 
 // =======================================================================
-// GENERADOR DE CUADROS AUTOMATIZADO
+// GENERADOR DE CUADROS AUTOMATIZADO (DINÁMICO PARA 4, 8, 16, 32 CUPOS)
 // =======================================================================
 export const generarCuadros = async (req: Request, res: Response) => {
   try {
@@ -356,75 +333,54 @@ export const generarCuadros = async (req: Request, res: Response) => {
         .json({ message: "Se necesitan al menos 4 inscritos confirmados." });
     }
 
+    // Borrar llaves anteriores si existían
     await supabase.from("partidos").delete().eq("torneo_id", id);
 
     const shuffled = inscripciones.sort(() => 0.5 - Math.random());
     const partidos = [];
     let orden = 1;
 
-    // Creación de Formato Eliminatoria Directa (Ej: 8 jugadores)
     if (torneo.formato === "Eliminatoria Directa") {
-      const isOctavos = shuffled.length > 8;
+      const cupos = torneo.cupos_maximos || 16;
 
-      if (isOctavos) {
-        for (let i = 0; i < 16; i += 2)
+      // Mapeo maestro de rondas
+      const roundsConfig = [
+        { name: "32AVOS", matches: 32 },
+        { name: "16AVOS", matches: 16 },
+        { name: "OCTAVOS", matches: 8 },
+        { name: "CUARTOS", matches: 4 },
+        { name: "SEMIS", matches: 2 },
+        { name: "FINAL", matches: 1 },
+      ];
+
+      // Encontramos desde qué ronda debe empezar el torneo (Ej: Cupo 4 -> StartIndex apunta a SEMIS (2 partidos))
+      const startIndex = roundsConfig.findIndex((r) => r.matches === cupos / 2);
+      if (startIndex === -1)
+        throw new Error("Cantidad de cupos inválida para generar cuadro.");
+
+      for (let i = startIndex; i < roundsConfig.length; i++) {
+        const round = roundsConfig[i];
+
+        for (let j = 0; j < round.matches; j++) {
+          let equipo_a_id = null;
+          let equipo_b_id = null;
+
+          // Solo poblamos con jugadores la ronda inicial, el resto espera rival
+          if (i === startIndex) {
+            equipo_a_id = shuffled[j * 2]?.id || null;
+            equipo_b_id = shuffled[j * 2 + 1]?.id || null;
+          }
+
           partidos.push({
             torneo_id: id,
-            equipo_a_id: shuffled[i]?.id || null,
-            equipo_b_id: shuffled[i + 1]?.id || null,
-            ronda: "OCTAVOS",
+            equipo_a_id,
+            equipo_b_id,
+            ronda: round.name,
             orden: orden++,
             estado_partido: "Programado",
           });
-        for (let i = 0; i < 4; i++)
-          partidos.push({
-            torneo_id: id,
-            equipo_a_id: null,
-            equipo_b_id: null,
-            ronda: "CUARTOS",
-            orden: orden++,
-            estado_partido: "Programado",
-          });
-      } else {
-        // Cuartos de final
-        for (let i = 0; i < 8; i += 2)
-          partidos.push({
-            torneo_id: id,
-            equipo_a_id: shuffled[i]?.id || null,
-            equipo_b_id: shuffled[i + 1]?.id || null,
-            ronda: "CUARTOS",
-            orden: orden++,
-            estado_partido: "Programado",
-          });
+        }
       }
-
-      // Semifinales
-      partidos.push({
-        torneo_id: id,
-        equipo_a_id: null,
-        equipo_b_id: null,
-        ronda: "SEMIS",
-        orden: orden++,
-        estado_partido: "Programado",
-      });
-      partidos.push({
-        torneo_id: id,
-        equipo_a_id: null,
-        equipo_b_id: null,
-        ronda: "SEMIS",
-        orden: orden++,
-        estado_partido: "Programado",
-      });
-
-      // Final
-      partidos.push({
-        torneo_id: id,
-        equipo_a_id: null,
-        equipo_b_id: null,
-        ronda: "FINAL",
-        orden: orden++,
-        estado_partido: "Programado",
-      });
     }
 
     const { error: insertError } = await supabase
@@ -432,7 +388,6 @@ export const generarCuadros = async (req: Request, res: Response) => {
       .insert(partidos);
     if (insertError) throw insertError;
 
-    // --- ACCIÓN AUTOMÁTICA: Cambiar estado a "En curso" ---
     await supabase.from("torneos").update({ estado: "En curso" }).eq("id", id);
 
     res.status(200).json({
@@ -447,7 +402,7 @@ export const generarCuadros = async (req: Request, res: Response) => {
 };
 
 // =======================================================================
-// AVANCE MATEMÁTICO UNIVERSAL
+// AVANCE MATEMÁTICO UNIVERSAL + REPARTO DE PUNTOS PROFESIONAL
 // =======================================================================
 export const actualizarResultado = async (req: Request, res: Response) => {
   try {
@@ -464,27 +419,131 @@ export const actualizarResultado = async (req: Request, res: Response) => {
         estado_partido: "Finalizado",
       })
       .eq("id", partido_id)
-      .select("id, torneo_id, ronda, orden")
+      .select("id, torneo_id, ronda, orden, equipo_a_id, equipo_b_id")
       .single();
 
     if (updateError) throw updateError;
 
-    // 2. Si es la FINAL, actualizamos el estado del torneo a "Finalizado"
-    if (partido.ronda === "FINAL") {
+    // 2. Identificar al Perdedor de este partido específico
+    const perdedor_id =
+      ganador_id === partido.equipo_a_id
+        ? partido.equipo_b_id
+        : partido.equipo_a_id;
+
+    // 3. Obtener info del Torneo para el Ranking
+    const { data: torneoInfo } = await supabase
+      .from("torneos")
+      .select("nivel, categoria, modalidad")
+      .eq("id", partido.torneo_id)
+      .single();
+
+    if (torneoInfo) {
+      // --- TABLA DE PUNTUACIÓN ESTÁNDAR (Estilo Premier Padel) ---
+      const TABLA_PUNTOS: Record<
+        string,
+        { ganador?: number; perdedor: number }
+      > = {
+        "16AVOS": { perdedor: 45 },
+        OCTAVOS: { perdedor: 90 },
+        CUARTOS: { perdedor: 180 },
+        SEMIS: { perdedor: 360 },
+        FINAL: { ganador: 1000, perdedor: 600 }, // La final da puntos a ambos
+      };
+
+      const rondaNormalizada = partido.ronda.toUpperCase().trim();
+      const puntosRonda = TABLA_PUNTOS[rondaNormalizada];
+
+      // Helper: Procesar inscripción, sumar puntos y registrar ESTADÍSTICAS (PJ/PG)
+      const darPuntosAInscripcion = async (
+        inscripcionId: string,
+        puntosASumar: number,
+        isGanador: boolean,
+      ) => {
+        if (!inscripcionId) return;
+
+        const { data: inscripcion } = await supabase
+          .from("inscripciones")
+          .select("usuario_id")
+          .eq("id", inscripcionId)
+          .single();
+
+        if (inscripcion && inscripcion.usuario_id) {
+          const { data: rank } = await supabase
+            .from("rankings")
+            .select("puntos, pj, pg")
+            .eq("usuario_id", inscripcion.usuario_id)
+            .eq("categoria", torneoInfo.nivel)
+            .single();
+
+          const pAnt = rank?.puntos || 0;
+          const pjAnt = rank?.pj || 0;
+          const pgAnt = rank?.pg || 0;
+
+          // ACTUALIZACIÓN MAESTRA DE ESTADÍSTICAS EN TIEMPO REAL
+          await supabase.from("rankings").upsert(
+            {
+              usuario_id: inscripcion.usuario_id,
+              categoria: torneoInfo.nivel,
+              rama: torneoInfo.categoria,
+              puntos: pAnt + puntosASumar,
+              pj: pjAnt + 1, // Suma 1 Partido Jugado siempre
+              pg: isGanador ? pgAnt + 1 : pgAnt, // Suma 1 Ganado solo si ganó
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "usuario_id,categoria" },
+          );
+
+          // Guardar historial de ranking (solo si sumó puntos por llegar lejos)
+          if (puntosASumar > 0) {
+            await supabase.from("historial_ranking").insert([
+              {
+                usuario_id: inscripcion.usuario_id,
+                torneo_id: partido.torneo_id,
+                puntos_anteriores: pAnt,
+                puntos_nuevos: pAnt + puntosASumar,
+              },
+            ]);
+          }
+        }
+      };
+
+      // 3.1 Asignar puntos y stats al PERDEDOR
+      if (perdedor_id) {
+        // El perdedor recibe los puntos correspondientes a la ronda en la que se quedó y suma 1 PJ, 0 PG
+        await darPuntosAInscripcion(
+          perdedor_id,
+          puntosRonda?.perdedor || 0,
+          false,
+        );
+      }
+
+      // 3.2 Asignar puntos y stats al GANADOR
+      if (ganador_id) {
+        // El ganador recibe puntos SOLO en la final. Pero en cada ronda, SIEMPRE suma 1 PJ y 1 PG
+        const puntosGanador =
+          rondaNormalizada === "FINAL" && puntosRonda?.ganador
+            ? puntosRonda.ganador
+            : 0;
+        await darPuntosAInscripcion(ganador_id, puntosGanador, true);
+      }
+    }
+
+    // 4. Lógica de Avance en el Cuadro o Finalización del Torneo
+    if (partido.ronda.toUpperCase() === "FINAL") {
       await supabase
         .from("torneos")
         .update({ estado: "Finalizado" })
         .eq("id", partido.torneo_id);
-    }
-    // 3. Si no es la FINAL, seguimos con la lógica de avance automático
-    else {
+    } else {
       const rondasSiguientes: Record<string, string> = {
+        "16AVOS": "OCTAVOS",
         OCTAVOS: "CUARTOS",
         CUARTOS: "SEMIS",
         SEMIS: "FINAL",
       };
 
-      const rondaSiguiente = rondasSiguientes[partido.ronda];
+      const rondaSiguiente =
+        rondasSiguientes[partido.ronda.toUpperCase().trim()];
       if (rondaSiguiente) {
         const { data: partidosRondaActual } = await supabase
           .from("partidos")
@@ -519,7 +578,10 @@ export const actualizarResultado = async (req: Request, res: Response) => {
       }
     }
 
-    res.status(200).json({ message: "Resultado cargado exitosamente" });
+    res.status(200).json({
+      message:
+        "Resultado cargado y estadísticas/puntos distribuidos exitosamente",
+    });
   } catch (error: any) {
     res
       .status(500)

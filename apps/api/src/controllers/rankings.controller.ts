@@ -11,7 +11,7 @@ export const RankingsController = {
         .select(
           `
           *, 
-          perfiles(nombre_completo, categoria_padel),
+          perfiles(nombre_completo, categoria_padel, avatar_url),
           historial_ranking(torneo_id, puntos_nuevos, created_at)
         `,
         )
@@ -28,29 +28,45 @@ export const RankingsController = {
     }
   },
 
-  // Obtiene el ranking global con la posición calculada mediante la vista de SQL
   async obtenerRankingGlobal(req: Request, res: Response) {
     try {
       const { categoria } = req.query;
 
       let query = supabase
-        .from("vista_ranking_posiciones")
-        .select("*, perfiles(nombre_completo, avatar_url)")
-        .order("posicion", { ascending: true })
-        .limit(50); // Límite solicitado
+        .from("rankings")
+        .select(
+          `
+          *, 
+          perfiles!inner(nombre_completo, avatar_url)
+        `,
+        )
+        .order("puntos", { ascending: false }) // Ordenamos por el que tiene más puntos
+        .limit(100);
 
-      if (categoria) query = query.eq("categoria", categoria);
+      // Si se filtra por categoría (Ej: "5ª")
+      if (categoria && categoria !== "Todas") {
+        query = query.eq("categoria", categoria);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
 
-      return res.status(200).json(data);
+      // Inyectamos la posición real y aseguramos que PJ y PG existan
+      const rankingCalculado = (data || []).map((jugador, index) => ({
+        ...jugador,
+        posicion_actual: index + 1,
+        pj: jugador.pj || 0,
+        pg: jugador.pg || 0,
+        tendencia: jugador.tendencia || 0,
+      }));
+
+      return res.status(200).json(rankingCalculado);
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
     }
   },
 
-  // Método transaccional: Actualiza ranking y registra historial
+  // Método manual para que el Admin corrija puntos si es necesario
   async actualizarPuntosJugador(req: Request, res: Response) {
     try {
       const { usuario_id, puntos_a_sumar, categoria, torneo_id } = req.body;
@@ -59,7 +75,6 @@ export const RankingsController = {
         return res.status(400).json({ message: "Faltan datos obligatorios." });
       }
 
-      // 1. Obtener puntos actuales
       const { data: rankingActual } = await supabase
         .from("rankings")
         .select("puntos")
@@ -70,7 +85,6 @@ export const RankingsController = {
       const puntosAnteriores = rankingActual?.puntos || 0;
       const nuevosPuntos = puntosAnteriores + puntos_a_sumar;
 
-      // 2. Actualizar tabla rankings
       const { error: rankError } = await supabase.from("rankings").upsert(
         {
           usuario_id,
@@ -83,24 +97,18 @@ export const RankingsController = {
 
       if (rankError) throw rankError;
 
-      // 3. Registrar en historial (Auditoría)
-      const { error: histError } = await supabase
-        .from("historial_ranking")
-        .insert([
-          {
-            usuario_id,
-            torneo_id,
-            puntos_anteriores: puntosAnteriores,
-            puntos_nuevos: nuevosPuntos,
-          },
-        ]);
+      await supabase.from("historial_ranking").insert([
+        {
+          usuario_id,
+          torneo_id,
+          puntos_anteriores: puntosAnteriores,
+          puntos_nuevos: nuevosPuntos,
+        },
+      ]);
 
-      if (histError) throw histError;
-
-      return res.status(200).json({
-        message: "Ranking e historial actualizados",
-        nuevosPuntos,
-      });
+      return res
+        .status(200)
+        .json({ message: "Ranking actualizado manual", nuevosPuntos });
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
     }
