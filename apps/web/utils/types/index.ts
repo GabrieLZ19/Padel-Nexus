@@ -85,6 +85,11 @@ export interface RankingJugador {
   perfiles?: {
     nombre_completo: string | null;
     avatar_url: string | null;
+
+    clubes?: {
+      nombre: string;
+      provincia: string;
+    } | null;
   } | null;
 }
 

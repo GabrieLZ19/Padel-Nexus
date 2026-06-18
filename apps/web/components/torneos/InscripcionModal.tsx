@@ -22,6 +22,12 @@ interface InscripcionModalProps {
   torneo: Torneo;
 }
 
+const INITIAL_STATE = {
+  jugador1: "",
+  jugador2: "",
+  email2: "",
+};
+
 export default function InscripcionModal({
   isOpen,
   onClose,
@@ -30,10 +36,7 @@ export default function InscripcionModal({
   const router = useRouter();
   const [step, setStep] = useState<"form" | "success">("form");
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    jugador1: "",
-    jugador2: torneo.modalidad === "Individual" ? "-" : "",
-  });
+  const [formData, setFormData] = useState(INITIAL_STATE);
   const { profile } = useProfileStore();
   const userLevel = profile?.categoria_padel || "";
   const requiredLevel = torneo.nivel || "";
@@ -62,8 +65,9 @@ export default function InscripcionModal({
       await InscripcionesService.inscribir({
         torneo_id: torneo.id,
         usuario_id: profile.id,
+        usuario2_email: isIndividual ? null : formData.email2,
         jugador1_nombre: formData.jugador1,
-        jugador2_nombre: formData.jugador2,
+        jugador2_nombre: isIndividual ? "-" : formData.jugador2,
         monto: Number(torneo.precio_inscripcion),
       });
 
@@ -107,7 +111,11 @@ export default function InscripcionModal({
 
   const handleClose = () => {
     setStep("form");
-    setFormData({ jugador1: "", jugador2: isIndividual ? "-" : "" });
+    setFormData({
+      ...INITIAL_STATE,
+      jugador2: isIndividual ? "-" : "",
+    });
+
     onClose();
   };
 
@@ -170,18 +178,16 @@ export default function InscripcionModal({
                         animate={{ opacity: 1, height: "auto" }}
                       >
                         <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                          <Users className="size-3 text-padel-4" /> Nombre
-                          Jugador 2
+                          <Users className="size-3 text-padel-4" /> Nombre Email
+                          de tu compañero
                         </label>
                         <input
-                          placeholder="Ej: Marcos Ruiz"
+                          type="email"
+                          placeholder="compañero@email.com"
                           className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white focus:outline-none focus:border-padel-4/50 transition-all"
-                          value={formData.jugador2}
+                          value={formData.email2}
                           onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              jugador2: e.target.value,
-                            })
+                            setFormData({ ...formData, email2: e.target.value })
                           }
                         />
                       </motion.div>

@@ -17,7 +17,7 @@ import { RankingJugador } from "@/utils/types";
 // Importamos las constantes oficiales
 import { PROVINCIAS_ARG, NIVELES_PADEL } from "@/utils/constants/padelConfig";
 
-// Importamos el Dropdown que subiste
+// Importamos el Dropdown
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import Image from "next/image";
 
@@ -35,7 +35,7 @@ export default function RankingPublicPage() {
   );
   const [activeCategory, setActiveCategory] = useState<string>("Todas");
 
-  // --- EFECTO PRINCIPAL DE CARGA (Saneado de cascading renders) ---
+  // --- EFECTO PRINCIPAL DE CARGA ---
   useEffect(() => {
     let ignore = false;
 
@@ -64,20 +64,22 @@ export default function RankingPublicPage() {
     fetchRankings();
 
     return () => {
-      ignore = true; // Cleanup function previene memory leaks y setStates en desmontaje
+      ignore = true;
     };
-  }, [activeScope, activeProvincia, activeCategory]); // Dependencias limpias
+  }, [activeScope, activeProvincia, activeCategory]);
 
   // Filtrado puramente de búsqueda en memoria (Input Search)
   const filteredRankings = rankings.filter((player) => {
     const nombre = player.perfiles?.nombre_completo?.toLowerCase() || "";
-    // Aseguramos que la DB traiga club_nombre o en su defecto no crasheé
-    const club = player.club_nombre?.toLowerCase() || "";
+
+    const club =
+      player.perfiles?.clubes?.nombre?.toLowerCase() ||
+      player.club_nombre?.toLowerCase() ||
+      "";
     const query = search.toLowerCase();
     return nombre.includes(query) || club.includes(query);
   });
 
-  // Los rankings de la DB ya vienen ordenados por la Vista SQL, pero hacemos un fallback
   const sortedRankings = [...filteredRankings].sort(
     (a, b) => b.puntos - a.puntos,
   );
@@ -87,7 +89,6 @@ export default function RankingPublicPage() {
   const top3 = sortedRankings[2] || null;
   const tablePlayers = sortedRankings.slice(3);
 
-  // Opciones formateadas para el CustomDropdown
   const opcionesProvincias = PROVINCIAS_ARG.map((p) => ({
     value: p.value,
     label: p.label,
@@ -118,7 +119,7 @@ export default function RankingPublicPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 size-4" />
               <input
                 type="text"
-                placeholder="Buscar jugador..."
+                placeholder="Buscar jugador o club..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-9 pr-8 py-2.5 bg-padel-5 border border-white/5 rounded-xl text-sm text-white focus:outline-none focus:border-padel-4/50 h-13"
@@ -150,7 +151,7 @@ export default function RankingPublicPage() {
               ))}
             </div>
 
-            {/* Implementamos CustomDropdown para Provincia y Categoría */}
+            {/* Dropdowns de Selección */}
             <div className="flex gap-4 z-40">
               {activeScope !== "Global" && (
                 <div className="w-48">
@@ -175,27 +176,11 @@ export default function RankingPublicPage() {
           </div>
         </div>
 
-        {/* --- RENDERIZADO CONDICIONAL --- */}
+        {/* --- RENDERIZADO DE CONTENIDO --- */}
         {loading ? (
-          <div className="w-full animate-pulse">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 items-end">
-              <div className="bg-padel-5/50 border border-white/5 rounded-3xl p-6 flex flex-col items-center justify-center order-2 md:order-1 h-50">
-                <div className="w-12 h-12 bg-white/5 rounded-full mb-3"></div>
-                <div className="w-8 h-6 bg-white/5 rounded mb-2"></div>
-                <div className="w-32 h-4 bg-white/5 rounded mt-2"></div>
-              </div>
-              <div className="bg-padel-5/50 border border-white/5 rounded-3xl p-8 flex flex-col items-center justify-center order-1 md:order-2 h-60 transform md:-translate-y-4">
-                <div className="w-16 h-16 bg-white/5 rounded-full mb-3"></div>
-                <div className="w-10 h-8 bg-white/5 rounded mb-2"></div>
-                <div className="w-40 h-5 bg-white/5 rounded mt-2"></div>
-              </div>
-              <div className="bg-padel-5/50 border border-white/5 rounded-3xl p-6 flex flex-col items-center justify-center order-3 h-50">
-                <div className="w-12 h-12 bg-white/5 rounded-full mb-3"></div>
-                <div className="w-8 h-6 bg-white/5 rounded mb-2"></div>
-                <div className="w-32 h-4 bg-white/5 rounded mt-2"></div>
-              </div>
-            </div>
-            <div className="bg-padel-5/50 rounded-3xl border border-white/5 overflow-hidden h-75"></div>
+          <div className="w-full animate-pulse space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 items-end h-60 bg-padel-5/20 rounded-3xl" />
+            <div className="bg-padel-5/50 rounded-3xl border border-white/5 h-75" />
           </div>
         ) : sortedRankings.length === 0 ? (
           <div className="w-full py-24 text-center border border-dashed border-white/10 rounded-3xl bg-padel-5/20 text-gray-500">
@@ -214,6 +199,8 @@ export default function RankingPublicPage() {
                     <Image
                       src={top2.perfiles.avatar_url}
                       alt="Avatar"
+                      width={48}
+                      height={48}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -226,7 +213,10 @@ export default function RankingPublicPage() {
                 <div className="font-bold text-base text-white truncate w-full">
                   {top2?.perfiles?.nombre_completo || "A confirmar"}
                 </div>
-                <div className="text-gray-400 text-xs font-semibold mt-0.5">
+                <div className="text-padel-4 text-xs font-bold mt-1">
+                  {top2?.perfiles?.clubes?.nombre || "Particular"}
+                </div>
+                <div className="text-gray-400 text-[11px] font-semibold mt-0.5">
                   {top2 ? `${top2.puntos.toLocaleString()} pts` : "-"}
                 </div>
               </div>
@@ -241,6 +231,8 @@ export default function RankingPublicPage() {
                     <Image
                       src={top1.perfiles.avatar_url}
                       alt="Avatar"
+                      width={64}
+                      height={64}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -253,7 +245,10 @@ export default function RankingPublicPage() {
                 <div className="font-bold text-lg text-white truncate w-full">
                   {top1?.perfiles?.nombre_completo || "A confirmar"}
                 </div>
-                <div className="text-padel-4 text-xs font-black tracking-wide mt-0.5">
+                <div className="text-padel-4 text-xs font-bold mt-1">
+                  {top1?.perfiles?.clubes?.nombre || "Particular"}
+                </div>
+                <div className="text-gray-400 text-[11px] font-black tracking-wide mt-0.5">
                   {top1 ? `${top1.puntos.toLocaleString()} pts` : "-"}
                 </div>
               </div>
@@ -265,6 +260,8 @@ export default function RankingPublicPage() {
                     <Image
                       src={top3.perfiles.avatar_url}
                       alt="Avatar"
+                      width={48}
+                      height={48}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -277,7 +274,10 @@ export default function RankingPublicPage() {
                 <div className="font-bold text-base text-white truncate w-full">
                   {top3?.perfiles?.nombre_completo || "A confirmar"}
                 </div>
-                <div className="text-gray-400 text-xs font-semibold mt-0.5">
+                <div className="text-padel-4 text-xs font-bold mt-1">
+                  {top3?.perfiles?.clubes?.nombre || "Particular"}
+                </div>
+                <div className="text-gray-400 text-[11px] font-semibold mt-0.5">
                   {top3 ? `${top3.puntos.toLocaleString()} pts` : "-"}
                 </div>
               </div>
@@ -292,7 +292,7 @@ export default function RankingPublicPage() {
                       <th className="py-4 px-6 w-16 text-center">#</th>
                       <th className="py-4 px-6">Jugador</th>
                       <th className="py-4 px-6">Categoría</th>
-                      <th className="py-4 px-6">Provincia</th>
+                      <th className="py-4 px-6">Club</th>
                       <th className="py-4 px-6 text-center">PJ</th>
                       <th className="py-4 px-6 text-center">PG</th>
                       <th className="py-4 px-6 text-center">Efec.</th>
@@ -307,7 +307,7 @@ export default function RankingPublicPage() {
                         partidosJugados > 0
                           ? `${Math.round((partidosGanados / partidosJugados) * 100)}%`
                           : "0%";
-                      const posicionReal = index + 4; // Ajuste por top 3
+                      const posicionReal = index + 4;
 
                       return (
                         <tr
@@ -323,6 +323,8 @@ export default function RankingPublicPage() {
                                 <Image
                                   src={player.perfiles.avatar_url}
                                   alt="Avatar"
+                                  width={36}
+                                  height={36}
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
@@ -338,7 +340,7 @@ export default function RankingPublicPage() {
                             {player.categoria}
                           </td>
                           <td className="py-4 px-6 text-xs text-gray-400">
-                            {player.provincia || "No registrada"}
+                            {player.perfiles?.clubes?.nombre || "Particular"}
                           </td>
                           <td className="py-4 px-6 text-xs text-gray-400 text-center">
                             {partidosJugados}
@@ -361,7 +363,7 @@ export default function RankingPublicPage() {
                                 </span>
                               ) : (player.tendencia || 0) < 0 ? (
                                 <span className="flex items-center text-[10px] font-black text-red-500 w-8 justify-end">
-                                  <TrendingDown className="size-3 mr-0.5" />{" "}
+                                  <TrendingDown className="size-3 mr-0.5" />
                                   {Math.abs(player.tendencia!)}
                                 </span>
                               ) : (

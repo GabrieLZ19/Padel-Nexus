@@ -38,6 +38,7 @@ export const InscripcionesService = {
   async inscribir(data: {
     torneo_id: string;
     usuario_id: string;
+    usuario2_email?: string | null;
     jugador1_nombre: string;
     jugador2_nombre: string;
     monto: number;

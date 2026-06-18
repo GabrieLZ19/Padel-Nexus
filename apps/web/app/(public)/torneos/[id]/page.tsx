@@ -292,7 +292,7 @@ export default function TorneoDetallePage() {
 
             {/* GENERADOR DE COLUMNAS FLEXIBLE (Se adapta a 4, 8 o 16 cupos) */}
             <div className="flex gap-8 lg:gap-12 min-w-150 h-137.5 pb-4">
-              {rondasToShow.map((rondaInfo, index) => {
+              {rondasToShow.map((rondaInfo) => {
                 const roundMatches = getRoundMatches(
                   rondaInfo.id,
                   rondaInfo.required,
