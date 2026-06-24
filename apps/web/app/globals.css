@@ -1,24 +1,34 @@
 @import "tailwindcss";
 
 @theme {
-  /* La paleta oficial de Padel Nexus */
-  --color-padel-1: #121212; /* Fondo principal oscuro */
-  --color-padel-2: #2e3f00; /* Verde oliva oscuro */
-  --color-padel-3: #1c2308; /* Verde muy oscuro */
-  --color-padel-4: #ccff00; /* Neón - Botones y acentos */
-  --color-padel-5: #1c1c1c; /* Gris oscuro para tarjetas/inputs */
+  /* --- PALETA OFICIAL DE PADEL NEXUS (Manual de Marca) --- */
+  --color-brand-chartreuse: #cbfe01; /* Verde Neón oficial[cite: 1] */
+  --color-brand-moss: #6e8901; /* Verde Musgo oficial[cite: 1] */
+  --color-brand-black: #0b0b0b; /* Negro real de fondo de la landing[cite: 1] */
+  --color-brand-white: #ffffff; /* Blanco de alto contraste[cite: 1] */
 
-  /* Tipografía por defecto */
-  --font-sans:
-    "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
-    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  /* Componentes oscuros del CRM */
+  --color-brand-card: #121212;
+  --color-brand-input: #1c1c1c;
+
+  /* --- PALETA TIPOGRÁFICA OFICIAL --- */
+  --font-sans: "Unigeo", "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Un pequeño reseteo global para asegurar que el fondo oscuro aplique a toda la página */
-@layer base {
-  body {
-    @apply bg-padel-1 text-white;
-  }
+/* Las fuentes y reseteos se declaran abajo de forma independiente en v4 */
+@font-face {
+  font-family: "Unigeo";
+  src: url("/fonts/Unigeo-Semibold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  background-color: var(--color-brand-black);
+  color: var(--color-brand-white);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
 @layer utilities {
@@ -36,11 +46,11 @@
   @keyframes navbar-menu-close {
     from {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateY(-16px);
     }
     to {
       opacity: 0;
-      transform: translateY(-16px);
+      transform: translateY(0);
     }
   }
 }

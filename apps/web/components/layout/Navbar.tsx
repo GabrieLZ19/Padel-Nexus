@@ -76,21 +76,22 @@ export default function Navbar() {
   const avatarUrl = user?.user_metadata?.avatar_url;
 
   return (
-    <header className="border-b border-white/5 bg-padel-1/95 backdrop-blur-xl relative top-0 z-50">
+    <header className="border-b border-brand-white/5 bg-brand-black/95 backdrop-blur-xl relative top-0 z-50">
       <div className="flex items-center justify-between px-6 md:px-10 py-4 md:py-6">
         <div className="flex items-center gap-5 md:gap-12">
-          <Link href="/" className="flex items-center cursor-pointer gap-3">
-            <div className="bg-padel-4 text-padel-1 font-black p-1.5 rounded-md text-sm leading-none">
-              ∞
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-bold tracking-tight text-white">
-                padel
-              </span>
-              <span className="text-xl tracking-tight text-white">nexus</span>
-            </div>
+          {/* LOGO OFICIAL: Importación directa del vector SVG del Manual de Marca */}
+          <Link href="/" className="flex items-center cursor-pointer">
+            <Image
+              src="/brand/Logo.svg"
+              alt="Padel Nexus"
+              width={180}
+              height={45}
+              className="h-9 md:h-11 w-auto"
+              priority
+            />
           </Link>
 
+          {/* Menú Desktop */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold">
             {navLinks.map((link) => {
               const isActive = pathname.startsWith(link.path);
@@ -99,7 +100,9 @@ export default function Navbar() {
                   key={link.name}
                   href={link.path}
                   className={`transition-colors duration-200 ${
-                    isActive ? "text-padel-4" : "text-gray-400 hover:text-white"
+                    isActive
+                      ? "text-brand-chartreuse"
+                      : "text-gray-400 hover:text-brand-white"
                   }`}
                 >
                   {link.name}
@@ -110,11 +113,12 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-3 md:gap-4 relative">
-          <button className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200">
+          <button className="w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200">
             <Search className="size-5" />
           </button>
 
-          <button className="hidden md:flex items-center gap-2 bg-padel-4 hover:bg-padel-3 text-padel-1 px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-sm shadow-padel-4/20">
+          {/* Botón Descargar App con la Paleta de Color Oficial Chartreuse */}
+          <button className="hidden md:flex items-center gap-2 bg-brand-chartreuse hover:opacity-90 text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-sm shadow-brand-chartreuse/20">
             <Smartphone className="size-4" /> Descargar app
           </button>
 
@@ -124,18 +128,20 @@ export default function Navbar() {
               <>
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-white/10 hover:bg-white/5 transition-all duration-200"
+                  className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-brand-white/10 hover:bg-brand-white/5 transition-all duration-200"
                 >
                   {avatarUrl ? (
-                    <Image
-                      src={avatarUrl}
-                      alt="Perfil"
-                      fill
-                      className="rounded-full object-cover"
-                      sizes="40px"
-                    />
+                    <div className="relative size-7">
+                      <Image
+                        src={avatarUrl}
+                        alt="Perfil"
+                        fill
+                        className="rounded-full object-cover"
+                        sizes="40px"
+                      />
+                    </div>
                   ) : (
-                    <div className="size-7 rounded-full bg-padel-4 text-padel-1 flex items-center justify-center text-xs font-bold">
+                    <div className="size-7 rounded-full bg-brand-chartreuse text-brand-black flex items-center justify-center text-xs font-bold">
                       {userInitials}
                     </div>
                   )}
@@ -151,9 +157,9 @@ export default function Navbar() {
                       className="fixed inset-0 z-40"
                       onClick={() => setIsDropdownOpen(false)}
                     ></div>
-                    <div className="absolute right-0 mt-3 w-56 bg-[#161616] border border-white/10 rounded-2xl shadow-xl z-50 overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                      <div className="px-4 py-3 border-b border-white/5 mb-2">
-                        <p className="text-sm font-bold text-white truncate">
+                    <div className="absolute right-0 mt-3 w-56 bg-brand-card border border-brand-white/10 rounded-2xl shadow-xl z-50 overflow-hidden py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="px-4 py-3 border-b border-brand-white/5 mb-2">
+                        <p className="text-sm font-bold text-brand-white truncate">
                           {userName}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
@@ -164,7 +170,7 @@ export default function Navbar() {
                       <Link
                         href="/mi-perfil"
                         onClick={() => setIsDropdownOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-brand-white hover:bg-brand-white/5 transition-colors"
                       >
                         <LayoutDashboard className="size-4 text-gray-400" /> Mi
                         Panel
@@ -173,13 +179,13 @@ export default function Navbar() {
                       <Link
                         href="/mi-perfil/ajustes"
                         onClick={() => setIsDropdownOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-brand-white hover:bg-brand-white/5 transition-colors"
                       >
                         <Settings className="size-4 text-gray-400" />{" "}
                         Configuración
                       </Link>
 
-                      <div className="h-px bg-white/5 my-2"></div>
+                      <div className="h-px bg-brand-white/5 my-2"></div>
 
                       <button
                         onClick={handleLogout}
@@ -194,7 +200,7 @@ export default function Navbar() {
             ) : (
               <Link
                 href="/login"
-                className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200"
+                className="w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200"
               >
                 <User className="size-5" />
               </Link>
@@ -202,7 +208,7 @@ export default function Navbar() {
           </div>
 
           <button
-            className="md:hidden w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-200"
+            className="md:hidden w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200"
             onClick={() => {
               if (isMenuOpen) {
                 setIsClosing(true);
@@ -223,9 +229,7 @@ export default function Navbar() {
       {/* Menú Mobile */}
       {(isMenuOpen || isClosing) && (
         <div
-          className={`md:hidden bg-[#0d0d0d] border-t border-white/10 shadow-xl transition-transform duration-300 ease-out ${
-            isClosing ? "translate-y-0 opacity-0" : "translate-y-0 opacity-100"
-          }`}
+          className="md:hidden bg-brand-black border-t border-brand-white/10 shadow-xl transition-transform duration-300 ease-out"
           style={{
             animation: `${isClosing ? "navbar-menu-close 300ms ease-out forwards" : "navbar-menu-open 300ms ease-out forwards"}`,
           }}
@@ -237,9 +241,8 @@ export default function Navbar() {
           }}
         >
           <div className="px-6 py-5 space-y-4">
-            {/* Info Usuario Mobile */}
             {user && (
-              <div className="flex items-center gap-3 px-2 pb-4 border-b border-white/5">
+              <div className="flex items-center gap-3 px-2 pb-4 border-b border-brand-white/5">
                 {avatarUrl ? (
                   <Image
                     src={avatarUrl}
@@ -249,12 +252,12 @@ export default function Navbar() {
                     className="size-10 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="size-10 rounded-full bg-padel-4 text-padel-1 flex items-center justify-center text-sm font-bold">
+                  <div className="size-10 rounded-full bg-brand-chartreuse text-brand-black flex items-center justify-center text-sm font-bold">
                     {userInitials}
                   </div>
                 )}
                 <div>
-                  <p className="text-sm font-bold text-white truncate">
+                  <p className="text-sm font-bold text-brand-white truncate">
                     {userName}
                   </p>
                   <p className="text-xs text-gray-500 truncate">{user.email}</p>
@@ -271,8 +274,8 @@ export default function Navbar() {
                     href={link.path}
                     className={`block rounded-2xl px-4 py-3 transition duration-200 ease-out ${
                       isActive
-                        ? "bg-padel-4/10 text-padel-4"
-                        : "text-gray-300 hover:bg-white/5 hover:text-white"
+                        ? "bg-brand-chartreuse/10 text-brand-chartreuse"
+                        : "text-gray-300 hover:bg-brand-white/5 hover:text-brand-white"
                     }`}
                     onClick={() => setIsMenuOpen(false)}
                   >
@@ -282,20 +285,20 @@ export default function Navbar() {
               })}
             </nav>
 
-            <div className="flex flex-col gap-3 pt-4 border-t border-white/5">
+            <div className="flex flex-col gap-3 pt-4 border-t border-brand-white/5">
               {user ? (
                 <>
                   <Link
                     href="/mi-perfil"
                     onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white rounded-2xl transition-colors"
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-brand-white/5 hover:text-brand-white rounded-2xl transition-colors"
                   >
                     <LayoutDashboard className="size-4" /> Mi Panel
                   </Link>
                   <Link
                     href="/mi-perfil/ajustes"
                     onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white rounded-2xl transition-colors"
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-brand-white/5 hover:text-brand-white rounded-2xl transition-colors"
                   >
                     <Settings className="size-4" /> Configuración
                   </Link>
@@ -308,12 +311,12 @@ export default function Navbar() {
                 </>
               ) : (
                 <>
-                  <button className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-padel-4 px-4 py-3 text-sm font-bold text-padel-1 transition duration-200 ease-out hover:bg-padel-3 hover:opacity-95 shadow-md shadow-padel-4/15">
+                  <button className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-white/10 bg-brand-chartreuse px-4 py-3 text-sm font-bold text-brand-black transition duration-200 ease-out hover:opacity-90 shadow-md shadow-brand-chartreuse/15">
                     <Smartphone className="size-4" /> Descargar app
                   </button>
                   <Link
                     href="/login"
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-gray-300 transition duration-200 ease-out hover:bg-white/5 hover:text-white"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-white/10 px-4 py-3 text-sm font-semibold text-gray-300 transition duration-200 ease-out hover:bg-brand-white/5 hover:text-brand-white"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     <User className="size-4" /> Iniciar sesión
