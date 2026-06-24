@@ -4,14 +4,27 @@ import { authenticate, authorize } from "../middleware/auth";
 
 const router = Router();
 
-// Todas las rutas de perfiles requieren autenticación base
+// ==========================================
+// 🔓 ENDPOINTS PÚBLICOS (Sin Token)
+// ==========================================
+router.post("/login", PerfilController.login);
+router.post("/registro", PerfilController.registro);
+router.post("/recuperar-password", PerfilController.solicitarRecuperarPassword);
+
+// ==========================================
+// 🛡️ MIDDLEWARE DE INTERCEPTACIÓN GLOBAL
+// ==========================================
+// De aquí en adelante se requiere obligatoriamente una sesión activa de la plataforma
 router.use(authenticate);
 
-// Rutas de autogestión para el Jugador logueado
+// ==========================================
+// 🔐 ENDPOINTS PROTEGIDOS (Requieren Token)
+// ==========================================
+router.post("/actualizar-password", PerfilController.ActualizarPassword);
 router.get("/me", PerfilController.getMiPerfil);
 router.put("/me", PerfilController.updatePerfil);
 
-// Rutas Administrativas (Ver perfiles y fichas de terceros)
+// Acceso restringido exclusivamente a las jerarquías de administración FAP
 router.get(
   "/:id",
   authorize(["superadmin", "admin_federacion", "admin_provincial"]),
