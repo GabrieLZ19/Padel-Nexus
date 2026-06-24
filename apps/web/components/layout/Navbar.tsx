@@ -14,8 +14,6 @@ import {
   LayoutDashboard,
   ChevronDown,
 } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
-import type { User as SupabaseUser } from "@supabase/supabase-js";
 import Image from "next/image";
 import { useProfileStore } from "@/store/useProfileStore";
 
@@ -24,40 +22,28 @@ export default function Navbar() {
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
-
-  // Estados de Autenticación
-  const { profile, fetchProfile } = useProfileStore();
-  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const supabase = createClient();
+
+  // Consumo exclusivo del Store de Zustand centralizado
+  const { profile, fetchProfile, clearProfile } = useProfileStore();
 
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
 
-  useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setUser(session?.user || null);
-    };
-    getUser();
+  const handleLogout = () => {
+    // 1. Borramos de forma efectiva las cookies de sesión para Next.js Middleware y Axios
+    document.cookie =
+      "padel_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie =
+      "padel_user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
-    // Escuchar cambios de sesión (login/logout)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase.auth]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+    // 2. Limpiamos el estado global de la app
+    clearProfile();
     setIsDropdownOpen(false);
     setIsMenuOpen(false);
+
+    // 3. Redirección limpia
     router.push("/login");
   };
 
@@ -69,17 +55,20 @@ export default function Navbar() {
     { name: "Clubes", path: "/clubes" },
   ];
 
-  // Extraer nombre e iniciales
-  const userName =
-    profile?.nombre_completo || user?.user_metadata?.full_name || "Cargando...";
-  const userInitials = userName.substring(0, 2).toUpperCase();
-  const avatarUrl = user?.user_metadata?.avatar_url;
+  // Extraer nombre e iniciales directamente del perfil unificado de nuestra API
+  const userName = profile?.nombre_completo || "Cargando...";
+  const userInitials = profile?.nombre_completo
+    ? profile.nombre_completo.substring(0, 2).toUpperCase()
+    : "PN";
+
+  // Si usás avatares dinámicos en tu tabla perfiles lo mapeás acá, sino usamos las iniciales
+  const avatarUrl = null;
 
   return (
     <header className="border-b border-brand-white/5 bg-brand-black/95 backdrop-blur-xl relative top-0 z-50">
       <div className="flex items-center justify-between px-6 md:px-10 py-4 md:py-6">
         <div className="flex items-center gap-5 md:gap-12">
-          {/* LOGO OFICIAL: Importación directa del vector SVG del Manual de Marca */}
+          {/* LOGO OFICIAL */}
           <Link href="/" className="flex items-center cursor-pointer">
             <Image
               src="/brand/Logo.svg"
@@ -113,22 +102,22 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-3 md:gap-4 relative">
-          <button className="w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200">
+          <button className="w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200 cursor-pointer">
             <Search className="size-5" />
           </button>
 
-          {/* Botón Descargar App con la Paleta de Color Oficial Chartreuse */}
-          <button className="hidden md:flex items-center gap-2 bg-brand-chartreuse hover:opacity-90 text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-sm shadow-brand-chartreuse/20">
+          {/* Botón Descargar App */}
+          <button className="hidden md:flex items-center gap-2 bg-brand-chartreuse hover:opacity-90 text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-sm shadow-brand-chartreuse/20 cursor-pointer">
             <Smartphone className="size-4" /> Descargar app
           </button>
 
-          {/* Menú de Usuario Desktop */}
+          {/* Menú de Usuario Desktop basado en Zustand */}
           <div className="hidden md:block relative">
-            {user ? (
+            {profile ? (
               <>
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-brand-white/10 hover:bg-brand-white/5 transition-all duration-200"
+                  className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border border-brand-white/10 hover:bg-brand-white/5 transition-all duration-200 cursor-pointer"
                 >
                   {avatarUrl ? (
                     <div className="relative size-7">
@@ -163,12 +152,16 @@ export default function Navbar() {
                           {userName}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
-                          {user.email}
+                          {profile.email}
                         </p>
                       </div>
 
                       <Link
-                        href="/mi-perfil"
+                        href={
+                          profile.rol !== "usuario"
+                            ? "/dashboard"
+                            : "/mi-perfil"
+                        }
                         onClick={() => setIsDropdownOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-brand-white hover:bg-brand-white/5 transition-colors"
                       >
@@ -189,7 +182,7 @@ export default function Navbar() {
 
                       <button
                         onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer text-left"
                       >
                         <LogOut className="size-4" /> Cerrar sesión
                       </button>
@@ -208,7 +201,7 @@ export default function Navbar() {
           </div>
 
           <button
-            className="md:hidden w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200"
+            className="md:hidden w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200 cursor-pointer"
             onClick={() => {
               if (isMenuOpen) {
                 setIsClosing(true);
@@ -241,26 +234,18 @@ export default function Navbar() {
           }}
         >
           <div className="px-6 py-5 space-y-4">
-            {user && (
+            {profile && (
               <div className="flex items-center gap-3 px-2 pb-4 border-b border-brand-white/5">
-                {avatarUrl ? (
-                  <Image
-                    src={avatarUrl}
-                    alt={userName}
-                    width={40}
-                    height={40}
-                    className="size-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="size-10 rounded-full bg-brand-chartreuse text-brand-black flex items-center justify-center text-sm font-bold">
-                    {userInitials}
-                  </div>
-                )}
+                <div className="size-10 rounded-full bg-brand-chartreuse text-brand-black flex items-center justify-center text-sm font-bold">
+                  {userInitials}
+                </div>
                 <div>
                   <p className="text-sm font-bold text-brand-white truncate">
                     {userName}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {profile.email}
+                  </p>
                 </div>
               </div>
             )}
@@ -286,37 +271,39 @@ export default function Navbar() {
             </nav>
 
             <div className="flex flex-col gap-3 pt-4 border-t border-brand-white/5">
-              {user ? (
+              {profile ? (
                 <>
                   <Link
-                    href="/mi-perfil"
+                    href={
+                      profile.rol !== "usuario" ? "/dashboard" : "/mi-perfil"
+                    }
                     onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-brand-white/5 hover:text-brand-white rounded-2xl transition-colors"
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white rounded-2xl transition-colors"
                   >
                     <LayoutDashboard className="size-4" /> Mi Panel
                   </Link>
                   <Link
                     href="/mi-perfil/ajustes"
                     onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-brand-white/5 hover:text-brand-white rounded-2xl transition-colors"
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white rounded-2xl transition-colors"
                   >
                     <Settings className="size-4" /> Configuración
                   </Link>
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/10 rounded-2xl transition-colors w-full text-left"
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/10 rounded-2xl transition-colors w-full text-left cursor-pointer"
                   >
                     <LogOut className="size-4" /> Cerrar sesión
                   </button>
                 </>
               ) : (
                 <>
-                  <button className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-white/10 bg-brand-chartreuse px-4 py-3 text-sm font-bold text-brand-black transition duration-200 ease-out hover:opacity-90 shadow-md shadow-brand-chartreuse/15">
+                  <button className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-white/10 bg-brand-chartreuse px-4 py-3 text-sm font-bold text-brand-black transition duration-200 ease-out hover:opacity-90 shadow-md shadow-brand-chartreuse/15 cursor-pointer">
                     <Smartphone className="size-4" /> Descargar app
                   </button>
                   <Link
                     href="/login"
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-white/10 px-4 py-3 text-sm font-semibold text-gray-300 transition duration-200 ease-out hover:bg-brand-white/5 hover:text-brand-white"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-white/10 px-4 py-3 text-sm font-semibold text-gray-300 transition duration-200 ease-out hover:bg-white/5 hover:text-white"
                     onClick={() => setIsMenuOpen(false)}
                   >
                     <User className="size-4" /> Iniciar sesión
