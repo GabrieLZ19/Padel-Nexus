@@ -1,18 +1,18 @@
 import { Router } from "express";
-import { RankingsController } from "../controllers/rankings.controller";
+import { RankingsController } from "../controllers/ranking.controller";
 import { authenticate, authorize } from "../middleware/auth";
 
 const router = Router();
 
-// Rutas Públicas
+// --- Rutas Públicas (Cualquier jugador o visitante puede ver las estadísticas) ---
 router.get("/", RankingsController.obtenerRankingGlobal);
 router.get("/:usuario_id", RankingsController.obtenerPerfilRanking);
 
-// Rutas Admin
+// --- Rutas Administrativas Protegidas ---
 router.post(
   "/actualizar-puntos",
   authenticate,
-  authorize(["admin"]),
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
   RankingsController.actualizarPuntosJugador,
 );
 

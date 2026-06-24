@@ -1,18 +1,21 @@
 import { Router } from "express";
-import {
-  getMiPerfil,
-  getPerfilById,
-  updatePerfil,
-} from "../controllers/perfil.controller";
+import { PerfilController } from "../controllers/perfil.controller";
 import { authenticate, authorize } from "../middleware/auth";
 
 const router = Router();
 
-// Rutas del usuario autenticado
-router.get("/me", authenticate, getMiPerfil);
-router.put("/me", authenticate, updatePerfil);
+// Todas las rutas de perfiles requieren autenticación base
+router.use(authenticate);
 
-// Rutas del admin
-router.get("/:id", authenticate, authorize(["admin"]), getPerfilById);
+// Rutas de autogestión para el Jugador logueado
+router.get("/me", PerfilController.getMiPerfil);
+router.put("/me", PerfilController.updatePerfil);
+
+// Rutas Administrativas (Ver perfiles y fichas de terceros)
+router.get(
+  "/:id",
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  PerfilController.getPerfilById,
+);
 
 export default router;
