@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { PerfilService, ActualizarPerfilDTO } from "../services/perfil.service";
 import { AuthService, RegistroDTO } from "../services/auth.service";
+import { env } from "../config/env.config";
 
 export const PerfilController = {
   /**
@@ -203,6 +204,95 @@ export const PerfilController = {
           ? error.message
           : "Error al procesar la solicitud de recuperación.";
       return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * GET /api/perfiles/google
+   * Envía la URL oficial de Google OAuth generada de forma segura
+   */
+  async iniciarGoogleAuth(req: Request, res: Response): Promise<Response> {
+    try {
+      const urlDeRedireccion = await AuthService.obtenerUrlGoogle();
+
+      // Retornamos la URL en un JSON para que el frontend la maneje con window.location.href
+      return res.status(200).json({
+        exito: true,
+        url: urlDeRedireccion,
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al iniciar OAuth.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+  /**
+   * GET /api/perfiles/google/callback
+   * Captura el código enviado por Google, genera la sesión e inyecta cookies en el navegador
+   */
+  async googleCallback(req: Request, res: Response): Promise<void> {
+    try {
+      const code = req.query.code as string;
+
+      if (!code) {
+        return res.redirect(
+          `${env.FRONTEND_URL || "http://localhost:3000"}/login?error=oauth_missing_code`,
+        );
+      }
+
+      // Cambiamos el código por la sesión de Supabase Auth en el backend
+      const resultado = await AuthService.cambiarCodigoPorSesion(code);
+
+      // Seteamos las cookies directamente al navegador desde Express
+      res.cookie("padel_token", resultado.token, {
+        path: "/",
+        maxAge: 1000 * 60 * 60 * 24,
+      });
+      res.cookie("padel_user_role", resultado.usuario.rol, {
+        path: "/",
+        maxAge: 1000 * 60 * 60 * 24,
+      });
+
+      // Redirección limpia al frontend según el rol
+      const rutaDestino =
+        resultado.usuario.rol !== "usuario" ? "/dashboard" : "/";
+      return res.redirect(
+        `${env.FRONTEND_URL || "http://localhost:3000"}${rutaDestino}`,
+      );
+    } catch (error: unknown) {
+      console.error("Error crítico en Google OAuth Callback:", error);
+      return res.redirect(
+        `${env.FRONTEND_URL || "http://localhost:3000"}/login?error=oauth_failed`,
+      );
+    }
+  },
+
+  async verificarGoogleAuthToken(
+    req: Request,
+    res: Response,
+  ): Promise<Response> {
+    try {
+      const { accessToken } = req.body;
+      if (!accessToken) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "El token de acceso es requerido." });
+      }
+
+      const resultado = await AuthService.verificarTokenGoogle(accessToken);
+
+      return res.status(200).json({
+        exito: true,
+        mensaje: "Token validado y perfil sincronizado correctamente.",
+        usuario: resultado.usuario,
+        token: resultado.token,
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al validar token federativo.";
+      return res.status(401).json({ exito: false, error: message });
     }
   },
 };

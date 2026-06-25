@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase";
+import { env } from "../config/env.config";
 
 // DTO para el registro unificado FAP
 export interface RegistroDTO {
@@ -103,5 +104,134 @@ export class AuthService {
     }
 
     return { exito: true, mensaje: "Contraseña actualizada correctamente." };
+  }
+
+  /**
+   * Genera la URL de autorización oficial de Google usando signInWithOAuth
+   */
+  static async obtenerUrlGoogle() {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        //  Forzamos a Supabase a redirigir a tu nueva pantalla procesadora del cliente
+        redirectTo: `${env.FRONTEND_URL || "http://localhost:3000"}/callback`,
+        skipBrowserRedirect: true,
+        queryParams: {
+          prompt: "select_account",
+        },
+      },
+    });
+
+    if (error || !data?.url) {
+      throw new Error(
+        `No se pudo inicializar Google OAuth: ${error?.message || "URL vacía"}`,
+      );
+    }
+
+    return data.url;
+  }
+
+  /**
+   * Recibe el "code" temporal de Google OAuth y lo cambia por los tokens de sesión
+   */
+  static async cambiarCodigoPorSesion(code: string) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error || !data.session || !data.user) {
+      throw new Error(
+        `Fallo en el intercambio de código de Google: ${error?.message}`,
+      );
+    }
+
+    // Buscamos su perfil unificado en la base
+    let { data: perfil, error: perfilError } = await supabase
+      .from("perfiles")
+      .select("id, nombre_completo, dni, lugar_residencia, rol, email")
+      .eq("id", data.user.id)
+      .single();
+
+    // Fallback por si es un registro nuevo vía Google
+    if (perfilError || !perfil) {
+      const { data: nuevoPerfil, error: insertError } = await supabase
+        .from("perfiles")
+        .insert({
+          id: data.user.id,
+          nombre_completo:
+            data.user.user_metadata?.full_name || "Jugador Google",
+          email: data.user.email,
+          rol: "usuario",
+          lugar_residencia: "A completar",
+          dni: "A completar",
+        })
+        .select("id, nombre_completo, dni, lugar_residencia, rol, email")
+        .single();
+
+      if (insertError || !nuevoPerfil) {
+        throw new Error("No se pudo inicializar la ficha de perfil técnica.");
+      }
+      perfil = nuevoPerfil;
+    }
+
+    return {
+      usuario: perfil,
+      token: data.session.access_token,
+    };
+  }
+
+  /**
+   * Recibe el token extraído del cliente, valida autenticidad y extrae la ficha técnica FAP
+   */
+  static async verificarTokenGoogle(accessToken: string) {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(accessToken);
+
+    if (authError || !user) {
+      throw new Error(
+        "El token de Google OAuth provisto no es válido o ya caducó.",
+      );
+    }
+
+    // Aseguramos traer lugar_residencia y los campos exactos del modelo relacional
+    let { data: perfil, error: perfilError } = await supabase
+      .from("perfiles")
+      .select(
+        "id, nombre_completo, dni, lugar_residencia, rol, email, categoria_padel, lado_preferido",
+      )
+      .eq("id", user.id)
+      .single();
+
+    // Si es un registro nuevo vía Google, insertamos la fila inicial con la estructura correcta
+    if (perfilError || !perfil) {
+      const { data: nuevoPerfil, error: insertError } = await supabase
+        .from("perfiles")
+        .insert({
+          id: user.id,
+          nombre_completo: user.user_metadata?.full_name || "Jugador Google",
+          email: user.email,
+          rol: "usuario",
+          lugar_residencia: "La Rioja", // Seteamos por defecto tu localidad para consistencia
+          dni: "A completar",
+          categoria_padel: "S/C",
+          lado_preferido: "S/C",
+        })
+        .select(
+          "id, nombre_completo, dni, lugar_residencia, rol, email, categoria_padel, lado_preferido",
+        )
+        .single();
+
+      if (insertError || !nuevoPerfil) {
+        throw new Error(
+          "Se autenticó en Google pero falló la inicialización del Perfil.",
+        );
+      }
+      perfil = nuevoPerfil;
+    }
+
+    return {
+      usuario: perfil,
+      token: accessToken,
+    };
   }
 }

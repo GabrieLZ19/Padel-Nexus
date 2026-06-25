@@ -11,6 +11,10 @@ router.post("/login", PerfilController.login);
 router.post("/registro", PerfilController.registro);
 router.post("/recuperar-password", PerfilController.solicitarRecuperarPassword);
 
+router.get("/google", PerfilController.iniciarGoogleAuth);
+router.get("/google/callback", PerfilController.googleCallback);
+router.post("/google/verificar", PerfilController.verificarGoogleAuthToken);
+
 // ==========================================
 // 🛡️ MIDDLEWARE DE INTERCEPTACIÓN GLOBAL
 // ==========================================
