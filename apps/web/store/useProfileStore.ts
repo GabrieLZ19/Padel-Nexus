@@ -16,8 +16,10 @@ export const useProfileStore = create<ProfileStore>((set) => ({
   fetchProfile: async () => {
     try {
       const data = await PerfilService.getMe();
+      console.log("🟢 API /perfil/me respondió con éxito:", data);
       set({ profile: data });
     } catch (e) {
+      console.error("🔴 Error cargando sesión en Zustand:", e);
       set({ profile: null });
     }
   },

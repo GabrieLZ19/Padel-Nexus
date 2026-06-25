@@ -7,9 +7,8 @@ import { useProfileStore } from "@/store/useProfileStore";
 import CredencialDigital from "@/components/perfil/CredencialDigital";
 import LicenciaModal from "@/components/perfil/LicencialModal";
 
-// Ajustamos el skeleton para que acompañe el nuevo diseño asimétrico
 const Skeleton = ({ className }: { className?: string }) => (
-  <div className={`animate-pulse bg-white/5 rounded-3xl ${className}`} />
+  <div className={`animate-pulse bg-brand-white/5 rounded-3xl ${className}`} />
 );
 
 export default function PlayerDashboard() {
@@ -21,31 +20,33 @@ export default function PlayerDashboard() {
   }, [fetchProfile]);
 
   return (
-    <main className="max-w-6xl mx-auto p-5 md:p-10 space-y-8 md:space-y-10">
+    <main className="max-w-6xl mx-auto p-5 md:p-10 space-y-8 md:space-y-10 relative isolate">
+      {/* EFECTO DE LUZ DE FONDO SUTIL */}
+      <div className="absolute top-[-10%] left-[-5%] w-100 h-100 rounded-full bg-brand-chartreuse/5 blur-[100px] pointer-events-none z-0" />
+
       {/* HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-5 border-b border-white/5 pb-6 md:pb-8">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-5 border-b border-brand-white/5 pb-6 md:pb-8 relative z-10">
         <div>
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
             Hola,{" "}
-            <span className="text-padel-4">
+            <span className="text-brand-chartreuse">
               {profile?.nombre_completo?.split(" ")[0] || "Jugador"}
             </span>
           </h1>
           <p className="text-sm md:text-lg text-gray-400 mt-1 md:mt-2">
-            Gestioná tu perfil, torneos y reservas.
+            Gestioná tu ficha unificada FAP, torneos oficiales y reservas.
           </p>
         </div>
         <Link
           href="/reservar"
-          className="w-full md:w-auto text-center bg-white text-black px-6 py-3.5 md:py-4 rounded-xl font-bold hover:bg-gray-200 transition-colors shadow-sm md:text-lg"
+          className="w-full sm:w-auto text-center bg-brand-white text-brand-black px-6 py-3.5 md:py-4 rounded-xl font-bold hover:bg-gray-100 transition-colors shadow-md md:text-lg cursor-pointer"
         >
           Nueva Reserva
         </Link>
       </header>
 
       {/* BENTO GRID MAESTRO */}
-      {/* En móvil: 2 columnas. En escritorio: 3 columnas. */}
-      <section className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 md:auto-rows-[1fr]">
+      <section className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 md:auto-rows-[1fr] relative z-10">
         {!profile ? (
           <>
             <Skeleton className="order-4 md:order-1 col-span-2 md:col-span-1 md:row-span-2 min-h-80" />
@@ -55,13 +56,13 @@ export default function PlayerDashboard() {
           </>
         ) : (
           <>
-            {/* 1. Licencia - Tarjeta Vertical Alta (Escritorio: Izquierda / Móvil: Abajo) */}
-            <div className="order-4 md:order-1 col-span-2 md:col-span-1 md:row-span-2 bg-[#161616] p-6 md:p-8 rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center gap-6 group hover:border-white/10 transition-colors relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-32 bg-linear-to-b from-padel-4/5 to-transparent"></div>
+            {/* 1. Licencia - Tarjeta Vertical Alta */}
+            <div className="order-4 md:order-1 col-span-2 md:col-span-1 md:row-span-2 bg-brand-card p-6 md:p-8 rounded-3xl border border-brand-white/5 flex flex-col items-center justify-center text-center gap-6 group hover:border-brand-white/10 transition-colors relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-32 bg-linear-to-b from-brand-chartreuse/5 to-transparent"></div>
 
               <div className="flex flex-col items-center w-full relative z-10">
-                <div className="p-3 bg-padel-4/10 rounded-2xl mb-3">
-                  <CreditCard className="text-padel-4 size-6 md:size-8" />
+                <div className="p-3 bg-brand-chartreuse/10 rounded-2xl mb-3">
+                  <CreditCard className="text-brand-chartreuse size-6 md:size-8" />
                 </div>
                 <p className="text-sm font-medium text-gray-400">
                   Licencia Federativa
@@ -72,13 +73,13 @@ export default function PlayerDashboard() {
                 {profile.licencias && profile.licencias.length > 0 ? (
                   profile.licencias[0].estado === "Activa" ? (
                     <div className="flex flex-col items-center w-full">
-                      <div className="w-full max-w-50 md:max-w-55 flex justify-center drop-shadow-xl">
+                      <div className="w-full max-w-50 md:max-w-55 flex justify-center drop-shadow-[0_0_30px_rgba(203,254,1,0.1)]">
                         <CredencialDigital usuarioId={profile.id} />
                       </div>
-                      <h2 className="text-xl md:text-2xl font-bold mt-5 text-white tracking-wider">
+                      <h2 className="text-xl md:text-2xl font-bold mt-5 text-brand-white tracking-wider">
                         {profile.licencias[0].nro_licencia}
                       </h2>
-                      <p className="text-xs md:text-sm text-padel-4 uppercase font-black tracking-widest mt-1">
+                      <p className="text-xs md:text-sm text-brand-chartreuse uppercase font-black tracking-widest mt-1">
                         Estado: Activa
                       </p>
                     </div>
@@ -94,7 +95,7 @@ export default function PlayerDashboard() {
                 ) : (
                   <button
                     onClick={() => setIsModalOpen(true)}
-                    className="w-full max-w-60 bg-padel-4 text-padel-1 font-bold py-3.5 px-4 rounded-xl hover:bg-padel-3 transition-colors shadow-sm"
+                    className="w-full max-w-60 bg-brand-chartreuse text-brand-black font-bold py-3.5 px-4 rounded-xl hover:opacity-95 transition-all shadow-md cursor-pointer"
                   >
                     Solicitar Alta
                   </button>
@@ -102,39 +103,39 @@ export default function PlayerDashboard() {
               </div>
             </div>
 
-            {/* 2. Categoría - Banner Horizontal (Escritorio: Arriba Derecha / Móvil: Arriba) */}
-            <div className="order-1 md:order-2 col-span-2 md:col-span-2 bg-[#161616] p-6 md:p-8 rounded-3xl border border-white/5 flex items-center justify-between group hover:border-white/10 transition-colors overflow-hidden relative">
+            {/* 2. Categoría - Banner Horizontal */}
+            <div className="order-1 md:order-2 col-span-2 md:col-span-2 bg-brand-card p-6 md:p-8 rounded-3xl border border-brand-white/5 flex items-center justify-between group hover:border-brand-white/10 transition-colors overflow-hidden relative">
               <div className="flex items-center gap-4 md:gap-6 relative z-10">
-                <div className="p-4 bg-padel-4/10 rounded-2xl">
-                  <Trophy className="text-padel-4 size-7 md:size-10" />
+                <div className="p-4 bg-brand-chartreuse/10 rounded-2xl">
+                  <Trophy className="text-brand-chartreuse size-7 md:size-10" />
                 </div>
                 <div className="text-left">
                   <p className="text-xs md:text-sm font-medium text-gray-400 mb-0.5 md:mb-1">
-                    Nivel de Juego
+                    Categoría del Circuito
                   </p>
-                  <h2 className="text-3xl md:text-5xl font-black tracking-tight text-white">
+                  <h2 className="text-3xl md:text-5xl font-black tracking-tight text-brand-white">
                     {profile.categoria_padel || "S/C"}
                   </h2>
                 </div>
               </div>
               {/* Marca de agua decorativa en escritorio */}
               <div className="hidden md:flex absolute -right-6 top-1/2 -translate-y-1/2 opacity-5 select-none pointer-events-none">
-                <span className="font-black text-[120px] italic">
+                <span className="font-black text-[120px] italic text-brand-white">
                   {profile.categoria_padel || "S/C"}
                 </span>
               </div>
             </div>
 
-            {/* 3. Mis Torneos - Cuadrado (Escritorio: Abajo Centro / Móvil: Centro Izquierda) */}
+            {/* 3. Mis Torneos - Botón Bento */}
             <Link
               href="/torneos"
-              className="order-2 md:order-3 col-span-1 bg-[#161616] p-5 md:p-8 rounded-3xl border border-white/5 hover:border-padel-4/50 transition-all flex flex-col items-center justify-center text-center gap-4 group"
+              className="order-2 md:order-3 col-span-1 bg-brand-card p-5 md:p-8 rounded-3xl border border-brand-white/5 hover:border-brand-chartreuse/40 transition-all flex flex-col items-center justify-center text-center gap-4 group cursor-pointer"
             >
-              <div className="p-4 bg-white/5 rounded-2xl group-hover:bg-padel-4/10 transition-colors">
-                <ClipboardList className="text-white group-hover:text-padel-4 size-7 md:size-10 transition-colors" />
+              <div className="p-4 bg-brand-white/5 rounded-2xl group-hover:bg-brand-chartreuse/10 transition-colors">
+                <ClipboardList className="text-brand-white group-hover:text-brand-chartreuse size-7 md:size-10 transition-colors" />
               </div>
               <div>
-                <h2 className="text-lg md:text-2xl font-bold text-white">
+                <h2 className="text-lg md:text-2xl font-bold text-brand-white">
                   Historial
                 </h2>
                 <p className="text-[11px] md:text-sm text-gray-400 mt-1">
@@ -143,20 +144,20 @@ export default function PlayerDashboard() {
               </div>
             </Link>
 
-            {/* 4. Partidos - Cuadrado (Escritorio: Abajo Derecha / Móvil: Centro Derecha) */}
+            {/* 4. Partidos - Botón Bento */}
             <Link
               href="/partidos"
-              className="order-3 md:order-4 col-span-1 bg-[#161616] p-5 md:p-8 rounded-3xl border border-white/5 hover:border-padel-4/50 transition-all flex flex-col items-center justify-center text-center gap-4 group"
+              className="order-3 md:order-4 col-span-1 bg-brand-card p-5 md:p-8 rounded-3xl border border-brand-white/5 hover:border-brand-chartreuse/40 transition-all flex flex-col items-center justify-center text-center gap-4 group cursor-pointer"
             >
-              <div className="p-4 bg-white/5 rounded-2xl group-hover:bg-padel-4/10 transition-colors">
-                <Users className="text-white group-hover:text-padel-4 size-7 md:size-10 transition-colors" />
+              <div className="p-4 bg-brand-white/5 rounded-2xl group-hover:bg-brand-chartreuse/10 transition-colors">
+                <Users className="text-brand-white group-hover:text-brand-chartreuse size-7 md:size-10 transition-colors" />
               </div>
               <div>
-                <h2 className="text-lg md:text-2xl font-bold text-white">
+                <h2 className="text-lg md:text-2xl font-bold text-brand-white">
                   Buscar 4to
                 </h2>
                 <p className="text-[11px] md:text-sm text-gray-400 mt-1">
-                  Partidos
+                  Partidos Abiertos
                 </p>
               </div>
             </Link>

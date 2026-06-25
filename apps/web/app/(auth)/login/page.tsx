@@ -34,11 +34,9 @@ export default function AuthPage() {
     setError(null);
 
     try {
-      // Consumo a través del servicio unificado
       const data = await PerfilService.loginConEmail(email, password);
 
       if (data.exito) {
-        // Inyección de cookies de sesión para Axios y Next.js Middleware
         document.cookie = `padel_token=${data.token}; path=/; max-age=${rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24}`;
         document.cookie = `padel_user_role=${data.usuario.rol}; path=/; max-age=${rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24}`;
 
@@ -55,6 +53,17 @@ export default function AuthPage() {
         setError("Error de red inesperado. Intente nuevamente.");
       }
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleOAuth = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await PerfilService.loginConGoogle();
+    } catch (err: unknown) {
+      setError("No se pudo iniciar el canal de autenticación con Google. ");
       setLoading(false);
     }
   };
@@ -120,7 +129,7 @@ export default function AuthPage() {
               Bienvenido
             </h2>
             <p className="text-base sm:text-lg text-gray-400">
-              Ingresá tus credenciales de acceso.
+              Elegí cómo querés ingresar a la plataforma.
             </p>
           </div>
 
@@ -131,6 +140,47 @@ export default function AuthPage() {
                 <p>{error}</p>
               </div>
             )}
+
+            {/* BOTÓN INTERNACIONAL DE GOOGLE REDISEÑADO CON COMPATIBILIDAD V4 */}
+            <button
+              onClick={handleGoogleOAuth}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 py-3.5 sm:py-4 bg-brand-white text-brand-black font-semibold rounded-xl border border-brand-white/20 hover:bg-gray-100 transition-all shadow-sm disabled:cursor-not-allowed disabled:opacity-70 text-sm sm:text-base cursor-pointer"
+            >
+              <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-brand-white shadow-sm">
+                <svg
+                  className="h-4 w-4 sm:h-5 sm:w-5"
+                  viewBox="0 0 533.5 544.3"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M533.5 278.4c0-17.4-1.4-34.1-4.1-50.3H272v95.1h146.9c-6.4 34.6-25.8 63.9-55 83.5v69.4h88.9c52.1-48 81.7-118.4 81.7-197.7z"
+                    fill="#4285F4"
+                  />
+                  <path
+                    d="M272 544.3c74.1 0 136.3-24.4 181.7-66.2l-88.9-69.4c-24.7 16.6-56.4 26.5-92.8 26.5-71.3 0-131.8-48.1-153.5-112.7H28.3v70.6C73.2 482.8 166.6 544.3 272 544.3z"
+                    fill="#34A853"
+                  />
+                  <path
+                    d="M118.5 327.5c-11.7-34.6-11.7-71.8 0-106.4V150.5H28.3c-43.2 86.5-43.2 189.7 0 276.2l90.2-69.2z"
+                    fill="#FBBC05"
+                  />
+                  <path
+                    d="M272 107.7c39.5 0 75.1 13.6 103.1 40.3l77.2-77.2C411.8 24.7 344.1 0 272 0 166.6 0 73.2 61.5 28.3 150.5l90.2 70.6C140.2 155.8 200.7 107.7 272 107.7z"
+                    fill="#EA4335"
+                  />
+                </svg>
+              </span>
+              Continuar con Google
+            </button>
+
+            <div className="flex items-center gap-4 text-gray-600 text-sm py-1">
+              <div className="flex-1 border-t border-brand-white/5"></div>
+              <span className="whitespace-nowrap text-gray-400">
+                o con tus credenciales
+              </span>
+              <div className="flex-1 border-t border-brand-white/5"></div>
+            </div>
 
             <form
               onSubmit={handleEmailLogin}
@@ -224,7 +274,7 @@ export default function AuthPage() {
 
           <div className="mt-8 pt-6 border-t border-brand-white/5 text-center">
             <p className="text-gray-400 text-sm">
-              ¿No tenés una cuenta?{" "}
+              ¿No tenés una account?{" "}
               <Link
                 href="/signup"
                 className="text-brand-chartreuse font-bold hover:underline"

@@ -15,6 +15,7 @@ export interface CustomDropdownProps {
   options: readonly DropdownOption[];
   placeholder: string;
   disabled?: boolean;
+  haciaArriba?: boolean; // ➡️ Prop opcional declarado correctamente para evitar ts(2322)
 }
 
 export default function CustomDropdown({
@@ -23,11 +24,11 @@ export default function CustomDropdown({
   options,
   placeholder,
   disabled,
+  haciaArriba = false, // Por defecto se despliega hacia abajo
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Cerrar al hacer clic afuera
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -45,65 +46,75 @@ export default function CustomDropdown({
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Botón Principal (Emula al Input) */}
+      {/* BOTÓN PRINCIPAL */}
       <div
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full bg-padel-1 p-4 rounded-xl border ${
-          isOpen ? "border-padel-4" : "border-white/5"
-        } text-sm flex justify-between items-center transition-colors ${
-          disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+        className={`w-full bg-brand-input px-4 py-3.5 rounded-xl border text-sm md:text-base flex justify-between items-center transition-all duration-200 select-none ${
+          isOpen
+            ? "border-brand-chartreuse ring-1 ring-brand-chartreuse shadow-[0_0_15px_rgba(203,254,1,0.05)]"
+            : "border-brand-white/5 hover:border-brand-white/10"
+        } ${
+          disabled
+            ? "opacity-40 cursor-not-allowed text-gray-500"
+            : "cursor-pointer text-brand-white"
         }`}
       >
         <span
           className={
-            selectedOption ? "text-white font-medium" : "text-gray-500"
+            selectedOption ? "text-brand-white font-medium" : "text-gray-500"
           }
         >
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <ChevronDown
-          className={`size-4 transition-transform duration-200 ${
-            isOpen ? "rotate-180 text-padel-4" : "text-gray-500"
+          className={`size-4 shrink-0 transition-transform duration-200 ${
+            isOpen ? "rotate-180 text-brand-chartreuse" : "text-gray-500"
           }`}
         />
       </div>
 
-      {/* Menú Desplegable Animado */}
+      {/* MENÚ DESPLEGABLE CON POSICIONAMIENTO CONTROLADO */}
       <AnimatePresence>
         {isOpen && !disabled && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: haciaArriba ? -4 : 4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.15 }}
-            className="absolute left-0 right-0 top-full mt-2 bg-padel-1 border border-white/10 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] z-60 overflow-hidden max-h-60 overflow-y-auto 
-            [&::-webkit-scrollbar]:w-2 
+            exit={{ opacity: 0, y: haciaArriba ? -4 : 4 }}
+            transition={{ duration: 0.12, ease: "easeOut" }}
+            className={`absolute left-0 right-0 bg-brand-card border border-brand-white/10 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] z-500 overflow-hidden max-h-52 overflow-y-auto 
+            [&::-webkit-scrollbar]:w-1.5 
             [&::-webkit-scrollbar-track]:bg-transparent 
-            [&::-webkit-scrollbar-thumb]:bg-white/10 
+            [&::-webkit-scrollbar-thumb]:bg-brand-white/10 
             [&::-webkit-scrollbar-thumb]:rounded-full 
-            hover:[&::-webkit-scrollbar-thumb]:bg-white/20"
+            hover:[&::-webkit-scrollbar-thumb]:bg-brand-white/20 
+            ${haciaArriba ? "bottom-full mb-2" : "top-full mt-2"}`}
           >
             {options.length === 0 ? (
               <div className="p-4 text-sm text-gray-500 text-center">
-                No hay opciones
+                No hay opciones disponibles
               </div>
             ) : (
-              options.map((opt) => (
-                <div
-                  key={opt.value}
-                  onClick={() => {
-                    onChange(opt.value);
-                    setIsOpen(false);
-                  }}
-                  className={`p-4 text-sm cursor-pointer transition-colors hover:bg-white/5 ${
-                    value === opt.value
-                      ? "text-padel-4 font-bold bg-white/5 border-l-2 border-padel-4"
-                      : "text-gray-300 border-l-2 border-transparent"
-                  }`}
-                >
-                  {opt.label}
-                </div>
-              ))
+              <div className="py-1">
+                {options.map((opt) => {
+                  const isSelected = value === opt.value;
+                  return (
+                    <div
+                      key={opt.value}
+                      onClick={() => {
+                        onChange(opt.value);
+                        setIsOpen(false);
+                      }}
+                      className={`px-4 py-3 text-sm md:text-base cursor-pointer transition-colors text-left flex items-center ${
+                        isSelected
+                          ? "text-brand-chartreuse font-bold bg-brand-chartreuse/5 border-l-2 border-brand-chartreuse"
+                          : "text-gray-300 border-l-2 border-transparent hover:bg-brand-white/5 hover:text-brand-white"
+                      }`}
+                    >
+                      {opt.label}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </motion.div>
         )}

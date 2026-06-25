@@ -55,14 +55,22 @@ export default function Navbar() {
     { name: "Clubes", path: "/clubes" },
   ];
 
-  // Extraer nombre e iniciales directamente del perfil unificado de nuestra API
-  const userName = profile?.nombre_completo || "Cargando...";
-  const userInitials = profile?.nombre_completo
-    ? profile.nombre_completo.substring(0, 2).toUpperCase()
-    : "PN";
+  // Extraer nombre directamente del perfil unificado de nuestra API
+  const userName = profile?.nombre_completo || "";
 
-  // Si usás avatares dinámicos en tu tabla perfiles lo mapeás acá, sino usamos las iniciales
-  const avatarUrl = null;
+  // Calculamos las iniciales de forma dinámica basándonos en el nombre real
+  const userInitials =
+    userName && userName.trim()
+      ? userName
+          .trim()
+          .split(/\s+/)
+          .map((n) => n[0])
+          .join("")
+          .substring(0, 2)
+          .toUpperCase()
+      : "PN"; // Fallback transitorio
+
+  const avatarUrl = profile?.avatar_url || null;
 
   return (
     <header className="border-b border-brand-white/5 bg-brand-black/95 backdrop-blur-xl relative top-0 z-50">
