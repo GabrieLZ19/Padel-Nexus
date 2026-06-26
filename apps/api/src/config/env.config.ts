@@ -4,7 +4,11 @@ import path from "path";
 // Centralizamos la lectura del archivo .env en un solo lugar limpio
 dotenv.config({ path: path.join(process.cwd(), ".env") });
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+if (
+  !process.env.SUPABASE_URL ||
+  !process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  !process.env.SUPABASE_API_KEY
+) {
   throw new Error(
     "❌ ERROR CRÍTICO: Falta configurar las credenciales de Supabase en el archivo .env",
   );
