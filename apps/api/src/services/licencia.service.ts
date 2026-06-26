@@ -8,7 +8,7 @@ export class LicenciaService {
     let query = supabase
       .from("licencias")
       .select(
-        "*, perfiles(nombre_completo, telefono, email, categoria_padel)",
+        "*, perfiles(nombre, apellido, telefono, email, categoria_padel)",
         { count: "exact" },
       )
       .order("created_at", { ascending: false });
@@ -16,7 +16,7 @@ export class LicenciaService {
     if (search) {
       const term = `%${search.trim()}%`;
       query = query.or(
-        `nro_licencia.ilike.${term},perfiles.nombre_completo.ilike.${term},perfiles.email.ilike.${term}`,
+        `nro_licencia.ilike.${term},perfiles.nombre.ilike.${term},perfiles.apellido.ilike.${term},perfiles.email.ilike.${term}`,
       );
     }
 
@@ -81,7 +81,7 @@ export class LicenciaService {
     const { data, error } = await supabase
       .from("licencias")
       .select(
-        "estado, nro_licencia, fecha_vencimiento, perfiles(nombre_completo)",
+        "estado, nro_licencia, fecha_vencimiento, perfiles(nombre, apellido)",
       )
       .eq("usuario_id", usuario_id)
       .single();

@@ -54,7 +54,8 @@ export class RankingService {
         `
         *, 
         perfiles!inner (
-          nombre_completo, 
+          nombre,
+          apellido,
           avatar_url,
           lugar_residencia
         )

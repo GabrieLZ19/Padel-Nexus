@@ -163,12 +163,14 @@ export const PerfilController = {
         !datosRegistro.email ||
         !datosRegistro.password ||
         !datosRegistro.dni ||
-        !datosRegistro.lugar_residencia
+        !datosRegistro.lugar_residencia ||
+        !datosRegistro.nombre ||
+        !datosRegistro.apellido
       ) {
         return res.status(400).json({
           exito: false,
           error:
-            "Faltan datos obligatorios para el registro FAP (Email, Password, DNI, Residencia).",
+            "Faltan datos obligatorios para el registro FAP (Email, Password, DNI, Residencia, Nombre, Apellido).",
         });
       }
 
@@ -298,6 +300,57 @@ export const PerfilController = {
           ? error.message
           : "Error al validar token federativo.";
       return res.status(401).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * POST /api/perfil/avatar
+   * Sube o actualiza la foto de perfil del usuario logueado en formato base64
+   */
+  async subirAvatar(req: Request, res: Response): Promise<Response> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "Usuario no autorizado." });
+      }
+
+      const { avatar_base64 } = req.body;
+      if (!avatar_base64) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "La foto de perfil en base64 es requerida." });
+      }
+
+      const avatarUrl = await PerfilService.actualizarAvatar(userId, avatar_base64);
+      return res.status(200).json({ exito: true, data: { avatar_url: avatarUrl } });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al subir la foto de perfil.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * DELETE /api/perfil/avatar
+   * Elimina la foto de perfil actual del usuario logueado
+   */
+  async eliminarAvatar(req: Request, res: Response): Promise<Response> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "Usuario no autorizado." });
+      }
+
+      await PerfilService.eliminarAvatar(userId);
+      return res.status(200).json({ exito: true, mensaje: "Foto de perfil eliminada." });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al eliminar la foto de perfil.";
+      return res.status(500).json({ exito: false, error: message });
     }
   },
 };

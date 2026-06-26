@@ -37,7 +37,7 @@ export class PartidoService {
       .select(
         `
         *,
-        perfiles!partidos_abiertos_creador_id_fkey (nombre_completo, avatar_url),
+        perfiles!partidos_abiertos_creador_id_fkey (nombre, apellido, avatar_url),
         reservas (fecha_reserva, turno_id)
       `,
       )

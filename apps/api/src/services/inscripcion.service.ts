@@ -28,7 +28,7 @@ export class InscripcionService {
     let query = supabase
       .from("inscripciones")
       .select(
-        `*, perfiles!fk_inscripciones_usuario(nombre_completo), torneos!fk_inscripciones_torneo(nombre, categoria)`,
+        `*, perfiles!fk_inscripciones_usuario(nombre, apellido), torneos!fk_inscripciones_torneo(nombre, categoria)`,
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
@@ -47,7 +47,7 @@ export class InscripcionService {
     // Evitamos el 'any' tipando temporalmente la respuesta de Supabase
     type SupabaseInscripcion = Record<string, unknown> & {
       jugador1_nombre?: string;
-      perfiles?: { nombre_completo?: string };
+      perfiles?: { nombre?: string; apellido?: string };
       torneos?: { nombre?: string };
     };
 
@@ -56,7 +56,7 @@ export class InscripcionService {
         ...ins,
         jugador1_nombre:
           ins.jugador1_nombre?.trim() ||
-          ins.perfiles?.nombre_completo ||
+          (ins.perfiles?.apellido ? `${ins.perfiles.apellido.toUpperCase()}, ${ins.perfiles.nombre}` : "Desconocido") ||
           "Usuario Desconocido",
         torneo_nombre: ins.torneos?.nombre || "Torneo no asignado",
       }),
@@ -166,7 +166,7 @@ export class InscripcionService {
     }
 
     // 6. VALIDACIÓN CATEGORÍAS (Jugador 1 y Jugador 2)
-    // Nota: El torneo requiere un "nivel" o "categoria" (ej: '7ma'). Lo validamos contra perfil.categoria_padel
+    // Nota: El torneo requiere un "nivel" o "categoria" (ej: '7ª'). Lo validamos contra perfil.categoria_padel
     if (solicitante.categoria_padel !== torneo.nivel) {
       throw new Error(
         `Tu categoría (${solicitante.categoria_padel}) no coincide con la requerida (${torneo.nivel}).`,

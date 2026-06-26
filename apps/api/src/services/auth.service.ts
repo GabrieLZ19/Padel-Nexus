@@ -5,12 +5,14 @@ import { env } from "../config/env.config";
 export interface RegistroDTO {
   email: string;
   password: string;
-  nombre_completo: string;
+  nombre: string;
+  apellido: string;
   telefono: string;
   dni: string;
   lugar_residencia: string;
   categoria_padel: string;
   lado_preferido: string;
+  avatar_base64?: string;
 }
 
 export class AuthService {
@@ -33,7 +35,7 @@ export class AuthService {
     // Al estar aislado, ignora el RLS de forma directa sin caer en bucles de Postgres
     const { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
-      .select("id, nombre_completo, dni, lugar_residencia, rol, email")
+      .select("id, nombre, apellido, dni, lugar_residencia, rol, email, ranking_nacional, ranking_provincial")
       .eq("id", authData.user.id)
       .single();
 
@@ -54,13 +56,27 @@ export class AuthService {
    * Registra un nuevo usuario en Supabase Auth y crea su perfil relacional FAP
    */
   static async registrar(datos: RegistroDTO) {
+    const capitalizarTexto = (texto: string) => {
+      if (!texto) return "";
+      return texto
+        .trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+    };
+
+    const nombreCapitalizado = capitalizarTexto(datos.nombre);
+    const apellidoCapitalizado = capitalizarTexto(datos.apellido);
+
     const { data, error } = await supabase.auth.signUp({
       email: datos.email,
       password: datos.password,
       options: {
         // Guardamos la metadata obligatoria de la FAP
         data: {
-          nombre_completo: datos.nombre_completo,
+          nombre: nombreCapitalizado,
+          apellido: apellidoCapitalizado,
           telefono: datos.telefono,
           dni: datos.dni,
           lugar_residencia: datos.lugar_residencia,
@@ -76,11 +92,62 @@ export class AuthService {
       );
     }
 
+    // Subir avatar si se proporcionó en base64
+    if (datos.avatar_base64 && data.user) {
+      try {
+        const userId = data.user.id;
+        const avatarUrl = await this.subirAvatarBase64(userId, datos.avatar_base64);
+        
+        // Actualizar el perfil recién creado en perfiles con la URL
+        await supabaseAdmin
+          .from("perfiles")
+          .update({ avatar_url: avatarUrl })
+          .eq("id", userId);
+      } catch (uploadError: any) {
+        console.error("🔴 Error al subir avatar en registro:", uploadError.message || uploadError);
+      }
+    }
+
     return {
       exito: true,
       mensaje:
         "Usuario registrado. Verifique su correo electrónico para confirmar la cuenta.",
     };
+  }
+
+  /**
+   * Sube una foto de perfil en formato base64 a Supabase Storage con privilegios de admin
+   */
+  private static async subirAvatarBase64(userId: string, base64Data: string): Promise<string> {
+    const matches = base64Data.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      throw new Error("Formato de imagen base64 inválido.");
+    }
+
+    const mimeType = matches[1];
+    const base64Content = matches[2];
+    const buffer = Buffer.from(base64Content, "base64");
+    
+    const ext = mimeType.split("/")[1] || "png";
+    const fileName = `avatar_${Date.now()}.${ext}`;
+    const filePath = `${userId}/${fileName}`;
+
+    const { error } = await supabaseAdmin.storage
+      .from("avatars")
+      .upload(filePath, buffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from("avatars")
+      .getPublicUrl(filePath);
+
+    return publicUrl;
   }
 
   /**
@@ -149,7 +216,7 @@ export class AuthService {
     // Buscamos su perfil unificado en la base
     let { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
-      .select("id, nombre_completo, dni, lugar_residencia, rol, email")
+      .select("id, nombre, apellido, dni, lugar_residencia, rol, email, ranking_nacional, ranking_provincial")
       .eq("id", data.user.id)
       .single();
 
@@ -159,14 +226,14 @@ export class AuthService {
         .from("perfiles")
         .insert({
           id: data.user.id,
-          nombre_completo:
-            data.user.user_metadata?.full_name || "Jugador Google",
+          nombre: (data.user.user_metadata?.full_name || "Jugador Google").split(" ")[0],
+          apellido: (data.user.user_metadata?.full_name || "").includes(" ") ? (data.user.user_metadata?.full_name || "").split(" ").slice(1).join(" ") : "",
           email: data.user.email,
           rol: "usuario",
           lugar_residencia: "A completar",
           dni: "A completar",
         })
-        .select("id, nombre_completo, dni, lugar_residencia, rol, email")
+        .select("id, nombre, apellido, dni, lugar_residencia, rol, email, ranking_nacional, ranking_provincial")
         .single();
 
       if (insertError || !nuevoPerfil) {
@@ -201,7 +268,7 @@ export class AuthService {
     let { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
       .select(
-        "id, nombre_completo, dni, lugar_residencia, rol, email, categoria_padel, lado_preferido",
+        "id, nombre, apellido, dni, lugar_residencia, rol, email, categoria_padel, lado_preferido, ranking_nacional, ranking_provincial",
       )
       .eq("id", user.id)
       .single();
@@ -212,7 +279,8 @@ export class AuthService {
         .from("perfiles")
         .insert({
           id: user.id,
-          nombre_completo: user.user_metadata?.full_name || "Jugador Google",
+          nombre: (user.user_metadata?.full_name || "Jugador Google").split(" ")[0],
+          apellido: (user.user_metadata?.full_name || "").includes(" ") ? (user.user_metadata?.full_name || "").split(" ").slice(1).join(" ") : "",
           email: user.email,
           rol: "usuario",
           lugar_residencia: "La Rioja",
@@ -221,7 +289,7 @@ export class AuthService {
           lado_preferido: "S/C",
         })
         .select(
-          "id, nombre_completo, dni, lugar_residencia, rol, email, categoria_padel, lado_preferido",
+          "id, nombre, apellido, dni, lugar_residencia, rol, email, categoria_padel, lado_preferido, ranking_nacional, ranking_provincial",
         )
         .single();
 

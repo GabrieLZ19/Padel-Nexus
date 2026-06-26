@@ -181,18 +181,24 @@ export const LicenciasController = {
   async solicitar(req: Request, res: Response): Promise<Response> {
     try {
       const usuarioIdLogueado = req.user?.id;
-      const { nombre_completo, documento, provincia, club_id } = req.body;
+      const { nombre, apellido, documento, provincia, club_id } = req.body;
+      const usuario_id = req.user?.id;
 
-      if (!usuarioIdLogueado) {
+      if (!usuario_id) {
         return res
           .status(401)
-          .json({
-            exito: false,
-            error: "Usuario no autenticado en el servidor.",
-          });
+          .json({ exito: false, message: "Usuario no autenticado." });
       }
 
-      const datosSolicitud = { nombre_completo, documento, provincia, club_id };
+      if (!nombre || !apellido || !documento || !provincia || !club_id) {
+        return res.status(400).json({
+          exito: false,
+          message:
+            "Faltan datos obligatorios para la licencia (nombre, apellido, dni, provincia, club).",
+        });
+      }
+
+      const datosSolicitud = { nombre, apellido, documento, provincia, club_id };
       const data = await LicenciaService.solicitar(
         usuarioIdLogueado,
         datosSolicitud,
