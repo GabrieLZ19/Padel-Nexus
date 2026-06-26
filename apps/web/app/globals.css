@@ -53,4 +53,67 @@ body {
       transform: translateY(0);
     }
   }
+
+  /* Ocultar barra de desplazamiento nativa pero mantener funcionalidad de scroll */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE y Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  /* Clases responsivas basadas en altura para el panel izquierdo de marca */
+  .left-panel-responsive {
+    padding: 4rem; /* xl:p-16 */
+  }
+
+  @media (max-width: 1280px) {
+    .left-panel-responsive {
+      padding: 2.5rem; /* p-10 */
+    }
+  }
+
+  @media (max-height: 850px) {
+    .left-panel-responsive {
+      padding: 2rem;
+    }
+  }
+
+  @media (max-height: 750px) {
+    .left-panel-responsive {
+      padding: 1.5rem;
+    }
+  }
+
+  .left-panel-card {
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+    transition: all 0.3s ease;
+  }
+
+  @media (max-height: 850px) {
+    .left-panel-card {
+      margin-top: 1rem;
+      margin-bottom: 1rem;
+    }
+  }
+
+  @media (max-height: 720px) {
+    .left-panel-card {
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+      transform: scale(0.9);
+      transform-origin: center;
+    }
+  }
+
+  @media (max-height: 650px) {
+    .left-panel-card {
+      margin-top: 0.25rem;
+      margin-bottom: 0.25rem;
+      transform: scale(0.85);
+    }
+  }
 }
+

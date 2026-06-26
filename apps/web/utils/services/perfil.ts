@@ -17,12 +17,14 @@ export interface AuthResponse {
 export interface RegistroPayload {
   email: string;
   password: string;
-  nombre_completo: string;
+  nombre: string;
+  apellido: string;
   telefono: string;
   dni: string;
   lugar_residencia: string;
   categoria_padel: string;
   lado_preferido: string;
+  avatar_base64?: string;
 }
 
 export const PerfilService = {
@@ -143,5 +145,23 @@ export const PerfilService = {
       accessToken,
     });
     return response.data;
+  },
+
+  /**
+   * Sube o actualiza la foto de perfil en el backend (vía base64)
+   */
+  async subirAvatar(avatarBase64: string): Promise<string> {
+    const response = await api.post<{ exito: boolean; data: { avatar_url: string } }>(
+      "/perfil/avatar",
+      { avatar_base64: avatarBase64 }
+    );
+    return response.data.data.avatar_url;
+  },
+
+  /**
+   * Elimina la foto de perfil actual del usuario
+   */
+  async eliminarAvatar(): Promise<void> {
+    await api.delete<{ exito: boolean; mensaje: string }>("/perfil/avatar");
   },
 };

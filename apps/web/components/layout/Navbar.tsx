@@ -56,7 +56,7 @@ export default function Navbar() {
   ];
 
   // Extraer nombre directamente del perfil unificado de nuestra API
-  const userName = profile?.nombre_completo || "";
+  const userName = profile?.nombre ? `${profile.apellido?.toUpperCase()}, ${profile.nombre}` : "";
 
   // Calculamos las iniciales de forma dinámica basándonos en el nombre real
   const userInitials =

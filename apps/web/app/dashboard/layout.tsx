@@ -98,7 +98,7 @@ export default function DashboardLayout({
   ];
 
   const displayName =
-    profile?.nombre_completo || profile?.email?.split("@")[0] || "Admin";
+    (profile?.nombre ? `${profile.apellido?.toUpperCase()}, ${profile.nombre}` : "") || profile?.email?.split("@")[0] || "Admin";
 
   // Mantenemos el Loader si está cargando O si está a punto de expulsar por falta de perfil
   if (loading || !profile) {

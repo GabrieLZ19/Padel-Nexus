@@ -126,7 +126,7 @@ export default function PerfilJugadorAdminPage() {
 
         <div className="pt-14 pb-8 px-8 border-b border-white/5">
           <h1 className="text-3xl font-bold text-white mb-1 tracking-tight">
-            {perfil.nombre_completo || "Usuario sin nombre"}
+            {perfil.nombre ? `${perfil.apellido?.toUpperCase()}, ${perfil.nombre}` : "Usuario sin nombre"}
           </h1>
           <p className="text-gray-400 flex items-center gap-2 text-sm">
             <Mail className="size-4" /> {perfil.email || "Sin email registrado"}

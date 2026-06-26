@@ -209,7 +209,7 @@ export default function LandingPage() {
                   <div className="flex items-center gap-3">
                     <span className="font-black text-gray-600">0{i + 1}</span>
                     <span className="text-sm font-medium">
-                      {r.perfiles?.nombre_completo || "Jugador anónimo"}
+                      {r.perfiles?.nombre ? `${r.perfiles.apellido?.toUpperCase()}, ${r.perfiles.nombre}` : "Jugador anónimo"}
                     </span>
                   </div>
                   <span className="text-brand-chartreuse font-bold">

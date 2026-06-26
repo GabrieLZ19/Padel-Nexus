@@ -2,7 +2,8 @@ import { api } from "../api";
 import { Licencia } from "../types";
 
 interface DatosSolicitud {
-  nombre_completo: string;
+  nombre: string;
+  apellido: string;
   documento: string;
   club: string;
   provincia: string;

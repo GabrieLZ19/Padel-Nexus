@@ -65,7 +65,7 @@ export default function OAuthCallbackPage() {
           setProfile(data.usuario);
           setStatus("success");
           setMensaje(
-            `¡Bienvenido, ${data.usuario.nombre_completo || "Jugador"}! Conexión exitosa.`,
+            `¡Bienvenido, ${data.usuario.nombre || "Jugador"}! Conexión exitosa.`,
           );
 
           setTimeout(() => {

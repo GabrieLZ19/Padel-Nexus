@@ -94,12 +94,12 @@ export default function LicenciaModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!userProfile?.nombre_completo) {
+    if (!userProfile?.nombre || !userProfile?.apellido) {
       setFeedback({
         isOpen: true,
         title: "Perfil incompleto",
         description:
-          "Por favor, completá tu nombre en la configuración de tu perfil antes de solicitar una licencia.",
+          "Por favor, completá tu nombre y apellido en la configuración de tu perfil antes de solicitar una licencia.",
         type: "warning",
       });
       return;
@@ -108,7 +108,8 @@ export default function LicenciaModal({
     setLoading(true);
     try {
       await LicenciasService.solicitarAlta({
-        nombre_completo: userProfile.nombre_completo,
+        nombre: userProfile.nombre,
+        apellido: userProfile.apellido,
         documento: dni,
         club: selectedClub,
         provincia: provincia,
@@ -158,7 +159,7 @@ export default function LicenciaModal({
               </label>
               <input
                 type="text"
-                value={userProfile?.nombre_completo || ""}
+                value={userProfile?.nombre ? `${userProfile.apellido?.toUpperCase()}, ${userProfile.nombre}` : ""}
                 disabled
                 className="w-full bg-[#111] p-3.5 rounded-xl border border-white/5 text-gray-500 cursor-not-allowed"
               />

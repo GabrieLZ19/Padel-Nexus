@@ -33,11 +33,14 @@ export interface Licencia {
 
 export interface Perfil {
   id: string;
-  nombre_completo: string | null;
+  nombre: string | null;
+  apellido: string | null;
   telefono: string | null;
   email: string | null;
   categoria_padel: string | null;
   lado_preferido: string | null;
+  ranking_nacional: number;
+  ranking_provincial: Record<string, number>;
   rol: RolUsuario;
   avatar_url: string | null;
   dni: string | null;

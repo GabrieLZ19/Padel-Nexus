@@ -222,7 +222,7 @@ export default function JugadoresLicenciasPage() {
                         </div>
                         <div>
                           <div className="font-bold text-white group-hover:text-brand-chartreuse transition-colors">
-                            {licencia.perfiles?.nombre_completo || "Sin nombre"}
+                            {licencia.perfiles?.nombre ? `${licencia.perfiles.apellido?.toUpperCase()}, ${licencia.perfiles.nombre}` : "Sin nombre"}
                           </div>
                           <div className="text-xs text-gray-500">
                             {licencia.perfiles?.email || "Sin email registrado"}
@@ -332,7 +332,7 @@ export default function JugadoresLicenciasPage() {
               <div>
                 <p className="text-xs text-gray-500 mb-1">Jugador</p>
                 <p className="text-white font-medium">
-                  {licenciaAVerificar.perfiles?.nombre_completo}
+                  {licenciaAVerificar.perfiles?.nombre ? `${licenciaAVerificar.perfiles.apellido?.toUpperCase()}, ${licenciaAVerificar.perfiles.nombre}` : ""}
                 </p>
                 <p className="text-sm text-gray-400">
                   {licenciaAVerificar.perfiles?.email}

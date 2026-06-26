@@ -22,13 +22,20 @@ export const useProfileStore = create<ProfileStore>((set) => ({
         set({ profile: perfil });
         return true;
       }
-      throw new Error("El backend no devolvió un perfil válido");
+
+      // Si es null, el backend retornó un 401 (No autorizado). Limpiamos cookies de sesión.
+      if (typeof window !== "undefined") {
+        document.cookie = "padel_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        document.cookie = "padel_user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      }
+      set({ profile: null });
+      return false;
     } catch (error: unknown) {
       const message =
-        error instanceof Error ? error.message : "Error desconocido";
+        error instanceof Error ? error.message : "Error de red";
       console.error("🔴 ERROR EN FETCH_PROFILE:", message);
-      set({ profile: null });
-      return false; // Avisamos que falló
+      // En error de red no borramos las cookies para no desloguear accidentalmente
+      return false;
     }
   },
 }));

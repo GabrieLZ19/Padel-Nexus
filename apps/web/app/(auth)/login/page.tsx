@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -29,6 +29,15 @@ export default function AuthPage() {
   const router = useRouter();
   const { setProfile } = useProfileStore();
 
+  // Cargar email guardado si existe "Recordarme"
+  useEffect(() => {
+    const savedEmail = localStorage.getItem("padel_remember_email");
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
+
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -39,6 +48,13 @@ export default function AuthPage() {
       const data = await PerfilService.loginConEmail(email, password);
 
       if (data && data.exito && data.token && data.usuario) {
+        // Guardar o borrar email en localStorage según la preferencia
+        if (rememberMe) {
+          localStorage.setItem("padel_remember_email", email.trim());
+        } else {
+          localStorage.removeItem("padel_remember_email");
+        }
+
         document.cookie = `padel_token=${data.token}; path=/; max-age=${rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24}`;
         document.cookie = `padel_user_role=${data.usuario.rol}; path=/; max-age=${rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24}`;
 

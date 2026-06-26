@@ -16,6 +16,7 @@ export interface CustomDropdownProps {
   placeholder: string;
   disabled?: boolean;
   haciaArriba?: boolean; // ➡️ Prop opcional declarado correctamente para evitar ts(2322)
+  hasError?: boolean;
 }
 
 export default function CustomDropdown({
@@ -25,6 +26,7 @@ export default function CustomDropdown({
   placeholder,
   disabled,
   haciaArriba = false, // Por defecto se despliega hacia abajo
+  hasError = false,
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -52,6 +54,8 @@ export default function CustomDropdown({
         className={`w-full bg-brand-input px-4 py-3.5 rounded-xl border text-sm md:text-base flex justify-between items-center transition-all duration-200 select-none ${
           isOpen
             ? "border-brand-chartreuse ring-1 ring-brand-chartreuse shadow-[0_0_15px_rgba(203,254,1,0.05)]"
+            : hasError
+            ? "border-red-500/50 hover:border-red-500/80"
             : "border-brand-white/5 hover:border-brand-white/10"
         } ${
           disabled

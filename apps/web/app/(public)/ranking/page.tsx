@@ -81,13 +81,14 @@ export default function RankingPublicPage() {
 
   // Filtrado puramente de búsqueda en memoria
   const filteredRankings = rankings.filter((player) => {
-    const nombre = player.perfiles?.nombre_completo?.toLowerCase() || "";
+    const nombre = player.perfiles?.nombre?.toLowerCase() || "";
+    const apellido = player.perfiles?.apellido?.toLowerCase() || "";
     const club =
       player.perfiles?.clubes?.nombre?.toLowerCase() ||
       player.club_nombre?.toLowerCase() ||
       "";
     const query = search.toLowerCase();
-    return nombre.includes(query) || club.includes(query);
+    return nombre.includes(query) || apellido.includes(query) || club.includes(query);
   });
 
   const sortedRankings = [...filteredRankings].sort(
@@ -235,7 +236,7 @@ export default function RankingPublicPage() {
                 </div>
                 <Medal className="text-gray-400 size-6 mb-2 mt-4 md:mt-0" />
                 <div className="font-black text-xl text-brand-white truncate w-full px-2 mb-1">
-                  {top2?.perfiles?.nombre_completo || "A confirmar"}
+                  {top2?.perfiles?.nombre ? `${top2.perfiles.apellido?.toUpperCase()}, ${top2.perfiles.nombre}` : "A confirmar"}
                 </div>
                 <div className="text-gray-400 text-sm font-semibold mb-3">
                   {top2?.perfiles?.clubes?.nombre || "Particular"}
@@ -269,7 +270,7 @@ export default function RankingPublicPage() {
                   Campeón
                 </div>
                 <div className="font-black text-2xl md:text-3xl text-brand-white truncate w-full px-2 mb-1">
-                  {top1?.perfiles?.nombre_completo || "A confirmar"}
+                  {top1?.perfiles?.nombre ? `${top1.perfiles.apellido?.toUpperCase()}, ${top1.perfiles.nombre}` : "A confirmar"}
                 </div>
                 <div className="text-gray-400 text-sm font-semibold mb-4">
                   {top1?.perfiles?.clubes?.nombre || "Particular"}
@@ -298,7 +299,7 @@ export default function RankingPublicPage() {
                 </div>
                 <Medal className="text-amber-600 size-6 mb-2 mt-4 md:mt-0" />
                 <div className="font-black text-xl text-brand-white truncate w-full px-2 mb-1">
-                  {top3?.perfiles?.nombre_completo || "A confirmar"}
+                  {top3?.perfiles?.nombre ? `${top3.perfiles.apellido?.toUpperCase()}, ${top3.perfiles.nombre}` : "A confirmar"}
                 </div>
                 <div className="text-gray-400 text-sm font-semibold mb-3">
                   {top3?.perfiles?.clubes?.nombre || "Particular"}
@@ -324,7 +325,7 @@ export default function RankingPublicPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-bold text-brand-white truncate">
-                          {player.perfiles?.nombre_completo || "Desconocido"}
+                          {player.perfiles?.nombre ? `${player.perfiles.apellido?.toUpperCase()}, ${player.perfiles.nombre}` : "Desconocido"}
                         </span>
                         <span className="bg-brand-white/10 px-2 py-0.5 rounded-md text-[10px] font-bold text-brand-chartreuse uppercase shrink-0">
                           {player.categoria}
@@ -407,8 +408,7 @@ export default function RankingPublicPage() {
                               )}
                             </div>
                             <span className="font-bold text-sm text-gray-200 group-hover:text-brand-white transition-colors">
-                              {player.perfiles?.nombre_completo ||
-                                "Jugador Desconocido"}
+                              {player.perfiles?.nombre ? `${player.perfiles.apellido?.toUpperCase()}, ${player.perfiles.nombre}` : "Jugador Desconocido"}
                             </span>
                           </td>
                           <td className="py-5 px-6">

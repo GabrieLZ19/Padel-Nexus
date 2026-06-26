@@ -30,7 +30,7 @@ export default function PlayerDashboard() {
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
             Hola,{" "}
             <span className="text-brand-chartreuse">
-              {profile?.nombre_completo?.split(" ")[0] || "Jugador"}
+              {profile?.nombre || "Jugador"}
             </span>
           </h1>
           <p className="text-sm md:text-lg text-gray-400 mt-1 md:mt-2">
