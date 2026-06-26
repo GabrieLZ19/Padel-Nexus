@@ -1,3 +1,5 @@
+import { FAP_ESTADOS_TORNEO } from "./fap";
+
 // 1. Definimos los tipos para mayor seguridad
 export type NivelPadel = "1ª" | "2ª" | "3ª" | "4ª" | "5ª" | "6ª" | "7ª" | "8ª";
 export type LadoPadel = "Drive" | "Revés" | "Ambos";
@@ -55,10 +57,10 @@ export const CATEGORIAS_TORNEO = [
 ] as const;
 
 export const ESTADOS_TORNEO = [
-  { value: "Borrador", label: "Borrador (Oculto)" },
-  { value: "Inscripción", label: "Inscripción Abierta" },
-  { value: "En curso", label: "En Curso" },
-  { value: "Finalizado", label: "Finalizado" },
+  { value: FAP_ESTADOS_TORNEO.BORRADOR, label: "Borrador (Oculto)" },
+  { value: FAP_ESTADOS_TORNEO.INSCRIPCION, label: "Inscripción Abierta" },
+  { value: FAP_ESTADOS_TORNEO.EN_CURSO, label: "En Curso" },
+  { value: FAP_ESTADOS_TORNEO.FINALIZADO, label: "Finalizado" },
 ] as const;
 
 export const MODALIDADES_TORNEO = [

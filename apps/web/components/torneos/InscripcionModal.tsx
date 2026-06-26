@@ -140,7 +140,7 @@ export default function InscripcionModal({
               {step === "form" ? (
                 <div className="p-8 lg:p-10">
                   <div className="mb-8">
-                    <div className="inline-flex items-center gap-2 bg-padel-4/10 text-padel-4 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 border border-padel-4/20">
+                    <div className="inline-flex items-center gap-2 bg-brand-chartreuse/10 text-brand-chartreuse px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 border border-brand-chartreuse/20">
                       Confirmar Inscripción
                     </div>
                     <h2 className="text-2xl lg:text-3xl font-bold text-white tracking-tight leading-tight">
@@ -155,7 +155,7 @@ export default function InscripcionModal({
                     {/* JUGADOR 1 */}
                     <div>
                       <label className=" text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                        <User className="size-3 text-padel-4" />{" "}
+                        <User className="size-3 text-brand-chartreuse" />{" "}
                         {isIndividual
                           ? "Nombre del Jugador"
                           : "Nombre Jugador 1"}
@@ -163,7 +163,7 @@ export default function InscripcionModal({
                       <input
                         autoFocus
                         placeholder="Ej: Gabriel Lazo"
-                        className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white focus:outline-none focus:border-padel-4/50 transition-all"
+                        className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white focus:outline-none focus:border-brand-chartreuse/50 transition-all"
                         value={formData.jugador1}
                         onChange={(e) =>
                           setFormData({ ...formData, jugador1: e.target.value })
@@ -178,13 +178,13 @@ export default function InscripcionModal({
                         animate={{ opacity: 1, height: "auto" }}
                       >
                         <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                          <Users className="size-3 text-padel-4" /> Nombre Email
+                          <Users className="size-3 text-brand-chartreuse" /> Nombre Email
                           de tu compañero
                         </label>
                         <input
                           type="email"
                           placeholder="compañero@email.com"
-                          className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white focus:outline-none focus:border-padel-4/50 transition-all"
+                          className="w-full bg-white/5 border border-white/5 p-4 rounded-2xl text-white focus:outline-none focus:border-brand-chartreuse/50 transition-all"
                           value={formData.email2}
                           onChange={(e) =>
                             setFormData({ ...formData, email2: e.target.value })
@@ -194,12 +194,12 @@ export default function InscripcionModal({
                     )}
 
                     {/* RESUMEN DE COSTO */}
-                    <div className="bg-padel-4/5 border border-padel-4/10 p-5 rounded-2xl flex justify-between items-center">
+                    <div className="bg-brand-chartreuse/5 border border-brand-chartreuse/10 p-5 rounded-2xl flex justify-between items-center">
                       <div>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                           Total a pagar
                         </p>
-                        <p className="text-2xl font-black text-padel-4">
+                        <p className="text-2xl font-black text-brand-chartreuse">
                           $
                           {Number(torneo.precio_inscripcion).toLocaleString(
                             "es-AR",
@@ -239,7 +239,7 @@ export default function InscripcionModal({
                     <button
                       disabled={!canSubmit || loading}
                       onClick={handleSubmit}
-                      className="w-full bg-padel-4 disabled:opacity-30 disabled:grayscale hover:bg-[#b3e600] text-[#111] py-5 rounded-2xl font-black text-lg transition-all shadow-[0_0_30px_rgba(204,255,0,0.2)] flex items-center justify-center gap-3"
+                      className="w-full bg-brand-chartreuse disabled:opacity-30 disabled:grayscale hover:bg-[#b3e600] text-[#111] py-5 rounded-2xl font-black text-lg transition-all shadow-[0_0_30px_rgba(204,255,0,0.2)] flex items-center justify-center gap-3"
                     >
                       {loading ? (
                         "Procesando..."
@@ -255,7 +255,7 @@ export default function InscripcionModal({
               ) : (
                 /* ESTADO DE ÉXITO */
                 <div className="p-10 text-center flex flex-col items-center">
-                  <div className="w-20 h-20 bg-padel-4 rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(204,255,0,0.3)]">
+                  <div className="w-20 h-20 bg-brand-chartreuse rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(204,255,0,0.3)]">
                     <CheckCircle2 className="size-10 text-[#111]" />
                   </div>
                   <h2 className="text-3xl font-black text-white mb-3">

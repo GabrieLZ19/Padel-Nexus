@@ -16,6 +16,7 @@ import {
 import { isAxiosError } from "axios";
 import { PerfilService } from "@/utils/services/perfil";
 import { useProfileStore } from "@/store/useProfileStore";
+import { esRolAdministrativo } from "@/utils/auth/roles";
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -34,14 +35,22 @@ export default function AuthPage() {
     setError(null);
 
     try {
+      //  Ahora data es estrictamente del tipo AuthResponse puro
       const data = await PerfilService.loginConEmail(email, password);
 
-      if (data.exito) {
+      if (data && data.exito && data.token && data.usuario) {
         document.cookie = `padel_token=${data.token}; path=/; max-age=${rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24}`;
         document.cookie = `padel_user_role=${data.usuario.rol}; path=/; max-age=${rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24}`;
 
         setProfile(data.usuario);
-        router.push(data.usuario.rol !== "usuario" ? "/dashboard" : "/");
+
+        // Definimos quién va al CRM
+        const isAdmin = esRolAdministrativo(data.usuario.rol);
+
+        // Redirección instantánea basada en el rol
+        router.push(isAdmin ? "/dashboard" : "/");
+      } else {
+        setError("No se pudo procesar la sesión. Formato inválido.");
       }
     } catch (err: unknown) {
       if (isAxiosError(err)) {
@@ -62,7 +71,7 @@ export default function AuthPage() {
     setError(null);
     try {
       await PerfilService.loginConGoogle();
-    } catch (err: unknown) {
+    } catch {
       setError("No se pudo iniciar el canal de autenticación con Google. ");
       setLoading(false);
     }
@@ -118,7 +127,7 @@ export default function AuthPage() {
           <div className="mb-8 sm:mb-10 mt-6 sm:mt-0">
             <div className="lg:hidden mb-6">
               <Image
-                src="/brand/LogoGeneric.svg"
+                src="/brand/LogoHorizontal.svg"
                 alt="Padel Nexus"
                 width={140}
                 height={35}

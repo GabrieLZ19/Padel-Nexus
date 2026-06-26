@@ -21,6 +21,7 @@ import FeedbackModal, {
 } from "../../../../components/ui/FeedbackModal";
 import { MatchCard } from "@/components/torneos/MatchCard";
 import { LiveArbitrajeRow } from "@/components/torneos/LiveArbitrajeRow";
+import { BracketEditor } from "@/components/torneos/BracketEditor";
 
 const TABS = [
   { id: "resumen", label: "Resumen", icon: LayoutDashboard },
@@ -285,45 +286,7 @@ export default function TorneoDetallePage() {
     (p) => p.equipo_a_id && p.equipo_b_id && p.ganador === null,
   );
 
-  // --- MOTOR DINÁMICO DE CUADROS ---
-  const RONDAS_CONFIG = [
-    { id: "OCTAVOS", label: "Octavos", required: 8 },
-    { id: "CUARTOS", label: "Cuartos", required: 4 },
-    { id: "SEMIS", label: "Semis", required: 2 },
-    { id: "FINAL", label: "Final", required: 1 },
-  ];
 
-  const rondasToShow = RONDAS_CONFIG.filter(
-    (r) => r.required <= (torneo.cupos_maximos || 16) / 2,
-  );
-
-  const getRoundMatches = (round: string, requiredCount: number): Partido[] => {
-    const found = partidos
-      .filter((p) => p.ronda === round)
-      .sort((a, b) => a.orden - b.orden);
-    const result: Partido[] = [];
-    for (let i = 0; i < requiredCount; i++) {
-      if (found[i]) result.push(found[i]);
-      else {
-        result.push({
-          id: `empty-${round}-${i}`,
-          torneo_id: id,
-          ronda: round,
-          orden: i + 1,
-          equipo_a_id: null,
-          equipo_a_j1: null,
-          equipo_a_j2: null,
-          equipo_b_id: null,
-          equipo_b_j1: null,
-          equipo_b_j2: null,
-          set1_a: null,
-          set1_b: null,
-          ganador: null,
-        });
-      }
-    }
-    return result;
-  };
 
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 space-y-6 md:px-10 md:py-10">
@@ -339,7 +302,7 @@ export default function TorneoDetallePage() {
           <div>
             <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
               {torneo.nombre}
-              <span className="text-xs font-black bg-padel-4/20 text-padel-4 px-3 py-1 rounded-full uppercase tracking-wider">
+              <span className="text-xs font-black bg-brand-chartreuse/20 text-brand-chartreuse px-3 py-1 rounded-full uppercase tracking-wider">
                 {torneo.estado || "Borrador"}
               </span>
             </h1>
@@ -359,7 +322,7 @@ export default function TorneoDetallePage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 pb-4 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${activeTab === tab.id ? "border-padel-4 text-padel-4" : "border-transparent text-gray-500 hover:text-gray-300"}`}
+                className={`flex items-center gap-2 pb-4 text-sm font-bold transition-all border-b-2 whitespace-nowrap ${activeTab === tab.id ? "border-brand-chartreuse text-brand-chartreuse" : "border-transparent text-gray-500 hover:text-gray-300"}`}
               >
                 <Icon className="size-4" />
                 {tab.label}
@@ -375,7 +338,7 @@ export default function TorneoDetallePage() {
         {activeTab === "resumen" && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 relative overflow-hidden">
-              <TrendingUp className="size-8 text-padel-4 mb-4" />
+              <TrendingUp className="size-8 text-brand-chartreuse mb-4" />
               <div className="text-4xl font-black text-white mb-2">
                 ${totalRecaudado.toLocaleString("es-AR")}
               </div>
@@ -448,8 +411,8 @@ export default function TorneoDetallePage() {
                         </td>
                         <td className="px-6 py-5">
                           <div className="font-bold text-white flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-padel-4/10 flex items-center justify-center shrink-0">
-                              <User className="size-4 text-padel-4" />
+                            <div className="w-8 h-8 rounded-full bg-brand-chartreuse/10 flex items-center justify-center shrink-0">
+                              <User className="size-4 text-brand-chartreuse" />
                             </div>
                             <div>
                               {ins.jugador1_nombre || "Desconocido"}
@@ -464,7 +427,7 @@ export default function TorneoDetallePage() {
                           </div>
                         </td>
                         <td className="px-8 py-5 text-right text-gray-400 text-sm">
-                          {new Date(ins.created_at).toLocaleDateString("es-AR")}
+                          {ins.created_at ? new Date(ins.created_at).toLocaleDateString("es-AR") : "-"}
                         </td>
                       </tr>
                     ))}
@@ -477,66 +440,7 @@ export default function TorneoDetallePage() {
 
         {/* CUADROS */}
         {activeTab === "cuadros" && (
-          <div>
-            {partidos.length === 0 ? (
-              <div className="bg-[#111111] border border-white/5 rounded-3xl p-10 flex flex-col items-center justify-center text-center">
-                <GitMerge className="size-16 text-gray-600 mb-6" />
-                <h2 className="text-2xl font-bold mb-2">
-                  Generador de Cuadros
-                </h2>
-                <p className="text-gray-400 max-w-md mb-8">
-                  Dispones de <strong>{inscripciones.length}</strong>{" "}
-                  confirmados. Requiere mínimo 4.
-                </p>
-                <button
-                  onClick={handleGenerarCuadro}
-                  className="bg-padel-4 text-[#111] px-8 py-3 rounded-xl font-black shadow-lg hover:bg-[#b3e600] transition-colors disabled:opacity-50"
-                >
-                  Generar Cuadro Automático
-                </button>
-              </div>
-            ) : (
-              <div className="bg-[#111111] border border-white/5 rounded-3xl p-8 overflow-x-auto">
-                <div className="flex justify-between items-center mb-8 border-b border-white/5 pb-6 min-w-200">
-                  <h3 className="font-bold text-2xl text-white">
-                    Fixture del Torneo
-                  </h3>
-                  <button
-                    onClick={handleGenerarCuadro}
-                    disabled={partidosJugados > 0}
-                    className="flex items-center gap-2 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 px-4 py-2 rounded-lg font-bold transition-colors disabled:opacity-30"
-                  >
-                    <AlertTriangle className="size-4" /> Regenerar Cruces
-                  </button>
-                </div>
-
-                <div className="flex gap-8 lg:gap-12 min-w-150 h-137.5 pb-4">
-                  {rondasToShow.map((rondaInfo) => (
-                    <div
-                      key={rondaInfo.id}
-                      className="flex-1 flex flex-col relative justify-center"
-                    >
-                      <h3 className="text-center text-xs font-black text-padel-4 uppercase tracking-widest mb-4 absolute -top-10 w-full">
-                        {rondaInfo.label}
-                      </h3>
-                      <div className="flex flex-col justify-around h-full space-y-8">
-                        {getRoundMatches(rondaInfo.id, rondaInfo.required).map(
-                          (p) => (
-                            <div
-                              key={p.id}
-                              className="relative flex items-center"
-                            >
-                              <MatchCard partido={p} />
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          <BracketEditor torneoId={id} torneo={torneo} partidos={partidos} />
         )}
 
         {/* ARBITRAJE EN VIVO */}

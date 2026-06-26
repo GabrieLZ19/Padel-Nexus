@@ -19,6 +19,7 @@ import {
 import { TorneosService } from "@/utils/services/torneos";
 import { InscripcionesService } from "@/utils/services/inscripciones";
 import { Torneo, Inscripcion } from "@/utils/types";
+import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "@/utils/constants/fap";
 
 export default function DashboardHome() {
   const [torneos, setTorneos] = useState<Torneo[]>([]);
@@ -63,8 +64,10 @@ export default function DashboardHome() {
   // 1. Torneos y Reservas Activas
   const torneosActivos = torneos.filter(
     (t) =>
-      (t.estado || "").toLowerCase() === "inscripción" ||
-      (t.estado || "").toLowerCase() === "en curso",
+      (t.estado || "").toLowerCase() ===
+        FAP_ESTADOS_TORNEO.INSCRIPCION.toLowerCase() ||
+      (t.estado || "").toLowerCase() ===
+        FAP_ESTADOS_TORNEO.EN_CURSO.toLowerCase(),
   ).length;
   const inscripcionesTorneo = inscripciones.filter(
     (i) => !i.tipo || i.tipo === "Inscripción torneo",
@@ -74,21 +77,21 @@ export default function DashboardHome() {
   );
 
   const inscripcionesConfirmadas = inscripcionesTorneo.filter(
-    (i) => i.estado_pago === "Confirmado",
+    (i) => i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO,
   ).length;
 
   // 2. Ingresos
   const ingresosTorneos = inscripcionesTorneo
-    .filter((i) => i.estado_pago === "Confirmado")
+    .filter((i) => i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO)
     .reduce((a, b) => a + Number(b.monto), 0);
   const ingresosReservas = reservasCancha
-    .filter((i) => i.estado_pago === "Confirmado")
+    .filter((i) => i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO)
     .reduce((a, b) => a + Number(b.monto), 0);
   const ingresosTotales = ingresosTorneos + ingresosReservas;
 
   // Ingresos pendientes (para el badge dinámico)
   const ingresosPendientes = inscripciones
-    .filter((i) => i.estado_pago === "Pendiente")
+    .filter((i) => i.estado_pago === FAP_ESTADOS_PAGO.PENDIENTE)
     .reduce((a, b) => a + Number(b.monto), 0);
 
   // 3. Usuarios Únicos (Aproximación leyendo los nombres de jugadores en inscripciones)
@@ -189,7 +192,7 @@ export default function DashboardHome() {
       change: "Únicos totales",
       icon: Users,
       trendIcon: Users,
-      trendColor: "text-padel-4",
+      trendColor: "text-brand-chartreuse",
     },
     {
       title: "Torneos activos",
@@ -197,7 +200,7 @@ export default function DashboardHome() {
       change: `De ${torneos.length} creados`,
       icon: Trophy,
       trendIcon: Activity,
-      trendColor: "text-padel-4",
+      trendColor: "text-brand-chartreuse",
     },
     {
       title: "Inscripciones a torneos",
@@ -205,7 +208,7 @@ export default function DashboardHome() {
       change: `${inscripcionesConfirmadas} Confirmadas`,
       icon: ClipboardList,
       trendIcon: CheckCircle2,
-      trendColor: "text-padel-4",
+      trendColor: "text-brand-chartreuse",
     },
     {
       title: "Reservas del mes",
@@ -213,7 +216,7 @@ export default function DashboardHome() {
       change: "Global",
       icon: CalendarCheck,
       trendIcon: Calendar,
-      trendColor: "text-padel-4",
+      trendColor: "text-brand-chartreuse",
     },
     {
       title: "Ventas marketplace",
@@ -275,11 +278,11 @@ export default function DashboardHome() {
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
           <button className="w-full sm:w-auto min-w-35 flex items-center justify-center gap-2.5 bg-transparent border border-white/10 hover:bg-white/5 text-gray-300 hover:text-white px-3 py-2 rounded-2xl transition-colors text-sm font-medium">
-            <Calendar className="size-4 text-padel-4" />
+            <Calendar className="size-4 text-brand-chartreuse" />
             Últimos 30 días
           </button>
           <button className="w-full sm:w-auto min-w-14 flex items-center justify-center h-10 bg-transparent border border-white/10 hover:bg-white/5 text-gray-300 hover:text-white rounded-2xl transition-colors relative">
-            <div className="absolute top-2.5 right-2.5 size-1.5 bg-padel-4 rounded-full shadow-[0_0_8px_rgba(204,255,0,0.8)]"></div>
+            <div className="absolute top-2.5 right-2.5 size-1.5 bg-brand-chartreuse rounded-full shadow-[0_0_8px_rgba(204,255,0,0.8)]"></div>
             <Bell className="size-5" />
           </button>
         </div>
@@ -298,11 +301,11 @@ export default function DashboardHome() {
               className="bg-[#151515] p-6 rounded-2xl border border-white/5 flex flex-col justify-between min-h-55 hover:border-white/10 transition-colors"
             >
               <div className="flex items-start justify-between">
-                <div className="size-12 bg-[#2a3614] rounded-xl flex items-center justify-center border border-padel-4/10">
-                  <metric.icon className="size-6 text-padel-4 stroke-[1.5]" />
+                <div className="size-12 bg-[#2a3614] rounded-xl flex items-center justify-center border border-brand-chartreuse/10">
+                  <metric.icon className="size-6 text-brand-chartreuse stroke-[1.5]" />
                 </div>
                 {/* BADGE DINÁMICO E INFORMATIVO */}
-                <div className="flex items-center gap-1.5 bg-[#1c2e0e] text-gray-300 px-3 py-1.5 rounded-full text-[11px] font-bold border border-padel-4/20 tracking-wide">
+                <div className="flex items-center gap-1.5 bg-[#1c2e0e] text-gray-300 px-3 py-1.5 rounded-full text-[11px] font-bold border border-brand-chartreuse/20 tracking-wide">
                   <TrendIcon className={`size-3.5 ${metric.trendColor}`} />
                   {metric.change}
                 </div>
@@ -348,7 +351,7 @@ export default function DashboardHome() {
                   <div className="w-full relative flex flex-col justify-end h-48 md:h-64 items-center">
                     {/* NÚMERO VISIBLE PERMANENTEMENTE SOBRE LA BARRA */}
                     <div
-                      className={`mb-2 text-sm font-black transition-colors ${data.active ? "text-padel-4 drop-shadow-[0_0_8px_rgba(204,255,0,0.5)]" : "text-gray-400"}`}
+                      className={`mb-2 text-sm font-black transition-colors ${data.active ? "text-brand-chartreuse drop-shadow-[0_0_8px_rgba(204,255,0,0.5)]" : "text-gray-400"}`}
                     >
                       {data.count}
                     </div>
@@ -363,13 +366,13 @@ export default function DashboardHome() {
                       }}
                       className={`w-full max-w-17.5 rounded-t-xl transition-all duration-300 ${
                         data.active
-                          ? "bg-padel-4 shadow-[0_0_30px_rgba(204,255,0,0.25)]"
+                          ? "bg-brand-chartreuse shadow-[0_0_30px_rgba(204,255,0,0.25)]"
                           : "bg-[#33421b] hover:bg-[#435723]"
                       }`}
                     />
                   </div>
                   <span
-                    className={`text-sm font-medium mt-4 ${data.active ? "text-padel-4 font-bold" : "text-gray-400"}`}
+                    className={`text-sm font-medium mt-4 ${data.active ? "text-brand-chartreuse font-bold" : "text-gray-400"}`}
                   >
                     {data.month}
                   </span>
@@ -418,7 +421,7 @@ export default function DashboardHome() {
                     }}
                     className={`h-full rounded-full ${
                       index === 0
-                        ? "bg-padel-4 shadow-[0_0_15px_rgba(204,255,0,0.4)]"
+                        ? "bg-brand-chartreuse shadow-[0_0_15px_rgba(204,255,0,0.4)]"
                         : index === 1
                           ? "bg-[#00ff88]"
                           : "bg-[#435723]"

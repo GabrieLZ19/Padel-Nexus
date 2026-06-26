@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, AlertTriangle, Trash2, Info, X } from "lucide-react";
 
@@ -9,10 +10,15 @@ export interface FeedbackModalProps {
   title: string;
   description: string;
   type?: "success" | "danger" | "warning" | "info";
-  onConfirm?: () => void; // Si se pasa, muestra botón de confirmar y cancelar
   confirmText?: string;
   cancelText?: string;
   isLoading?: boolean;
+  showInput?: boolean;
+  inputPlaceholder?: string;
+  inputType?: string;
+  showSelect?: boolean;
+  selectOptions?: { value: string; label: string }[];
+  onConfirm?: (inputValue?: string, selectValue?: string) => void;
 }
 
 export default function FeedbackModal({
@@ -25,7 +31,21 @@ export default function FeedbackModal({
   confirmText = "Aceptar",
   cancelText = "Cancelar",
   isLoading = false,
+  showInput = false,
+  inputPlaceholder = "Ingrese un valor",
+  inputType = "text",
+  showSelect = false,
+  selectOptions = [],
 }: FeedbackModalProps) {
+  const [inputValue, setInputValue] = useState("");
+  const [selectValue, setSelectValue] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setInputValue("");
+      setSelectValue(selectOptions[0]?.value || "");
+    }
+  }, [isOpen, selectOptions]);
   // Configuraciones visuales dinámicas según el tipo de alerta
   const config = {
     success: {
@@ -54,11 +74,11 @@ export default function FeedbackModal({
     },
     info: {
       icon: Info,
-      color: "text-padel-4",
-      bg: "bg-padel-4/10",
-      border: "border-padel-4/20",
+      color: "text-brand-chartreuse",
+      bg: "bg-brand-chartreuse/10",
+      border: "border-brand-chartreuse/20",
       btnClass:
-        "bg-padel-4 text-black hover:bg-[#b3e600] shadow-[0_0_15px_rgba(204,255,0,0.2)]",
+        "bg-brand-chartreuse text-black hover:bg-[#b3e600] shadow-[0_0_15px_rgba(204,255,0,0.2)]",
     },
   };
 
@@ -99,12 +119,50 @@ export default function FeedbackModal({
               {description}
             </p>
 
+            {/* Inputs Dinámicos */}
+            {(showInput || showSelect) && (
+              <div className="flex flex-col gap-4 mb-8 text-left">
+                {showSelect && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-1">
+                      Método
+                    </label>
+                    <select
+                      value={selectValue}
+                      onChange={(e) => setSelectValue(e.target.value)}
+                      className="w-full bg-[#111111] text-white rounded-xl border border-white/10 px-4 py-3 focus:border-brand-chartreuse focus:ring-1 focus:ring-brand-chartreuse transition-colors"
+                    >
+                      {selectOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {showInput && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-1">
+                      Monto
+                    </label>
+                    <input
+                      type={inputType}
+                      placeholder={inputPlaceholder}
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      className="w-full bg-[#111111] text-white rounded-xl border border-white/10 px-4 py-3 focus:border-brand-chartreuse focus:ring-1 focus:ring-brand-chartreuse transition-colors"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Controles Dinámicos */}
             <div className="flex flex-col gap-3">
               {onConfirm && (
                 <button
-                  disabled={isLoading}
-                  onClick={onConfirm}
+                  disabled={isLoading || (showInput && !inputValue)}
+                  onClick={() => onConfirm(inputValue, selectValue)}
                   className={`w-full py-4 rounded-xl font-bold text-[15px] transition-all ${btnClass} disabled:opacity-50 flex items-center justify-center gap-2`}
                 >
                   {isLoading ? "Procesando..." : confirmText}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard,
@@ -19,8 +20,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { createClient } from "../../utils/supabase/client";
-import { User as SupabaseUser } from "@supabase/supabase-js";
+import { useProfileStore } from "@/store/useProfileStore";
 
 export default function DashboardLayout({
   children,
@@ -28,65 +28,58 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
+
+  // 🚀 Usamos EXCLUSIVAMENTE la store, como en las vistas públicas
+  const { profile, fetchProfile, clearProfile } = useProfileStore();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   const toggleMobileMenu = () => setMobileMenuOpen((open) => !open);
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
+  const handleLogout = useCallback(() => {
+    clearProfile();
+    document.cookie = "padel_token=; path=/; max-age=0;";
+    document.cookie = "padel_user_role=; path=/; max-age=0;";
+    setMobileMenuOpen(false);
+    setLoading(false);
+
+    router.replace("/login");
+  }, [clearProfile, router]);
+
+  // Reemplazá los dos useEffect de tu DashboardLayout por este único bloque:
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
+    let isMounted = true;
 
-        if (error || !session) {
-          window.location.href = "/";
-          return;
-        }
-
-        setCurrentUser(session.user);
-      } catch (err) {
-        console.error("Error de autenticación:", err);
-        window.location.href = "/";
-      } finally {
+    const initSession = async () => {
+      // 1. Si ya tenemos el perfil en RAM, cortamos el loader y nos quedamos.
+      if (profile) {
         setLoading(false);
+        return;
+      }
+
+      // 2. Si no lo tenemos (F5), lo vamos a buscar al backend
+      const recuperadoConExito = await fetchProfile();
+
+      if (isMounted) {
+        if (!recuperadoConExito) {
+          // 3. Si falló (token expirado o backend apagado), lo echamos limpiamente
+          handleLogout();
+        } else {
+          // 4. Si lo recuperó, sacamos el loader y mostramos el panel
+          setLoading(false);
+        }
       }
     };
 
-    checkSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_OUT" || !session) {
-        window.location.href = "/";
-      } else {
-        setCurrentUser(session?.user ?? null);
-      }
-    });
+    initSession();
 
     return () => {
-      subscription.unsubscribe();
+      isMounted = false;
     };
-  }, [supabase]);
-
-  const handleLogout = async () => {
-    try {
-      setLoading(true);
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.error("Error crítico al cerrar sesión:", err);
-    } finally {
-      // Forzamos recarga total para limpiar estado y caché
-      window.location.href = "/";
-    }
-  };
+  }, [fetchProfile, handleLogout, profile]);
 
   const menuItems = [
     { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
@@ -105,12 +98,10 @@ export default function DashboardLayout({
   ];
 
   const displayName =
-    currentUser?.user_metadata?.full_name ||
-    currentUser?.email?.split("@")[0] ||
-    "Admin";
+    profile?.nombre_completo || profile?.email?.split("@")[0] || "Admin";
 
-  // LOADER PROFESIONAL
-  if (loading) {
+  // Mantenemos el Loader si está cargando O si está a punto de expulsar por falta de perfil
+  if (loading || !profile) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-[#111111]">
         <motion.div
@@ -122,13 +113,13 @@ export default function DashboardLayout({
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="size-16 bg-padel-4 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(204,255,0,0.2)]"
+            className="size-16 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(204,255,0,0.2)] bg-brand-chartreuse"
           >
-            <span className="text-[#111] font-bold text-4xl">∞</span>
+            <Image src="/brand/LogoAccessory.svg" alt="Padel Nexus" width={40} height={40} className="object-contain" />
           </motion.div>
           <div className="w-32 h-1 bg-white/5 rounded-full overflow-hidden">
             <motion.div
-              className="h-full bg-padel-4"
+              className="h-full bg-brand-chartreuse"
               initial={{ width: "0%" }}
               animate={{ width: "100%" }}
               transition={{ duration: 1.5, ease: "easeInOut" }}
@@ -139,8 +130,6 @@ export default function DashboardLayout({
     );
   }
 
-  if (!currentUser) return null;
-
   return (
     <div className="flex h-screen bg-[#0a0a0a] text-white font-sans overflow-hidden">
       <aside
@@ -148,17 +137,15 @@ export default function DashboardLayout({
       >
         <div className="h-28 px-8 flex items-center justify-between gap-3 border-b border-white/5 md:border-none">
           <div className="flex items-center gap-3">
-            <div className="size-10 bg-padel-4 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(204,255,0,0.15)]">
-              <span className="text-[#111] font-bold text-2xl leading-none">
-                ∞
-              </span>
+            <div className="size-10 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(204,255,0,0.15)] bg-brand-chartreuse">
+              <Image src="/brand/LogoAccessory.svg" alt="Padel Nexus" width={24} height={24} className="object-contain" />
             </div>
             <div className="flex flex-col justify-center mt-1">
               <span className="text-xl tracking-tight text-white">
                 <span className="font-extrabold">padel</span>
                 <span className="font-light">nexus</span>
               </span>
-              <span className="text-[10px] text-padel-4 font-bold tracking-[0.2em] -mt-1">
+              <span className="text-[10px] text-brand-chartreuse font-bold tracking-[0.2em] -mt-1">
                 ADMIN CRM
               </span>
             </div>
@@ -181,7 +168,7 @@ export default function DashboardLayout({
                 className="block relative group"
               >
                 <motion.div
-                  className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${isActive ? "bg-padel-4 text-[#111] font-bold" : "text-gray-400 hover:bg-white/5"}`}
+                  className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${isActive ? "bg-brand-chartreuse text-[#111] font-bold" : "text-gray-400 hover:bg-white/5"}`}
                 >
                   <item.icon className="size-5" />
                   <span className="text-[14px]">{item.name}</span>
@@ -200,12 +187,13 @@ export default function DashboardLayout({
               {displayName}
             </span>
             <span className="text-[11px] text-gray-500 truncate">
-              {currentUser.email}
+              {profile.email}
             </span>
           </div>
           <button
             onClick={handleLogout}
             className="p-2.5 text-gray-500 hover:text-red-500 transition-colors rounded-xl"
+            title="Cerrar sesión"
           >
             <LogOut className="size-4" />
           </button>

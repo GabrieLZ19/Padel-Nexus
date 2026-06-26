@@ -84,4 +84,24 @@ export const TorneosService = {
     );
     return response.data;
   },
+
+  async getZonas(torneoId: string) {
+    const response = await api.get(`/torneos/${torneoId}/zonas`);
+    return response.data;
+  },
+
+  async generarZonas(torneoId: string) {
+    const response = await api.post(`/torneos/${torneoId}/generar-zonas`);
+    return response.data;
+  },
+
+  async moverPareja(payload: {
+    inscripcion_id: string;
+    grupo_origen_id: string;
+    grupo_destino_id: string;
+    motivo: string;
+  }) {
+    const response = await api.put(`/torneos/override/mover-pareja`, payload);
+    return response.data;
+  },
 };

@@ -140,13 +140,13 @@ export default function JugadoresLicenciasPage() {
             placeholder="Buscar por jugador, email o N° licencia..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-padel-5 border border-white/5 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-padel-4/50 transition-colors"
+            className="w-full pl-11 pr-4 py-3 bg-[#111111] border border-white/5 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors"
           />
         </div>
       </div>
 
       {/* TABLA PRINCIPAL */}
-      <div className="bg-padel-5 rounded-3xl border border-white/5 overflow-hidden shadow-xl">
+      <div className="bg-[#111111] rounded-3xl border border-white/5 overflow-hidden shadow-xl">
         {loading ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-225">
@@ -217,11 +217,11 @@ export default function JugadoresLicenciasPage() {
                   >
                     <td className="py-4 px-8">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-padel-1 border border-white/10 flex items-center justify-center text-gray-500 shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-brand-card border border-white/10 flex items-center justify-center text-gray-500 shrink-0">
                           <User className="size-5" />
                         </div>
                         <div>
-                          <div className="font-bold text-white group-hover:text-padel-4 transition-colors">
+                          <div className="font-bold text-white group-hover:text-brand-chartreuse transition-colors">
                             {licencia.perfiles?.nombre_completo || "Sin nombre"}
                           </div>
                           <div className="text-xs text-gray-500">
@@ -291,14 +291,14 @@ export default function JugadoresLicenciasPage() {
                       {licencia.estado === "Pendiente" ? (
                         <button
                           onClick={() => setLicenciaAVerificar(licencia)} // <-- ABRE EL MODAL
-                          className="flex items-center gap-2 bg-padel-4 hover:bg-[#b3e600] text-padel-1 px-4 py-2 rounded-lg font-bold text-sm transition-colors shadow-[0_0_15px_rgba(204,255,0,0.15)]"
+                          className="flex items-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-card px-4 py-2 rounded-lg font-bold text-sm transition-colors shadow-[0_0_15px_rgba(204,255,0,0.15)]"
                         >
                           <ShieldCheck className="size-4" /> Validar
                         </button>
                       ) : (
                         <Link
                           href={`/dashboard/jugadores/${licencia.usuario_id}`}
-                          className="text-padel-4 hover:underline font-semibold text-sm transition-all"
+                          className="text-brand-chartreuse hover:underline font-semibold text-sm transition-all"
                         >
                           Ver perfil
                         </Link>
@@ -358,7 +358,7 @@ export default function JugadoresLicenciasPage() {
               <button
                 disabled={procesando}
                 onClick={() => confirmarEstadoLicencia("Activa")}
-                className="w-full flex items-center justify-center gap-2 py-3.5 bg-padel-4 text-black font-bold rounded-xl hover:bg-[#b3e600] transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-brand-chartreuse text-black font-bold rounded-xl hover:bg-[#b3e600] transition-colors disabled:opacity-50"
               >
                 {procesando ? (
                   "Procesando..."

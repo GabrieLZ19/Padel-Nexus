@@ -26,7 +26,8 @@ import FeedbackModal, {
 import InscripcionDetalleModal from "../../../components/inscripciones/InscripcionDetalleModal";
 import CustomDropdown from "../../../components/ui/CustomDropdown";
 import Pagination from "../../../components/ui/Pagination";
-import { TorneosService } from "@/utils/services";
+import { TorneosService, PagosService } from "@/utils/services";
+import { FAP_ESTADOS_PAGO } from "@/utils/constants/fap";
 
 const TABS = ["Todas", "Pendientes", "Confirmadas", "Rechazadas"];
 
@@ -84,58 +85,111 @@ export default function GestionInscripcionesPage() {
   const handleCambiarEstado = (
     id: string,
     nuevoEstado: "Confirmado" | "Rechazado",
+    montoDefecto?: number,
   ) => {
     const accion = nuevoEstado === "Confirmado" ? "aprobar" : "rechazar";
 
-    setFeedbackModal({
-      isOpen: true,
-      type: nuevoEstado === "Confirmado" ? "info" : "danger",
-      title: `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} pago?`,
-      description: `Estás a punto de ${accion} esta inscripción. El cambio se reflejará inmediatamente en el estado del torneo.`,
-      confirmText: `Sí, ${accion}`,
-      cancelText: "Cancelar",
-      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
-      onConfirm: () => {
-        setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+    if (nuevoEstado === "Confirmado") {
+      // Mostrar popover manual de pago con método y monto
+      setFeedbackModal({
+        isOpen: true,
+        type: "info",
+        title: `Confirmar Pago Manual`,
+        description: `Ingresa el monto cobrado y el método de pago para la inscripción.`,
+        confirmText: `Confirmar Pago`,
+        cancelText: "Cancelar",
+        showInput: true,
+        inputPlaceholder: `Monto (Ej: ${montoDefecto || 0})`,
+        inputType: "number",
+        showSelect: true,
+        selectOptions: [
+          { value: "Efectivo", label: "Efectivo" },
+          { value: "Transferencia", label: "Transferencia" },
+          { value: "Mercado Pago", label: "Mercado Pago" },
+        ],
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        onConfirm: async (montoIngresado?: string, metodoPago?: string) => {
+          const monto = Number(montoIngresado) || montoDefecto || 0;
+          if (monto <= 0) return; // Prevent empty
 
-        InscripcionesService.updateEstado(id, nuevoEstado)
-          .then(() => {
+          setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+          try {
+            await PagosService.confirmarPagoManual({
+              entidad_tipo: "inscripcion",
+              entidad_id: id,
+              monto: monto,
+              metodo_pago: metodoPago || "Efectivo",
+            });
             setFeedbackModal({
               isOpen: true,
               type: "success",
-              title: "Estado actualizado",
-              description: `La inscripción ahora figura como ${nuevoEstado}.`,
-              onClose: () =>
-                setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+              title: "Pago Confirmado",
+              description: `El pago ha sido registrado y la inscripción está confirmada.`,
+              onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
             });
             setRefreshKey((prev) => prev + 1);
-          })
-          .catch((error: unknown) => {
-            let mensajeError =
-              "Ocurrió un error inesperado al procesar la solicitud.";
-            if (error instanceof Error) {
-              mensajeError = error.message;
-            }
-
-            interface ApiError {
-              response?: { data?: { message?: string } };
-            }
-            const apiError = error as ApiError;
-            if (apiError.response?.data?.message) {
-              mensajeError = apiError.response.data.message;
-            }
-
+          } catch (error: any) {
             setFeedbackModal({
               isOpen: true,
-              type: "warning",
-              title: "Hubo un problema",
-              description: "No pudimos actualizar el estado: " + mensajeError,
-              onClose: () =>
-                setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+              type: "danger",
+              title: "Error al procesar pago",
+              description: error.message || "Error al registrar el pago manual.",
+              onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
             });
-          });
-      },
-    });
+          }
+        },
+      });
+    } else {
+      setFeedbackModal({
+        isOpen: true,
+        type: "danger",
+        title: `¿Rechazar inscripción?`,
+        description: `Estás a punto de rechazar esta inscripción.`,
+        confirmText: `Sí, rechazar`,
+        cancelText: "Cancelar",
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        onConfirm: () => {
+          setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+
+          InscripcionesService.updateEstado(id, nuevoEstado)
+            .then(() => {
+              setFeedbackModal({
+                isOpen: true,
+                type: "success",
+                title: "Estado actualizado",
+                description: `La inscripción ahora figura como ${nuevoEstado}.`,
+                onClose: () =>
+                  setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+              });
+              setRefreshKey((prev) => prev + 1);
+            })
+            .catch((error: unknown) => {
+              let mensajeError =
+                "Ocurrió un error inesperado al procesar la solicitud.";
+              if (error instanceof Error) {
+                mensajeError = error.message;
+              }
+
+              interface ApiError {
+                response?: { data?: { message?: string } };
+              }
+              const apiError = error as ApiError;
+              if (apiError.response?.data?.message) {
+                mensajeError = apiError.response.data.message;
+              }
+
+              setFeedbackModal({
+                isOpen: true,
+                type: "warning",
+                title: "Hubo un problema",
+                description: "No pudimos actualizar el estado: " + mensajeError,
+                onClose: () =>
+                  setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+              });
+            });
+        },
+      });
+    }
   };
 
   const handleOpenDetalle = (inscripcion: Inscripcion) => {
@@ -160,25 +214,25 @@ export default function GestionInscripcionesPage() {
 
     const matchTab =
       activeTab === "Todas" ||
-      (activeTab === "Pendientes" && i.estado_pago === "Pendiente") ||
-      (activeTab === "Confirmadas" && i.estado_pago === "Confirmado") ||
-      (activeTab === "Rechazadas" && i.estado_pago === "Rechazado");
+      (activeTab === "Pendientes" && i.estado_pago === FAP_ESTADOS_PAGO.PENDIENTE) ||
+      (activeTab === "Confirmadas" && i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO) ||
+      (activeTab === "Rechazadas" && i.estado_pago === FAP_ESTADOS_PAGO.RECHAZADO);
 
     return matchSearch && matchTab;
   });
 
   // --- CÁLCULO DE MÉTRICAS REALES ---
   const kpiPendientes = inscripciones.filter(
-    (i) => i.estado_pago === "Pendiente",
+    (i) => i.estado_pago === FAP_ESTADOS_PAGO.PENDIENTE,
   ).length;
   const kpiConfirmadas = inscripciones.filter(
-    (i) => i.estado_pago === "Confirmado",
+    (i) => i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO,
   ).length;
   const kpiRechazadas = inscripciones.filter(
-    (i) => i.estado_pago === "Rechazado",
+    (i) => i.estado_pago === FAP_ESTADOS_PAGO.RECHAZADO,
   ).length;
   const recaudacionTotal = inscripciones
-    .filter((i) => i.estado_pago === "Confirmado")
+    .filter((i) => i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO)
     .reduce((acc, curr) => acc + Number(curr.monto || 0), 0);
 
   const formatMoney = (amount: number) => {
@@ -291,10 +345,10 @@ export default function GestionInscripcionesPage() {
           </div>
         </div>
 
-        <div className="bg-[#111111] border border-white/5 rounded-2xl p-6 relative overflow-hidden group hover:border-padel-4/30 transition-all">
-          <div className="absolute -right-8 -top-8 w-32 h-32 bg-padel-4/10 rounded-full blur-3xl group-hover:bg-padel-4/20 transition-all"></div>
-          <TrendingUp className="size-6 text-padel-4 mb-4 opacity-80" />
-          <div className="text-4xl font-black text-padel-4 leading-none mb-2">
+        <div className="bg-[#111111] border border-white/5 rounded-2xl p-6 relative overflow-hidden group hover:border-brand-chartreuse/30 transition-all">
+          <div className="absolute -right-8 -top-8 w-32 h-32 bg-brand-chartreuse/10 rounded-full blur-3xl group-hover:bg-brand-chartreuse/20 transition-all"></div>
+          <TrendingUp className="size-6 text-brand-chartreuse mb-4 opacity-80" />
+          <div className="text-4xl font-black text-brand-chartreuse leading-none mb-2">
             {formatMoney(recaudacionTotal)}
           </div>
           <div className="text-sm font-medium text-gray-400">
@@ -328,7 +382,7 @@ export default function GestionInscripcionesPage() {
               onClick={() => setActiveTab(tab)}
               className={`whitespace-nowrap rounded-lg px-5 py-2 text-sm font-bold transition-all ${
                 activeTab === tab
-                  ? "bg-padel-4 text-[#111] shadow-[0_0_10px_rgba(204,255,0,0.15)]"
+                  ? "bg-brand-chartreuse text-[#111] shadow-[0_0_10px_rgba(204,255,0,0.15)]"
                   : "text-gray-400 hover:text-white"
               }`}
             >
@@ -344,7 +398,7 @@ export default function GestionInscripcionesPage() {
             placeholder="Buscar dupla o torneo..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 bg-[#111111] rounded-xl border border-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-padel-4/50 transition-colors"
+            className="w-full pl-11 pr-4 py-2.5 bg-[#111111] rounded-xl border border-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors"
           />
         </div>
       </div>
@@ -419,7 +473,7 @@ export default function GestionInscripcionesPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-250">
+            <table className="w-full text-left border-collapse min-w-[900px]">
               <thead>
                 <tr className="border-b border-white/5 text-gray-400 text-xs font-bold uppercase tracking-wider bg-black/20">
                   <th className="py-4 px-8">Jugador / Dupla</th>
@@ -445,9 +499,9 @@ export default function GestionInscripcionesPage() {
                       <td className="py-4 px-8">
                         <div className="flex items-center gap-3 mb-1">
                           {esDupla ? (
-                            <Users className="size-4 text-padel-4" />
+                            <Users className="size-4 text-brand-chartreuse" />
                           ) : (
-                            <User className="size-4 text-padel-4" />
+                            <User className="size-4 text-brand-chartreuse" />
                           )}
                           <div>
                             <div className="font-bold text-white text-[14px]">
@@ -517,13 +571,14 @@ export default function GestionInscripcionesPage() {
 
                       <td className="py-4 px-8 text-right">
                         <div className="flex flex-wrap justify-end gap-2">
-                          {ins.estado_pago === "Pendiente" ? (
+                          {ins.estado_pago === FAP_ESTADOS_PAGO.PENDIENTE ? (
                             <>
                               <button
                                 onClick={() =>
                                   handleCambiarEstado(
                                     String(ins.id),
-                                    "Confirmado",
+                                    FAP_ESTADOS_PAGO.CONFIRMADO,
+                                    Number(ins.monto || 0),
                                   )
                                 }
                                 className="p-2.5 bg-green-500/10 hover:bg-green-500/20 text-[#00ff88] rounded-xl transition-all border border-green-500/20"
@@ -535,7 +590,7 @@ export default function GestionInscripcionesPage() {
                                 onClick={() =>
                                   handleCambiarEstado(
                                     String(ins.id),
-                                    "Rechazado",
+                                    FAP_ESTADOS_PAGO.RECHAZADO,
                                   )
                                 }
                                 className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-[#ff4444] rounded-xl transition-all border border-red-500/20"
@@ -547,7 +602,7 @@ export default function GestionInscripcionesPage() {
                           ) : (
                             <button
                               onClick={() => handleOpenDetalle(ins)}
-                              className="flex items-center gap-1 text-gray-400 hover:text-padel-4 font-semibold text-[13px] transition-colors"
+                              className="flex items-center gap-1 text-gray-400 hover:text-brand-chartreuse font-semibold text-[13px] transition-colors"
                             >
                               Detalles <ChevronRight className="size-4" />
                             </button>

@@ -187,7 +187,7 @@ export default function GestionClubesPage() {
 
         <button
           onClick={handleOpenCreate}
-          className="flex items-center gap-2 bg-padel-4 hover:bg-[#b3e600] text-padel-1 px-5 py-3 rounded-xl font-bold text-sm transition-all shadow-[0_0_20px_rgba(204,255,0,0.15)]"
+          className="flex items-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-card px-5 py-3 rounded-xl font-bold text-sm transition-all shadow-[0_0_20px_rgba(204,255,0,0.15)]"
         >
           <Plus className="size-5" /> Agregar club
         </button>
@@ -199,12 +199,12 @@ export default function GestionClubesPage() {
           {[...Array(6)].map((_, i) => (
             <div
               key={i}
-              className="bg-padel-5 rounded-2xl border border-white/5 p-6 h-56"
+              className="bg-[#111111] rounded-2xl border border-white/5 p-6 h-56"
             ></div>
           ))}
         </div>
       ) : clubes.length === 0 ? (
-        <div className="w-full py-24 text-center border border-dashed border-white/10 rounded-3xl bg-padel-5/20 flex flex-col items-center">
+        <div className="w-full py-24 text-center border border-dashed border-white/10 rounded-3xl bg-[#111111]/50 flex flex-col items-center">
           <Building2 className="size-12 text-gray-600 mb-4" />
           <h3 className="text-xl font-bold text-white mb-2">
             No hay clubes registrados
@@ -215,10 +215,10 @@ export default function GestionClubesPage() {
           {clubes.map((club) => (
             <div
               key={club.id}
-              className="bg-padel-5 rounded-2xl border border-white/5 p-6 flex flex-col justify-between hover:border-white/10 transition-colors"
+              className="bg-[#111111] rounded-2xl border border-white/5 p-6 flex flex-col justify-between hover:border-white/10 transition-colors"
             >
               <div className="flex gap-4 items-start">
-                <div className="w-14 h-14 rounded-xl bg-padel-4/10 border border-padel-4/20 text-padel-4 flex items-center justify-center shrink-0">
+                <div className="w-14 h-14 rounded-xl bg-brand-chartreuse/10 border border-brand-chartreuse/20 text-brand-chartreuse flex items-center justify-center shrink-0">
                   <Building2 className="size-7" />
                 </div>
                 <div>
@@ -227,7 +227,7 @@ export default function GestionClubesPage() {
                       {club.nombre}
                     </h3>
                     {club.estado === "Activo" && (
-                      <CheckCircle2 className="size-4 text-padel-4" />
+                      <CheckCircle2 className="size-4 text-brand-chartreuse" />
                     )}
                   </div>
                   <div className="flex items-center gap-1 text-sm text-gray-400">
@@ -281,7 +281,7 @@ export default function GestionClubesPage() {
                 </div>
                 <button
                   onClick={() => handleOpenEdit(club)}
-                  className="text-padel-4 hover:bg-padel-4/10 px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors"
+                  className="text-brand-chartreuse hover:bg-brand-chartreuse/10 px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors"
                 >
                   Gestionar
                 </button>

@@ -70,7 +70,7 @@ export default function ClubModal({
                 </label>
                 <input
                   placeholder="Ej: Padel Center"
-                  className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
+                  className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
                   value={formData.nombre}
                   onChange={(e) =>
                     setFormData({ ...formData, nombre: e.target.value })
@@ -99,7 +99,7 @@ export default function ClubModal({
                   </label>
                   <input
                     placeholder="Ciudad / Barrio"
-                    className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
+                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
                     value={formData.localidad}
                     onChange={(e) =>
                       setFormData({ ...formData, localidad: e.target.value })
@@ -117,7 +117,7 @@ export default function ClubModal({
                   <input
                     type="number"
                     min="1"
-                    className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
+                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
                     value={formData.canchas || ""}
                     onChange={(e) =>
                       setFormData({
@@ -157,7 +157,7 @@ export default function ClubModal({
                 <button
                   disabled={isSaving || !formData.nombre || !formData.localidad}
                   onClick={onSave}
-                  className="flex-2 w-full bg-padel-4 disabled:bg-padel-2 disabled:text-gray-500 text-padel-1 font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(204,255,0,0.15)]"
+                  className="flex-2 w-full bg-brand-chartreuse disabled:bg-white/5 disabled:text-gray-500 text-brand-card font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(204,255,0,0.15)]"
                 >
                   {isSaving ? (
                     "Procesando..."

@@ -78,7 +78,7 @@ export default function PerfilJugadorAdminPage() {
         <p className="text-gray-500 mb-4">No se encontró el jugador.</p>
         <button
           onClick={() => router.back()}
-          className="text-padel-4 hover:underline font-medium"
+          className="text-brand-chartreuse hover:underline font-medium"
         >
           Volver al listado
         </button>
@@ -100,7 +100,7 @@ export default function PerfilJugadorAdminPage() {
 
       {/* Tarjeta Principal del Perfil */}
       <div className="bg-[#161616] rounded-3xl border border-white/5 overflow-hidden shadow-2xl">
-        <div className="h-32 bg-linear-to-r from-padel-4/10 to-transparent border-b border-white/5 relative">
+        <div className="h-32 bg-linear-to-r from-brand-chartreuse/10 to-transparent border-b border-white/5 relative">
           {/* Foto de Perfil (Izquierda) */}
           <div className="absolute -bottom-10 left-8">
             <div className="w-24 h-24 rounded-full bg-[#1a1a1a] border-4 border-[#161616] flex items-center justify-center text-gray-500 shadow-lg">
@@ -180,7 +180,7 @@ export default function PerfilJugadorAdminPage() {
                     <span
                       className={`font-bold text-sm ${
                         licencia.estado === "Activa"
-                          ? "text-padel-4"
+                          ? "text-brand-chartreuse"
                           : licencia.estado === "Pendiente"
                             ? "text-yellow-500"
                             : "text-red-500"

@@ -66,11 +66,18 @@ export const PerfilService = {
    * Despacha credenciales al backend para autenticación centralizada
    */
   async loginConEmail(email: string, password: string): Promise<AuthResponse> {
-    const response = await api.post<AuthResponse>("/perfil/login", {
-      email,
-      password,
-    });
-    return response.data;
+    const response = await api.post<{ exito: boolean; data: AuthResponse }>(
+      "/perfil/login",
+      {
+        email,
+        password,
+      },
+    );
+
+    return {
+      ...response.data.data,
+      exito: response.data.exito,
+    };
   },
 
   /**

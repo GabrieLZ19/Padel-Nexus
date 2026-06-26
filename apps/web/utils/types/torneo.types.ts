@@ -41,9 +41,12 @@ export interface Inscripcion {
   jugador1_nombre?: string | null;
   jugador2_nombre?: string | null;
   monto: number;
-  estado_pago: "Pendiente" | "Completado" | "Rechazado";
+  estado_pago: "Pendiente" | "Confirmado" | "Rechazado";
   tipo: string;
   letra_prioridad?: string | null;
+  torneo_nombre?: string;
+  cancha_nombre?: string;
+  categoria?: string;
 }
 
 export interface Partido {
@@ -91,4 +94,9 @@ export interface FormTorneoState {
   premio_1?: string;
   premio_2?: string;
   premio_3?: string;
+  premios?: {
+    uno?: string;
+    dos?: string;
+    tres?: string;
+  };
 }

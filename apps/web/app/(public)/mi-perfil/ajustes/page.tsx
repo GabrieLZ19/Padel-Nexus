@@ -116,6 +116,7 @@ export default function ProfileSettings() {
                   onChange={(e) =>
                     setProfile({ ...profile, dni: e.target.value })
                   }
+                  required
                 />
               </div>
             </div>
@@ -148,6 +149,7 @@ export default function ProfileSettings() {
                   onChange={(e) =>
                     setProfile({ ...profile, lugar_residencia: e.target.value })
                   }
+                  required
                 />
               </div>
             </div>

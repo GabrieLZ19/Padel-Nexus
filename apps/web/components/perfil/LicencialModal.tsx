@@ -175,7 +175,7 @@ export default function LicenciaModal({
                 placeholder="Ej: 35123456"
                 required
                 minLength={7}
-                className="w-full bg-padel-1 p-3.5 rounded-xl border border-white/5 text-white focus:border-padel-4 transition-all outline-none"
+                className="w-full bg-brand-card p-3.5 rounded-xl border border-white/5 text-white focus:border-brand-chartreuse transition-all outline-none"
               />
             </div>
 
@@ -226,7 +226,7 @@ export default function LicenciaModal({
               <button
                 type="submit"
                 disabled={loading || !selectedClub || dni.length < 7}
-                className="flex-1 py-3.5 bg-padel-4 text-black font-bold rounded-xl disabled:bg-padel-2 disabled:text-gray-500 hover:bg-[#b3e600] transition-colors flex justify-center"
+                className="flex-1 py-3.5 bg-brand-chartreuse text-black font-bold rounded-xl disabled:bg-white/5 disabled:text-gray-500 hover:bg-[#b3e600] transition-colors flex justify-center"
               >
                 {loading ? "Procesando..." : "Solicitar Alta"}
               </button>

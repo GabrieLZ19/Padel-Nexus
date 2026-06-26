@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ShieldCheck, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import { PerfilService } from "@/utils/services/perfil";
+import { getSupabaseBrowserClient } from "@/utils/supabase/client";
 
 type AuthStatus = "loading" | "success" | "error";
 
@@ -20,20 +21,33 @@ export default function OAuthCallbackPage() {
     const procesarHash = async () => {
       if (typeof window === "undefined") return;
 
+      const supabase = getSupabaseBrowserClient();
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get("code");
       const hash = window.location.hash;
-      if (!hash) {
-        setStatus("error");
-        setMensaje("No se encontraron credenciales de autenticación.");
-        setTimeout(() => router.push("/login"), 2500);
-        return;
-      }
 
-      const params = new URLSearchParams(hash.substring(1));
-      const accessToken = params.get("access_token");
+      let accessToken: string | null = null;
+
+      if (code) {
+        const { data, error } =
+          await supabase.auth.exchangeCodeForSession(code);
+
+        if (error || !data.session) {
+          setStatus("error");
+          setMensaje("No se pudo intercambiar el código de Google.");
+          setTimeout(() => router.push("/login?error=oauth_failed"), 2500);
+          return;
+        }
+
+        accessToken = data.session.access_token;
+      } else if (hash) {
+        const params = new URLSearchParams(hash.substring(1));
+        accessToken = params.get("access_token");
+      }
 
       if (!accessToken) {
         setStatus("error");
-        setMensaje("El token de acceso de Google no está presente.");
+        setMensaje("No se encontraron credenciales de autenticación.");
         setTimeout(() => router.push("/login"), 2500);
         return;
       }

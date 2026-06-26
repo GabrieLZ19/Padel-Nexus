@@ -60,7 +60,7 @@ export default function Pagination({
               onClick={() => onPageChange(pageNumber)}
               className={`min-w-10 px-3 py-2 rounded-full text-sm font-semibold transition-colors ${
                 pageNumber === page
-                  ? "bg-padel-4 text-[#111]"
+                  ? "bg-brand-chartreuse text-[#111]"
                   : "bg-white/5 text-gray-300 hover:bg-white/10"
               }`}
             >

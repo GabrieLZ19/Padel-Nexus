@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { esRolAdministrativo } from "@/utils/auth/roles";
 
 export function middleware(request: NextRequest) {
   const token = request.cookies.get("padel_token")?.value;
@@ -9,10 +10,7 @@ export function middleware(request: NextRequest) {
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/signup");
-  const isAdminOrMod =
-    userRole === "superadmin" ||
-    userRole === "admin_federacion" ||
-    userRole === "admin_provincial";
+  const isAdminOrMod = esRolAdministrativo(userRole);
 
   // --- REGLAS DE ACCESO BASADAS EN COOKIES DE API ---
 

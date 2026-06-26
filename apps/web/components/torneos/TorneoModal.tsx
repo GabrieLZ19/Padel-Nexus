@@ -105,7 +105,7 @@ export default function TorneoModal({
                   </label>
                   <input
                     placeholder="Ej: Master Series BA"
-                    className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
+                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
                     value={formData.nombre}
                     onChange={(e) =>
                       setFormData({ ...formData, nombre: e.target.value })
@@ -119,7 +119,7 @@ export default function TorneoModal({
                   <input
                     type="date"
                     min={minDate}
-                    className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors scheme-dark"
+                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors scheme-dark"
                     value={fechaFormulario}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -158,7 +158,7 @@ export default function TorneoModal({
                   <label className="flex items-center justify-between text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
                     <span>Estado de publicación</span>
                     {isAutoManaged && (
-                      <span className="flex items-center gap-1 text-padel-4">
+                      <span className="flex items-center gap-1 text-brand-chartreuse">
                         <Lock className="size-3" /> Auto
                       </span>
                     )}
@@ -268,7 +268,7 @@ export default function TorneoModal({
                   <input
                     type="text"
                     placeholder="Ej: 24000"
-                    className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-semibold"
+                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-semibold"
                     value={formData.precio_inscripcion ?? ""}
                     onChange={(e) => {
                       const soloNumeros = e.target.value.replace(/[^0-9]/g, "");
@@ -300,7 +300,7 @@ export default function TorneoModal({
                     <input
                       type="text"
                       placeholder="Ej: $180.000 + Trofeo"
-                      className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
+                      className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
                       value={formData.premio_1 || ""}
                       onChange={(e) =>
                         setFormData({ ...formData, premio_1: e.target.value })
@@ -320,7 +320,7 @@ export default function TorneoModal({
                     <input
                       type="text"
                       placeholder="Ej: $80.000 + Medalla"
-                      className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
+                      className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
                       value={formData.premio_2 || ""}
                       onChange={(e) =>
                         setFormData({ ...formData, premio_2: e.target.value })
@@ -340,7 +340,7 @@ export default function TorneoModal({
                     <input
                       type="text"
                       placeholder="Ej: Inscripción gratis"
-                      className="w-full bg-padel-1 p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
+                      className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
                       value={formData.premio_3 || ""}
                       onChange={(e) =>
                         setFormData({ ...formData, premio_3: e.target.value })
@@ -353,7 +353,7 @@ export default function TorneoModal({
               <button
                 disabled={isSaving || !formData.nombre}
                 onClick={onSave}
-                className="w-full bg-[#212b06] disabled:opacity-50 border border-padel-4/10 hover:border-padel-4/30 hover:bg-[#2c3a08] text-padel-4 font-bold py-4 rounded-xl mt-4 flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(204,255,0,0.05)]"
+                className="w-full bg-[#212b06] disabled:opacity-50 border border-brand-chartreuse/10 hover:border-brand-chartreuse/30 hover:bg-[#2c3a08] text-brand-chartreuse font-bold py-4 rounded-xl mt-4 flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(204,255,0,0.05)]"
               >
                 {isSaving ? (
                   "Procesando..."

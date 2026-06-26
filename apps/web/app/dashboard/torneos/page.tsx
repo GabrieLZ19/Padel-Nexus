@@ -226,7 +226,7 @@ export default function TorneosPage() {
         </div>
         <button
           onClick={handleOpenCreate}
-          className="inline-flex items-center gap-2 bg-padel-4 hover:bg-[#b3e600] text-padel-1 px-5 py-2.5 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(204,255,0,0.15)] text-sm"
+          className="inline-flex items-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-card px-5 py-2.5 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(204,255,0,0.15)] text-sm"
         >
           <Plus className="size-5" /> Nuevo torneo
         </button>
@@ -244,7 +244,7 @@ export default function TorneosPage() {
               }}
               className={`whitespace-nowrap rounded-lg px-5 py-2 text-sm font-bold transition-all ${
                 activeTab === tab
-                  ? "bg-padel-4 text-padel-1 shadow-[0_0_10px_rgba(204,255,0,0.15)]"
+                  ? "bg-brand-chartreuse text-brand-card shadow-[0_0_10px_rgba(204,255,0,0.15)]"
                   : "text-gray-400 hover:text-white"
               }`}
             >
@@ -263,13 +263,13 @@ export default function TorneosPage() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="w-full pl-11 pr-4 py-2.5 bg-[#111111] rounded-xl border border-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-padel-4/50 transition-colors"
+            className="w-full pl-11 pr-4 py-2.5 bg-[#111111] rounded-xl border border-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors"
           />
         </div>
       </div>
 
       {/* TABLA DE RESULTADOS */}
-      <div className="bg-padel-5 rounded-3xl border border-white/5 overflow-hidden shadow-xl">
+      <div className="bg-[#111111] rounded-3xl border border-white/5 overflow-hidden shadow-xl">
         {loading ? (
           /* SKELETON LOADER PREMIUM */
           <div className="overflow-x-auto">
@@ -355,7 +355,7 @@ export default function TorneosPage() {
                       className="hover:bg-white/2 transition-colors group"
                     >
                       <td className="py-4 px-8">
-                        <div className="font-bold text-white group-hover:text-padel-4 transition-colors text-[15px]">
+                        <div className="font-bold text-white group-hover:text-brand-chartreuse transition-colors text-[15px]">
                           {t.nombre}
                         </div>
                         <div className="text-[13px] text-gray-500 mt-0.5 font-medium">
@@ -427,7 +427,7 @@ export default function TorneosPage() {
                             onClick={() =>
                               router.push(`/dashboard/torneos/${t.id}`)
                             }
-                            className="p-2 bg-padel-4/10 hover:bg-padel-4/20 text-padel-4 border border-transparent hover:border-padel-4/30 rounded-lg transition-colors"
+                            className="p-2 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-transparent hover:border-brand-chartreuse/30 rounded-lg transition-colors"
                             title="Centro de Control (Cuadros y Llaves)"
                           >
                             <LayoutDashboard className="size-4" />

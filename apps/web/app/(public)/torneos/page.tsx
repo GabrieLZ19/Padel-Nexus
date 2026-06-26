@@ -13,8 +13,8 @@ import {
   Filter,
   Users,
 } from "lucide-react";
-import { TorneosService } from "../../../utils/services/torneos";
-import { Torneo } from "../../../utils/types";
+import { TorneosService } from "@/utils/services/torneos";
+import { Torneo } from "@/utils/types";
 import { useProfileStore } from "@/store/useProfileStore";
 
 function TorneosContent() {
@@ -96,14 +96,14 @@ function TorneosContent() {
     {
       id: "Inscripción",
       label: "Inscripciones Abiertas",
-      color: "bg-[#00ff88]",
-      shadow: "shadow-[0_0_8px_rgba(0,255,136,0.6)]",
+      color: "bg-emerald-500",
+      shadow: "shadow-[0_0_10px_rgba(16,185,129,0.4)]",
     },
     {
       id: "En curso",
       label: "En Curso",
-      color: "bg-[#ffb800]",
-      shadow: "shadow-[0_0_8px_rgba(255,184,0,0.6)]",
+      color: "bg-amber-500",
+      shadow: "shadow-[0_0_10px_rgba(245,158,11,0.4)]",
     },
     {
       id: "Finalizado",
@@ -154,7 +154,6 @@ function TorneosContent() {
 
   const formatFecha = (fechaVal?: string | number | null) => {
     if (!fechaVal) return "Fecha a confirmar";
-    // FIX del UTC Midnight Bug (igual que hicimos antes)
     const fechaLimpia = String(fechaVal).split("T")[0];
     return new Date(`${fechaLimpia}T12:00:00`).toLocaleDateString("es-AR", {
       weekday: "short",
@@ -164,19 +163,19 @@ function TorneosContent() {
   };
 
   return (
-    <div className="min-h-screen bg-padel-1 text-white font-sans selection:bg-padel-4 selection:text-padel-1 flex flex-col pt-20">
-      <div className="flex flex-1 max-w-[1600px] w-full mx-auto relative">
+    <div className="min-h-screen bg-brand-black text-brand-white font-sans selection:bg-brand-chartreuse selection:text-brand-black flex flex-col pt-10">
+      <div className="flex flex-1 max-w-[1600px] w-full mx-auto relative px-4 md:px-6">
         {/* OVERLAY PARA MÓVIL */}
         {isMobileFiltersOpen && (
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+            className="fixed inset-0 bg-brand-black/60 backdrop-blur-sm z-40 lg:hidden"
             onClick={() => setIsMobileFiltersOpen(false)}
           />
         )}
 
         {/* SIDEBAR DE FILTROS */}
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-72 bg-[#161616] border-r border-white/5 p-8 space-y-8 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:w-72 lg:bg-transparent overflow-y-auto ${
+          className={`fixed inset-y-0 left-0 z-50 w-72 bg-brand-card border-r border-brand-white/5 p-8 space-y-8 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:w-72 lg:bg-transparent overflow-y-auto ${
             isMobileFiltersOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -185,13 +184,13 @@ function TorneosContent() {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleClearFilters}
-                className="text-padel-4 text-xs font-semibold hover:underline"
+                className="text-brand-chartreuse text-xs font-semibold hover:underline cursor-pointer"
               >
                 Limpiar
               </button>
               <button
                 onClick={() => setIsMobileFiltersOpen(false)}
-                className="lg:hidden text-gray-400 hover:text-white"
+                className="lg:hidden text-gray-400 hover:text-brand-white cursor-pointer"
               >
                 <X className="size-5" />
               </button>
@@ -205,7 +204,7 @@ function TorneosContent() {
               placeholder="Buscar torneo o club..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:border-padel-4 focus:outline-none transition-colors"
+              className="w-full pl-9 pr-3 py-2.5 bg-brand-input border border-brand-white/5 rounded-xl text-sm text-brand-white placeholder-gray-500 focus:border-brand-chartreuse focus:outline-none transition-colors"
             />
           </div>
 
@@ -225,14 +224,14 @@ function TorneosContent() {
                     }
                   >
                     <div
-                      className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${activeProvincia === prov ? "border-padel-4 bg-padel-4" : "border-white/20 group-hover:border-padel-4"}`}
+                      className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${activeProvincia === prov ? "border-brand-chartreuse bg-brand-chartreuse" : "border-brand-white/20 group-hover:border-brand-chartreuse"}`}
                     >
                       {activeProvincia === prov && (
-                        <div className="w-2.5 h-2.5 bg-padel-1 rounded-sm"></div>
+                        <div className="w-2.5 h-2.5 bg-brand-black rounded-xs"></div>
                       )}
                     </div>
                     <span
-                      className={`text-sm font-medium transition-colors ${activeProvincia === prov ? "text-white" : "text-gray-400 group-hover:text-white"}`}
+                      className={`text-sm font-medium transition-colors ${activeProvincia === prov ? "text-brand-white" : "text-gray-400 group-hover:text-brand-white"}`}
                     >
                       {prov}
                     </span>
@@ -255,10 +254,10 @@ function TorneosContent() {
                     onClick={() =>
                       setActiveCategory(activeCategory === cat ? null : cat)
                     }
-                    className={`px-4 h-10 rounded-xl text-sm font-bold transition-all border ${
+                    className={`px-4 h-10 rounded-xl text-sm font-bold transition-all border cursor-pointer ${
                       activeCategory === cat
-                        ? "bg-padel-4 border-padel-4 text-padel-1 shadow-[0_0_15px_rgba(204,255,0,0.2)]"
-                        : "border-white/10 text-gray-400 hover:border-padel-4/50 hover:text-white bg-white/5"
+                        ? "bg-brand-chartreuse border-brand-chartreuse text-brand-black shadow-[0_0_15px_rgba(203,254,1,0.2)]"
+                        : "border-brand-white/10 text-gray-400 hover:border-brand-chartreuse hover:text-brand-white bg-brand-input"
                     }`}
                   >
                     {cat}
@@ -283,14 +282,14 @@ function TorneosContent() {
                   }
                 >
                   <div
-                    className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${activeStatus === est.id ? "border-padel-4" : "border-white/20 group-hover:border-padel-4/50"}`}
+                    className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${activeStatus === est.id ? "border-brand-chartreuse" : "border-brand-white/20 group-hover:border-brand-chartreuse/50"}`}
                   >
                     {activeStatus === est.id && (
-                      <div className="w-2.5 h-2.5 rounded-full bg-padel-4"></div>
+                      <div className="w-2.5 h-2.5 rounded-full bg-brand-chartreuse"></div>
                     )}
                   </div>
                   <span
-                    className={`text-sm flex items-center gap-2 ${activeStatus === est.id ? "text-white" : "text-gray-400"}`}
+                    className={`text-sm flex items-center gap-2 ${activeStatus === est.id ? "text-brand-white" : "text-gray-400"}`}
                   >
                     <span
                       className={`w-2 h-2 rounded-full ${est.color} ${activeStatus === est.id ? est.shadow : ""}`}
@@ -314,10 +313,10 @@ function TorneosContent() {
                   onClick={() =>
                     setActiveModalidad(activeModalidad === mod ? null : mod)
                   }
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
                     activeModalidad === mod
-                      ? "bg-padel-4 text-padel-1"
-                      : "bg-white/5 text-gray-400 hover:text-white"
+                      ? "bg-brand-chartreuse border-brand-chartreuse text-brand-black"
+                      : "bg-brand-input border-brand-white/5 text-gray-400 hover:text-brand-white"
                   }`}
                 >
                   {mod}
@@ -328,10 +327,10 @@ function TorneosContent() {
         </aside>
 
         {/* GRILLA PRINCIPAL */}
-        <main className="flex-1 p-6 lg:p-10 w-full overflow-x-hidden">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+        <main className="flex-1 lg:pl-10 w-full overflow-x-hidden pb-20">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-[32px] md:text-[40px] font-bold leading-tight tracking-tight">
+              <h1 className="text-[32px] md:text-[40px] font-extrabold leading-tight tracking-tight">
                 Explorá torneos
               </h1>
               <p className="text-gray-400 mt-1 md:mt-2 text-sm md:text-base">
@@ -341,18 +340,18 @@ function TorneosContent() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
+            <div className="flex items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0">
               <button
                 onClick={() => setIsMobileFiltersOpen(true)}
-                className="lg:hidden flex-1 flex justify-center items-center gap-2 px-4 py-3 rounded-xl border border-white/10 text-sm font-medium hover:bg-white/5 transition-colors bg-[#161616]"
+                className="lg:hidden flex-1 flex justify-center items-center gap-2 px-4 py-3 rounded-xl border border-brand-white/10 text-sm font-medium hover:bg-brand-white/5 transition-colors bg-brand-card cursor-pointer"
               >
                 <Filter className="size-4" /> Filtros
               </button>
 
-              <div className="relative flex-1 md:flex-none" ref={dropdownRef}>
+              <div className="relative flex-1 sm:flex-none" ref={dropdownRef}>
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-white/10 text-sm font-medium hover:bg-white/5 transition-colors bg-[#161616]"
+                  className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-brand-white/10 text-sm font-medium hover:bg-brand-white/5 transition-colors bg-brand-card cursor-pointer"
                 >
                   {sortBy === "recientes"
                     ? "Más recientes"
@@ -362,13 +361,13 @@ function TorneosContent() {
                   />
                 </button>
                 {isDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-full md:w-48 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden z-20 py-1">
+                  <div className="absolute right-0 mt-2 w-full sm:w-48 bg-brand-card border border-brand-white/10 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] overflow-hidden z-20 py-1">
                     <button
                       onClick={() => {
                         setSortBy("recientes");
                         setIsDropdownOpen(false);
                       }}
-                      className={`block w-full text-left px-4 py-3 text-sm transition-colors ${sortBy === "recientes" ? "bg-white/10 text-white font-bold border-l-2 border-padel-4" : "text-gray-400 hover:bg-white/5 hover:text-white border-l-2 border-transparent"}`}
+                      className={`block w-full text-left px-4 py-3 text-sm transition-colors border-l-2 cursor-pointer ${sortBy === "recientes" ? "bg-brand-white/5 text-brand-white font-bold border-brand-chartreuse" : "text-gray-400 hover:bg-brand-white/5 hover:text-brand-white border-transparent"}`}
                     >
                       Más recientes
                     </button>
@@ -377,7 +376,7 @@ function TorneosContent() {
                         setSortBy("alfabetico");
                         setIsDropdownOpen(false);
                       }}
-                      className={`block w-full text-left px-4 py-3 text-sm transition-colors ${sortBy === "alfabetico" ? "bg-white/10 text-white font-bold border-l-2 border-padel-4" : "text-gray-400 hover:bg-white/5 hover:text-white border-l-2 border-transparent"}`}
+                      className={`block w-full text-left px-4 py-3 text-sm transition-colors border-l-2 cursor-pointer ${sortBy === "alfabetico" ? "bg-brand-white/5 text-brand-white font-bold border-brand-chartreuse" : "text-gray-400 hover:bg-brand-white/5 hover:text-brand-white border-transparent"}`}
                     >
                       Orden alfabético
                     </button>
@@ -392,14 +391,14 @@ function TorneosContent() {
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
-                  className="bg-white/5 border border-white/5 rounded-3xl h-70"
+                  className="bg-brand-white/5 border border-brand-white/5 rounded-3xl h-72"
                 ></div>
               ))}
             </div>
           ) : sortedTournaments.length === 0 ? (
-            <div className="w-full py-32 flex flex-col items-center justify-center border border-dashed border-white/10 rounded-3xl bg-white/5">
+            <div className="w-full py-32 flex flex-col items-center justify-center border border-dashed border-brand-white/10 rounded-3xl bg-brand-card/30">
               <Trophy className="size-12 text-gray-600 mb-4" />
-              <h3 className="text-xl font-bold text-white mb-2">
+              <h3 className="text-xl font-bold text-brand-white mb-2">
                 No se encontraron torneos
               </h3>
               <p className="text-gray-400 text-sm mb-6 max-w-sm text-center px-4">
@@ -408,7 +407,7 @@ function TorneosContent() {
               </p>
               <button
                 onClick={handleClearFilters}
-                className="bg-white/10 border border-white/10 text-white font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-white/20 transition-colors"
+                className="bg-brand-white/10 border border-brand-white/10 text-brand-white font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-brand-white/20 transition-colors cursor-pointer"
               >
                 Limpiar filtros
               </button>
@@ -416,7 +415,6 @@ function TorneosContent() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {sortedTournaments.map((t) => {
-                // NORMALIZACIÓN DE ESTADOS
                 const estadoStr = (t.estado || "").toLowerCase().trim();
                 const isAbierto =
                   estadoStr === "inscripción" || estadoStr === "borrador";
@@ -427,15 +425,14 @@ function TorneosContent() {
                   profile &&
                   t.inscripciones?.some((ins) => ins.usuario_id === profile.id);
 
-                // --- LÓGICA DE CUPOS AGOTADOS ---
                 const cuposActuales = t.cupos_actuales || 0;
                 const cuposMaximos = t.cupos_maximos || 16;
                 const isLleno = cuposActuales >= cuposMaximos;
 
-                // --- CONFIGURACIÓN DINÁMICA DEL BOTÓN ---
                 let btnText = "Inscribirme";
                 let btnHref = `/torneos/${t.id}`;
-                let btnClass = "bg-padel-4 text-[#111] hover:bg-[#b3e600]";
+                let btnClass =
+                  "bg-brand-chartreuse text-brand-black hover:opacity-95";
 
                 if (isEnCurso) {
                   btnText = "Ver en vivo";
@@ -444,7 +441,7 @@ function TorneosContent() {
                 } else if (isFinalizado) {
                   btnText = "Ver resultados";
                   btnClass =
-                    "bg-white/10 text-white hover:bg-white/20 border border-white/10";
+                    "bg-brand-white/10 text-brand-white hover:bg-brand-white/20 border border-brand-white/10";
                 } else {
                   if (!profile) {
                     btnText = "Ingresar";
@@ -453,14 +450,12 @@ function TorneosContent() {
                     btnText = "Ver inscripción";
                     btnClass = "bg-gray-800 text-gray-300 hover:bg-gray-700";
                   } else if (isLleno) {
-                    // Si está lleno y NO está inscripto
                     btnText = "Cupos Agotados";
                     btnClass =
                       "bg-red-500/10 text-red-500 border border-red-500/20 opacity-80 cursor-not-allowed";
                   }
                 }
 
-                // Label Visual del Estado
                 const labelEstado = isAbierto
                   ? "Abierto"
                   : isEnCurso
@@ -472,70 +467,71 @@ function TorneosContent() {
                 return (
                   <div
                     key={t.id}
-                    className="group bg-[#161616] border border-white/5 hover:border-padel-4/40 rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_0_25px_rgba(204,255,0,0.05)] h-70"
+                    className="group bg-brand-card border border-brand-white/5 hover:border-brand-chartreuse/40 rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_0_25px_rgba(203,254,1,0.03)] h-72 relative overflow-hidden"
                   >
-                    {/* ENCABEZADO DE LA CARD */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                      <div className="flex gap-2">
-                        <div className="bg-padel-4 text-[#111] text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide">
-                          {t.nivel || "5ª"} {t.categoria || "Caballeros"}
+                    <div>
+                      {/* ENCABEZADO DE LA CARD */}
+                      <div className="flex items-center justify-between gap-2 mb-4">
+                        <div className="flex gap-2">
+                          <div className="bg-brand-chartreuse text-brand-black text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide">
+                            {t.nivel || "5ª"} {t.categoria || "Caballeros"}
+                          </div>
+                          <div className="bg-brand-white/10 text-brand-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                            {t.modalidad || "Duplas"}
+                          </div>
                         </div>
-                        <div className="bg-white/10 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                          {t.modalidad || "Duplas"}
+
+                        <div
+                          className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs font-black transition-colors ${
+                            isLleno
+                              ? "bg-red-500/10 border-red-500/20 text-red-500"
+                              : "bg-brand-white/5 border-brand-white/10 text-brand-white"
+                          }`}
+                        >
+                          <Users className="size-3 opacity-70" />
+                          {cuposActuales}{" "}
+                          <span className="text-gray-500 font-bold">
+                            / {cuposMaximos}
+                          </span>
                         </div>
                       </div>
 
-                      {/* CONTADOR DE INSCRIPTOS (Se pinta de rojo si está lleno) */}
-                      <div
-                        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs font-black transition-colors ${
-                          isLleno
-                            ? "bg-red-500/10 border-red-500/20 text-red-500"
-                            : "bg-white/5 border-white/10 text-white"
-                        }`}
-                      >
-                        <Users className="size-3 opacity-70" />
-                        {cuposActuales}{" "}
-                        <span className="text-gray-500 font-bold">
-                          / {cuposMaximos}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* CUERPO DE LA CARD */}
-                    <div className="mt-auto mb-6">
-                      <h3
-                        className="text-xl font-bold text-white mb-3 line-clamp-1"
-                        title={t.nombre}
-                      >
-                        {t.nombre}
-                      </h3>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-gray-400">
-                          <MapPin className="size-4 text-gray-500 shrink-0" />
-                          <span className="truncate">
-                            {t.clubes?.nombre || "Sede a confirmar"}{" "}
-                            {t.clubes?.provincia
-                              ? `· ${t.clubes.provincia}`
-                              : ""}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-400">
-                          <Calendar className="size-4 text-gray-500 shrink-0" />
-                          <span className="capitalize">
-                            {formatFecha(t.fecha)}
-                          </span>
+                      {/* CUERPO DE LA CARD */}
+                      <div className="mt-4">
+                        <h3
+                          className="text-xl font-bold text-brand-white mb-3 line-clamp-1 group-hover:text-brand-chartreuse transition-colors"
+                          title={t.nombre}
+                        >
+                          {t.nombre}
+                        </h3>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm text-gray-400">
+                            <MapPin className="size-4 text-gray-500 shrink-0" />
+                            <span className="truncate">
+                              {t.clubes?.nombre || "Sede a confirmar"}{" "}
+                              {t.clubes?.provincia
+                                ? `· ${t.clubes.provincia}`
+                                : ""}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-400">
+                            <Calendar className="size-4 text-gray-500 shrink-0" />
+                            <span className="capitalize">
+                              {formatFecha(t.fecha)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* FOOTER DE LA CARD */}
-                    <div className="flex items-center justify-between pt-4 border-t border-white/5 gap-3">
+                    <div className="flex items-center justify-between pt-4 border-t border-brand-white/5 gap-3 mt-4">
                       <div className="flex items-center gap-2 shrink-0">
                         <span
-                          className={`w-2.5 h-2.5 rounded-full ${isAbierto ? "bg-[#00ff88] shadow-[0_0_8px_rgba(0,255,136,0.6)]" : isFinalizado ? "bg-gray-500" : "bg-red-500 shadow-[0_0_8px_rgba(255,0,0,0.6)]"}`}
+                          className={`w-2.5 h-2.5 rounded-full ${isAbierto ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" : isFinalizado ? "bg-gray-500" : "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"}`}
                         ></span>
                         <span
-                          className={`text-sm font-bold truncate ${isAbierto ? "text-[#00ff88]" : isFinalizado ? "text-gray-400" : "text-red-500"}`}
+                          className={`text-sm font-bold truncate ${isAbierto ? "text-emerald-400" : isFinalizado ? "text-gray-400" : "text-red-500"}`}
                         >
                           {labelEstado}
                         </span>
@@ -563,7 +559,7 @@ export default function TorneosExplorerPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-padel-1 flex items-center justify-center text-padel-4 font-bold tracking-widest uppercase">
+        <div className="min-h-screen bg-brand-black flex items-center justify-center text-brand-chartreuse font-bold tracking-widest uppercase">
           Cargando Ecosistema...
         </div>
       }

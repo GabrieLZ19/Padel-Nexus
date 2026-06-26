@@ -1,5 +1,6 @@
 export type RolUsuario =
   | "usuario"
+  | "admin"
   | "admin_provincial"
   | "admin_federacion"
   | "superadmin";

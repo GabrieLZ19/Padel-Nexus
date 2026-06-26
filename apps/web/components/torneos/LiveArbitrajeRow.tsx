@@ -87,7 +87,7 @@ export const LiveArbitrajeRow = ({
     <div className="bg-black/40 border border-white/10 rounded-2xl p-5 flex flex-col xl:flex-row items-center gap-6 shadow-lg">
       {/* Indicador de Ronda */}
       <div className="text-center xl:text-left shrink-0">
-        <div className="text-[10px] text-padel-4 font-black uppercase tracking-widest bg-padel-4/10 px-3 py-1 rounded-md inline-block">
+        <div className="text-[10px] text-brand-chartreuse font-black uppercase tracking-widest bg-brand-chartreuse/10 px-3 py-1 rounded-md inline-block">
           {partido.ronda}
         </div>
       </div>
@@ -103,7 +103,7 @@ export const LiveArbitrajeRow = ({
             onClick={() => handlePunto("A")}
             className="bg-white/10 hover:bg-white/20 text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
           >
-            <Play className="size-3 text-padel-4" /> Punto Eq. A
+            <Play className="size-3 text-brand-chartreuse" /> Punto Eq. A
           </button>
         </div>
 
@@ -118,23 +118,23 @@ export const LiveArbitrajeRow = ({
               min="0"
               value={gamesA}
               onChange={(e) => setGamesA(Number(e.target.value))}
-              className="w-12 h-12 bg-white/5 rounded-lg text-center text-white font-black text-xl outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-1 focus:ring-padel-4"
+              className="w-12 h-12 bg-white/5 rounded-lg text-center text-white font-black text-xl outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-1 focus:ring-brand-chartreuse"
             />
           </div>
 
           <div className="flex flex-col items-center gap-1 mx-2">
-            <span className="text-[10px] font-bold text-padel-4 uppercase animate-pulse">
+            <span className="text-[10px] font-bold text-brand-chartreuse uppercase animate-pulse">
               Live
             </span>
-            <div className="flex items-center gap-2 bg-black px-4 py-2 rounded-lg border border-padel-4/30">
+            <div className="flex items-center gap-2 bg-black px-4 py-2 rounded-lg border border-brand-chartreuse/30">
               <span
-                className={`w-6 text-center font-black ${ptsA === "Ad" ? "text-padel-4" : "text-white"}`}
+                className={`w-6 text-center font-black ${ptsA === "Ad" ? "text-brand-chartreuse" : "text-white"}`}
               >
                 {ptsA}
               </span>
               <span className="text-gray-600 font-bold">-</span>
               <span
-                className={`w-6 text-center font-black ${ptsB === "Ad" ? "text-padel-4" : "text-white"}`}
+                className={`w-6 text-center font-black ${ptsB === "Ad" ? "text-brand-chartreuse" : "text-white"}`}
               >
                 {ptsB}
               </span>
@@ -150,7 +150,7 @@ export const LiveArbitrajeRow = ({
               min="0"
               value={gamesB}
               onChange={(e) => setGamesB(Number(e.target.value))}
-              className="w-12 h-12 bg-white/5 rounded-lg text-center text-white font-black text-xl outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-1 focus:ring-padel-4"
+              className="w-12 h-12 bg-white/5 rounded-lg text-center text-white font-black text-xl outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-1 focus:ring-brand-chartreuse"
             />
           </div>
         </div>
@@ -164,7 +164,7 @@ export const LiveArbitrajeRow = ({
             onClick={() => handlePunto("B")}
             className="bg-white/10 hover:bg-white/20 text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
           >
-            <Play className="size-3 text-padel-4" /> Punto Eq. B
+            <Play className="size-3 text-brand-chartreuse" /> Punto Eq. B
           </button>
         </div>
       </div>
@@ -173,7 +173,7 @@ export const LiveArbitrajeRow = ({
       <button
         onClick={handleFinalizar}
         disabled={isSaving || (gamesA === 0 && gamesB === 0)}
-        className="shrink-0 bg-padel-4 text-[#111] hover:bg-[#b3e600] px-6 py-3.5 rounded-xl text-sm font-black transition-all shadow-[0_0_15px_rgba(204,255,0,0.15)] disabled:opacity-40 disabled:shadow-none flex items-center gap-2 w-full xl:w-auto justify-center mt-4 xl:mt-0"
+        className="shrink-0 bg-brand-chartreuse text-[#111] hover:bg-[#b3e600] px-6 py-3.5 rounded-xl text-sm font-black transition-all shadow-[0_0_15px_rgba(204,255,0,0.15)] disabled:opacity-40 disabled:shadow-none flex items-center gap-2 w-full xl:w-auto justify-center mt-4 xl:mt-0"
       >
         {isSaving ? (
           <Loader2 className="size-4 animate-spin" />
