@@ -166,7 +166,7 @@ export default function InscripcionDetalleModal({
                     <CalendarDays className="size-3" /> Fecha de Registro
                   </div>
                   <div className="text-sm font-semibold text-white flex items-center gap-2">
-                    {new Date(inscripcion.created_at).toLocaleDateString(
+                    {new Date(inscripcion.created_at || Date.now()).toLocaleDateString(
                       "es-AR",
                       {
                         weekday: "long",
@@ -177,7 +177,7 @@ export default function InscripcionDetalleModal({
                     )}
                     <span className="text-gray-500 font-normal">
                       <Clock className="size-3.5 inline mr-1" />
-                      {new Date(inscripcion.created_at).toLocaleTimeString(
+                      {new Date(inscripcion.created_at || Date.now()).toLocaleTimeString(
                         "es-AR",
                         { hour: "2-digit", minute: "2-digit" },
                       )}
