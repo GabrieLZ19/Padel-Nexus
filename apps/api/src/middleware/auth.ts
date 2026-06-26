@@ -1,15 +1,15 @@
 import { Request, Response, NextFunction } from "express";
 import { supabase } from "../config/supabase";
+import type { RolUsuario } from "../constants/roles";
 
 declare global {
   namespace Express {
     interface Request {
-      user?: { id: string; email?: string; rol?: string };
+      user?: { id: string; email?: string; rol?: RolUsuario };
     }
   }
 }
 
-// Middleware de Autenticación Base
 export const authenticate = async (
   req: Request,
   res: Response,
@@ -21,6 +21,8 @@ export const authenticate = async (
   }
 
   const token = authHeader.split(" ")[1];
+
+  // getUser valida la firma criptográfica del token de forma ultra rápida
   const {
     data: { user },
     error,
@@ -30,18 +32,18 @@ export const authenticate = async (
     return res.status(401).json({ message: "No autorizado" });
   }
 
-  // Obtenemos el rol desde la base de datos de una vez
-  const { data: perfil } = await supabase
-    .from("perfiles")
-    .select("rol")
-    .eq("id", user.id)
-    .single();
+  // 🚀 MEJOR PRÁCTICA: Leemos el rol directo del JWT (app_metadata), ahorrándonos una query a la BD
+  const rolDelUsuario = (user.app_metadata?.rol || "usuario") as RolUsuario;
 
-  req.user = { id: user.id, email: user.email, rol: perfil?.rol };
+  req.user = {
+    id: user.id,
+    email: user.email,
+    rol: rolDelUsuario,
+  };
+
   next();
 };
 
-// Middleware de Autorización Flexible
 export const authorize = (rolesPermitidos: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user || !req.user.rol) {
@@ -49,11 +51,9 @@ export const authorize = (rolesPermitidos: string[]) => {
     }
 
     if (!rolesPermitidos.includes(req.user.rol)) {
-      return res
-        .status(403)
-        .json({
-          message: `Requiere uno de estos roles: ${rolesPermitidos.join(", ")}`,
-        });
+      return res.status(403).json({
+        message: `Requiere uno de estos roles: ${rolesPermitidos.join(", ")}`,
+      });
     }
 
     next();

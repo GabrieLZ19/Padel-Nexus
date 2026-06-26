@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { TorneoService } from "../services/torneo.service";
+import { CompetenciaService } from "../services/competencia.service";
 
 export const getAllTorneos = async (
   req: Request,
@@ -147,5 +148,44 @@ export const actualizarResultado = async (
     return res
       .status(500)
       .json({ message: "Error al actualizar partido", error: error.message });
+  }
+};
+
+export const getZonasByTorneo = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const zonas = await CompetenciaService.obtenerZonas(req.params.id);
+    return res.status(200).json(zonas);
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ message: "Error al obtener zonas", error: error.message });
+  }
+};
+
+export const moverParejaOverride = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { inscripcion_id, grupo_origen_id, grupo_destino_id, motivo } = req.body;
+    const admin_id = req.user?.id;
+    if (!admin_id) {
+        return res.status(401).json({ message: "No autorizado" });
+    }
+    const resultado = await CompetenciaService.moverPareja(
+      inscripcion_id,
+      grupo_origen_id,
+      grupo_destino_id,
+      motivo,
+      admin_id
+    );
+    return res.status(200).json(resultado);
+  } catch (error: any) {
+    return res
+      .status(400)
+      .json({ message: "Error al mover pareja", error: error.message });
   }
 };

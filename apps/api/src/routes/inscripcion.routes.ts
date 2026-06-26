@@ -6,6 +6,7 @@ import {
   deleteInscripcion,
 } from "../controllers/inscripcion.controller";
 import { authenticate, authorize } from "../middleware/auth";
+import { ROLES_ADMINISTRATIVOS } from "../constants/roles";
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.use(authenticate);
 // Listar inscripciones (Solo admins)
 router.get(
   "/",
-  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  authorize(ROLES_ADMINISTRATIVOS),
   getAllInscripciones,
 );
 
@@ -25,7 +26,7 @@ router.post("/", createInscripcion);
 // Actualizar pago (Solo admins) - Nota: cambiaste a PATCH que es más semántico para un solo campo
 router.patch(
   "/:id/pago",
-  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  authorize(ROLES_ADMINISTRATIVOS),
   updateEstadoPago,
 );
 

@@ -9,6 +9,8 @@ import {
   getPartidosByTorneo,
   getInscripcionesByTorneo,
   generarCuadros,
+  getZonasByTorneo,
+  moverParejaOverride,
 } from "../controllers/torneo.controller";
 import { generarZonas } from "../controllers/competencia.controller";
 import { obtenerPosicionesZona } from "../controllers/clasificacion.controller";
@@ -27,41 +29,51 @@ router.use(authenticate);
 
 router.post(
   "/",
-  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   createTorneo,
 );
 router.put(
   "/:id",
-  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   updateTorneo,
 );
 router.delete(
   "/:id",
-  authorize(["superadmin", "admin_federacion"]),
+  authorize(["superadmin", "admin_federacion", "admin"]),
   deleteTorneo,
 );
 
 router.get(
   "/:id/inscripciones",
-  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   getInscripcionesByTorneo,
 );
 
 // Operaciones del Motor de Competencias y Avances
 router.post(
   "/:id/generar-zonas",
-  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   generarZonas,
 );
 router.post(
   "/:id/generar-cuadro",
-  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   generarCuadros,
 );
 router.put(
   "/partidos/:partido_id/resultado",
-  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   actualizarResultado,
+);
+router.get(
+  "/:id/zonas",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  getZonasByTorneo,
+);
+router.put(
+  "/override/mover-pareja",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  moverParejaOverride,
 );
 
 export default router;

@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase";
+import { supabaseAdmin } from "../config/supabase";
 
 export interface ActualizarPerfilDTO {
   nombre_completo?: string;
@@ -14,19 +14,14 @@ export class PerfilService {
    * Obtiene la ficha técnica completa de un jugador con sus licencias y afiliaciones
    */
   static async obtenerPerfilCompleto(userId: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("perfiles")
-      .select(
-        `
-        *,
-        licencias (nro_licencia, estado, fecha_vencimiento),
-        afiliaciones (id, entidad, estado, fecha_vencimiento)
-      `,
-      )
+      .select("*")
       .eq("id", userId)
       .single();
 
     if (error || !data) {
+      console.error("🔴 ERROR EN OBTENER_PERFIL_COMPLETO:", error);
       throw new Error("Perfil de usuario no encontrado en la plataforma.");
     }
 
@@ -40,7 +35,7 @@ export class PerfilService {
     userId: string,
     datos: ActualizarPerfilDTO,
   ) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("perfiles")
       .update({
         nombre_completo: datos.nombre_completo,
@@ -51,13 +46,7 @@ export class PerfilService {
         dni: datos.dni,
       })
       .eq("id", userId)
-      .select(
-        `
-        *,
-        licencias (nro_licencia, estado, fecha_vencimiento),
-        afiliaciones (id, entidad, estado, fecha_vencimiento)
-      `,
-      )
+      .select("*")
       .single();
 
     if (error || !data) {

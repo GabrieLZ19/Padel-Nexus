@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase";
+import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "../constants/fap";
 
 interface ParejaRanking {
   inscripcionId: string;
@@ -30,7 +31,7 @@ export class CompetenciaService {
       `,
       )
       .eq("torneo_id", torneoId)
-      .eq("estado_pago", "Completado"); // Solo armamos llaves con los que pagaron
+      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO); // Solo armamos llaves con los que pagaron
 
     if (errInsc || !inscripciones || inscripciones.length < 3) {
       throw new Error(
@@ -130,6 +131,16 @@ export class CompetenciaService {
 
       const p = zona.parejas;
 
+      // Insertar en grupo_parejas
+      const grupoParejasData = p.map((pareja, idx) => ({
+        grupo_id: grupoInsertado.id,
+        inscripcion_id: pareja.inscripcionId,
+        seed: idx + 1
+      }));
+      if (grupoParejasData.length > 0) {
+        await supabase.from("grupo_parejas").insert(grupoParejasData);
+      }
+
       // Generar Partidos según la cantidad de parejas en la zona
       const partidos = [];
 
@@ -197,7 +208,7 @@ export class CompetenciaService {
     // Actualizamos el estado del torneo
     await supabase
       .from("torneos")
-      .update({ estado: "En curso" })
+      .update({ estado: FAP_ESTADOS_TORNEO.EN_CURSO })
       .eq("id", torneoId);
 
     return {
@@ -205,5 +216,80 @@ export class CompetenciaService {
       mensaje: "Zonas y cruces generados correctamente",
       zonas,
     };
+  }
+
+  /**
+   * Obtiene la estructura de zonas con parejas y sus seeds.
+   */
+  static async obtenerZonas(torneoId: string) {
+    const { data: grupos, error } = await supabase
+      .from("grupos")
+      .select(`
+        id,
+        nombre_grupo,
+        grupo_parejas (
+          id,
+          seed,
+          inscripcion_id,
+          inscripciones (
+            id,
+            jugador1_nombre,
+            jugador2_nombre
+          )
+        )
+      `)
+      .eq("torneo_id", torneoId)
+      .order("nombre_grupo");
+
+    if (error) {
+      throw new Error(`Error al obtener zonas: ${error.message}`);
+    }
+
+    return grupos;
+  }
+
+  /**
+   * Override administrativo: mueve una pareja de una zona a otra, guardando motivo.
+   */
+  static async moverPareja(
+    inscripcionId: string,
+    grupoOrigenId: string,
+    grupoDestinoId: string,
+    motivo: string,
+    adminId: string
+  ) {
+    // 1. Eliminar de la zona original
+    const { error: errDel } = await supabase
+      .from("grupo_parejas")
+      .delete()
+      .eq("grupo_id", grupoOrigenId)
+      .eq("inscripcion_id", inscripcionId);
+
+    if (errDel) throw new Error(`Error quitando pareja: ${errDel.message}`);
+
+    // 2. Insertar en la zona destino
+    const { error: errIns } = await supabase
+      .from("grupo_parejas")
+      .insert({
+        grupo_id: grupoDestinoId,
+        inscripcion_id: inscripcionId,
+        seed: 0 // Se inserta sin seed o se recalcula si es necesario
+      });
+
+    if (errIns) throw new Error(`Error insertando pareja: ${errIns.message}`);
+
+    // 3. Registrar auditoría
+    await supabase.from("logs_auditoria").insert({
+      usuario_id_admin: adminId,
+      accion: "mover_pareja_zona",
+      entidad_afectada: inscripcionId,
+      detalles: {
+        grupo_origen: grupoOrigenId,
+        grupo_destino: grupoDestinoId,
+        motivo: motivo
+      }
+    });
+
+    return { exito: true, mensaje: "Pareja movida exitosamente" };
   }
 }

@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase";
+import { FAP_ESTADOS_LICENCIA, FAP_ESTADOS_PAGO } from "../constants/fap";
 
 interface ProcesarPagoManualDTO {
   entidadTipo: "inscripcion" | "licencia";
@@ -34,10 +35,10 @@ export class PagoService {
     const updatePayload: Record<string, any> = {};
 
     if (datos.entidadTipo === "inscripcion") {
-      updatePayload.estado_pago = "Confirmado"; // Cambia de Pendiente a Confirmado para habilitar al jugador en el fixture
+      updatePayload.estado_pago = FAP_ESTADOS_PAGO.CONFIRMADO; // Cambia de Pendiente a Confirmado para habilitar al jugador en el fixture
       updatePayload.monto = datos.monto;
     } else {
-      updatePayload.estado = "Activa"; // Si es una licencia pendiente, la activa
+      updatePayload.estado = FAP_ESTADOS_LICENCIA.ACTIVA; // Si es una licencia pendiente, la activa
     }
 
     const { data: entidadActualizada, error: errUpdate } = await supabase

@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase";
+import { supabase, supabaseAdmin } from "../config/supabase";
 import { env } from "../config/env.config";
 
 // DTO para el registro unificado FAP
@@ -18,6 +18,7 @@ export class AuthService {
    * Valida credenciales contra Supabase Auth y extrae el perfil con su rol FAP
    */
   static async login(email: string, password: string) {
+    // 1. Validamos la sesión con el cliente estándar (muta su contexto interno)
     const { data: authData, error: authError } =
       await supabase.auth.signInWithPassword({
         email,
@@ -28,16 +29,18 @@ export class AuthService {
       throw new Error("Credenciales inválidas o usuario no registrado.");
     }
 
-    // Traer perfil con DNI y Residencia corregidos según el esquema FAP
-    const { data: perfil, error: perfilError } = await supabase
+    // 2. Consultamos la base de datos con el cliente Administrador Seguro
+    // Al estar aislado, ignora el RLS de forma directa sin caer en bucles de Postgres
+    const { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
       .select("id, nombre_completo, dni, lugar_residencia, rol, email")
       .eq("id", authData.user.id)
       .single();
 
     if (perfilError || !perfil) {
+      console.error("🔴 MOTIVO DEL REBOTE:", perfilError);
       throw new Error(
-        "El usuario está autenticado pero no posee un perfil activo.",
+        "Error crítico de sincronización: El perfil asignado no se encuentra activo.",
       );
     }
 
@@ -144,7 +147,7 @@ export class AuthService {
     }
 
     // Buscamos su perfil unificado en la base
-    let { data: perfil, error: perfilError } = await supabase
+    let { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
       .select("id, nombre_completo, dni, lugar_residencia, rol, email")
       .eq("id", data.user.id)
@@ -152,7 +155,7 @@ export class AuthService {
 
     // Fallback por si es un registro nuevo vía Google
     if (perfilError || !perfil) {
-      const { data: nuevoPerfil, error: insertError } = await supabase
+      const { data: nuevoPerfil, error: insertError } = await supabaseAdmin
         .from("perfiles")
         .insert({
           id: data.user.id,
@@ -182,6 +185,7 @@ export class AuthService {
    * Recibe el token extraído del cliente, valida autenticidad y extrae la ficha técnica FAP
    */
   static async verificarTokenGoogle(accessToken: string) {
+    // 1. Validamos usando el cliente de usuario (anon) para que el JWT se verifique de forma nativa
     const {
       data: { user },
       error: authError,
@@ -193,8 +197,8 @@ export class AuthService {
       );
     }
 
-    // Aseguramos traer lugar_residencia y los campos exactos del modelo relacional
-    let { data: perfil, error: perfilError } = await supabase
+    // 2. Buscamos su perfil relacional
+    let { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
       .select(
         "id, nombre_completo, dni, lugar_residencia, rol, email, categoria_padel, lado_preferido",
@@ -202,16 +206,16 @@ export class AuthService {
       .eq("id", user.id)
       .single();
 
-    // Si es un registro nuevo vía Google, insertamos la fila inicial con la estructura correcta
+    // Si es un registro nuevo o el RLS bloquea la lectura inicial, usamos el canal de respaldo administrativo para asegurar la creación de la ficha
     if (perfilError || !perfil) {
-      const { data: nuevoPerfil, error: insertError } = await supabase
+      const { data: nuevoPerfil, error: insertError } = await supabaseAdmin
         .from("perfiles")
         .insert({
           id: user.id,
           nombre_completo: user.user_metadata?.full_name || "Jugador Google",
           email: user.email,
           rol: "usuario",
-          lugar_residencia: "La Rioja", // Seteamos por defecto tu localidad para consistencia
+          lugar_residencia: "La Rioja",
           dni: "A completar",
           categoria_padel: "S/C",
           lado_preferido: "S/C",

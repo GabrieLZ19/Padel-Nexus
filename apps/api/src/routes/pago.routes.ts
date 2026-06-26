@@ -10,7 +10,7 @@ router.use(authenticate);
 // Endpoint del Checkbox administrativo (Fase 1)
 router.patch(
   "/confirmar-manual",
-  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   PagoController.confirmarPagoManual,
 );
 

@@ -1,4 +1,9 @@
 import { supabase } from "../config/supabase";
+import {
+  FAP_ESTADOS_PAGO,
+  FAP_ESTADOS_TORNEO,
+  FAP_REGLAS,
+} from "../constants/fap";
 
 export interface FiltrosTorneo {
   search?: string;
@@ -216,9 +221,13 @@ export class TorneoService {
       .from("inscripciones")
       .select("id, usuario_id")
       .eq("torneo_id", id)
-      .eq("estado_pago", "Confirmado");
+      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
 
-    if (inscError || !inscripciones || inscripciones.length < 4) {
+    if (
+      inscError ||
+      !inscripciones ||
+      inscripciones.length < FAP_REGLAS.CUPOS_MINIMOS_LLUAVES
+    ) {
       throw new Error("Se necesitan al menos 4 inscritos confirmados.");
     }
 
@@ -271,7 +280,10 @@ export class TorneoService {
       .insert(partidos);
     if (insertError) throw new Error(insertError.message);
 
-    await supabase.from("torneos").update({ estado: "En curso" }).eq("id", id);
+    await supabase
+      .from("torneos")
+      .update({ estado: FAP_ESTADOS_TORNEO.EN_CURSO })
+      .eq("id", id);
     return partidos.length;
   }
 
@@ -287,7 +299,7 @@ export class TorneoService {
         ganador: ganadorId,
         set1_a: set1A,
         set1_b: set1B,
-        estado_partido: "Finalizado",
+        estado_partido: FAP_ESTADOS_TORNEO.FINALIZADO,
       })
       .eq("id", partidoId)
       .select("id, torneo_id, ronda, orden, equipo_a_id, equipo_b_id")
@@ -388,7 +400,7 @@ export class TorneoService {
     if (partido.ronda.toUpperCase() === "FINAL") {
       await supabase
         .from("torneos")
-        .update({ estado: "Finalizado" })
+        .update({ estado: FAP_ESTADOS_TORNEO.FINALIZADO })
         .eq("id", partido.torneo_id);
     } else {
       const rondasSiguientes: Record<string, string> = {

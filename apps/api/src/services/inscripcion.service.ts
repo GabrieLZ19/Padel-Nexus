@@ -1,4 +1,9 @@
 import { supabase } from "../config/supabase";
+import {
+  FAP_ESTADOS_LICENCIA,
+  FAP_ESTADOS_PAGO,
+  FAP_REGLAS,
+} from "../constants/fap";
 
 interface RegistroInscripcionDTO {
   torneoId: string;
@@ -99,7 +104,11 @@ export class InscripcionService {
       .eq("usuario_id", jugador1Id)
       .single();
 
-    if (licError || !licencia || licencia.estado !== "Activa") {
+    if (
+      licError ||
+      !licencia ||
+      licencia.estado !== FAP_ESTADOS_LICENCIA.ACTIVA
+    ) {
       throw new Error(
         "Para inscribirte, debes tener una licencia FAP vigente y activa.",
       );
@@ -125,7 +134,7 @@ export class InscripcionService {
     if (
       Math.ceil(
         (fechaTorneo.getTime() - fechaActual.getTime()) / (1000 * 60 * 60 * 24),
-      ) <= 7
+      ) <= FAP_REGLAS.DIAS_CIERRE_INSCRIPCION
     ) {
       throw new Error(
         "Las inscripciones cerraron automáticamente (7 días antes del inicio).",
@@ -202,7 +211,7 @@ export class InscripcionService {
           jugador1_nombre: jugador1Nombre,
           jugador2_nombre: jugador2Nombre,
           monto,
-          estado_pago: "Pendiente",
+          estado_pago: FAP_ESTADOS_PAGO.PENDIENTE,
           tipo: "Inscripción torneo",
           letra_prioridad: letraPrioridad || null,
         },

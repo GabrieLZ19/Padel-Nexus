@@ -114,7 +114,7 @@ export const PerfilController = {
 
   /**
    * POST /api/perfiles/login
-   * Endpoint centralizado de autenticación
+   * Endpoint centralizado de autenticación (Unificado para Next.js)
    */
   async login(req: Request, res: Response): Promise<Response> {
     try {
@@ -134,6 +134,11 @@ export const PerfilController = {
         mensaje: "Sesión iniciada correctamente.",
         usuario: result.usuario,
         token: result.token,
+        data: {
+          // Envoltorio consistente para desestructuración limpia
+          usuario: result.usuario,
+          token: result.token,
+        },
       });
     } catch (error: unknown) {
       const message =
