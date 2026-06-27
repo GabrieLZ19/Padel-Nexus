@@ -169,8 +169,9 @@ export default function TorneoDetallePage() {
     { id: "FINAL", label: "Final", required: 1 },
   ];
 
+  const activeRounds = new Set((partidos || []).map((p) => p.ronda.toUpperCase()));
   const rondasToShow = RONDAS_CONFIG.filter(
-    (r) => r.required <= cuposMaximos / 2,
+    (r) => activeRounds.has(r.id),
   );
 
   const getRoundMatches = (round: string, requiredCount: number): Partido[] => {

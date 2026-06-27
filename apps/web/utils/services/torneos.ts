@@ -104,4 +104,20 @@ export const TorneosService = {
     const response = await api.put(`/torneos/override/mover-pareja`, payload);
     return response.data;
   },
+
+  async guardarZonas(
+    torneoId: string,
+    payload: {
+      zonas: { id: string; nombre: string; parejas: { id: string }[] }[];
+      motivo: string;
+    }
+  ) {
+    const response = await api.put(`/torneos/${torneoId}/guardar-zonas`, payload);
+    return response.data;
+  },
+
+  async getAuditoria(torneoId: string) {
+    const response = await api.get(`/torneos/${torneoId}/auditoria`);
+    return response.data;
+  },
 };

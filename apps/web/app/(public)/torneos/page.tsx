@@ -420,6 +420,7 @@ function TorneosContent() {
                   estadoStr === "inscripción" || estadoStr === "borrador";
                 const isEnCurso = estadoStr === "en curso";
                 const isFinalizado = estadoStr === "finalizado";
+                const isCerrado = estadoStr === "cerrado";
 
                 const isEnrolled =
                   profile &&
@@ -442,6 +443,10 @@ function TorneosContent() {
                   btnText = "Ver resultados";
                   btnClass =
                     "bg-brand-white/10 text-brand-white hover:bg-brand-white/20 border border-brand-white/10";
+                } else if (isCerrado) {
+                  btnText = "Inscripciones cerradas";
+                  btnClass = "bg-brand-white/5 text-gray-500 border border-brand-white/10 opacity-70 cursor-not-allowed";
+                  btnHref = "#";
                 } else {
                   if (!profile) {
                     btnText = "Ingresar";
@@ -458,11 +463,13 @@ function TorneosContent() {
 
                 const labelEstado = isAbierto
                   ? "Abierto"
-                  : isEnCurso
-                    ? "En curso"
-                    : isFinalizado
-                      ? "Finalizado"
-                      : t.estado;
+                  : isCerrado
+                    ? "Cerrado"
+                    : isEnCurso
+                      ? "En curso"
+                      : isFinalizado
+                        ? "Finalizado"
+                        : t.estado;
 
                 return (
                   <div

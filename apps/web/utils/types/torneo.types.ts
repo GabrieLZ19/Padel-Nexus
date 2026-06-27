@@ -3,6 +3,7 @@ import { Club } from "./club.types";
 export type EstadoTorneo =
   | "Borrador"
   | "Inscripción"
+  | "Cerrado"
   | "En curso"
   | "Finalizado";
 export type FormatoTorneo = "Eliminatoria Directa" | "Fase de Grupos" | "Mixto";

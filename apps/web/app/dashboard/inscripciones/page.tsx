@@ -18,7 +18,8 @@ import {
   TrendingUp,
   MapPin,
 } from "lucide-react";
-import { InscripcionesService } from "../../../utils/services/inscripciones";
+import { InscripcionesService } from "@/utils/services/inscripciones";
+import ConfirmarPagoModal from "@/components/inscripciones/ConfirmarPagoModal";
 import { Inscripcion, Torneo } from "../../../utils/types";
 import FeedbackModal, {
   FeedbackModalProps,
@@ -81,63 +82,29 @@ export default function GestionInscripcionesPage() {
     void loadData();
   }, [filterTorneo, page, refreshKey]);
 
-  // CORRECCIÓN: Tipado estricto a string (UUID)
+  const [pagoModal, setPagoModal] = useState<{
+    isOpen: boolean;
+    inscripcionId: string;
+    montoDefecto: number;
+    isLoading: boolean;
+  }>({
+    isOpen: false,
+    inscripcionId: "",
+    montoDefecto: 0,
+    isLoading: false,
+  });
+
   const handleCambiarEstado = (
     id: string,
     nuevoEstado: "Confirmado" | "Rechazado",
     montoDefecto?: number,
   ) => {
-    const accion = nuevoEstado === "Confirmado" ? "aprobar" : "rechazar";
-
     if (nuevoEstado === "Confirmado") {
-      // Mostrar popover manual de pago con método y monto
-      setFeedbackModal({
+      setPagoModal({
         isOpen: true,
-        type: "info",
-        title: `Confirmar Pago Manual`,
-        description: `Ingresa el monto cobrado y el método de pago para la inscripción.`,
-        confirmText: `Confirmar Pago`,
-        cancelText: "Cancelar",
-        showInput: true,
-        inputPlaceholder: `Monto (Ej: ${montoDefecto || 0})`,
-        inputType: "number",
-        showSelect: true,
-        selectOptions: [
-          { value: "Efectivo", label: "Efectivo" },
-          { value: "Transferencia", label: "Transferencia" },
-          { value: "Mercado Pago", label: "Mercado Pago" },
-        ],
-        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
-        onConfirm: async (montoIngresado?: string, metodoPago?: string) => {
-          const monto = Number(montoIngresado) || montoDefecto || 0;
-          if (monto <= 0) return; // Prevent empty
-
-          setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
-          try {
-            await PagosService.confirmarPagoManual({
-              entidad_tipo: "inscripcion",
-              entidad_id: id,
-              monto: monto,
-              metodo_pago: metodoPago || "Efectivo",
-            });
-            setFeedbackModal({
-              isOpen: true,
-              type: "success",
-              title: "Pago Confirmado",
-              description: `El pago ha sido registrado y la inscripción está confirmada.`,
-              onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
-            });
-            setRefreshKey((prev) => prev + 1);
-          } catch (error: any) {
-            setFeedbackModal({
-              isOpen: true,
-              type: "error",
-              title: "Error al procesar pago",
-              description: error.message || "Error al registrar el pago manual.",
-              onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
-            });
-          }
-        },
+        inscripcionId: id,
+        montoDefecto: montoDefecto || 0,
+        isLoading: false,
       });
     } else {
       setFeedbackModal({
@@ -214,9 +181,12 @@ export default function GestionInscripcionesPage() {
 
     const matchTab =
       activeTab === "Todas" ||
-      (activeTab === "Pendientes" && i.estado_pago === FAP_ESTADOS_PAGO.PENDIENTE) ||
-      (activeTab === "Confirmadas" && i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO) ||
-      (activeTab === "Rechazadas" && i.estado_pago === FAP_ESTADOS_PAGO.RECHAZADO);
+      (activeTab === "Pendientes" &&
+        i.estado_pago === FAP_ESTADOS_PAGO.PENDIENTE) ||
+      (activeTab === "Confirmadas" &&
+        i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO) ||
+      (activeTab === "Rechazadas" &&
+        i.estado_pago === FAP_ESTADOS_PAGO.RECHAZADO);
 
     return matchSearch && matchTab;
   });
@@ -633,6 +603,51 @@ export default function GestionInscripcionesPage() {
         isOpen={detalleModalOpen}
         onClose={() => setDetalleModalOpen(false)}
         inscripcion={selectedInscripcion}
+      />
+
+      <ConfirmarPagoModal
+        isOpen={pagoModal.isOpen}
+        montoSugerido={pagoModal.montoDefecto}
+        isLoading={pagoModal.isLoading}
+        onClose={() => setPagoModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={async (monto: number, metodo: string) => {
+          setPagoModal((prev) => ({ ...prev, isLoading: true }));
+          try {
+            await PagosService.confirmarPagoManual({
+              entidad_tipo: "inscripcion",
+              entidad_id: pagoModal.inscripcionId,
+              monto: monto,
+              metodo_pago: metodo || "Efectivo",
+            });
+            setPagoModal((prev) => ({ ...prev, isOpen: false }));
+            setFeedbackModal({
+              isOpen: true,
+              type: "success",
+              title: "Pago Confirmado",
+              description: `El pago ha sido registrado y la inscripción está confirmada.`,
+              onClose: () =>
+                setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+            });
+            setRefreshKey((prev) => prev + 1);
+          } catch (error: any) {
+            setPagoModal((prev) => ({
+              ...prev,
+              isLoading: false,
+              isOpen: false,
+            }));
+            setFeedbackModal({
+              isOpen: true,
+              type: "error",
+              title: "Error al procesar pago",
+              description:
+                error.response?.data?.error ||
+                error.message ||
+                "Error al registrar el pago manual.",
+              onClose: () =>
+                setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+            });
+          }
+        }}
       />
     </div>
   );

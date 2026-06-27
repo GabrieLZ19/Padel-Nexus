@@ -16,6 +16,7 @@ export interface FeedbackModalProps {
   showInput?: boolean;
   inputPlaceholder?: string;
   inputType?: string;
+  inputLabel?: string;
   showSelect?: boolean;
   selectOptions?: { value: string; label: string }[];
   onConfirm?: (inputValue?: string, selectValue?: string) => void;
@@ -34,6 +35,7 @@ export default function FeedbackModal({
   showInput = false,
   inputPlaceholder = "Ingrese un valor",
   inputType = "text",
+  inputLabel = "Valor",
   showSelect = false,
   selectOptions = [],
 }: FeedbackModalProps) {
@@ -43,9 +45,9 @@ export default function FeedbackModal({
   useEffect(() => {
     if (isOpen) {
       setInputValue("");
-      setSelectValue(selectOptions[0]?.value || "");
+      setSelectValue(selectOptions?.[0]?.value || "");
     }
-  }, [isOpen, selectOptions]);
+  }, [isOpen]);
   // Configuraciones visuales dinámicas según el tipo de alerta
   const config = {
     success: {
@@ -151,7 +153,7 @@ export default function FeedbackModal({
                 {showInput && (
                   <div>
                     <label className="block text-xs font-bold text-gray-400 mb-1">
-                      Monto
+                      {inputLabel}
                     </label>
                     <input
                       type={inputType}

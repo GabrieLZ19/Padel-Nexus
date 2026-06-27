@@ -164,14 +164,14 @@ export default function InscripcionModal({
                         {torneo.modalidad}
                       </span>
                     </div>
-                    {torneo.lugar && (
+                    {(torneo.lugar || torneo.clubes?.nombre) && (
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-500 flex items-center gap-2">
                           <MapPin className="size-3.5 text-brand-chartreuse" />
                           Lugar
                         </span>
-                        <span className="text-gray-200 font-semibold">
-                          {torneo.lugar}
+                        <span className="text-gray-200 font-semibold text-right">
+                          {torneo.lugar || torneo.clubes?.nombre}
                         </span>
                       </div>
                     )}

@@ -18,3 +18,21 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Interceptor para redireccionar automáticamente al login en caso de 401 (Sesión vencida)
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      if (typeof window !== "undefined") {
+        // Limpiar cookies de sesión
+        document.cookie = "padel_token=; path=/; max-age=0;";
+        document.cookie = "padel_user_role=; path=/; max-age=0;";
+        
+        // Redirigir a login indicando que la sesión expiró
+        window.location.href = "/login?expired=true";
+      }
+    }
+    return Promise.reject(error);
+  }
+);

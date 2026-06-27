@@ -20,6 +20,7 @@ import { TorneosService } from "@/utils/services/torneos";
 import { InscripcionesService } from "@/utils/services/inscripciones";
 import { Torneo, Inscripcion } from "@/utils/types";
 import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "@/utils/constants/fap";
+import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 
 export default function DashboardHome() {
   const [torneos, setTorneos] = useState<Torneo[]>([]);
@@ -281,10 +282,9 @@ export default function DashboardHome() {
             <Calendar className="size-4 text-brand-chartreuse" />
             Últimos 30 días
           </button>
-          <button className="w-full sm:w-auto min-w-14 flex items-center justify-center h-10 bg-transparent border border-white/10 hover:bg-white/5 text-gray-300 hover:text-white rounded-2xl transition-colors relative">
-            <div className="absolute top-2.5 right-2.5 size-1.5 bg-brand-chartreuse rounded-full shadow-[0_0_8px_rgba(204,255,0,0.8)]"></div>
-            <Bell className="size-5" />
-          </button>
+          <div className="hidden md:block">
+            <NotificationCenter />
+          </div>
         </div>
       </div>
 

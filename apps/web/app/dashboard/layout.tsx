@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
+import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 
 export default function DashboardLayout({
   children,
@@ -98,7 +99,11 @@ export default function DashboardLayout({
   ];
 
   const displayName =
-    (profile?.nombre ? `${profile.apellido?.toUpperCase()}, ${profile.nombre}` : "") || profile?.email?.split("@")[0] || "Admin";
+    (profile?.nombre
+      ? `${profile.apellido?.toUpperCase()}, ${profile.nombre}`
+      : "") ||
+    profile?.email?.split("@")[0] ||
+    "Admin";
 
   // Mantenemos el Loader si está cargando O si está a punto de expulsar por falta de perfil
   if (loading || !profile) {
@@ -115,7 +120,13 @@ export default function DashboardLayout({
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
             className="size-16 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(204,255,0,0.2)] bg-brand-chartreuse"
           >
-            <Image src="/brand/LogoAccessory.svg" alt="Padel Nexus" width={40} height={40} className="object-contain" />
+            <Image
+              src="/brand/LogoAccessory.svg"
+              alt="Padel Nexus"
+              width={40}
+              height={40}
+              className="object-contain"
+            />
           </motion.div>
           <div className="w-32 h-1 bg-white/5 rounded-full overflow-hidden">
             <motion.div
@@ -138,7 +149,13 @@ export default function DashboardLayout({
         <div className="h-28 px-8 flex items-center justify-between gap-3 border-b border-white/5 md:border-none">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(204,255,0,0.15)] bg-brand-chartreuse">
-              <Image src="/brand/LogoAccessory.svg" alt="Padel Nexus" width={24} height={24} className="object-contain" />
+              <Image
+                src="/brand/LogoAccessory.svg"
+                alt="Padel Nexus"
+                width={24}
+                height={24}
+                className="object-contain"
+              />
             </div>
             <div className="flex flex-col justify-center mt-1">
               <span className="text-xl tracking-tight text-white">
@@ -215,10 +232,16 @@ export default function DashboardLayout({
           >
             <Menu className="size-5" />
           </button>
-          <div className="text-[13px] font-black uppercase tracking-[0.35em] text-white">
-            PADEL NEXUS
+          <Image
+            src="/brand/Logo.svg"
+            alt="Padel Nexus"
+            width={100}
+            height={40}
+            className="object-contain"
+          />
+          <div className="flex items-center justify-center">
+            <NotificationCenter />
           </div>
-          <div className="w-10" />
         </div>
         <motion.div
           initial={{ opacity: 0, y: 10 }}

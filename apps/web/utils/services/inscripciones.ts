@@ -30,7 +30,7 @@ export const InscripcionesService = {
     id: string | number,
     estado_pago: string,
   ): Promise<Inscripcion> {
-    const response = await api.put<Inscripcion>(`/inscripciones/${id}/estado`, {
+    const response = await api.patch<Inscripcion>(`/inscripciones/${id}/pago`, {
       estado_pago,
     });
     return response.data;

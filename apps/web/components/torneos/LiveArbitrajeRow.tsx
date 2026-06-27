@@ -1,8 +1,8 @@
 import { Partido } from "@/utils/types";
 import { Loader2, Play, Trophy } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-type PadelScore = "0" | "15" | "30" | "40" | "Ad";
+type PadelScore = "0" | "15" | "30" | "40" | "Ad" | string;
 
 export const LiveArbitrajeRow = ({
   partido,
@@ -25,6 +25,18 @@ export const LiveArbitrajeRow = ({
   const [ptsA, setPtsA] = useState<PadelScore>("0");
   const [ptsB, setPtsB] = useState<PadelScore>("0");
 
+  useEffect(() => {
+    if (gamesA === 6 && gamesB === 6) {
+      if (
+        ptsA === "15" || ptsA === "30" || ptsA === "40" || ptsA === "Ad" ||
+        ptsB === "15" || ptsB === "30" || ptsB === "40" || ptsB === "Ad"
+      ) {
+        setPtsA("0");
+        setPtsB("0");
+      }
+    }
+  }, [gamesA, gamesB, ptsA, ptsB]);
+
   const txtA = partido.equipo_a_j1
     ? `${partido.equipo_a_j1} ${partido.equipo_a_j2 && partido.equipo_a_j2 !== "-" ? `/ ${partido.equipo_a_j2}` : ""}`
     : "Equipo A";
@@ -32,9 +44,39 @@ export const LiveArbitrajeRow = ({
     ? `${partido.equipo_b_j1} ${partido.equipo_b_j2 && partido.equipo_b_j2 !== "-" ? `/ ${partido.equipo_b_j2}` : ""}`
     : "Equipo B";
 
-  // Lógica de puntuación del Pádel
+  // Lógica de puntuación del Pádel (incluye soporte para Tie-break en 6-6)
   const handlePunto = (scorer: "A" | "B") => {
-    const nextScore: Record<PadelScore, PadelScore> = {
+    // Si estamos en tie-break (6-6)
+    if (gamesA === 6 && gamesB === 6) {
+      const curA = parseInt(ptsA) || 0;
+      const curB = parseInt(ptsB) || 0;
+      
+      let nextA = curA;
+      let nextB = curB;
+      
+      if (scorer === "A") {
+        nextA++;
+      } else {
+        nextB++;
+      }
+      
+      // Condición de ganar tie-break: >= 7 puntos y diferencia de >= 2
+      if (nextA >= 7 && nextA - nextB >= 2) {
+        setGamesA(7);
+        setPtsA("0");
+        setPtsB("0");
+      } else if (nextB >= 7 && nextB - nextA >= 2) {
+        setGamesB(7);
+        setPtsA("0");
+        setPtsB("0");
+      } else {
+        setPtsA(String(nextA));
+        setPtsB(String(nextB));
+      }
+      return;
+    }
+
+    const nextScore: Record<string, string> = {
       "0": "15",
       "15": "30",
       "30": "40",
@@ -111,7 +153,7 @@ export const LiveArbitrajeRow = ({
         <div className="flex items-center gap-3 bg-[#111] p-3 rounded-xl border border-white/5 shrink-0">
           <div className="flex flex-col items-center gap-1">
             <span className="text-[10px] font-bold text-gray-500 uppercase">
-              Sets
+              Juegos
             </span>
             <input
               type="number"
@@ -143,7 +185,7 @@ export const LiveArbitrajeRow = ({
 
           <div className="flex flex-col items-center gap-1">
             <span className="text-[10px] font-bold text-gray-500 uppercase">
-              Sets
+              Juegos
             </span>
             <input
               type="number"
