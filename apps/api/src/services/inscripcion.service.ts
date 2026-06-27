@@ -4,6 +4,7 @@ import {
   FAP_ESTADOS_PAGO,
   FAP_REGLAS,
 } from "../constants/fap";
+import { NotificacionService } from "./notificacion.service";
 
 interface RegistroInscripcionDTO {
   torneoId: string;
@@ -133,7 +134,7 @@ export class InscripcionService {
     if (
       Math.ceil(
         (fechaTorneo.getTime() - fechaActual.getTime()) / (1000 * 60 * 60 * 24),
-      ) <= FAP_REGLAS.DIAS_CIERRE_INSCRIPCION
+      ) < FAP_REGLAS.DIAS_CIERRE_INSCRIPCION
     ) {
       throw new Error(
         "Las inscripciones cerraron automáticamente (7 días antes del inicio).",
@@ -143,7 +144,7 @@ export class InscripcionService {
     // 5. REGLAS ARQUITECTURA NACIONAL
     const { data: solicitante } = await supabaseAdmin
       .from("perfiles")
-      .select("rol, categoria_padel")
+      .select("rol, categoria_padel, nombre")
       .eq("id", usuarioSolicitanteId)
       .single();
 
@@ -228,6 +229,20 @@ export class InscripcionService {
       .from("torneos")
       .update({ cupos_actuales: (torneo.cupos_actuales || 0) + 1 })
       .eq("id", torneoId);
+
+    // 11. NOTIFICAR A LOS ADMINISTRADORES
+    const isPareja = jugador2Nombre && jugador2Nombre.trim() !== "" && jugador2Nombre !== "-";
+    const jugadoresTexto = isPareja
+      ? `${jugador1Nombre || solicitante.nombre} y ${jugador2Nombre}`
+      : `${jugador1Nombre || solicitante.nombre}`;
+    const verbo = isPareja ? "se han inscripto" : "se ha inscripto";
+    
+    // Fire and forget (no await to avoid blocking response)
+    NotificacionService.notificarAdmins({
+      titulo: "Nueva Inscripción",
+      mensaje: `${jugadoresTexto} ${verbo} en el torneo.`,
+      tipo: "info",
+    }).catch(err => console.error("Error al notificar admins de nueva inscripcion:", err));
 
     return inscripcionInsertada;
   }

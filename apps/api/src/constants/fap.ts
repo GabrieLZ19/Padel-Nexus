@@ -1,6 +1,7 @@
 export const FAP_ESTADOS_TORNEO = {
   BORRADOR: "Borrador",
   INSCRIPCION: "Inscripción",
+  CERRADO: "Cerrado",
   EN_CURSO: "En curso",
   FINALIZADO: "Finalizado",
 } as const;

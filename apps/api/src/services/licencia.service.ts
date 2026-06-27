@@ -296,6 +296,16 @@ export class LicenciaService {
       .single();
 
     if (error) throw new Error(error.message);
+
+    // Notificar a los administradores
+    NotificacionService.notificarAdmins({
+      titulo: "Nueva Solicitud de Licencia",
+      mensaje: `${datos.nombre} ${datos.apellido} ha solicitado una nueva licencia deportiva.`,
+      tipo: "info",
+    }).catch((err) =>
+      console.error("Error al notificar admins de nueva licencia:", err),
+    );
+
     return data;
   }
 }

@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../config/supabase";
 import { FAP_ESTADOS_LICENCIA, FAP_ESTADOS_PAGO } from "../constants/fap";
+import { NotificacionService } from "./notificacion.service";
 
 interface ProcesarPagoManualDTO {
   entidadTipo: "inscripcion" | "licencia";
@@ -78,6 +79,28 @@ export class PagoService {
         "❌ Alerta de Auditoría: Pago procesado pero no se pudo registrar el log:",
         errAuditoria.message,
       );
+    }
+
+    // 4. NOTIFICAR AL USUARIO
+    try {
+      let titulo = "";
+      let mensaje = "";
+      if (datos.entidadTipo === "inscripcion") {
+        titulo = "Inscripción Confirmada";
+        mensaje = `Tu pago de $${datos.monto} ha sido verificado. ¡Tu inscripción está oficialmente confirmada!`;
+      } else {
+        titulo = "Licencia Activada";
+        mensaje = `Tu pago de $${datos.monto} ha sido recibido y tu licencia está activa.`;
+      }
+
+      await NotificacionService.crearNotificacion({
+        usuario_id: entidadActualizada.usuario_id,
+        titulo: titulo,
+        mensaje: mensaje,
+        tipo: "success"
+      });
+    } catch (errNotif) {
+      console.error("Error al enviar notificación de pago:", errNotif);
     }
 
     return entidadActualizada;

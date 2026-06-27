@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { TorneoService } from "../services/torneo.service";
 import { CompetenciaService } from "../services/competencia.service";
+import { supabaseAdmin } from "../config/supabase";
 
 export const getAllTorneos = async (
   req: Request,
@@ -187,5 +188,54 @@ export const moverParejaOverride = async (
     return res
       .status(400)
       .json({ message: "Error al mover pareja", error: error.message });
+  }
+};
+
+export const guardarZonasOverride = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const torneoId = req.params.id;
+    const { zonas, motivo } = req.body;
+    const admin_id = req.user?.id;
+    if (!admin_id) {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+    const resultado = await CompetenciaService.guardarZonas(
+      torneoId,
+      zonas,
+      motivo,
+      admin_id
+    );
+    return res.status(200).json(resultado);
+  } catch (error: any) {
+    return res
+      .status(400)
+      .json({ message: "Error al guardar zonas", error: error.message });
+  }
+};
+
+export const getAuditoriaByTorneo = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { data: logs, error } = await supabaseAdmin
+      .from("logs_auditoria")
+      .select(`
+        id,
+        accion,
+        detalles,
+        created_at,
+        perfiles!fk_logs_admin(nombre, apellido)
+      `)
+      .eq("entidad_afectada", req.params.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return res.status(200).json(logs);
+  } catch (error: any) {
+    return res.status(400).json({ message: "Error al obtener auditoría", error: error.message });
   }
 };

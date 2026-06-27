@@ -18,6 +18,20 @@ export class CompetenciaService {
    * Genera las zonas y partidos de la fase de grupos basándose en el reglamento FAP.
    */
   static async generarFaseGrupos(torneoId: string) {
+    // 0. LIMPIEZA PREVIA PARA EVITAR DUPLICADOS
+    await supabaseAdmin.from("partidos").delete().eq("torneo_id", torneoId);
+    
+    const { data: gruposViejos } = await supabaseAdmin
+      .from("grupos")
+      .select("id")
+      .eq("torneo_id", torneoId);
+      
+    if (gruposViejos && gruposViejos.length > 0) {
+      const grupoIds = gruposViejos.map((g) => g.id);
+      await supabaseAdmin.from("grupo_parejas").delete().in("grupo_id", grupoIds);
+    }
+    await supabaseAdmin.from("grupos").delete().eq("torneo_id", torneoId);
+
     // 1. OBTENER INSCRIPCIONES CONFIRMADAS
     const { data: inscripciones, error: errInsc } = await supabaseAdmin
       .from("inscripciones")
@@ -205,6 +219,41 @@ export class CompetenciaService {
       }
     }
 
+    // 6. GENERAR PARTIDOS DE PLAYOFF EN BLANCO (LLAVES)
+    const roundsConfig = [
+      { name: "OCTAVOS", matches: 8 },
+      { name: "CUARTOS", matches: 4 },
+      { name: "SEMIS", matches: 2 },
+      { name: "FINAL", matches: 1 },
+    ];
+    
+    // El número de jugadores que avanzan es totalZonas * 2
+    const advancingPlayers = cantidadZonas * 2;
+    const startIndex = roundsConfig.findIndex((r) => r.matches === advancingPlayers / 2);
+    
+    if (startIndex !== -1) {
+      const playoffPartidos = [];
+      let playoffOrden = 100; // Un orden alto para que queden después de los partidos de zona
+      
+      for (let i = startIndex; i < roundsConfig.length; i++) {
+        const round = roundsConfig[i];
+        for (let j = 0; j < round.matches; j++) {
+          playoffPartidos.push({
+            torneo_id: torneoId,
+            equipo_a_id: null,
+            equipo_b_id: null,
+            ronda: round.name,
+            orden: playoffOrden++,
+            estado_partido: "Programado",
+          });
+        }
+      }
+      
+      if (playoffPartidos.length > 0) {
+        await supabaseAdmin.from("partidos").insert(playoffPartidos);
+      }
+    }
+
     // Actualizamos el estado del torneo
     await supabaseAdmin
       .from("torneos")
@@ -235,7 +284,9 @@ export class CompetenciaService {
           inscripciones (
             id,
             jugador1_nombre,
-            jugador2_nombre
+            jugador2_nombre,
+            usuario_id,
+            usuario2_id
           )
         )
       `,
@@ -247,7 +298,56 @@ export class CompetenciaService {
       throw new Error(`Error al obtener zonas: ${error.message}`);
     }
 
-    return grupos;
+    if (!grupos) return [];
+
+    // Obtener los ids de usuario para consultar afiliaciones activas
+    const userIds: string[] = [];
+    grupos.forEach((g) => {
+      g.grupo_parejas?.forEach((gp: any) => {
+        if (gp.inscripciones) {
+          if (gp.inscripciones.usuario_id) userIds.push(gp.inscripciones.usuario_id);
+          if (gp.inscripciones.usuario2_id) userIds.push(gp.inscripciones.usuario2_id);
+        }
+      });
+    });
+
+    const afiliacionesMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: afs } = await supabaseAdmin
+        .from("afiliaciones")
+        .select("usuario_id, entidad")
+        .eq("estado", "activo")
+        .in("usuario_id", userIds);
+
+      afs?.forEach((a) => {
+        afiliacionesMap[a.usuario_id] = a.entidad;
+      });
+    }
+
+    // Mapear el nombre del club a la respuesta
+    const gruposConClub = grupos.map((g) => ({
+      ...g,
+      grupo_parejas: (g.grupo_parejas || []).map((gp: any) => {
+        const club1 = gp.inscripciones?.usuario_id ? afiliacionesMap[gp.inscripciones.usuario_id] : null;
+        const club2 = gp.inscripciones?.usuario2_id ? afiliacionesMap[gp.inscripciones.usuario2_id] : null;
+
+        let clubName = "Sin club asignado";
+        if (club1 && club2) {
+          clubName = `${club1} / ${club2}`;
+        } else if (club1) {
+          clubName = club1;
+        } else if (club2) {
+          clubName = club2;
+        }
+
+        return {
+          ...gp,
+          clubName,
+        };
+      }),
+    }));
+
+    return gruposConClub;
   }
 
   /**
@@ -260,6 +360,25 @@ export class CompetenciaService {
     motivo: string,
     adminId: string,
   ) {
+    // Obtener información de los grupos para saber el torneo_id y nombres de zonas
+    const { data: origenGrupo } = await supabaseAdmin
+      .from("grupos")
+      .select("torneo_id, nombre_grupo")
+      .eq("id", grupoOrigenId)
+      .single();
+
+    const { data: destinoGrupo } = await supabaseAdmin
+      .from("grupos")
+      .select("nombre_grupo")
+      .eq("id", grupoDestinoId)
+      .single();
+
+    if (!origenGrupo || !destinoGrupo) {
+      throw new Error("No se encontraron los grupos de origen o destino.");
+    }
+
+    const torneoId = origenGrupo.torneo_id;
+
     // 1. Eliminar de la zona original
     const { error: errDel } = await supabaseAdmin
       .from("grupo_parejas")
@@ -278,7 +397,11 @@ export class CompetenciaService {
 
     if (errIns) throw new Error(`Error insertando pareja: ${errIns.message}`);
 
-    // 3. Registrar auditoría
+    // 3. Re-generar los partidos para ambos grupos afectados
+    await CompetenciaService.regenerarPartidosDeGrupo(torneoId, grupoOrigenId, origenGrupo.nombre_grupo);
+    await CompetenciaService.regenerarPartidosDeGrupo(torneoId, grupoDestinoId, destinoGrupo.nombre_grupo);
+
+    // 4. Registrar auditoría
     await supabaseAdmin.from("logs_auditoria").insert({
       usuario_id_admin: adminId,
       accion: "mover_pareja_zona",
@@ -291,5 +414,155 @@ export class CompetenciaService {
     });
 
     return { exito: true, mensaje: "Pareja movida exitosamente" };
+  }
+
+  /**
+   * Regenera los partidos de un grupo específico a partir de las parejas actuales.
+   */
+  static async regenerarPartidosDeGrupo(
+    torneoId: string,
+    grupoId: string,
+    nombreGrupo: string,
+  ) {
+    // 1. Eliminar partidos previos de este grupo (solo si no tienen resultados cargados)
+    await supabaseAdmin
+      .from("partidos")
+      .delete()
+      .eq("torneo_id", torneoId)
+      .eq("ronda", nombreGrupo);
+
+    // 2. Obtener parejas actuales en el grupo ordenadas por seed
+    const { data: parejas } = await supabaseAdmin
+      .from("grupo_parejas")
+      .select("inscripcion_id, seed")
+      .eq("grupo_id", grupoId)
+      .order("seed", { ascending: true });
+
+    if (!parejas || parejas.length < 2) return;
+
+    const partidos = [];
+    if (parejas.length === 3) {
+      partidos.push({
+        torneo_id: torneoId,
+        ronda: nombreGrupo,
+        orden: 1,
+        equipo_a_id: parejas[0].inscripcion_id,
+        equipo_b_id: parejas[1].inscripcion_id,
+      });
+      partidos.push({
+        torneo_id: torneoId,
+        ronda: nombreGrupo,
+        orden: 2,
+        equipo_a_id: parejas[1].inscripcion_id,
+        equipo_b_id: parejas[2].inscripcion_id,
+      });
+      partidos.push({
+        torneo_id: torneoId,
+        ronda: nombreGrupo,
+        orden: 3,
+        equipo_a_id: parejas[0].inscripcion_id,
+        equipo_b_id: parejas[2].inscripcion_id,
+      });
+    } else if (parejas.length === 4) {
+      partidos.push({
+        torneo_id: torneoId,
+        ronda: nombreGrupo,
+        orden: 1,
+        equipo_a_id: parejas[0].inscripcion_id,
+        equipo_b_id: parejas[3].inscripcion_id,
+      });
+      partidos.push({
+        torneo_id: torneoId,
+        ronda: nombreGrupo,
+        orden: 2,
+        equipo_a_id: parejas[1].inscripcion_id,
+        equipo_b_id: parejas[2].inscripcion_id,
+      });
+      partidos.push({
+        torneo_id: torneoId,
+        ronda: nombreGrupo,
+        orden: 4,
+        estado_partido: "Pendiente Perdedores",
+      });
+    } else {
+      // Fallback genérico: Todos contra todos (Round Robin) para cualquier otro tamaño
+      let orden = 1;
+      for (let i = 0; i < parejas.length; i++) {
+        for (let j = i + 1; j < parejas.length; j++) {
+          partidos.push({
+            torneo_id: torneoId,
+            ronda: nombreGrupo,
+            orden: orden++,
+            equipo_a_id: parejas[i].inscripcion_id,
+            equipo_b_id: parejas[j].inscripcion_id,
+          });
+        }
+      }
+    }
+
+    if (partidos.length > 0) {
+      await supabaseAdmin.from("partidos").insert(partidos);
+    }
+  }
+
+  /**
+   * Guarda la disposición completa de las zonas y regenera sus respectivos fixtures.
+   */
+  static async guardarZonas(
+    torneoId: string,
+    zonas: { id: string; nombre: string; parejas: { id: string }[] }[],
+    motivo: string,
+    adminId: string,
+  ) {
+    // 1. Guardar la nueva distribución de parejas para cada zona
+    for (const z of zonas) {
+      // Eliminar las parejas anteriores del grupo
+      const { error: errDel } = await supabaseAdmin
+        .from("grupo_parejas")
+        .delete()
+        .eq("grupo_id", z.id);
+
+      if (errDel) {
+        throw new Error(`Error limpiando parejas de ${z.nombre}: ${errDel.message}`);
+      }
+
+      // Insertar las parejas actuales en el nuevo orden (los seeds quedan según su índice)
+      const toInsert = z.parejas.map((p, idx) => ({
+        grupo_id: z.id,
+        inscripcion_id: p.id,
+        seed: idx + 1,
+      }));
+
+      if (toInsert.length > 0) {
+        const { error: errIns } = await supabaseAdmin
+          .from("grupo_parejas")
+          .insert(toInsert);
+        if (errIns) {
+          throw new Error(`Error guardando parejas en ${z.nombre}: ${errIns.message}`);
+        }
+      }
+    }
+
+    // 2. Regenerar los partidos para cada una de las zonas guardadas
+    for (const z of zonas) {
+      await CompetenciaService.regenerarPartidosDeGrupo(torneoId, z.id, z.nombre);
+    }
+
+    // 3. Registrar auditoría única
+    await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: adminId,
+      accion: "guardar_zonas_completo",
+      entidad_afectada: torneoId,
+      detalles: {
+        zonas_actualizadas: zonas.map((z) => ({
+          grupo_id: z.id,
+          nombre: z.nombre,
+          parejas: z.parejas.map((p) => p.id),
+        })),
+        motivo: motivo,
+      },
+    });
+
+    return { exito: true, mensaje: "Distribución de zonas guardada exitosamente" };
   }
 }

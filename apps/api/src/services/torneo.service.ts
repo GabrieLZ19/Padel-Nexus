@@ -26,6 +26,31 @@ export interface TorneoPayload {
 }
 
 export class TorneoService {
+  // Helper para calcular estado dinámico (Cierre automático)
+  private static evaluateDynamicState(torneo: any) {
+    if (
+      (torneo.estado === FAP_ESTADOS_TORNEO.INSCRIPCION ||
+        torneo.estado === FAP_ESTADOS_TORNEO.CERRADO) &&
+      torneo.fecha
+    ) {
+      const fechaTorneo = new Date(torneo.fecha);
+      fechaTorneo.setHours(0, 0, 0, 0);
+      const fechaActual = new Date();
+      fechaActual.setHours(0, 0, 0, 0);
+
+      const diasFaltantes = Math.ceil(
+        (fechaTorneo.getTime() - fechaActual.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
+      if (diasFaltantes < FAP_REGLAS.DIAS_CIERRE_INSCRIPCION) {
+        torneo.estado = FAP_ESTADOS_TORNEO.CERRADO;
+      } else {
+        torneo.estado = FAP_ESTADOS_TORNEO.INSCRIPCION;
+      }
+    }
+    return torneo;
+  }
+
   static async listarTorneos(
     page?: number,
     limit: number = 10,
@@ -45,8 +70,14 @@ export class TorneoService {
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean);
-      if (estados.length === 1) query = query.eq("estado", estados[0]);
-      else if (estados.length > 1) query = query.in("estado", estados);
+      
+      // Si piden "Cerrado", buscamos también los de "Inscripción" para poder aplicarles la regla dinámica
+      const dbEstados = estados.includes(FAP_ESTADOS_TORNEO.CERRADO) && !estados.includes(FAP_ESTADOS_TORNEO.INSCRIPCION) 
+        ? [...estados, FAP_ESTADOS_TORNEO.INSCRIPCION]
+        : estados;
+
+      if (dbEstados.length === 1) query = query.eq("estado", dbEstados[0]);
+      else if (dbEstados.length > 1) query = query.in("estado", dbEstados);
     }
 
     type DbTorneo = Record<string, any> & {
@@ -54,29 +85,37 @@ export class TorneoService {
       cupos_maximos?: number;
     };
 
+    let data;
+    let count = 0;
+
     if (page !== undefined) {
       const from = (page - 1) * limit;
       const to = from + limit - 1;
-      const { data, error, count } = await query.range(from, to);
-      if (error) throw new Error(error.message);
+      const result = await query.range(from, to);
+      data = result.data;
+      count = result.count || 0;
+      if (result.error) throw new Error(result.error.message);
+    } else {
+      const result = await query.limit(limit);
+      data = result.data;
+      if (result.error) throw new Error(result.error.message);
+    }
 
-      const formatted = ((data as DbTorneo[]) || []).map((t) => ({
+    let formatted = ((data as DbTorneo[]) || []).map((t) =>
+      TorneoService.evaluateDynamicState({
         ...t,
         cupos_actuales: t.cupos_actuales || 0,
         cupos_maximos: t.cupos_maximos || 0,
-      }));
-      return { data: formatted, total: count || 0, paginated: true };
+      }),
+    );
+
+    // Si filtraron específicamente por estado en el query string, volver a filtrar en memoria por si el estado dinámico lo cambió
+    if (filtros?.estado) {
+      const requestedStates = filtros.estado.split(",").map(s => s.trim());
+      formatted = formatted.filter(t => requestedStates.includes(t.estado));
     }
 
-    const { data, error } = await query.limit(limit);
-    if (error) throw new Error(error.message);
-
-    const formatted = ((data as DbTorneo[]) || []).map((t) => ({
-      ...t,
-      cupos_actuales: t.cupos_actuales || 0,
-      cupos_maximos: t.cupos_maximos || 0,
-    }));
-    return { data: formatted, paginated: false };
+    return { data: formatted, total: count, paginated: page !== undefined };
   }
 
   static async obtenerPorId(id: string) {
@@ -87,19 +126,21 @@ export class TorneoService {
       .single();
 
     if (error || !data) throw new Error("Torneo no encontrado.");
-    return data;
+    return TorneoService.evaluateDynamicState(data);
   }
 
   static async crearTorneo(datos: TorneoPayload) {
+    const payload = TorneoService.evaluateDynamicState({ ...datos });
+
     const { data: torneo, error: torneoError } = await supabaseAdmin
       .from("torneos")
       .insert([
         {
-          nombre: datos.nombre,
-          subtitulo: datos.subtitulo,
-          club_id: datos.club_id,
-          fecha: datos.fecha,
-          estado: datos.estado,
+          nombre: payload.nombre,
+          subtitulo: payload.subtitulo,
+          club_id: payload.club_id,
+          fecha: payload.fecha,
+          estado: payload.estado,
           cupos_maximos: datos.cupos_maximos,
           cupos_actuales: 0,
           nivel: datos.nivel,
@@ -135,7 +176,22 @@ export class TorneoService {
   }
 
   static async actualizarTorneo(id: string, datos: any) {
+    const { data: torneoActual } = await supabaseAdmin
+      .from("torneos")
+      .select("estado, fecha")
+      .eq("id", id)
+      .single();
+
     const updateData: Record<string, any> = { ...datos };
+
+    if (torneoActual) {
+      const mergedForEval = { ...torneoActual, ...updateData };
+      const evaluated = TorneoService.evaluateDynamicState(mergedForEval);
+      if (evaluated.estado) {
+        updateData.estado = evaluated.estado;
+      }
+    }
+
     if (datos.premios) {
       updateData.premio_1 = datos.premios.uno;
       updateData.premio_2 = datos.premios.dos;
@@ -439,6 +495,167 @@ export class TorneoService {
               .eq("id", partidoDestino.id);
           }
         }
+      }
+    }
+
+    // Si el partido finalizado es de zona (ej. "Zona A"), verificar avance automático
+    if (partido.ronda.toUpperCase().startsWith("ZONA")) {
+      const { data: allGroupMatches } = await supabaseAdmin
+        .from("partidos")
+        .select("id, ronda, ganador, equipo_a_id, equipo_b_id, set1_a, set1_b")
+        .eq("torneo_id", partido.torneo_id)
+        .ilike("ronda", "Zona %");
+
+      const pendingCount = allGroupMatches?.filter((p) => p.ganador === null).length || 0;
+
+      if (pendingCount === 0 && allGroupMatches && allGroupMatches.length > 0) {
+        await avanzarJugadoresALlaves(partido.torneo_id, allGroupMatches);
+      }
+    }
+  }
+}
+
+async function avanzarJugadoresALlaves(torneoId: string, groupMatches: any[]) {
+  // 1. Obtener grupos y sus integrantes
+  const { data: grupos } = await supabaseAdmin
+    .from("grupos")
+    .select("id, nombre_grupo, grupo_parejas(inscripcion_id)")
+    .eq("torneo_id", torneoId)
+    .order("nombre_grupo");
+    
+  if (!grupos) return;
+  
+  // 2. Calcular tabla de posiciones de cada grupo
+  const standingsByGroup: Record<string, { id: string, points: number, diffSets: number }[]> = {};
+  
+  for (const g of grupos) {
+    const parejas = g.grupo_parejas || [];
+    const stats = parejas.map((p: any) => {
+      let points = 0;
+      let diffSets = 0;
+      let diffGames = 0;
+      let gamesAFavor = 0;
+      let gamesEnContra = 0;
+      
+      groupMatches.forEach((m) => {
+        if (m.ronda === g.nombre_grupo && m.ganador) {
+          if (m.equipo_a_id === p.inscripcion_id) {
+            const setsWon = Number(m.set1_a || 0);
+            const setsLost = Number(m.set1_b || 0);
+            diffSets += (setsWon - setsLost);
+            diffGames += (setsWon - setsLost);
+            gamesAFavor += setsWon;
+            gamesEnContra += setsLost;
+            if (m.ganador === p.inscripcion_id) {
+              points += 2;
+            } else {
+              points += 1;
+            }
+          } else if (m.equipo_b_id === p.inscripcion_id) {
+            const setsWon = Number(m.set1_b || 0);
+            const setsLost = Number(m.set1_a || 0);
+            diffSets += (setsWon - setsLost);
+            diffGames += (setsWon - setsLost);
+            gamesAFavor += setsWon;
+            gamesEnContra += setsLost;
+            if (m.ganador === p.inscripcion_id) {
+              points += 2;
+            } else {
+              points += 1;
+            }
+          }
+        }
+      });
+      return { id: p.inscripcion_id, points, diffSets, diffGames, gamesAFavor, gamesEnContra };
+    });
+    
+    // Group and sort using FAP tie-breaker rules
+    const groupsMap: Record<number, any[]> = {};
+    stats.forEach((team) => {
+      const pts = team.points;
+      if (!groupsMap[pts]) groupsMap[pts] = [];
+      groupsMap[pts].push(team);
+    });
+
+    const sortedPoints = Object.keys(groupsMap)
+      .map(Number)
+      .sort((a, b) => b - a);
+
+    const sortedStats: any[] = [];
+
+    for (const pts of sortedPoints) {
+      const tiedTeams = groupsMap[pts];
+      if (tiedTeams.length === 2) {
+        // Desempate Directo
+        const a = tiedTeams[0];
+        const b = tiedTeams[1];
+        const partidoDirecto = groupMatches.find(
+          (m) =>
+            m.ronda === g.nombre_grupo &&
+            m.ganador &&
+            ((m.equipo_a_id === a.id && m.equipo_b_id === b.id) ||
+              (m.equipo_a_id === b.id && m.equipo_b_id === a.id))
+        );
+        if (partidoDirecto && partidoDirecto.ganador) {
+          if (partidoDirecto.ganador === a.id) {
+            sortedStats.push(a, b);
+          } else {
+            sortedStats.push(b, a);
+          }
+        } else {
+          sortedStats.push(a, b);
+        }
+      } else if (tiedTeams.length >= 3) {
+        // Triple Empate
+        tiedTeams.sort((a, b) => {
+          if (a.diffSets !== b.diffSets) return b.diffSets - a.diffSets;
+          if (a.diffGames !== b.diffGames) return b.diffGames - a.diffGames;
+          if (a.gamesAFavor !== b.gamesAFavor) return b.gamesAFavor - a.gamesAFavor;
+          if (a.gamesEnContra !== b.gamesEnContra) return a.gamesEnContra - b.gamesEnContra;
+          return 0;
+        });
+        sortedStats.push(...tiedTeams);
+      } else {
+        sortedStats.push(...tiedTeams);
+      }
+    }
+    standingsByGroup[g.nombre_grupo] = sortedStats;
+  }
+  
+  // 3. Obtener nombres de zonas ordenadas (Zona A, Zona B...)
+  const groupNames = Object.keys(standingsByGroup).sort();
+  const n = groupNames.length;
+  
+  if (n < 2) return;
+  
+  // Determinar la ronda correspondiente al primer cruce de playoffs
+  const roundName = n === 2 ? "SEMIS" : n === 4 ? "CUARTOS" : n === 8 ? "OCTAVOS" : "16AVOS";
+  
+  const { data: playoffMatches } = await supabaseAdmin
+    .from("partidos")
+    .select("id")
+    .eq("torneo_id", torneoId)
+    .eq("ronda", roundName)
+    .order("orden", { ascending: true });
+     
+  if (playoffMatches && playoffMatches.length >= n) {
+    for (let k = 0; k < n; k++) {
+      // Pareja 1: El 1º del grupo k
+      const firstOfK = standingsByGroup[groupNames[k]]?.[0]?.id;
+      
+      // Pareja 2: El 2º del grupo (k ^ 1) [XOR 1 cruza 0 con 1, 2 con 3, etc.]
+      const opponentIndex = k ^ 1;
+      const secondOfOpponent = standingsByGroup[groupNames[opponentIndex]]?.[1]?.id;
+       
+      if (firstOfK && secondOfOpponent) {
+        await supabaseAdmin
+          .from("partidos")
+          .update({ 
+            equipo_a_id: firstOfK, 
+            equipo_b_id: secondOfOpponent,
+            estado_partido: "Programado"
+          })
+          .eq("id", playoffMatches[k].id);
       }
     }
   }

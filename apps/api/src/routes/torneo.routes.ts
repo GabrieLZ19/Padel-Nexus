@@ -11,6 +11,8 @@ import {
   generarCuadros,
   getZonasByTorneo,
   moverParejaOverride,
+  guardarZonasOverride,
+  getAuditoriaByTorneo,
 } from "../controllers/torneo.controller";
 import { generarZonas } from "../controllers/competencia.controller";
 import { obtenerPosicionesZona } from "../controllers/clasificacion.controller";
@@ -74,6 +76,16 @@ router.put(
   "/override/mover-pareja",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   moverParejaOverride,
+);
+router.put(
+  "/:id/guardar-zonas",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  guardarZonasOverride,
+);
+router.get(
+  "/:id/auditoria",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  getAuditoriaByTorneo,
 );
 
 export default router;

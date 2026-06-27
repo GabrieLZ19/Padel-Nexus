@@ -83,54 +83,64 @@ export class ClasificacionService {
       }
     });
 
-    // 4. ORDENAMIENTO REGLAMENTARIO FAP
+    // 4. ORDENAMIENTO REGLAMENTARIO FAP CON DESEMPATES
     const tabla = Object.values(stats);
 
-    tabla.sort((a, b) => {
-      // Prioridad 0 común: Partidos Ganados
-      if (a.partidosGanados !== b.partidosGanados) {
-        return b.partidosGanados - a.partidosGanados;
-      }
-
-      // Si hay empate en Partidos Ganados, aplicamos el reglamento
-      if (capacidadZona === 4) {
-        // REGLA FAP (Zona de 4): Prioridad al Resultado en Cancha
-        const partidoDirecto = partidos.find(
-          (p) =>
-            (p.equipo_a_id === a.inscripcionId &&
-              p.equipo_b_id === b.inscripcionId) ||
-            (p.equipo_a_id === b.inscripcionId &&
-              p.equipo_b_id === a.inscripcionId),
-        );
-        if (partidoDirecto && partidoDirecto.ganador) {
-          return partidoDirecto.ganador === a.inscripcionId ? -1 : 1;
-        }
-      }
-
-      // REGLA FAP COMÚN / ZONA DE 3:
-      // 1. Diferencia de Set [cite: 127, 136]
-      const difSetA = a.setsAFavor - a.setsEnContra;
-      const difSetB = b.setsAFavor - b.setsEnContra;
-      if (difSetA !== difSetB) return difSetB - difSetA;
-
-      // 2. Diferencia de Game [cite: 128, 137]
-      const difGameA = a.gamesAFavor - a.gamesEnContra;
-      const difGameB = b.gamesAFavor - b.gamesEnContra;
-      if (difGameA !== difGameB) return difGameB - difGameA;
-
-      // 3. Games a Favor [cite: 129, 138]
-      if (a.gamesAFavor !== b.gamesAFavor) return b.gamesAFavor - a.gamesAFavor;
-
-      // 4. Games en Contra [cite: 130, 139]
-      // (Quien tenga menos games en contra es mejor)
-      if (a.gamesEnContra !== b.gamesEnContra)
-        return a.gamesEnContra - b.gamesEnContra;
-
-      // 5. Triple Empate en Zona de 3: Resultado en Cancha / Sorteo [cite: 131, 140]
-      // En este punto (empate absoluto), el reglamento indica "sorteo" o revisión técnica manual.
-      return 0;
+    const groups: Record<number, EstadisticasPareja[]> = {};
+    tabla.forEach((team) => {
+      const wins = team.partidosGanados;
+      if (!groups[wins]) groups[wins] = [];
+      groups[wins].push(team);
     });
 
-    return tabla;
+    const sortedWins = Object.keys(groups)
+      .map(Number)
+      .sort((a, b) => b - a);
+
+    const resultadoOrdenado: EstadisticasPareja[] = [];
+
+    for (const wins of sortedWins) {
+      const tiedTeams = groups[wins];
+      
+      if (tiedTeams.length === 2) {
+        // Desempate Directo por confrontación entre sí (Regla FAP para 2 empatados)
+        const a = tiedTeams[0];
+        const b = tiedTeams[1];
+        const partidoDirecto = partidos.find(
+          (p) =>
+            (p.equipo_a_id === a.inscripcionId && p.equipo_b_id === b.inscripcionId) ||
+            (p.equipo_a_id === b.inscripcionId && p.equipo_b_id === a.inscripcionId)
+        );
+        if (partidoDirecto && partidoDirecto.ganador) {
+          if (partidoDirecto.ganador === a.inscripcionId) {
+            resultadoOrdenado.push(a, b);
+          } else {
+            resultadoOrdenado.push(b, a);
+          }
+        } else {
+          resultadoOrdenado.push(a, b);
+        }
+      } else if (tiedTeams.length >= 3) {
+        // Desempate para triple empate (sets, games a favor, games en contra)
+        tiedTeams.sort((a, b) => {
+          const difSetA = a.setsAFavor - a.setsEnContra;
+          const difSetB = b.setsAFavor - b.setsEnContra;
+          if (difSetA !== difSetB) return difSetB - difSetA;
+
+          const difGameA = a.gamesAFavor - a.gamesEnContra;
+          const difGameB = b.gamesAFavor - b.gamesEnContra;
+          if (difGameA !== difGameB) return difGameB - difGameA;
+
+          if (a.gamesAFavor !== b.gamesAFavor) return b.gamesAFavor - a.gamesAFavor;
+          if (a.gamesEnContra !== b.gamesEnContra) return a.gamesEnContra - b.gamesEnContra;
+          return 0;
+        });
+        resultadoOrdenado.push(...tiedTeams);
+      } else {
+        resultadoOrdenado.push(...tiedTeams);
+      }
+    }
+
+    return resultadoOrdenado;
   }
 }
