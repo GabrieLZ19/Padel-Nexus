@@ -248,9 +248,21 @@ export default function Navbar() {
           <div className="px-6 py-5 space-y-4">
             {profile && (
               <div className="flex items-center gap-3 px-2 pb-4 border-b border-brand-white/5">
-                <div className="size-10 rounded-full bg-brand-chartreuse text-brand-black flex items-center justify-center text-sm font-bold">
-                  {userInitials}
-                </div>
+                {avatarUrl ? (
+                  <div className="relative size-10">
+                    <Image
+                      src={avatarUrl}
+                      alt="Perfil"
+                      fill
+                      className="rounded-full object-cover"
+                      sizes="40px"
+                    />
+                  </div>
+                ) : (
+                  <div className="size-10 rounded-full bg-brand-chartreuse text-brand-black flex items-center justify-center text-sm font-bold">
+                    {userInitials}
+                  </div>
+                )}
                 <div>
                   <p className="text-sm font-bold text-brand-white truncate">
                     {userName}
