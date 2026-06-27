@@ -140,7 +140,7 @@ export default function TorneoDetallePage() {
           error instanceof Error ? error.message : "Fallo la generación.";
         setFeedbackModal({
           isOpen: true,
-          type: "danger",
+          type: "error",
           title: "Error operativo",
           description: errMsg,
           onClose: () =>
@@ -212,7 +212,7 @@ export default function TorneoDetallePage() {
           : "Error al impactar el marcador.";
       setFeedbackModal({
         isOpen: true,
-        type: "danger",
+        type: "error",
         title: "Error al guardar",
         description: errMsg,
         onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),

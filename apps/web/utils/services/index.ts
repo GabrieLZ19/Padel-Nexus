@@ -6,3 +6,4 @@ export * from "./pagos";
 export * from "./ranking";
 export * from "./licencias";
 export * from "./inscripciones";
+export * from "./notificaciones";

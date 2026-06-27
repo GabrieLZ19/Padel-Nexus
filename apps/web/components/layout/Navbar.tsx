@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useProfileStore } from "@/store/useProfileStore";
+import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -68,7 +69,7 @@ export default function Navbar() {
           .join("")
           .substring(0, 2)
           .toUpperCase()
-      : "PN"; // Fallback transitorio
+          : "PN"; // Fallback transitorio
 
   const avatarUrl = profile?.avatar_url || null;
 
@@ -113,6 +114,9 @@ export default function Navbar() {
           <button className="w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200 cursor-pointer">
             <Search className="size-5" />
           </button>
+
+          {/* Centro de Notificaciones */}
+          <NotificationCenter />
 
           {/* Botón Descargar App */}
           <button className="hidden md:flex items-center gap-2 bg-brand-chartreuse hover:opacity-90 text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-sm shadow-brand-chartreuse/20 cursor-pointer">

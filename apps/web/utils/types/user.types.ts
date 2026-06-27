@@ -11,6 +11,7 @@ export interface Afiliacion {
   entidad: string;
   estado: string;
   fecha_vencimiento: string;
+  vencimiento?: string; // Para compatibilidad de esquema según requerimiento
   created_at?: string;
 }
 
@@ -59,4 +60,15 @@ export interface LogAuditoria {
   entidad_afectada: string;
   detalles?: Record<string, unknown> | null;
   created_at?: string;
+}
+
+export interface Notificacion {
+  id: string;
+  usuario_id: string;
+  titulo: string;
+  mensaje: string;
+  tipo: "info" | "success" | "warning" | "error";
+  leido: boolean;
+  metadata?: Record<string, any>;
+  created_at: string;
 }

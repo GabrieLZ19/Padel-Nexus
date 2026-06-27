@@ -4,9 +4,10 @@ import QRCode from "react-qr-code";
 
 interface Props {
   usuarioId: string;
+  licenciaId?: string;
 }
 
-export default function CredencialDigital({ usuarioId }: Props) {
+export default function CredencialDigital({ usuarioId, licenciaId }: Props) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   // Si no hay origin todavía (fase de render inicial), mostramos el placeholder
@@ -16,7 +17,9 @@ export default function CredencialDigital({ usuarioId }: Props) {
     );
   }
 
-  const verificationUrl = `${origin}/verificar/${usuarioId}`;
+  const verificationUrl = licenciaId
+    ? `${origin}/verificar/${usuarioId}?licencia=${licenciaId}`
+    : `${origin}/verificar/${usuarioId}`;
 
   return (
     <div className="bg-white p-2.5 rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.1)] flex items-center justify-center">

@@ -5,7 +5,7 @@ interface DatosSolicitud {
   nombre: string;
   apellido: string;
   documento: string;
-  club: string;
+  club_id: string;
   provincia: string;
 }
 
@@ -48,9 +48,10 @@ export const LicenciasService = {
   },
 
   // Para el Admin (Actualización de estado)
-  async updateEstado(id: string, estado: string): Promise<Licencia> {
+  async updateEstado(id: string, estado: string, fecha_vencimiento?: string): Promise<Licencia> {
     const response = await api.patch<Licencia>(`/licencias/${id}/estado`, {
       estado,
+      fecha_vencimiento,
     });
     return response.data;
   },

@@ -113,7 +113,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         } catch (error: any) {
           setFeedbackModal({
             isOpen: true,
-            type: "danger",
+            type: "error",
             title: "Error",
             description: error.message || "Error al mover la pareja.",
             onClose: () =>

@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, AlertTriangle, Trash2, Info, X } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Trash2, Info, X, XCircle } from "lucide-react";
 
 export interface FeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   description: string;
-  type?: "success" | "danger" | "warning" | "info";
+  type?: "success" | "danger" | "warning" | "info" | "error";
   confirmText?: string;
   cancelText?: string;
   isLoading?: boolean;
@@ -58,6 +58,14 @@ export default function FeedbackModal({
     },
     danger: {
       icon: Trash2,
+      color: "text-red-500",
+      bg: "bg-red-500/10",
+      border: "border-red-500/20",
+      btnClass:
+        "bg-red-500 text-white hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.2)]",
+    },
+    error: {
+      icon: XCircle,
       color: "text-red-500",
       bg: "bg-red-500/10",
       border: "border-red-500/20",

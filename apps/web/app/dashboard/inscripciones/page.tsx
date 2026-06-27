@@ -131,7 +131,7 @@ export default function GestionInscripcionesPage() {
           } catch (error: any) {
             setFeedbackModal({
               isOpen: true,
-              type: "danger",
+              type: "error",
               title: "Error al procesar pago",
               description: error.message || "Error al registrar el pago manual.",
               onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),

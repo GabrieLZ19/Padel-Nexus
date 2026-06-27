@@ -1,23 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Trophy, CreditCard, Users, ClipboardList } from "lucide-react";
+import {
+  Trophy,
+  CreditCard,
+  Users,
+  ClipboardList,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
+import { useSocket } from "@/hooks/useSocket";
 import CredencialDigital from "@/components/perfil/CredencialDigital";
-import LicenciaModal from "@/components/perfil/LicencialModal";
+import LicenciaModal from "@/components/perfil/LicenciaModal";
 
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-white/5 rounded-3xl ${className}`} />
 );
 
+const LICENSE_RELATED_TITLES = [
+  "Licencia Aprobada",
+  "Licencia Suspendida",
+  "Solicitud de Alta Rechazada",
+];
+
 export default function PlayerDashboard() {
   const { profile, fetchProfile } = useProfileStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeLicenciaIndex, setActiveLicenciaIndex] = useState(0);
 
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  // Refrescar el perfil en tiempo real cuando cambia el estado de una licencia
+  const handleSocketNotif = useCallback(
+    (notif: { titulo: string }) => {
+      if (LICENSE_RELATED_TITLES.includes(notif.titulo)) {
+        fetchProfile();
+      }
+    },
+    [fetchProfile],
+  );
+
+  useSocket(handleSocketNotif);
 
   return (
     <main className="max-w-6xl mx-auto p-5 md:p-10 space-y-8 md:space-y-10 relative isolate">
@@ -71,27 +98,88 @@ export default function PlayerDashboard() {
 
               <div className="w-full flex flex-col items-center relative z-10">
                 {profile.licencias && profile.licencias.length > 0 ? (
-                  profile.licencias[0].estado === "Activa" ? (
-                    <div className="flex flex-col items-center w-full">
-                      <div className="w-full max-w-50 md:max-w-55 flex justify-center drop-shadow-[0_0_30px_rgba(203,254,1,0.1)]">
-                        <CredencialDigital usuarioId={profile.id} />
+                  (() => {
+                    const licList = profile.licencias;
+                    const index =
+                      activeLicenciaIndex < licList.length
+                        ? activeLicenciaIndex
+                        : 0;
+                    const currentLic = licList[index];
+
+                    return (
+                      <div className="w-full flex flex-col items-center">
+                        {/* Selector de Licencias si hay más de una */}
+                        {licList.length > 1 && (
+                          <div className="flex items-center justify-between w-full max-w-60 mb-4 bg-brand-black/40 border border-brand-white/5 rounded-xl p-1.5">
+                            <button
+                              onClick={() =>
+                                setActiveLicenciaIndex((prev) =>
+                                  prev === 0 ? licList.length - 1 : prev - 1,
+                                )
+                              }
+                              className="p-1 hover:text-brand-chartreuse text-gray-400 transition-colors cursor-pointer"
+                            >
+                              <ChevronLeft className="size-5" />
+                            </button>
+                            <span className="text-xs font-bold text-gray-300">
+                              Ficha {index + 1} de {licList.length}
+                            </span>
+                            <button
+                              onClick={() =>
+                                setActiveLicenciaIndex((prev) =>
+                                  prev === licList.length - 1 ? 0 : prev + 1,
+                                )
+                              }
+                              className="p-1 hover:text-brand-chartreuse text-gray-400 transition-colors cursor-pointer"
+                            >
+                              <ChevronRight className="size-5" />
+                            </button>
+                          </div>
+                        )}
+
+                        {currentLic.estado === "Activa" ? (
+                          <div className="flex flex-col items-center w-full">
+                            <div className="w-full max-w-50 md:max-w-55 flex justify-center drop-shadow-[0_0_30px_rgba(203,254,1,0.1)]">
+                              <CredencialDigital
+                                usuarioId={profile.id}
+                                licenciaId={currentLic.id}
+                              />
+                            </div>
+                            <h2 className="text-xl md:text-2xl font-bold mt-5 text-brand-white tracking-wider">
+                              {currentLic.nro_licencia}
+                            </h2>
+                            <p className="text-xs md:text-sm text-brand-chartreuse uppercase font-black tracking-widest mt-1">
+                              Estado: Activa
+                            </p>
+                          </div>
+                        ) : currentLic.estado === "Pendiente" ? (
+                          <div className="w-full flex flex-col items-center gap-3">
+                            <div className="w-full p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-500 text-sm font-medium text-center">
+                              En revisión administrativa
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-400 font-mono">
+                              {currentLic.nro_licencia}
+                            </h2>
+                          </div>
+                        ) : (
+                          <div className="w-full flex flex-col items-center gap-3">
+                            <div className="w-full p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm  text-center uppercase font-bold">
+                              {currentLic.estado}
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-400 font-mono">
+                              {currentLic.nro_licencia}
+                            </h2>
+                            <button
+                              onClick={() => setIsModalOpen(true)}
+                              className="w-full max-w-60 bg-brand-chartreuse text-brand-black font-bold py-2.5 px-4 rounded-xl hover:opacity-95 transition-all shadow-md cursor-pointer text-xs"
+                            >
+                              Solicitar Reingreso
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <h2 className="text-xl md:text-2xl font-bold mt-5 text-brand-white tracking-wider">
-                        {profile.licencias[0].nro_licencia}
-                      </h2>
-                      <p className="text-xs md:text-sm text-brand-chartreuse uppercase font-black tracking-widest mt-1">
-                        Estado: Activa
-                      </p>
-                    </div>
-                  ) : profile.licencias[0].estado === "Pendiente" ? (
-                    <div className="w-full p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-500 text-sm font-medium text-center">
-                      En revisión administrativa
-                    </div>
-                  ) : (
-                    <h2 className="text-xl font-bold mt-2 text-red-500 uppercase">
-                      {profile.licencias[0].estado}
-                    </h2>
-                  )
+                    );
+                  })()
                 ) : (
                   <button
                     onClick={() => setIsModalOpen(true)}
@@ -101,6 +189,50 @@ export default function PlayerDashboard() {
                   </button>
                 )}
               </div>
+
+              {/* Afiliaciones cruzadas */}
+              {profile.licencias && profile.licencias.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-brand-white/5 w-full relative z-10 flex flex-col items-center">
+                  {profile.afiliaciones &&
+                  profile.afiliaciones.filter(
+                    (af) => af.estado !== "suspendido",
+                  ).length > 0 ? (
+                    <>
+                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2">
+                        Clubes Afiliados (
+                        {
+                          profile.afiliaciones.filter(
+                            (af) => af.estado !== "suspendido",
+                          ).length
+                        }
+                        )
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-1.5 max-h-24 overflow-y-auto pr-1 mb-3 w-full">
+                        {profile.afiliaciones
+                          .filter((af) => af.estado !== "suspendido")
+                          .map((af) => (
+                            <span
+                              key={af.id}
+                              className="px-2.5 py-1 bg-brand-chartreuse/10 border border-brand-chartreuse/25 rounded-lg text-[9px] text-brand-chartreuse font-extrabold uppercase tracking-wider"
+                            >
+                              {af.entidad}
+                            </span>
+                          ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic mb-3">
+                      Sin clubes activos.
+                    </p>
+                  )}
+                  <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="w-full max-w-50 py-2 bg-brand-white/5 hover:bg-brand-white/10 text-brand-white border border-brand-white/10 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    + Afiliarse a otro club
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* 2. Categoría - Banner Horizontal */}

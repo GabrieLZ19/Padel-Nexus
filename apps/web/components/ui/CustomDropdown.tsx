@@ -55,8 +55,8 @@ export default function CustomDropdown({
           isOpen
             ? "border-brand-chartreuse ring-1 ring-brand-chartreuse shadow-[0_0_15px_rgba(203,254,1,0.05)]"
             : hasError
-            ? "border-red-500/50 hover:border-red-500/80"
-            : "border-brand-white/5 hover:border-brand-white/10"
+              ? "border-red-500/50 hover:border-red-500/80"
+              : "border-brand-white/5 hover:border-brand-white/10"
         } ${
           disabled
             ? "opacity-40 cursor-not-allowed text-gray-500"
@@ -85,7 +85,7 @@ export default function CustomDropdown({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: haciaArriba ? -4 : 4 }}
             transition={{ duration: 0.12, ease: "easeOut" }}
-            className={`absolute left-0 right-0 bg-brand-card border border-brand-white/10 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] z-500 overflow-hidden max-h-52 overflow-y-auto 
+            className={`absolute left-0 right-0 bg-brand-card border border-brand-white/10 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] z-60 overflow-hidden max-h-52 overflow-y-auto 
             [&::-webkit-scrollbar]:w-1.5 
             [&::-webkit-scrollbar-track]:bg-transparent 
             [&::-webkit-scrollbar-thumb]:bg-brand-white/10 

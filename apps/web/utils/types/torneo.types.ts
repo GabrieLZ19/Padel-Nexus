@@ -26,6 +26,7 @@ export interface Torneo {
   premio_1?: string | null;
   premio_2?: string | null;
   premio_3?: string | null;
+  lugar?: string | null;
 
   // Relaciones
   clubes?: Partial<Club> | null;

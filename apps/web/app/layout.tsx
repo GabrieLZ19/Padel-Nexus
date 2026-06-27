@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Toaster } from "sileo";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,7 +31,21 @@ export default function RootLayout({
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Toaster
+          position="top-right"
+          options={{
+            fill: "#0b0b0b",
+            roundness: 14,
+            styles: {
+              title: "!text-white !font-bold",
+              description: "!text-gray-300",
+              badge: "!bg-[#cbfe01] !text-black",
+            },
+          }}
+        />
+      </body>
     </html>
   );
 }

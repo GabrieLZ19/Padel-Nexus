@@ -110,7 +110,7 @@ export default function GestionClubesPage() {
 
         setFeedbackModal({
           isOpen: true,
-          type: "danger",
+          type: "error",
           title: "Acceso denegado",
           description: `No pudimos guardar el club. Detalle: ${mensajeError}`,
           onClose: () =>
