@@ -24,13 +24,14 @@ export const RankingsController = {
 
   async obtenerRankingGlobal(req: Request, res: Response): Promise<Response> {
     try {
-      const { categoria, alcance, scope, provincia } = req.query;
+      const { categoria, alcance, scope, provincia, pais } = req.query;
       const alcanceFinal = (alcance || scope) as string | undefined;
 
       const data = await RankingService.obtenerRankingGlobal(
         categoria as string | undefined,
         alcanceFinal,
         provincia as string | undefined,
+        (pais as string | undefined) || "Argentina",
       );
 
       return res.status(200).json({ exito: true, data });

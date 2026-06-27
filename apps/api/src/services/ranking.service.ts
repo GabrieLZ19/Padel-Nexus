@@ -48,6 +48,7 @@ export class RankingService {
     categoria?: string,
     alcance: string = "Provincial",
     provincia?: string,
+    pais?: string,
   ) {
     let query = supabaseAdmin
       .from("rankings")
@@ -58,13 +59,16 @@ export class RankingService {
           nombre,
           apellido,
           avatar_url,
-          lugar_residencia
+          lugar_residencia,
+          pais
         )
       `,
       );
 
-    if (alcance && alcance !== "Global") {
-      query = query.eq("alcance", alcance);
+    const alcanceBusqueda = alcance === "Nacional" ? "Provincial" : alcance;
+
+    if (alcanceBusqueda && alcanceBusqueda !== "Global") {
+      query = query.eq("alcance", alcanceBusqueda);
     }
 
     query = query.order("puntos", { ascending: false }).limit(100);
@@ -73,7 +77,11 @@ export class RankingService {
       query = query.eq("categoria", categoria);
     }
 
-    if (provincia) {
+    if (alcance === "Nacional" && pais) {
+      query = query.eq("perfiles.pais", pais);
+    }
+
+    if (provincia && alcance !== "Global" && alcance !== "Nacional") {
       query = query.eq("perfiles.lugar_residencia", provincia);
     }
 
@@ -85,18 +93,62 @@ export class RankingService {
 
     // Tipamos la respuesta para evitar 'any' de manera segura
     type RowRanking = Record<string, unknown> & {
+      usuario_id: string;
       pj?: number;
       pg?: number;
       tendencia?: number;
+      perfiles?: Record<string, unknown>;
     };
 
-    return ((data as RowRanking[]) || []).map((jugador, index) => ({
-      ...jugador,
-      posicion_actual: index + 1,
-      pj: jugador.pj || 0,
-      pg: jugador.pg || 0,
-      tendencia: jugador.tendencia || 0,
-    }));
+    // Obtener los IDs de los usuarios para buscar afiliaciones activas
+    const userIds = ((data as RowRanking[]) || []).map((jugador) => jugador.usuario_id);
+    const afiliacionesMap: Record<string, { nombre: string; provincia: string }> = {};
+
+    if (userIds.length > 0) {
+      const { data: afs } = await supabaseAdmin
+        .from("afiliaciones")
+        .select("usuario_id, entidad")
+        .eq("estado", "activo")
+        .in("usuario_id", userIds);
+
+      const nombresClubes = Array.from(new Set(afs?.map((a) => a.entidad).filter(Boolean) || []));
+      const clubesMap: Record<string, string> = {};
+
+      if (nombresClubes.length > 0) {
+        const { data: clubs } = await supabaseAdmin
+          .from("clubes")
+          .select("nombre, provincia")
+          .in("nombre", nombresClubes);
+
+        clubs?.forEach((c) => {
+          clubesMap[c.nombre] = c.provincia;
+        });
+      }
+
+      afs?.forEach((a) => {
+        afiliacionesMap[a.usuario_id] = {
+          nombre: a.entidad,
+          provincia: clubesMap[a.entidad] || "",
+        };
+      });
+    }
+
+    return ((data as RowRanking[]) || []).map((jugador, index) => {
+      const perfilObj = jugador.perfiles || {};
+      const clubInfo = afiliacionesMap[jugador.usuario_id] || null;
+
+      return {
+        ...jugador,
+        posicion_actual: index + 1,
+        pj: jugador.pj || 0,
+        pg: jugador.pg || 0,
+        tendencia: jugador.tendencia || 0,
+        perfiles: {
+          ...perfilObj,
+          clubes: clubInfo,
+        },
+      };
+    });
   }
 
   /**
