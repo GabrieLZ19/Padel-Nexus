@@ -48,7 +48,7 @@ export default function RankingPublicPage() {
       try {
         const params = {
           scope: activeScope,
-          provincia: activeScope === "Global" ? undefined : activeProvincia,
+          provincia: activeScope === "Provincial" ? activeProvincia : undefined,
           categoria: activeCategory === "Todas" ? undefined : activeCategory,
         };
 
@@ -98,7 +98,7 @@ export default function RankingPublicPage() {
   const top1 = sortedRankings[0] || null;
   const top2 = sortedRankings[1] || null;
   const top3 = sortedRankings[2] || null;
-  const tablePlayers = sortedRankings.slice(3);
+  const tablePlayers = sortedRankings;
 
   const opcionesProvincias = PROVINCIAS_ARG.map((p) => ({
     value: p.value,
@@ -167,7 +167,7 @@ export default function RankingPublicPage() {
 
             {/* Dropdowns */}
             <div className="flex gap-3 w-full lg:w-auto z-30">
-              {activeScope !== "Global" && (
+              {activeScope === "Provincial" && (
                 <div className="flex-1 lg:w-48 h-13">
                   <CustomDropdown
                     value={activeProvincia}
@@ -313,7 +313,7 @@ export default function RankingPublicPage() {
             {/* VISTA MÓVIL: TARJETAS */}
             <div className="md:hidden flex flex-col gap-3">
               {tablePlayers.map((player, index) => {
-                const posicionReal = index + 4;
+                const posicionReal = index + 1;
                 return (
                   <div
                     key={player.id}
@@ -384,7 +384,7 @@ export default function RankingPublicPage() {
                         partidosJugados > 0
                           ? `${Math.round((partidosGanados / partidosJugados) * 100)}%`
                           : "0%";
-                      const posicionReal = index + 4;
+                      const posicionReal = index + 1;
 
                       return (
                         <tr
