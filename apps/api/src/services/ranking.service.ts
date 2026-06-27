@@ -47,6 +47,7 @@ export class RankingService {
   static async obtenerRankingGlobal(
     categoria?: string,
     alcance: string = "Provincial",
+    provincia?: string,
   ) {
     let query = supabaseAdmin
       .from("rankings")
@@ -60,18 +61,27 @@ export class RankingService {
           lugar_residencia
         )
       `,
-      )
-      .eq("alcance", alcance)
-      .order("puntos", { ascending: false })
-      .limit(100);
+      );
+
+    if (alcance && alcance !== "Global") {
+      query = query.eq("alcance", alcance);
+    }
+
+    query = query.order("puntos", { ascending: false }).limit(100);
 
     if (categoria && categoria !== "Todas") {
       query = query.eq("categoria", categoria);
     }
 
+    if (provincia) {
+      query = query.eq("perfiles.lugar_residencia", provincia);
+    }
+
     const { data, error } = await query;
-    if (error)
+    if (error) {
+      console.error("Error al obtener ranking global:", error);
       throw new Error("Error interno al obtener el listado de clasificación.");
+    }
 
     // Tipamos la respuesta para evitar 'any' de manera segura
     type RowRanking = Record<string, unknown> & {
