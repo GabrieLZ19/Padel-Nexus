@@ -98,7 +98,7 @@ export class RankingService {
     // Buscamos si ya tiene una billetera existente en esa categoría y alcance
     const { data: rankingActual } = await supabaseAdmin
       .from("rankings")
-      .select("puntos")
+      .select("id, puntos")
       .eq("usuario_id", datos.usuarioId)
       .eq("categoria", datos.categoria)
       .eq("alcance", alcanceFinal)
@@ -110,6 +110,7 @@ export class RankingService {
     // Actualizamos o insertamos de forma segura con un upsert reglamentario
     const { error: rankError } = await supabaseAdmin.from("rankings").upsert(
       {
+        ...(rankingActual?.id ? { id: rankingActual.id } : {}),
         usuario_id: datos.usuarioId,
         puntos: nuevosPuntos,
         categoria: datos.categoria,
@@ -119,13 +120,15 @@ export class RankingService {
       { onConflict: "id" }, // Usamos la clave primaria por seguridad de restricciones
     );
 
-    if (rankError)
+    if (rankError) {
+      console.error(`Error al actualizar la billetera de puntos para usuario ${datos.usuarioId}:`, rankError);
       throw new Error(
         `Error al actualizar la billetera de puntos: ${rankError.message}`,
       );
+    }
 
     // Dejamos registro en el historial para auditorías deportivas
-    await supabaseAdmin.from("historial_ranking").insert([
+    const { error: histError } = await supabaseAdmin.from("historial_ranking").insert([
       {
         usuario_id: datos.usuarioId,
         torneo_id: datos.torneoId,
@@ -133,6 +136,11 @@ export class RankingService {
         puntos_nuevos: nuevosPuntos,
       },
     ]);
+
+    if (histError) {
+      console.error(`Error al insertar historial de ranking para usuario ${datos.usuarioId}:`, histError);
+      throw new Error(`Error al registrar en historial de ranking: ${histError.message}`);
+    }
 
     return nuevosPuntos;
   }

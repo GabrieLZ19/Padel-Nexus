@@ -407,7 +407,7 @@ export class TorneoService {
         for (const uid of ids) {
           const { data: rank } = await supabaseAdmin
             .from("rankings")
-            .select("puntos, pj, pg")
+            .select("id, puntos, pj, pg")
             .eq("usuario_id", uid)
             .eq("categoria", torneoInfo.nivel)
             .maybeSingle();
@@ -416,8 +416,9 @@ export class TorneoService {
           const pjAnt = rank?.pj || 0;
           const pgAnt = rank?.pg || 0;
 
-          await supabaseAdmin.from("rankings").upsert(
+          const { error: rankError } = await supabaseAdmin.from("rankings").upsert(
             {
+              ...(rank?.id ? { id: rank.id } : {}),
               usuario_id: uid,
               categoria: torneoInfo.nivel,
               rama: torneoInfo.categoria,
@@ -428,8 +429,13 @@ export class TorneoService {
             { onConflict: "id" }, // Ajustado a id por consistencia estructural
           );
 
+          if (rankError) {
+            console.error(`Error al actualizar ranking para usuario ${uid}:`, rankError);
+            throw new Error(`Error al actualizar ranking: ${rankError.message}`);
+          }
+
           if (puntos > 0) {
-            await supabaseAdmin.from("historial_ranking").insert([
+            const { error: histError } = await supabaseAdmin.from("historial_ranking").insert([
               {
                 usuario_id: uid,
                 torneo_id: partido.torneo_id,
@@ -437,6 +443,10 @@ export class TorneoService {
                 puntos_nuevos: pAnt + puntos,
               },
             ]);
+            if (histError) {
+              console.error(`Error al insertar historial de ranking para usuario ${uid}:`, histError);
+              throw new Error(`Error al insertar historial de ranking: ${histError.message}`);
+            }
           }
         }
       };
