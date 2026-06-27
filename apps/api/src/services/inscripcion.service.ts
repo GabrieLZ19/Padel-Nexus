@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase";
+import { supabaseAdmin } from "../config/supabase";
 import {
   FAP_ESTADOS_LICENCIA,
   FAP_ESTADOS_PAGO,
@@ -25,7 +25,7 @@ export class InscripcionService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let query = supabase
+    let query = supabaseAdmin
       .from("inscripciones")
       .select(
         `*, perfiles!fk_inscripciones_usuario(nombre, apellido), torneos!fk_inscripciones_torneo(nombre, categoria)`,
@@ -56,7 +56,9 @@ export class InscripcionService {
         ...ins,
         jugador1_nombre:
           ins.jugador1_nombre?.trim() ||
-          (ins.perfiles?.apellido ? `${ins.perfiles.apellido.toUpperCase()}, ${ins.perfiles.nombre}` : "Desconocido") ||
+          (ins.perfiles?.apellido
+            ? `${ins.perfiles.apellido.toUpperCase()}, ${ins.perfiles.nombre}`
+            : "Desconocido") ||
           "Usuario Desconocido",
         torneo_nombre: ins.torneos?.nombre || "Torneo no asignado",
       }),
@@ -82,7 +84,7 @@ export class InscripcionService {
     let perfilJugador2 = null;
 
     if (jugador2Email) {
-      const { data: user2, error: user2Error } = await supabase
+      const { data: user2, error: user2Error } = await supabaseAdmin
         .from("perfiles")
         .select("id, categoria_padel")
         .eq("email", jugador2Email)
@@ -97,25 +99,22 @@ export class InscripcionService {
       perfilJugador2 = user2;
     }
 
-    // 2. VALIDAR LICENCIA (Fase 2 de Padel Nexus)
-    const { data: licencia, error: licError } = await supabase
+    // 2. VALIDAR LICENCIA — tolera múltiples licencias, solo necesita al menos una activa
+    const { data: licencias, error: licError } = await supabaseAdmin
       .from("licencias")
       .select("estado")
       .eq("usuario_id", jugador1Id)
-      .single();
+      .eq("estado", FAP_ESTADOS_LICENCIA.ACTIVA)
+      .limit(1);
 
-    if (
-      licError ||
-      !licencia ||
-      licencia.estado !== FAP_ESTADOS_LICENCIA.ACTIVA
-    ) {
+    if (licError || !licencias || licencias.length === 0) {
       throw new Error(
         "Para inscribirte, debes tener una licencia FAP vigente y activa.",
       );
     }
 
     // 3. OBTENER DATOS DEL TORNEO
-    const { data: torneo, error: errTorneo } = await supabase
+    const { data: torneo, error: errTorneo } = await supabaseAdmin
       .from("torneos")
       .select("id, fecha, nivel, cupos_maximos, cupos_actuales, estado")
       .eq("id", torneoId)
@@ -142,7 +141,7 @@ export class InscripcionService {
     }
 
     // 5. REGLAS ARQUITECTURA NACIONAL
-    const { data: solicitante } = await supabase
+    const { data: solicitante } = await supabaseAdmin
       .from("perfiles")
       .select("rol, categoria_padel")
       .eq("id", usuarioSolicitanteId)
@@ -183,7 +182,7 @@ export class InscripcionService {
     const idsAValidar = jugador2Id
       ? `usuario_id.in.("${jugador1Id}","${jugador2Id}"),usuario2_id.in.("${jugador1Id}","${jugador2Id}")`
       : `usuario_id.eq."${jugador1Id}",usuario2_id.eq."${jugador1Id}"`;
-    const { count: inscripcionesPrevias } = await supabase
+    const { count: inscripcionesPrevias } = await supabaseAdmin
       .from("inscripciones")
       .select("id", { count: "exact", head: true })
       .eq("torneo_id", torneoId)
@@ -201,7 +200,7 @@ export class InscripcionService {
     }
 
     // 9. INSERCIÓN
-    const { data: inscripcionInsertada, error: errInsert } = await supabase
+    const { data: inscripcionInsertada, error: errInsert } = await supabaseAdmin
       .from("inscripciones")
       .insert([
         {
@@ -225,7 +224,7 @@ export class InscripcionService {
       );
 
     // 10. ATOMICIDAD CUPOS
-    await supabase
+    await supabaseAdmin
       .from("torneos")
       .update({ cupos_actuales: (torneo.cupos_actuales || 0) + 1 })
       .eq("id", torneoId);
@@ -234,7 +233,7 @@ export class InscripcionService {
   }
 
   static async actualizarEstadoPago(id: string, estadoPago: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("inscripciones")
       .update({ estado_pago: estadoPago })
       .eq("id", id)
@@ -248,7 +247,7 @@ export class InscripcionService {
 
   static async cancelarInscripcion(id: string) {
     // 1. Obtener ID del torneo
-    const { data: inscripcion, error: fetchError } = await supabase
+    const { data: inscripcion, error: fetchError } = await supabaseAdmin
       .from("inscripciones")
       .select("torneo_id")
       .eq("id", id)
@@ -258,7 +257,7 @@ export class InscripcionService {
       throw new Error("Inscripción no encontrada.");
 
     // 2. Borrar inscripción
-    const { error: delError } = await supabase
+    const { error: delError } = await supabaseAdmin
       .from("inscripciones")
       .delete()
       .eq("id", id);
@@ -266,14 +265,14 @@ export class InscripcionService {
     if (delError) throw new Error("Error interno al eliminar la inscripción.");
 
     // 3. Liberar cupo
-    const { data: torneo } = await supabase
+    const { data: torneo } = await supabaseAdmin
       .from("torneos")
       .select("cupos_actuales")
       .eq("id", inscripcion.torneo_id)
       .single();
 
     if (torneo) {
-      await supabase
+      await supabaseAdmin
         .from("torneos")
         .update({ cupos_actuales: Math.max(0, torneo.cupos_actuales - 1) })
         .eq("id", inscripcion.torneo_id);

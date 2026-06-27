@@ -152,7 +152,7 @@ export const LicenciasController = {
   async cambiarEstadoLicencia(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
-      const { estado } = req.body;
+      const { estado, fecha_vencimiento } = req.body;
 
       if (!id || !estado) {
         return res
@@ -163,7 +163,7 @@ export const LicenciasController = {
           });
       }
 
-      const data = await LicenciaService.actualizarEstado(id, estado);
+      const data = await LicenciaService.actualizarEstado(id, estado, fecha_vencimiento);
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {
       const message =
@@ -180,7 +180,6 @@ export const LicenciasController = {
    */
   async solicitar(req: Request, res: Response): Promise<Response> {
     try {
-      const usuarioIdLogueado = req.user?.id;
       const { nombre, apellido, documento, provincia, club_id } = req.body;
       const usuario_id = req.user?.id;
 
@@ -200,7 +199,7 @@ export const LicenciasController = {
 
       const datosSolicitud = { nombre, apellido, documento, provincia, club_id };
       const data = await LicenciaService.solicitar(
-        usuarioIdLogueado,
+        usuario_id,
         datosSolicitud,
       );
 

@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase";
+import { supabaseAdmin } from "../config/supabase";
 import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "../constants/fap";
 
 interface ParejaRanking {
@@ -19,7 +19,7 @@ export class CompetenciaService {
    */
   static async generarFaseGrupos(torneoId: string) {
     // 1. OBTENER INSCRIPCIONES CONFIRMADAS
-    const { data: inscripciones, error: errInsc } = await supabase
+    const { data: inscripciones, error: errInsc } = await supabaseAdmin
       .from("inscripciones")
       .select(
         `
@@ -47,7 +47,7 @@ export class CompetenciaService {
           ? [ins.usuario_id, ins.usuario2_id]
           : [ins.usuario_id];
 
-        const { data: rankings } = await supabase
+        const { data: rankings } = await supabaseAdmin
           .from("rankings")
           .select("puntos")
           .in("usuario_id", ids);
@@ -121,7 +121,7 @@ export class CompetenciaService {
     // 5. PERSISTENCIA EN BASE DE DATOS
     for (const zona of zonas) {
       // Crear el Grupo
-      const { data: grupoInsertado } = await supabase
+      const { data: grupoInsertado } = await supabaseAdmin
         .from("grupos")
         .insert({ torneo_id: torneoId, nombre_grupo: zona.nombre })
         .select()
@@ -135,10 +135,10 @@ export class CompetenciaService {
       const grupoParejasData = p.map((pareja, idx) => ({
         grupo_id: grupoInsertado.id,
         inscripcion_id: pareja.inscripcionId,
-        seed: idx + 1
+        seed: idx + 1,
       }));
       if (grupoParejasData.length > 0) {
-        await supabase.from("grupo_parejas").insert(grupoParejasData);
+        await supabaseAdmin.from("grupo_parejas").insert(grupoParejasData);
       }
 
       // Generar Partidos según la cantidad de parejas en la zona
@@ -201,12 +201,12 @@ export class CompetenciaService {
       }
 
       if (partidos.length > 0) {
-        await supabase.from("partidos").insert(partidos);
+        await supabaseAdmin.from("partidos").insert(partidos);
       }
     }
 
     // Actualizamos el estado del torneo
-    await supabase
+    await supabaseAdmin
       .from("torneos")
       .update({ estado: FAP_ESTADOS_TORNEO.EN_CURSO })
       .eq("id", torneoId);
@@ -222,9 +222,10 @@ export class CompetenciaService {
    * Obtiene la estructura de zonas con parejas y sus seeds.
    */
   static async obtenerZonas(torneoId: string) {
-    const { data: grupos, error } = await supabase
+    const { data: grupos, error } = await supabaseAdmin
       .from("grupos")
-      .select(`
+      .select(
+        `
         id,
         nombre_grupo,
         grupo_parejas (
@@ -237,7 +238,8 @@ export class CompetenciaService {
             jugador2_nombre
           )
         )
-      `)
+      `,
+      )
       .eq("torneo_id", torneoId)
       .order("nombre_grupo");
 
@@ -256,10 +258,10 @@ export class CompetenciaService {
     grupoOrigenId: string,
     grupoDestinoId: string,
     motivo: string,
-    adminId: string
+    adminId: string,
   ) {
     // 1. Eliminar de la zona original
-    const { error: errDel } = await supabase
+    const { error: errDel } = await supabaseAdmin
       .from("grupo_parejas")
       .delete()
       .eq("grupo_id", grupoOrigenId)
@@ -268,26 +270,24 @@ export class CompetenciaService {
     if (errDel) throw new Error(`Error quitando pareja: ${errDel.message}`);
 
     // 2. Insertar en la zona destino
-    const { error: errIns } = await supabase
-      .from("grupo_parejas")
-      .insert({
-        grupo_id: grupoDestinoId,
-        inscripcion_id: inscripcionId,
-        seed: 0 // Se inserta sin seed o se recalcula si es necesario
-      });
+    const { error: errIns } = await supabaseAdmin.from("grupo_parejas").insert({
+      grupo_id: grupoDestinoId,
+      inscripcion_id: inscripcionId,
+      seed: 0, // Se inserta sin seed o se recalcula si es necesario
+    });
 
     if (errIns) throw new Error(`Error insertando pareja: ${errIns.message}`);
 
     // 3. Registrar auditoría
-    await supabase.from("logs_auditoria").insert({
+    await supabaseAdmin.from("logs_auditoria").insert({
       usuario_id_admin: adminId,
       accion: "mover_pareja_zona",
       entidad_afectada: inscripcionId,
       detalles: {
         grupo_origen: grupoOrigenId,
         grupo_destino: grupoDestinoId,
-        motivo: motivo
-      }
+        motivo: motivo,
+      },
     });
 
     return { exito: true, mensaje: "Pareja movida exitosamente" };

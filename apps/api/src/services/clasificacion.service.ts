@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase";
+import { supabaseAdmin } from "../config/supabase";
 
 interface EstadisticasPareja {
   inscripcionId: string;
@@ -20,7 +20,7 @@ export class ClasificacionService {
     capacidadZona: number,
   ) {
     // 1. OBTENEMOS TODOS LOS PARTIDOS JUGADOS DE LA ZONA
-    const { data: partidos, error } = await supabase
+    const { data: partidos, error } = await supabaseAdmin
       .from("partidos")
       .select("*")
       .eq("torneo_id", torneoId)

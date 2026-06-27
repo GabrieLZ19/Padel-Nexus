@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase";
+import { supabaseAdmin } from "../config/supabase";
 import {
   FAP_ESTADOS_PAGO,
   FAP_ESTADOS_TORNEO,
@@ -31,7 +31,7 @@ export class TorneoService {
     limit: number = 10,
     filtros?: FiltrosTorneo,
   ) {
-    let query = supabase
+    let query = supabaseAdmin
       .from("torneos")
       .select(`*, clubes(nombre, provincia), inscripciones(usuario_id)`, {
         count: "exact",
@@ -80,7 +80,7 @@ export class TorneoService {
   }
 
   static async obtenerPorId(id: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("torneos")
       .select(`*, clubes(nombre, provincia), inscripciones(usuario_id)`)
       .eq("id", id)
@@ -91,7 +91,7 @@ export class TorneoService {
   }
 
   static async crearTorneo(datos: TorneoPayload) {
-    const { data: torneo, error: torneoError } = await supabase
+    const { data: torneo, error: torneoError } = await supabaseAdmin
       .from("torneos")
       .insert([
         {
@@ -118,7 +118,7 @@ export class TorneoService {
     if (torneoError || !torneo)
       throw new Error(`Error al crear torneo: ${torneoError?.message}`);
 
-    const { error: cuadroError } = await supabase.from("cuadros").insert([
+    const { error: cuadroError } = await supabaseAdmin.from("cuadros").insert([
       {
         torneo_id: torneo.id,
         fase: "Fase Inicial",
@@ -143,7 +143,7 @@ export class TorneoService {
       delete updateData.premios;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("torneos")
       .update(updateData)
       .eq("id", id)
@@ -156,13 +156,13 @@ export class TorneoService {
   }
 
   static async eliminarTorneo(id: string) {
-    const { error } = await supabase.from("torneos").delete().eq("id", id);
+    const { error } = await supabaseAdmin.from("torneos").delete().eq("id", id);
     if (error)
       throw new Error(`No se pudo eliminar el torneo: ${error.message}`);
   }
 
   static async obtenerInscripciones(id: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("inscripciones")
       .select("*")
       .eq("torneo_id", id)
@@ -173,7 +173,7 @@ export class TorneoService {
   }
 
   static async obtenerPartidosFormateados(id: string) {
-    const { data: partidos, error: partidosError } = await supabase
+    const { data: partidos, error: partidosError } = await supabaseAdmin
       .from("partidos")
       .select("*")
       .eq("torneo_id", id)
@@ -181,7 +181,7 @@ export class TorneoService {
 
     if (partidosError) throw new Error(partidosError.message);
 
-    const { data: inscripciones, error: insError } = await supabase
+    const { data: inscripciones, error: insError } = await supabaseAdmin
       .from("inscripciones")
       .select("id, jugador1_nombre, jugador2_nombre")
       .eq("torneo_id", id);
@@ -209,7 +209,7 @@ export class TorneoService {
   }
 
   static async generarCuadroEliminatoria(id: string) {
-    const { data: torneo, error: torneoError } = await supabase
+    const { data: torneo, error: torneoError } = await supabaseAdmin
       .from("torneos")
       .select("formato, cupos_maximos")
       .eq("id", id)
@@ -217,7 +217,7 @@ export class TorneoService {
 
     if (torneoError || !torneo) throw new Error("Torneo no encontrado");
 
-    const { data: inscripciones, error: inscError } = await supabase
+    const { data: inscripciones, error: inscError } = await supabaseAdmin
       .from("inscripciones")
       .select("id, usuario_id")
       .eq("torneo_id", id)
@@ -231,7 +231,7 @@ export class TorneoService {
       throw new Error("Se necesitan al menos 4 inscritos confirmados.");
     }
 
-    await supabase.from("partidos").delete().eq("torneo_id", id);
+    await supabaseAdmin.from("partidos").delete().eq("torneo_id", id);
 
     const shuffled = [...inscripciones].sort(() => 0.5 - Math.random());
     const partidos: Record<string, any>[] = [];
@@ -275,12 +275,12 @@ export class TorneoService {
       }
     }
 
-    const { error: insertError } = await supabase
+    const { error: insertError } = await supabaseAdmin
       .from("partidos")
       .insert(partidos);
     if (insertError) throw new Error(insertError.message);
 
-    await supabase
+    await supabaseAdmin
       .from("torneos")
       .update({ estado: FAP_ESTADOS_TORNEO.EN_CURSO })
       .eq("id", id);
@@ -293,7 +293,7 @@ export class TorneoService {
     set1A: number,
     set1B: number,
   ) {
-    const { data: partido, error: updateError } = await supabase
+    const { data: partido, error: updateError } = await supabaseAdmin
       .from("partidos")
       .update({
         ganador: ganadorId,
@@ -313,7 +313,7 @@ export class TorneoService {
         ? partido.equipo_b_id
         : partido.equipo_a_id;
 
-    const { data: torneoInfo } = await supabase
+    const { data: torneoInfo } = await supabaseAdmin
       .from("torneos")
       .select("nivel, categoria, modalidad")
       .eq("id", partido.torneo_id)
@@ -340,7 +340,7 @@ export class TorneoService {
         esGanador: boolean,
       ) => {
         if (!inscripcionId) return;
-        const { data: ins } = await supabase
+        const { data: ins } = await supabaseAdmin
           .from("inscripciones")
           .select("usuario_id, usuario2_id")
           .eq("id", inscripcionId)
@@ -349,7 +349,7 @@ export class TorneoService {
 
         const ids = [ins.usuario_id, ins.usuario2_id].filter(Boolean);
         for (const uid of ids) {
-          const { data: rank } = await supabase
+          const { data: rank } = await supabaseAdmin
             .from("rankings")
             .select("puntos, pj, pg")
             .eq("usuario_id", uid)
@@ -360,7 +360,7 @@ export class TorneoService {
           const pjAnt = rank?.pj || 0;
           const pgAnt = rank?.pg || 0;
 
-          await supabase.from("rankings").upsert(
+          await supabaseAdmin.from("rankings").upsert(
             {
               usuario_id: uid,
               categoria: torneoInfo.nivel,
@@ -373,7 +373,7 @@ export class TorneoService {
           );
 
           if (puntos > 0) {
-            await supabase.from("historial_ranking").insert([
+            await supabaseAdmin.from("historial_ranking").insert([
               {
                 usuario_id: uid,
                 torneo_id: partido.torneo_id,
@@ -398,7 +398,7 @@ export class TorneoService {
     }
 
     if (partido.ronda.toUpperCase() === "FINAL") {
-      await supabase
+      await supabaseAdmin
         .from("torneos")
         .update({ estado: FAP_ESTADOS_TORNEO.FINALIZADO })
         .eq("id", partido.torneo_id);
@@ -413,13 +413,13 @@ export class TorneoService {
         rondasSiguientes[partido.ronda.toUpperCase().trim()];
 
       if (rondaSiguiente) {
-        const { data: pact } = await supabase
+        const { data: pact } = await supabaseAdmin
           .from("partidos")
           .select("id")
           .eq("torneo_id", partido.torneo_id)
           .eq("ronda", partido.ronda)
           .order("orden", { ascending: true });
-        const { data: psig } = await supabase
+        const { data: psig } = await supabaseAdmin
           .from("partidos")
           .select("id")
           .eq("torneo_id", partido.torneo_id)
@@ -433,7 +433,7 @@ export class TorneoService {
 
           if (partidoDestino) {
             const ranura = miIndice % 2 === 0 ? "equipo_a_id" : "equipo_b_id";
-            await supabase
+            await supabaseAdmin
               .from("partidos")
               .update({ [ranura]: ganadorId })
               .eq("id", partidoDestino.id);

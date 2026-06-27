@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase";
+import { supabaseAdmin } from "../config/supabase";
 
 interface OverridePartidoDTO {
   partidoId: string;
@@ -16,7 +16,7 @@ export class AdminService {
    */
   static async realizarOverridePartido(datos: OverridePartidoDTO) {
     // 1. OBTENER ESTADO ACTUAL DEL PARTIDO PARA EL REGISTRO DE AUDITORÍA
-    const { data: partidoActual, error: errFetch } = await supabase
+    const { data: partidoActual, error: errFetch } = await supabaseAdmin
       .from("partidos")
       .select("*")
       .eq("id", datos.partidoId)
@@ -44,7 +44,7 @@ export class AdminService {
     }
 
     // 3. EJECUTAR LA ACTUALIZACIÓN EN LA BASE DE DATOS
-    const { data: partidoModificado, error: errUpdate } = await supabase
+    const { data: partidoModificado, error: errUpdate } = await supabaseAdmin
       .from("partidos")
       .update(updatePayload)
       .eq("id", datos.partidoId)
@@ -58,28 +58,30 @@ export class AdminService {
     }
 
     // 4. AUDITORÍA OBLIGATORIA (Guardamos el estado anterior y el nuevo en un campo JSONB seguro)
-    const { error: errLog } = await supabase.from("logs_auditoria").insert([
-      {
-        usuario_id_admin: datos.usuarioAdminId,
-        accion: "ADMIN_OVERRIDE_PARTIDO",
-        entidad_afectada: `partido_id: ${datos.partidoId}`,
-        detalles: {
-          antes: {
-            equipo_a_id: partidoActual.equipo_a_id,
-            equipo_b_id: partidoActual.equipo_b_id,
-            estado_partido: partidoActual.estado_partido,
+    const { error: errLog } = await supabaseAdmin
+      .from("logs_auditoria")
+      .insert([
+        {
+          usuario_id_admin: datos.usuarioAdminId,
+          accion: "ADMIN_OVERRIDE_PARTIDO",
+          entidad_afectada: `partido_id: ${datos.partidoId}`,
+          detalles: {
+            antes: {
+              equipo_a_id: partidoActual.equipo_a_id,
+              equipo_b_id: partidoActual.equipo_b_id,
+              estado_partido: partidoActual.estado_partido,
+            },
+            despues: {
+              equipo_a_id: partidoModificado.equipo_a_id,
+              equipo_b_id: partidoModificado.equipo_b_id,
+              estado_partido: partidoModificado.estado_partido,
+            },
+            motivo:
+              datos.notas ||
+              "Modificación manual del fixture por el organizador deportivo.",
           },
-          despues: {
-            equipo_a_id: partidoModificado.equipo_a_id,
-            equipo_b_id: partidoModificado.equipo_b_id,
-            estado_partido: partidoModificado.estado_partido,
-          },
-          motivo:
-            datos.notas ||
-            "Modificación manual del fixture por el organizador deportivo.",
         },
-      },
-    ]);
+      ]);
 
     if (errLog) {
       console.error(
@@ -95,7 +97,7 @@ export class AdminService {
    * Obtiene el historial de auditoría completo de un torneo para fiscalización oficial
    */
   static async obtenerLogsTorneo(torneoId: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("logs_auditoria")
       .select("*")
       .ilike("entidad_afectada", `%${torneoId}%`)

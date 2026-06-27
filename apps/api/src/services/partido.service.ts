@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase";
+import { supabaseAdmin } from "../config/supabase";
 
 interface PublicarPartidoDTO {
   reservaId: string;
@@ -11,7 +11,7 @@ interface PublicarPartidoDTO {
 export class PartidoService {
   static async publicarPartidoAbierto(datos: PublicarPartidoDTO) {
     // Insertamos en la tabla real según tu esquema: partidos_abiertos
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("partidos_abiertos")
       .insert([
         {
@@ -32,7 +32,7 @@ export class PartidoService {
   }
 
   static async obtenerPartidosAbiertos(nivelRequerido?: string) {
-    let query = supabase
+    let query = supabaseAdmin
       .from("partidos_abiertos")
       .select(
         `
@@ -55,7 +55,7 @@ export class PartidoService {
 
   static async unirseAPartidoExistente(partidoId: string, jugadorId: string) {
     // 1. Obtener estado del partido abierto utilizando la tabla correcta
-    const { data: partido, error: pError } = await supabase
+    const { data: partido, error: pError } = await supabaseAdmin
       .from("partidos_abiertos")
       .select("id, jugadores_faltantes, estado")
       .eq("id", partidoId)
@@ -67,7 +67,7 @@ export class PartidoService {
     }
 
     // 2. Verificar si el usuario ya está inscrito en este partido
-    const { data: yaInscripto } = await supabase
+    const { data: yaInscripto } = await supabaseAdmin
       .from("inscripciones_partidos")
       .select("id")
       .eq("partido_id", partidoId)
@@ -78,7 +78,7 @@ export class PartidoService {
       throw new Error("Ya estás inscrito en este partido abierto.");
 
     // 3. Registrar al usuario en la tabla intermedia correcta: inscripciones_partidos
-    const { error: insError } = await supabase
+    const { error: insError } = await supabaseAdmin
       .from("inscripciones_partidos")
       .insert([
         { partido_id: partidoId, jugador_id: jugadorId, estado: "confirmado" },
@@ -91,7 +91,7 @@ export class PartidoService {
     const nuevosFaltantes = partido.jugadores_faltantes - 1;
     const nuevoEstado = nuevosFaltantes === 0 ? "completo" : "abierto";
 
-    const { error: updError } = await supabase
+    const { error: updError } = await supabaseAdmin
       .from("partidos_abiertos")
       .update({
         jugadores_faltantes: nuevosFaltantes,

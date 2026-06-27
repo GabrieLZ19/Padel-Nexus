@@ -13,8 +13,15 @@ import reservasRoutes from "./routes/reserva.routes";
 import perfilRoutes from "./routes/perfil.routes";
 import adminRoutes from "./routes/admin.routes";
 import pagosRoutes from "./routes/pago.routes";
+import notificacionesRoutes from "./routes/notificacion.routes";
+import { createServer } from "http";
+import { SocketService } from "./services/socket.service";
 
 const app = express();
+const server = createServer(app);
+
+// Inicializar Socket.io
+SocketService.init(server, env.FRONTEND_URL);
 
 // Configuración de Middlewares
 app.use(
@@ -43,6 +50,7 @@ app.use("/api/reservas", reservasRoutes);
 app.use("/api/perfil", perfilRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/pagos", pagosRoutes);
+app.use("/api/notificaciones", notificacionesRoutes);
 
 // Manejador global de errores (Debe ir después de todas las rutas)
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
@@ -54,7 +62,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 // Inicio del servidor
-app.listen(env.PORT, () => {
+server.listen(env.PORT, () => {
   console.log(
     `🚀 Servidor de Pádel Nexus corriendo en http://localhost:${env.PORT}`,
   );

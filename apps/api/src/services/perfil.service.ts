@@ -18,13 +18,21 @@ export class PerfilService {
   static async obtenerPerfilCompleto(userId: string) {
     const { data, error } = await supabaseAdmin
       .from("perfiles")
-      .select("*")
+      .select("*, licencias:licencias!fk_licencias_usuario(*), afiliaciones:afiliaciones!fk_afiliaciones_usuario(*)")
       .eq("id", userId)
       .single();
 
     if (error || !data) {
       console.error("🔴 ERROR EN OBTENER_PERFIL_COMPLETO:", error);
       throw new Error("Perfil de usuario no encontrado en la plataforma.");
+    }
+
+    // Mapear fecha_vencimiento a vencimiento para cumplir con la documentación de Afiliaciones Múltiples (1:N)
+    if (data.afiliaciones && Array.isArray(data.afiliaciones)) {
+      data.afiliaciones = data.afiliaciones.map((af: any) => ({
+        ...af,
+        vencimiento: af.fecha_vencimiento,
+      }));
     }
 
     return data;

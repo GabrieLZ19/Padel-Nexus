@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { supabase } from "../config/supabase";
+import { supabaseAdmin } from "../config/supabase";
 
 export const ReservasController = {
   // Crear una reserva (ya sea manual o automática por partido)
@@ -8,7 +8,7 @@ export const ReservasController = {
       const { cancha_id, fecha, hora_inicio, duracion, usuario_id } = req.body;
 
       // 1. Validar disponibilidad (Evitar solapamiento)
-      const { data: reservaExistente } = await supabase
+      const { data: reservaExistente } = await supabaseAdmin
         .from("reservas")
         .select("id")
         .eq("cancha_id", cancha_id)
@@ -22,7 +22,7 @@ export const ReservasController = {
       }
 
       // 2. Crear la reserva
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from("reservas")
         .insert([
           {
@@ -45,7 +45,7 @@ export const ReservasController = {
 
   async getReservasPorClub(req: Request, res: Response) {
     const { club_id } = req.params;
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("reservas")
       .select("*, canchas(nombre)")
       .eq("canchas.club_id", club_id); // Filtro relacional

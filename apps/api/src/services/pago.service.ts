@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase";
+import { supabaseAdmin } from "../config/supabase";
 import { FAP_ESTADOS_LICENCIA, FAP_ESTADOS_PAGO } from "../constants/fap";
 
 interface ProcesarPagoManualDTO {
@@ -19,7 +19,7 @@ export class PagoService {
       datos.entidadTipo === "inscripcion" ? "inscripciones" : "licencias";
 
     // 1. VERIFICAR EXISTENCIA DE LA ENTIDAD
-    const { data: entidad, error: errFetch } = await supabase
+    const { data: entidad, error: errFetch } = await supabaseAdmin
       .from(tabla)
       .select("*")
       .eq("id", datos.entidadId)
@@ -41,7 +41,7 @@ export class PagoService {
       updatePayload.estado = FAP_ESTADOS_LICENCIA.ACTIVA; // Si es una licencia pendiente, la activa
     }
 
-    const { data: entidadActualizada, error: errUpdate } = await supabase
+    const { data: entidadActualizada, error: errUpdate } = await supabaseAdmin
       .from(tabla)
       .update(updatePayload)
       .eq("id", datos.entidadId)
@@ -56,7 +56,7 @@ export class PagoService {
 
     // 3. REGISTRAR TRANSACCIÓN EN EL HISTORIAL DE CAJA/AUDITORÍA
     // Esto asegura que el dinero quede registrado bajo el usuario del administrador responsable
-    const { error: errAuditoria } = await supabase
+    const { error: errAuditoria } = await supabaseAdmin
       .from("logs_auditoria")
       .insert([
         {

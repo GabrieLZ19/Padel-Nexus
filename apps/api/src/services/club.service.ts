@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase";
+import { supabase, supabaseAdmin } from "../config/supabase";
 
 export interface CrearClubDTO {
   nombre: string;
@@ -20,7 +20,7 @@ export class ClubService {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let query = supabase
+    let query = supabaseAdmin
       .from("clubes")
       .select(`*, torneos(count)`, { count: "exact" })
       .range(from, to);
@@ -54,7 +54,7 @@ export class ClubService {
   }
 
   static async obtenerClubPorId(id: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("clubes")
       .select(`*, torneos(*)`)
       .eq("id", id)
@@ -65,7 +65,7 @@ export class ClubService {
   }
 
   static async crearClub(datos: CrearClubDTO) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("clubes")
       .insert([
         {
@@ -87,7 +87,7 @@ export class ClubService {
       payload.canchas = Number(payload.canchas) || 0;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("clubes")
       .update(payload)
       .eq("id", id)
@@ -99,7 +99,7 @@ export class ClubService {
   }
 
   static async desactivarClub(id: string) {
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from("clubes")
       .update({ estado: "Inactivo" })
       .eq("id", id);

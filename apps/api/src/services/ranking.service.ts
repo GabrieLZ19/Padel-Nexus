@@ -1,4 +1,4 @@
-import { supabase } from "../config/supabase";
+import { supabaseAdmin } from "../config/supabase";
 
 export interface ActualizarPuntosDTO {
   usuarioId: string;
@@ -14,7 +14,7 @@ export class RankingService {
    * Obtiene la billetera de ranking de un jugador específico junto con su historial deportivo
    */
   static async obtenerRankingPorUsuario(usuarioId: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("rankings")
       .select(
         `
@@ -48,7 +48,7 @@ export class RankingService {
     categoria?: string,
     alcance: string = "Provincial",
   ) {
-    let query = supabase
+    let query = supabaseAdmin
       .from("rankings")
       .select(
         `
@@ -96,7 +96,7 @@ export class RankingService {
     const alcanceFinal = datos.alcance || "Provincial";
 
     // Buscamos si ya tiene una billetera existente en esa categoría y alcance
-    const { data: rankingActual } = await supabase
+    const { data: rankingActual } = await supabaseAdmin
       .from("rankings")
       .select("puntos")
       .eq("usuario_id", datos.usuarioId)
@@ -108,7 +108,7 @@ export class RankingService {
     const nuevosPuntos = puntosAnteriores + datos.puntosASumar;
 
     // Actualizamos o insertamos de forma segura con un upsert reglamentario
-    const { error: rankError } = await supabase.from("rankings").upsert(
+    const { error: rankError } = await supabaseAdmin.from("rankings").upsert(
       {
         usuario_id: datos.usuarioId,
         puntos: nuevosPuntos,
@@ -125,7 +125,7 @@ export class RankingService {
       );
 
     // Dejamos registro en el historial para auditorías deportivas
-    await supabase.from("historial_ranking").insert([
+    await supabaseAdmin.from("historial_ranking").insert([
       {
         usuario_id: datos.usuarioId,
         torneo_id: datos.torneoId,
