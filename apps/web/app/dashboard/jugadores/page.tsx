@@ -251,6 +251,7 @@ export default function JugadoresLicenciasPage() {
               <thead>
                 <tr className="border-b border-white/5 text-gray-400 text-xs font-bold uppercase tracking-wider bg-black/20">
                   <th className="py-5 px-8">Jugador</th>
+                  <th className="py-5 px-6">DNI</th>
                   <th className="py-5 px-6">Categoría</th>
                   <th className="py-5 px-6">N° Licencia</th>
                   <th className="py-5 px-6">Estado</th>
@@ -269,6 +270,9 @@ export default function JugadoresLicenciasPage() {
                           <div className="h-3 w-32 bg-white/5 rounded" />
                         </div>
                       </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="h-4 w-20 bg-white/10 rounded" />
                     </td>
                     <td className="py-4 px-6">
                       <div className="h-4 w-24 bg-white/10 rounded" />
@@ -300,6 +304,7 @@ export default function JugadoresLicenciasPage() {
               <thead>
                 <tr className="border-b border-white/5 text-gray-400 text-xs font-bold uppercase tracking-wider bg-black/20">
                   <th className="py-5 px-8">Jugador</th>
+                  <th className="py-5 px-6">DNI</th>
                   <th className="py-5 px-6">Categoría</th>
                   <th className="py-5 px-6">N° Licencia</th>
                   <th className="py-5 px-6">Estado</th>
@@ -333,6 +338,10 @@ export default function JugadoresLicenciasPage() {
                             </div>
                           </div>
                         </div>
+                      </td>
+
+                      <td className="py-4 px-6 text-sm font-semibold text-gray-400 font-mono">
+                        {jugador.dni || "—"}
                       </td>
 
                       <td className="py-4 px-6">
