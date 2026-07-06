@@ -27,6 +27,41 @@ import { GripVertical } from "lucide-react";
 import { MatchCard } from "./MatchCard";
 import { Partido } from "@/utils/types";
 
+const cleanName = (name?: string | null) => {
+  if (!name) return "";
+  let cleaned = name
+    .trim()
+    .replace(/^[\s,.\-]+/, "") // remove leading spaces, commas, dots, dashes
+    .replace(/[\s,.\-]+$/, ""); // remove trailing spaces, commas, dots, dashes
+  if (cleaned === "," || cleaned === "." || cleaned === "") return "";
+  return cleaned;
+};
+
+const getClasificanTexto = (totalZonas: number) => {
+  if (totalZonas <= 0) return "Clasifican 2";
+  if (totalZonas === 1) return "Clasifican 2";
+  if (totalZonas === 2) return "Clasifican 2 por zona";
+  if (totalZonas === 3) return "Clasifica 1 por zona + 1 mejor 2º";
+  if (totalZonas === 4) return "Clasifican 2 por zona";
+  if (totalZonas === 5) return "Clasifica 1 por zona + 3 mejores 2º";
+  if (totalZonas === 6) return "Clasifica 1 por zona + 2 mejores 2º";
+  if (totalZonas === 7) return "Clasifica 1 por zona + 9 mejores 2º";
+  if (totalZonas === 8) return "Clasifican 2 por zona";
+  return "Clasifican 2 por zona";
+};
+
+const getLimiteClasificadosDirectos = (totalZonas: number) => {
+  if (
+    totalZonas === 3 ||
+    totalZonas === 5 ||
+    totalZonas === 6 ||
+    totalZonas === 7
+  ) {
+    return 1;
+  }
+  return 2;
+};
+
 export interface ParejaDrag {
   id: string; // inscripcion_id
   jugador1_nombre: string;
@@ -51,6 +86,7 @@ interface DragDropPairingProps {
   ) => void;
   isEditing: boolean;
   partidos: Partido[];
+  isSiembra?: boolean;
 }
 
 export const SortablePareja = ({
@@ -59,12 +95,14 @@ export const SortablePareja = ({
   stats,
   isClassified,
   posNum,
+  isSiembra = false,
 }: {
   pareja: ParejaDrag;
   isEditing: boolean;
   stats: { played: number; won: number; points: number };
   isClassified?: boolean;
   posNum?: number;
+  isSiembra?: boolean;
 }) => {
   const {
     attributes,
@@ -81,10 +119,12 @@ export const SortablePareja = ({
     opacity: isDragging ? 0.4 : 1,
   };
 
-  const nombreCompleto = pareja.jugador1_nombre
-    ? pareja.jugador2_nombre && pareja.jugador2_nombre !== "-"
-      ? `${pareja.jugador1_nombre} / ${pareja.jugador2_nombre}`
-      : pareja.jugador1_nombre
+  const j1 = cleanName(pareja.jugador1_nombre);
+  const j2 = cleanName(pareja.jugador2_nombre);
+  const nombreCompleto = j1
+    ? j2 && j2 !== "-"
+      ? `${j1} / ${j2}`
+      : j1
     : "DESCONOCIDO";
 
   return (
@@ -133,32 +173,34 @@ export const SortablePareja = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-2.5 shrink-0 px-2 text-xs">
-        <div className="flex flex-col items-center">
-          <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">
-            PJ
-          </span>
-          <div className="flex items-center justify-center size-7 rounded bg-[#111111] text-white font-bold text-xs">
-            {stats.played}
+      {!isSiembra && (
+        <div className="flex items-center gap-2.5 shrink-0 px-2 text-xs">
+          <div className="flex flex-col items-center">
+            <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">
+              PJ
+            </span>
+            <div className="flex items-center justify-center size-7 rounded bg-[#111111] text-white font-bold text-xs">
+              {stats.played}
+            </div>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">
+              PG
+            </span>
+            <div className="flex items-center justify-center size-7 rounded bg-[#111111] text-white font-bold text-xs">
+              {stats.won}
+            </div>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-[8px] text-brand-chartreuse/60 font-bold uppercase tracking-tight">
+              PTS
+            </span>
+            <div className="flex items-center justify-center size-7 rounded bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20 font-black text-xs">
+              {stats.points}
+            </div>
           </div>
         </div>
-        <div className="flex flex-col items-center">
-          <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">
-            PG
-          </span>
-          <div className="flex items-center justify-center size-7 rounded bg-[#111111] text-white font-bold text-xs">
-            {stats.won}
-          </div>
-        </div>
-        <div className="flex flex-col items-center">
-          <span className="text-[8px] text-brand-chartreuse/60 font-bold uppercase tracking-tight">
-            PTS
-          </span>
-          <div className="flex items-center justify-center size-7 rounded bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20 font-black text-xs">
-            {stats.points}
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -167,10 +209,14 @@ export const DroppableZona = ({
   zona,
   isEditing,
   partidos = [],
+  totalZonas = 4,
+  isSiembra = false,
 }: {
   zona: ZonaDrag;
   isEditing: boolean;
   partidos?: Partido[];
+  totalZonas?: number;
+  isSiembra?: boolean;
 }) => {
   const { setNodeRef } = useDroppable({
     id: zona.id,
@@ -307,9 +353,11 @@ export const DroppableZona = ({
         <h4 className="text-white font-black uppercase tracking-widest text-lg">
           {zona.nombre}
         </h4>
-        <span className="px-3 py-1 bg-black/40 rounded-full text-[11px] font-bold text-gray-400 uppercase tracking-wide">
-          Clasifican 2
-        </span>
+        {!isSiembra && (
+          <span className="px-3 py-1 bg-black/40 rounded-full text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+            {getClasificanTexto(totalZonas)}
+          </span>
+        )}
       </div>
       <div className="flex-1 flex flex-col gap-2">
         <SortableContext
@@ -318,7 +366,9 @@ export const DroppableZona = ({
         >
           {parejasConStats.map((pareja, index) => {
             const isClassified =
-              !isEditing && index < 2 && pareja.stats.played > 0;
+              !isEditing &&
+              index < getLimiteClasificadosDirectos(totalZonas) &&
+              pareja.stats.played > 0;
             return (
               <SortablePareja
                 key={pareja.id}
@@ -327,15 +377,18 @@ export const DroppableZona = ({
                 stats={pareja.stats}
                 isClassified={isClassified}
                 posNum={index + 1}
+                isSiembra={isSiembra}
               />
             );
           })}
         </SortableContext>
 
         {/* Placeholder for dropping new ones or empty state */}
-        <div className="mt-2 flex items-center justify-center p-3 rounded-2xl border border-dashed border-brand-chartreuse/50 text-brand-chartreuse text-sm font-bold bg-brand-chartreuse/5">
-          + Soltar aquí
-        </div>
+        {(!isSiembra || (isSiembra && zona.parejas.length < 2)) && (
+          <div className="mt-2 flex items-center justify-center p-3 rounded-2xl border border-dashed border-brand-chartreuse/50 text-brand-chartreuse text-sm font-bold bg-brand-chartreuse/5">
+            + Soltar aquí
+          </div>
+        )}
       </div>
     </div>
   );
@@ -347,6 +400,7 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
   onMovePareja,
   isEditing,
   partidos = [],
+  isSiembra = false,
 }) => {
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -496,6 +550,8 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
             zona={zona}
             isEditing={isEditing}
             partidos={partidos}
+            totalZonas={zonas.length}
+            isSiembra={isSiembra}
           />
         ))}
       </div>
@@ -507,6 +563,7 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
               pareja={getParejaById(activeId)!}
               isEditing={true}
               stats={getParejaStatsById(activeId)}
+              isSiembra={isSiembra}
             />
           </div>
         ) : null}

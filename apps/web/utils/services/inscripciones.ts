@@ -56,4 +56,7 @@ export const InscripcionesService = {
     const response = await api.post("/inscripciones/manual", data);
     return response.data;
   },
+  async eliminar(id: string | number): Promise<void> {
+    await api.delete(`/inscripciones/${id}`);
+  },
 };

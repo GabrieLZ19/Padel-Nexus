@@ -266,7 +266,7 @@ export default function AuthPage() {
                       className="peer appearance-none size-5 rounded-sm bg-brand-input border border-brand-white/10 cursor-pointer checked:bg-brand-chartreuse checked:border-brand-chartreuse focus:ring-2 focus:ring-brand-chartreuse transition-colors"
                     />
                     <Check
-                      className="absolute size-3.5 text-brand-black pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity"
+                      className="absolute size-3.5 text-brand-card pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity"
                       strokeWidth={4}
                     />
                   </div>

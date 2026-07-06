@@ -13,9 +13,13 @@ import {
   AlertTriangle,
   CheckCircle2,
   User,
+  Download,
+  Upload,
+  Trash2,
 } from "lucide-react";
 import { TorneosService } from "../../../../utils/services/torneos";
 import { PagosService } from "../../../../utils/services/pagos";
+import { InscripcionesService } from "../../../../utils/services/inscripciones";
 import { Torneo, Inscripcion, Partido } from "../../../../utils/types";
 import FeedbackModal, {
   FeedbackModalProps,
@@ -32,6 +36,16 @@ const TABS = [
   { id: "cuadros", label: "Cuadros y Llaves", icon: GitMerge },
   { id: "resultados", label: "Arbitraje en Vivo", icon: Trophy },
 ];
+
+const cleanName = (name?: string | null) => {
+  if (!name) return "Desconocido";
+  let cleaned = name
+    .trim()
+    .replace(/^[\s,]+/, "")
+    .replace(/[\s,]+$/, "");
+  if (cleaned === "," || cleaned === "") return "Desconocido";
+  return cleaned;
+};
 
 export default function TorneoDetallePage() {
   const params = useParams();
@@ -72,6 +86,160 @@ export default function TorneoDetallePage() {
     onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
   });
 
+  const [importingCSV, setImportingCSV] = useState(false);
+
+  const handleDescargarPlantilla = () => {
+    if (!torneo) return;
+    const isIndiv = torneo.modalidad === "Individual";
+    const headers = isIndiv
+      ? [
+          "Jugador (DNI o Email)",
+          "Metodo de Pago (Efectivo / Transferencia / Dejar vacio)",
+        ]
+      : [
+          "Jugador 1 (DNI o Email)",
+          "Jugador 2 (DNI o Email)",
+          "Metodo de Pago (Efectivo / Transferencia / Dejar vacio)",
+        ];
+
+    const exampleRows = isIndiv
+      ? [
+          ["jugador@email.com", "Efectivo"],
+          ["40123456", "Transferencia"],
+          ["otro_jugador@email.com", ""],
+        ]
+      : [
+          ["jugador1@email.com", "jugador2@email.com", "Efectivo"],
+          ["40123456", "41765432", "Transferencia"],
+          ["otro_j1@email.com", "otro_j2@email.com", ""],
+        ];
+
+    // UTF-8 BOM so Excel opens accents correctly
+    const csvContent =
+      "data:text/csv;charset=utf-8,\uFEFF" +
+      [headers.join(","), ...exampleRows.map((e) => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `plantilla_inscripcion_${torneo.modalidad.toLowerCase()}_${torneo.nombre.toLowerCase().replace(/\s+/g, "_")}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleSubirCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !torneo) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const text = evt.target?.result as string;
+      if (!text) return;
+
+      const lines = text
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+      if (lines.length <= 1) {
+        setFeedbackModal({
+          isOpen: true,
+          type: "error",
+          title: "Archivo vacío",
+          description:
+            "El archivo no contiene filas de datos (solo cabecera o vacío).",
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+        return;
+      }
+
+      setImportingCSV(true);
+      let successCount = 0;
+      let errors: string[] = [];
+
+      const dataRows = lines.slice(1);
+      const isIndiv = torneo.modalidad === "Individual";
+
+      for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i];
+        const delimiter = row.includes(";") ? ";" : ",";
+        const parts = row
+          .split(delimiter)
+          .map((p) => p.trim().replace(/^["']|["']$/g, ""));
+
+        if (isIndiv) {
+          const identificador = parts[0];
+          const metodo = parts[1] || "";
+          if (!identificador) continue;
+
+          try {
+            await InscripcionesService.inscribirManual({
+              torneo_id: torneo.id,
+              jugador1_identificador: identificador,
+              monto: Number(torneo.precio_inscripcion || 0),
+              metodo_pago: metodo || undefined,
+            });
+            successCount++;
+          } catch (err: any) {
+            const errMsg =
+              err.response?.data?.error || err.message || "Error desconocido";
+            errors.push(`Fila ${i + 2} (${identificador}): ${errMsg}`);
+          }
+        } else {
+          // Duplas
+          const j1 = parts[0];
+          const j2 = parts[1];
+          const metodo = parts[2] || "";
+          if (!j1) continue;
+
+          try {
+            await InscripcionesService.inscribirManual({
+              torneo_id: torneo.id,
+              jugador1_identificador: j1,
+              jugador2_identificador: j2 || undefined,
+              monto: Number(torneo.precio_inscripcion || 0),
+              metodo_pago: metodo || undefined,
+            });
+            successCount++;
+          } catch (err: any) {
+            const errMsg =
+              err.response?.data?.error || err.message || "Error desconocido";
+            errors.push(`Fila ${i + 2} (${j1}/${j2 || "N/A"}): ${errMsg}`);
+          }
+        }
+      }
+
+      setImportingCSV(false);
+      setRefreshKey((prev) => prev + 1);
+
+      if (errors.length === 0) {
+        setFeedbackModal({
+          isOpen: true,
+          type: "success",
+          title: "Inscripción Masiva Completada",
+          description: `Se inscribieron exitosamente ${successCount} ${isIndiv ? "jugadores" : "parejas"}.`,
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+      } else {
+        setFeedbackModal({
+          isOpen: true,
+          type: "warning",
+          title: "Inscripción con Advertencias",
+          description: `Se inscribieron ${successCount} participantes. Fallaron ${errors.length}:\n\n${errors.slice(0, 5).join("\n")}${errors.length > 5 ? "\n... entre otros." : ""}`,
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   const showErrorModal = (msg: string) => {
     setFeedbackModal({
       isOpen: true,
@@ -88,7 +256,7 @@ export default function TorneoDetallePage() {
 
     const fetchTorneoData = async () => {
       try {
-        if (isMounted) setLoading(true);
+        if (isMounted && refreshKey === 0) setLoading(true);
         const [dataTorneo, dataInscripciones, dataPartidos] = await Promise.all(
           [
             TorneosService.getById(id),
@@ -123,6 +291,32 @@ export default function TorneoDetallePage() {
         type: "warning",
         title: "Cupos insuficientes",
         description: `Se necesitan al menos 4 inscripciones confirmadas para armar llaves. Actual: ${inscripciones.length}.`,
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
+      return;
+    }
+
+    if (inscripciones.length % 2 !== 0) {
+      setFeedbackModal({
+        isOpen: true,
+        type: "warning",
+        title: "Cantidad impar de parejas",
+        description: `Para generar el fixture de eliminatorias, la cantidad de participantes confirmados debe ser un número par. Actualmente hay ${inscripciones.length} confirmados.`,
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
+      return;
+    }
+
+    const tienePendientes = inscripciones.some(
+      (ins) => ins.estado_pago !== "Confirmado",
+    );
+    if (tienePendientes) {
+      setFeedbackModal({
+        isOpen: true,
+        type: "warning",
+        title: "Inscripciones pendientes",
+        description:
+          "Existen inscripciones con pago pendiente. Todos los participantes deben estar confirmados/aprobados antes de generar el fixture.",
         onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
       });
       return;
@@ -191,6 +385,43 @@ export default function TorneoDetallePage() {
         onConfirm: executeGeneration,
       });
     }
+  };
+
+  const handleEliminarInscripcion = (inscripcionId: string | number) => {
+    setFeedbackModal({
+      isOpen: true,
+      type: "danger",
+      title: "¿Eliminar inscripción?",
+      description: "Esta acción no se puede deshacer y liberará los cupos del torneo. ¿Estás seguro de que deseas eliminar este inscrito?",
+      confirmText: "Eliminar",
+      cancelText: "Cancelar",
+      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      onConfirm: async () => {
+        try {
+          setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+          await InscripcionesService.eliminar(inscripcionId);
+          setFeedbackModal({
+            isOpen: true,
+            type: "success",
+            title: "Inscripción eliminada",
+            description: "La inscripción fue eliminada exitosamente y el cupo ha sido liberado.",
+            onClose: () => {
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
+              setRefreshKey((prev) => prev + 1);
+            },
+          });
+        } catch (error: any) {
+          console.error("Error al eliminar la inscripción:", error);
+          setFeedbackModal({
+            isOpen: true,
+            type: "error",
+            title: "Error al eliminar",
+            description: error.response?.data?.message || "Ocurrió un error inesperado al intentar eliminar la inscripción.",
+            onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        }
+      }
+    });
   };
 
   const handleGuardarResultadoLive = async (
@@ -282,7 +513,9 @@ export default function TorneoDetallePage() {
   }
 
   // --- VARIABLES DE ESTADO Y FILTRADO ---
-  const confirmadasCount = inscripciones.filter((i) => i.estado_pago === "Confirmado").length;
+  const confirmadasCount = inscripciones.filter(
+    (i) => i.estado_pago === "Confirmado",
+  ).length;
   const totalRecaudado = inscripciones
     .filter((i) => i.estado_pago === "Confirmado")
     .reduce((acc, curr) => acc + Number(curr.monto || 0), 0);
@@ -298,8 +531,6 @@ export default function TorneoDetallePage() {
   const partidosJugables = partidos.filter(
     (p) => p.equipo_a_id && p.equipo_b_id && p.ganador === null,
   );
-
-
 
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 space-y-6 md:px-10 md:py-10">
@@ -324,6 +555,34 @@ export default function TorneoDetallePage() {
             </p>
           </div>
         </div>
+
+        {partidos.length === 0 && (
+          <div className="flex items-center gap-4">
+            {inscripciones.length % 2 !== 0 && (
+              <span className="text-xs text-red-500 font-extrabold bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl">
+                Se requiere una cantidad par de participantes confirmados para
+                generar el fixture.
+              </span>
+            )}
+            {inscripciones.length % 2 === 0 &&
+              inscripciones.some((ins) => ins.estado_pago !== "Confirmado") && (
+                <span className="text-xs text-yellow-500 font-extrabold bg-yellow-500/10 border border-yellow-500/20 px-3.5 py-2.5 rounded-xl">
+                  Todos los inscritos deben estar aprobados/confirmados para
+                  generar el fixture.
+                </span>
+              )}
+            <button
+              onClick={handleGenerarCuadro}
+              disabled={
+                inscripciones.length % 2 !== 0 ||
+                inscripciones.some((ins) => ins.estado_pago !== "Confirmado")
+              }
+              className="flex items-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Trophy className="size-4" /> Generar Fixture
+            </button>
+          </div>
+        )}
       </div>
 
       {/* TABS */}
@@ -386,14 +645,43 @@ export default function TorneoDetallePage() {
             <div className="p-6 border-b border-white/5 flex justify-between items-center bg-black/20">
               <h3 className="font-bold text-white flex items-center gap-2">
                 <CheckCircle2 className="size-5 text-[#00ff88]" />
-                Inscripciones ({confirmadasCount} confirmadas de {torneo.cupos_maximos || 16})
+                Inscripciones ({confirmadasCount} confirmadas de{" "}
+                {torneo.cupos_maximos || 16})
               </h3>
-              <button
-                onClick={() => setIsManualModalOpen(true)}
-                className="flex items-center gap-1.5 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-4 py-2 rounded-xl font-bold text-xs transition-all shadow-md cursor-pointer"
-              >
-                Inscribir Pareja
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDescargarPlantilla}
+                  className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-3.5 py-2 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer"
+                  title="Descargar plantilla CSV para carga masiva"
+                >
+                  <Download className="size-3.5" /> Descargar Plantilla
+                </button>
+
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleSubirCSV}
+                    disabled={importingCSV}
+                    className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                  />
+                  <button
+                    disabled={importingCSV}
+                    className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-3.5 py-2 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer disabled:opacity-50"
+                  >
+                    <Upload className="size-3.5" />{" "}
+                    {importingCSV ? "Importando..." : "Subir CSV"}
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setIsManualModalOpen(true)}
+                  className="flex items-center gap-1.5 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-4 py-2 rounded-xl font-bold text-xs transition-all shadow-md cursor-pointer"
+                >
+                  Inscribir{" "}
+                  {torneo.modalidad === "Individual" ? "Jugador" : "Pareja"}
+                </button>
+              </div>
             </div>
             {inscripciones.length === 0 ? (
               <div className="p-16 flex flex-col items-center justify-center text-center">
@@ -402,7 +690,8 @@ export default function TorneoDetallePage() {
                   Aún no hay inscritos
                 </h3>
                 <p className="text-gray-500 text-sm max-w-sm">
-                  No existen jugadores o duplas registradas para esta competencia.
+                  No existen jugadores o duplas registradas para esta
+                  competencia.
                 </p>
               </div>
             ) : (
@@ -415,6 +704,7 @@ export default function TorneoDetallePage() {
                       <th className="px-6 py-5">Participante / Dupla</th>
                       <th className="px-6 py-5 text-center">Estado Pago</th>
                       <th className="px-8 py-5 text-right">Monto</th>
+                      <th className="px-8 py-5 text-center w-20">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
@@ -435,7 +725,11 @@ export default function TorneoDetallePage() {
                                   setPagoModal({
                                     isOpen: true,
                                     inscripcionId: String(ins.id),
-                                    montoDefecto: Number(ins.monto || torneo.precio_inscripcion || 0),
+                                    montoDefecto: Number(
+                                      ins.monto ||
+                                        torneo.precio_inscripcion ||
+                                        0,
+                                    ),
                                     isLoading: false,
                                   });
                                 }
@@ -452,24 +746,35 @@ export default function TorneoDetallePage() {
                                 <User className="size-4 text-brand-chartreuse" />
                               </div>
                               <div>
-                                {ins.jugador1_nombre || "Desconocido"}
+                                {cleanName(ins.jugador1_nombre)}
                                 {ins.jugador2_nombre &&
                                   ins.jugador2_nombre !== "-" && (
                                     <span className="text-gray-400 font-medium">
                                       {" "}
-                                      / {ins.jugador2_nombre}
+                                      / {cleanName(ins.jugador2_nombre)}
                                     </span>
                                   )}
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-5 text-center">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${isConfirmed ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"}`}>
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-xs font-bold ${isConfirmed ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"}`}
+                            >
                               {ins.estado_pago || "Pendiente"}
                             </span>
                           </td>
-                          <td className="px-8 py-5 text-right text-gray-200 font-semibold text-sm">
+                          <td className="px-8 py-5 text-right text-brand-white font-semibold text-sm">
                             ${Number(ins.monto || 0).toLocaleString("es-AR")}
+                          </td>
+                          <td className="px-8 py-5 text-center">
+                            <button
+                              onClick={() => handleEliminarInscripcion(ins.id)}
+                              className="text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                              title="Eliminar Inscripción"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
                           </td>
                         </tr>
                       );
@@ -483,14 +788,20 @@ export default function TorneoDetallePage() {
 
         {/* CUADROS */}
         {activeTab === "cuadros" && (
-          <BracketEditor torneoId={id} torneo={torneo} partidos={partidos} />
+          <BracketEditor
+            torneoId={id}
+            torneo={torneo}
+            partidos={partidos}
+            inscripciones={inscripciones}
+            onRefresh={() => setRefreshKey((prev) => prev + 1)}
+          />
         )}
 
         {/* ARBITRAJE EN VIVO */}
         {activeTab === "resultados" && (
           <div className="space-y-4">
-            <div className="bg-[#111111] rounded-3xl border border-white/5 p-6">
-              <h3 className="font-bold text-xl mb-2">
+            <div className="bg-brand-card rounded-3xl border border-white/5 p-6 shadow-xl">
+              <h3 className="font-extrabold text-white text-xl mb-2">
                 Consola de Arbitraje en Vivo
               </h3>
               <p className="text-gray-400 text-sm mb-6">

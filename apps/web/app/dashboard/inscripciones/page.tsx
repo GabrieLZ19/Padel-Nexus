@@ -12,6 +12,7 @@ import {
   CreditCard,
   ChevronRight,
   Download,
+  Upload,
   AlertCircle,
   CheckCircle2,
   XCircle,
@@ -34,6 +35,13 @@ import InscripcionManualModal from "@/components/inscripciones/InscripcionManual
 const TABS = ["Todas", "Pendientes", "Confirmadas", "Rechazadas"];
 
 const PAGE_SIZE = 5;
+
+const cleanName = (name?: string | null) => {
+  if (!name) return "Desconocido";
+  let cleaned = name.trim().replace(/^[\s,]+/, "").replace(/[\s,]+$/, "");
+  if (cleaned === "," || cleaned === "") return "Desconocido";
+  return cleaned;
+};
 
 export default function GestionInscripcionesPage() {
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
@@ -59,6 +67,138 @@ export default function GestionInscripcionesPage() {
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
 
   const selectedTorneo = torneos.find((t) => t.id === filterTorneo);
+
+  const [importingCSV, setImportingCSV] = useState(false);
+
+  const handleDescargarPlantilla = () => {
+    if (!selectedTorneo) return;
+    const isIndiv = selectedTorneo.modalidad === "Individual";
+    const headers = isIndiv
+      ? ["Jugador (DNI o Email)", "Metodo de Pago (Efectivo / Transferencia / Dejar vacio)"]
+      : ["Jugador 1 (DNI o Email)", "Jugador 2 (DNI o Email)", "Metodo de Pago (Efectivo / Transferencia / Dejar vacio)"];
+      
+    const exampleRows = isIndiv
+      ? [
+          ["jugador@email.com", "Efectivo"],
+          ["40123456", "Transferencia"],
+          ["otro_jugador@email.com", ""],
+        ]
+      : [
+          ["jugador1@email.com", "jugador2@email.com", "Efectivo"],
+          ["40123456", "41765432", "Transferencia"],
+          ["otro_j1@email.com", "otro_j2@email.com", ""],
+        ];
+
+    // UTF-8 BOM so Excel opens accents correctly
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF"
+      + [headers.join(","), ...exampleRows.map(e => e.join(","))].join("\n");
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `plantilla_inscripcion_${selectedTorneo.modalidad.toLowerCase()}_${selectedTorneo.nombre.toLowerCase().replace(/\s+/g, "_")}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleSubirCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedTorneo) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const text = evt.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (lines.length <= 1) {
+        setFeedbackModal({
+          isOpen: true,
+          type: "error",
+          title: "Archivo vacío",
+          description: "El archivo no contiene filas de datos (solo cabecera o vacío).",
+          onClose: () => setFeedbackModal(prev => ({ ...prev, isOpen: false })),
+        });
+        return;
+      }
+
+      setImportingCSV(true);
+      let successCount = 0;
+      let errors: string[] = [];
+
+      const dataRows = lines.slice(1);
+      const isIndiv = selectedTorneo.modalidad === "Individual";
+
+      for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i];
+        const delimiter = row.includes(";") ? ";" : ",";
+        const parts = row.split(delimiter).map(p => p.trim().replace(/^["']|["']$/g, ""));
+        
+        if (isIndiv) {
+          const identificador = parts[0];
+          const metodo = parts[1] || "";
+          if (!identificador) continue;
+
+          try {
+            await InscripcionesService.inscribirManual({
+              torneo_id: selectedTorneo.id,
+              jugador1_identificador: identificador,
+              monto: Number(selectedTorneo.precio_inscripcion || 0),
+              metodo_pago: metodo || undefined,
+            });
+            successCount++;
+          } catch (err: any) {
+            const errMsg = err.response?.data?.error || err.message || "Error desconocido";
+            errors.push(`Fila ${i + 2} (${identificador}): ${errMsg}`);
+          }
+        } else {
+          // Duplas
+          const j1 = parts[0];
+          const j2 = parts[1];
+          const metodo = parts[2] || "";
+          if (!j1) continue;
+
+          try {
+            await InscripcionesService.inscribirManual({
+              torneo_id: selectedTorneo.id,
+              jugador1_identificador: j1,
+              jugador2_identificador: j2 || undefined,
+              monto: Number(selectedTorneo.precio_inscripcion || 0),
+              metodo_pago: metodo || undefined,
+            });
+            successCount++;
+          } catch (err: any) {
+            const errMsg = err.response?.data?.error || err.message || "Error desconocido";
+            errors.push(`Fila ${i + 2} (${j1}/${j2 || 'N/A'}): ${errMsg}`);
+          }
+        }
+      }
+
+      setImportingCSV(false);
+      setRefreshKey((prev) => prev + 1);
+
+      if (errors.length === 0) {
+        setFeedbackModal({
+          isOpen: true,
+          type: "success",
+          title: "Inscripción Masiva Completada",
+          description: `Se inscribieron exitosamente ${successCount} ${isIndiv ? 'jugadores' : 'parejas'}.`,
+          onClose: () => setFeedbackModal(prev => ({ ...prev, isOpen: false })),
+        });
+      } else {
+        setFeedbackModal({
+          isOpen: true,
+          type: "warning",
+          title: "Inscripción con Advertencias",
+          description: `Se inscribieron ${successCount} participantes. Fallaron ${errors.length}:\n\n${errors.slice(0, 5).join("\n")}${errors.length > 5 ? "\n... entre otros." : ""}`,
+          onClose: () => setFeedbackModal(prev => ({ ...prev, isOpen: false })),
+        });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   useEffect(() => {
     TorneosService.getAll().then(setTorneos).catch(console.error);
@@ -277,12 +417,38 @@ export default function GestionInscripcionesPage() {
         </div>
         <div className="flex gap-2">
           {selectedTorneo && (
-            <button
-              onClick={() => setIsManualModalOpen(true)}
-              className="flex items-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md cursor-pointer"
-            >
-              Inscribir Pareja
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleDescargarPlantilla}
+                className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer animate-in fade-in"
+                title="Descargar plantilla CSV para carga masiva"
+              >
+                <Download className="size-3.5" /> Descargar Plantilla
+              </button>
+              
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleSubirCSV}
+                  disabled={importingCSV}
+                  className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                />
+                <button
+                  disabled={importingCSV}
+                  className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer disabled:opacity-50"
+                >
+                  <Upload className="size-3.5" /> {importingCSV ? "Importando..." : "Subir CSV"}
+                </button>
+              </div>
+
+              <button
+                onClick={() => setIsManualModalOpen(true)}
+                className="flex items-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md cursor-pointer"
+              >
+                Inscribir {selectedTorneo.modalidad === "Individual" ? "Jugador" : "Pareja"}
+              </button>
+            </div>
           )}
           <button
             onClick={handleExportarExcel}
@@ -490,11 +656,11 @@ export default function GestionInscripcionesPage() {
                           <div>
                             <div className="font-bold text-white text-[14px]">
                               {/* Eliminamos ins.perfiles porque el backend ya inyectó el nombre dentro de jugador1_nombre */}
-                              {ins.jugador1_nombre || "Jugador Desconocido"}
+                              {cleanName(ins.jugador1_nombre)}
                               {esDupla && ins.jugador2_nombre && (
                                 <span className="text-gray-400 font-medium">
                                   {" "}
-                                  / {ins.jugador2_nombre}
+                                  / {cleanName(ins.jugador2_nombre)}
                                 </span>
                               )}
                             </div>
@@ -506,7 +672,7 @@ export default function GestionInscripcionesPage() {
                       </td>
 
                       <td className="py-4 px-6">
-                        <div className="font-semibold text-gray-200 mb-1 flex items-center gap-2 text-[14px]">
+                        <div className="font-semibold text-brand-white mb-1 flex items-center gap-2 text-[14px]">
                           {ins.tipo === "Reserva cancha" ? (
                             <MapPin className="size-3.5 text-gray-500" />
                           ) : (
@@ -548,7 +714,7 @@ export default function GestionInscripcionesPage() {
                         </div>
                       </td>
 
-                      <td className="py-4 px-6 font-bold text-white flex items-center gap-1.5 text-[14px]">
+                      <td className="py-4 px-6 font-bold text-brand-white flex items-center gap-1.5 text-[14px]">
                         <CreditCard className="size-4 text-gray-500" />$
                         {Number(ins.monto || 0).toLocaleString("es-AR")}
                       </td>

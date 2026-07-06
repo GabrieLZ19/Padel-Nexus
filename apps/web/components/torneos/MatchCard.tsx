@@ -14,11 +14,22 @@ export const MatchCard = ({
   const isB =
     partido.ganador === partido.equipo_b_id && partido.ganador !== null;
 
+  const cleanName = (name?: string | null) => {
+    if (!name) return "";
+    let cleaned = name.trim()
+      .replace(/^[\s,.\-]+/, "") // remove leading spaces, commas, dots, dashes
+      .replace(/[\s,.\-]+$/, ""); // remove trailing spaces, commas, dots, dashes
+    if (cleaned === "," || cleaned === "." || cleaned === "") return "";
+    return cleaned;
+  };
+
   const renderEquipo = (j1?: string | null, j2?: string | null) => {
-    if (!j1 && !j2) return "Esperando rival...";
-    const nombreJ1 = j1 || "Desconocido";
-    if (!j2 || j2.trim() === "" || j2 === "-") return nombreJ1;
-    return `${nombreJ1} / ${j2}`;
+    const c1 = cleanName(j1);
+    const c2 = cleanName(j2);
+    if (!c1 && !c2) return "Esperando rival...";
+    const nombreJ1 = c1 || "Desconocido";
+    if (!c2 || c2 === "-") return nombreJ1;
+    return `${nombreJ1} / ${c2}`;
   };
 
   return (

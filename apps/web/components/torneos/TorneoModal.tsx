@@ -13,6 +13,7 @@ import {
   MODALIDADES_TORNEO,
   FORMATOS_TORNEO,
 } from "@/utils/constants/padelConfig";
+import { TorneosService } from "@/utils/services/torneos";
 
 interface TorneoModalProps {
   isOpen: boolean;
@@ -38,17 +39,43 @@ export default function TorneoModal({
   // 1. Obtenemos el día actual estrictamente en la zona horaria local del usuario
   const [isCustomCat, setIsCustomCat] = useState(false);
   const [isCustomNiv, setIsCustomNiv] = useState(false);
+  const [dbCategorias, setDbCategorias] = useState<string[]>([]);
+  const [dbNiveles, setDbNiveles] = useState<string[]>([]);
 
-  // Sincronizar estado cuando se abre el modal o cambian los valores
+  // Sincronizar estado cuando se abre el modal
   useEffect(() => {
     if (isOpen) {
-      const customCat = formData.categoria && !CATEGORIAS_TORNEO.some((c) => c.value === formData.categoria);
-      setIsCustomCat(!!customCat);
+      // 1. Obtener todas las categorías y niveles cargados en otros torneos
+      TorneosService.getAll()
+        .then((all) => {
+          const cats = all
+            .map((t) => t.categoria)
+            .filter((c): c is string => !!c)
+            .filter((c) => !CATEGORIAS_TORNEO.some((opt) => opt.value === c));
+          const uniqueCats = Array.from(new Set(cats));
+          setDbCategorias(uniqueCats);
 
-      const customNiv = formData.nivel && !NIVELES_PADEL.some((n) => n.value === formData.nivel);
-      setIsCustomNiv(!!customNiv);
+          const nivs = all
+            .map((t) => t.nivel)
+            .filter((n): n is string => !!n)
+            .filter((n) => !NIVELES_PADEL.some((opt) => opt.value === n));
+          const uniqueNivs = Array.from(new Set(nivs));
+          setDbNiveles(uniqueNivs);
+
+          // 2. Determinar si los valores actuales del torneo son completamente nuevos/personalizados
+          const customCat = formData.categoria && 
+            !CATEGORIAS_TORNEO.some((c) => c.value === formData.categoria) &&
+            !uniqueCats.includes(formData.categoria);
+          setIsCustomCat(!!customCat);
+
+          const customNiv = formData.nivel && 
+            !NIVELES_PADEL.some((n) => n.value === formData.nivel) &&
+            !uniqueNivs.includes(formData.nivel);
+          setIsCustomNiv(!!customNiv);
+        })
+        .catch((err) => console.error("Error cargando categorías/niveles:", err));
     }
-  }, [isOpen, formData.categoria, formData.nivel]);
+  }, [isOpen]);
 
   const selectedClub = clubs.find((c) => String(c.id) === String(formData.club_id));
   const maxCanchas = selectedClub ? selectedClub.canchas : 999;
@@ -88,12 +115,14 @@ export default function TorneoModal({
 
   const categoriasOptions = [
     ...CATEGORIAS_TORNEO,
+    ...dbCategorias.map((c) => ({ value: c, label: c })),
     { value: "Personalizado", label: "Personalizado..." },
   ];
   const selectedCategoriaValue = isCustomCat ? "Personalizado" : formData.categoria;
 
   const nivelesOptions = [
     ...NIVELES_PADEL,
+    ...dbNiveles.map((n) => ({ value: n, label: n })),
     { value: "Personalizado", label: "Personalizado..." },
   ];
   const selectedNivelValue = isCustomNiv ? "Personalizado" : formData.nivel;
@@ -150,8 +179,15 @@ export default function TorneoModal({
                   <input
                     type="date"
                     min={minDate}
-                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors scheme-dark"
+                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-brand-white focus:outline-none text-sm transition-colors cursor-pointer"
                     value={fechaFormulario}
+                    onClick={(e) => {
+                      try {
+                        (e.target as any).showPicker();
+                      } catch (err) {
+                        console.log("Picker not supported:", err);
+                      }
+                    }}
                     onChange={(e) => {
                       const val = e.target.value;
                       // MAGIA ANTI-ZONA HORARIA: Inyectamos mediodía con huso horario argentino (-03:00)
@@ -252,14 +288,19 @@ export default function TorneoModal({
                     placeholder="Seleccionar..."
                   />
                   {isCustomCat && (
-                    <input
-                      placeholder="Escribí la categoría..."
-                      className="w-full bg-brand-card p-3 rounded-xl border border-white/5 mt-2 text-white focus:outline-none text-sm transition-all"
-                      value={formData.categoria}
-                      onChange={(e) =>
-                        setFormData({ ...formData, categoria: e.target.value })
-                      }
-                    />
+                    <div className="mt-2">
+                      <input
+                        placeholder="Escribí la categoría..."
+                        className="w-full bg-brand-card p-3 rounded-xl border border-white/5 text-brand-white focus:outline-none text-sm transition-all"
+                        value={formData.categoria}
+                        onChange={(e) =>
+                          setFormData({ ...formData, categoria: e.target.value })
+                        }
+                      />
+                      <p className="text-[10px] text-brand-chartreuse mt-1 flex items-center gap-1 font-medium">
+                        <Save className="size-3" /> Se guardará automáticamente para futuros torneos.
+                      </p>
+                    </div>
                   )}
                 </div>
                 <div>
@@ -281,14 +322,19 @@ export default function TorneoModal({
                     placeholder="Seleccionar..."
                   />
                   {isCustomNiv && (
-                    <input
-                      placeholder="Escribí el nivel..."
-                      className="w-full bg-brand-card p-3 rounded-xl border border-white/5 mt-2 text-white focus:outline-none text-sm transition-all"
-                      value={formData.nivel}
-                      onChange={(e) =>
-                        setFormData({ ...formData, nivel: e.target.value })
-                      }
-                    />
+                    <div className="mt-2">
+                      <input
+                        placeholder="Escribí el nivel..."
+                        className="w-full bg-brand-card p-3 rounded-xl border border-white/5 mt-2 text-brand-white focus:outline-none text-sm transition-all"
+                        value={formData.nivel}
+                        onChange={(e) =>
+                          setFormData({ ...formData, nivel: e.target.value })
+                        }
+                      />
+                      <p className="text-[10px] text-brand-chartreuse mt-1 flex items-center gap-1 font-medium">
+                        <Save className="size-3" /> Se guardará automáticamente para futuros torneos.
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -358,10 +404,18 @@ export default function TorneoModal({
                     min="1"
                     max={maxCanchas}
                     placeholder="Ej: 3"
-                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-semibold"
-                    value={formData.canchas_disponibles ?? 1}
+                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-brand-white focus:outline-none text-sm transition-colors font-semibold"
+                    value={formData.canchas_disponibles ?? ""}
                     onChange={(e) => {
-                      let val = Number(e.target.value) || 1;
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        setFormData({
+                          ...formData,
+                          canchas_disponibles: undefined,
+                        });
+                        return;
+                      }
+                      let val = Number(raw);
                       if (val > maxCanchas) {
                         val = maxCanchas;
                       }
@@ -369,6 +423,14 @@ export default function TorneoModal({
                         ...formData,
                         canchas_disponibles: val,
                       });
+                    }}
+                    onBlur={() => {
+                      if (!formData.canchas_disponibles) {
+                        setFormData({
+                          ...formData,
+                          canchas_disponibles: 1,
+                        });
+                      }
                     }}
                   />
                   {selectedClub && (
@@ -386,14 +448,30 @@ export default function TorneoModal({
                     type="number"
                     min="10"
                     placeholder="Ej: 90"
-                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-semibold"
-                    value={formData.duracion_partido_minutos ?? 90}
-                    onChange={(e) =>
+                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-brand-white focus:outline-none text-sm transition-colors font-semibold"
+                    value={formData.duracion_partido_minutos ?? ""}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        setFormData({
+                          ...formData,
+                          duracion_partido_minutos: undefined,
+                        });
+                        return;
+                      }
                       setFormData({
                         ...formData,
-                        duracion_partido_minutos: Number(e.target.value) || 90,
-                      })
-                    }
+                        duracion_partido_minutos: Number(raw),
+                      });
+                    }}
+                    onBlur={() => {
+                      if (!formData.duracion_partido_minutos || formData.duracion_partido_minutos < 10) {
+                        setFormData({
+                          ...formData,
+                          duracion_partido_minutos: 90,
+                        });
+                      }
+                    }}
                   />
                 </div>
 
@@ -402,22 +480,19 @@ export default function TorneoModal({
                     Hora Inicio Jornada
                   </label>
                   <input
-                    type="text"
-                    placeholder="Ej: 08:00"
-                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-semibold font-mono"
+                    type="time"
+                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-brand-white focus:outline-none text-sm transition-colors font-semibold font-mono cursor-pointer"
                     value={formData.hora_inicio_jornada || "08:00"}
+                    onClick={(e) => {
+                      try {
+                        (e.target as any).showPicker();
+                      } catch (err) {}
+                    }}
                     onChange={(e) => {
-                      let val = e.target.value;
-                      val = val.replace(/[^0-9:]/g, "");
-                      if (val.length === 2 && !val.includes(":")) {
-                        val = val + ":";
-                      }
-                      if (val.length <= 5) {
-                        setFormData({
-                          ...formData,
-                          hora_inicio_jornada: val,
-                        });
-                      }
+                      setFormData({
+                        ...formData,
+                        hora_inicio_jornada: e.target.value,
+                      });
                     }}
                   />
                 </div>
@@ -494,7 +569,7 @@ export default function TorneoModal({
               <button
                 disabled={isSaving || !formData.nombre}
                 onClick={onSave}
-                className="w-full bg-[#212b06] disabled:opacity-50 border border-brand-chartreuse/10 hover:border-brand-chartreuse/30 hover:bg-[#2c3a08] text-brand-chartreuse font-bold py-4 rounded-xl mt-4 flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(204,255,0,0.05)]"
+                className="w-full bg-brand-chartreuse disabled:opacity-50 text-brand-black font-bold py-4 rounded-xl mt-4 flex items-center justify-center gap-2 transition-all hover:opacity-90 shadow-lg cursor-pointer"
               >
                 {isSaving ? (
                   "Procesando..."

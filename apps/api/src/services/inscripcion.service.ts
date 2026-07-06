@@ -17,6 +17,21 @@ interface RegistroInscripcionDTO {
   letraPrioridad?: string;
 }
 
+function formatNombreCompleto(apellido?: string | null, nombre?: string | null): string {
+  const ap = (apellido || "").trim();
+  const nom = (nombre || "").trim();
+  if (ap && nom) {
+    return `${ap.toUpperCase()}, ${nom}`;
+  }
+  if (ap) {
+    return ap.toUpperCase();
+  }
+  if (nom) {
+    return nom;
+  }
+  return "Desconocido";
+}
+
 export class InscripcionService {
   static async obtenerInscripcionesPaginadas(
     torneoId?: string,
@@ -57,9 +72,7 @@ export class InscripcionService {
         ...ins,
         jugador1_nombre:
           ins.jugador1_nombre?.trim() ||
-          (ins.perfiles?.apellido
-            ? `${ins.perfiles.apellido.toUpperCase()}, ${ins.perfiles.nombre}`
-            : "Desconocido") ||
+          formatNombreCompleto(ins.perfiles?.apellido, ins.perfiles?.nombre) ||
           "Usuario Desconocido",
         torneo_nombre: ins.torneos?.nombre || "Torneo no asignado",
       }),
@@ -378,9 +391,9 @@ export class InscripcionService {
     const estadoPago = metodoPago
       ? FAP_ESTADOS_PAGO.CONFIRMADO
       : FAP_ESTADOS_PAGO.PENDIENTE;
-    const j1Nombre = `${j1.apellido?.toUpperCase() ?? ""}, ${j1.nombre ?? ""}`.trim();
+    const j1Nombre = formatNombreCompleto(j1.apellido, j1.nombre);
     const j2Nombre = j2
-      ? `${j2.apellido?.toUpperCase() ?? ""}, ${j2.nombre ?? ""}`.trim()
+      ? formatNombreCompleto(j2.apellido, j2.nombre)
       : "-";
 
     // 6. Insertar inscripción

@@ -141,10 +141,17 @@ export default function DashboardLayout({
     { name: "Chat interno", icon: MessageSquare, href: "/dashboard/chat" },
   ];
 
+  const formatNombreCompleto = (apellido?: string | null, nombre?: string | null) => {
+    const ap = (apellido || "").trim();
+    const nom = (nombre || "").trim();
+    if (ap && nom) return `${ap.toUpperCase()}, ${nom}`;
+    if (ap) return ap.toUpperCase();
+    if (nom) return nom;
+    return "";
+  };
+
   const displayName =
-    (profile?.nombre
-      ? `${profile.apellido?.toUpperCase()}, ${profile.nombre}`
-      : "") ||
+    formatNombreCompleto(profile?.apellido, profile?.nombre) ||
     profile?.email?.split("@")[0] ||
     "Admin";
 

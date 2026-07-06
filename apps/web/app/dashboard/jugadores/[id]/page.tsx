@@ -304,8 +304,13 @@ export default function PerfilJugadorAdminPage() {
                         <div className="flex items-center gap-1.5">
                           <input
                             type="date"
-                            className="bg-[#1a1a1a] text-white border border-white/10 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-brand-chartreuse"
+                            className="bg-[#1a1a1a] text-brand-white border border-white/10 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-brand-chartreuse cursor-pointer"
                             value={fechaVencimientoInput}
+                            onClick={(e) => {
+                              try {
+                                (e.target as any).showPicker();
+                              } catch (err) {}
+                            }}
                             onChange={(e) =>
                               setFechaVencimientoInput(e.target.value)
                             }

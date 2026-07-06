@@ -69,8 +69,8 @@ export const TorneosService = {
     return response.data;
   },
 
-  async generarCuadro(torneoId: string) {
-    const response = await api.post(`/torneos/${torneoId}/generar-cuadro`);
+  async generarCuadro(torneoId: string, ordenSiembra?: string[], motivo?: string) {
+    const response = await api.post(`/torneos/${torneoId}/generar-cuadro`, { ordenSiembra, motivo });
     return response.data;
   },
 
@@ -122,6 +122,14 @@ export const TorneosService = {
 
   async getAuditoria(torneoId: string) {
     const response = await api.get(`/torneos/${torneoId}/auditoria`);
+    return response.data;
+  },
+
+  async actualizarEquiposPartido(
+    partidoId: string,
+    payload: { equipo_a_id: string | null; equipo_b_id: string | null; motivo: string },
+  ) {
+    const response = await api.put(`/torneos/partidos/${partidoId}/equipos`, payload);
     return response.data;
   },
 };

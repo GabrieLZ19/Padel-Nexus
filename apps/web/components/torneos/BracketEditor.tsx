@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { DragDropPairing, ZonaDrag } from "./DragDropPairing";
+import { DragDropPairing, ZonaDrag, ParejaDrag } from "./DragDropPairing";
 import { TorneosService } from "@/utils/services/torneos";
-import { Torneo, Partido } from "@/utils/types";
+import { Torneo, Partido, Inscripcion } from "@/utils/types";
 import {
   GitMerge,
   LayoutGrid,
@@ -26,19 +26,26 @@ interface BracketEditorProps {
   torneoId: string;
   torneo?: Torneo;
   partidos?: Partido[];
+  inscripciones?: Inscripcion[];
+  onRefresh?: () => void;
 }
 
 export const BracketEditor: React.FC<BracketEditorProps> = ({
   torneoId,
   torneo,
   partidos = [],
+  inscripciones = [],
+  onRefresh,
 }) => {
   const [activeView, setActiveView] = useState<
-    "zonas" | "llaves" | "auditoria"
-  >(torneo?.formato === "Eliminatoria Directa" ? "llaves" : "zonas");
+    "zonas" | "siembra" | "llaves" | "auditoria"
+  >(torneo?.formato === "Eliminatoria Directa" ? "siembra" : "zonas");
   const [zonas, setZonas] = useState<ZonaDrag[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  // Siembra (Eliminatoria Directa) drag-and-drop state
+  const [siembraZonas, setSiembraZonas] = useState<ZonaDrag[]>([]);
+  const [isSiembraEditing, setIsSiembraEditing] = useState(false);
   const [modificacionNoDestructiva, setModificacionNoDestructiva] =
     useState(true);
   const [tamanioGrupo, setTamanioGrupo] = useState<number>(3);
@@ -104,10 +111,22 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   };
 
   const handleRegenerarZonas = async () => {
+    if ((inscripciones || []).length % 2 !== 0) {
+      setFeedbackModal({
+        isOpen: true,
+        type: "warning",
+        title: "Cantidad impar de parejas",
+        description: `Para generar las zonas de clasificación, la cantidad de participantes confirmados debe ser un número par. Actualmente hay ${(inscripciones || []).length} confirmados.`,
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
+      return;
+    }
+
     try {
       setLoading(true);
       await TorneosService.generarZonas(torneoId, tamanioGrupo);
       await loadZonas();
+      onRefresh?.();
       setFeedbackModal({
         isOpen: true,
         type: "success",
@@ -147,6 +166,140 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   useEffect(() => {
     loadZonas();
   }, [torneoId]);
+
+  // Construir siembraZonas a partir de los partidos de primera ronda cuando cambian los partidos
+  useEffect(() => {
+    if (torneo?.formato !== "Eliminatoria Directa" || partidos.length === 0)
+      return;
+    // Detectar la primera ronda del fixture (la que tiene más partidos)
+    const rondas = [...new Set(partidos.map((p) => p.ronda))];
+    // Excluir SEMIS/FINAL/CUARTOS/OCTAVOS — buscar la ronda con más cantidad de partidos de la primera ronda
+    const ROUNDS_ORDER = ["OCTAVOS", "CUARTOS", "SEMIS", "FINAL"];
+    const nonPlayoffRondas = rondas.filter(
+      (r) => !ROUNDS_ORDER.includes(r.toUpperCase()),
+    );
+    const primeraRonda =
+      rondas
+        .filter((r) => ROUNDS_ORDER.includes(r.toUpperCase()))
+        .sort(
+          (a, b) =>
+            ROUNDS_ORDER.indexOf(a.toUpperCase()) -
+            ROUNDS_ORDER.indexOf(b.toUpperCase()),
+        )[0] ?? nonPlayoffRondas[0];
+    if (!primeraRonda) return;
+    const matchesPrimeraRonda = partidos
+      .filter(
+        (p) => p.ronda === primeraRonda && (p.equipo_a_id || p.equipo_b_id),
+      )
+      .sort((a, b) => a.orden - b.orden);
+    // Cada partido = una "zona" de siembra con hasta 2 "parejas" (los slots equipo_a y equipo_b)
+    const zonasGeneradas: ZonaDrag[] = matchesPrimeraRonda.map((p, idx) => {
+      const parejas: ParejaDrag[] = [];
+      if (p.equipo_a_id && p.equipo_a_j1) {
+        parejas.push({
+          id: p.equipo_a_id,
+          jugador1_nombre: p.equipo_a_j1 ?? "",
+          jugador2_nombre: p.equipo_a_j2 ?? null,
+          seed: idx * 2 + 1,
+          club: "",
+        });
+      }
+      if (p.equipo_b_id && p.equipo_b_j1) {
+        parejas.push({
+          id: p.equipo_b_id,
+          jugador1_nombre: p.equipo_b_j1 ?? "",
+          jugador2_nombre: p.equipo_b_j2 ?? null,
+          seed: idx * 2 + 2,
+          club: "",
+        });
+      }
+      return {
+        id: p.id, // usamos el id del partido como id de la zona
+        nombre: `Partido ${idx + 1}`,
+        parejas,
+      };
+    });
+    setSiembraZonas(zonasGeneradas);
+  }, [partidos, torneo?.formato]);
+
+  const handleMoveSiembra = (
+    inscripcionId: string,
+    origenZonaId: string,
+    destinoZonaId: string,
+  ) => {
+    let moved: ParejaDrag | null = null;
+    const next = siembraZonas.map((z) => {
+      if (z.id === origenZonaId) {
+        moved = z.parejas.find((p) => p.id === inscripcionId) ?? null;
+        return {
+          ...z,
+          parejas: z.parejas.filter((p) => p.id !== inscripcionId),
+        };
+      }
+      return z;
+    });
+    if (moved) {
+      setSiembraZonas(
+        next.map((z) => {
+          if (z.id === destinoZonaId)
+            return { ...z, parejas: [...z.parejas, moved!] };
+          return z;
+        }),
+      );
+    }
+  };
+
+  const handleGuardarSiembra = () => {
+    setFeedbackModal({
+      isOpen: true,
+      type: "warning",
+      title: "Confirmar Siembra",
+      description:
+        "Estás por guardar los cambios en la siembra del cuadro de eliminatorias. Indicá el motivo para que quede registrado en auditoría.",
+      confirmText: "Guardar",
+      cancelText: "Cancelar",
+      showInput: true,
+      inputLabel: "Motivo del cambio",
+      inputPlaceholder: "Ej: Ajuste manual por pedido del organizador",
+      onConfirm: async (motivo?: string) => {
+        if (!motivo) return;
+        try {
+          setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+
+          const ordenSiembra = siembraZonas.flatMap((z) => {
+            const list = [];
+            if (z.parejas[0]?.id) list.push(z.parejas[0].id);
+            if (z.parejas[1]?.id) list.push(z.parejas[1].id);
+            return list;
+          });
+
+          await TorneosService.generarCuadro(torneoId, ordenSiembra, motivo);
+          setIsSiembraEditing(false);
+          setFeedbackModal({
+            isOpen: true,
+            type: "success",
+            title: "Siembra Guardada",
+            description:
+              "Los cambios en la siembra fueron aplicados y registrados en auditoría.",
+            onClose: () => {
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
+              onRefresh?.();
+            },
+          });
+        } catch (error: any) {
+          setFeedbackModal({
+            isOpen: true,
+            type: "error",
+            title: "Error al guardar",
+            description: error.message || "No se pudo guardar la siembra.",
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        }
+      },
+      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+    });
+  };
 
   useEffect(() => {
     if (activeView === "auditoria") {
@@ -219,7 +372,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 "La disposición de las zonas y los partidos se actualizaron exitosamente.",
               onClose: () => {
                 setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
-                window.location.reload();
+                onRefresh?.();
               },
             });
           } catch (error: any) {
@@ -252,12 +405,33 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     { id: "FINAL", label: "Final", required: 1 },
   ];
 
+  const getPlayoffSize = (zonasCount: number): number => {
+    if (zonasCount <= 1) return 2;
+    if (zonasCount === 2 || zonasCount === 3) return 4;
+    if (zonasCount >= 4 && zonasCount <= 6) return 8;
+    if (zonasCount >= 7 && zonasCount <= 12) return 16;
+    return 32;
+  };
+
+  const getClasificanTexto = (totalZonas: number) => {
+    if (totalZonas <= 0) return "Clasifican 2";
+    if (totalZonas === 1) return "Clasifican 2";
+    if (totalZonas === 2) return "Clasifican 2 por zona";
+    if (totalZonas === 3) return "Clasifica 1 por zona + 1 mejor 2º";
+    if (totalZonas === 4) return "Clasifican 2 por zona";
+    if (totalZonas === 5) return "Clasifica 1 por zona + 3 mejores 2º";
+    if (totalZonas === 6) return "Clasifica 1 por zona + 2 mejores 2º";
+    if (totalZonas === 7) return "Clasifica 1 por zona + 9 mejores 2º";
+    if (totalZonas === 8) return "Clasifican 2 por zona";
+    return "Clasifican 2 por zona";
+  };
+
   const totalZonas =
     zonas.length || Math.floor((torneo?.cupos_maximos || 8) / 3);
   const advancingPlayers =
     torneo?.formato === "Eliminatoria Directa"
       ? torneo?.cupos_maximos || 16
-      : totalZonas * 2;
+      : getPlayoffSize(totalZonas);
 
   const rondasToShow = RONDAS_CONFIG.filter(
     (r) => r.required <= advancingPlayers / 2,
@@ -305,39 +479,56 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              setActiveView("zonas");
-              setTourStep(0);
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 border border-brand-chartreuse/25 text-brand-chartreuse hover:bg-brand-chartreuse/5 rounded-xl text-sm font-semibold transition-colors"
-          >
-            Tutorial
-          </button>
-          {isEditing && (
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-yellow-500/30 text-yellow-500 text-xs font-bold uppercase tracking-wider">
-              <PenLine className="size-3.5" /> Modo edición
-            </div>
-          )}
-          <button
-            id="btn-editar"
-            onClick={handleGuardarCambios}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#ccff00] text-black hover:bg-[#b3e600] transition-all relative ${
-              tourStep === 1
-                ? "ring-4 ring-brand-chartreuse shadow-[0_0_20px_rgba(204,255,0,0.6)] z-101"
-                : ""
-            }`}
-          >
-            {isEditing ? (
+          {/* Tutorial y Editar solo en Fase de Grupos */}
+          {torneo?.formato !== "Eliminatoria Directa" &&
+            activeView === "zonas" && (
               <>
-                <Check className="size-4" /> Guardar cambios
-              </>
-            ) : (
-              <>
-                <PenLine className="size-4" /> Editar
+                <button
+                  onClick={() => {
+                    setActiveView("zonas");
+                    setTourStep(0);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2.5 border border-brand-chartreuse/25 text-brand-chartreuse hover:bg-brand-chartreuse/5 rounded-xl text-sm font-semibold transition-colors"
+                >
+                  Tutorial
+                </button>
+                {isEditing && (
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-yellow-500/30 text-yellow-500 text-xs font-bold uppercase tracking-wider">
+                    <PenLine className="size-3.5" /> Modo edición
+                  </div>
+                )}
+                {isEditing && (
+                  <button
+                    onClick={() => {
+                      setIsEditing(false);
+                      void loadZonas();
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                )}
+                <button
+                  id="btn-editar"
+                  onClick={handleGuardarCambios}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#ccff00] text-black hover:bg-[#b3e600] transition-all relative ${
+                    tourStep === 1
+                      ? "ring-4 ring-brand-chartreuse shadow-[0_0_20px_rgba(204,255,0,0.6)] z-101"
+                      : ""
+                  }`}
+                >
+                  {isEditing ? (
+                    <>
+                      <Check className="size-4" /> Guardar cambios
+                    </>
+                  ) : (
+                    <>
+                      <PenLine className="size-4" /> Editar
+                    </>
+                  )}
+                </button>
               </>
             )}
-          </button>
         </div>
       </div>
 
@@ -393,16 +584,31 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       </div>
 
       <div className="flex bg-transparent border-b border-white/5 mb-6 gap-2">
-        <button
-          onClick={() => setActiveView("zonas")}
-          className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors ${
-            activeView === "zonas"
-              ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
-              : "border border-transparent text-gray-500 hover:text-gray-300"
-          }`}
-        >
-          <LayoutGrid className="size-4" /> Fase de grupos
-        </button>
+        {torneo?.formato !== "Eliminatoria Directa" && (
+          <button
+            onClick={() => setActiveView("zonas")}
+            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors ${
+              activeView === "zonas"
+                ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
+                : "border border-transparent text-gray-500 hover:text-gray-300"
+            }`}
+          >
+            <LayoutGrid className="size-4" /> Fase de grupos
+          </button>
+        )}
+        {/* Tab Siembra: solo para Eliminatoria Directa cuando hay partidos */}
+        {torneo?.formato === "Eliminatoria Directa" && partidos.length > 0 && (
+          <button
+            onClick={() => setActiveView("siembra")}
+            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors ${
+              activeView === "siembra"
+                ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
+                : "border border-transparent text-gray-500 hover:text-gray-300"
+            }`}
+          >
+            <Move className="size-4" /> Zonas
+          </button>
+        )}
         <button
           id="tab-llaves-indicador"
           onClick={() => setActiveView("llaves")}
@@ -410,7 +616,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             activeView === "llaves"
               ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
               : "border border-transparent text-gray-500 hover:text-gray-300"
-          } ${tourStep === 4 ? "ring-2 ring-brand-chartreuse shadow-[0_0_15px_rgba(204,255,0,0.5)] z-101" : ""}`}
+          } ${tourStep === 4 ? "ring-2 ring-brand-chartreuse shadow-[0_0_15px_rgba(204,255,0,0.5)] z-101 bg-brand-card text-brand-white" : ""}`}
         >
           <Trophy className="size-4" /> Llave campeonato
         </button>
@@ -426,16 +632,109 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         </button>
       </div>
 
+      {/* PANEL SIEMBRA — Drag & Drop primera ronda de Eliminatoria Directa */}
+      {activeView === "siembra" && (
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h4 className="font-bold text-white text-lg">Cuadro</h4>
+              <p className="text-gray-400 text-sm mt-1">
+                Arrastrá y soltá {isIndividual ? "jugadores" : "parejas"} entre
+                los partidos para modificar el cuadro de primera ronda.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {isSiembraEditing && (
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-yellow-500/30 text-yellow-500 text-xs font-bold uppercase tracking-wider">
+                  <PenLine className="size-3.5" /> Modo edición
+                </div>
+              )}
+              {isSiembraEditing && (
+                <button
+                  onClick={() => {
+                    setIsSiembraEditing(false);
+                    // Recargar siembra desde partidos originales
+                    onRefresh?.();
+                  }}
+                  className="flex items-center gap-2 px-4 py-2.5 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              )}
+              <button
+                onClick={
+                  isSiembraEditing
+                    ? handleGuardarSiembra
+                    : () => setIsSiembraEditing(true)
+                }
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#ccff00] text-black hover:bg-[#b3e600] transition-all"
+              >
+                {isSiembraEditing ? (
+                  <>
+                    <Check className="size-4" /> Guardar
+                  </>
+                ) : (
+                  <>
+                    <PenLine className="size-4" /> Editar
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+          {siembraZonas.length === 0 ? (
+            <div className="text-center p-12 text-gray-500 border border-dashed border-white/10 rounded-2xl">
+              No hay partidos de primera ronda cargados. Generá el fixture
+              primero.
+            </div>
+          ) : (
+            <DragDropPairing
+              zonas={siembraZonas}
+              onZonasChange={setSiembraZonas}
+              onMovePareja={handleMoveSiembra}
+              isEditing={isSiembraEditing}
+              partidos={[]}
+              isSiembra={true}
+            />
+          )}
+        </div>
+      )}
+
       {activeView === "zonas" && (
         <div className="space-y-6">
+          {(inscripciones || []).length % 2 !== 0 && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-extrabold px-4 py-3.5 rounded-xl">
+              ⚠️ Se requiere una cantidad par de participantes confirmados para
+              poder generar las zonas de la fase de grupos. Actualmente hay{" "}
+              {(inscripciones || []).length} confirmados.
+            </div>
+          )}
+          {(inscripciones || []).length % 2 === 0 &&
+            (inscripciones || []).some(
+              (ins) => ins.estado_pago !== "Confirmado",
+            ) && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-xs font-extrabold px-4 py-3.5 rounded-xl">
+                Todos los inscritos deben estar confirmados/aprobados para poder
+                generar las zonas de la fase de grupos.
+              </div>
+            )}
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-3">
               <button
                 id="btn-regenerar"
                 onClick={handleRegenerarZonas}
-                className={`flex items-center gap-2 px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-all relative ${
-                  tourStep === 0
-                    ? "ring-4 ring-brand-chartreuse shadow-[0_0_20px_rgba(204,255,0,0.6)] z-101"
+                disabled={
+                  (inscripciones || []).length % 2 !== 0 ||
+                  (inscripciones || []).some(
+                    (ins) => ins.estado_pago !== "Confirmado",
+                  )
+                }
+                className={`flex items-center gap-2 px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-all relative disabled:opacity-40 disabled:cursor-not-allowed ${
+                  tourStep === 0 &&
+                  (inscripciones || []).length % 2 === 0 &&
+                  !(inscripciones || []).some(
+                    (ins) => ins.estado_pago !== "Confirmado",
+                  )
+                    ? "ring-4 ring-brand-chartreuse shadow-[0_0_20px_rgba(204,255,0,0.6)] z-101 bg-brand-card text-brand-white border-brand-chartreuse"
                     : ""
                 }`}
               >
@@ -444,31 +743,33 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               </button>
 
               <div className="flex items-center gap-2 bg-[#222222] border border-white/5 rounded-xl px-3.5 py-1 text-sm text-gray-300">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide shrink-0">Parejas por Zona:</span>
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide shrink-0">
+                  {isIndividual ? "Jugadores" : "Parejas"} por Zona:
+                </span>
                 <div className="w-40">
                   <CustomDropdown
                     value={String(tamanioGrupo)}
                     onChange={(val) => setTamanioGrupo(Number(val))}
                     options={[
-                      { value: "2", label: "2 parejas" },
-                      { value: "3", label: "3 parejas (FAP)" },
-                      { value: "4", label: "4 parejas" },
-                      { value: "5", label: "5 parejas" },
+                      {
+                        value: "3",
+                        label: isIndividual ? "3 jugadores" : "3 parejas",
+                      },
+                      {
+                        value: "4",
+                        label: isIndividual ? "4 jugadores" : "4 parejas",
+                      },
                     ]}
                     placeholder="Seleccionar..."
                   />
                 </div>
               </div>
-              <button className="flex items-center gap-2 px-4 py-2 border border-brand-chartreuse/30 rounded-xl text-sm font-semibold text-brand-chartreuse hover:bg-brand-chartreuse/10 transition-colors">
-                <Plus className="size-4" />{" "}
-                {isIndividual ? "Agregar jugador" : "Agregar pareja"}
-              </button>
             </div>
             <div
               id="btn-no-destructivo"
               className={`flex items-center gap-3 px-4 py-2 border border-brand-chartreuse/30 rounded-full transition-all relative ${
                 tourStep === 2
-                  ? "ring-4 ring-brand-chartreuse shadow-[0_0_20px_rgba(204,255,0,0.6)] z-101"
+                  ? "ring-4 ring-brand-chartreuse shadow-[0_0_20px_rgba(204,255,0,0.6)] z-101 bg-brand-card text-brand-white border-brand-chartreuse"
                   : ""
               }`}
             >
@@ -511,7 +812,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             </div>
             <div className="text-gray-500 text-sm">
               {zonas.length} zonas · {totalParejas}{" "}
-              {isIndividual ? "jugadores" : "parejas"} · clasifican 2 por zona
+              {isIndividual ? "jugadores" : "parejas"} ·{" "}
+              {getClasificanTexto(zonas.length)}
             </div>
           </div>
 
@@ -653,50 +955,61 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
       {/* FLOATING TOUR OVERLAY / STEP-BY-STEP DIALOG */}
       {tourStep !== null && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#1f1f1f] border border-brand-chartreuse/30 p-6 rounded-3xl max-w-md w-full shadow-[0_10px_50px_rgba(204,255,0,0.15)] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-4">
-              <span className="text-[10px] font-black text-brand-chartreuse uppercase tracking-widest bg-brand-chartreuse/10 px-2.5 py-1 rounded-full">
-                Paso {tourStep + 1} de {TOUR_STEPS.length}
-              </span>
-              <button
-                onClick={() => setTourStep(null)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
+        <>
+          {/* Backdrop: z-100 */}
+          <div
+            className="fixed inset-0 z-100 bg-black/60 backdrop-blur-sm"
+            onClick={() => setTourStep(null)}
+          />
 
-            <h4 className="text-lg font-bold text-white mb-2">
-              {TOUR_STEPS[tourStep].title}
-            </h4>
-            <p className="text-gray-300 text-sm leading-relaxed mb-6">
-              {TOUR_STEPS[tourStep].description}
-            </p>
+          {/* Dialog Wrapper: z-110 (rendered above z-101 highlighted siblings) */}
+          <div className="fixed inset-0 z-110 flex items-center justify-center pointer-events-none p-4">
+            <div className="bg-brand-card border border-brand-chartreuse/30 p-6 rounded-3xl max-w-md w-full shadow-[0_10px_50px_rgba(204,255,0,0.15)] animate-in fade-in zoom-in duration-200 pointer-events-auto">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-[10px] font-black text-brand-chartreuse uppercase tracking-widest bg-brand-chartreuse/10 px-2.5 py-1 rounded-full">
+                  Paso {tourStep + 1} de {TOUR_STEPS.length}
+                </span>
+                <button
+                  onClick={() => setTourStep(null)}
+                  className="text-gray-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
 
-            <div className="flex justify-between items-center">
-              <button
-                disabled={tourStep === 0}
-                onClick={() => setTourStep((prev) => prev! - 1)}
-                className="text-xs font-bold text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              >
-                Atrás
-              </button>
-              <button
-                onClick={() => {
-                  if (tourStep < TOUR_STEPS.length - 1) {
-                    setTourStep((prev) => prev! + 1);
-                  } else {
-                    setTourStep(null);
-                  }
-                }}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-chartreuse text-[#111] hover:bg-[#b3e600] transition-colors"
-              >
-                {tourStep === TOUR_STEPS.length - 1 ? "Entendido" : "Siguiente"}
-              </button>
+              <h4 className="text-lg font-bold text-white mb-2">
+                {TOUR_STEPS[tourStep].title}
+              </h4>
+              <p className="text-gray-300 text-sm leading-relaxed mb-6">
+                {TOUR_STEPS[tourStep].description}
+              </p>
+
+              <div className="flex justify-between items-center">
+                <button
+                  disabled={tourStep === 0}
+                  onClick={() => setTourStep((prev) => prev! - 1)}
+                  className="text-xs font-bold text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                >
+                  Atrás
+                </button>
+                <button
+                  onClick={() => {
+                    if (tourStep < TOUR_STEPS.length - 1) {
+                      setTourStep((prev) => prev! + 1);
+                    } else {
+                      setTourStep(null);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-chartreuse text-brand-black hover:bg-[#b3e600] transition-colors cursor-pointer"
+                >
+                  {tourStep === TOUR_STEPS.length - 1
+                    ? "Entendido"
+                    : "Siguiente"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

@@ -17,6 +17,7 @@ export interface CustomDropdownProps {
   disabled?: boolean;
   haciaArriba?: boolean; // ➡️ Prop opcional declarado correctamente para evitar ts(2322)
   hasError?: boolean;
+  className?: string;
 }
 
 export default function CustomDropdown({
@@ -27,6 +28,7 @@ export default function CustomDropdown({
   disabled,
   haciaArriba = false, // Por defecto se despliega hacia abajo
   hasError = false,
+  className = "",
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -61,7 +63,7 @@ export default function CustomDropdown({
           disabled
             ? "opacity-40 cursor-not-allowed text-gray-500"
             : "cursor-pointer text-brand-white"
-        }`}
+        } ${className}`}
       >
         <span
           className={

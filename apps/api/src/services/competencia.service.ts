@@ -32,24 +32,43 @@ export class CompetenciaService {
     }
     await supabaseAdmin.from("grupos").delete().eq("torneo_id", torneoId);
 
-    // 1. OBTENER INSCRIPCIONES CONFIRMADAS
-    const { data: inscripciones, error: errInsc } = await supabaseAdmin
+    // 1. OBTENER INSCRIPCIONES
+    const { data: todasInscripciones, error: errInsc } = await supabaseAdmin
       .from("inscripciones")
       .select(
         `
         id, 
         usuario_id, 
         usuario2_id,
+        estado_pago,
         perfiles!fk_inscripciones_usuario (lugar_residencia),
         perfiles_jugador2:perfiles!inscripciones_usuario2_id_fkey (lugar_residencia)
       `,
       )
-      .eq("torneo_id", torneoId)
-      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO); // Solo armamos llaves con los que pagaron
+      .eq("torneo_id", torneoId);
 
-    if (errInsc || !inscripciones || inscripciones.length < 3) {
+    if (errInsc || !todasInscripciones || todasInscripciones.length < 3) {
       throw new Error(
-        "No hay suficientes parejas confirmadas para armar un torneo.",
+        "No hay suficientes parejas para armar un torneo.",
+      );
+    }
+
+    const pendientes = todasInscripciones.filter(
+      (i) => i.estado_pago !== FAP_ESTADOS_PAGO.CONFIRMADO,
+    );
+    if (pendientes.length > 0) {
+      throw new Error(
+        `Hay ${pendientes.length} inscripciones pendientes de pago. Todos los inscritos deben estar confirmados/aprobados para generar las zonas.`,
+      );
+    }
+
+    const inscripciones = todasInscripciones;
+
+
+
+    if (inscripciones.length % 2 !== 0) {
+      throw new Error(
+        `La cantidad de participantes confirmados debe ser un número par. Actualmente hay ${inscripciones.length} inscritos confirmados.`
       );
     }
 
@@ -82,36 +101,69 @@ export class CompetenciaService {
     // Ordenamos de mayor a menor ranking (Pareja 1 es la mejor rankeada)
     parejas.sort((a, b) => b.puntosTotales - a.puntosTotales);
 
-    // 3. CALCULAR CANTIDAD DE ZONAS Y CAPACIDADES SEGÚN REGLAMENTO GENERALIZADO
+    // 3. CALCULAR CANTIDAD DE ZONAS Y CAPACIDADES SEGÚN REGLAMENTO OFICIAL FAP/APA (SUMA TOTAL = totalParejas)
     const totalParejas = parejas.length;
-    const S = Number(size) || 3;
-    const cantidadZonas = Math.max(1, Math.floor(totalParejas / S));
-    const resto = totalParejas < S ? 0 : totalParejas % S;
+    const S = Number(size) === 4 ? 4 : 3; // Forzamos a que sea únicamente 3 o 4 por reglamento FAP/APA
 
-    const zonas: Zona[] = Array.from({ length: cantidadZonas }).map(
-      (_, index) => {
-        let capacidad = S;
-        if (totalParejas < S) {
-          capacidad = totalParejas;
-        } else if (index < resto) {
-          capacidad = S + 1;
+    const getZonasFAP = (total: number, preferredSize: number): number[] => {
+      if (total < 3) return [total];
+      if (preferredSize === 3) {
+        const mod = total % 3;
+        if (mod === 0) return Array(total / 3).fill(3);
+        if (mod === 1) {
+          const count3 = Math.floor((total - 4) / 3);
+          if (count3 >= 0) return [...Array(count3).fill(3), 4];
         }
+        if (mod === 2) {
+          const count3 = Math.floor((total - 8) / 3);
+          if (count3 >= 0) return [...Array(count3).fill(3), 4, 4];
+        }
+        if (total === 5) return [3, 2];
+        if (total === 4) return [4];
+      } else {
+        const mod = total % 4;
+        if (mod === 0) return Array(total / 4).fill(4);
+        if (mod === 1) {
+          const count4 = Math.floor((total - 9) / 4);
+          if (count4 >= 0) return [...Array(count4).fill(4), 3, 3, 3];
+        }
+        if (mod === 2) {
+          const count4 = Math.floor((total - 6) / 4);
+          if (count4 >= 0) return [...Array(count4).fill(4), 3, 3];
+        }
+        if (mod === 3) {
+          const count4 = Math.floor((total - 3) / 4);
+          if (count4 >= 0) return [...Array(count4).fill(4), 3];
+        }
+        if (total === 5) return [3, 2];
+        if (total === 3) return [3];
+      }
+      const count = Math.max(1, Math.floor(total / preferredSize));
+      const baseCap = Math.floor(total / count);
+      const remainder = total % count;
+      return Array.from({ length: count }).map((_, idx) => idx < remainder ? baseCap + 1 : baseCap);
+    };
 
-        return {
-          nombre: `Zona ${String.fromCharCode(65 + index)}`, // Convierte 0 -> A, 1 -> B
-          capacidad,
-          parejas: [],
-        };
-      },
-    );
+    const capacidadesZonas = getZonasFAP(totalParejas, S);
+    const cantidadZonas = capacidadesZonas.length;
 
-    // 4. DISTRIBUCIÓN SERPIENTE (SNAKE DRAFT) CON TOPE DE CAPACIDAD
+    const zonas: Zona[] = capacidadesZonas.map((capacidad, index) => ({
+      nombre: `Zona ${String.fromCharCode(65 + index)}`, // Convierte 0 -> A, 1 -> B
+      capacidad,
+      parejas: [],
+    }));
+
+    // 4. DISTRIBUCIÓN SERPIENTE (SNAKE DRAFT) CON TOPE DE CAPACIDAD Y RESGUARDO DE BUCLE INFINITO
     let zonaActual = 0;
     let direccion = 1;
 
     for (const pareja of parejas) {
       // Buscar la siguiente zona que tenga espacio
-      while (zonas[zonaActual].parejas.length >= zonas[zonaActual].capacidad) {
+      let attempts = 0;
+      while (
+        zonas[zonaActual].parejas.length >= zonas[zonaActual].capacidad &&
+        attempts < cantidadZonas * 2
+      ) {
         zonaActual += direccion;
         if (zonaActual >= cantidadZonas) {
           zonaActual = cantidadZonas - 1;
@@ -120,8 +172,10 @@ export class CompetenciaService {
           zonaActual = 0;
           direccion = 1;
         }
+        attempts++;
       }
 
+      // Si por alguna anomalía se agotaron todas las capacidades de las zonas, forzamos inserción en la zona actual
       zonas[zonaActual].parejas.push(pareja);
 
       // Lógica de movimiento Serpiente tradicional (1..N, N..1)
@@ -215,6 +269,20 @@ export class CompetenciaService {
           orden: 4,
           estado_partido: "Pendiente Perdedores",
         }); // P1 vs P2
+      } else {
+        // Fallback genérico: Todos contra todos (Round Robin) para cualquier otro tamaño
+        let orden = 1;
+        for (let i = 0; i < p.length; i++) {
+          for (let j = i + 1; j < p.length; j++) {
+            partidos.push({
+              torneo_id: torneoId,
+              ronda: zona.nombre,
+              orden: orden++,
+              equipo_a_id: p[i].inscripcionId,
+              equipo_b_id: p[j].inscripcionId,
+            });
+          }
+        }
       }
 
       if (partidos.length > 0) {
@@ -230,8 +298,16 @@ export class CompetenciaService {
       { name: "FINAL", matches: 1 },
     ];
     
-    // El número de jugadores que avanzan es totalZonas * 2
-    const advancingPlayers = cantidadZonas * 2;
+    const getPlayoffSize = (zonasCount: number): number => {
+      if (zonasCount <= 1) return 2;
+      if (zonasCount === 2 || zonasCount === 3) return 4;
+      if (zonasCount >= 4 && zonasCount <= 6) return 8;
+      if (zonasCount >= 7 && zonasCount <= 12) return 16;
+      return 32;
+    };
+    
+    // El número de jugadores que avanzan es playoffSize
+    const advancingPlayers = getPlayoffSize(cantidadZonas);
     const startIndex = roundsConfig.findIndex((r) => r.matches === advancingPlayers / 2);
     
     if (startIndex !== -1) {

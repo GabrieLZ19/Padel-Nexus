@@ -116,7 +116,8 @@ export const generarCuadros = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    const count = await TorneoService.generarCuadroEliminatoria(req.params.id);
+    const { ordenSiembra, motivo } = req.body;
+    const count = await TorneoService.generarCuadroEliminatoria(req.params.id, ordenSiembra, req.user?.id, motivo);
     return res
       .status(200)
       .json({ message: "Cuadro generado exitosamente", partidosCount: count });
@@ -149,6 +150,22 @@ export const actualizarResultado = async (
     return res
       .status(500)
       .json({ message: "Error al actualizar partido", error: error.message });
+  }
+};
+
+export const actualizarEquiposPartido = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { partido_id } = req.params;
+    const { equipo_a_id, equipo_b_id, motivo } = req.body;
+    const admin_id = req.user?.id;
+    if (!admin_id) return res.status(401).json({ message: "No autorizado" });
+    await TorneoService.actualizarEquiposPartido(partido_id, equipo_a_id ?? null, equipo_b_id ?? null, motivo || "Ajuste manual de rivales", admin_id);
+    return res.status(200).json({ message: "Rivales actualizados exitosamente" });
+  } catch (error: any) {
+    return res.status(500).json({ message: "Error al actualizar rivales", error: error.message });
   }
 };
 

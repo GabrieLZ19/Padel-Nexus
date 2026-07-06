@@ -60,6 +60,7 @@ export class RankingService {
           apellido,
           avatar_url,
           lugar_residencia,
+          categoria_padel,
           pais
         )
       `,
@@ -100,8 +101,19 @@ export class RankingService {
       perfiles?: Record<string, unknown>;
     };
 
+    // Deduplicar jugadores por usuario_id (tomando su categoría con mayor puntuación, que viene primero en el ordenamiento)
+    const seenUsers = new Set<string>();
+    const uniqueData: RowRanking[] = [];
+    
+    for (const jugador of (data as RowRanking[] || [])) {
+      if (!seenUsers.has(jugador.usuario_id)) {
+        seenUsers.add(jugador.usuario_id);
+        uniqueData.push(jugador);
+      }
+    }
+
     // Obtener los IDs de los usuarios para buscar afiliaciones activas
-    const userIds = ((data as RowRanking[]) || []).map((jugador) => jugador.usuario_id);
+    const userIds = uniqueData.map((jugador) => jugador.usuario_id);
     const afiliacionesMap: Record<string, { nombre: string; provincia: string }> = {};
 
     if (userIds.length > 0) {
@@ -133,7 +145,7 @@ export class RankingService {
       });
     }
 
-    return ((data as RowRanking[]) || []).map((jugador, index) => {
+    return uniqueData.map((jugador, index) => {
       const perfilObj = jugador.perfiles || {};
       const clubInfo = afiliacionesMap[jugador.usuario_id] || null;
 

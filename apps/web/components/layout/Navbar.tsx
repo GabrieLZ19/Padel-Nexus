@@ -98,19 +98,32 @@ export default function Navbar() {
   ];
 
   // Extraer nombre directamente del perfil unificado de nuestra API
-  const userName = profile?.nombre ? `${profile.apellido?.toUpperCase()}, ${profile.nombre}` : "";
+  const formatNombreCompleto = (apellido?: string | null, nombre?: string | null) => {
+    const ap = (apellido || "").trim();
+    const nom = (nombre || "").trim();
+    if (ap && nom) return `${ap.toUpperCase()}, ${nom}`;
+    if (ap) return ap.toUpperCase();
+    if (nom) return nom;
+    return "";
+  };
+
+  const userName = formatNombreCompleto(profile?.apellido, profile?.nombre) || profile?.email?.split("@")[0] || "Admin";
 
   // Calculamos las iniciales de forma dinámica basándonos en el nombre real
-  const userInitials =
-    userName && userName.trim()
-      ? userName
-          .trim()
-          .split(/\s+/)
-          .map((n) => n[0])
-          .join("")
-          .substring(0, 2)
-          .toUpperCase()
-          : "PN"; // Fallback transitorio
+  const userInitials = (() => {
+    const ap = (profile?.apellido || "").trim().replace(/[^a-zA-Z0-9]/g, "");
+    const nom = (profile?.nombre || "").trim().replace(/[^a-zA-Z0-9]/g, "");
+    if (ap && nom) {
+      return (ap[0] + nom[0]).toUpperCase();
+    }
+    if (ap) {
+      return ap.slice(0, 2).toUpperCase();
+    }
+    if (nom) {
+      return nom.slice(0, 2).toUpperCase();
+    }
+    return profile?.email?.slice(0, 2).toUpperCase() || "PN";
+  })();
 
   const avatarUrl = profile?.avatar_url || null;
 

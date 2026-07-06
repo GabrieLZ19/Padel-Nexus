@@ -16,12 +16,14 @@ import { RankingsService } from "@/utils/services/ranking";
 import { RankingJugador } from "@/utils/types";
 import { PROVINCIAS_ARG, NIVELES_PADEL } from "@/utils/constants/padelConfig";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import Pagination from "@/components/ui/Pagination";
 import Image from "next/image";
 
 export default function RankingPublicPage() {
   const [rankings, setRankings] = useState<RankingJugador[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // --- ESTADOS DE FILTRADO Y BÚSQUEDA ---
   const [search, setSearch] = useState<string>("");
@@ -30,6 +32,11 @@ export default function RankingPublicPage() {
     PROVINCIAS_ARG[0].value,
   );
   const [activeCategory, setActiveCategory] = useState<string>("Todas");
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, activeScope, activeProvincia, activeCategory]);
 
   // REFERENCIA DE CONTROL DE CONTROL VISUAL
   const isFirstLoad = useRef(true);
@@ -98,7 +105,8 @@ export default function RankingPublicPage() {
   const top1 = sortedRankings[0] || null;
   const top2 = sortedRankings[1] || null;
   const top3 = sortedRankings[2] || null;
-  const tablePlayers = sortedRankings;
+  const startIndex = (currentPage - 1) * 10;
+  const tablePlayers = sortedRankings.slice(startIndex, startIndex + 10);
 
   const opcionesProvincias = PROVINCIAS_ARG.map((p) => ({
     value: p.value,
@@ -218,41 +226,43 @@ export default function RankingPublicPage() {
             {/* TOP 3 PODIO PROFESIONAL */}
             <div className="flex flex-col md:flex-row justify-center items-center md:items-end gap-y-16 gap-x-6 lg:gap-x-8 mb-16 pt-16 md:pt-10">
               {/* PUESTO #2 (Plata) */}
-              <div className="order-2 md:order-1 w-full md:w-70 bg-linear-to-b from-gray-500/10 to-brand-card border border-gray-500/20 rounded-3xl md:rounded-t-[40px] md:rounded-b-2xl p-6 lg:p-8 flex flex-col items-center text-center h-65 justify-end relative shadow-lg">
-                <div className="absolute top-4 left-4 md:hidden text-4xl font-black text-gray-500/20">
-                  2
+              {top2 && (
+                <div className="order-2 md:order-1 w-full md:w-70 bg-linear-to-b from-gray-500/10 to-brand-card border border-gray-500/20 rounded-3xl md:rounded-t-[40px] md:rounded-b-2xl p-6 lg:p-8 flex flex-col items-center text-center h-65 justify-end relative shadow-lg">
+                  <div className="absolute top-4 left-4 md:hidden text-4xl font-black text-gray-500/20">
+                    2
+                  </div>
+                  <div className="absolute -top-10 w-20 h-20 bg-brand-black border-4 border-brand-card rounded-full flex items-center justify-center text-gray-400 overflow-hidden shadow-lg z-10">
+                    {top2.perfiles?.avatar_url ? (
+                      <Image
+                        src={top2.perfiles.avatar_url}
+                        alt="Avatar"
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <User className="size-8 opacity-50" />
+                    )}
+                  </div>
+                  <Medal className="text-gray-400 size-6 mb-2 mt-4 md:mt-0" />
+                  <div className="font-black text-xl text-brand-white truncate w-full px-2 mb-1">
+                    {top2.perfiles?.nombre ? `${top2.perfiles.apellido?.toUpperCase()}, ${top2.perfiles.nombre}` : "A confirmar"}
+                  </div>
+                  <div className="text-gray-400 text-sm font-semibold mb-3">
+                    {top2.perfiles?.clubes?.nombre || "Particular"}
+                  </div>
+                  <div className="bg-gray-500/10 text-gray-300 px-4 py-1.5 rounded-full text-sm font-bold border border-gray-500/20">
+                    {top2.puntos.toLocaleString()} pts
+                  </div>
                 </div>
-                <div className="absolute -top-10 w-20 h-20 bg-brand-black border-4 border-brand-card rounded-full flex items-center justify-center text-gray-400 overflow-hidden shadow-lg z-10">
-                  {top2?.perfiles?.avatar_url ? (
-                    <Image
-                      src={top2.perfiles.avatar_url}
-                      alt="Avatar"
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <User className="size-8 opacity-50" />
-                  )}
-                </div>
-                <Medal className="text-gray-400 size-6 mb-2 mt-4 md:mt-0" />
-                <div className="font-black text-xl text-brand-white truncate w-full px-2 mb-1">
-                  {top2?.perfiles?.nombre ? `${top2.perfiles.apellido?.toUpperCase()}, ${top2.perfiles.nombre}` : "A confirmar"}
-                </div>
-                <div className="text-gray-400 text-sm font-semibold mb-3">
-                  {top2?.perfiles?.clubes?.nombre || "Particular"}
-                </div>
-                <div className="bg-gray-500/10 text-gray-300 px-4 py-1.5 rounded-full text-sm font-bold border border-gray-500/20">
-                  {top2 ? `${top2.puntos.toLocaleString()} pts` : "-"}
-                </div>
-              </div>
+              )}
 
               {/* PUESTO #1 (Oro / Neón) */}
               <div className="order-1 md:order-2 w-full md:w-85 bg-linear-to-b from-brand-chartreuse/15 to-brand-card border border-brand-chartreuse/40 rounded-3xl md:rounded-t-[48px] md:rounded-b-2xl p-6 lg:p-10 flex flex-col items-center text-center h-80 justify-end relative shadow-[0_-10px_40px_rgba(203,254,1,0.08)] z-10">
                 <div className="absolute top-4 right-4 md:hidden text-5xl font-black text-brand-chartreuse/10">
                   1
                 </div>
-                <div className="absolute -top-6 bg-brand-chartreuse text-brand-black w-12 h-12 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(203,254,1,0.4)] z-30">
-                  <Crown className="size-6" />
+                <div className="absolute -top-19 bg-brand-chartreuse text-brand-black w-9 h-9 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(203,254,1,0.4)] z-30">
+                  <Crown className="size-5" />
                 </div>
                 <div className="absolute -top-14 w-28 h-28 bg-brand-black border-4 border-brand-card rounded-full flex items-center justify-center text-brand-chartreuse overflow-hidden shadow-[0_0_30px_rgba(203,254,1,0.2)] z-20">
                   {top1?.perfiles?.avatar_url ? (
@@ -281,39 +291,41 @@ export default function RankingPublicPage() {
               </div>
 
               {/* PUESTO #3 (Bronce) */}
-              <div className="order-3 w-full md:w-70 bg-linear-to-b from-amber-700/15 to-brand-card border border-amber-700/30 rounded-3xl md:rounded-t-[40px] md:rounded-b-2xl p-6 lg:p-8 flex flex-col items-center text-center h-60 justify-end relative shadow-lg">
-                <div className="absolute top-4 right-4 md:hidden text-4xl font-black text-amber-700/20">
-                  3
+              {top3 && (
+                <div className="order-3 w-full md:w-70 bg-linear-to-b from-amber-700/15 to-brand-card border border-amber-700/30 rounded-3xl md:rounded-t-[40px] md:rounded-b-2xl p-6 lg:p-8 flex flex-col items-center text-center h-60 justify-end relative shadow-lg">
+                  <div className="absolute top-4 right-4 md:hidden text-4xl font-black text-amber-700/20">
+                    3
+                  </div>
+                  <div className="absolute -top-10 w-20 h-20 bg-brand-black border-4 border-brand-card rounded-full flex items-center justify-center text-amber-700 overflow-hidden shadow-lg z-10">
+                    {top3.perfiles?.avatar_url ? (
+                      <Image
+                        src={top3.perfiles.avatar_url}
+                        alt="Avatar"
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <User className="size-8 opacity-50" />
+                    )}
+                  </div>
+                  <Medal className="text-amber-600 size-6 mb-2 mt-4 md:mt-0" />
+                  <div className="font-black text-xl text-brand-white truncate w-full px-2 mb-1">
+                    {top3.perfiles?.nombre ? `${top3.perfiles.apellido?.toUpperCase()}, ${top3.perfiles.nombre}` : "A confirmar"}
+                  </div>
+                  <div className="text-gray-400 text-sm font-semibold mb-3">
+                    {top3.perfiles?.clubes?.nombre || "Particular"}
+                  </div>
+                  <div className="bg-amber-700/20 text-amber-500 px-4 py-1.5 rounded-full text-sm font-bold border border-amber-700/30">
+                    {top3.puntos.toLocaleString()} pts
+                  </div>
                 </div>
-                <div className="absolute -top-10 w-20 h-20 bg-brand-black border-4 border-brand-card rounded-full flex items-center justify-center text-amber-700 overflow-hidden shadow-lg z-10">
-                  {top3?.perfiles?.avatar_url ? (
-                    <Image
-                      src={top3.perfiles.avatar_url}
-                      alt="Avatar"
-                      fill
-                      className="object-cover"
-                    />
-                  ) : (
-                    <User className="size-8 opacity-50" />
-                  )}
-                </div>
-                <Medal className="text-amber-600 size-6 mb-2 mt-4 md:mt-0" />
-                <div className="font-black text-xl text-brand-white truncate w-full px-2 mb-1">
-                  {top3?.perfiles?.nombre ? `${top3.perfiles.apellido?.toUpperCase()}, ${top3.perfiles.nombre}` : "A confirmar"}
-                </div>
-                <div className="text-gray-400 text-sm font-semibold mb-3">
-                  {top3?.perfiles?.clubes?.nombre || "Particular"}
-                </div>
-                <div className="bg-amber-700/20 text-amber-500 px-4 py-1.5 rounded-full text-sm font-bold border border-amber-700/30">
-                  {top3 ? `${top3.puntos.toLocaleString()} pts` : "-"}
-                </div>
-              </div>
+              )}
             </div>
 
             {/* VISTA MÓVIL: TARJETAS */}
             <div className="md:hidden flex flex-col gap-3">
               {tablePlayers.map((player, index) => {
-                const posicionReal = index + 1;
+                const posicionReal = startIndex + index + 1;
                 return (
                   <div
                     key={player.id}
@@ -324,7 +336,7 @@ export default function RankingPublicPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-brand-white truncate">
+                        <span className="font-bold text-white truncate">
                           {player.perfiles?.nombre ? `${player.perfiles.apellido?.toUpperCase()}, ${player.perfiles.nombre}` : "Desconocido"}
                         </span>
                         <span className="bg-brand-white/10 px-2 py-0.5 rounded-md text-[10px] font-bold text-brand-chartreuse uppercase shrink-0">
@@ -384,14 +396,14 @@ export default function RankingPublicPage() {
                         partidosJugados > 0
                           ? `${Math.round((partidosGanados / partidosJugados) * 100)}%`
                           : "0%";
-                      const posicionReal = index + 1;
+                      const posicionReal = startIndex + index + 1;
 
                       return (
                         <tr
                           key={player.id}
                           className="hover:bg-brand-white/5 transition-colors group"
                         >
-                          <td className="py-5 px-8 text-center font-black text-base text-gray-500 group-hover:text-brand-white transition-colors">
+                          <td className="py-5 px-8 text-center font-black text-base text-gray-500 group-hover:text-white transition-colors">
                             {posicionReal}
                           </td>
                           <td className="py-5 px-6 flex items-center gap-4">
@@ -407,12 +419,12 @@ export default function RankingPublicPage() {
                                 <User className="size-4" />
                               )}
                             </div>
-                            <span className="font-bold text-sm text-gray-200 group-hover:text-brand-white transition-colors">
+                            <span className="font-bold text-sm text-white group-hover:opacity-95 transition-all">
                               {player.perfiles?.nombre ? `${player.perfiles.apellido?.toUpperCase()}, ${player.perfiles.nombre}` : "Jugador Desconocido"}
                             </span>
                           </td>
                           <td className="py-5 px-6">
-                            <span className="bg-brand-white/5 text-gray-300 px-3 py-1.5 rounded-lg text-xs font-bold uppercase">
+                            <span className="bg-brand-black/5 dark:bg-brand-white/5 text-brand-black/80 dark:text-gray-300 px-3 py-1.5 rounded-lg text-xs font-black uppercase">
                               {player.categoria}
                             </span>
                           </td>
@@ -425,7 +437,7 @@ export default function RankingPublicPage() {
                           <td className="py-5 px-6 text-sm font-bold text-gray-400 text-center">
                             {partidosGanados}
                           </td>
-                          <td className="py-5 px-6 text-sm font-black text-gray-300 text-center">
+                          <td className="py-5 px-6 text-sm font-black text-white text-center">
                             {efectividad}
                           </td>
                           <td className="py-5 px-8 text-right">
@@ -457,6 +469,19 @@ export default function RankingPublicPage() {
                 </table>
               </div>
             </div>
+
+            {/* Paginación */}
+            {sortedRankings.length > 10 && (
+              <div className="mt-6">
+                <Pagination
+                  page={currentPage}
+                  total={sortedRankings.length}
+                  pageSize={10}
+                  currentCount={tablePlayers.length}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            )}
           </div>
         )}
       </main>

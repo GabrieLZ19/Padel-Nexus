@@ -6,6 +6,7 @@ import {
   updateTorneo,
   deleteTorneo,
   actualizarResultado,
+  actualizarEquiposPartido,
   getPartidosByTorneo,
   getInscripcionesByTorneo,
   generarCuadros,
@@ -66,6 +67,11 @@ router.put(
   "/partidos/:partido_id/resultado",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   actualizarResultado,
+);
+router.put(
+  "/partidos/:partido_id/equipos",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  actualizarEquiposPartido,
 );
 router.get(
   "/:id/zonas",

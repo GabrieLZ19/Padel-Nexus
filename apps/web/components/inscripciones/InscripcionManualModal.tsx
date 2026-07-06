@@ -23,7 +23,9 @@ export default function InscripcionManualModal({
 }: InscripcionManualModalProps) {
   const [j1, setJ1] = useState("");
   const [j2, setJ2] = useState("");
-  const [monto, setMonto] = useState<number>(Number(torneo.precio_inscripcion || 0));
+  const [monto, setMonto] = useState<number>(
+    Number(torneo.precio_inscripcion || 0),
+  );
   const [metodoPago, setMetodoPago] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -94,8 +96,13 @@ export default function InscripcionManualModal({
             >
               <div className="flex justify-between items-center border-b border-white/5 pb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-white">Inscribir Pareja</h3>
-                  <p className="text-xs text-gray-500 mt-1">Torneo: {torneo.nombre}</p>
+                  <h3 className="text-xl font-bold text-white">
+                    Inscribir{" "}
+                    {torneo.modalidad === "Individual" ? "Jugador" : "Pareja"}
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Torneo: {torneo.nombre}
+                  </p>
                 </div>
                 <button
                   onClick={onClose}
@@ -150,9 +157,9 @@ export default function InscripcionManualModal({
                       <input
                         type="number"
                         placeholder="Ej: 12000"
-                        className="w-full bg-[#111] border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-brand-chartreuse/50 transition-colors font-semibold"
+                        className="w-full bg-[#111] border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-brand-chartreuse/50 transition-colors font-semibold cursor-not-allowed opacity-60"
                         value={monto}
-                        onChange={(e) => setMonto(Number(e.target.value))}
+                        readOnly={true}
                       />
                     </div>
                   </div>
@@ -171,6 +178,7 @@ export default function InscripcionManualModal({
                       ]}
                       placeholder="Seleccionar..."
                       haciaArriba={true}
+                      className="py-2.5! text-sm!"
                     />
                   </div>
                 </div>
@@ -186,7 +194,8 @@ export default function InscripcionManualModal({
                 ) : (
                   <>
                     <Save className="size-4" />
-                    Registrar Pareja
+                    Registrar{" "}
+                    {torneo.modalidad === "Individual" ? "Jugador" : "Pareja"}
                   </>
                 )}
               </button>

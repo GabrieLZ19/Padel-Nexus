@@ -37,11 +37,25 @@ export const LiveArbitrajeRow = ({
     }
   }, [gamesA, gamesB, ptsA, ptsB]);
 
-  const txtA = partido.equipo_a_j1
-    ? `${partido.equipo_a_j1} ${partido.equipo_a_j2 && partido.equipo_a_j2 !== "-" ? `/ ${partido.equipo_a_j2}` : ""}`
+  const cleanName = (name?: string | null) => {
+    if (!name) return "";
+    let cleaned = name.trim()
+      .replace(/^[\s,.\-]+/, "") // remove leading spaces, commas, dots, dashes
+      .replace(/[\s,.\-]+$/, ""); // remove trailing spaces, commas, dots, dashes
+    if (cleaned === "," || cleaned === "." || cleaned === "") return "";
+    return cleaned;
+  };
+
+  const j1A = cleanName(partido.equipo_a_j1);
+  const j2A = cleanName(partido.equipo_a_j2);
+  const txtA = j1A
+    ? `${j1A} ${j2A && j2A !== "-" ? `/ ${j2A}` : ""}`
     : "Equipo A";
-  const txtB = partido.equipo_b_j1
-    ? `${partido.equipo_b_j1} ${partido.equipo_b_j2 && partido.equipo_b_j2 !== "-" ? `/ ${partido.equipo_b_j2}` : ""}`
+
+  const j1B = cleanName(partido.equipo_b_j1);
+  const j2B = cleanName(partido.equipo_b_j2);
+  const txtB = j1B
+    ? `${j1B} ${j2B && j2B !== "-" ? `/ ${j2B}` : ""}`
     : "Equipo B";
 
   // Lógica de puntuación del Pádel (incluye soporte para Tie-break en 6-6)
@@ -126,10 +140,10 @@ export const LiveArbitrajeRow = ({
   };
 
   return (
-    <div className="bg-black/40 border border-white/10 rounded-2xl p-5 flex flex-col xl:flex-row items-center gap-6 shadow-lg">
+    <div className="bg-brand-card border border-white/5 rounded-3xl p-6 flex flex-col xl:flex-row items-center gap-6 shadow-xl transition-all duration-300">
       {/* Indicador de Ronda */}
       <div className="text-center xl:text-left shrink-0">
-        <div className="text-[10px] text-brand-chartreuse font-black uppercase tracking-widest bg-brand-chartreuse/10 px-3 py-1 rounded-md inline-block">
+        <div className="text-[10px] text-brand-chartreuse font-extrabold uppercase tracking-widest bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-3.5 py-1.5 rounded-full inline-block">
           {partido.ronda}
         </div>
       </div>
@@ -137,22 +151,22 @@ export const LiveArbitrajeRow = ({
       {/* Controles del Partido */}
       <div className="flex-1 flex flex-col lg:flex-row items-center justify-between gap-6 w-full">
         {/* EQUIPO A */}
-        <div className="flex flex-col items-center lg:items-end flex-1 w-full gap-2">
-          <span className="text-sm font-bold text-white text-center lg:text-right">
+        <div className="flex flex-col items-center lg:items-end flex-1 w-full gap-3">
+          <span className="text-base font-black text-white text-center lg:text-right tracking-tight">
             {txtA}
           </span>
           <button
             onClick={() => handlePunto("A")}
-            className="bg-white/10 hover:bg-white/20 text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+            className="bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/20 hover:border-brand-chartreuse/40 text-xs font-extrabold px-4.5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer active:scale-95 shadow-sm"
           >
-            <Play className="size-3 text-brand-chartreuse" /> Punto Eq. A
+            <Play className="size-3.5 text-brand-chartreuse fill-brand-chartreuse" /> Punto Eq. A
           </button>
         </div>
 
         {/* MARCADOR CENTRAL */}
-        <div className="flex items-center gap-3 bg-[#111] p-3 rounded-xl border border-white/5 shrink-0">
+        <div className="flex items-center gap-4 bg-brand-card p-3.5 rounded-2xl border border-white/5 shrink-0 shadow-inner">
           <div className="flex flex-col items-center gap-1">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">
+            <span className="text-[9px] font-black text-gray-500 uppercase tracking-wider">
               Juegos
             </span>
             <input
@@ -160,23 +174,23 @@ export const LiveArbitrajeRow = ({
               min="0"
               value={gamesA}
               onChange={(e) => setGamesA(Number(e.target.value))}
-              className="w-12 h-12 bg-white/5 rounded-lg text-center text-white font-black text-xl outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-1 focus:ring-brand-chartreuse"
+              className="w-14 h-14 bg-brand-input rounded-xl text-center text-white font-black text-2xl outline-none border border-white/10 focus:border-brand-chartreuse/60 focus:ring-1 focus:ring-brand-chartreuse/30 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           </div>
 
-          <div className="flex flex-col items-center gap-1 mx-2">
-            <span className="text-[10px] font-bold text-brand-chartreuse uppercase animate-pulse">
+          <div className="flex flex-col items-center gap-1 mx-1.5">
+            <span className="text-[9px] font-black text-brand-chartreuse uppercase tracking-widest animate-pulse">
               Live
             </span>
-            <div className="flex items-center gap-2 bg-black px-4 py-2 rounded-lg border border-brand-chartreuse/30">
+            <div className="flex items-center gap-2.5 bg-brand-black px-4.5 py-2.5 rounded-xl border border-brand-chartreuse/20 shadow-sm dark:shadow-none">
               <span
-                className={`w-6 text-center font-black ${ptsA === "Ad" ? "text-brand-chartreuse" : "text-white"}`}
+                className={`w-7 text-center text-lg font-extrabold ${ptsA === "Ad" ? "text-brand-chartreuse font-black" : "text-white"}`}
               >
                 {ptsA}
               </span>
-              <span className="text-gray-600 font-bold">-</span>
+              <span className="text-gray-600 font-bold text-sm">-</span>
               <span
-                className={`w-6 text-center font-black ${ptsB === "Ad" ? "text-brand-chartreuse" : "text-white"}`}
+                className={`w-7 text-center text-lg font-extrabold ${ptsB === "Ad" ? "text-brand-chartreuse font-black" : "text-white"}`}
               >
                 {ptsB}
               </span>
@@ -184,7 +198,7 @@ export const LiveArbitrajeRow = ({
           </div>
 
           <div className="flex flex-col items-center gap-1">
-            <span className="text-[10px] font-bold text-gray-500 uppercase">
+            <span className="text-[9px] font-black text-gray-500 uppercase tracking-wider">
               Juegos
             </span>
             <input
@@ -192,21 +206,21 @@ export const LiveArbitrajeRow = ({
               min="0"
               value={gamesB}
               onChange={(e) => setGamesB(Number(e.target.value))}
-              className="w-12 h-12 bg-white/5 rounded-lg text-center text-white font-black text-xl outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-1 focus:ring-brand-chartreuse"
+              className="w-14 h-14 bg-brand-input rounded-xl text-center text-white font-black text-2xl outline-none border border-white/10 focus:border-brand-chartreuse/60 focus:ring-1 focus:ring-brand-chartreuse/30 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           </div>
         </div>
 
         {/* EQUIPO B */}
-        <div className="flex flex-col items-center lg:items-start flex-1 w-full gap-2">
-          <span className="text-sm font-bold text-white text-center lg:text-left">
+        <div className="flex flex-col items-center lg:items-start flex-1 w-full gap-3">
+          <span className="text-base font-black text-white text-center lg:text-left tracking-tight">
             {txtB}
           </span>
           <button
             onClick={() => handlePunto("B")}
-            className="bg-white/10 hover:bg-white/20 text-xs font-bold px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+            className="bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/20 hover:border-brand-chartreuse/40 text-xs font-extrabold px-4.5 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer active:scale-95 shadow-sm"
           >
-            <Play className="size-3 text-brand-chartreuse" /> Punto Eq. B
+            <Play className="size-3.5 text-brand-chartreuse fill-brand-chartreuse" /> Punto Eq. B
           </button>
         </div>
       </div>
@@ -215,7 +229,7 @@ export const LiveArbitrajeRow = ({
       <button
         onClick={handleFinalizar}
         disabled={isSaving || (gamesA === 0 && gamesB === 0)}
-        className="shrink-0 bg-brand-chartreuse text-[#111] hover:bg-[#b3e600] px-6 py-3.5 rounded-xl text-sm font-black transition-all shadow-[0_0_15px_rgba(204,255,0,0.15)] disabled:opacity-40 disabled:shadow-none flex items-center gap-2 w-full xl:w-auto justify-center mt-4 xl:mt-0"
+        className="shrink-0 bg-brand-chartreuse text-brand-black hover:opacity-90 px-6 py-4 rounded-xl text-sm font-black transition-all shadow-[0_5px_20px_rgba(204,255,0,0.2)] active:scale-95 disabled:opacity-40 disabled:shadow-none flex items-center gap-2 w-full xl:w-auto justify-center mt-4 xl:mt-0 cursor-pointer"
       >
         {isSaving ? (
           <Loader2 className="size-4 animate-spin" />

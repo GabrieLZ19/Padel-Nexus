@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CreditCard, CheckCircle2, DollarSign } from "lucide-react";
 import CustomDropdown from "../ui/CustomDropdown";
@@ -28,6 +28,10 @@ export default function ConfirmarPagoModal({
 }: ConfirmarPagoModalProps) {
   const [monto, setMonto] = useState<string>(montoSugerido.toString());
   const [metodo, setMetodo] = useState<string>("Efectivo");
+
+  useEffect(() => {
+    setMonto(montoSugerido.toString());
+  }, [montoSugerido]);
 
   if (!isOpen) return null;
 
@@ -91,9 +95,8 @@ export default function ConfirmarPagoModal({
                   <input
                     type="number"
                     value={monto}
-                    onChange={(e) => setMonto(e.target.value)}
-                    disabled={isLoading}
-                    className="w-full bg-[#111] text-white text-lg font-semibold rounded-xl border border-white/10 pl-11 pr-4 py-3.5 focus:border-brand-chartreuse focus:ring-1 focus:ring-brand-chartreuse transition-colors disabled:opacity-50"
+                    readOnly={true}
+                    className="w-full bg-[#111] text-white text-lg font-semibold rounded-xl border border-white/10 pl-11 pr-4 py-3.5 cursor-not-allowed opacity-60 transition-colors"
                     placeholder="0"
                   />
                 </div>

@@ -370,7 +370,7 @@ export default function TorneosPage() {
                       </td>
 
                       <td className="py-4 px-6">
-                        <div className="text-[14px] font-bold text-gray-200">
+                        <div className="text-[14px] font-bold text-brand-white">
                           {t.clubes?.nombre || "Sede a confirmar"}
                         </div>
                         <div className="text-[13px] text-gray-500 mt-0.5">

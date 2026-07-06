@@ -453,7 +453,7 @@ function TorneosContent() {
                     btnHref = "/login";
                   } else if (isEnrolled) {
                     btnText = "Ver inscripción";
-                    btnClass = "bg-gray-800 text-gray-300 hover:bg-gray-700";
+                    btnClass = "bg-brand-input text-white border border-brand-white/10 hover:opacity-90";
                   } else if (isLleno) {
                     btnText = "Cupos Agotados";
                     btnClass =

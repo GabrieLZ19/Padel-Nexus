@@ -66,7 +66,7 @@ export default function PlayerDashboard() {
         </div>
         <Link
           href="/reservar"
-          className="w-full sm:w-auto text-center bg-brand-white text-brand-black px-6 py-3.5 md:py-4 rounded-xl font-bold hover:bg-gray-100 transition-colors shadow-md md:text-lg cursor-pointer"
+          className="w-full sm:w-auto text-center bg-brand-white text-brand-black px-6 py-3.5 md:py-4 rounded-xl font-bold hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md md:text-lg cursor-pointer"
         >
           Nueva Reserva
         </Link>
@@ -245,14 +245,17 @@ export default function PlayerDashboard() {
                   <p className="text-xs md:text-sm font-medium text-gray-400 mb-0.5 md:mb-1">
                     Categoría del Circuito
                   </p>
-                  <h2 className="text-3xl md:text-5xl font-black tracking-tight text-brand-white">
+                  <h2 className="text-3xl md:text-5xl font-black tracking-tight text-white">
                     {profile.categoria_padel || "S/C"}
                   </h2>
                 </div>
               </div>
-              {/* Marca de agua decorativa en escritorio */}
-              <div className="hidden md:flex absolute -right-6 top-1/2 -translate-y-1/2 opacity-5 select-none pointer-events-none">
-                <span className="font-black text-[120px] italic text-brand-white">
+              {/* Marca de agua decorativa */}
+              <div className="absolute -right-6 top-1/2 -translate-y-1/2 select-none pointer-events-none z-0">
+                <span 
+                  className="font-black text-[120px] italic"
+                  style={{ color: 'var(--color-brand-white)', opacity: 0.07 }}
+                >
                   {profile.categoria_padel || "S/C"}
                 </span>
               </div>

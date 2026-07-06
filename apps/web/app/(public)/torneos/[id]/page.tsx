@@ -202,6 +202,13 @@ export default function TorneoDetallePage() {
     return result;
   };
 
+  const maxMatches = rondasToShow.reduce((max, rondaInfo) => {
+    const count = getRoundMatches(rondaInfo.id, rondaInfo.required).length;
+    return count > max ? count : max;
+  }, 1);
+
+  const dynamicHeight = Math.max(580, maxMatches * 115);
+
   return (
     <div className="min-h-screen bg-brand-black text-brand-white font-sans selection:bg-brand-chartreuse selection:text-brand-black">
       <div className="max-w-7xl mx-auto px-5 lg:px-10 py-6 lg:py-8 animate-in fade-in duration-300">
@@ -291,7 +298,10 @@ export default function TorneoDetallePage() {
 
             {/* CONTENEDOR SCROLLABLE UNIVERSAL */}
             <div className="w-full overflow-x-auto pb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-              <div className="flex gap-6 lg:gap-8 w-max min-w-full h-125 lg:h-150 px-2 lg:px-0">
+              <div 
+                className="flex gap-6 lg:gap-8 w-max min-w-full px-2 lg:px-0"
+                style={{ height: `${dynamicHeight}px` }}
+              >
                 {rondasToShow.map((rondaInfo) => {
                   const roundMatches = getRoundMatches(
                     rondaInfo.id,
