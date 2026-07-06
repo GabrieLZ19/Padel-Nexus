@@ -331,7 +331,15 @@ export default function RankingPublicPage() {
                     key={player.id}
                     className="bg-brand-card border border-brand-white/5 rounded-2xl p-4 flex items-center gap-4 shadow-lg"
                   >
-                    <div className="w-8 h-8 rounded-full bg-brand-white/5 flex items-center justify-center font-bold text-gray-400 text-sm shrink-0">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0 border ${
+                       posicionReal === 1
+                         ? "bg-amber-500/10 text-amber-500 border-amber-500/20 shadow-[0_0_8px_rgba(245,158,11,0.2)]"
+                         : posicionReal === 2
+                         ? "bg-slate-400/10 text-slate-400 border-slate-400/20"
+                         : posicionReal === 3
+                         ? "bg-amber-700/10 text-amber-700 border-amber-700/20"
+                         : "bg-brand-white/5 text-gray-400 border-white/5"
+                     }`}>
                       {posicionReal}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -339,8 +347,8 @@ export default function RankingPublicPage() {
                         <span className="font-bold text-white truncate">
                           {player.perfiles?.nombre ? `${player.perfiles.apellido?.toUpperCase()}, ${player.perfiles.nombre}` : "Desconocido"}
                         </span>
-                        <span className="bg-brand-white/10 px-2 py-0.5 rounded-md text-[10px] font-bold text-brand-chartreuse uppercase shrink-0">
-                          {player.categoria}
+                        <span className="bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-md text-[10px] font-black text-brand-chartreuse uppercase shrink-0">
+                          {(player.perfiles as any)?.categoria_padel || player.categoria}
                         </span>
                       </div>
                       <div className="text-xs text-gray-500 truncate">
@@ -403,7 +411,15 @@ export default function RankingPublicPage() {
                           key={player.id}
                           className="hover:bg-brand-white/5 transition-colors group"
                         >
-                          <td className="py-5 px-8 text-center font-black text-base text-gray-500 group-hover:text-white transition-colors">
+                          <td className={`py-5 px-8 text-center font-black text-base transition-colors ${
+                             posicionReal === 1
+                               ? "text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]"
+                               : posicionReal === 2
+                               ? "text-slate-400 drop-shadow-[0_0_8px_rgba(148,163,184,0.4)]"
+                               : posicionReal === 3
+                               ? "text-amber-700 drop-shadow-[0_0_8px_rgba(180,83,9,0.4)]"
+                               : "text-gray-500 group-hover:text-white"
+                           }`}>
                             {posicionReal}
                           </td>
                           <td className="py-5 px-6 flex items-center gap-4">
@@ -424,8 +440,8 @@ export default function RankingPublicPage() {
                             </span>
                           </td>
                           <td className="py-5 px-6">
-                            <span className="bg-brand-black/5 dark:bg-brand-white/5 text-brand-black/80 dark:text-gray-300 px-3 py-1.5 rounded-lg text-xs font-black uppercase">
-                              {player.categoria}
+                            <span className="bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20 px-3 py-1.5 rounded-lg text-xs font-black uppercase">
+                              {(player.perfiles as any)?.categoria_padel || player.categoria}
                             </span>
                           </td>
                           <td className="py-5 px-6 text-sm font-medium text-gray-400">
