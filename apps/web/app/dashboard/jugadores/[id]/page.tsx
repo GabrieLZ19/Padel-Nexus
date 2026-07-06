@@ -227,6 +227,15 @@ export default function PerfilJugadorAdminPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-gray-400 flex items-center gap-2 text-sm">
+                  <User className="size-4" /> DNI
+                </span>
+                <span className="font-medium text-white">
+                  {perfil.dni || "No registrado"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 flex items-center gap-2 text-sm">
                   <Phone className="size-4" /> Teléfono
                 </span>
                 <span className="font-medium text-white">

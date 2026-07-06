@@ -20,6 +20,7 @@ import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
 import { MatchCard } from "./MatchCard";
+import CustomDropdown from "@/components/ui/CustomDropdown";
 
 interface BracketEditorProps {
   torneoId: string;
@@ -40,6 +41,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [modificacionNoDestructiva, setModificacionNoDestructiva] =
     useState(true);
+  const [tamanioGrupo, setTamanioGrupo] = useState<number>(3);
   const [auditoriaLogs, setAuditoriaLogs] = useState<any[]>([]);
   const [loadingAuditoria, setLoadingAuditoria] = useState(false);
 
@@ -104,7 +106,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   const handleRegenerarZonas = async () => {
     try {
       setLoading(true);
-      await TorneosService.generarZonas(torneoId);
+      await TorneosService.generarZonas(torneoId, tamanioGrupo);
       await loadZonas();
       setFeedbackModal({
         isOpen: true,
@@ -427,7 +429,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       {activeView === "zonas" && (
         <div className="space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex gap-3">
+            <div className="flex items-center gap-3">
               <button
                 id="btn-regenerar"
                 onClick={handleRegenerarZonas}
@@ -440,6 +442,23 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 <RefreshCw className="size-4 text-gray-400" /> Regenerar
                 automático
               </button>
+
+              <div className="flex items-center gap-2 bg-[#222222] border border-white/5 rounded-xl px-3.5 py-1 text-sm text-gray-300">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide shrink-0">Parejas por Zona:</span>
+                <div className="w-40">
+                  <CustomDropdown
+                    value={String(tamanioGrupo)}
+                    onChange={(val) => setTamanioGrupo(Number(val))}
+                    options={[
+                      { value: "2", label: "2 parejas" },
+                      { value: "3", label: "3 parejas (FAP)" },
+                      { value: "4", label: "4 parejas" },
+                      { value: "5", label: "5 parejas" },
+                    ]}
+                    placeholder="Seleccionar..."
+                  />
+                </div>
+              </div>
               <button className="flex items-center gap-2 px-4 py-2 border border-brand-chartreuse/30 rounded-xl text-sm font-semibold text-brand-chartreuse hover:bg-brand-chartreuse/10 transition-colors">
                 <Plus className="size-4" />{" "}
                 {isIndividual ? "Agregar jugador" : "Agregar pareja"}

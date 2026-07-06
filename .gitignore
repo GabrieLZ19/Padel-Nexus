@@ -3,7 +3,7 @@ dist/
 .env
 .turbo/
 package-lock.json
-package.json
-tsconfig.json
-turbo.json
+.agents/
+.vscode/
+
 node_modules

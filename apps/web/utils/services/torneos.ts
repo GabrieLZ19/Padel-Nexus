@@ -90,8 +90,12 @@ export const TorneosService = {
     return response.data;
   },
 
-  async generarZonas(torneoId: string) {
-    const response = await api.post(`/torneos/${torneoId}/generar-zonas`);
+  async generarZonas(torneoId: string, size?: number) {
+    const response = await api.post(
+      `/torneos/${torneoId}/generar-zonas`,
+      {},
+      { params: size ? { tamanioGrupo: size } : {} }
+    );
     return response.data;
   },
 

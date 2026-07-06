@@ -83,7 +83,7 @@ export default function LandingPage() {
                 placeholder="Buscá torneos, clubes o jugadores"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent border-none text-brand-white focus:outline-none placeholder-gray-500 text-base"
+                className="w-full bg-transparent border-none text-brand-white focus:outline-none placeholder-gray-500 text-base p-2"
               />
             </label>
             <button
@@ -209,7 +209,9 @@ export default function LandingPage() {
                   <div className="flex items-center gap-3">
                     <span className="font-black text-gray-600">0{i + 1}</span>
                     <span className="text-sm font-medium">
-                      {r.perfiles?.nombre ? `${r.perfiles.apellido?.toUpperCase()}, ${r.perfiles.nombre}` : "Jugador anónimo"}
+                      {r.perfiles?.nombre
+                        ? `${r.perfiles.apellido?.toUpperCase()}, ${r.perfiles.nombre}`
+                        : "Jugador anónimo"}
                     </span>
                   </div>
                   <span className="text-brand-chartreuse font-bold">

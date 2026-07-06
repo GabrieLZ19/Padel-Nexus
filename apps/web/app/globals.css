@@ -24,6 +24,191 @@
   font-display: swap;
 }
 
+html.light {
+  --color-brand-black: #f1f5f9; /* Slate 100 - soft, low-brightness background */
+  --color-brand-white: #0f172a; /* Slate 900 - dark text */
+  --color-brand-card: #ffffff; /* White cards */
+  --color-brand-input: #e2e8f0; /* Slate 200 - inputs, lines, and borders */
+  --color-brand-chartreuse: #6e8901; /* Forest/olive green - premium, high contrast */
+  --color-brand-moss: #2b3d14; /* Deep forest green */
+}
+
+/* Correcciones de legibilidad y contraste en Modo Claro */
+html.light body {
+  color: #0f172a;
+}
+html.light .text-gray-500,
+html.light .text-gray-400 {
+  color: #475569 !important; /* Slate 600 */
+}
+html.light .text-gray-300 {
+  color: #1e293b !important; /* Slate 800 */
+}
+html.light .text-white {
+  color: #0f172a !important; /* Slate 900 */
+}
+
+/* Sobrescribir fondos oscuros en modo claro */
+html.light .bg-\[\#0a0a0a\],
+html.light .bg-\[\#0d0d0d\],
+html.light .bg-\[\#0f0f0f\],
+html.light .bg-\[\#0f0f0f\/90\],
+html.light .bg-\[\#0f0f0f\]\/90,
+html.light .bg-black {
+  background-color: var(--color-brand-black) !important;
+}
+
+html.light .bg-\[\#111111\],
+html.light .bg-\[\#111\],
+html.light .bg-\[\#151515\],
+html.light .bg-\[\#161616\],
+html.light .bg-\[\#1a1a1a\],
+html.light .bg-\[\#1a1a1a\/90\],
+html.light .bg-\[\#1a1a1a\]\/90,
+html.light .bg-\[\#222222\],
+html.light .bg-\[\#2a2a2a\],
+html.light .bg-brand-card {
+  background-color: var(--color-brand-card) !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .bg-black\/20,
+html.light .bg-black\/40,
+html.light .bg-white\/5,
+html.light .bg-white\/10,
+html.light .hover\:bg-white\/5:hover,
+html.light .hover\:bg-white\/10:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* Estilos para inputs en modo claro */
+html.light input,
+html.light select,
+html.light textarea,
+html.light .bg-brand-input {
+  background-color: var(--color-brand-input) !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Badges e iconos del Dashboard en modo claro */
+html.light .bg-\[\#1c2e0e\] {
+  background-color: rgba(60, 94, 27, 0.1) !important; /* Soft green */
+  color: var(--color-brand-chartreuse) !important; /* Dark green text */
+  border-color: rgba(60, 94, 27, 0.2) !important;
+}
+
+html.light .bg-\[\#2a3614\] {
+  background-color: rgba(60, 94, 27, 0.1) !important; /* Soft green */
+  border-color: rgba(60, 94, 27, 0.2) !important;
+}
+
+/* Sobrescribir fondos de barras inactivas en gráficos para que sean gris claro en modo claro */
+html.light .bg-\[\#33421b\] {
+  background-color: #cbd5e1 !important; /* Slate 300 - soft gray for inactive bars */
+}
+
+html.light .hover\:bg-\[\#435723\]\:hover:hover {
+  background-color: #94a3b8 !important; /* Slate 400 */
+}
+
+/* Deshabilitar sombras y brillos de tipo neon en modo claro */
+html.light [class*="shadow-[0_0_"],
+html.light [class*="drop-shadow-[0_0_"] {
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+/* Forzar contraste en botones verdes del Modo Claro */
+html.light .bg-brand-chartreuse {
+  background-color: var(--color-brand-chartreuse) !important;
+  color: #ffffff !important; /* Force readable white text */
+}
+
+html.light .bg-brand-chartreuse\/10 {
+  background-color: rgba(60, 94, 27, 0.1) !important;
+}
+
+html.light .border-brand-chartreuse\/20 {
+  border-color: rgba(60, 94, 27, 0.2) !important;
+}
+
+html.light .border-white\/5,
+html.light .border-white\/10,
+html.light .border-brand-white\/5,
+html.light .border-brand-white\/10 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .divide-white\/5 > *,
+html.light .divide-brand-white\/5 > * {
+  border-color: #e2e8f0 !important;
+}
+
+/* --- EFECTO DE TRANSICIÓN DE TEMA POLYGON (View Transitions API) --- */
+:root {
+  --expo-out: linear(
+    0 0%, 0.1684 2.66%, 0.3165 5.49%,
+    0.446 8.52%, 0.5581 11.78%,
+    0.6535 15.29%, 0.7341 19.11%,
+    0.8011 23.3%, 0.8557 27.93%,
+    0.8962 32.68%, 0.9283 38.01%,
+    0.9529 44.08%, 0.9711 51.14%,
+    0.9833 59.06%, 0.9915 68.74%, 1 100%
+  );
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Transición por defecto a modo oscuro */
+::view-transition-new(root) {
+  animation: reveal-dark 700ms var(--expo-out) both;
+}
+
+/* Transición a modo claro */
+html.light::view-transition-new(root) {
+  animation: reveal-light 700ms var(--expo-out) both;
+}
+
+@keyframes reveal-dark {
+  from {
+    clip-path: polygon(50% -71%, -50% 71%, -50% 71%, 50% -71%);
+  }
+  to {
+    clip-path: polygon(50% -71%, -50% 71%, 50% 171%, 171% 50%);
+  }
+}
+
+@keyframes reveal-light {
+  from {
+    clip-path: polygon(171% 50%, 50% 171%, 50% 171%, 171% 50%);
+  }
+  to {
+    clip-path: polygon(171% 50%, 50% 171%, -50% 71%, 50% -71%);
+  }
+}
+
+/* Filtro del logo para cambiar el texto blanco por texto oscuro en modo claro */
+html.light img[src$="Logo.svg"],
+html.light img[src$="LogoHorizontal.svg"] {
+  filter: invert(0.9) brightness(0.2) contrast(1.2) !important;
+}
+
+/* Ocultar flechas de inputs de tipo number */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 body {
   background-color: var(--color-brand-black);
   color: var(--color-brand-white);
@@ -55,13 +240,28 @@ body {
   }
 
   @keyframes wiggle {
-    0%, 100% { transform: rotate(0deg); }
-    15%       { transform: rotate(-12deg); }
-    30%       { transform: rotate(10deg); }
-    45%       { transform: rotate(-8deg); }
-    60%       { transform: rotate(6deg); }
-    75%       { transform: rotate(-4deg); }
-    90%       { transform: rotate(2deg); }
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+    15% {
+      transform: rotate(-12deg);
+    }
+    30% {
+      transform: rotate(10deg);
+    }
+    45% {
+      transform: rotate(-8deg);
+    }
+    60% {
+      transform: rotate(6deg);
+    }
+    75% {
+      transform: rotate(-4deg);
+    }
+    90% {
+      transform: rotate(2deg);
+    }
   }
 
   /* Ocultar barra de desplazamiento nativa pero mantener funcionalidad de scroll */
@@ -69,8 +269,8 @@ body {
     display: none;
   }
   .no-scrollbar {
-    -ms-overflow-style: none;  /* IE y Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none; /* IE y Edge */
+    scrollbar-width: none; /* Firefox */
   }
 
   /* Clases responsivas basadas en altura para el panel izquierdo de marca */
@@ -126,4 +326,3 @@ body {
     }
   }
 }
-

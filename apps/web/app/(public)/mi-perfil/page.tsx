@@ -122,7 +122,7 @@ export default function PlayerDashboard() {
                               <ChevronLeft className="size-5" />
                             </button>
                             <span className="text-xs font-bold text-gray-300">
-                              Ficha {index + 1} de {licList.length}
+                              Licencia {index + 1} de {licList.length}
                             </span>
                             <button
                               onClick={() =>

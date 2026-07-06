@@ -29,6 +29,7 @@ import CustomDropdown from "../../../components/ui/CustomDropdown";
 import Pagination from "../../../components/ui/Pagination";
 import { TorneosService, PagosService } from "@/utils/services";
 import { FAP_ESTADOS_PAGO } from "@/utils/constants/fap";
+import InscripcionManualModal from "@/components/inscripciones/InscripcionManualModal";
 
 const TABS = ["Todas", "Pendientes", "Confirmadas", "Rechazadas"];
 
@@ -55,6 +56,9 @@ export default function GestionInscripcionesPage() {
   const [detalleModalOpen, setDetalleModalOpen] = useState(false);
   const [selectedInscripcion, setSelectedInscripcion] =
     useState<Inscripcion | null>(null);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+
+  const selectedTorneo = torneos.find((t) => t.id === filterTorneo);
 
   useEffect(() => {
     TorneosService.getAll().then(setTorneos).catch(console.error);
@@ -271,13 +275,23 @@ export default function GestionInscripcionesPage() {
           </h1>
           <p className="text-gray-400 mt-1">Control de pagos y validaciones</p>
         </div>
-        <button
-          onClick={handleExportarExcel}
-          disabled={loading || filteredInscripciones.length === 0}
-          className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
-        >
-          <Download className="size-4" /> Exportar CSV
-        </button>
+        <div className="flex gap-2">
+          {selectedTorneo && (
+            <button
+              onClick={() => setIsManualModalOpen(true)}
+              className="flex items-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md cursor-pointer"
+            >
+              Inscribir Pareja
+            </button>
+          )}
+          <button
+            onClick={handleExportarExcel}
+            disabled={loading || filteredInscripciones.length === 0}
+            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50 cursor-pointer"
+          >
+            <Download className="size-4" /> Exportar CSV
+          </button>
+        </div>
       </div>
 
       {/* TARJETAS DE MÉTRICAS */}
@@ -604,6 +618,15 @@ export default function GestionInscripcionesPage() {
         onClose={() => setDetalleModalOpen(false)}
         inscripcion={selectedInscripcion}
       />
+
+      {isManualModalOpen && selectedTorneo && (
+        <InscripcionManualModal
+          isOpen={isManualModalOpen}
+          onClose={() => setIsManualModalOpen(false)}
+          onSuccess={() => setRefreshKey((prev) => prev + 1)}
+          torneo={selectedTorneo}
+        />
+      )}
 
       <ConfirmarPagoModal
         isOpen={pagoModal.isOpen}

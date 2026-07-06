@@ -47,27 +47,33 @@ interface DragDropPairingProps {
   onMovePareja: (
     inscripcionId: string,
     origenZonaId: string,
-    destinoZonaId: string
+    destinoZonaId: string,
   ) => void;
   isEditing: boolean;
   partidos: Partido[];
 }
 
-export const SortablePareja = ({ 
-  pareja, 
+export const SortablePareja = ({
+  pareja,
   isEditing,
   stats,
   isClassified,
   posNum,
-}: { 
-  pareja: ParejaDrag; 
+}: {
+  pareja: ParejaDrag;
   isEditing: boolean;
   stats: { played: number; won: number; points: number };
   isClassified?: boolean;
   posNum?: number;
 }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: pareja.id, disabled: !isEditing });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: pareja.id, disabled: !isEditing });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -75,10 +81,10 @@ export const SortablePareja = ({
     opacity: isDragging ? 0.4 : 1,
   };
 
-  const nombreCompleto = pareja.jugador1_nombre 
-    ? (pareja.jugador2_nombre && pareja.jugador2_nombre !== "-" 
+  const nombreCompleto = pareja.jugador1_nombre
+    ? pareja.jugador2_nombre && pareja.jugador2_nombre !== "-"
       ? `${pareja.jugador1_nombre} / ${pareja.jugador2_nombre}`
-      : pareja.jugador1_nombre)
+      : pareja.jugador1_nombre
     : "DESCONOCIDO";
 
   return (
@@ -96,52 +102,58 @@ export const SortablePareja = ({
       }`}
     >
       {isEditing && (
-        <div 
-          className="flex items-center justify-center text-gray-500 hover:text-white px-1 shrink-0"
-        >
+        <div className="flex items-center justify-center text-gray-500 hover:text-white px-1 shrink-0">
           <GripVertical className="size-4" />
         </div>
       )}
 
-      <div className={`flex items-center justify-center size-7 rounded font-bold text-sm shrink-0 ${
-        isClassified 
-          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" 
-          : "bg-[#111111] text-brand-chartreuse"
-      }`}>
-        {isEditing ? (pareja.seed || "-") : (posNum || "-")}
+      <div
+        className={`flex items-center justify-center size-7 rounded font-bold text-sm shrink-0 ${
+          isClassified
+            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+            : "bg-[#111111] text-brand-chartreuse"
+        }`}
+      >
+        {isEditing ? pareja.seed || "-" : posNum || "-"}
       </div>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <div className="text-[13px] font-black text-white uppercase truncate leading-tight tracking-wide">
+      <div className="flex-1 min-w-0 py-0.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div className="text-[11.5px] font-black text-white uppercase leading-snug tracking-wide whitespace-normal wrap-break-word">
             {nombreCompleto}
           </div>
           {isClassified && (
-            <span className="shrink-0 text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
+            <span className="shrink-0 text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
               Pasa
             </span>
           )}
         </div>
-        <div className="text-[11px] font-semibold text-gray-400 mt-0.5 truncate">
+        <div className="text-[10px] font-semibold text-gray-400 mt-1 truncate">
           {pareja.club || "Sin club asignado"}
         </div>
       </div>
 
       <div className="flex items-center gap-2.5 shrink-0 px-2 text-xs">
         <div className="flex flex-col items-center">
-          <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">PJ</span>
+          <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">
+            PJ
+          </span>
           <div className="flex items-center justify-center size-7 rounded bg-[#111111] text-white font-bold text-xs">
             {stats.played}
           </div>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">PG</span>
+          <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">
+            PG
+          </span>
           <div className="flex items-center justify-center size-7 rounded bg-[#111111] text-white font-bold text-xs">
             {stats.won}
           </div>
         </div>
         <div className="flex flex-col items-center">
-          <span className="text-[8px] text-brand-chartreuse/60 font-bold uppercase tracking-tight">PTS</span>
+          <span className="text-[8px] text-brand-chartreuse/60 font-bold uppercase tracking-tight">
+            PTS
+          </span>
           <div className="flex items-center justify-center size-7 rounded bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20 font-black text-xs">
             {stats.points}
           </div>
@@ -177,15 +189,18 @@ export const DroppableZona = ({
 
     partidos.forEach((p) => {
       if (p.ronda === zona.nombre && p.ganador) {
-        if (p.equipo_a_id === inscripcionId || p.equipo_b_id === inscripcionId) {
+        if (
+          p.equipo_a_id === inscripcionId ||
+          p.equipo_b_id === inscripcionId
+        ) {
           played++;
-          
+
           const setA = p.set1_a || 0;
           const setB = p.set1_b || 0;
-          
+
           if (p.equipo_a_id === inscripcionId) {
-            diffSets += (setA - setB);
-            diffGames += (setA - setB);
+            diffSets += setA - setB;
+            diffGames += setA - setB;
             gamesAFavor += setA;
             gamesEnContra += setB;
             if (p.ganador === inscripcionId) {
@@ -195,8 +210,8 @@ export const DroppableZona = ({
               points += 1;
             }
           } else {
-            diffSets += (setB - setA);
-            diffGames += (setB - setA);
+            diffSets += setB - setA;
+            diffGames += setB - setA;
             gamesAFavor += setB;
             gamesEnContra += setA;
             if (p.ganador === inscripcionId) {
@@ -210,7 +225,15 @@ export const DroppableZona = ({
       }
     });
 
-    return { played, won, points, diffSets, diffGames, gamesAFavor, gamesEnContra };
+    return {
+      played,
+      won,
+      points,
+      diffSets,
+      diffGames,
+      gamesAFavor,
+      gamesEnContra,
+    };
   };
 
   // Asignar estadísticas
@@ -244,7 +267,7 @@ export const DroppableZona = ({
             p.ronda === zona.nombre &&
             p.ganador &&
             ((p.equipo_a_id === a.id && p.equipo_b_id === b.id) ||
-              (p.equipo_a_id === b.id && p.equipo_b_id === a.id))
+              (p.equipo_a_id === b.id && p.equipo_b_id === a.id)),
         );
         if (partidoDirecto && partidoDirecto.ganador) {
           if (partidoDirecto.ganador === a.id) {
@@ -257,10 +280,14 @@ export const DroppableZona = ({
         }
       } else if (tiedTeams.length >= 3) {
         tiedTeams.sort((a, b) => {
-          if (a.stats.diffSets !== b.stats.diffSets) return b.stats.diffSets - a.stats.diffSets;
-          if (a.stats.diffGames !== b.stats.diffGames) return b.stats.diffGames - a.stats.diffGames;
-          if (a.stats.gamesAFavor !== b.stats.gamesAFavor) return b.stats.gamesAFavor - a.stats.gamesAFavor;
-          if (a.stats.gamesEnContra !== b.stats.gamesEnContra) return a.stats.gamesEnContra - b.stats.gamesEnContra;
+          if (a.stats.diffSets !== b.stats.diffSets)
+            return b.stats.diffSets - a.stats.diffSets;
+          if (a.stats.diffGames !== b.stats.diffGames)
+            return b.stats.diffGames - a.stats.diffGames;
+          if (a.stats.gamesAFavor !== b.stats.gamesAFavor)
+            return b.stats.gamesAFavor - a.stats.gamesAFavor;
+          if (a.stats.gamesEnContra !== b.stats.gamesEnContra)
+            return a.stats.gamesEnContra - b.stats.gamesEnContra;
           return 0;
         });
         sortedList.push(...tiedTeams);
@@ -290,7 +317,8 @@ export const DroppableZona = ({
           items={parejasConStats.map((p) => p.id)}
         >
           {parejasConStats.map((pareja, index) => {
-            const isClassified = !isEditing && index < 2 && pareja.stats.played > 0;
+            const isClassified =
+              !isEditing && index < 2 && pareja.stats.played > 0;
             return (
               <SortablePareja
                 key={pareja.id}
@@ -303,7 +331,7 @@ export const DroppableZona = ({
             );
           })}
         </SortableContext>
-        
+
         {/* Placeholder for dropping new ones or empty state */}
         <div className="mt-2 flex items-center justify-center p-3 rounded-2xl border border-dashed border-brand-chartreuse/50 text-brand-chartreuse text-sm font-bold bg-brand-chartreuse/5">
           + Soltar aquí
@@ -324,8 +352,12 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 5 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   const findZonaOfPareja = (id: string) => {
@@ -343,7 +375,7 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
   const getParejaStatsById = (id: string) => {
     const activeZona = findZonaOfPareja(id);
     if (!activeZona) return { played: 0, won: 0, points: 0 };
-    
+
     let played = 0;
     let won = 0;
     let points = 0;
@@ -379,7 +411,8 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
     if (activeId === overId) return;
 
     const activeZona = findZonaOfPareja(activeId);
-    const overZona = findZonaOfPareja(overId) || zonas.find((z) => z.id === overId);
+    const overZona =
+      findZonaOfPareja(overId) || zonas.find((z) => z.id === overId);
 
     if (!activeZona || !overZona || activeZona.id === overZona.id) return;
 
@@ -394,7 +427,7 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
         if (z.id === overZona.id) {
           const activePareja = getParejaById(activeId);
           if (!activePareja) return z;
-          
+
           const overIndex = z.parejas.findIndex((p) => p.id === overId);
           const newParejas = [...z.parejas];
           if (overIndex >= 0) {
@@ -405,7 +438,7 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
           return { ...z, parejas: newParejas };
         }
         return z;
-      })
+      }),
     );
   };
 
@@ -419,12 +452,17 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
     const overId = over.id as string;
 
     const activeZona = findZonaOfPareja(activeId);
-    const overZona = findZonaOfPareja(overId) || zonas.find((z) => z.id === overId);
+    const overZona =
+      findZonaOfPareja(overId) || zonas.find((z) => z.id === overId);
 
     if (activeZona && overZona && activeZona.id !== overZona.id) {
       // It moved across zones, trigger the onMove callback
       onMovePareja(activeId, activeZona.id, overZona.id);
-    } else if (activeZona && activeZona.id === overZona?.id && activeId !== overId) {
+    } else if (
+      activeZona &&
+      activeZona.id === overZona?.id &&
+      activeId !== overId
+    ) {
       // Reordered in the same zone
       const oldIndex = activeZona.parejas.findIndex((p) => p.id === activeId);
       const newIndex = activeZona.parejas.findIndex((p) => p.id === overId);
@@ -438,7 +476,7 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
             };
           }
           return z;
-        })
+        }),
       );
     }
   };
@@ -451,7 +489,7 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {zonas.map((zona) => (
           <DroppableZona
             key={zona.id}

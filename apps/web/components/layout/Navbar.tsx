@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -13,6 +14,8 @@ import {
   Settings,
   LayoutDashboard,
   ChevronDown,
+  Sun,
+  Moon,
 } from "lucide-react";
 import Image from "next/image";
 import { useProfileStore } from "@/store/useProfileStore";
@@ -28,9 +31,47 @@ export default function Navbar() {
   // Consumo exclusivo del Store de Zustand centralizado
   const { profile, fetchProfile, clearProfile } = useProfileStore();
 
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
+
   useEffect(() => {
     fetchProfile();
+    // Check saved theme
+    const savedTheme = localStorage.getItem("theme") as "light" | "dark";
+    if (savedTheme) {
+      setTheme(savedTheme);
+      if (savedTheme === "light") {
+        document.documentElement.classList.add("light");
+      } else {
+        document.documentElement.classList.remove("light");
+      }
+    } else {
+      document.documentElement.classList.remove("light");
+    }
   }, [fetchProfile]);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "light" ? "dark" : "light";
+    
+    const updateDOM = () => {
+      setTheme(nextTheme);
+      localStorage.setItem("theme", nextTheme);
+      if (nextTheme === "light") {
+        document.documentElement.classList.add("light");
+      } else {
+        document.documentElement.classList.remove("light");
+      }
+    };
+
+    if (!document.startViewTransition) {
+      updateDOM();
+    } else {
+      document.startViewTransition(() => {
+        flushSync(() => {
+          updateDOM();
+        });
+      });
+    }
+  };
 
   const handleLogout = () => {
     // 1. Borramos de forma efectiva las cookies de sesión para Next.js Middleware y Axios
@@ -113,6 +154,15 @@ export default function Navbar() {
         <div className="flex items-center gap-3 md:gap-4 relative">
           <button className="w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200 cursor-pointer">
             <Search className="size-5" />
+          </button>
+
+          {/* Toggle de Tema Claro/Oscuro */}
+          <button
+            onClick={toggleTheme}
+            className="w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200 cursor-pointer"
+            title="Cambiar tema"
+          >
+            {theme === "light" ? <Moon className="size-5" /> : <Sun className="size-5" />}
           </button>
 
           {/* Centro de Notificaciones */}

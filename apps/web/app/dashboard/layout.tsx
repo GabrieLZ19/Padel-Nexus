@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -19,6 +20,8 @@ import {
   User,
   Menu,
   X,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
@@ -36,6 +39,46 @@ export default function DashboardLayout({
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as "light" | "dark";
+    if (savedTheme) {
+      setTheme(savedTheme);
+      if (savedTheme === "light") {
+        document.documentElement.classList.add("light");
+      } else {
+        document.documentElement.classList.remove("light");
+      }
+    } else {
+      document.documentElement.classList.remove("light");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "light" ? "dark" : "light";
+
+    const updateDOM = () => {
+      setTheme(nextTheme);
+      localStorage.setItem("theme", nextTheme);
+      if (nextTheme === "light") {
+        document.documentElement.classList.add("light");
+      } else {
+        document.documentElement.classList.remove("light");
+      }
+    };
+
+    if (!document.startViewTransition) {
+      updateDOM();
+    } else {
+      document.startViewTransition(() => {
+        flushSync(() => {
+          updateDOM();
+        });
+      });
+    }
+  };
 
   const toggleMobileMenu = () => setMobileMenuOpen((open) => !open);
   const closeMobileMenu = () => setMobileMenuOpen(false);
@@ -118,7 +161,7 @@ export default function DashboardLayout({
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="size-16 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(204,255,0,0.2)] bg-brand-chartreuse"
+            className="size-16 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(204,255,0,0.2)] bg-[#cbfe01]"
           >
             <Image
               src="/brand/LogoAccessory.svg"
@@ -142,13 +185,13 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-[#0a0a0a] text-white font-sans overflow-hidden">
+    <div className="flex h-screen bg-brand-black text-brand-white font-sans overflow-hidden">
       <aside
         className={`fixed inset-y-0 left-0 z-30 w-72 transform bg-[#111111] flex flex-col shrink-0 border-r border-white/5 shadow-2xl transition-transform duration-300 md:relative md:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="h-28 px-8 flex items-center justify-between gap-3 border-b border-white/5 md:border-none">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(204,255,0,0.15)] bg-brand-chartreuse">
+            <div className="size-10 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(204,255,0,0.15)] bg-[#cbfe01]">
               <Image
                 src="/brand/LogoAccessory.svg"
                 alt="Padel Nexus"
@@ -158,7 +201,7 @@ export default function DashboardLayout({
               />
             </div>
             <div className="flex flex-col justify-center mt-1">
-              <span className="text-xl tracking-tight text-white">
+              <span className="text-xl tracking-tight text-brand-white">
                 <span className="font-extrabold">padel</span>
                 <span className="font-light">nexus</span>
               </span>
@@ -200,13 +243,24 @@ export default function DashboardLayout({
             <User className="size-5 text-gray-400" />
           </div>
           <div className="flex flex-col flex-1 overflow-hidden">
-            <span className="text-[13px] font-bold text-white truncate">
+            <span className="text-[13px] font-bold text-brand-white truncate">
               {displayName}
             </span>
             <span className="text-[11px] text-gray-500 truncate">
               {profile.email}
             </span>
           </div>
+          <button
+            onClick={toggleTheme}
+            className="p-2 text-gray-500 hover:text-white transition-colors rounded-xl mr-1"
+            title="Cambiar tema"
+          >
+            {theme === "light" ? (
+              <Moon className="size-4" />
+            ) : (
+              <Sun className="size-4" />
+            )}
+          </button>
           <button
             onClick={handleLogout}
             className="p-2.5 text-gray-500 hover:text-red-500 transition-colors rounded-xl"
@@ -224,7 +278,7 @@ export default function DashboardLayout({
         ></div>
       )}
 
-      <main className="flex-1 overflow-y-auto bg-[#0a0a0a]">
+      <main className="flex-1 overflow-y-auto bg-brand-black">
         <div className="md:hidden sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-[#111111]/80 backdrop-blur-md">
           <button
             onClick={toggleMobileMenu}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Save, Lock } from "lucide-react";
 import CustomDropdown from "../ui/CustomDropdown";
@@ -35,6 +36,24 @@ export default function TorneoModal({
   editingId,
 }: TorneoModalProps) {
   // 1. Obtenemos el día actual estrictamente en la zona horaria local del usuario
+  const [isCustomCat, setIsCustomCat] = useState(false);
+  const [isCustomNiv, setIsCustomNiv] = useState(false);
+
+  // Sincronizar estado cuando se abre el modal o cambian los valores
+  useEffect(() => {
+    if (isOpen) {
+      const customCat = formData.categoria && !CATEGORIAS_TORNEO.some((c) => c.value === formData.categoria);
+      setIsCustomCat(!!customCat);
+
+      const customNiv = formData.nivel && !NIVELES_PADEL.some((n) => n.value === formData.nivel);
+      setIsCustomNiv(!!customNiv);
+    }
+  }, [isOpen, formData.categoria, formData.nivel]);
+
+  const selectedClub = clubs.find((c) => String(c.id) === String(formData.club_id));
+  const maxCanchas = selectedClub ? selectedClub.canchas : 999;
+
+  // 1. Obtenemos el día actual estrictamente en la zona horaria local del usuario
   const hoy = new Date();
   const fechaLocal = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60000)
     .toISOString()
@@ -66,6 +85,18 @@ export default function TorneoModal({
   const opcionesEstado = isAutoManaged
     ? [{ value: formData.estado, label: formData.estado.toUpperCase() }]
     : ESTADOS_TORNEO;
+
+  const categoriasOptions = [
+    ...CATEGORIAS_TORNEO,
+    { value: "Personalizado", label: "Personalizado..." },
+  ];
+  const selectedCategoriaValue = isCustomCat ? "Personalizado" : formData.categoria;
+
+  const nivelesOptions = [
+    ...NIVELES_PADEL,
+    { value: "Personalizado", label: "Personalizado..." },
+  ];
+  const selectedNivelValue = isCustomNiv ? "Personalizado" : formData.nivel;
 
   return (
     <AnimatePresence>
@@ -207,24 +238,58 @@ export default function TorneoModal({
                     Rama / Categoría
                   </label>
                   <CustomDropdown
-                    value={formData.categoria}
-                    onChange={(val) =>
-                      setFormData({ ...formData, categoria: val })
-                    }
-                    options={CATEGORIAS_TORNEO}
+                    value={selectedCategoriaValue}
+                    onChange={(val) => {
+                      if (val === "Personalizado") {
+                        setIsCustomCat(true);
+                        setFormData({ ...formData, categoria: "" });
+                      } else {
+                        setIsCustomCat(false);
+                        setFormData({ ...formData, categoria: val });
+                      }
+                    }}
+                    options={categoriasOptions}
                     placeholder="Seleccionar..."
                   />
+                  {isCustomCat && (
+                    <input
+                      placeholder="Escribí la categoría..."
+                      className="w-full bg-brand-card p-3 rounded-xl border border-white/5 mt-2 text-white focus:outline-none text-sm transition-all"
+                      value={formData.categoria}
+                      onChange={(e) =>
+                        setFormData({ ...formData, categoria: e.target.value })
+                      }
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
                     Nivel
                   </label>
                   <CustomDropdown
-                    value={formData.nivel}
-                    onChange={(val) => setFormData({ ...formData, nivel: val })}
-                    options={NIVELES_PADEL}
+                    value={selectedNivelValue}
+                    onChange={(val) => {
+                      if (val === "Personalizado") {
+                        setIsCustomNiv(true);
+                        setFormData({ ...formData, nivel: "" });
+                      } else {
+                        setIsCustomNiv(false);
+                        setFormData({ ...formData, nivel: val });
+                      }
+                    }}
+                    options={nivelesOptions}
                     placeholder="Seleccionar..."
                   />
+                  {isCustomNiv && (
+                    <input
+                      placeholder="Escribí el nivel..."
+                      className="w-full bg-brand-card p-3 rounded-xl border border-white/5 mt-2 text-white focus:outline-none text-sm transition-all"
+                      value={formData.nivel}
+                      onChange={(e) =>
+                        setFormData({ ...formData, nivel: e.target.value })
+                      }
+                    />
+                  )}
                 </div>
               </div>
 
@@ -271,12 +336,88 @@ export default function TorneoModal({
                     className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-semibold"
                     value={formData.precio_inscripcion ?? ""}
                     onChange={(e) => {
-                      const soloNumeros = e.target.value.replace(/[^0-9]/g, "");
+                       const soloNumeros = e.target.value.replace(/[^0-9]/g, "");
+                       setFormData({
+                         ...formData,
+                         precio_inscripcion:
+                           soloNumeros === "" ? undefined : Number(soloNumeros),
+                       });
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* FILA EXTRA: Planificación Logística y Horarios */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    Canchas Disponibles
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={maxCanchas}
+                    placeholder="Ej: 3"
+                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-semibold"
+                    value={formData.canchas_disponibles ?? 1}
+                    onChange={(e) => {
+                      let val = Number(e.target.value) || 1;
+                      if (val > maxCanchas) {
+                        val = maxCanchas;
+                      }
                       setFormData({
                         ...formData,
-                        precio_inscripcion:
-                          soloNumeros === "" ? undefined : Number(soloNumeros),
+                        canchas_disponibles: val,
                       });
+                    }}
+                  />
+                  {selectedClub && (
+                    <span className="text-[10px] text-gray-500 mt-1 block">
+                      Máx. del club: {selectedClub.canchas} {selectedClub.canchas === 1 ? "cancha" : "canchas"}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    Duración Partido (Minutos)
+                  </label>
+                  <input
+                    type="number"
+                    min="10"
+                    placeholder="Ej: 90"
+                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-semibold"
+                    value={formData.duracion_partido_minutos ?? 90}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        duracion_partido_minutos: Number(e.target.value) || 90,
+                      })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    Hora Inicio Jornada
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: 08:00"
+                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-semibold font-mono"
+                    value={formData.hora_inicio_jornada || "08:00"}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      val = val.replace(/[^0-9:]/g, "");
+                      if (val.length === 2 && !val.includes(":")) {
+                        val = val + ":";
+                      }
+                      if (val.length <= 5) {
+                        setFormData({
+                          ...formData,
+                          hora_inicio_jornada: val,
+                        });
+                      }
                     }}
                   />
                 </div>

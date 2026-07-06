@@ -14,7 +14,7 @@ export const NIVELES_PADEL = [
   { value: "6ª", label: "6ª Categoría" },
   { value: "7ª", label: "7ª Categoría" },
   { value: "8ª", label: "8ª Categoría" },
-  { value: "Iniciante", label: "Iniciante" },
+  { value: "Inicial", label: "Inicial" },
 ] as const;
 
 export const LADOS_PADEL = [
@@ -51,6 +51,10 @@ export const PROVINCIAS_ARG = [
 ] as const;
 
 export const CATEGORIAS_TORNEO = [
+  { value: "Libres", label: "Libres" },
+  { value: "Menores", label: "Menores" },
+  { value: "Ladies", label: "Ladies" },
+  { value: "Veteranos", label: "Veteranos" },
   { value: "Masculino", label: "Masculino" },
   { value: "Femenino", label: "Femenino" },
   { value: "Mixto", label: "Mixto" },

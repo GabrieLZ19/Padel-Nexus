@@ -15,6 +15,7 @@ import {
   User,
 } from "lucide-react";
 import { TorneosService } from "../../../../utils/services/torneos";
+import { PagosService } from "../../../../utils/services/pagos";
 import { Torneo, Inscripcion, Partido } from "../../../../utils/types";
 import FeedbackModal, {
   FeedbackModalProps,
@@ -22,6 +23,8 @@ import FeedbackModal, {
 import { MatchCard } from "@/components/torneos/MatchCard";
 import { LiveArbitrajeRow } from "@/components/torneos/LiveArbitrajeRow";
 import { BracketEditor } from "@/components/torneos/BracketEditor";
+import ConfirmarPagoModal from "@/components/inscripciones/ConfirmarPagoModal";
+import InscripcionManualModal from "@/components/inscripciones/InscripcionManualModal";
 
 const TABS = [
   { id: "resumen", label: "Resumen", icon: LayoutDashboard },
@@ -43,6 +46,19 @@ export default function TorneoDetallePage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [generando, setGenerando] = useState<boolean>(false);
   const [refreshKey, setRefreshKey] = useState<number>(0);
+
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [pagoModal, setPagoModal] = useState<{
+    isOpen: boolean;
+    inscripcionId: string;
+    montoDefecto: number;
+    isLoading: boolean;
+  }>({
+    isOpen: false,
+    inscripcionId: "",
+    montoDefecto: 0,
+    isLoading: false,
+  });
 
   const [guardandoPartidoId, setGuardandoPartidoId] = useState<string | null>(
     null,
@@ -85,10 +101,7 @@ export default function TorneoDetallePage() {
 
         if (isMounted) {
           setTorneo(dataTorneo);
-          const confirmados = (dataInscripciones as Inscripcion[]).filter(
-            (i) => i.estado_pago === "Confirmado",
-          );
-          setInscripciones(confirmados);
+          setInscripciones(dataInscripciones as Inscripcion[]);
           setPartidos(dataPartidos as Partido[]);
         }
       } catch (error) {
@@ -269,12 +282,12 @@ export default function TorneoDetallePage() {
   }
 
   // --- VARIABLES DE ESTADO Y FILTRADO ---
-  const totalRecaudado = inscripciones.reduce(
-    (acc, curr) => acc + Number(curr.monto || 0),
-    0,
-  );
+  const confirmadasCount = inscripciones.filter((i) => i.estado_pago === "Confirmado").length;
+  const totalRecaudado = inscripciones
+    .filter((i) => i.estado_pago === "Confirmado")
+    .reduce((acc, curr) => acc + Number(curr.monto || 0), 0);
   const porcentajeOcupacion = Math.round(
-    (inscripciones.length / (torneo.cupos_maximos || 1)) * 100,
+    (confirmadasCount / (torneo.cupos_maximos || 1)) * 100,
   );
   const partidosJugados = partidos.filter((p) => p.ganador !== null).length;
   const progresoTorneo =
@@ -373,9 +386,14 @@ export default function TorneoDetallePage() {
             <div className="p-6 border-b border-white/5 flex justify-between items-center bg-black/20">
               <h3 className="font-bold text-white flex items-center gap-2">
                 <CheckCircle2 className="size-5 text-[#00ff88]" />
-                Inscripciones Confirmadas ({inscripciones.length} /{" "}
-                {torneo.cupos_maximos || 16})
+                Inscripciones ({confirmadasCount} confirmadas de {torneo.cupos_maximos || 16})
               </h3>
+              <button
+                onClick={() => setIsManualModalOpen(true)}
+                className="flex items-center gap-1.5 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-4 py-2 rounded-xl font-bold text-xs transition-all shadow-md cursor-pointer"
+              >
+                Inscribir Pareja
+              </button>
             </div>
             {inscripciones.length === 0 ? (
               <div className="p-16 flex flex-col items-center justify-center text-center">
@@ -384,8 +402,7 @@ export default function TorneoDetallePage() {
                   Aún no hay inscritos
                 </h3>
                 <p className="text-gray-500 text-sm max-w-sm">
-                  No existen jugadores o duplas con estado de pago confirmado
-                  para esta competencia.
+                  No existen jugadores o duplas registradas para esta competencia.
                 </p>
               </div>
             ) : (
@@ -393,44 +410,70 @@ export default function TorneoDetallePage() {
                 <table className="w-full text-left">
                   <thead className="bg-white/5 text-xs text-gray-400 uppercase tracking-wider">
                     <tr>
+                      <th className="px-8 py-5 w-16 text-center">Pago</th>
                       <th className="px-8 py-5">Código Ref.</th>
                       <th className="px-6 py-5">Participante / Dupla</th>
-                      <th className="px-8 py-5 text-right">
-                        Fecha Confirmación
-                      </th>
+                      <th className="px-6 py-5 text-center">Estado Pago</th>
+                      <th className="px-8 py-5 text-right">Monto</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {inscripciones.map((ins) => (
-                      <tr
-                        key={ins.id}
-                        className="hover:bg-white/5 transition-colors"
-                      >
-                        <td className="px-8 py-5 font-mono text-gray-500 text-sm">
-                          {String(ins.id).slice(0, 8).toUpperCase()}
-                        </td>
-                        <td className="px-6 py-5">
-                          <div className="font-bold text-white flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-brand-chartreuse/10 flex items-center justify-center shrink-0">
-                              <User className="size-4 text-brand-chartreuse" />
+                    {inscripciones.map((ins) => {
+                      const isConfirmed = ins.estado_pago === "Confirmado";
+                      return (
+                        <tr
+                          key={ins.id}
+                          className={`transition-colors ${isConfirmed ? "hover:bg-green-500/5 bg-green-500/2" : "hover:bg-white/5"}`}
+                        >
+                          <td className="px-8 py-5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isConfirmed}
+                              disabled={isConfirmed}
+                              onChange={() => {
+                                if (!isConfirmed) {
+                                  setPagoModal({
+                                    isOpen: true,
+                                    inscripcionId: String(ins.id),
+                                    montoDefecto: Number(ins.monto || torneo.precio_inscripcion || 0),
+                                    isLoading: false,
+                                  });
+                                }
+                              }}
+                              className="size-4 rounded border-white/10 text-brand-chartreuse focus:ring-brand-chartreuse cursor-pointer disabled:cursor-not-allowed"
+                            />
+                          </td>
+                          <td className="px-8 py-5 font-mono text-gray-500 text-sm">
+                            {String(ins.id).slice(0, 8).toUpperCase()}
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="font-bold text-white flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-brand-chartreuse/10 flex items-center justify-center shrink-0">
+                                <User className="size-4 text-brand-chartreuse" />
+                              </div>
+                              <div>
+                                {ins.jugador1_nombre || "Desconocido"}
+                                {ins.jugador2_nombre &&
+                                  ins.jugador2_nombre !== "-" && (
+                                    <span className="text-gray-400 font-medium">
+                                      {" "}
+                                      / {ins.jugador2_nombre}
+                                    </span>
+                                  )}
+                              </div>
                             </div>
-                            <div>
-                              {ins.jugador1_nombre || "Desconocido"}
-                              {ins.jugador2_nombre &&
-                                ins.jugador2_nombre !== "-" && (
-                                  <span className="text-gray-400 font-medium">
-                                    {" "}
-                                    / {ins.jugador2_nombre}
-                                  </span>
-                                )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-8 py-5 text-right text-gray-400 text-sm">
-                          {ins.created_at ? new Date(ins.created_at).toLocaleDateString("es-AR") : "-"}
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-6 py-5 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${isConfirmed ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"}`}>
+                              {ins.estado_pago || "Pendiente"}
+                            </span>
+                          </td>
+                          <td className="px-8 py-5 text-right text-gray-200 font-semibold text-sm">
+                            ${Number(ins.monto || 0).toLocaleString("es-AR")}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -477,6 +520,60 @@ export default function TorneoDetallePage() {
       </div>
 
       <FeedbackModal {...feedbackModal} />
+
+      <ConfirmarPagoModal
+        isOpen={pagoModal.isOpen}
+        montoSugerido={pagoModal.montoDefecto}
+        isLoading={pagoModal.isLoading}
+        onClose={() => setPagoModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={async (monto: number, metodo: string) => {
+          setPagoModal((prev) => ({ ...prev, isLoading: true }));
+          try {
+            await PagosService.confirmarPagoManual({
+              entidad_tipo: "inscripcion",
+              entidad_id: pagoModal.inscripcionId,
+              monto: monto,
+              metodo_pago: metodo || "Efectivo",
+            });
+            setPagoModal((prev) => ({ ...prev, isOpen: false }));
+            setFeedbackModal({
+              isOpen: true,
+              type: "success",
+              title: "Pago Confirmado",
+              description: `El pago ha sido registrado y la inscripción está confirmada.`,
+              onClose: () =>
+                setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+            });
+            setRefreshKey((prev) => prev + 1);
+          } catch (error: any) {
+            setPagoModal((prev) => ({
+              ...prev,
+              isLoading: false,
+              isOpen: false,
+            }));
+            setFeedbackModal({
+              isOpen: true,
+              type: "error",
+              title: "Error al procesar pago",
+              description:
+                error.response?.data?.error ||
+                error.message ||
+                "Error al registrar el pago manual.",
+              onClose: () =>
+                setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+            });
+          }
+        }}
+      />
+
+      {isManualModalOpen && torneo && (
+        <InscripcionManualModal
+          isOpen={isManualModalOpen}
+          onClose={() => setIsManualModalOpen(false)}
+          onSuccess={() => setRefreshKey((prev) => prev + 1)}
+          torneo={torneo}
+        />
+      )}
     </div>
   );
 }

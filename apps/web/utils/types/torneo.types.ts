@@ -28,6 +28,9 @@ export interface Torneo {
   premio_2?: string | null;
   premio_3?: string | null;
   lugar?: string | null;
+  canchas_disponibles?: number | null;
+  duracion_partido_minutos?: number | null;
+  hora_inicio_jornada?: string | null;
 
   // Relaciones
   clubes?: Partial<Club> | null;
@@ -101,4 +104,7 @@ export interface FormTorneoState {
     dos?: string;
     tres?: string;
   };
+  canchas_disponibles?: number;
+  duracion_partido_minutos?: number;
+  hora_inicio_jornada?: string;
 }

@@ -46,4 +46,14 @@ export const InscripcionesService = {
     const response = await api.post("/inscripciones", data);
     return response.data;
   },
+  async inscribirManual(data: {
+    torneo_id: string;
+    jugador1_identificador: string;
+    jugador2_identificador?: string;
+    monto: number;
+    metodo_pago?: string;
+  }) {
+    const response = await api.post("/inscripciones/manual", data);
+    return response.data;
+  },
 };

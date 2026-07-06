@@ -410,7 +410,7 @@ export default function DashboardHome() {
                     </span>
                   </div>
                 </div>
-                <div className="w-full h-3 bg-[#222222] rounded-full overflow-hidden">
+                <div className="w-full h-3 bg-brand-input rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${item.percentage}%` }}

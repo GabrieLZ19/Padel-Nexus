@@ -36,6 +36,9 @@ const ESTADO_INICIAL: FormTorneoState = {
   premio_1: "",
   premio_2: "",
   premio_3: "",
+  canchas_disponibles: 1,
+  duracion_partido_minutos: 90,
+  hora_inicio_jornada: "08:00",
 };
 
 const PAGE_SIZE = 5;
@@ -129,6 +132,9 @@ export default function TorneosPage() {
       premio_1: torneo.premio_1 ?? "",
       premio_2: torneo.premio_2 ?? "",
       premio_3: torneo.premio_3 ?? "",
+      canchas_disponibles: torneo.canchas_disponibles ?? 1,
+      duracion_partido_minutos: torneo.duracion_partido_minutos ?? 90,
+      hora_inicio_jornada: torneo.hora_inicio_jornada ?? "08:00",
     });
     setEditingId(String(torneo.id));
     setIsModalOpen(true);
