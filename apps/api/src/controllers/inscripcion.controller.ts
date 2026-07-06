@@ -137,7 +137,7 @@ export const createInscripcionManual = async (
       return res.status(401).json({ message: "No autorizado." });
     }
 
-    if (!torneo_id || !jugador1_identificador || !monto) {
+    if (!torneo_id || !jugador1_identificador || monto === undefined || monto === null) {
       return res.status(400).json({ message: "Faltan datos obligatorios." });
     }
 
