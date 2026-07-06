@@ -118,3 +118,45 @@ export const deleteInscripcion = async (
       .json({ message: "Error al cancelar inscripción", error: message });
   }
 };
+
+export const createInscripcionManual = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    const {
+      torneo_id,
+      jugador1_identificador,
+      jugador2_identificador,
+      monto,
+      metodo_pago,
+    } = req.body;
+
+    const adminId = req.user?.id;
+    if (!adminId) {
+      return res.status(401).json({ message: "No autorizado." });
+    }
+
+    if (!torneo_id || !jugador1_identificador || !monto) {
+      return res.status(400).json({ message: "Faltan datos obligatorios." });
+    }
+
+    const nuevaInscripcion = await InscripcionService.registrarInscripcionManual({
+      torneoId: torneo_id,
+      jugador1Identificador: jugador1_identificador,
+      jugador2Identificador: jugador2_identificador,
+      monto: Number(monto),
+      metodoPago: metodo_pago,
+      adminId,
+    });
+
+    return res.status(201).json(nuevaInscripcion);
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    return res.status(400).json({
+      message: "No se pudo procesar la inscripción manual.",
+      error: message,
+    });
+  }
+};

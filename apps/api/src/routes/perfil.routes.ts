@@ -33,7 +33,7 @@ router.delete("/avatar", PerfilController.eliminarAvatar);
 // Acceso restringido exclusivamente a las jerarquías de administración FAP
 router.get(
   "/:id",
-  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   PerfilController.getPerfilById,
 );
 

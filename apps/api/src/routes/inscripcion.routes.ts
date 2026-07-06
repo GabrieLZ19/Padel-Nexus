@@ -4,6 +4,7 @@ import {
   createInscripcion,
   updateEstadoPago,
   deleteInscripcion,
+  createInscripcionManual,
 } from "../controllers/inscripcion.controller";
 import { authenticate, authorize } from "../middleware/auth";
 import { ROLES_ADMINISTRATIVOS } from "../constants/roles";
@@ -22,6 +23,13 @@ router.get(
 
 // Crear inscripción (Las validaciones de rol Nacional vs Local se hacen adentro del servicio)
 router.post("/", createInscripcion);
+
+// Crear inscripción manual (Solo admins)
+router.post(
+  "/manual",
+  authorize(ROLES_ADMINISTRATIVOS),
+  createInscripcionManual,
+);
 
 // Actualizar pago (Solo admins) - Nota: cambiaste a PATCH que es más semántico para un solo campo
 router.patch(

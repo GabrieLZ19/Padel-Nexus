@@ -23,6 +23,9 @@ export interface TorneoPayload {
   precio_inscripcion: number;
   formato: string;
   premios?: { uno?: string; dos?: string; tres?: string };
+  canchas_disponibles?: number;
+  duracion_partido_minutos?: number;
+  hora_inicio_jornada?: string;
 }
 
 export class TorneoService {
@@ -151,6 +154,9 @@ export class TorneoService {
           premio_1: datos.premios?.uno,
           premio_2: datos.premios?.dos,
           premio_3: datos.premios?.tres,
+          canchas_disponibles: datos.canchas_disponibles || 1,
+          duracion_partido_minutos: datos.duracion_partido_minutos || 90,
+          hora_inicio_jornada: datos.hora_inicio_jornada || "08:00",
         },
       ])
       .select()
@@ -267,7 +273,7 @@ export class TorneoService {
   static async generarCuadroEliminatoria(id: string) {
     const { data: torneo, error: torneoError } = await supabaseAdmin
       .from("torneos")
-      .select("formato, cupos_maximos")
+      .select("formato, cupos_maximos, fecha, canchas_disponibles, duracion_partido_minutos, hora_inicio_jornada")
       .eq("id", id)
       .single();
 
@@ -293,6 +299,15 @@ export class TorneoService {
     const partidos: Record<string, any>[] = [];
     let orden = 1;
 
+    const canchasCount = torneo.canchas_disponibles || 1;
+    const matchDur = torneo.duracion_partido_minutos || 90;
+    const baseDateStr = torneo.fecha ? torneo.fecha.split("T")[0] : new Date().toISOString().split("T")[0];
+    const horaInicio = torneo.hora_inicio_jornada || "08:00";
+    const [hours, minutes] = horaInicio.split(":").map(Number);
+
+    let currentRoundStartTime = new Date(baseDateStr + "T00:00:00");
+    currentRoundStartTime.setHours(hours, minutes, 0, 0);
+
     if (torneo.formato === "Eliminatoria Directa") {
       const cupos = torneo.cupos_maximos || 16;
       const roundsConfig = [
@@ -310,7 +325,8 @@ export class TorneoService {
 
       for (let i = startIndex; i < roundsConfig.length; i++) {
         const round = roundsConfig[i];
-        for (let j = 0; j < round.matches; j++) {
+        const numMatches = round.matches;
+        for (let j = 0; j < numMatches; j++) {
           let equipo_a_id = null;
           let equipo_b_id = null;
 
@@ -319,6 +335,10 @@ export class TorneoService {
             equipo_b_id = shuffled[j * 2 + 1]?.id || null;
           }
 
+          const slotIndex = Math.floor(j / canchasCount);
+          const canchaNo = (j % canchasCount) + 1;
+          const matchTime = new Date(currentRoundStartTime.getTime() + slotIndex * matchDur * 60 * 1000);
+
           partidos.push({
             torneo_id: id,
             equipo_a_id,
@@ -326,8 +346,14 @@ export class TorneoService {
             ronda: round.name,
             orden: orden++,
             estado_partido: "Programado",
+            cancha_asignada: `Cancha ${canchaNo}`,
+            fecha_partido: matchTime.toISOString(),
           });
         }
+        
+        // Avance de tiempo para la siguiente ronda
+        const roundSlots = Math.ceil(numMatches / canchasCount);
+        currentRoundStartTime = new Date(currentRoundStartTime.getTime() + roundSlots * matchDur * 60 * 1000);
       }
     }
 

@@ -17,7 +17,7 @@ export class CompetenciaService {
   /**
    * Genera las zonas y partidos de la fase de grupos basándose en el reglamento FAP.
    */
-  static async generarFaseGrupos(torneoId: string) {
+  static async generarFaseGrupos(torneoId: string, size?: number) {
     // 0. LIMPIEZA PREVIA PARA EVITAR DUPLICADOS
     await supabaseAdmin.from("partidos").delete().eq("torneo_id", torneoId);
     
@@ -82,17 +82,20 @@ export class CompetenciaService {
     // Ordenamos de mayor a menor ranking (Pareja 1 es la mejor rankeada)
     parejas.sort((a, b) => b.puntosTotales - a.puntosTotales);
 
-    // 3. CALCULAR CANTIDAD DE ZONAS Y CAPACIDADES SEGÚN REGLAMENTO
+    // 3. CALCULAR CANTIDAD DE ZONAS Y CAPACIDADES SEGÚN REGLAMENTO GENERALIZADO
     const totalParejas = parejas.length;
-    const cantidadZonas = Math.floor(totalParejas / 3);
-    const resto = totalParejas % 3;
+    const S = Number(size) || 3;
+    const cantidadZonas = Math.max(1, Math.floor(totalParejas / S));
+    const resto = totalParejas < S ? 0 : totalParejas % S;
 
-    // Regla FAP: Si sobra 1 -> Zona A es de 4. Si sobran 2 -> Zona A y B son de 4.
     const zonas: Zona[] = Array.from({ length: cantidadZonas }).map(
       (_, index) => {
-        let capacidad = 3;
-        if (resto === 1 && index === 0) capacidad = 4; // Zona A
-        if (resto === 2 && (index === 0 || index === 1)) capacidad = 4; // Zona A y B
+        let capacidad = S;
+        if (totalParejas < S) {
+          capacidad = totalParejas;
+        } else if (index < resto) {
+          capacidad = S + 1;
+        }
 
         return {
           nombre: `Zona ${String.fromCharCode(65 + index)}`, // Convierte 0 -> A, 1 -> B

@@ -293,4 +293,139 @@ export class InscripcionService {
         .eq("id", inscripcion.torneo_id);
     }
   }
+
+  static async registrarInscripcionManual(datos: {
+    torneoId: string;
+    jugador1Identificador: string;
+    jugador2Identificador?: string;
+    monto: number;
+    metodoPago?: string;
+    adminId: string;
+  }) {
+    const {
+      torneoId,
+      jugador1Identificador,
+      jugador2Identificador,
+      monto,
+      metodoPago,
+      adminId,
+    } = datos;
+
+    // 1. Resolver jugador 1 por DNI o Email
+    const { data: j1, error: j1Error } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, nombre, apellido")
+      .or(`dni.eq."${jugador1Identificador}",email.eq."${jugador1Identificador}"`)
+      .maybeSingle();
+
+    if (j1Error || !j1) {
+      throw new Error(
+        `El jugador 1 (${jugador1Identificador}) no está registrado en la plataforma.`,
+      );
+    }
+
+    // 2. Resolver jugador 2 por DNI o Email (si aplica)
+    let j2 = null;
+    if (
+      jugador2Identificador &&
+      jugador2Identificador.trim() !== "" &&
+      jugador2Identificador !== "-"
+    ) {
+      const { data: resolvedJ2, error: j2Error } = await supabaseAdmin
+        .from("perfiles")
+        .select("id, nombre, apellido")
+        .or(`dni.eq."${jugador2Identificador}",email.eq."${jugador2Identificador}"`)
+        .maybeSingle();
+
+      if (j2Error || !resolvedJ2) {
+        throw new Error(
+          `El jugador 2 (${jugador2Identificador}) no está registrado en la plataforma.`,
+        );
+      }
+      j2 = resolvedJ2;
+    }
+
+    // 3. Obtener datos del torneo
+    const { data: torneo, error: errTorneo } = await supabaseAdmin
+      .from("torneos")
+      .select("id, cupos_maximos, cupos_actuales, estado")
+      .eq("id", torneoId)
+      .single();
+
+    if (errTorneo || !torneo) throw new Error("Torneo no encontrado.");
+
+    // 4. Validar que no estén inscriptos ya
+    const idsAValidar = j2
+      ? `usuario_id.in.("${j1.id}","${j2.id}"),usuario2_id.in.("${j1.id}","${j2.id}")`
+      : `usuario_id.eq."${j1.id}",usuario2_id.eq."${j1.id}"`;
+    const { count: inscripcionesPrevias } = await supabaseAdmin
+      .from("inscripciones")
+      .select("id", { count: "exact", head: true })
+      .eq("torneo_id", torneoId)
+      .or(idsAValidar);
+
+    if (inscripcionesPrevias && inscripcionesPrevias > 0) {
+      throw new Error(
+        "Uno de los jugadores ya se encuentra inscripto en este torneo.",
+      );
+    }
+
+    // 5. Cupos
+    if ((torneo.cupos_actuales || 0) >= (torneo.cupos_maximos || 32)) {
+      throw new Error("El torneo ha alcanzado el límite máximo de cupos.");
+    }
+
+    const estadoPago = metodoPago
+      ? FAP_ESTADOS_PAGO.CONFIRMADO
+      : FAP_ESTADOS_PAGO.PENDIENTE;
+    const j1Nombre = `${j1.apellido?.toUpperCase() ?? ""}, ${j1.nombre ?? ""}`.trim();
+    const j2Nombre = j2
+      ? `${j2.apellido?.toUpperCase() ?? ""}, ${j2.nombre ?? ""}`.trim()
+      : "-";
+
+    // 6. Insertar inscripción
+    const { data: inscripcionInsertada, error: errInsert } = await supabaseAdmin
+      .from("inscripciones")
+      .insert([
+        {
+          torneo_id: torneoId,
+          usuario_id: j1.id,
+          usuario2_id: j2 ? j2.id : null,
+          jugador1_nombre: j1Nombre,
+          jugador2_nombre: j2Nombre,
+          monto,
+          estado_pago: estadoPago,
+          tipo: "Inscripción torneo",
+        },
+      ])
+      .select()
+      .single();
+
+    if (errInsert || !inscripcionInsertada) {
+      throw new Error(
+        `Error al registrar la inscripción manual: ${errInsert?.message}`,
+      );
+    }
+
+    // 7. Actualizar cupo
+    await supabaseAdmin
+      .from("torneos")
+      .update({ cupos_actuales: (torneo.cupos_actuales || 0) + 1 })
+      .eq("id", torneoId);
+
+    // 8. Registrar log de auditoría
+    await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: adminId,
+      accion: "PAGO_MANUAL_INSCRIPCION_MANUAL",
+      entidad_afectada: `inscripciones_id: ${inscripcionInsertada.id}`,
+      detalles: {
+        monto,
+        metodo_pago: metodoPago || "No especificado",
+        fecha_pago: new Date().toISOString(),
+        observaciones: "Inscripción manual directa desde CRM.",
+      },
+    });
+
+    return inscripcionInsertada;
+  }
 }

@@ -18,7 +18,8 @@ export const generarZonas = async (
     // Aquí podríamos agregar una validación extra para asegurar que req.user.rol sea Admin
     // if (req.user?.rol === 'usuario') return res.status(403).json({...})
 
-    const resultado = await CompetenciaService.generarFaseGrupos(torneoId);
+    const size = req.query.tamanioGrupo ? Number(req.query.tamanioGrupo) : undefined;
+    const resultado = await CompetenciaService.generarFaseGrupos(torneoId, size);
 
     return res.status(200).json(resultado);
   } catch (error: unknown) {
