@@ -48,6 +48,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   const [isSiembraEditing, setIsSiembraEditing] = useState(false);
   const [modificacionNoDestructiva, setModificacionNoDestructiva] =
     useState(true);
+  const [validarCabezasSerie, setValidarCabezasSerie] = useState(true);
   const [tamanioGrupo, setTamanioGrupo] = useState<number>(3);
   const [auditoriaLogs, setAuditoriaLogs] = useState<any[]>([]);
   const [loadingAuditoria, setLoadingAuditoria] = useState(false);
@@ -100,6 +101,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           jugador1_nombre: gp.inscripciones.jugador1_nombre,
           jugador2_nombre: gp.inscripciones.jugador2_nombre,
           club: gp.clubName || "Sin club asignado",
+          cabezaDeSerie: gp.cabezaDeSerie,
         })),
       }));
       setZonas(formattedZonas);
@@ -362,6 +364,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 parejas: z.parejas.map((p) => ({ id: p.id })),
               })),
               motivo: motivo,
+              validarCabezasSerie: validarCabezasSerie,
             });
             setIsEditing(false);
             setFeedbackModal({
@@ -381,7 +384,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               type: "error",
               title: "Error al guardar",
               description:
-                error.message || "No se pudieron guardar los cambios.",
+                error.response?.data?.error ||
+                error.response?.data?.message ||
+                error.message ||
+                "No se pudieron guardar los cambios.",
               onClose: () =>
                 setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
             });
@@ -466,10 +472,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   };
 
   return (
-    <div className="bg-[#1a1a1a] border border-white/5 rounded-3xl p-6 md:p-8">
+    <div className="bg-[#1a1a1a] border border-white/5 rounded-3xl p-4 sm:p-6 md:p-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h3 className="font-extrabold text-2xl text-white tracking-tight uppercase">
+          <h3 className="font-extrabold text-xl sm:text-2xl text-white tracking-tight uppercase">
             EDITOR DE LLAVES — {torneo?.nombre || "TORNEO"} ·{" "}
             {torneo?.categoria || "CATEGORÍA"}
           </h3>
@@ -478,7 +484,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             manualmente sin borrar resultados.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {/* Tutorial y Editar solo en Fase de Grupos */}
           {torneo?.formato !== "Eliminatoria Directa" &&
             activeView === "zonas" && (
@@ -488,12 +494,12 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     setActiveView("zonas");
                     setTourStep(0);
                   }}
-                  className="flex items-center gap-2 px-4 py-2.5 border border-brand-chartreuse/25 text-brand-chartreuse hover:bg-brand-chartreuse/5 rounded-xl text-sm font-semibold transition-colors"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 border border-brand-chartreuse/25 text-brand-chartreuse hover:bg-brand-chartreuse/5 rounded-xl text-sm font-semibold transition-colors"
                 >
                   Tutorial
                 </button>
                 {isEditing && (
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-yellow-500/30 text-yellow-500 text-xs font-bold uppercase tracking-wider">
+                  <div className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-yellow-500/30 text-yellow-500 text-xs font-bold uppercase tracking-wider">
                     <PenLine className="size-3.5" /> Modo edición
                   </div>
                 )}
@@ -503,7 +509,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                       setIsEditing(false);
                       void loadZonas();
                     }}
-                    className="flex items-center gap-2 px-4 py-2.5 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer"
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer"
                   >
                     Cancelar
                   </button>
@@ -511,7 +517,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 <button
                   id="btn-editar"
                   onClick={handleGuardarCambios}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#ccff00] text-black hover:bg-[#b3e600] transition-all relative ${
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#ccff00] text-black hover:bg-[#b3e600] transition-all relative ${
                     tourStep === 1
                       ? "ring-4 ring-brand-chartreuse shadow-[0_0_20px_rgba(204,255,0,0.6)] z-101"
                       : ""
@@ -532,62 +538,11 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         </div>
       </div>
 
-      {/* BANNER ASISTENTE / WIZARD ONBOARDING */}
-      <div className="mb-6 p-5 rounded-2xl bg-brand-chartreuse/5 border border-brand-chartreuse/20 flex flex-col md:flex-row gap-5 items-start">
-        <div className="p-3 bg-brand-chartreuse/10 rounded-xl text-brand-chartreuse shrink-0">
-          <GitMerge className="size-6" />
-        </div>
-        <div className="flex-1 space-y-2">
-          <h4 className="text-sm font-bold text-white tracking-wide uppercase">
-            Guía de Gestión del Torneo
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs text-gray-400">
-            <div className="space-y-1">
-              <span className="font-extrabold text-brand-chartreuse">
-                1. Generar Grupos
-              </span>
-              <p>
-                Presiona <b>Regenerar automático</b> para armar las Zonas de
-                clasificación por ranking oficial FAP.
-              </p>
-            </div>
-            <div className="space-y-1">
-              <span className="font-extrabold text-brand-chartreuse">
-                2. Reubicar Manual
-              </span>
-              <p>
-                Activa <b>Modo edición</b> para arrastrar y soltar{" "}
-                {isIndividual ? "jugadores" : "parejas"} entre zonas.
-              </p>
-            </div>
-            <div className="space-y-1">
-              <span className="font-extrabold text-brand-chartreuse">
-                3. Modo No Destructivo
-              </span>
-              <p>
-                Si está <b>ON</b>, reubicar{" "}
-                {isIndividual ? "jugadores" : "parejas"} no borrará los
-                resultados cargados en la base de datos.
-              </p>
-            </div>
-            <div className="space-y-1">
-              <span className="font-extrabold text-brand-chartreuse">
-                4. Llave Final
-              </span>
-              <p>
-                Al concluir la fase de zonas, ve a la pestaña{" "}
-                <b>Llave campeonato</b> para generar y jugar el cuadro final.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex bg-transparent border-b border-white/5 mb-6 gap-2">
+      <div className="flex bg-transparent border-b border-white/5 mb-6 gap-2 overflow-x-auto scrollbar-none">
         {torneo?.formato !== "Eliminatoria Directa" && (
           <button
             onClick={() => setActiveView("zonas")}
-            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
               activeView === "zonas"
                 ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
                 : "border border-transparent text-gray-500 hover:text-gray-300"
@@ -600,7 +555,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         {torneo?.formato === "Eliminatoria Directa" && partidos.length > 0 && (
           <button
             onClick={() => setActiveView("siembra")}
-            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors ${
+            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
               activeView === "siembra"
                 ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
                 : "border border-transparent text-gray-500 hover:text-gray-300"
@@ -612,7 +567,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         <button
           id="tab-llaves-indicador"
           onClick={() => setActiveView("llaves")}
-          className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-all relative ${
+          className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-all relative shrink-0 ${
             activeView === "llaves"
               ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
               : "border border-transparent text-gray-500 hover:text-gray-300"
@@ -622,7 +577,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         </button>
         <button
           onClick={() => setActiveView("auditoria")}
-          className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors ${
+          className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
             activeView === "auditoria"
               ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
               : "border border-transparent text-gray-500 hover:text-gray-300"
@@ -717,8 +672,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 generar las zonas de la fase de grupos.
               </div>
             )}
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
               <button
                 id="btn-regenerar"
                 onClick={handleRegenerarZonas}
@@ -728,7 +683,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     (ins) => ins.estado_pago !== "Confirmado",
                   )
                 }
-                className={`flex items-center gap-2 px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-all relative disabled:opacity-40 disabled:cursor-not-allowed ${
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-all relative disabled:opacity-40 disabled:cursor-not-allowed ${
                   tourStep === 0 &&
                   (inscripciones || []).length % 2 === 0 &&
                   !(inscripciones || []).some(
@@ -742,11 +697,11 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 automático
               </button>
 
-              <div className="flex items-center gap-2 bg-[#222222] border border-white/5 rounded-xl px-3.5 py-1 text-sm text-gray-300">
+              <div className="flex-1 sm:flex-initial flex items-center justify-between sm:justify-start gap-2 bg-[#222222] border border-white/5 rounded-xl px-3.5 py-1.5 text-sm text-gray-300 w-full sm:w-auto">
                 <span className="text-xs font-bold text-gray-500 uppercase tracking-wide shrink-0">
                   {isIndividual ? "Jugadores" : "Parejas"} por Zona:
                 </span>
-                <div className="w-40">
+                <div className="w-32 sm:w-40">
                   <CustomDropdown
                     value={String(tamanioGrupo)}
                     onChange={(val) => setTamanioGrupo(Number(val))}
@@ -765,32 +720,60 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 </div>
               </div>
             </div>
-            <div
-              id="btn-no-destructivo"
-              className={`flex items-center gap-3 px-4 py-2 border border-brand-chartreuse/30 rounded-full transition-all relative ${
-                tourStep === 2
-                  ? "ring-4 ring-brand-chartreuse shadow-[0_0_20px_rgba(204,255,0,0.6)] z-101 bg-brand-card text-brand-white border-brand-chartreuse"
-                  : ""
-              }`}
-            >
-              <span className="text-sm font-semibold text-gray-300">
-                Modificación no destructiva
-              </span>
-              <button
-                onClick={() =>
-                  setModificacionNoDestructiva(!modificacionNoDestructiva)
-                }
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${modificacionNoDestructiva ? "bg-brand-chartreuse" : "bg-gray-600"}`}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+              <div
+                id="btn-validar-cabezas"
+                className="flex items-center justify-between w-full sm:w-auto px-4 py-2.5 border border-brand-chartreuse/10 rounded-2xl bg-white/5 transition-all relative gap-4"
               >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${modificacionNoDestructiva ? "translate-x-6" : "translate-x-1"}`}
-                />
-              </button>
-              <span
-                className={`text-xs font-black ${modificacionNoDestructiva ? "text-brand-chartreuse" : "text-gray-500"}`}
+                <span className="text-sm font-semibold text-gray-300">
+                  Validación de cabezas de serie
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setValidarCabezasSerie(!validarCabezasSerie)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${validarCabezasSerie ? "bg-brand-chartreuse" : "bg-gray-600"}`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${validarCabezasSerie ? "translate-x-6" : "translate-x-1"}`}
+                    />
+                  </button>
+                  <span
+                    className={`text-xs font-black w-6 text-center ${validarCabezasSerie ? "text-brand-chartreuse" : "text-gray-500"}`}
+                  >
+                    ON
+                  </span>
+                </div>
+              </div>
+
+              <div
+                id="btn-no-destructivo"
+                className={`flex items-center justify-between w-full sm:w-auto px-4 py-2.5 border border-brand-chartreuse/10 rounded-2xl bg-white/5 transition-all relative gap-4 ${
+                  tourStep === 2
+                    ? "ring-4 ring-brand-chartreuse shadow-[0_0_20px_rgba(204,255,0,0.6)] z-101 bg-brand-card text-brand-white border-brand-chartreuse"
+                    : ""
+                }`}
               >
-                ON
-              </span>
+                <span className="text-sm font-semibold text-gray-300">
+                  Modificación no destructiva
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() =>
+                      setModificacionNoDestructiva(!modificacionNoDestructiva)
+                    }
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${modificacionNoDestructiva ? "bg-brand-chartreuse" : "bg-gray-600"}`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${modificacionNoDestructiva ? "translate-x-6" : "translate-x-1"}`}
+                    />
+                  </button>
+                  <span
+                    className={`text-xs font-black w-6 text-center ${modificacionNoDestructiva ? "text-brand-chartreuse" : "text-gray-500"}`}
+                  >
+                    ON
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -801,16 +784,16 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               : "Arrastrá una pareja a un slot para reubicarla."}
           </div>
 
-          <div className="flex justify-between items-end border-b border-white/5 pb-2">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 border-b border-white/5 pb-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <h4 className="text-xl font-bold text-white">
                 Zonas de clasificación
               </h4>
-              <span className="px-3 py-1 bg-brand-chartreuse/10 border border-brand-chartreuse/20 text-brand-chartreuse text-xs font-bold rounded-full flex items-center gap-1.5">
+              <span className="px-3 py-1 bg-brand-chartreuse/10 border border-brand-chartreuse/20 text-brand-chartreuse text-xs font-bold rounded-full flex items-center gap-1.5 shrink-0">
                 <Check className="size-3.5" /> Fase consolidada
               </span>
             </div>
-            <div className="text-gray-500 text-sm">
+            <div className="text-gray-500 text-xs sm:text-sm font-medium">
               {zonas.length} zonas · {totalParejas}{" "}
               {isIndividual ? "jugadores" : "parejas"} ·{" "}
               {getClasificanTexto(zonas.length)}

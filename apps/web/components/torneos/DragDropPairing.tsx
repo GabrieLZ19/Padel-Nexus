@@ -68,6 +68,7 @@ export interface ParejaDrag {
   jugador2_nombre: string | null;
   seed: number;
   club?: string;
+  cabezaDeSerie?: boolean;
 }
 
 export interface ZonaDrag {
@@ -159,9 +160,14 @@ export const SortablePareja = ({
 
       <div className="flex-1 min-w-0 py-0.5">
         <div className="flex flex-wrap items-center gap-1.5">
-          <div className="text-[11.5px] font-black text-white uppercase leading-snug tracking-wide whitespace-normal wrap-break-word">
+          <div className="text-[11.5px] font-black text-white uppercase leading-snug tracking-wide wrap-break-word break-all">
             {nombreCompleto}
           </div>
+          {pareja.cabezaDeSerie && (
+            <span className="shrink-0 text-[8px] font-black text-[#ccff00] bg-[#ccff00]/10 border border-[#ccff00]/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+              Cab. Serie
+            </span>
+          )}
           {isClassified && (
             <span className="shrink-0 text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
               Pasa

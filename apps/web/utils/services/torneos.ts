@@ -114,6 +114,7 @@ export const TorneosService = {
     payload: {
       zonas: { id: string; nombre: string; parejas: { id: string }[] }[];
       motivo: string;
+      validarCabezasSerie?: boolean;
     }
   ) {
     const response = await api.put(`/torneos/${torneoId}/guardar-zonas`, payload);

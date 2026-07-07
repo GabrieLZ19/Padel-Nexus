@@ -24,7 +24,6 @@ import { Torneo, Inscripcion, Partido } from "../../../../utils/types";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "../../../../components/ui/FeedbackModal";
-import { MatchCard } from "@/components/torneos/MatchCard";
 import { LiveArbitrajeRow } from "@/components/torneos/LiveArbitrajeRow";
 import { BracketEditor } from "@/components/torneos/BracketEditor";
 import ConfirmarPagoModal from "@/components/inscripciones/ConfirmarPagoModal";
@@ -392,7 +391,8 @@ export default function TorneoDetallePage() {
       isOpen: true,
       type: "danger",
       title: "¿Eliminar inscripción?",
-      description: "Esta acción no se puede deshacer y liberará los cupos del torneo. ¿Estás seguro de que deseas eliminar este inscrito?",
+      description:
+        "Esta acción no se puede deshacer y liberará los cupos del torneo. ¿Estás seguro de que deseas eliminar este inscrito?",
       confirmText: "Eliminar",
       cancelText: "Cancelar",
       onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
@@ -404,7 +404,8 @@ export default function TorneoDetallePage() {
             isOpen: true,
             type: "success",
             title: "Inscripción eliminada",
-            description: "La inscripción fue eliminada exitosamente y el cupo ha sido liberado.",
+            description:
+              "La inscripción fue eliminada exitosamente y el cupo ha sido liberado.",
             onClose: () => {
               setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
               setRefreshKey((prev) => prev + 1);
@@ -416,11 +417,14 @@ export default function TorneoDetallePage() {
             isOpen: true,
             type: "error",
             title: "Error al eliminar",
-            description: error.response?.data?.message || "Ocurrió un error inesperado al intentar eliminar la inscripción.",
-            onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+            description:
+              error.response?.data?.message ||
+              "Ocurrió un error inesperado al intentar eliminar la inscripción.",
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
           });
         }
-      }
+      },
     });
   };
 
@@ -535,38 +539,38 @@ export default function TorneoDetallePage() {
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 space-y-6 md:px-10 md:py-10">
       {/* HEADER DE NAVEGACIÓN */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="flex items-start sm:items-center gap-4">
           <button
             onClick={() => router.push("/dashboard/torneos")}
-            className="w-10 h-10 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl flex items-center justify-center transition-colors"
+            className="w-10 h-10 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl flex items-center justify-center transition-colors shrink-0"
           >
             <ArrowLeft className="size-5" />
           </button>
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex flex-wrap items-center gap-3">
               {torneo.nombre}
               <span className="text-xs font-black bg-brand-chartreuse/20 text-brand-chartreuse px-3 py-1 rounded-full uppercase tracking-wider">
                 {torneo.estado || "Borrador"}
               </span>
             </h1>
-            <p className="text-gray-400 mt-1 font-medium">
+            <p className="text-gray-400 mt-1 text-sm sm:text-base font-medium">
               {torneo.nivel} · {torneo.categoria} · {torneo.modalidad}
             </p>
           </div>
         </div>
 
         {partidos.length === 0 && (
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
             {inscripciones.length % 2 !== 0 && (
-              <span className="text-xs text-red-500 font-extrabold bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl">
+              <span className="text-xs text-red-500 font-extrabold bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 rounded-xl text-center sm:text-left">
                 Se requiere una cantidad par de participantes confirmados para
                 generar el fixture.
               </span>
             )}
             {inscripciones.length % 2 === 0 &&
               inscripciones.some((ins) => ins.estado_pago !== "Confirmado") && (
-                <span className="text-xs text-yellow-500 font-extrabold bg-yellow-500/10 border border-yellow-500/20 px-3.5 py-2.5 rounded-xl">
+                <span className="text-xs text-yellow-500 font-extrabold bg-yellow-500/10 border border-yellow-500/20 px-3.5 py-2.5 rounded-xl text-center sm:text-left">
                   Todos los inscritos deben estar aprobados/confirmados para
                   generar el fixture.
                 </span>
@@ -577,7 +581,7 @@ export default function TorneoDetallePage() {
                 inscripciones.length % 2 !== 0 ||
                 inscripciones.some((ins) => ins.estado_pago !== "Confirmado")
               }
-              className="flex items-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex justify-center items-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-5 py-3 rounded-xl font-bold text-sm transition-all shadow-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Trophy className="size-4" /> Generar Fixture
             </button>
@@ -642,22 +646,22 @@ export default function TorneoDetallePage() {
         {/* 2. PESTAÑA INSCRITOS CORREGIDA (Con Empty State Hermoso) */}
         {activeTab === "inscritos" && (
           <div className="bg-[#111111] rounded-3xl border border-white/5 overflow-hidden shadow-xl">
-            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-black/20">
+            <div className="p-6 border-b border-white/5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-black/20">
               <h3 className="font-bold text-white flex items-center gap-2">
                 <CheckCircle2 className="size-5 text-[#00ff88]" />
                 Inscripciones ({confirmadasCount} confirmadas de{" "}
                 {torneo.cupos_maximos || 16})
               </h3>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
                 <button
                   onClick={handleDescargarPlantilla}
-                  className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-3.5 py-2 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer"
+                  className="flex-1 lg:flex-none justify-center flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer"
                   title="Descargar plantilla CSV para carga masiva"
                 >
                   <Download className="size-3.5" /> Descargar Plantilla
                 </button>
 
-                <div className="relative">
+                <div className="relative flex-1 lg:flex-none">
                   <input
                     type="file"
                     accept=".csv"
@@ -667,7 +671,7 @@ export default function TorneoDetallePage() {
                   />
                   <button
                     disabled={importingCSV}
-                    className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-3.5 py-2 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer disabled:opacity-50"
+                    className="w-full flex justify-center items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer disabled:opacity-50"
                   >
                     <Upload className="size-3.5" />{" "}
                     {importingCSV ? "Importando..." : "Subir CSV"}
@@ -676,7 +680,7 @@ export default function TorneoDetallePage() {
 
                 <button
                   onClick={() => setIsManualModalOpen(true)}
-                  className="flex items-center gap-1.5 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-4 py-2 rounded-xl font-bold text-xs transition-all shadow-md cursor-pointer"
+                  className="w-full lg:w-auto flex justify-center items-center gap-1.5 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-4 py-2.5 rounded-xl font-bold text-xs transition-all shadow-md cursor-pointer"
                 >
                   Inscribir{" "}
                   {torneo.modalidad === "Individual" ? "Jugador" : "Pareja"}
@@ -695,27 +699,127 @@ export default function TorneoDetallePage() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-white/5 text-xs text-gray-400 uppercase tracking-wider">
-                    <tr>
-                      <th className="px-8 py-5 w-16 text-center">Pago</th>
-                      <th className="px-8 py-5">Código Ref.</th>
-                      <th className="px-6 py-5">Participante / Dupla</th>
-                      <th className="px-6 py-5 text-center">Estado Pago</th>
-                      <th className="px-8 py-5 text-right">Monto</th>
-                      <th className="px-8 py-5 text-center w-20">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {inscripciones.map((ins) => {
-                      const isConfirmed = ins.estado_pago === "Confirmado";
-                      return (
-                        <tr
-                          key={ins.id}
-                          className={`transition-colors ${isConfirmed ? "hover:bg-green-500/5 bg-green-500/2" : "hover:bg-white/5"}`}
-                        >
-                          <td className="px-8 py-5 text-center">
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-white/5 text-xs text-gray-400 uppercase tracking-wider">
+                      <tr>
+                        <th className="px-8 py-5 w-16 text-center">Pago</th>
+                        <th className="px-8 py-5">Código Ref.</th>
+                        <th className="px-6 py-5">Participante / Dupla</th>
+                        <th className="px-6 py-5 text-center">Estado Pago</th>
+                        <th className="px-8 py-5 text-right">Monto</th>
+                        <th className="px-8 py-5 text-center w-20">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {inscripciones.map((ins) => {
+                        const isConfirmed = ins.estado_pago === "Confirmado";
+                        return (
+                          <tr
+                            key={ins.id}
+                            className={`transition-colors ${isConfirmed ? "hover:bg-green-500/5 bg-green-500/2" : "hover:bg-white/5"}`}
+                          >
+                            <td className="px-8 py-5 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isConfirmed}
+                                disabled={isConfirmed}
+                                onChange={() => {
+                                  if (!isConfirmed) {
+                                    setPagoModal({
+                                      isOpen: true,
+                                      inscripcionId: String(ins.id),
+                                      montoDefecto: Number(
+                                        ins.monto ||
+                                          torneo.precio_inscripcion ||
+                                          0,
+                                      ),
+                                      isLoading: false,
+                                    });
+                                  }
+                                }}
+                                className="size-4 rounded border-white/10 text-brand-chartreuse focus:ring-brand-chartreuse cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </td>
+                            <td className="px-8 py-5 font-mono text-gray-500 text-sm">
+                              {String(ins.id).slice(0, 8).toUpperCase()}
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="font-bold text-white flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-brand-chartreuse/10 flex items-center justify-center shrink-0">
+                                  <User className="size-4 text-brand-chartreuse" />
+                                </div>
+                                <div>
+                                  {cleanName(ins.jugador1_nombre)}
+                                  {ins.jugador2_nombre &&
+                                    ins.jugador2_nombre !== "-" && (
+                                      <span className="text-gray-400 font-medium">
+                                        {" "}
+                                        / {cleanName(ins.jugador2_nombre)}
+                                      </span>
+                                    )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-5 text-center">
+                              <span
+                                className={`px-2.5 py-1 rounded-full text-xs font-bold ${isConfirmed ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"}`}
+                              >
+                                {ins.estado_pago || "Pendiente"}
+                              </span>
+                            </td>
+                            <td className="px-8 py-5 text-right text-brand-white font-semibold text-sm">
+                              ${Number(ins.monto || 0).toLocaleString("es-AR")}
+                            </td>
+                            <td className="px-8 py-5 text-center">
+                              <button
+                                onClick={() => handleEliminarInscripcion(ins.id)}
+                                className="text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                                title="Eliminar Inscripción"
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Cards View */}
+                <div className="md:hidden divide-y divide-white/5">
+                  {inscripciones.map((ins) => {
+                    const isConfirmed = ins.estado_pago === "Confirmado";
+                    return (
+                      <div
+                        key={ins.id}
+                        className={`p-4 transition-colors flex flex-col gap-3 ${isConfirmed ? "bg-green-500/2" : ""}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-gray-500 text-xs">
+                            REF: {String(ins.id).slice(0, 8).toUpperCase()}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${isConfirmed ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"}`}
+                            >
+                              {ins.estado_pago || "Pendiente"}
+                            </span>
+                            <button
+                              onClick={() => handleEliminarInscripcion(ins.id)}
+                              className="text-red-500 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                              title="Eliminar Inscripción"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-center">
                             <input
                               type="checkbox"
                               checked={isConfirmed}
@@ -734,54 +838,29 @@ export default function TorneoDetallePage() {
                                   });
                                 }
                               }}
-                              className="size-4 rounded border-white/10 text-brand-chartreuse focus:ring-brand-chartreuse cursor-pointer disabled:cursor-not-allowed"
+                              className="size-5 rounded border-white/10 text-brand-chartreuse focus:ring-brand-chartreuse cursor-pointer disabled:cursor-not-allowed"
                             />
-                          </td>
-                          <td className="px-8 py-5 font-mono text-gray-500 text-sm">
-                            {String(ins.id).slice(0, 8).toUpperCase()}
-                          </td>
-                          <td className="px-6 py-5">
-                            <div className="font-bold text-white flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-brand-chartreuse/10 flex items-center justify-center shrink-0">
-                                <User className="size-4 text-brand-chartreuse" />
-                              </div>
-                              <div>
-                                {cleanName(ins.jugador1_nombre)}
-                                {ins.jugador2_nombre &&
-                                  ins.jugador2_nombre !== "-" && (
-                                    <span className="text-gray-400 font-medium">
-                                      {" "}
-                                      / {cleanName(ins.jugador2_nombre)}
-                                    </span>
-                                  )}
-                              </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold text-white text-sm flex flex-wrap items-center gap-1.5">
+                              <span>{cleanName(ins.jugador1_nombre)}</span>
+                              {ins.jugador2_nombre &&
+                                ins.jugador2_nombre !== "-" && (
+                                  <span className="text-gray-400 font-medium">
+                                    / {cleanName(ins.jugador2_nombre)}
+                                  </span>
+                                )}
                             </div>
-                          </td>
-                          <td className="px-6 py-5 text-center">
-                            <span
-                              className={`px-2.5 py-1 rounded-full text-xs font-bold ${isConfirmed ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"}`}
-                            >
-                              {ins.estado_pago || "Pendiente"}
-                            </span>
-                          </td>
-                          <td className="px-8 py-5 text-right text-brand-white font-semibold text-sm">
+                          </div>
+                          <div className="text-right text-brand-white font-semibold text-sm shrink-0">
                             ${Number(ins.monto || 0).toLocaleString("es-AR")}
-                          </td>
-                          <td className="px-8 py-5 text-center">
-                            <button
-                              onClick={() => handleEliminarInscripcion(ins.id)}
-                              className="text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                              title="Eliminar Inscripción"
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
         )}
