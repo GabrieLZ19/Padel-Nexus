@@ -214,7 +214,7 @@ export const guardarZonasOverride = async (
 ): Promise<Response> => {
   try {
     const torneoId = req.params.id;
-    const { zonas, motivo } = req.body;
+    const { zonas, motivo, validarCabezasSerie } = req.body;
     const admin_id = req.user?.id;
     if (!admin_id) {
       return res.status(401).json({ message: "No autorizado" });
@@ -223,7 +223,8 @@ export const guardarZonasOverride = async (
       torneoId,
       zonas,
       motivo,
-      admin_id
+      admin_id,
+      validarCabezasSerie
     );
     return res.status(200).json(resultado);
   } catch (error: any) {

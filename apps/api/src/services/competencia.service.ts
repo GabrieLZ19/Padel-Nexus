@@ -379,6 +379,38 @@ export class CompetenciaService {
 
     if (!grupos) return [];
 
+    // Calcular cabezas de serie
+    const { data: inscripciones } = await supabaseAdmin
+      .from("inscripciones")
+      .select("id, usuario_id, usuario2_id")
+      .eq("torneo_id", torneoId)
+      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
+
+    const cabezasDeSerieIds = new Set<string>();
+    if (inscripciones && inscripciones.length > 0) {
+      const parejasConPuntos = await Promise.all(
+        inscripciones.map(async (ins) => {
+          const ids = ins.usuario2_id
+            ? [ins.usuario_id, ins.usuario2_id]
+            : [ins.usuario_id];
+
+          const { data: rankings } = await supabaseAdmin
+            .from("rankings")
+            .select("puntos")
+            .in("usuario_id", ids);
+
+          const puntosTotales =
+            rankings?.reduce((acc, curr) => acc + (curr.puntos || 0), 0) || 0;
+
+          return { id: ins.id, puntosTotales };
+        }),
+      );
+
+      parejasConPuntos.sort((a, b) => b.puntosTotales - a.puntosTotales);
+      const K = grupos.length;
+      parejasConPuntos.slice(0, K).forEach((p) => cabezasDeSerieIds.add(p.id));
+    }
+
     // Obtener los ids de usuario para consultar afiliaciones activas
     const userIds: string[] = [];
     grupos.forEach((g) => {
@@ -419,9 +451,12 @@ export class CompetenciaService {
           clubName = club2;
         }
 
+        const cabezaDeSerie = gp.inscripcion_id ? cabezasDeSerieIds.has(gp.inscripcion_id) : false;
+
         return {
           ...gp,
           clubName,
+          cabezaDeSerie,
         };
       }),
     }));
@@ -592,7 +627,74 @@ export class CompetenciaService {
     zonas: { id: string; nombre: string; parejas: { id: string }[] }[],
     motivo: string,
     adminId: string,
+    validarCabezasSerie?: boolean,
   ) {
+    if (validarCabezasSerie) {
+      // 0. OBTENER INSCRIPCIONES CONFIRMADAS
+      const { data: inscripciones, error: errInsc } = await supabaseAdmin
+        .from("inscripciones")
+        .select(`
+          id, 
+          usuario_id, 
+          usuario2_id,
+          jugador1_nombre,
+          jugador2_nombre
+        `)
+        .eq("torneo_id", torneoId)
+        .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
+
+      if (errInsc || !inscripciones || inscripciones.length === 0) {
+        throw new Error("No hay inscripciones confirmadas para validar las cabezas de serie.");
+      }
+
+      // Calcular puntos de cada pareja
+      const parejasConPuntos = await Promise.all(
+        inscripciones.map(async (ins) => {
+          const ids = ins.usuario2_id
+            ? [ins.usuario_id, ins.usuario2_id]
+            : [ins.usuario_id];
+
+          const { data: rankings } = await supabaseAdmin
+            .from("rankings")
+            .select("puntos")
+            .in("usuario_id", ids);
+
+          const puntosTotales =
+            rankings?.reduce((acc, curr) => acc + (curr.puntos || 0), 0) || 0;
+
+          const cleanJ1 = ins.jugador1_nombre ? ins.jugador1_nombre.trim() : "";
+          const cleanJ2 = ins.jugador2_nombre ? ins.jugador2_nombre.trim() : "";
+          const nombre = cleanJ1 && cleanJ2 ? `${cleanJ1} / ${cleanJ2}` : cleanJ1 || "Pareja sin nombre";
+
+          return { id: ins.id, puntosTotales, nombre };
+        }),
+      );
+
+      // Ordenar de mayor a menor puntos
+      parejasConPuntos.sort((a, b) => b.puntosTotales - a.puntosTotales);
+
+      // El número de zonas es K
+      const K = zonas.length;
+      // Las top K parejas son las cabezas de serie
+      const cabezasDeSerieIds = new Set(parejasConPuntos.slice(0, K).map((p) => p.id));
+
+      // Verificar que ninguna zona tenga más de una cabeza de serie
+      for (const z of zonas) {
+        const cabezasEnZona = z.parejas.filter((p) => cabezasDeSerieIds.has(p.id));
+        if (cabezasEnZona.length > 1) {
+          const nombresCabezas = cabezasEnZona
+            .map((c) => {
+              const found = parejasConPuntos.find((p) => p.id === c.id);
+              return found ? found.nombre : "Pareja";
+            })
+            .join(" y ");
+          throw new Error(
+            `La ${z.nombre} tiene más de una pareja cabeza de serie (${nombresCabezas}) según el ranking. Por favor, sepárelas conforme al reglamento FAP.`
+          );
+        }
+      }
+    }
+
     // 1. Guardar la nueva distribución de parejas para cada zona
     for (const z of zonas) {
       // Eliminar las parejas anteriores del grupo
