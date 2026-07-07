@@ -22,6 +22,7 @@ export interface TorneoPayload {
   modalidad: string;
   precio_inscripcion: number;
   formato: string;
+  alcance?: 'Nacional' | 'Provincial' | 'Local' | null;
   premios?: { uno?: string; dos?: string; tres?: string };
   canchas_disponibles?: number;
   duracion_partido_minutos?: number;
@@ -151,6 +152,7 @@ export class TorneoService {
           modalidad: datos.modalidad,
           precio_inscripcion: datos.precio_inscripcion,
           formato: datos.formato,
+          alcance: datos.alcance ?? 'Provincial',
           premio_1: datos.premios?.uno,
           premio_2: datos.premios?.dos,
           premio_3: datos.premios?.tres,
