@@ -119,7 +119,7 @@ export default function ConfirmarPagoModal({
           {/* Footer */}
           <div className="p-6 pt-2 flex flex-col gap-3">
             <button
-              disabled={isLoading || !monto || Number(monto) <= 0}
+              disabled={isLoading || !monto || Number(monto) < 0}
               onClick={() => onConfirm(Number(monto), metodo)}
               className="w-full py-4 rounded-xl font-bold text-[#111] bg-brand-chartreuse hover:bg-brand-chartreuse/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(203,254,1,0.15)]"
             >

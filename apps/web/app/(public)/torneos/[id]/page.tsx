@@ -169,10 +169,10 @@ export default function TorneoDetallePage() {
     { id: "FINAL", label: "Final", required: 1 },
   ];
 
-  const activeRounds = new Set((partidos || []).map((p) => p.ronda.toUpperCase()));
-  const rondasToShow = RONDAS_CONFIG.filter(
-    (r) => activeRounds.has(r.id),
+  const activeRounds = new Set(
+    (partidos || []).map((p) => p.ronda.toUpperCase()),
   );
+  const rondasToShow = RONDAS_CONFIG.filter((r) => activeRounds.has(r.id));
 
   const getRoundMatches = (round: string, requiredCount: number): Partido[] => {
     const found = partidos
@@ -275,66 +275,163 @@ export default function TorneoDetallePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
-          {/* COLUMNA IZQUIERDA: CUADRO PRINCIPAL */}
-          <div className="lg:col-span-2 bg-brand-card border border-brand-white/5 rounded-3xl p-5 lg:p-10 shadow-xl flex flex-col overflow-hidden">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 lg:mb-12">
-              <h2 className="text-xl md:text-2xl font-bold text-brand-white">
-                Cuadro principal
-              </h2>
-              <div className="flex gap-2">
-                {isEnCurso && (
-                  <div className="flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold rounded-full uppercase tracking-wider">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                    En vivo
+          {/* COLUMNA IZQUIERDA: CUADRO PRINCIPAL O LISTA DE INSCRIPTOS */}
+          <div className="lg:col-span-2">
+            {isAbierto ? (
+              <div className="bg-brand-card border border-brand-white/5 rounded-3xl p-5 lg:p-10 shadow-xl flex flex-col">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-black text-brand-white flex items-center gap-3">
+                      <Users className="size-6 text-brand-chartreuse" />
+                      Inscriptos
+                    </h2>
+                    <p className="text-gray-400 text-sm mt-1">
+                      Lista de participantes registrados en el torneo.
+                    </p>
                   </div>
-                )}
-                {isFinalizado && (
-                  <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold rounded-full uppercase tracking-wider">
-                    <CheckCircle2 className="size-3" /> Finalizado
-                  </div>
-                )}
-              </div>
-            </div>
+                  <span className="bg-brand-chartreuse/10 text-brand-chartreuse px-4 py-1.5 rounded-full text-sm font-bold border border-brand-chartreuse/20">
+                    {cuposActuales} / {cuposMaximos}{" "}
+                    {isIndividual ? "Jugadores" : "Duplas"}
+                  </span>
+                </div>
 
-            {/* CONTENEDOR SCROLLABLE UNIVERSAL */}
-            <div className="w-full overflow-x-auto pb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-              <div 
-                className="flex gap-6 lg:gap-8 w-max min-w-full px-2 lg:px-0"
-                style={{ height: `${dynamicHeight}px` }}
-              >
-                {rondasToShow.map((rondaInfo) => {
-                  const roundMatches = getRoundMatches(
-                    rondaInfo.id,
-                    rondaInfo.required,
-                  );
-
-                  return (
-                    <div
-                      key={rondaInfo.id}
-                      className="min-w-50 lg:min-w-60 flex-1 flex flex-col relative h-full"
-                    >
-                      <h3 className="text-center text-[11px] lg:text-xs font-black text-brand-chartreuse uppercase tracking-widest mb-4 absolute -top-8 lg:-top-10 w-full">
-                        {rondaInfo.label}
-                      </h3>
-
-                      <div className="flex flex-col justify-around h-full w-full">
-                        {roundMatches.map((p) => (
-                          <div
-                            key={p.id}
-                            className="relative w-full flex items-center justify-center"
-                          >
-                            <MatchCard partido={p} />
-                          </div>
-                        ))}
+                {/* Visualización de Cupos (Ocupados / Disponibles) */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {Array.from({ length: cuposMaximos }).map((_, index) => {
+                    const isOcupado = index < cuposActuales;
+                    return (
+                      <div
+                        key={index}
+                        className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 transition-all duration-200 ${
+                          isOcupado
+                            ? "bg-brand-white/2 border-brand-white/5 opacity-60 font-medium"
+                            : "bg-brand-chartreuse/5 border-brand-chartreuse/10 hover:border-brand-chartreuse/35"
+                        }`}
+                      >
+                        <div
+                          className={`size-10 rounded-full flex items-center justify-center font-bold text-sm ${
+                            isOcupado
+                              ? "bg-brand-white/5 text-gray-400"
+                              : "bg-brand-chartreuse/15 text-brand-chartreuse shadow-[0_0_15px_rgba(203,254,1,0.1)]"
+                          }`}
+                        >
+                          {index + 1}
+                        </div>
+                        <span
+                          className={`text-xs font-bold uppercase tracking-wider ${
+                            isOcupado
+                              ? "text-gray-500"
+                              : "text-brand-chartreuse"
+                          }`}
+                        >
+                          {isOcupado
+                            ? isIndividual
+                              ? "Ocupado"
+                              : "Dupla Inscripta"
+                            : "Disponible"}
+                        </span>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+
+                {/* Sección informativa adicional */}
+                <div className="mt-8 pt-8 border-t border-brand-white/5 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-brand-white/1 border border-brand-white/5 rounded-2xl p-5">
+                    <h4 className="text-sm font-bold text-brand-chartreuse uppercase tracking-widest mb-3">
+                      Reglamento y Formato
+                    </h4>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Este torneo se juega bajo la modalidad{" "}
+                      <span className="text-brand-white font-semibold">
+                        {torneo.modalidad}
+                      </span>{" "}
+                      con formato de{" "}
+                      <span className="text-brand-white font-semibold">
+                        {torneo.formato || "Eliminatoria Directa"}
+                      </span>
+                      . Las reglas oficiales de la federación aplican para todas
+                      las categorías.
+                    </p>
+                  </div>
+                  <div className="bg-brand-white/1 border border-brand-white/5 rounded-2xl p-5">
+                    <h4 className="text-sm font-bold text-brand-chartreuse uppercase tracking-widest mb-3">
+                      Sede y Canchas
+                    </h4>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Los encuentros se disputarán en{" "}
+                      <span className="text-brand-white font-semibold">
+                        {torneo.clubes?.nombre ||
+                          torneo.lugar ||
+                          "Sede central"}
+                      </span>
+                      . El complejo cuenta con canchas profesionales.
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-            <p className="text-center text-xs text-gray-500 mt-2 flex items-center justify-center gap-2 opacity-70">
-              ↔ Deslizá para ver todas las rondas
-            </p>
+            ) : (
+              <div className="bg-brand-card border border-brand-white/5 rounded-3xl p-5 lg:p-10 shadow-xl flex flex-col overflow-hidden">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 lg:mb-12">
+                  <h2 className="text-xl md:text-2xl font-bold text-brand-white">
+                    Cuadro principal
+                  </h2>
+                  <div className="flex gap-2">
+                    {isEnCurso && (
+                      <div className="flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold rounded-full uppercase tracking-wider">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                        En vivo
+                      </div>
+                    )}
+                    {isFinalizado && (
+                      <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold rounded-full uppercase tracking-wider">
+                        <CheckCircle2 className="size-3" /> Finalizado
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* CONTENEDOR SCROLLABLE UNIVERSAL */}
+                <div className="w-full overflow-x-auto pb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+                  <div
+                    className="flex gap-6 lg:gap-8 w-max min-w-full px-2 lg:px-0"
+                    style={{ height: `${dynamicHeight}px` }}
+                  >
+                    {rondasToShow.map((rondaInfo) => {
+                      const roundMatches = getRoundMatches(
+                        rondaInfo.id,
+                        rondaInfo.required,
+                      );
+
+                      return (
+                        <div
+                          key={rondaInfo.id}
+                          className="min-w-50 lg:min-w-60 flex-1 flex flex-col relative h-full"
+                        >
+                          <h3 className="text-center text-[11px] lg:text-xs font-black text-brand-chartreuse uppercase tracking-widest mb-4 absolute -top-8 lg:-top-10 w-full">
+                            {rondaInfo.label}
+                          </h3>
+
+                          <div className="flex flex-col justify-around h-full w-full">
+                            {roundMatches.map((p) => (
+                              <div
+                                key={p.id}
+                                className="relative w-full flex items-center justify-center"
+                              >
+                                <MatchCard partido={p} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <p className="text-center text-xs text-gray-500 mt-2 flex items-center justify-center gap-2 opacity-70">
+                  ↔ Deslizá para ver todas las rondas
+                </p>
+              </div>
+            )}
           </div>
 
           {/* COLUMNA DERECHA: INSCRIPCIÓN Y PREMIOS */}
@@ -345,15 +442,23 @@ export default function TorneoDetallePage() {
                 Inscripción
               </div>
               <div className="flex items-end gap-2 mb-6">
-                <span className="text-4xl lg:text-5xl font-black text-brand-chartreuse tracking-tight">
-                  $
-                  {Number(torneo.precio_inscripcion || 0).toLocaleString(
-                    "es-AR",
-                  )}
-                </span>
-                <span className="text-gray-400 font-semibold mb-1 text-sm lg:text-base">
-                  / {isIndividual ? "jugador" : "dupla"}
-                </span>
+                {Number(torneo.precio_inscripcion || 0) === 0 ? (
+                  <span className="text-4xl lg:text-5xl font-black text-brand-chartreuse tracking-tight">
+                    Gratis
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-4xl lg:text-5xl font-black text-brand-chartreuse tracking-tight">
+                      $
+                      {Number(torneo.precio_inscripcion || 0).toLocaleString(
+                        "es-AR",
+                      )}
+                    </span>
+                    <span className="text-gray-400 font-semibold mb-1 text-sm lg:text-base">
+                      / {isIndividual ? "jugador" : "dupla"}
+                    </span>
+                  </>
+                )}
               </div>
               <ul className="space-y-3 lg:space-y-4 mb-8">
                 <li className="flex items-center gap-3 text-xs lg:text-sm font-medium text-gray-300">

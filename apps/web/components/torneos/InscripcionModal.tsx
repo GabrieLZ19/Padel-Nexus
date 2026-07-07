@@ -118,7 +118,7 @@ export default function InscripcionModal({
     <>
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+          <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/5 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -127,7 +127,7 @@ export default function InscripcionModal({
             >
               <button
                 onClick={handleClose}
-                className="absolute top-5 right-5 text-gray-600 hover:text-white transition-colors z-10 p-1.5 rounded-full hover:bg-white/5 cursor-pointer"
+                className="absolute top-5 right-5 text-gray-500 hover:text-white transition-colors z-10 p-1.5 rounded-full hover:bg-white/5 cursor-pointer"
               >
                 <X className="size-5" />
               </button>
@@ -145,32 +145,32 @@ export default function InscripcionModal({
                   </div>
 
                   {/* Datos del torneo */}
-                  <div className="bg-white/3 border border-white/5 rounded-2xl p-4 mb-6 space-y-2.5">
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6 space-y-2.5">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500 flex items-center gap-2">
+                      <span className="text-gray-400 flex items-center gap-2">
                         <Calendar className="size-3.5 text-brand-chartreuse" />
                         Fecha
                       </span>
-                      <span className="text-gray-200 font-semibold">
+                      <span className="text-white font-semibold">
                         {formatFechaTorneo(torneo.fecha)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500 flex items-center gap-2">
+                      <span className="text-gray-400 flex items-center gap-2">
                         <Users className="size-3.5 text-brand-chartreuse" />
                         Modalidad
                       </span>
-                      <span className="text-gray-200 font-semibold">
+                      <span className="text-white font-semibold">
                         {torneo.modalidad}
                       </span>
                     </div>
                     {(torneo.lugar || torneo.clubes?.nombre) && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500 flex items-center gap-2">
+                        <span className="text-gray-400 flex items-center gap-2">
                           <MapPin className="size-3.5 text-brand-chartreuse" />
                           Lugar
                         </span>
-                        <span className="text-gray-200 font-semibold text-right">
+                        <span className="text-white font-semibold text-right">
                           {torneo.lugar || torneo.clubes?.nombre}
                         </span>
                       </div>
@@ -179,15 +179,15 @@ export default function InscripcionModal({
 
                   {/* Jugador 1 — sólo lectura, viene del perfil */}
                   <div className="mb-5">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                       <User className="size-3 text-brand-chartreuse" />
                       {isIndividual ? "Jugador" : "Jugador 1 (vos)"}
                     </label>
-                    <div className="w-full bg-white/3 border border-white/5 px-4 py-3.5 rounded-2xl text-gray-300 text-sm flex items-center gap-3">
+                    <div className="w-full bg-white/5 border border-white/10 px-4 py-3.5 rounded-2xl text-gray-300 text-sm flex items-center gap-3">
                       <div className="w-7 h-7 rounded-full bg-brand-chartreuse/10 border border-brand-chartreuse/20 flex items-center justify-center shrink-0">
                         <User className="size-3.5 text-brand-chartreuse" />
                       </div>
-                      <span className="font-semibold">
+                      <span className="font-semibold text-white">
                         {jugador1Nombre || profile?.email || "—"}
                       </span>
                       <span className="ml-auto text-[10px] bg-brand-chartreuse/10 text-brand-chartreuse px-2 py-0.5 rounded-full border border-brand-chartreuse/20 font-bold uppercase">
@@ -203,18 +203,18 @@ export default function InscripcionModal({
                       animate={{ opacity: 1, height: "auto" }}
                       className="mb-5"
                     >
-                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                         <Users className="size-3 text-brand-chartreuse" />
                         Email de tu compañero/a
                       </label>
                       <input
                         type="email"
                         placeholder="compañero@email.com"
-                        className="w-full bg-white/5 border border-white/5 px-4 py-3.5 rounded-2xl text-white text-sm focus:outline-none focus:border-brand-chartreuse/50 transition-all placeholder:text-gray-600"
+                        className="w-full bg-white/5 border border-white/10 px-4 py-3.5 rounded-2xl text-white text-sm focus:outline-none focus:border-brand-chartreuse/50 transition-all placeholder:text-gray-500"
                         value={email2}
                         onChange={(e) => setEmail2(e.target.value)}
                       />
-                      <p className="text-[11px] text-gray-600 mt-1.5">
+                      <p className="text-[11px] text-gray-500 mt-1.5">
                         El compañero debe estar registrado en Padel Nexus.
                       </p>
                     </motion.div>
@@ -253,8 +253,8 @@ export default function InscripcionModal({
 
                   {/* Aviso pago fase 2 */}
                   <div className="flex items-start gap-3 mb-6">
-                    <ShieldCheck className="size-6 text-gray-600 shrink-0 mt-0.5" />
-                    <p className="text-[15px] text-gray-600 leading-relaxed">
+                    <ShieldCheck className="size-6 text-gray-500 shrink-0 mt-0.5" />
+                    <p className="text-[15px] text-gray-500 leading-relaxed">
                       Al inscribirte reservás tu lugar.
                     </p>
                   </div>
