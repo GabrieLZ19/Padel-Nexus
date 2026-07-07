@@ -28,6 +28,7 @@ export interface Torneo {
   premio_2?: string | null;
   premio_3?: string | null;
   lugar?: string | null;
+  alcance?: 'Nacional' | 'Provincial' | 'Local' | null;
   canchas_disponibles?: number | null;
   duracion_partido_minutos?: number | null;
   hora_inicio_jornada?: string | null;
@@ -96,6 +97,7 @@ export interface FormTorneoState {
   modalidad: string;
   precio_inscripcion?: number;
   formato: string;
+  alcance?: 'Nacional' | 'Provincial' | 'Local' | null;
   premio_1?: string;
   premio_2?: string;
   premio_3?: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useRef } from "react";
+import { useState, useEffect, Suspense, useRef, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,10 +12,65 @@ import {
   X,
   Filter,
   Users,
+  Globe,
+  Building2,
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo } from "@/utils/types";
 import { useProfileStore } from "@/store/useProfileStore";
+
+// ─── Componente de sección acordeón ───────────────────────────────────────────
+function FilterSection({
+  label,
+  isOpen,
+  onToggle,
+  activeCount = 0,
+  children,
+}: {
+  label: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  activeCount?: number;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between py-3 text-left cursor-pointer group"
+      >
+        <span className="flex items-center gap-2">
+          <span
+            className={`text-xs font-bold tracking-wider uppercase transition-colors ${
+              isOpen
+                ? "text-gray-300"
+                : "text-gray-500 group-hover:text-gray-300"
+            }`}
+          >
+            {label}
+          </span>
+          {activeCount > 0 && (
+            <span className="min-w-[16px] h-4 px-1.5 rounded-full bg-brand-chartreuse text-brand-black text-[10px] font-bold flex items-center justify-center shadow-[0_0_8px_rgba(203,254,1,0.5)]">
+              {activeCount}
+            </span>
+          )}
+        </span>
+        <ChevronDown
+          className={`size-3 shrink-0 transition-all duration-200 ${
+            isOpen
+              ? "text-brand-chartreuse rotate-180"
+              : "text-gray-600 group-hover:text-gray-400"
+          }`}
+        />
+      </button>
+      {isOpen && (
+        <div className="pb-3 border-t border-brand-white/5 pt-2.5">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function TorneosContent() {
   const searchParams = useSearchParams();
@@ -29,13 +84,29 @@ function TorneosContent() {
   const [search, setSearch] = useState<string>(initialQuery);
   const [activeProvincia, setActiveProvincia] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [activeStatus, setActiveStatus] = useState<string | null>(
-    "Inscripción",
-  );
+  const [activeStatus, setActiveStatus] = useState<string | null>(null);
   const [activeModalidad, setActiveModalidad] = useState<string | null>(null);
+  const [activeGenero, setActiveGenero] = useState<string | null>(null);
+  const [activeAlcance, setActiveAlcance] = useState<string | null>(null);
+  const [activeOrganizador, setActiveOrganizador] = useState<string | null>(
+    null,
+  );
 
   // --- ESTADO RESPONSIVE ---
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+
+  // --- ESTADO ACORDEONES (colapsados por defecto, abrir los más usados) ---
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    estado: true,
+    genero: true,
+    alcance: false,
+    categoria: false,
+    modalidad: false,
+    provincia: false,
+    organizador: false,
+  });
+  const toggleSection = (key: string) =>
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
 
   // --- ESTADOS DE ORDENAMIENTO ---
   const [sortBy, setSortBy] = useState<string>("recientes");
@@ -92,6 +163,13 @@ function TorneosContent() {
     new Set(tournaments.map((t) => t.nivel).filter(Boolean)),
   ).sort() as string[];
 
+  const GENEROS_FIJOS = ["Masculino", "Femenino", "Mixto"];
+  const ALCANCES_FIJOS = ["Nacional", "Provincial", "Local"];
+
+  const ORGANIZADORES_DINAMICOS = Array.from(
+    new Set(tournaments.map((t) => t.clubes?.nombre).filter(Boolean)),
+  ).sort() as string[];
+
   const ESTADOS = [
     {
       id: "Inscripción",
@@ -127,13 +205,20 @@ function TorneosContent() {
       (t.estado || "").toLowerCase() === activeStatus.toLowerCase();
     const matchesModalidad =
       !activeModalidad || t.modalidad === activeModalidad;
+    const matchesGenero = !activeGenero || t.categoria === activeGenero;
+    const matchesAlcance = !activeAlcance || t.alcance === activeAlcance;
+    const matchesOrganizador =
+      !activeOrganizador || t.clubes?.nombre === activeOrganizador;
 
     return (
       matchesSearch &&
       matchesProvincia &&
       matchesCategory &&
       matchesStatus &&
-      matchesModalidad
+      matchesModalidad &&
+      matchesGenero &&
+      matchesAlcance &&
+      matchesOrganizador
     );
   });
 
@@ -150,6 +235,9 @@ function TorneosContent() {
     setActiveCategory(null);
     setActiveStatus(null);
     setActiveModalidad(null);
+    setActiveGenero(null);
+    setActiveAlcance(null);
+    setActiveOrganizador(null);
   };
 
   const formatFecha = (fechaVal?: string | number | null) => {
@@ -175,154 +263,244 @@ function TorneosContent() {
 
         {/* SIDEBAR DE FILTROS */}
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-72 bg-brand-card border-r border-brand-white/5 p-8 space-y-8 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 lg:w-72 lg:bg-transparent overflow-y-auto ${
+          className={`fixed inset-y-0 left-0 z-50 w-72 bg-[#0f0f0f] border-r border-brand-white/5 p-6 flex flex-col gap-0 transform transition-transform duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:w-56 lg:bg-transparent lg:border-0 overflow-y-auto shrink-0 ${
             isMobileFiltersOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <div className="flex items-center justify-between">
-            <h2 className="font-bold text-lg">Filtros</h2>
+          {/* HEADER */}
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <Filter className="size-3 text-brand-chartreuse" />
+              <h2 className="text-xs font-bold tracking-wider uppercase text-gray-400">
+                Filtros
+              </h2>
+            </div>
             <div className="flex items-center gap-3">
               <button
                 onClick={handleClearFilters}
-                className="text-brand-chartreuse text-xs font-semibold hover:underline cursor-pointer"
+                className="text-xs font-semibold text-brand-chartreuse hover:opacity-70 transition-opacity cursor-pointer uppercase tracking-wider"
               >
                 Limpiar
               </button>
               <button
                 onClick={() => setIsMobileFiltersOpen(false)}
-                className="lg:hidden text-gray-400 hover:text-brand-white cursor-pointer"
+                className="lg:hidden w-6 h-6 flex items-center justify-center rounded-full bg-brand-white/5 text-gray-400 hover:text-brand-white hover:bg-brand-white/10 transition-colors cursor-pointer"
               >
-                <X className="size-5" />
+                <X className="size-3.5" />
               </button>
             </div>
           </div>
 
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 size-4" />
+          {/* BUSCADOR */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 size-3" />
             <input
               type="text"
-              placeholder="Buscar torneo o club..."
+              placeholder="Buscar..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 bg-brand-input border border-brand-white/5 rounded-xl text-sm text-brand-white placeholder-gray-500 focus:border-brand-chartreuse focus:outline-none transition-colors"
+              className="w-full pl-7 pr-3 py-2 bg-brand-card border border-brand-white/5 rounded-xl text-xs text-brand-white placeholder-gray-600 focus:border-brand-chartreuse/40 focus:outline-none transition-colors"
             />
           </div>
 
-          {/* FILTRO PROVINCIA */}
-          {PROVINCIAS_DINAMICAS.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                Provincia
-              </h3>
-              <div className="space-y-3">
-                {PROVINCIAS_DINAMICAS.map((prov) => (
-                  <label
-                    key={prov}
-                    className="flex items-center gap-3 cursor-pointer group"
-                    onClick={() =>
-                      setActiveProvincia(activeProvincia === prov ? null : prov)
-                    }
-                  >
-                    <div
-                      className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${activeProvincia === prov ? "border-brand-chartreuse bg-brand-chartreuse" : "border-brand-white/20 group-hover:border-brand-chartreuse"}`}
-                    >
-                      {activeProvincia === prov && (
-                        <div className="w-2.5 h-2.5 bg-brand-black rounded-xs"></div>
-                      )}
-                    </div>
-                    <span
-                      className={`text-sm font-medium transition-colors ${activeProvincia === prov ? "text-brand-white" : "text-gray-400 group-hover:text-brand-white"}`}
-                    >
-                      {prov}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* FILTRO NIVEL */}
-          {CATEGORIAS_DINAMICAS.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                Nivel
-              </h3>
-              <div className="flex gap-2 flex-wrap">
-                {CATEGORIAS_DINAMICAS.map((cat) => (
+          {/* SECCIONES ACORDEÓN */}
+          <div className="flex flex-col divide-y divide-brand-white/5">
+            {/* ESTADO */}
+            <FilterSection
+              label="Estado"
+              isOpen={openSections.estado}
+              onToggle={() => toggleSection("estado")}
+              activeCount={activeStatus ? 1 : 0}
+            >
+              <div className="flex flex-col gap-1 mt-1">
+                {ESTADOS.map((est) => (
                   <button
-                    key={cat}
+                    key={est.id}
                     onClick={() =>
-                      setActiveCategory(activeCategory === cat ? null : cat)
+                      setActiveStatus(activeStatus === est.id ? null : est.id)
                     }
-                    className={`px-4 h-10 rounded-xl text-sm font-bold transition-all border cursor-pointer ${
-                      activeCategory === cat
-                        ? "bg-brand-chartreuse border-brand-chartreuse text-brand-black shadow-[0_0_15px_rgba(203,254,1,0.2)]"
-                        : "border-brand-white/10 text-gray-400 hover:border-brand-chartreuse hover:text-brand-white bg-brand-input"
+                    className={`flex items-center gap-2 w-full px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                      activeStatus === est.id
+                        ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-brand-chartreuse shadow-[0_0_12px_rgba(203,254,1,0.08)]"
+                        : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-brand-white/5"
                     }`}
                   >
-                    {cat}
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${est.color} ${
+                        activeStatus === est.id ? est.shadow : ""
+                      }`}
+                    />
+                    {est.label}
                   </button>
                 ))}
               </div>
-            </div>
-          )}
+            </FilterSection>
 
-          {/* FILTRO ESTADO */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-              Estado
-            </h3>
-            <div className="space-y-3">
-              {ESTADOS.map((est) => (
-                <label
-                  key={est.id}
-                  className="flex items-center gap-3 cursor-pointer group"
-                  onClick={() =>
-                    setActiveStatus(activeStatus === est.id ? null : est.id)
-                  }
-                >
-                  <div
-                    className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${activeStatus === est.id ? "border-brand-chartreuse" : "border-brand-white/20 group-hover:border-brand-chartreuse/50"}`}
+            {/* GÉNERO */}
+            <FilterSection
+              label="Género"
+              isOpen={openSections.genero}
+              onToggle={() => toggleSection("genero")}
+              activeCount={activeGenero ? 1 : 0}
+            >
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {GENEROS_FIJOS.map((gen) => (
+                  <button
+                    key={gen}
+                    onClick={() =>
+                      setActiveGenero(activeGenero === gen ? null : gen)
+                    }
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      activeGenero === gen
+                        ? "bg-brand-chartreuse border-brand-chartreuse text-brand-black shadow-[0_0_12px_rgba(203,254,1,0.25)]"
+                        : "border-brand-white/10 text-gray-500 hover:border-brand-white/20 hover:text-gray-300 bg-brand-card"
+                    }`}
                   >
-                    {activeStatus === est.id && (
-                      <div className="w-2.5 h-2.5 rounded-full bg-brand-chartreuse"></div>
-                    )}
-                  </div>
-                  <span
-                    className={`text-sm flex items-center gap-2 ${activeStatus === est.id ? "text-brand-white" : "text-gray-400"}`}
-                  >
-                    <span
-                      className={`w-2 h-2 rounded-full ${est.color} ${activeStatus === est.id ? est.shadow : ""}`}
-                    ></span>
-                    {est.label}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
+                    {gen}
+                  </button>
+                ))}
+              </div>
+            </FilterSection>
 
-          {/* FILTRO MODALIDAD */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-              Modalidad
-            </h3>
-            <div className="flex gap-2">
-              {["Duplas", "Individual"].map((mod) => (
-                <button
-                  key={mod}
-                  onClick={() =>
-                    setActiveModalidad(activeModalidad === mod ? null : mod)
-                  }
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
-                    activeModalidad === mod
-                      ? "bg-brand-chartreuse border-brand-chartreuse text-brand-black"
-                      : "bg-brand-input border-brand-white/5 text-gray-400 hover:text-brand-white"
-                  }`}
-                >
-                  {mod}
-                </button>
-              ))}
-            </div>
+            {/* ALCANCE */}
+            <FilterSection
+              label="Alcance"
+              isOpen={openSections.alcance}
+              onToggle={() => toggleSection("alcance")}
+              activeCount={activeAlcance ? 1 : 0}
+            >
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {ALCANCES_FIJOS.map((alc) => (
+                  <button
+                    key={alc}
+                    onClick={() =>
+                      setActiveAlcance(activeAlcance === alc ? null : alc)
+                    }
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      activeAlcance === alc
+                        ? "bg-brand-chartreuse border-brand-chartreuse text-brand-black shadow-[0_0_12px_rgba(203,254,1,0.25)]"
+                        : "border-brand-white/10 text-gray-500 hover:border-brand-white/20 hover:text-gray-300 bg-brand-card"
+                    }`}
+                  >
+                    {alc}
+                  </button>
+                ))}
+              </div>
+            </FilterSection>
+
+            {/* MODALIDAD */}
+            <FilterSection
+              label="Modalidad"
+              isOpen={openSections.modalidad}
+              onToggle={() => toggleSection("modalidad")}
+              activeCount={activeModalidad ? 1 : 0}
+            >
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {["Duplas", "Individual"].map((mod) => (
+                  <button
+                    key={mod}
+                    onClick={() =>
+                      setActiveModalidad(activeModalidad === mod ? null : mod)
+                    }
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                      activeModalidad === mod
+                        ? "bg-brand-chartreuse border-brand-chartreuse text-brand-black shadow-[0_0_12px_rgba(203,254,1,0.25)]"
+                        : "border-brand-white/10 text-gray-500 hover:border-brand-white/20 hover:text-gray-300 bg-brand-card"
+                    }`}
+                  >
+                    {mod}
+                  </button>
+                ))}
+              </div>
+            </FilterSection>
+
+            {/* CATEGORÍA */}
+            {CATEGORIAS_DINAMICAS.length > 0 && (
+              <FilterSection
+                label="Categoría"
+                isOpen={openSections.categoria}
+                onToggle={() => toggleSection("categoria")}
+                activeCount={activeCategory ? 1 : 0}
+              >
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {CATEGORIAS_DINAMICAS.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() =>
+                        setActiveCategory(activeCategory === cat ? null : cat)
+                      }
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        activeCategory === cat
+                          ? "bg-brand-chartreuse border-brand-chartreuse text-brand-black shadow-[0_0_12px_rgba(203,254,1,0.25)]"
+                          : "border-brand-white/10 text-gray-500 hover:border-brand-white/20 hover:text-gray-300 bg-brand-card"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </FilterSection>
+            )}
+
+            {/* PROVINCIA */}
+            {PROVINCIAS_DINAMICAS.length > 0 && (
+              <FilterSection
+                label="Provincia"
+                isOpen={openSections.provincia}
+                onToggle={() => toggleSection("provincia")}
+                activeCount={activeProvincia ? 1 : 0}
+              >
+                <div className="flex flex-col gap-0.5 mt-1">
+                  {PROVINCIAS_DINAMICAS.map((prov) => (
+                    <button
+                      key={prov}
+                      onClick={() =>
+                        setActiveProvincia(
+                          activeProvincia === prov ? null : prov,
+                        )
+                      }
+                      className={`text-left px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        activeProvincia === prov
+                          ? "bg-brand-chartreuse/10 text-brand-chartreuse"
+                          : "text-gray-500 hover:text-gray-300 hover:bg-brand-white/5"
+                      }`}
+                    >
+                      {prov}
+                    </button>
+                  ))}
+                </div>
+              </FilterSection>
+            )}
+
+            {/* ORGANIZADOR */}
+            {ORGANIZADORES_DINAMICOS.length > 0 && (
+              <FilterSection
+                label="Organizador"
+                isOpen={openSections.organizador}
+                onToggle={() => toggleSection("organizador")}
+                activeCount={activeOrganizador ? 1 : 0}
+              >
+                <div className="flex flex-col gap-0.5 mt-1">
+                  {ORGANIZADORES_DINAMICOS.map((org) => (
+                    <button
+                      key={org}
+                      onClick={() =>
+                        setActiveOrganizador(
+                          activeOrganizador === org ? null : org,
+                        )
+                      }
+                      className={`text-left px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer truncate ${
+                        activeOrganizador === org
+                          ? "bg-brand-chartreuse/10 text-brand-chartreuse"
+                          : "text-gray-500 hover:text-gray-300 hover:bg-brand-white/5"
+                      }`}
+                    >
+                      {org}
+                    </button>
+                  ))}
+                </div>
+              </FilterSection>
+            )}
           </div>
         </aside>
 
@@ -336,7 +514,10 @@ function TorneosContent() {
               <p className="text-gray-400 mt-1 md:mt-2 text-sm md:text-base">
                 {sortedTournaments.length} torneos encontrados
                 {activeProvincia && <span> en {activeProvincia}</span>}
-                {activeCategory && <span> · Nivel {activeCategory}</span>}
+                {activeCategory && <span> · {activeCategory}</span>}
+                {activeGenero && <span> · {activeGenero}</span>}
+                {activeAlcance && <span> · {activeAlcance}</span>}
+                {activeOrganizador && <span> · {activeOrganizador}</span>}
               </p>
             </div>
 
@@ -445,7 +626,8 @@ function TorneosContent() {
                     "bg-brand-white/10 text-brand-white hover:bg-brand-white/20 border border-brand-white/10";
                 } else if (isCerrado) {
                   btnText = "Inscripciones cerradas";
-                  btnClass = "bg-brand-white/5 text-gray-500 border border-brand-white/10 opacity-70 cursor-not-allowed";
+                  btnClass =
+                    "bg-brand-white/5 text-gray-500 border border-brand-white/10 opacity-70 cursor-not-allowed";
                   btnHref = "#";
                 } else {
                   if (!profile) {
@@ -453,7 +635,8 @@ function TorneosContent() {
                     btnHref = "/login";
                   } else if (isEnrolled) {
                     btnText = "Ver inscripción";
-                    btnClass = "bg-brand-input text-white border border-brand-white/10 hover:opacity-90";
+                    btnClass =
+                      "bg-brand-input text-white border border-brand-white/10 hover:opacity-90";
                   } else if (isLleno) {
                     btnText = "Cupos Agotados";
                     btnClass =
@@ -474,11 +657,11 @@ function TorneosContent() {
                 return (
                   <div
                     key={t.id}
-                    className="group bg-brand-card border border-brand-white/5 hover:border-brand-chartreuse/40 rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_0_25px_rgba(203,254,1,0.03)] h-72 relative overflow-hidden"
+                    className="group bg-brand-card border border-brand-white/5 hover:border-brand-chartreuse/40 rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-[0_0_25px_rgba(203,254,1,0.03)] h-60 relative overflow-hidden"
                   >
                     <div>
                       {/* ENCABEZADO DE LA CARD */}
-                      <div className="flex items-center justify-between gap-2 mb-4">
+                      <div className="flex items-center justify-between gap-2 ">
                         <div className="flex gap-2">
                           <div className="bg-brand-chartreuse text-brand-black text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide">
                             {t.nivel || "5ª"} {t.categoria || "Caballeros"}
@@ -532,7 +715,7 @@ function TorneosContent() {
                     </div>
 
                     {/* FOOTER DE LA CARD */}
-                    <div className="flex items-center justify-between pt-4 border-t border-brand-white/5 gap-3 mt-4">
+                    <div className="flex items-center justify-between ">
                       <div className="flex items-center gap-2 shrink-0">
                         <span
                           className={`w-2.5 h-2.5 rounded-full ${isAbierto ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" : isFinalizado ? "bg-gray-500" : "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"}`}

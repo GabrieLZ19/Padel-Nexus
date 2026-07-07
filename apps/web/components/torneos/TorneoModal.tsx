@@ -12,6 +12,7 @@ import {
   ESTADOS_TORNEO,
   MODALIDADES_TORNEO,
   FORMATOS_TORNEO,
+  ALCANCES_TORNEO,
 } from "@/utils/constants/padelConfig";
 import { TorneosService } from "@/utils/services/torneos";
 
@@ -254,8 +255,8 @@ export default function TorneoModal({
                 </div>
               </div>
 
-              {/* FILA 3: Modalidad, Rama y Nivel */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {/* FILA 3: Modalidad, Alcance, Rama y Nivel */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
                     Modalidad
@@ -266,6 +267,22 @@ export default function TorneoModal({
                       setFormData({ ...formData, modalidad: val })
                     }
                     options={MODALIDADES_TORNEO}
+                    placeholder="Seleccionar..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    Alcance
+                  </label>
+                  <CustomDropdown
+                    value={formData.alcance ?? "Provincial"}
+                    onChange={(val) =>
+                      setFormData({
+                        ...formData,
+                        alcance: val as 'Nacional' | 'Provincial' | 'Local',
+                      })
+                    }
+                    options={ALCANCES_TORNEO}
                     placeholder="Seleccionar..."
                   />
                 </div>

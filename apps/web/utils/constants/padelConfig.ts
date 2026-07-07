@@ -68,11 +68,17 @@ export const ESTADOS_TORNEO = [
 ] as const;
 
 export const MODALIDADES_TORNEO = [
-  { value: "Duplas", label: "Duplas (2 vs 2)" },
-  { value: "Individual", label: "Individual (1 vs 1)" },
+  { value: "Duplas", label: "Duplas" },
+  { value: "Individual", label: "Individual" },
 ] as const;
 
 export const FORMATOS_TORNEO = [
   { value: "Eliminatoria Directa", label: "Eliminatoria Directa" },
   { value: "Fase de Grupos", label: "Fase de Grupos + Llave" },
+] as const;
+
+export const ALCANCES_TORNEO = [
+  { value: "Local", label: "Local" },
+  { value: "Provincial", label: "Provincial" },
+  { value: "Nacional", label: "Nacional" },
 ] as const;

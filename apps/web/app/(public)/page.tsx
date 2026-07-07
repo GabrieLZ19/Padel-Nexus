@@ -58,11 +58,6 @@ export default function LandingPage() {
       {/* --- HERO SECTION --- */}
       <main className="max-w-[1600px] mx-auto px-6 sm:px-10 pt-20 pb-16 sm:pb-20 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center relative z-10">
         <div className="space-y-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-brand-chartreuse/30 bg-brand-chartreuse/10 text-brand-chartreuse text-[11px] font-bold tracking-wider whitespace-nowrap">
-            <span className="w-2 h-2 rounded-full bg-brand-chartreuse"></span>
-            TORNEOS · RANKING · RESERVAS · MARKETPLACE
-          </div>
-
           <h1 className="text-5xl sm:text-6xl md:text-[72px] lg:text-[80px] font-extrabold tracking-tight leading-[1.05]">
             El ecosistema del <br /> pádel, <br /> en una sola plataforma
           </h1>
