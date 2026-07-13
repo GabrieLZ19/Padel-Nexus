@@ -22,9 +22,12 @@ import {
   X,
   Sun,
   Moon,
+  Check,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
+import { useSocket } from "@/hooks/useSocket";
+import { sileo } from "sileo";
 
 export default function DashboardLayout({
   children,
@@ -125,6 +128,29 @@ export default function DashboardLayout({
     };
   }, [fetchProfile, handleLogout, profile]);
 
+  // Suscribirse al WebSocket para recibir y disparar notificaciones con sileo
+  useSocket((newNotif: any) => {
+    const payload = {
+      title: newNotif.titulo,
+      description: newNotif.mensaje,
+    };
+
+    switch (newNotif.tipo) {
+      case "success":
+        sileo.success(payload);
+        break;
+      case "error":
+        sileo.error(payload);
+        break;
+      case "warning":
+        sileo.warning(payload);
+        break;
+      default:
+        sileo.info(payload);
+        break;
+    }
+  });
+
   const menuItems = [
     { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
     { name: "Torneos", icon: Trophy, href: "/dashboard/torneos" },
@@ -141,7 +167,10 @@ export default function DashboardLayout({
     { name: "Chat interno", icon: MessageSquare, href: "/dashboard/chat" },
   ];
 
-  const formatNombreCompleto = (apellido?: string | null, nombre?: string | null) => {
+  const formatNombreCompleto = (
+    apellido?: string | null,
+    nombre?: string | null,
+  ) => {
     const ap = (apellido || "").trim();
     const nom = (nombre || "").trim();
     if (ap && nom) return `${ap.toUpperCase()}, ${nom}`;

@@ -5,8 +5,14 @@ export interface Club {
   localidad: string;
   canchas: number;
   estado: string;
+  latitud?: number | null;
+  longitud?: number | null;
   created_at?: string;
   torneos_count?: number; // Virtual
+}
+
+export interface ClubCercano extends Club {
+  distancia_km: number;
 }
 
 export interface Cancha {
@@ -44,4 +50,16 @@ export interface FormClubState {
   localidad: string;
   canchas: number;
   estado: string;
+}
+
+export interface SlotDisponible {
+  turno_id: string;
+  cancha_id: string;
+  cancha_nombre: string;
+  tipo_suelo: string | null;
+  techada: boolean;
+  hora_inicio: string;
+  hora_fin: string;
+  precio: number;
+  disponible: boolean;
 }

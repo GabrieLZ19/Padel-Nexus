@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Building2, MapPin, CheckCircle2, Plus } from "lucide-react";
 import { ClubesService } from "../../../utils/services/clubes";
 import { Club, FormClubState } from "../../../utils/types";
@@ -256,35 +257,54 @@ export default function GestionClubesPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between mt-6 pt-6 border-t border-white/5">
-                <div className="flex items-center gap-2 ">
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      club.estado === "Pendiente"
-                        ? "bg-orange-500"
-                        : club.estado === "Inactivo"
-                          ? "bg-red-500"
-                          : "bg-green-500"
-                    }`}
-                  ></span>
-                  <span
-                    className={`text-sm font-bold ${
-                      club.estado === "Pendiente"
-                        ? "text-orange-500"
-                        : club.estado === "Inactivo"
-                          ? "text-red-500"
-                          : "text-green-500"
-                    }`}
+              <div className="flex flex-col gap-4 mt-6 pt-6 border-t border-white/5">
+                {/* Estado y Ajustes */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        club.estado === "Pendiente"
+                          ? "bg-orange-500"
+                          : club.estado === "Inactivo"
+                            ? "bg-red-500"
+                            : "bg-green-500"
+                      }`}
+                    ></span>
+                    <span
+                      className={`text-sm font-bold ${
+                        club.estado === "Pendiente"
+                          ? "text-orange-500"
+                          : club.estado === "Inactivo"
+                            ? "text-red-500"
+                            : "text-green-500"
+                      }`}
+                    >
+                      {club.estado || "Activo"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleOpenEdit(club)}
+                    className="text-gray-400 hover:text-white px-3 py-1 rounded-lg text-xs font-semibold hover:bg-white/5 transition-colors cursor-pointer"
                   >
-                    {club.estado || "Activo"}
-                  </span>
+                    Ajustes
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleOpenEdit(club)}
-                  className="text-brand-chartreuse hover:bg-brand-chartreuse/10 px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors"
-                >
-                  Gestionar
-                </button>
+
+                {/* Accesos de Gestión de Reservas / Canchas */}
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <Link
+                    href={`/dashboard/clubes/${club.id}/canchas`}
+                    className="flex items-center justify-center py-2 px-3 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse rounded-xl text-xs font-bold transition-colors border border-brand-chartreuse/10 text-center"
+                  >
+                    Canchas
+                  </Link>
+                  <Link
+                    href={`/dashboard/clubes/${club.id}/reservas`}
+                    className="flex items-center justify-center py-2 px-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-colors border border-white/5 text-center"
+                  >
+                    Agenda
+                  </Link>
+                </div>
               </div>
             </div>
           ))}
