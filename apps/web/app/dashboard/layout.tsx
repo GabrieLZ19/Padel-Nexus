@@ -27,6 +27,7 @@ import {
 import { useProfileStore } from "@/store/useProfileStore";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 import { useSocket } from "@/hooks/useSocket";
+import { ChatService } from "@/utils/services/chat";
 import { sileo } from "sileo";
 
 export default function DashboardLayout({
@@ -42,6 +43,7 @@ export default function DashboardLayout({
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [chatNoLeidos, setChatNoLeidos] = useState(0);
 
   const [theme, setTheme] = useState<"light" | "dark">("dark");
 
@@ -151,6 +153,22 @@ export default function DashboardLayout({
     }
   });
 
+  // Cargar no leídos del chat y escuchar notificaciones
+  useEffect(() => {
+    ChatService.getNoLeidos()
+      .then((total) => setChatNoLeidos(total))
+      .catch(() => {});
+
+    const handler = () => {
+      ChatService.getNoLeidos()
+        .then((total) => setChatNoLeidos(total))
+        .catch(() => {});
+    };
+
+    window.addEventListener("chat_notification", handler);
+    return () => window.removeEventListener("chat_notification", handler);
+  }, []);
+
   const menuItems = [
     { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
     { name: "Torneos", icon: Trophy, href: "/dashboard/torneos" },
@@ -164,7 +182,7 @@ export default function DashboardLayout({
     { name: "Marketplace", icon: ShoppingBag, href: "/dashboard/marketplace" },
     { name: "Moderación", icon: Shield, href: "/dashboard/moderacion" },
     { name: "Estadísticas", icon: Activity, href: "/dashboard/estadisticas" },
-    { name: "Chat interno", icon: MessageSquare, href: "/dashboard/chat" },
+    { name: "Chat interno", icon: MessageSquare, href: "/dashboard/chat", badge: chatNoLeidos },
   ];
 
   const formatNombreCompleto = (
@@ -267,7 +285,12 @@ export default function DashboardLayout({
                   className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${isActive ? "bg-brand-chartreuse text-[#111] font-bold" : "text-gray-400 hover:bg-white/5"}`}
                 >
                   <item.icon className="size-5" />
-                  <span className="text-[14px]">{item.name}</span>
+                  <span className="text-[14px] flex-1">{item.name}</span>
+                  {('badge' in item) && (item as any).badge > 0 && (
+                    <span className="min-w-5 h-5 flex items-center justify-center bg-brand-chartreuse text-brand-black rounded-full text-[10px] font-black px-1 shadow-[0_0_8px_rgba(203,254,1,0.3)]">
+                      {(item as any).badge > 99 ? "99+" : (item as any).badge}
+                    </span>
+                  )}
                 </motion.div>
               </Link>
             );

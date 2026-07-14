@@ -4,6 +4,12 @@ import { useProfileStore } from "@/store/useProfileStore";
 
 let socketInstance: Socket | null = null;
 
+/**
+ * Obtiene la instancia singleton del socket (sin crear un hook).
+ * Usado por useChat para acceder a la misma conexión.
+ */
+export const getSocketInstance = (): Socket | null => socketInstance;
+
 export const useSocket = (onNotificationReceived?: (notif: any) => void) => {
   const { profile } = useProfileStore();
   const callbackRef = useRef(onNotificationReceived);
@@ -55,11 +61,23 @@ export const useSocket = (onNotificationReceived?: (notif: any) => void) => {
       }
     };
 
+    const handleChatNotificacion = (data: any) => {
+      console.log("💬 Notificación de chat recibida:", data);
+      // Disparar un evento custom para que otros componentes puedan escucharlo
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("chat_notification", { detail: data }),
+        );
+      }
+    };
+
     socketInstance.on("nueva_notificacion", handleNuevaNotificacion);
+    socketInstance.on("chat_notification", handleChatNotificacion);
 
     return () => {
       if (socketInstance) {
         socketInstance.off("nueva_notificacion", handleNuevaNotificacion);
+        socketInstance.off("chat_notification", handleChatNotificacion);
       }
     };
   }, [profile?.id]);
