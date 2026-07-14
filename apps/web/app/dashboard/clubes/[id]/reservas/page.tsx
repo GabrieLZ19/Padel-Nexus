@@ -97,14 +97,36 @@ export default function ReservasAdminPage() {
 
   const formatFecha = (dateStr: string) => {
     const date = new Date(dateStr + "T12:00:00Z");
-    const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-    const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const dias = [
+      "Domingo",
+      "Lunes",
+      "Martes",
+      "Miércoles",
+      "Jueves",
+      "Viernes",
+      "Sábado",
+    ];
+    const meses = [
+      "Ene",
+      "Feb",
+      "Mar",
+      "Abr",
+      "May",
+      "Jun",
+      "Jul",
+      "Ago",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dic",
+    ];
     return `${dias[date.getUTCDay()]} ${date.getUTCDate()} de ${meses[date.getUTCMonth()]}`;
   };
 
   const filteredReservas = reservas.filter((r) => {
     if (statusFilter === "todos") return true;
-    if (statusFilter === "confirmadas") return r.estado_reserva === "confirmada";
+    if (statusFilter === "confirmadas")
+      return r.estado_reserva === "confirmada";
     if (statusFilter === "pendientes") return r.estado_reserva === "pendiente";
     if (statusFilter === "canceladas") return r.estado_reserva === "cancelada";
     return true;
@@ -125,19 +147,29 @@ export default function ReservasAdminPage() {
             Agenda de Reservas {club ? `— ${club.nombre}` : ""}
           </h1>
         </div>
-        <button
-          onClick={fetchReservas}
-          className="inline-flex items-center gap-2 px-3 py-2 bg-brand-card hover:bg-white/5 border border-white/10 rounded-xl text-sm font-medium transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Actualizar
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/dashboard/clubes/${clubId}/reservas/transferencias`}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-chartreuse text-black hover:brightness-110 rounded-xl text-sm font-bold transition-all shadow-md shadow-brand-chartreuse/10"
+          >
+            Validar Transferencias
+          </Link>
+          <button
+            onClick={fetchReservas}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-brand-card hover:bg-white/5 border border-white/10 rounded-xl text-sm font-medium transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {/* ── Controles de Filtros ────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-brand-card border border-white/10 rounded-2xl p-6">
         <div>
-          <label className="block text-sm text-gray-400 mb-2">Seleccionar fecha</label>
+          <label className="block text-sm text-gray-400 mb-2">
+            Seleccionar fecha
+          </label>
           <div className="relative">
             <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input
@@ -150,7 +182,9 @@ export default function ReservasAdminPage() {
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-1.5">Estado de la reserva</label>
+          <label className="block text-sm text-gray-400 mb-1.5">
+            Estado de la reserva
+          </label>
           <CustomDropdown
             value={statusFilter}
             onChange={(val) => setStatusFilter(val)}

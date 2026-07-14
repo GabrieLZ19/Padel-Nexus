@@ -7,6 +7,8 @@ export interface Club {
   estado: string;
   latitud?: number | null;
   longitud?: number | null;
+  cbu?: string | null;
+  alias?: string | null;
   created_at?: string;
   torneos_count?: number; // Virtual
 }
@@ -50,6 +52,10 @@ export interface FormClubState {
   localidad: string;
   canchas: number;
   estado: string;
+  latitud?: number | null;
+  longitud?: number | null;
+  cbu?: string | null;
+  alias?: string | null;
 }
 
 export interface SlotDisponible {

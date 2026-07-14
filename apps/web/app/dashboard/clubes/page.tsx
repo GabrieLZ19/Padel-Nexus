@@ -18,6 +18,10 @@ const ESTADO_INICIAL: FormClubState = {
   localidad: "",
   canchas: 2,
   estado: "Activo",
+  latitud: null,
+  longitud: null,
+  cbu: "",
+  alias: "",
 };
 
 export default function GestionClubesPage() {
@@ -75,6 +79,10 @@ export default function GestionClubesPage() {
       localidad: club.localidad || "",
       canchas: club.canchas || 1,
       estado: club.estado || "Activo",
+      latitud: club.latitud || null,
+      longitud: club.longitud || null,
+      cbu: club.cbu || "",
+      alias: club.alias || "",
     });
     setEditingId(club.id);
     setIsModalOpen(true);

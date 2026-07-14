@@ -16,8 +16,13 @@ import {
   Coins,
   Wallet,
   ArrowRight,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import { api } from "@/utils/api";
+import { getSupabaseBrowserClient } from "@/utils/supabase/client";
+import { sileo } from "sileo";
 
 interface ReservaDetalle {
   id: string;
@@ -41,6 +46,10 @@ interface ReservaDetalle {
         nombre: string;
         provincia: string;
         localidad: string;
+        cbu?: string | null;
+        alias?: string | null;
+        latitud?: number | null;
+        longitud?: number | null;
       };
     };
   };
@@ -56,6 +65,26 @@ export default function CheckoutPage() {
   const [procesando, setProcesando] = useState(false);
   const [completado, setCompletado] = useState(false);
   const [metodoPago, setMetodoPago] = useState("transferencia");
+  const [referenciaTransferencia, setReferenciaTransferencia] = useState("");
+  const [comprobanteArchivo, setComprobanteArchivo] = useState<File | null>(null);
+  const [copiadoCbu, setCopiadoCbu] = useState(false);
+  const [copiadoAlias, setCopiadoAlias] = useState(false);
+
+  const handleCopiarCbu = () => {
+    if (reserva?.turnos?.canchas?.clubes?.cbu) {
+      navigator.clipboard.writeText(reserva.turnos.canchas.clubes.cbu);
+      setCopiadoCbu(true);
+      setTimeout(() => setCopiadoCbu(false), 2000);
+    }
+  };
+
+  const handleCopiarAlias = () => {
+    if (reserva?.turnos?.canchas?.clubes?.alias) {
+      navigator.clipboard.writeText(reserva.turnos.canchas.clubes.alias);
+      setCopiadoAlias(true);
+      setTimeout(() => setCopiadoAlias(false), 2000);
+    }
+  };
 
   useEffect(() => {
     const fetchReserva = async () => {
@@ -72,6 +101,12 @@ export default function CheckoutPage() {
           }
 
           const { data } = await api.get(`/reservas/turno/${tId}`);
+          const turnData = data.data;
+          const hasBankDetails = !!(turnData?.canchas?.clubes?.cbu?.trim() || turnData?.canchas?.clubes?.alias?.trim());
+          if (!hasBankDetails) {
+            setMetodoPago("efectivo");
+          }
+
           setReserva({
             id: "new",
             turno_id: tId,
@@ -79,13 +114,19 @@ export default function CheckoutPage() {
             fecha_reserva: fRes,
             estado_pago: "pendiente",
             estado_reserva: "pendiente",
-            turnos: data.data,
+            turnos: turnData,
           });
         } else {
           const { data } = await api.get(`/reservas/${reservaId}`);
-          setReserva(data.data);
+          const resData = data.data;
+          const hasBankDetails = !!(resData?.turnos?.canchas?.clubes?.cbu?.trim() || resData?.turnos?.canchas?.clubes?.alias?.trim());
+          if (!hasBankDetails) {
+            setMetodoPago("efectivo");
+          }
 
-          if (data.data.estado_pago === "completado") {
+          setReserva(resData);
+
+          if (resData.estado_pago === "completado") {
             setCompletado(true);
           }
         }
@@ -117,19 +158,39 @@ export default function CheckoutPage() {
           setCompletado(true);
         }
       } else if (paymentStatus === "failure") {
-        alert(
-          "El pago a través de Mercado Pago no pudo completarse. Por favor, intenta nuevamente.",
-        );
+        sileo.error({
+          title: "Pago Fallido",
+          description: "El pago a través de Mercado Pago no pudo completarse. Por favor, intenta nuevamente.",
+        });
       } else if (paymentStatus === "pending") {
-        alert(
-          "Tu pago se encuentra pendiente de acreditación en Mercado Pago.",
-        );
+        sileo.warning({
+          title: "Pago Pendiente",
+          description: "Tu pago se encuentra pendiente de acreditación en Mercado Pago.",
+        });
       }
     }
   }, [reservaId]);
 
   const handlePagar = async () => {
     if (!reserva) return;
+
+    if (metodoPago === "transferencia") {
+      if (!referenciaTransferencia.trim()) {
+        sileo.warning({
+          title: "Referencia Requerida",
+          description: "Por favor, ingresá la referencia de la transferencia.",
+        });
+        return;
+      }
+      if (!comprobanteArchivo) {
+        sileo.warning({
+          title: "Comprobante Requerido",
+          description: "Por favor, seleccioná la imagen o PDF del comprobante de transferencia.",
+        });
+        return;
+      }
+    }
+
     setProcesando(true);
 
     try {
@@ -142,6 +203,30 @@ export default function CheckoutPage() {
           fecha_reserva: reserva.fecha_reserva,
         });
         activeReservaId = createData.data.id;
+      }
+
+      // Subir archivo si es transferencia bancaria
+      let comprobanteUrl = "";
+      if (metodoPago === "transferencia" && comprobanteArchivo) {
+        try {
+          const supabase = getSupabaseBrowserClient();
+          const fileExt = comprobanteArchivo.name.split(".").pop();
+          const fileName = `${activeReservaId}_${Date.now()}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from("comprobantes")
+            .upload(fileName, comprobanteArchivo);
+
+          if (uploadError) throw uploadError;
+
+          const { data: urlData } = supabase.storage
+            .from("comprobantes")
+            .getPublicUrl(fileName);
+          
+          comprobanteUrl = urlData.publicUrl;
+        } catch (uploadErr: any) {
+          throw new Error(`Error al subir el comprobante: ${uploadErr.message}`);
+        }
       }
 
       // 2. Procesar el pago de la reserva
@@ -164,13 +249,17 @@ export default function CheckoutPage() {
         await api.post(`/reservas/${activeReservaId}/pagar`, {
           monto: reserva.turnos.precio,
           metodo_pago: metodoPago,
+          referencia_pago: metodoPago === "transferencia" ? referenciaTransferencia : undefined,
+          comprobante_url: comprobanteUrl || undefined,
         });
         setCompletado(true);
       }
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Error al procesar el pago";
-      alert(msg);
+    } catch (err: any) {
+      const msg = err.response?.data?.error || err.message || "Error al procesar el pago";
+      sileo.error({
+        title: "Error al Procesar",
+        description: msg,
+      });
     } finally {
       setProcesando(false);
     }
@@ -242,12 +331,27 @@ export default function CheckoutPage() {
             <div className="absolute inset-0 w-24 h-24 mx-auto rounded-full bg-brand-chartreuse/10 animate-ping" />
           </div>
 
-          <h1 className="text-3xl font-bold mb-2">¡Reserva confirmada!</h1>
-          <p className="text-gray-400 mb-8">
-            Tu cancha está lista. Te esperamos en{" "}
-            <span className="text-white font-medium">
-              {reserva.turnos.canchas.clubes.nombre}
-            </span>
+          <h1 className="text-3xl font-bold mb-2">
+            {metodoPago === "transferencia" ? "¡Comprobante enviado!" : "¡Reserva confirmada!"}
+          </h1>
+          <p className="text-gray-400 mb-8 text-sm leading-relaxed">
+            {metodoPago === "transferencia" ? (
+              <>
+                El club está validando tu transferencia para el complejo{" "}
+                <span className="text-white font-medium">
+                  {reserva.turnos.canchas.clubes.nombre}
+                </span>
+                . Te notificaremos cuando tu reserva sea confirmada.
+              </>
+            ) : (
+              <>
+                Tu cancha está lista. Te esperamos en{" "}
+                <span className="text-white font-medium">
+                  {reserva.turnos.canchas.clubes.nombre}
+                </span>
+                .
+              </>
+            )}
           </p>
 
           <div className="bg-brand-card border border-white/10 rounded-2xl p-6 mb-8 text-left space-y-3">
@@ -279,7 +383,7 @@ export default function CheckoutPage() {
               Reservar otra cancha
             </Link>
             <Link
-              href="/mi-perfil"
+              href="/mi-perfil/reservas"
               className="px-6 py-3 bg-brand-card border border-white/10 text-white font-medium rounded-xl hover:border-white/20 transition-all"
             >
               Ver mis reservas
@@ -293,7 +397,7 @@ export default function CheckoutPage() {
   // ── Formulario de Checkout ────────────────────────────
   return (
     <main className="min-h-screen pt-24 pb-20 bg-black text-white transition-colors duration-200">
-      <section className="max-w-4xl mx-auto px-4 sm:px-6">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6">
         <Link
           href={`/reservar/club/${reserva.turnos.canchas.clubes.id}`}
           className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-brand-chartreuse transition-all mb-8 group"
@@ -345,13 +449,19 @@ export default function CheckoutPage() {
                     icon: Wallet,
                     badge: "Recomendado",
                   },
-                ].map((metodo) => {
+                ].filter((metodo) => {
+                  if (metodo.id === "transferencia") {
+                    const club = reserva?.turnos?.canchas?.clubes;
+                    return !!(club?.cbu?.trim() || club?.alias?.trim());
+                  }
+                  return true;
+                }).map((metodo) => {
                   const IconComponent = metodo.icon;
                   const isSelected = metodoPago === metodo.id;
                   return (
                     <label
                       key={metodo.id}
-                      className={`flex items-center justify-between p-4.5 rounded-xl border cursor-pointer transition-all duration-300 relative overflow-hidden group ${
+                      className={`flex items-center justify-between p-4 md:p-4.5 rounded-xl border cursor-pointer transition-all duration-300 relative overflow-hidden group ${
                         isSelected
                           ? "border-brand-chartreuse bg-brand-chartreuse/5 shadow-[0_0_15px_rgba(203,254,1,0.05)]"
                           : "border-white/10 bg-brand-input hover:border-white/20"
@@ -365,28 +475,28 @@ export default function CheckoutPage() {
                         onChange={(e) => setMetodoPago(e.target.value)}
                         className="sr-only"
                       />
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1 mr-2">
                         <div
-                          className={`p-3 rounded-xl border transition-all duration-300 ${
+                          className={`p-2.5 md:p-3 rounded-xl border shrink-0 transition-all duration-300 ${
                             isSelected
                               ? "bg-brand-chartreuse text-black border-brand-chartreuse"
                               : "bg-white/5 text-gray-400 border-white/5 group-hover:text-white"
                           }`}
                         >
-                          <IconComponent className="w-5 h-5" />
+                          <IconComponent className="w-4.5 h-4.5 md:w-5 md:h-5" />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold text-white">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                            <p className="font-semibold text-sm md:text-base text-white truncate">
                               {metodo.label}
                             </p>
                             {metodo.badge && (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/25">
+                              <span className="px-1.5 py-0.5 rounded text-[8px] md:text-[10px] font-bold uppercase tracking-wider bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/25 shrink-0">
                                 {metodo.badge}
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-400 mt-0.5">
+                          <p className="text-[10px] md:text-xs text-gray-400 mt-0.5 line-clamp-2 md:line-clamp-none">
                             {metodo.desc}
                           </p>
                         </div>
@@ -407,6 +517,85 @@ export default function CheckoutPage() {
                   );
                 })}
               </div>
+
+              {metodoPago === "transferencia" && (
+                <div className="mt-6 pt-6 border-t border-white/5 space-y-4">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Datos de Transferencia Bancaria del Club
+                  </h3>
+                  <div className="p-4 rounded-xl bg-brand-black border border-white/5 space-y-3">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-400">CBU / CVU:</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-brand-chartreuse select-all">
+                          {reserva.turnos.canchas.clubes.cbu || "No disponible"}
+                        </span>
+                        {reserva.turnos.canchas.clubes.cbu && (
+                          <button
+                            type="button"
+                            onClick={handleCopiarCbu}
+                            className="p-1 hover:bg-white/5 rounded text-gray-400 hover:text-white transition-colors cursor-pointer active:scale-95"
+                            title="Copiar CBU"
+                          >
+                            {copiadoCbu ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-400">Alias de la Cuenta:</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-sans font-bold text-brand-chartreuse select-all">
+                          {reserva.turnos.canchas.clubes.alias || "No disponible"}
+                        </span>
+                        {reserva.turnos.canchas.clubes.alias && (
+                          <button
+                            type="button"
+                            onClick={handleCopiarAlias}
+                            className="p-1 hover:bg-white/5 rounded text-gray-400 hover:text-white transition-colors cursor-pointer active:scale-95"
+                            title="Copiar Alias"
+                          >
+                            {copiadoAlias ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-3.5 pt-2">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        Referencia o Nro de Operación de la Transferencia
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej: Código de transferencia, titular de la cuenta emisora"
+                        className="w-full bg-brand-black px-4 py-3 rounded-xl border border-white/10 focus:border-brand-chartreuse focus:outline-none text-sm text-white transition-colors"
+                        value={referenciaTransferencia}
+                        onChange={(e) => setReferenciaTransferencia(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        Comprobante de Transferencia (Foto o PDF)
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => setComprobanteArchivo(e.target.files?.[0] || null)}
+                        className="w-full text-sm text-gray-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-brand-chartreuse/10 file:text-brand-chartreuse hover:file:bg-brand-chartreuse/20 file:cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-start gap-3 p-4 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-400 leading-relaxed">
@@ -444,18 +633,13 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <MapPin className="w-4 h-4 text-brand-chartreuse shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-brand-chartreuse shrink-0 mt-0.5" />
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
-                      Cancha / Ubicación
+                      Cancha
                     </p>
                     <p className="font-semibold text-white mt-0.5">
                       {reserva.turnos.canchas.nombre}
-                      <span className="text-gray-400 font-medium">
-                        {" "}
-                        ({reserva.turnos.canchas.clubes.localidad},{" "}
-                        {reserva.turnos.canchas.clubes.provincia})
-                      </span>
                       {reserva.turnos.canchas.tipo_suelo && (
                         <span className="text-gray-400 font-medium">
                           {" "}
@@ -463,6 +647,33 @@ export default function CheckoutPage() {
                         </span>
                       )}
                     </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <MapPin className="w-4 h-4 text-brand-chartreuse shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
+                      Ubicación
+                    </p>
+                    <a
+                      href={
+                        reserva.turnos.canchas.clubes.latitud && reserva.turnos.canchas.clubes.longitud
+                          ? `https://www.google.com/maps/search/?api=1&query=${reserva.turnos.canchas.clubes.latitud},${reserva.turnos.canchas.clubes.longitud}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                              `${reserva.turnos.canchas.clubes.nombre}, ${reserva.turnos.canchas.clubes.localidad || ""}, ${reserva.turnos.canchas.clubes.provincia || ""}, Argentina`
+                            )}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-white mt-0.5 hover:text-brand-chartreuse transition-colors inline-flex items-center gap-1.5 group cursor-pointer"
+                    >
+                      <span>
+                        {reserva.turnos.canchas.clubes.localidad || "Ver dirección"},{" "}
+                        {reserva.turnos.canchas.clubes.provincia || ""}
+                      </span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                    </a>
                   </div>
                 </div>
 
