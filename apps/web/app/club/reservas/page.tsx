@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Calendar, Search, Grid, Clock, DollarSign, X } from "lucide-react";
 import { ClubPanelService } from "@/utils/services/club-panel";
 import type { Cancha } from "@/utils/types";
@@ -59,9 +60,24 @@ export default function ClubReservasPage() {
       case "completado":
         return "bg-green-500/10 text-green-500 border border-green-500/20";
       case "pendiente":
-        return "bg-amber-500/10 text-amber-500 border border-amber-500/20";
-      default:
+        return "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20";
+      case "rechazado":
         return "bg-red-500/10 text-red-500 border border-red-500/20";
+      default:
+        return "bg-gray-500/10 text-gray-500 border border-gray-500/20";
+    }
+  };
+
+  const getEstadoPagoNombre = (estado: string) => {
+    switch (estado) {
+      case "completado":
+        return "Completado";
+      case "pendiente":
+        return "Pendiente";
+      case "rechazado":
+        return "Rechazado";
+      default:
+        return estado;
     }
   };
 
@@ -87,14 +103,22 @@ export default function ClubReservasPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-black text-brand-white">
-          Reservas del Club
-        </h1>
-        <p className="text-sm text-gray-400 mt-2 font-medium">
-          Administre e inspeccione las reservas realizadas por los jugadores en
-          sus canchas
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-brand-white">
+            Reservas del Club
+          </h1>
+          <p className="text-sm text-gray-400 mt-2 font-medium">
+            Administre e inspeccione las reservas realizadas por los jugadores
+            en sus canchas
+          </p>
+        </div>
+        <Link
+          href="/club/reservas/transferencias"
+          className="bg-brand-chartreuse hover:opacity-90 text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm shadow-brand-chartreuse/20 flex items-center gap-2 cursor-pointer w-fit"
+        >
+          Validar Transferencias
+        </Link>
       </div>
 
       {/* Toolbar / Filtros */}
