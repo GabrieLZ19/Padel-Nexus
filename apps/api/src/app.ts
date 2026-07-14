@@ -14,6 +14,7 @@ import perfilRoutes from "./routes/perfil.routes";
 import adminRoutes from "./routes/admin.routes";
 import pagosRoutes from "./routes/pago.routes";
 import notificacionesRoutes from "./routes/notificacion.routes";
+import chatRoutes from "./routes/chat.routes";
 import { createServer } from "http";
 import { SocketService } from "./services/socket.service";
 
@@ -51,6 +52,7 @@ app.use("/api/perfil", perfilRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/pagos", pagosRoutes);
 app.use("/api/notificaciones", notificacionesRoutes);
+app.use("/api/mensajes", chatRoutes);
 
 // Manejador global de errores (Debe ir después de todas las rutas)
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
