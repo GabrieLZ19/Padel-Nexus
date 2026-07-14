@@ -60,11 +60,15 @@ export default function AuthPage() {
 
         setProfile(data.usuario);
 
-        // Definimos quién va al CRM
-        const isAdmin = esRolAdministrativo(data.usuario.rol);
-
-        // Redirección instantánea basada en el rol
-        router.push(isAdmin ? "/dashboard" : "/");
+        // Definimos quién va a qué panel
+        const rol = data.usuario.rol;
+        if (rol === "admin_club") {
+          router.push("/club");
+        } else if (esRolAdministrativo(rol)) {
+          router.push("/dashboard");
+        } else {
+          router.push("/");
+        }
       } else {
         setError("No se pudo procesar la sesión. Formato inválido.");
       }

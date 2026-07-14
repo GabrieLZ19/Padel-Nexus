@@ -8,13 +8,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard,
-  Trophy,
-  ClipboardList,
-  Building2,
-  Users,
-  ShoppingBag,
-  Shield,
-  Activity,
+  Grid,
+  Calendar,
+  Settings,
   MessageSquare,
   LogOut,
   User,
@@ -22,7 +18,6 @@ import {
   X,
   Sun,
   Moon,
-  Check,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
@@ -30,22 +25,19 @@ import { useSocket } from "@/hooks/useSocket";
 import { ChatService } from "@/utils/services/chat";
 import { sileo } from "sileo";
 
-export default function DashboardLayout({
+export default function ClubLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
-
-  // 🚀 Usamos EXCLUSIVAMENTE la store, como en las vistas públicas
   const { profile, fetchProfile, clearProfile } = useProfileStore();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [chatNoLeidos, setChatNoLeidos] = useState(0);
-
   const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [chatNoLeidos, setChatNoLeidos] = useState(0);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark";
@@ -63,7 +55,6 @@ export default function DashboardLayout({
 
   const toggleTheme = () => {
     const nextTheme = theme === "light" ? "dark" : "light";
-
     const updateDOM = () => {
       setTheme(nextTheme);
       localStorage.setItem("theme", nextTheme);
@@ -85,79 +76,43 @@ export default function DashboardLayout({
     }
   };
 
-  const toggleMobileMenu = () => setMobileMenuOpen((open) => !open);
-  const closeMobileMenu = () => setMobileMenuOpen(false);
-
   const handleLogout = useCallback(() => {
     clearProfile();
     document.cookie = "padel_token=; path=/; max-age=0;";
     document.cookie = "padel_user_role=; path=/; max-age=0;";
     setMobileMenuOpen(false);
-    setLoading(false);
-
     router.replace("/login");
   }, [clearProfile, router]);
 
-  // Reemplazá los dos useEffect de tu DashboardLayout por este único bloque:
   useEffect(() => {
     let isMounted = true;
-
     const initSession = async () => {
-      // 1. Si ya tenemos el perfil en RAM, cortamos el loader y nos quedamos o redirigimos si es admin_club.
       if (profile) {
-        if (profile.rol === "admin_club") {
-          router.replace("/club");
+        // Impedir que entren usuarios que no son admin_club a menos que sean admin general
+        if (profile.rol !== "admin_club" && profile.rol !== "superadmin" && profile.rol !== "admin_federacion") {
+          router.replace("/");
           return;
         }
         setLoading(false);
         return;
       }
 
-      // 2. Si no lo tenemos (F5), lo vamos a buscar al backend
       const recuperadoConExito = await fetchProfile();
-
       if (isMounted) {
         if (!recuperadoConExito) {
-          // 3. Si falló (token expirado o backend apagado), lo echamos limpiamente
           handleLogout();
         } else {
-          // 4. Si lo recuperó, sacamos el loader y mostramos el panel
           setLoading(false);
         }
       }
     };
-
     initSession();
-
     return () => {
       isMounted = false;
     };
-  }, [fetchProfile, handleLogout, profile]);
+  }, [fetchProfile, handleLogout, profile, router]);
 
-  // Suscribirse al WebSocket para recibir y disparar notificaciones con sileo
-  useSocket((newNotif: any) => {
-    const payload = {
-      title: newNotif.titulo,
-      description: newNotif.mensaje,
-    };
-
-    switch (newNotif.tipo) {
-      case "success":
-        sileo.success(payload);
-        break;
-      case "error":
-        sileo.error(payload);
-        break;
-      case "warning":
-        sileo.warning(payload);
-        break;
-      default:
-        sileo.info(payload);
-        break;
-    }
-  });
-
-  // Cargar no leídos del chat y escuchar notificaciones
+  // Cargar no leídos y notificaciones en tiempo real
   useEffect(() => {
     ChatService.getNoLeidos()
       .then((total) => setChatNoLeidos(total))
@@ -173,54 +128,33 @@ export default function DashboardLayout({
     return () => window.removeEventListener("chat_notification", handler);
   }, []);
 
+  useSocket((newNotif: any) => {
+    const payload = { title: newNotif.titulo, description: newNotif.mensaje };
+    switch (newNotif.tipo) {
+      case "success": sileo.success(payload); break;
+      case "error": sileo.error(payload); break;
+      case "warning": sileo.warning(payload); break;
+      default: sileo.info(payload); break;
+    }
+  });
+
   const menuItems = [
-    { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-    { name: "Torneos", icon: Trophy, href: "/dashboard/torneos" },
-    {
-      name: "Inscripciones",
-      icon: ClipboardList,
-      href: "/dashboard/inscripciones",
-    },
-    { name: "Clubes", icon: Building2, href: "/dashboard/clubes" },
-    { name: "Jugadores", icon: Users, href: "/dashboard/jugadores" },
-    { name: "Marketplace", icon: ShoppingBag, href: "/dashboard/marketplace" },
-    { name: "Moderación", icon: Shield, href: "/dashboard/moderacion" },
-    { name: "Estadísticas", icon: Activity, href: "/dashboard/estadisticas" },
-    { name: "Chat interno", icon: MessageSquare, href: "/dashboard/chat", badge: chatNoLeidos },
+    { name: "Mi Club", icon: LayoutDashboard, href: "/club" },
+    { name: "Canchas", icon: Grid, href: "/club/canchas" },
+    { name: "Reservas", icon: Calendar, href: "/club/reservas" },
+    { name: "Chat interno", icon: MessageSquare, href: "/club/chat", badge: chatNoLeidos },
+    { name: "Configuración", icon: Settings, href: "/club/configuracion" },
   ];
 
-  const formatNombreCompleto = (
-    apellido?: string | null,
-    nombre?: string | null,
-  ) => {
-    const ap = (apellido || "").trim();
-    const nom = (nombre || "").trim();
-    if (ap && nom) return `${ap.toUpperCase()}, ${nom}`;
-    if (ap) return ap.toUpperCase();
-    if (nom) return nom;
-    return "";
-  };
+  const displayName = profile?.nombre && profile?.apellido
+    ? `${profile.apellido.toUpperCase()}, ${profile.nombre}`
+    : profile?.email?.split("@")[0] || "Club Admin";
 
-  const displayName =
-    formatNombreCompleto(profile?.apellido, profile?.nombre) ||
-    profile?.email?.split("@")[0] ||
-    "Admin";
-
-  // Mantenemos el Loader si está cargando O si está a punto de expulsar por falta de perfil
   if (loading || !profile) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-[#111111]">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="flex flex-col items-center gap-6"
-        >
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="size-16 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(204,255,0,0.2)] bg-[#cbfe01]"
-          >
+        <div className="flex flex-col items-center gap-6">
+          <div className="size-16 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(204,255,0,0.2)] bg-[#cbfe01]">
             <Image
               src="/brand/LogoAccessory.svg"
               alt="Padel Nexus"
@@ -228,7 +162,7 @@ export default function DashboardLayout({
               height={40}
               className="object-contain"
             />
-          </motion.div>
+          </div>
           <div className="w-32 h-1 bg-white/5 rounded-full overflow-hidden">
             <motion.div
               className="h-full bg-brand-chartreuse"
@@ -237,15 +171,18 @@ export default function DashboardLayout({
               transition={{ duration: 1.5, ease: "easeInOut" }}
             />
           </div>
-        </motion.div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex h-screen bg-brand-black text-brand-white font-sans overflow-hidden">
+      {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-72 transform bg-[#111111] flex flex-col shrink-0 border-r border-white/5 shadow-2xl transition-transform duration-300 md:relative md:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-30 w-72 transform bg-[#111111] flex flex-col shrink-0 border-r border-white/5 shadow-2xl transition-transform duration-300 md:relative md:translate-x-0 ${
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
       >
         <div className="h-28 px-8 flex items-center justify-between gap-3 border-b border-white/5 md:border-none">
           <div className="flex items-center gap-3">
@@ -264,12 +201,12 @@ export default function DashboardLayout({
                 <span className="font-light">nexus</span>
               </span>
               <span className="text-[10px] text-brand-chartreuse font-bold tracking-[0.2em] -mt-1">
-                ADMIN CRM
+                CLUB PANEL
               </span>
             </div>
           </div>
           <button
-            onClick={closeMobileMenu}
+            onClick={() => setMobileMenuOpen(false)}
             className="md:hidden p-2 rounded-full text-gray-400 hover:text-white"
           >
             <X className="size-5" />
@@ -280,22 +217,20 @@ export default function DashboardLayout({
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
             return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className="block relative group"
-              >
-                <motion.div
-                  className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${isActive ? "bg-brand-chartreuse text-[#111] font-bold" : "text-gray-400 hover:bg-white/5"}`}
+              <Link key={item.name} href={item.href} className="block relative group">
+                <div
+                  className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
+                    isActive ? "bg-brand-chartreuse text-[#111] font-bold" : "text-gray-400 hover:bg-white/5"
+                  }`}
                 >
                   <item.icon className="size-5" />
                   <span className="text-[14px] flex-1">{item.name}</span>
-                  {('badge' in item) && (item as any).badge > 0 && (
+                  {("badge" in item) && (item as any).badge > 0 && (
                     <span className="min-w-5 h-5 flex items-center justify-center bg-brand-chartreuse text-brand-black rounded-full text-[10px] font-black px-1 shadow-[0_0_8px_rgba(203,254,1,0.3)]">
                       {(item as any).badge > 99 ? "99+" : (item as any).badge}
                     </span>
                   )}
-                </motion.div>
+                </div>
               </Link>
             );
           })}
@@ -306,23 +241,15 @@ export default function DashboardLayout({
             <User className="size-5 text-gray-400" />
           </div>
           <div className="flex flex-col flex-1 overflow-hidden">
-            <span className="text-[13px] font-bold text-brand-white truncate">
-              {displayName}
-            </span>
-            <span className="text-[11px] text-gray-500 truncate">
-              {profile.email}
-            </span>
+            <span className="text-[13px] font-bold text-brand-white truncate">{displayName}</span>
+            <span className="text-[11px] text-gray-500 truncate">{profile.email}</span>
           </div>
           <button
             onClick={toggleTheme}
             className="p-2 text-gray-500 hover:text-white transition-colors rounded-xl mr-1"
             title="Cambiar tema"
           >
-            {theme === "light" ? (
-              <Moon className="size-4" />
-            ) : (
-              <Sun className="size-4" />
-            )}
+            {theme === "light" ? <Moon className="size-4" /> : <Sun className="size-4" />}
           </button>
           <button
             onClick={handleLogout}
@@ -335,16 +262,14 @@ export default function DashboardLayout({
       </aside>
 
       {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-20 bg-black/60 md:hidden"
-          onClick={closeMobileMenu}
-        ></div>
+        <div className="fixed inset-0 z-20 bg-black/60 md:hidden" onClick={() => setMobileMenuOpen(false)}></div>
       )}
 
+      {/* Main Panel */}
       <main className="flex-1 overflow-y-auto bg-brand-black">
         <div className="md:hidden sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-brand-card/80 backdrop-blur-md border-b border-brand-white/5">
           <button
-            onClick={toggleMobileMenu}
+            onClick={() => setMobileMenuOpen(true)}
             className="p-2.5 rounded-xl bg-brand-card text-brand-white border border-brand-white/10 cursor-pointer hover:bg-brand-card/80 transition-colors"
           >
             <Menu className="size-5" />
@@ -356,17 +281,9 @@ export default function DashboardLayout({
             height={40}
             className="object-contain dark:invert-0"
           />
-          <div className="flex items-center justify-center">
-            <NotificationCenter />
-          </div>
+          <NotificationCenter />
         </div>
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          {children}
-        </motion.div>
+        <div className="p-6 md:p-8 lg:p-10">{children}</div>
       </main>
     </div>
   );

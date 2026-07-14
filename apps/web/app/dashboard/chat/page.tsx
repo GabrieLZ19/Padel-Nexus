@@ -68,6 +68,7 @@ export default function DashboardChatPage() {
     fetchConversaciones();
   }, [fetchConversaciones]);
 
+
   // ── Cargar mensajes de conversación activa ──────────────────────────
   const fetchMensajes = useCallback(async (convId: string, cursor?: string) => {
     if (!cursor) setLoadingMensajes(true);
@@ -110,6 +111,25 @@ export default function DashboardChatPage() {
     },
     [activeConv, joinConversation, leaveConversation, fetchMensajes],
   );
+
+  // ── Contactar Administración (Soporte) ─────────────────────────────
+  const handleContactarAdministracion = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await ChatService.iniciarSoporte();
+      const actualizadas = await ChatService.getConversaciones();
+      setConversaciones(actualizadas);
+
+      const soporteConv = actualizadas.find((c) => c.id === result.id);
+      if (soporteConv) {
+        handleSelectConversacion(soporteConv);
+      }
+    } catch (err) {
+      console.error("Error al contactar soporte administrador:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [handleSelectConversacion]);
 
   // ── Socket: escuchar nuevos mensajes ────────────────────────────────
   useEffect(() => {
@@ -413,6 +433,18 @@ export default function DashboardChatPage() {
               )}
             </div>
           </div>
+
+          {/* Botón de Contactar Soporte / Administración (para clubes y soporte rápido) */}
+          {profile?.rol === "admin_club" && (
+            <div className="px-4 pb-2">
+              <button
+                onClick={handleContactarAdministracion}
+                className="w-full bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/20 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-brand-chartreuse/5"
+              >
+                <Headset className="size-3.5 animate-pulse" /> Contactar a la Administración
+              </button>
+            </div>
+          )}
 
           {/* Lista */}
           <div className="flex-1 overflow-y-auto">

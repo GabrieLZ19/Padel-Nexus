@@ -4,6 +4,7 @@ export type RolAdministrativo = Exclude<RolUsuario, "usuario">;
 
 export const ROLES_ADMINISTRATIVOS = [
   "admin",
+  "admin_club",
   "superadmin",
   "admin_federacion",
   "admin_provincial",

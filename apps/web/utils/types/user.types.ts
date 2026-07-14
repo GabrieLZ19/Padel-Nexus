@@ -1,6 +1,7 @@
 export type RolUsuario =
   | "usuario"
   | "admin"
+  | "admin_club"
   | "admin_provincial"
   | "admin_federacion"
   | "superadmin";
@@ -46,6 +47,7 @@ export interface Perfil {
   avatar_url: string | null;
   dni: string | null;
   lugar_residencia: string | null;
+  club_id: string | null;
   created_at?: string;
 
   // Relaciones
