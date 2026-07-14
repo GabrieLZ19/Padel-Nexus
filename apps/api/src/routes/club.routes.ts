@@ -47,35 +47,35 @@ router.delete(
 router.post(
   "/:id/canchas",
   authenticate,
-  authorize(["superadmin", "admin", "admin_provincial", "admin_federacion"]),
+  authorize(["superadmin", "admin", "admin_club", "admin_provincial", "admin_federacion"]),
   createCancha,
 );
 
 router.put(
   "/canchas/:id",
   authenticate,
-  authorize(["superadmin", "admin", "admin_provincial", "admin_federacion"]),
+  authorize(["superadmin", "admin", "admin_club", "admin_provincial", "admin_federacion"]),
   updateCancha,
 );
 
 router.delete(
   "/canchas/:id",
   authenticate,
-  authorize(["superadmin", "admin", "admin_provincial", "admin_federacion"]),
+  authorize(["superadmin", "admin", "admin_club", "admin_provincial", "admin_federacion"]),
   deleteCancha,
 );
 
 router.post(
   "/canchas/:id/turnos",
   authenticate,
-  authorize(["superadmin", "admin", "admin_provincial", "admin_federacion"]),
+  authorize(["superadmin", "admin", "admin_club", "admin_provincial", "admin_federacion"]),
   createTurno,
 );
 
 router.delete(
   "/turnos/:id",
   authenticate,
-  authorize(["superadmin", "admin", "admin_provincial", "admin_federacion"]),
+  authorize(["superadmin", "admin", "admin_club", "admin_provincial", "admin_federacion"]),
   deleteTurno,
 );
 
