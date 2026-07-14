@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { ReservaService } from "../services/reserva.service";
 import { MercadoPagoConfig, Payment } from "mercadopago";
+import { supabaseAdmin } from "../config/supabase";
 
 export const ReservasController = {
   /**
@@ -325,6 +326,29 @@ export const ReservasController = {
         });
       }
 
+      // Validar que el pago corresponde al club del admin si es admin_club
+      if (req.user?.rol === "admin_club") {
+        const { data: perfil } = await supabaseAdmin
+          .from("perfiles")
+          .select("club_id")
+          .eq("id", req.user.id)
+          .single();
+        
+        const userClubId = perfil?.club_id;
+        if (!userClubId) {
+          return res.status(403).json({ exito: false, error: "El usuario no tiene un club asignado." });
+        }
+
+        const pagosPendientes = await ReservaService.obtenerPagosPendientes(userClubId);
+        const pertenece = pagosPendientes.some((p: any) => p.id === pagoId);
+        if (!pertenece) {
+          return res.status(403).json({
+            exito: false,
+            error: "No tienes permisos para validar este pago.",
+          });
+        }
+      }
+
       const resultado = await ReservaService.validarTransferencia(pagoId, Boolean(aprobado));
       return res.status(200).json({ exito: true, data: resultado });
     } catch (error: unknown) {
@@ -339,8 +363,19 @@ export const ReservasController = {
    */
   async getPagosPendientes(req: Request, res: Response) {
     try {
-      const { club_id } = req.query;
-      const pagos = await ReservaService.obtenerPagosPendientes(club_id as string | undefined);
+      let clubId = req.query.club_id as string | undefined;
+
+      // Si es admin_club, forzar el filtro a su propio club_id
+      if (req.user?.rol === "admin_club") {
+        const { data: perfil } = await supabaseAdmin
+          .from("perfiles")
+          .select("club_id")
+          .eq("id", req.user.id)
+          .single();
+        clubId = perfil?.club_id || undefined;
+      }
+
+      const pagos = await ReservaService.obtenerPagosPendientes(clubId);
       return res.status(200).json({ exito: true, data: pagos });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Error interno";

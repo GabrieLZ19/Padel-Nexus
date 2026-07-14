@@ -42,7 +42,7 @@ router.post("/webhook/mercadopago", ReservasController.webhookMercadoPago);
 router.get(
   "/pagos/pendientes",
   authenticate,
-  authorize(["superadmin", "admin", "admin_provincial", "admin_federacion"]),
+  authorize(["superadmin", "admin", "admin_provincial", "admin_federacion", "admin_club"]),
   ReservasController.getPagosPendientes,
 );
 
@@ -50,7 +50,7 @@ router.get(
 router.post(
   "/pagos/:pagoId/validar",
   authenticate,
-  authorize(["superadmin", "admin", "admin_provincial", "admin_federacion"]),
+  authorize(["superadmin", "admin", "admin_provincial", "admin_federacion", "admin_club"]),
   ReservasController.validarTransferenciaPago,
 );
 
