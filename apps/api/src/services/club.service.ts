@@ -8,6 +8,8 @@ export interface CrearClubDTO {
   estado?: string;
   latitud?: number | null;
   longitud?: number | null;
+  cbu?: string | null;
+  alias?: string | null;
 }
 
 export type ActualizarClubDTO = Partial<CrearClubDTO>;

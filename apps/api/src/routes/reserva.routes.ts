@@ -9,6 +9,9 @@ const router = Router();
 // Consultar disponibilidad de turnos por club y fecha
 router.get("/disponibles", authenticate, ReservasController.getDisponibilidad);
 
+// Obtener reservas del usuario autenticado
+router.get("/mis-reservas", authenticate, ReservasController.getMisReservas);
+
 // Obtener detalle de una reserva
 router.get("/:id", authenticate, ReservasController.getReservaPorId);
 
@@ -34,6 +37,22 @@ router.post("/:id/cancelar", authenticate, ReservasController.cancelarReserva);
 router.post("/webhook/mercadopago", ReservasController.webhookMercadoPago);
 
 // ── Endpoints administrativos ──────────────────────────────────────────
+
+// Obtener transferencias pendientes de validación
+router.get(
+  "/pagos/pendientes",
+  authenticate,
+  authorize(["superadmin", "admin", "admin_provincial", "admin_federacion"]),
+  ReservasController.getPagosPendientes,
+);
+
+// Validar una transferencia pendiente (aprobar/rechazar)
+router.post(
+  "/pagos/:pagoId/validar",
+  authenticate,
+  authorize(["superadmin", "admin", "admin_provincial", "admin_federacion"]),
+  ReservasController.validarTransferenciaPago,
+);
 
 // Listar reservas de un club (restringido a administradores)
 router.get(

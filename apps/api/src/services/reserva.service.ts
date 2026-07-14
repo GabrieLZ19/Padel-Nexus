@@ -185,7 +185,7 @@ export class ReservaService {
         id, hora_inicio, hora_fin, precio, dia_semana,
         canchas (
           id, nombre, tipo_suelo, techada,
-          clubes ( id, nombre, provincia, localidad )
+          clubes ( id, nombre, provincia, localidad, cbu, alias )
         )
       `,
       )
@@ -197,7 +197,7 @@ export class ReservaService {
   }
 
   /**
-   * Obtiene una reserva por su ID con datos del turno y la cancha.
+   * Obtiene una reserva por su ID con datos del turno, la cancha y los pagos.
    */
   static async obtenerReservaPorId(reservaId: string) {
     const { data, error } = await supabaseAdmin
@@ -209,8 +209,11 @@ export class ReservaService {
           id, hora_inicio, hora_fin, precio, dia_semana,
           canchas (
             id, nombre, tipo_suelo, techada,
-            clubes ( id, nombre, provincia, localidad )
+            clubes ( id, nombre, provincia, localidad, cbu, alias )
           )
+        ),
+        pagos (
+          id, monto, metodo_pago, referencia_pago, estado, comprobante_url, created_at
         )
       `,
       )
@@ -223,7 +226,7 @@ export class ReservaService {
 
   /**
    * Confirma el pago de una reserva y registra el pago en la tabla de pagos.
-   * En el futuro se integrará con MercadoPago.
+   * Si es por transferencia, se registra en estado pendiente a la espera de validación.
    */
   static async confirmarPago(
     reservaId: string,
@@ -231,6 +234,7 @@ export class ReservaService {
     monto: number,
     metodoPago: string,
     referenciaPago?: string,
+    comprobanteUrl?: string,
   ) {
     // 1. Verificar que la reserva existe y pertenece al usuario
     const { data: reserva, error: rError } = await supabaseAdmin
@@ -245,12 +249,14 @@ export class ReservaService {
     if (reserva.estado_pago === "completado")
       throw new Error("Esta reserva ya fue pagada.");
 
+    const esTransferencia = metodoPago === "transferencia";
+
     // 2. Actualizar la reserva
     const { error: updError } = await supabaseAdmin
       .from("reservas")
       .update({
-        estado_reserva: "confirmada",
-        estado_pago: "completado",
+        estado_reserva: esTransferencia ? "pendiente" : "confirmada",
+        estado_pago: esTransferencia ? "pendiente" : "completado",
       })
       .eq("id", reservaId);
 
@@ -267,7 +273,8 @@ export class ReservaService {
           monto,
           metodo_pago: metodoPago,
           referencia_pago: referenciaPago || null,
-          estado: "completado",
+          comprobante_url: comprobanteUrl || null,
+          estado: esTransferencia ? "pendiente" : "completado",
         },
       ])
       .select()
@@ -276,8 +283,12 @@ export class ReservaService {
     if (pagoError)
       throw new Error(`Error al registrar el pago: ${pagoError.message}`);
 
-    // Disparar notificaciones en segundo plano por WebSocket y DB
-    this.enviarNotificacionesPago(reservaId, monto);
+    // 4. Notificaciones
+    if (esTransferencia) {
+      this.enviarNotificacionesTransferenciaPendiente(reservaId, monto);
+    } else {
+      this.enviarNotificacionesPago(reservaId, monto);
+    }
 
     return pago;
   }
@@ -522,5 +533,208 @@ export class ReservaService {
     } catch (notifError) {
       console.warn("Error al emitir notificaciones post-pago:", notifError);
     }
+  }
+
+  /**
+   * Envía notificaciones de transferencia pendiente al usuario y a los administradores.
+   */
+  static async enviarNotificacionesTransferenciaPendiente(
+    reservaId: string,
+    monto: number,
+  ) {
+    try {
+      const { NotificacionService } = require("./notificacion.service");
+
+      const details = await this.obtenerReservaPorId(reservaId);
+      // @ts-ignore
+      const canchaNombre = details.turnos?.canchas?.nombre || "Cancha";
+      // @ts-ignore
+      const clubNombre = details.turnos?.canchas?.clubes?.nombre || "Club";
+      // @ts-ignore
+      const horaInicio = details.turnos?.hora_inicio?.slice(0, 5) || "00:00";
+
+      // 1. Notificar al usuario que reservó
+      if (details.usuario_id) {
+        await NotificacionService.crearNotificacion({
+          usuario_id: details.usuario_id,
+          titulo: "Transferencia Pendiente de Validacion",
+          mensaje: `Tu comprobante de transferencia por $${monto} para el turno en ${canchaNombre} (${clubNombre}) el ${details.fecha_reserva} a las ${horaInicio} Hs esta siendo revisado por el club.`,
+          tipo: "warning",
+          metadata: { reserva_id: reservaId },
+        });
+      }
+
+      // 2. Notificar a los administradores del club
+      await NotificacionService.notificarAdmins({
+        titulo: "Nueva Transferencia por Validar",
+        mensaje: `Un usuario cargo un comprobante de pago por $${monto} para el turno en ${canchaNombre} (${clubNombre}) del ${details.fecha_reserva} a las ${horaInicio} Hs.`,
+        tipo: "warning",
+        metadata: { reserva_id: reservaId },
+      });
+    } catch (notifError) {
+      console.warn(
+        "Error al emitir notificaciones de transferencia pendiente:",
+        notifError,
+      );
+    }
+  }
+
+  /**
+   * Valida un pago pendiente por transferencia (Aprobado o Rechazado).
+   */
+  static async validarTransferencia(pagoId: string, aprobado: boolean) {
+    // 1. Obtener el pago y validar su estado pendiente
+    const { data: pago, error: pError } = await supabaseAdmin
+      .from("pagos")
+      .select("*, reservas(id, usuario_id, fecha_reserva, turno_id)")
+      .eq("id", pagoId)
+      .single();
+
+    if (pError || !pago) throw new Error("Pago no encontrado.");
+    if (pago.estado !== "pendiente")
+      throw new Error("Este pago ya fue procesado.");
+
+    // @ts-ignore
+    const reservaId = pago.reservas?.id || pago.reserva_id;
+
+    if (aprobado) {
+      // 2a. Si es aprobado, marcamos el pago como completado y la reserva como confirmada
+      const { error: updPago } = await supabaseAdmin
+        .from("pagos")
+        .update({ estado: "completado" })
+        .eq("id", pagoId);
+      if (updPago) throw new Error("Error al actualizar estado del pago.");
+
+      const { error: updReserva } = await supabaseAdmin
+        .from("reservas")
+        .update({ estado_reserva: "confirmada", estado_pago: "completado" })
+        .eq("id", reservaId);
+      if (updReserva) throw new Error("Error al confirmar la reserva.");
+
+      // Disparar las notificaciones normales de pago confirmado
+      this.enviarNotificacionesPago(reservaId, Number(pago.monto));
+    } else {
+      // 2b. Si es rechazado, marcamos el pago como rechazado
+      const { error: updPago } = await supabaseAdmin
+        .from("pagos")
+        .update({ estado: "rechazado" })
+        .eq("id", pagoId);
+      if (updPago) throw new Error("Error al actualizar estado del pago.");
+
+      // La reserva vuelve a quedar en estado pendiente de pago
+      const { error: updReserva } = await supabaseAdmin
+        .from("reservas")
+        .update({ estado_reserva: "pendiente", estado_pago: "pendiente" })
+        .eq("id", reservaId);
+      if (updReserva)
+        throw new Error("Error al actualizar estado de la reserva.");
+
+      // Notificar al usuario sobre el rechazo
+      try {
+        const { NotificacionService } = require("./notificacion.service");
+        const details = await this.obtenerReservaPorId(reservaId);
+        // @ts-ignore
+        const canchaNombre = details.turnos?.canchas?.nombre || "Cancha";
+        // @ts-ignore
+        const clubNombre = details.turnos?.canchas?.clubes?.nombre || "Club";
+        // @ts-ignore
+        const horaInicio = details.turnos?.hora_inicio?.slice(0, 5) || "00:00";
+
+        if (pago.usuario_id) {
+          await NotificacionService.crearNotificacion({
+            usuario_id: pago.usuario_id,
+            titulo: "Transferencia Rechazada",
+            mensaje: `El comprobante cargado para tu turno en ${canchaNombre} (${clubNombre}) el ${details.fecha_reserva} a las ${horaInicio} Hs fue rechazado por el club. Por favor, verifica el comprobante o realiza un nuevo pago.`,
+            tipo: "error",
+            metadata: { reserva_id: reservaId },
+          });
+        }
+      } catch (notifError) {
+        console.warn(
+          "Error al emitir notificación de transferencia rechazada:",
+          notifError,
+        );
+      }
+    }
+
+    return { exito: true };
+  }
+
+  /**
+   * Obtiene todos los pagos pendientes de transferencia para los clubes administrados.
+   */
+  static async obtenerPagosPendientes(clubId?: string) {
+    let query = supabaseAdmin
+      .from("pagos")
+      .select(
+        `
+        *,
+        perfiles:usuario_id ( id, nombre, apellido, email ),
+        reservas:reserva_id (
+          id, fecha_reserva,
+          turnos (
+            id, hora_inicio, hora_fin, precio,
+            canchas (
+              id, nombre, club_id,
+              clubes ( id, nombre )
+            )
+          )
+        )
+      `,
+      )
+      .eq("estado", "pendiente")
+      .eq("metodo_pago", "transferencia")
+      .order("created_at", { ascending: false });
+
+    const { data, error } = await query;
+    if (error) throw new Error("Error al obtener pagos pendientes.");
+
+    // Si se especifica clubId, filtramos en memoria
+    if (clubId && data) {
+      return data.filter(
+        (pago: any) =>
+          // @ts-ignore
+          pago.reservas?.turnos?.canchas?.club_id === clubId,
+      );
+    }
+
+    return data || [];
+  }
+
+  /**
+   * Obtiene todas las reservas de un usuario con detalles de turno, cancha y club.
+   */
+  static async obtenerReservasUsuario(usuarioId: string) {
+    const { data, error } = await supabaseAdmin
+      .from("reservas")
+      .select(`
+        *,
+        turnos (
+          hora_inicio,
+          hora_fin,
+          precio,
+          canchas (
+            nombre,
+            tipo_suelo,
+            techada,
+            clubes (
+              nombre,
+              localidad,
+              provincia
+            )
+          )
+        ),
+        pagos (
+          id, metodo_pago, referencia_pago, estado, comprobante_url, created_at
+        )
+      `)
+      .eq("usuario_id", usuarioId)
+      .order("fecha_reserva", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      throw new Error(`Error al obtener las reservas del usuario: ${error.message}`);
+    }
+    return data || [];
   }
 }

@@ -106,7 +106,7 @@ export const ReservasController = {
     try {
       const { id } = req.params;
       const usuario_id = req.user?.id;
-      const { monto, metodo_pago, referencia_pago } = req.body;
+      const { monto, metodo_pago, referencia_pago, comprobante_url } = req.body;
 
       if (!usuario_id) {
         return res
@@ -127,6 +127,7 @@ export const ReservasController = {
         parseFloat(monto),
         metodo_pago,
         referencia_pago,
+        comprobante_url,
       );
 
       return res.status(200).json({ exito: true, data: pago });
@@ -304,6 +305,64 @@ export const ReservasController = {
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Error desconocido";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * POST /api/reservas/pagos/:pagoId/validar
+   * Permite a un administrador aprobar o rechazar un pago pendiente por transferencia.
+   */
+  async validarTransferenciaPago(req: Request, res: Response) {
+    try {
+      const { pagoId } = req.params;
+      const { aprobado } = req.body;
+
+      if (aprobado === undefined) {
+        return res.status(400).json({
+          exito: false,
+          error: "Se requiere especificar el parámetro 'aprobado' en el cuerpo.",
+        });
+      }
+
+      const resultado = await ReservaService.validarTransferencia(pagoId, Boolean(aprobado));
+      return res.status(200).json({ exito: true, data: resultado });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Error interno";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * GET /api/reservas/pagos/pendientes
+   * Obtiene la lista de transferencias pendientes para verificar.
+   */
+  async getPagosPendientes(req: Request, res: Response) {
+    try {
+      const { club_id } = req.query;
+      const pagos = await ReservaService.obtenerPagosPendientes(club_id as string | undefined);
+      return res.status(200).json({ exito: true, data: pagos });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Error interno";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * GET /api/reservas/mis-reservas
+   * Obtiene la lista de reservas del usuario autenticado.
+   */
+  async getMisReservas(req: Request, res: Response) {
+    try {
+      const usuario_id = req.user?.id;
+      if (!usuario_id) {
+        return res.status(401).json({ exito: false, error: "No autenticado." });
+      }
+
+      const reservas = await ReservaService.obtenerReservasUsuario(usuario_id);
+      return res.status(200).json({ exito: true, data: reservas });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Error interno";
       return res.status(500).json({ exito: false, error: message });
     }
   },

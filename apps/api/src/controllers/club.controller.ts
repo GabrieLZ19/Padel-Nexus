@@ -66,7 +66,7 @@ export const createClub = async (
   res: Response,
 ): Promise<Response | void> => {
   try {
-    const { nombre, provincia, localidad, canchas, estado, latitud, longitud } = req.body;
+    const { nombre, provincia, localidad, canchas, estado, latitud, longitud, cbu, alias } = req.body;
 
     if (!nombre || !provincia) {
       return res
@@ -82,6 +82,8 @@ export const createClub = async (
       estado,
       latitud: latitud ?? null,
       longitud: longitud ?? null,
+      cbu: cbu || null,
+      alias: alias || null,
     });
     return res.status(201).json({ exito: true, data });
   } catch (error: unknown) {
@@ -97,7 +99,7 @@ export const updateClub = async (
 ): Promise<Response | void> => {
   try {
     const { id } = req.params;
-    const { nombre, provincia, localidad, estado, canchas, latitud, longitud } = req.body;
+    const { nombre, provincia, localidad, estado, canchas, latitud, longitud, cbu, alias } = req.body;
 
     if (!id)
       return res
@@ -112,6 +114,8 @@ export const updateClub = async (
       canchas,
       latitud,
       longitud,
+      cbu,
+      alias,
     });
     return res.status(200).json({ exito: true, data });
   } catch (error: unknown) {
