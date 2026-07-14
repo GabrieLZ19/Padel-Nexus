@@ -29,8 +29,13 @@ api.interceptors.response.use(
         document.cookie = "padel_token=; path=/; max-age=0;";
         document.cookie = "padel_user_role=; path=/; max-age=0;";
         
-        // Redirigir a login indicando que la sesión expiró
-        window.location.href = "/login?expired=true";
+        // Redirigir a login indicando que la sesión expiró SOLAMENTE si está en un área privada
+        const path = window.location.pathname;
+        const isAreaPrivada = path.startsWith("/dashboard") || path.startsWith("/mi-perfil");
+        
+        if (isAreaPrivada) {
+          window.location.href = "/login?expired=true";
+        }
       }
     }
     return Promise.reject(error);

@@ -128,6 +128,10 @@ export default function CheckoutPage() {
 
           if (resData.estado_pago === "completado") {
             setCompletado(true);
+            const lastPayment = resData.pagos && resData.pagos.length > 0 ? resData.pagos[0] : null;
+            if (lastPayment) {
+              setMetodoPago(lastPayment.metodo_pago);
+            }
           }
         }
       } catch {
@@ -145,6 +149,7 @@ export default function CheckoutPage() {
       const paymentId = urlParams.get("payment_id") || urlParams.get("collection_id");
 
       if (paymentStatus === "success" || paymentStatus === "approved") {
+        setMetodoPago("mercadopago");
         if (paymentId && reservaId !== "new") {
           api.post(`/reservas/${reservaId}/confirmar-retorno`, { payment_id: paymentId })
             .then(() => {
@@ -152,17 +157,25 @@ export default function CheckoutPage() {
             })
             .catch((err) => {
               console.error("Error al confirmar retorno de pago:", err);
-              setCompletado(true);
+              sileo.error({
+                title: "Error de Acreditación",
+                description: "Hubo un problema al registrar tu pago. Si se debitó dinero de tu cuenta, por favor contactá al club.",
+              });
             });
-        } else {
-          setCompletado(true);
+        } else if (!paymentId) {
+          sileo.error({
+            title: "Pago no verificado",
+            description: "No se encontró el identificador de pago en la URL de retorno.",
+          });
         }
       } else if (paymentStatus === "failure") {
+        setMetodoPago("mercadopago");
         sileo.error({
           title: "Pago Fallido",
           description: "El pago a través de Mercado Pago no pudo completarse. Por favor, intenta nuevamente.",
         });
       } else if (paymentStatus === "pending") {
+        setMetodoPago("mercadopago");
         sileo.warning({
           title: "Pago Pendiente",
           description: "Tu pago se encuentra pendiente de acreditación en Mercado Pago.",

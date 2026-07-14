@@ -30,13 +30,17 @@ export default function ClubHorariosPage() {
   const clubId = params.id as string;
   const dateInputRef = useRef<HTMLInputElement>(null);
 
+  const getLocalIsoDate = (date: Date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const [club, setClub] = useState<ClubDetalle | null>(null);
   const [slots, setSlots] = useState<SlotDisponible[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split("T")[0];
-  });
+  const [selectedDate, setSelectedDate] = useState(() => getLocalIsoDate(new Date()));
   const [selectedSlot, setSelectedSlot] = useState<SlotDisponible | null>(null);
   const [reservando, setReservando] = useState(false);
 
@@ -152,7 +156,7 @@ export default function ClubHorariosPage() {
     for (let i = 0; i < 7; i++) {
       const next = new Date(today);
       next.setDate(today.getDate() + i);
-      days.push(next.toISOString().split("T")[0]);
+      days.push(getLocalIsoDate(next));
     }
     return days;
   };
