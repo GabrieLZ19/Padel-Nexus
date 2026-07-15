@@ -16,6 +16,7 @@ import pagosRoutes from "./routes/pago.routes";
 import notificacionesRoutes from "./routes/notificacion.routes";
 import chatRoutes from "./routes/chat.routes";
 import clubPanelRoutes from "./routes/club-panel.routes";
+import marketplaceRoutes from "./routes/marketplace.routes";
 import { createServer } from "http";
 import { SocketService } from "./services/socket.service";
 
@@ -55,6 +56,7 @@ app.use("/api/pagos", pagosRoutes);
 app.use("/api/notificaciones", notificacionesRoutes);
 app.use("/api/mensajes", chatRoutes);
 app.use("/api/club", clubPanelRoutes);
+app.use("/api/marketplace", marketplaceRoutes);
 
 // Manejador global de errores (Debe ir después de todas las rutas)
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
