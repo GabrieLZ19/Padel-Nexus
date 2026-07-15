@@ -16,10 +16,13 @@ import {
   ChevronDown,
   Sun,
   Moon,
+  ShoppingCart,
 } from "lucide-react";
 import Image from "next/image";
 import { useProfileStore } from "@/store/useProfileStore";
+import { useCartStore } from "@/store/useCartStore";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
+import CartDrawer from "@/components/marketplace/CartDrawer";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -27,6 +30,14 @@ export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cartMounted, setCartMounted] = useState(false);
+
+  const { totalItems } = useCartStore();
+
+  useEffect(() => {
+    setCartMounted(true);
+  }, []);
 
   // Consumo exclusivo del Store de Zustand centralizado
   const { profile, fetchProfile, clearProfile } = useProfileStore();
@@ -180,6 +191,20 @@ export default function Navbar() {
 
           {/* Centro de Notificaciones */}
           <NotificationCenter />
+
+          {/* Icono de Carrito con Badge */}
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200 cursor-pointer relative"
+            title="Ver carrito"
+          >
+            <ShoppingCart className="size-5" />
+            {cartMounted && totalItems() > 0 && (
+              <span className="absolute -top-1 -right-1 bg-brand-chartreuse text-brand-black text-[10px] font-bold rounded-full size-4.5 flex items-center justify-center animate-pulse">
+                {totalItems()}
+              </span>
+            )}
+          </button>
 
           {/* Botón Descargar App */}
           <button className="hidden md:flex items-center gap-2 bg-brand-chartreuse hover:opacity-90 text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-sm shadow-brand-chartreuse/20 cursor-pointer">
@@ -401,6 +426,8 @@ export default function Navbar() {
           </div>
         </div>
       )}
+      {/* Drawer lateral del Carrito */}
+      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </header>
   );
 }

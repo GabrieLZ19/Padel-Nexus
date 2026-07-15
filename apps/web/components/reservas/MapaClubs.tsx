@@ -32,8 +32,7 @@ export default function MapaClubs({ clubes, userLocation }: MapaClubsProps) {
       : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
     L.tileLayer(tileUrl, {
-      attribution:
-        'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+      attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
       maxZoom: 16,
     }).addTo(map);
 
@@ -52,12 +51,15 @@ export default function MapaClubs({ clubes, userLocation }: MapaClubsProps) {
         : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
       L.tileLayer(newUrl, {
         attribution: isLightNow
-          ? 'Tiles &copy; Esri'
-          : '&copy; OpenStreetMap &copy; CARTO',
+          ? "Tiles &copy; Esri"
+          : "&copy; OpenStreetMap &copy; CARTO",
         maxZoom: 16,
       }).addTo(map);
     });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
 
     return () => {
       map.remove();
@@ -121,9 +123,10 @@ export default function MapaClubs({ clubes, userLocation }: MapaClubsProps) {
         iconAnchor: [6, 6],
       });
 
-      const distText = club.distancia_km != null 
-        ? `<div style="font-size:12px;color:#6E8901;margin-top:4px;">${club.distancia_km.toFixed(1)} km</div>`
-        : "";
+      const distText =
+        club.distancia_km != null
+          ? `<div style="font-size:12px;color:#6E8901;margin-top:4px;">${club.distancia_km.toFixed(1)} km</div>`
+          : "";
 
       L.marker([club.latitud, club.longitud], { icon: clubIcon })
         .addTo(map)
@@ -155,7 +158,7 @@ export default function MapaClubs({ clubes, userLocation }: MapaClubsProps) {
   return (
     <div
       ref={mapRef}
-      className="w-full h-[400px] rounded-2xl border border-white/10 overflow-hidden"
+      className="w-full h-[500px] rounded-2xl border border-white/10 overflow-hidden"
       style={{ zIndex: 1 }}
     />
   );

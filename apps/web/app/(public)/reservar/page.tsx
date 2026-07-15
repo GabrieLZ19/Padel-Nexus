@@ -49,11 +49,16 @@ export default function ReservarPage() {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
         setGeoError(null);
       },
       () => {
-        setGeoError("No se pudo obtener tu ubicación. Mostrando todos los clubes.");
+        setGeoError(
+          "No se pudo obtener tu ubicación. Mostrando todos los clubes.",
+        );
       },
     );
   }, []);
@@ -100,14 +105,15 @@ export default function ReservarPage() {
   return (
     <main className="min-h-screen pt-24 pb-16">
       {/* ── Hero Section ─────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-chartreuse/10 border border-brand-chartreuse/20 text-brand-chartreuse text-sm font-medium mb-4">
             <MapPin className="w-4 h-4" />
             Reservá tu cancha
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-            Encontrá tu <span className="text-brand-chartreuse">cancha ideal</span>
+            Encontrá tu{" "}
+            <span className="text-brand-chartreuse">cancha ideal</span>
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
             Buscá clubes cercanos, elegí tu horario y reservá en segundos.
@@ -131,34 +137,36 @@ export default function ReservarPage() {
               />
 
               {/* Sugerencias de búsqueda */}
-              {search.trim().length > 0 && showSuggestions && clubes.length > 0 && (
-                <div className="absolute left-0 right-0 mt-2 bg-brand-card/95 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 divide-y divide-white/5">
-                  {clubes.slice(0, 5).map((club) => (
-                    <button
-                      key={club.id}
-                      onClick={() => {
-                        router.push(`/reservar/club/${club.id}`);
-                        setShowSuggestions(false);
-                      }}
-                      className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors group cursor-pointer"
-                    >
-                      <div>
-                        <p className="font-semibold text-white group-hover:text-brand-chartreuse transition-colors">
-                          {club.nombre}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {club.localidad}, {club.provincia}
-                        </p>
-                      </div>
-                      {club.distancia_km !== undefined && (
-                        <span className="text-xs text-brand-chartreuse font-medium">
-                          {formatDistancia(club.distancia_km)}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {search.trim().length > 0 &&
+                showSuggestions &&
+                clubes.length > 0 && (
+                  <div className="absolute left-0 right-0 mt-2 bg-brand-card/95 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 divide-y divide-white/5">
+                    {clubes.slice(0, 5).map((club) => (
+                      <button
+                        key={club.id}
+                        onClick={() => {
+                          router.push(`/reservar/club/${club.id}`);
+                          setShowSuggestions(false);
+                        }}
+                        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors group cursor-pointer"
+                      >
+                        <div>
+                          <p className="font-semibold text-white group-hover:text-brand-chartreuse transition-colors">
+                            {club.nombre}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {club.localidad}, {club.provincia}
+                          </p>
+                        </div>
+                        {club.distancia_km !== undefined && (
+                          <span className="text-xs text-brand-chartreuse font-medium">
+                            {formatDistancia(club.distancia_km)}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -186,8 +194,12 @@ export default function ReservarPage() {
             <div className="mt-4 p-5 bg-brand-card border border-white/10 rounded-xl space-y-4 animate-in slide-in-from-top-2">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm text-gray-400">Radio de búsqueda</label>
-                  <span className="text-sm font-medium text-brand-chartreuse">{radio} km</span>
+                  <label className="text-sm text-gray-400">
+                    Radio de búsqueda
+                  </label>
+                  <span className="text-sm font-medium text-brand-chartreuse">
+                    {radio} km
+                  </span>
                 </div>
                 <input
                   type="range"
@@ -207,7 +219,8 @@ export default function ReservarPage() {
               {userLocation && (
                 <div className="flex items-center gap-2 text-xs text-green-400">
                   <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                  Ubicación activa: {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+                  Ubicación activa: {userLocation.lat.toFixed(4)},{" "}
+                  {userLocation.lng.toFixed(4)}
                 </div>
               )}
               {geoError && (
@@ -220,10 +233,7 @@ export default function ReservarPage() {
         {/* ── Mapa ───────────────────────────────────────────── */}
         {userLocation && clubes.length > 0 && (
           <div className="mb-10">
-            <MapaClubs
-              clubes={clubes}
-              userLocation={userLocation}
-            />
+            <MapaClubs clubes={clubes} userLocation={userLocation} />
           </div>
         )}
 
@@ -232,7 +242,9 @@ export default function ReservarPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">
               {userLocation ? "Clubes cercanos" : "Todos los clubes"}
-              <span className="ml-2 text-sm text-gray-500">({clubes.length})</span>
+              <span className="ml-2 text-sm text-gray-500">
+                ({clubes.length})
+              </span>
             </h2>
           </div>
 
@@ -295,7 +307,8 @@ export default function ReservarPage() {
                     <div className="flex items-center gap-3 text-sm text-gray-400">
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-brand-chartreuse" />
-                        {club.canchas} {club.canchas === 1 ? "cancha" : "canchas"}
+                        {club.canchas}{" "}
+                        {club.canchas === 1 ? "cancha" : "canchas"}
                       </span>
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs ${

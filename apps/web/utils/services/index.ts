@@ -7,3 +7,4 @@ export * from "./ranking";
 export * from "./licencias";
 export * from "./inscripciones";
 export * from "./notificaciones";
+export * from "./marketplace";
