@@ -14,7 +14,21 @@ import {
   moverParejaOverride,
   guardarZonasOverride,
   getAuditoriaByTorneo,
+  obtenerSedesTorneo,
+  guardarSedesTorneo,
+  obtenerCanchasDisponibilidadTorneo,
+  guardarCanchasDisponibilidadTorneo,
+  subirBannerTorneo,
+  eliminarBannerTorneo,
+  guardarSiembraCustom,
 } from "../controllers/torneo.controller";
+import {
+  listarFiscales,
+  crearFiscal,
+  buscarFiscalPorDni,
+  obtenerFiscalesTorneo,
+  asignarFiscalesTorneo,
+} from "../controllers/fiscal.controller";
 import { generarZonas } from "../controllers/competencia.controller";
 import { obtenerPosicionesZona } from "../controllers/clasificacion.controller";
 import { authenticate, authorize } from "../middleware/auth";
@@ -40,6 +54,16 @@ router.put(
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   updateTorneo,
 );
+router.put(
+  "/:id/banner",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  subirBannerTorneo,
+);
+router.delete(
+  "/:id/banner",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  eliminarBannerTorneo,
+);
 router.delete(
   "/:id",
   authorize(["superadmin", "admin_federacion", "admin"]),
@@ -62,6 +86,11 @@ router.post(
   "/:id/generar-cuadro",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   generarCuadros,
+);
+router.post(
+  "/:id/guardar-siembra",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  guardarSiembraCustom,
 );
 router.put(
   "/partidos/:partido_id/resultado",
@@ -92,6 +121,52 @@ router.get(
   "/:id/auditoria",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   getAuditoriaByTorneo,
+);
+
+// --- Rutas de Fiscales (CRUD y Asignaciones) ---
+router.get(
+  "/fiscales/lista",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  listarFiscales,
+);
+router.post(
+  "/fiscales",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  crearFiscal,
+);
+router.get(
+  "/fiscales/dni/:dni",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  buscarFiscalPorDni,
+);
+router.get(
+  "/:id/fiscales",
+  obtenerFiscalesTorneo,
+);
+router.post(
+  "/:id/fiscales",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  asignarFiscalesTorneo,
+);
+
+// --- Rutas de Sedes y Canchas del Torneo ---
+router.get(
+  "/:id/sedes",
+  obtenerSedesTorneo,
+);
+router.post(
+  "/:id/sedes",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  guardarSedesTorneo,
+);
+router.get(
+  "/:id/canchas-disponibilidad",
+  obtenerCanchasDisponibilidadTorneo,
+);
+router.post(
+  "/:id/canchas-disponibilidad",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  guardarCanchasDisponibilidadTorneo,
 );
 
 export default router;

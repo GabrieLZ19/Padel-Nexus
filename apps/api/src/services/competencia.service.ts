@@ -365,7 +365,15 @@ export class CompetenciaService {
             jugador1_nombre,
             jugador2_nombre,
             usuario_id,
-            usuario2_id
+            usuario2_id,
+            perfiles:perfiles!fk_inscripciones_usuario (
+              club_id,
+              clubes:clubes!perfiles_club_id_fkey (nombre)
+            ),
+            perfiles_jugador2:perfiles!fk_inscripciones_usuario2 (
+              club_id,
+              clubes:clubes!perfiles_club_id_fkey (nombre)
+            )
           )
         )
       `,
@@ -439,8 +447,11 @@ export class CompetenciaService {
     const gruposConClub = grupos.map((g) => ({
       ...g,
       grupo_parejas: (g.grupo_parejas || []).map((gp: any) => {
-        const club1 = gp.inscripciones?.usuario_id ? afiliacionesMap[gp.inscripciones.usuario_id] : null;
-        const club2 = gp.inscripciones?.usuario2_id ? afiliacionesMap[gp.inscripciones.usuario2_id] : null;
+        const pClub1 = gp.inscripciones?.perfiles?.clubes?.nombre;
+        const pClub2 = gp.inscripciones?.perfiles_jugador2?.clubes?.nombre;
+
+        const club1 = pClub1 || (gp.inscripciones?.usuario_id ? afiliacionesMap[gp.inscripciones.usuario_id] : null);
+        const club2 = pClub2 || (gp.inscripciones?.usuario2_id ? afiliacionesMap[gp.inscripciones.usuario2_id] : null);
 
         let clubName = "Sin club asignado";
         if (club1 && club2) {

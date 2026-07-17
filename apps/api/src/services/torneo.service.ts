@@ -22,7 +22,7 @@ export interface TorneoPayload {
   modalidad: string;
   precio_inscripcion: number;
   formato: string;
-  alcance?: 'Nacional' | 'Provincial' | 'Local' | null;
+  alcance?: "Nacional" | "Provincial" | "Local" | null;
   premios?: { uno?: string; dos?: string; tres?: string };
   canchas_disponibles?: number;
   duracion_partido_minutos?: number;
@@ -62,7 +62,7 @@ export class TorneoService {
   ) {
     let query = supabaseAdmin
       .from("torneos")
-      .select(`*, clubes(nombre, provincia), inscripciones(usuario_id)`, {
+      .select(`*, clubes!club_id(nombre, provincia), inscripciones(usuario_id)`, {
         count: "exact",
       })
       .order("created_at", { ascending: false });
@@ -74,11 +74,13 @@ export class TorneoService {
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean);
-      
+
       // Si piden "Cerrado", buscamos también los de "Inscripción" para poder aplicarles la regla dinámica
-      const dbEstados = estados.includes(FAP_ESTADOS_TORNEO.CERRADO) && !estados.includes(FAP_ESTADOS_TORNEO.INSCRIPCION) 
-        ? [...estados, FAP_ESTADOS_TORNEO.INSCRIPCION]
-        : estados;
+      const dbEstados =
+        estados.includes(FAP_ESTADOS_TORNEO.CERRADO) &&
+        !estados.includes(FAP_ESTADOS_TORNEO.INSCRIPCION)
+          ? [...estados, FAP_ESTADOS_TORNEO.INSCRIPCION]
+          : estados;
 
       if (dbEstados.length === 1) query = query.eq("estado", dbEstados[0]);
       else if (dbEstados.length > 1) query = query.in("estado", dbEstados);
@@ -115,8 +117,8 @@ export class TorneoService {
 
     // Si filtraron específicamente por estado en el query string, volver a filtrar en memoria por si el estado dinámico lo cambió
     if (filtros?.estado) {
-      const requestedStates = filtros.estado.split(",").map(s => s.trim());
-      formatted = formatted.filter(t => requestedStates.includes(t.estado));
+      const requestedStates = filtros.estado.split(",").map((s) => s.trim());
+      formatted = formatted.filter((t) => requestedStates.includes(t.estado));
     }
 
     return { data: formatted, total: count, paginated: page !== undefined };
@@ -125,7 +127,7 @@ export class TorneoService {
   static async obtenerPorId(id: string) {
     const { data, error } = await supabaseAdmin
       .from("torneos")
-      .select(`*, clubes(nombre, provincia), inscripciones(usuario_id)`)
+      .select(`*, clubes!club_id(nombre, provincia), inscripciones(usuario_id)`)
       .eq("id", id)
       .single();
 
@@ -152,7 +154,7 @@ export class TorneoService {
           modalidad: datos.modalidad,
           precio_inscripcion: datos.precio_inscripcion,
           formato: datos.formato,
-          alcance: datos.alcance ?? 'Provincial',
+          alcance: datos.alcance ?? "Provincial",
           premio_1: datos.premios?.uno,
           premio_2: datos.premios?.dos,
           premio_3: datos.premios?.tres,
@@ -247,16 +249,38 @@ export class TorneoService {
 
     const { data: inscripciones, error: insError } = await supabaseAdmin
       .from("inscripciones")
-      .select("id, jugador1_nombre, jugador2_nombre")
+      .select(`
+        id, 
+        jugador1_nombre, 
+        jugador2_nombre,
+        usuario_id,
+        usuario2_id,
+        perfiles:perfiles!fk_inscripciones_usuario (
+          clubes:clubes!perfiles_club_id_fkey (nombre)
+        ),
+        perfiles_jugador2:perfiles!fk_inscripciones_usuario2 (
+          clubes:clubes!perfiles_club_id_fkey (nombre)
+        )
+      `)
       .eq("torneo_id", id);
 
     if (insError) throw new Error(insError.message);
 
-    const insMap = new Map<
-      string,
-      { jugador1_nombre: string | null; jugador2_nombre: string | null }
-    >();
-    (inscripciones || []).forEach((ins) => insMap.set(ins.id, ins));
+    const insMap = new Map<string, any>();
+    (inscripciones || []).forEach((ins: any) => {
+      const club1 = ins.perfiles?.clubes?.nombre;
+      const club2 = ins.perfiles_jugador2?.clubes?.nombre;
+      let clubName = null;
+      if (club1 && club2) clubName = `${club1} / ${club2}`;
+      else if (club1) clubName = club1;
+      else if (club2) clubName = club2;
+
+      insMap.set(ins.id, {
+        jugador1_nombre: ins.jugador1_nombre,
+        jugador2_nombre: ins.jugador2_nombre,
+        clubName: clubName || "Sin club asignado",
+      });
+    });
 
     return (partidos || []).map((p) => {
       const equipoA = p.equipo_a_id ? insMap.get(p.equipo_a_id) : null;
@@ -266,16 +290,25 @@ export class TorneoService {
         ...p,
         equipo_a_j1: equipoA ? equipoA.jugador1_nombre : null,
         equipo_a_j2: equipoA ? equipoA.jugador2_nombre : null,
+        equipo_a_club: equipoA ? equipoA.clubName : null,
         equipo_b_j1: equipoB ? equipoB.jugador1_nombre : null,
         equipo_b_j2: equipoB ? equipoB.jugador2_nombre : null,
+        equipo_b_club: equipoB ? equipoB.clubName : null,
       };
     });
   }
 
-  static async generarCuadroEliminatoria(id: string, ordenSiembra?: string[], adminId?: string, motivo?: string) {
+  static async generarCuadroEliminatoria(
+    id: string,
+    ordenSiembra?: string[],
+    adminId?: string,
+    motivo?: string,
+  ) {
     const { data: torneo, error: torneoError } = await supabaseAdmin
       .from("torneos")
-      .select("formato, cupos_maximos, fecha, canchas_disponibles, duracion_partido_minutos, hora_inicio_jornada")
+      .select(
+        "formato, cupos_maximos, fecha, canchas_disponibles, duracion_partido_minutos, hora_inicio_jornada",
+      )
       .eq("id", id)
       .single();
 
@@ -307,19 +340,23 @@ export class TorneoService {
 
     if (inscripciones.length % 2 !== 0) {
       throw new Error(
-        `La cantidad de participantes confirmados debe ser un número par. Actualmente hay ${inscripciones.length} inscritos confirmados.`
+        `La cantidad de participantes confirmados debe ser un número par. Actualmente hay ${inscripciones.length} inscritos confirmados.`,
       );
     }
 
     await supabaseAdmin.from("partidos").delete().eq("torneo_id", id);
 
     let shuffled = [...inscripciones];
-    if (ordenSiembra && Array.isArray(ordenSiembra) && ordenSiembra.length > 0) {
+    if (
+      ordenSiembra &&
+      Array.isArray(ordenSiembra) &&
+      ordenSiembra.length > 0
+    ) {
       shuffled = ordenSiembra
         .map((sid) => inscripciones.find((ins) => ins.id === sid))
         .filter(Boolean) as any[];
-      const setSiembra = new Set(shuffled.map(s => s.id));
-      const faltantes = inscripciones.filter(ins => !setSiembra.has(ins.id));
+      const setSiembra = new Set(shuffled.map((s) => s.id));
+      const faltantes = inscripciones.filter((ins) => !setSiembra.has(ins.id));
       shuffled.push(...faltantes);
     } else {
       shuffled = shuffled.sort(() => 0.5 - Math.random());
@@ -330,7 +367,9 @@ export class TorneoService {
 
     const canchasCount = torneo.canchas_disponibles || 1;
     const matchDur = torneo.duracion_partido_minutos || 90;
-    const baseDateStr = torneo.fecha ? torneo.fecha.split("T")[0] : new Date().toISOString().split("T")[0];
+    const baseDateStr = torneo.fecha
+      ? torneo.fecha.split("T")[0]
+      : new Date().toISOString().split("T")[0];
     const horaInicio = torneo.hora_inicio_jornada || "08:00";
     const [hours, minutes] = horaInicio.split(":").map(Number);
 
@@ -372,7 +411,7 @@ export class TorneoService {
         let equipo_b_id: string | null = null;
 
         // Distribución intercalada uniforme de BYEs
-        const isBye = ((j * B) % initialRound.matches) < B;
+        const isBye = (j * B) % initialRound.matches < B;
 
         if (isBye) {
           // Partidos con BYE: un jugador y el otro nulo
@@ -388,7 +427,9 @@ export class TorneoService {
 
         const slotIndex = Math.floor(j / canchasCount);
         const canchaNo = (j % canchasCount) + 1;
-        const matchTime = new Date(currentRoundStartTime.getTime() + slotIndex * matchDur * 60 * 1000);
+        const matchTime = new Date(
+          currentRoundStartTime.getTime() + slotIndex * matchDur * 60 * 1000,
+        );
 
         const partido = {
           torneo_id: id,
@@ -419,7 +460,10 @@ export class TorneoService {
         partidosPorRonda[initialRound.name].push(partido);
       }
 
-      let roundStartTime = new Date(currentRoundStartTime.getTime() + Math.ceil(initialRound.matches / canchasCount) * matchDur * 60 * 1000);
+      let roundStartTime = new Date(
+        currentRoundStartTime.getTime() +
+          Math.ceil(initialRound.matches / canchasCount) * matchDur * 60 * 1000,
+      );
 
       for (let i = startIndex + 1; i < roundsConfig.length; i++) {
         const round = roundsConfig[i];
@@ -435,7 +479,9 @@ export class TorneoService {
 
           const slotIndex = Math.floor(j / canchasCount);
           const canchaNo = (j % canchasCount) + 1;
-          const matchTime = new Date(roundStartTime.getTime() + slotIndex * matchDur * 60 * 1000);
+          const matchTime = new Date(
+            roundStartTime.getTime() + slotIndex * matchDur * 60 * 1000,
+          );
 
           const partido = {
             torneo_id: id,
@@ -455,7 +501,9 @@ export class TorneoService {
         }
 
         const roundSlots = Math.ceil(numMatches / canchasCount);
-        roundStartTime = new Date(roundStartTime.getTime() + roundSlots * matchDur * 60 * 1000);
+        roundStartTime = new Date(
+          roundStartTime.getTime() + roundSlots * matchDur * 60 * 1000,
+        );
       }
 
       partidos.push(...Object.values(partidosPorRonda).flat());
@@ -471,7 +519,12 @@ export class TorneoService {
       .update({ estado: FAP_ESTADOS_TORNEO.EN_CURSO })
       .eq("id", id);
 
-    if (ordenSiembra && Array.isArray(ordenSiembra) && ordenSiembra.length > 0 && adminId) {
+    if (
+      ordenSiembra &&
+      Array.isArray(ordenSiembra) &&
+      ordenSiembra.length > 0 &&
+      adminId
+    ) {
       await supabaseAdmin.from("auditoria_llaves").insert({
         torneo_id: id,
         tipo_cambio: "override_rival_partido",
@@ -488,6 +541,13 @@ export class TorneoService {
     ganadorId: string,
     set1A: number,
     set1B: number,
+    set2A?: number | null,
+    set2B?: number | null,
+    set3A?: number | null,
+    set3B?: number | null,
+    esSupertiebreak?: boolean,
+    esWo?: boolean,
+    esInjustificadoWo?: boolean,
   ) {
     const { data: partido, error: updateError } = await supabaseAdmin
       .from("partidos")
@@ -495,6 +555,13 @@ export class TorneoService {
         ganador: ganadorId,
         set1_a: set1A,
         set1_b: set1B,
+        set2_a: set2A ?? null,
+        set2_b: set2B ?? null,
+        set3_a: set3A ?? null,
+        set3_b: set3B ?? null,
+        es_supertiebreak: esSupertiebreak || false,
+        es_wo: esWo || false,
+        es_injustificado_wo: esInjustificadoWo || false,
         estado_partido: FAP_ESTADOS_TORNEO.FINALIZADO,
       })
       .eq("id", partidoId)
@@ -511,21 +578,46 @@ export class TorneoService {
 
     const { data: torneoInfo } = await supabaseAdmin
       .from("torneos")
-      .select("nivel, categoria, modalidad")
+      .select("nivel, categoria, modalidad, configuracion_puntos")
       .eq("id", partido.torneo_id)
       .single();
 
     if (torneoInfo) {
-      const TABLA_PUNTOS: Record<
-        string,
-        { ganador: number; perdedor: number }
-      > = {
-        "16AVOS": { ganador: 45, perdedor: 10 },
-        OCTAVOS: { ganador: 90, perdedor: 45 },
-        CUARTOS: { ganador: 180, perdedor: 90 },
-        SEMIS: { ganador: 360, perdedor: 180 },
-        FINAL: { ganador: 1000, perdedor: 600 },
-      };
+      let TABLA_PUNTOS: Record<string, { ganador: number; perdedor: number }> =
+        {
+          "16AVOS": { ganador: 45, perdedor: 10 },
+          OCTAVOS: { ganador: 90, perdedor: 45 },
+          CUARTOS: { ganador: 180, perdedor: 90 },
+          SEMIS: { ganador: 360, perdedor: 180 },
+          FINAL: { ganador: 1000, perdedor: 600 },
+        };
+
+      const configP = torneoInfo.configuracion_puntos as any;
+      if (configP && configP.puntos_activados) {
+        TABLA_PUNTOS = {
+          "32AVOS": { ganador: configP.puntos_32avos || 0, perdedor: 0 },
+          "16AVOS": {
+            ganador: configP.puntos_16avos || 0,
+            perdedor: configP.puntos_zona || 0,
+          },
+          OCTAVOS: {
+            ganador: configP.puntos_octavos || 0,
+            perdedor: configP.puntos_16avos || 0,
+          },
+          CUARTOS: {
+            ganador: configP.puntos_cuartos || 0,
+            perdedor: configP.puntos_octavos || 0,
+          },
+          SEMIS: {
+            ganador: configP.puntos_semis || 0,
+            perdedor: configP.puntos_cuartos || 0,
+          },
+          FINAL: {
+            ganador: configP.puntos_campeon || 0,
+            perdedor: configP.puntos_final || 0,
+          },
+        };
+      }
 
       const rondaNormalizada = partido.ronda.toUpperCase().trim();
       const puntosRonda = TABLA_PUNTOS[rondaNormalizada];
@@ -534,7 +626,13 @@ export class TorneoService {
       let puntosPerdedorNetos = puntosRonda?.perdedor || 0;
 
       if (puntosRonda) {
-        const SECUENCIA_RONDAS = ["16AVOS", "OCTAVOS", "CUARTOS", "SEMIS", "FINAL"];
+        const SECUENCIA_RONDAS = [
+          "16AVOS",
+          "OCTAVOS",
+          "CUARTOS",
+          "SEMIS",
+          "FINAL",
+        ];
         const idxRonda = SECUENCIA_RONDAS.indexOf(rondaNormalizada);
         let rondaAnterior = null;
 
@@ -557,8 +655,14 @@ export class TorneoService {
         if (rondaAnterior) {
           const puntosRondaAnterior = TABLA_PUNTOS[rondaAnterior];
           if (puntosRondaAnterior) {
-            puntosGanadorNetos = Math.max(0, puntosRonda.ganador - puntosRondaAnterior.ganador);
-            puntosPerdedorNetos = Math.max(0, puntosRonda.perdedor - puntosRondaAnterior.ganador);
+            puntosGanadorNetos = Math.max(
+              0,
+              puntosRonda.ganador - puntosRondaAnterior.ganador,
+            );
+            puntosPerdedorNetos = Math.max(
+              0,
+              puntosRonda.perdedor - puntosRondaAnterior.ganador,
+            );
           }
         }
       }
@@ -589,51 +693,57 @@ export class TorneoService {
           const pjAnt = rank?.pj || 0;
           const pgAnt = rank?.pg || 0;
 
-          const { error: rankError } = await supabaseAdmin.from("rankings").upsert(
-            {
-              ...(rank?.id ? { id: rank.id } : {}),
-              usuario_id: uid,
-              categoria: torneoInfo.nivel,
-              rama: torneoInfo.categoria,
-              puntos: pAnt + puntos,
-              pj: pjAnt + 1,
-              pg: esGanador ? pgAnt + 1 : pgAnt,
-            },
-            { onConflict: "id" },
-          );
+          const { error: rankError } = await supabaseAdmin
+            .from("rankings")
+            .upsert(
+              {
+                ...(rank?.id ? { id: rank.id } : {}),
+                usuario_id: uid,
+                categoria: torneoInfo.nivel,
+                rama: torneoInfo.categoria,
+                puntos: pAnt + puntos,
+                pj: pjAnt + 1,
+                pg: esGanador ? pgAnt + 1 : pgAnt,
+              },
+              { onConflict: "id" },
+            );
 
           if (rankError) {
-            console.error(`Error al actualizar ranking para usuario ${uid}:`, rankError);
-            throw new Error(`Error al actualizar ranking: ${rankError.message}`);
+            console.error(
+              `Error al actualizar ranking para usuario ${uid}:`,
+              rankError,
+            );
+            throw new Error(
+              `Error al actualizar ranking: ${rankError.message}`,
+            );
           }
 
           if (puntos > 0) {
-            const { error: histError } = await supabaseAdmin.from("historial_ranking").insert([
-              {
-                usuario_id: uid,
-                torneo_id: partido.torneo_id,
-                puntos_anteriores: pAnt,
-                puntos_nuevos: pAnt + puntos,
-              },
-            ]);
+            const { error: histError } = await supabaseAdmin
+              .from("historial_ranking")
+              .insert([
+                {
+                  usuario_id: uid,
+                  torneo_id: partido.torneo_id,
+                  puntos_anteriores: pAnt,
+                  puntos_nuevos: pAnt + puntos,
+                },
+              ]);
             if (histError) {
-              console.error(`Error al insertar historial de ranking para usuario ${uid}:`, histError);
-              throw new Error(`Error al insertar historial de ranking: ${histError.message}`);
+              console.error(
+                `Error al insertar historial de ranking para usuario ${uid}:`,
+                histError,
+              );
+              throw new Error(
+                `Error al insertar historial de ranking: ${histError.message}`,
+              );
             }
           }
         }
       };
 
-      await otorgarPuntosAInscripcion(
-        perdedorId,
-        puntosPerdedorNetos,
-        false,
-      );
-      await otorgarPuntosAInscripcion(
-        ganadorId,
-        puntosGanadorNetos,
-        true,
-      );
+      await otorgarPuntosAInscripcion(perdedorId, puntosPerdedorNetos, false);
+      await otorgarPuntosAInscripcion(ganadorId, puntosGanadorNetos, true);
     }
 
     if (partido.ronda.toUpperCase() === "FINAL") {
@@ -686,7 +796,9 @@ export class TorneoService {
       // 1. Avance interno para Zonas de 4 parejas (regla FAP de 4 partidos)
       const { data: thisGroupMatches } = await supabaseAdmin
         .from("partidos")
-        .select("id, ronda, ganador, equipo_a_id, equipo_b_id, orden, estado_partido")
+        .select(
+          "id, ronda, ganador, equipo_a_id, equipo_b_id, orden, estado_partido",
+        )
         .eq("torneo_id", partido.torneo_id)
         .eq("ronda", partido.ronda)
         .order("orden", { ascending: true });
@@ -702,8 +814,10 @@ export class TorneoService {
           if (p1.ganador && p2.ganador && !p3.equipo_a_id && !p4.equipo_a_id) {
             const g1 = p1.ganador;
             const g2 = p2.ganador;
-            const perdedor1 = p1.ganador === p1.equipo_a_id ? p1.equipo_b_id : p1.equipo_a_id;
-            const perdedor2 = p2.ganador === p2.equipo_a_id ? p2.equipo_b_id : p2.equipo_a_id;
+            const perdedor1 =
+              p1.ganador === p1.equipo_a_id ? p1.equipo_b_id : p1.equipo_a_id;
+            const perdedor2 =
+              p2.ganador === p2.equipo_a_id ? p2.equipo_b_id : p2.equipo_a_id;
 
             if (g1 && g2 && perdedor1 && perdedor2) {
               // Asignar ganadores al Partido 3
@@ -737,7 +851,8 @@ export class TorneoService {
         .eq("torneo_id", partido.torneo_id)
         .ilike("ronda", "Zona %");
 
-      const pendingCount = allGroupMatches?.filter((p) => p.ganador === null).length || 0;
+      const pendingCount =
+        allGroupMatches?.filter((p) => p.ganador === null).length || 0;
 
       if (pendingCount === 0 && allGroupMatches && allGroupMatches.length > 0) {
         await avanzarJugadoresALlaves(partido.torneo_id, allGroupMatches);
@@ -777,12 +892,216 @@ export class TorneoService {
     if (updateError) throw new Error(updateError.message);
 
     // 3. Registrar en auditoría
-    await supabaseAdmin.from("auditoria_llaves").insert({
-      torneo_id: partido.torneo_id,
-      tipo_cambio: "override_rival_partido",
-      descripcion: `Rival de partido (${partido.ronda}) cambiado manualmente. Motivo: ${motivo}`,
-      admin_id: adminId,
+    await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: adminId,
+      accion: "override_rival_partido",
+      entidad_afectada: partido.torneo_id,
+      detalles: {
+        partido_id: partidoId,
+        ronda: partido.ronda,
+        motivo: motivo,
+      },
     });
+  }
+
+  static async guardarSiembraCustom(
+    torneoId: string,
+    matches: { id: string; equipo_a_id: string | null; equipo_b_id: string | null }[],
+    motivo: string,
+    adminId: string,
+  ) {
+    // 1. Obtener todos los partidos de eliminatoria de este torneo
+    const { data: allMatches, error: fetchErr } = await supabaseAdmin
+      .from("partidos")
+      .select("id, ronda, orden, ganador")
+      .eq("torneo_id", torneoId)
+      .not("ronda", "ilike", "Zona %"); // excluir fase de grupos
+
+    if (fetchErr) throw new Error(`Error al obtener partidos: ${fetchErr.message}`);
+    if (!allMatches || allMatches.length === 0) {
+      throw new Error("No hay partidos de eliminatorias cargados para este torneo.");
+    }
+
+    // Determinar la primera ronda (la que tiene más partidos)
+    const counts: Record<string, number> = {};
+    allMatches.forEach((m) => {
+      counts[m.ronda] = (counts[m.ronda] || 0) + 1;
+    });
+
+    const ROUNDS_ORDER = ["32AVOS", "16AVOS", "OCTAVOS", "CUARTOS", "SEMIS", "FINAL"];
+    const primeraRonda = ROUNDS_ORDER.find((r) => (counts[r] || 0) > 0);
+    if (!primeraRonda) {
+      throw new Error("No se pudo determinar la primera ronda del cuadro.");
+    }
+
+    // 2. Actualizar los partidos de la primera ronda
+    for (const m of matches) {
+      const dbMatch = allMatches.find((x) => x.id === m.id);
+      if (!dbMatch) continue;
+
+      const isBye = !m.equipo_a_id || !m.equipo_b_id;
+      let ganador = null;
+      let estado = "Programado";
+      if (isBye) {
+        ganador = m.equipo_a_id || m.equipo_b_id || null;
+        if (ganador) {
+          estado = FAP_ESTADOS_TORNEO.FINALIZADO;
+        }
+      }
+
+      const { error: updateErr } = await supabaseAdmin
+        .from("partidos")
+        .update({
+          equipo_a_id: m.equipo_a_id,
+          equipo_b_id: m.equipo_b_id,
+          ganador,
+          estado_partido: estado,
+          set1_a: isBye && ganador ? 0 : null,
+          set1_b: isBye && ganador ? 0 : null,
+        })
+        .eq("id", m.id);
+
+      if (updateErr) throw new Error(`Error al actualizar partido: ${updateErr.message}`);
+    }
+
+    // 3. Resetear todos los partidos de las rondas siguientes
+    const subsequentRondas = ROUNDS_ORDER.filter(
+      (r) => ROUNDS_ORDER.indexOf(r) > ROUNDS_ORDER.indexOf(primeraRonda)
+    );
+
+    if (subsequentRondas.length > 0) {
+      const { error: resetErr } = await supabaseAdmin
+        .from("partidos")
+        .update({
+          equipo_a_id: null,
+          equipo_b_id: null,
+          ganador: null,
+          estado_partido: "Programado",
+          set1_a: null,
+          set1_b: null,
+        })
+        .eq("torneo_id", torneoId)
+        .in("ronda", subsequentRondas);
+
+      if (resetErr) throw new Error(`Error al resetear rondas siguientes: ${resetErr.message}`);
+    }
+
+    // 4. Volver a propagar los ganadores de los BYEs a la siguiente ronda
+    const { data: updatedFirstRoundMatches } = await supabaseAdmin
+      .from("partidos")
+      .select("id, ronda, orden, ganador")
+      .eq("torneo_id", torneoId)
+      .eq("ronda", primeraRonda)
+      .order("orden", { ascending: true });
+
+    if (updatedFirstRoundMatches) {
+      const rondasSiguientes: Record<string, string> = {
+        "32AVOS": "16AVOS",
+        "16AVOS": "OCTAVOS",
+        OCTAVOS: "CUARTOS",
+        CUARTOS: "SEMIS",
+        SEMIS: "FINAL",
+      };
+
+      const rondaSiguiente = rondasSiguientes[primeraRonda.toUpperCase().trim()];
+      if (rondaSiguiente) {
+        const { data: psig } = await supabaseAdmin
+          .from("partidos")
+          .select("id")
+          .eq("torneo_id", torneoId)
+          .eq("ronda", rondaSiguiente)
+          .order("orden", { ascending: true });
+
+        if (psig) {
+          for (const match of updatedFirstRoundMatches) {
+            if (match.ganador) {
+              const miIndice = updatedFirstRoundMatches.findIndex((p) => p.id === match.id);
+              const idxHijo = Math.floor(miIndice / 2);
+              const partidoDestino = psig[idxHijo];
+
+              if (partidoDestino) {
+                const ranura = miIndice % 2 === 0 ? "equipo_a_id" : "equipo_b_id";
+                await supabaseAdmin
+                  .from("partidos")
+                  .update({ [ranura]: match.ganador })
+                  .eq("id", partidoDestino.id);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 5. Registrar en auditoría
+    await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: adminId,
+      accion: "guardar_siembra_custom",
+      entidad_afectada: torneoId,
+      detalles: {
+        motivo: motivo,
+      },
+    });
+  }
+
+  static async obtenerSedes(torneoId: string) {
+    const { data, error } = await supabaseAdmin
+      .from("torneo_sedes")
+      .select("club_id, clubes(*)")
+      .eq("torneo_id", torneoId);
+    if (error) throw new Error(error.message);
+    return (data || []).map((ts: any) => ts.clubes).filter(Boolean);
+  }
+
+  static async guardarSedes(torneoId: string, clubIds: string[]) {
+    await supabaseAdmin.from("torneo_sedes").delete().eq("torneo_id", torneoId);
+
+    if (clubIds && clubIds.length > 0) {
+      const inserts = clubIds.map((cid) => ({
+        torneo_id: torneoId,
+        club_id: cid,
+      }));
+      const { error } = await supabaseAdmin
+        .from("torneo_sedes")
+        .insert(inserts);
+      if (error) throw new Error(error.message);
+    }
+    return true;
+  }
+
+  static async obtenerCanchasDisponibilidad(torneoId: string) {
+    const { data, error } = await supabaseAdmin
+      .from("torneo_canchas_disponibilidad")
+      .select("*, canchas(*), clubes(*)")
+      .eq("torneo_id", torneoId)
+      .order("fecha", { ascending: true })
+      .order("hora_inicio", { ascending: true });
+    if (error) throw new Error(error.message);
+    return data || [];
+  }
+
+  static async guardarCanchasDisponibilidad(
+    torneoId: string,
+    disponibilidad: any[],
+  ) {
+    await supabaseAdmin
+      .from("torneo_canchas_disponibilidad")
+      .delete()
+      .eq("torneo_id", torneoId);
+
+    if (disponibilidad && disponibilidad.length > 0) {
+      const inserts = disponibilidad.map((d) => ({
+        torneo_id: torneoId,
+        club_id: d.club_id,
+        cancha_id: d.cancha_id,
+        fecha: d.fecha,
+        hora_inicio: d.hora_inicio,
+      }));
+      const { error } = await supabaseAdmin
+        .from("torneo_canchas_disponibilidad")
+        .insert(inserts);
+      if (error) throw new Error(error.message);
+    }
+    return true;
   }
 }
 
@@ -793,12 +1112,15 @@ async function avanzarJugadoresALlaves(torneoId: string, groupMatches: any[]) {
     .select("id, nombre_grupo, grupo_parejas(inscripcion_id)")
     .eq("torneo_id", torneoId)
     .order("nombre_grupo");
-    
+
   if (!grupos) return;
-  
+
   // 2. Calcular tabla de posiciones de cada grupo
-  const standingsByGroup: Record<string, { id: string, points: number, diffSets: number }[]> = {};
-  
+  const standingsByGroup: Record<
+    string,
+    { id: string; points: number; diffSets: number }[]
+  > = {};
+
   for (const g of grupos) {
     const parejas = g.grupo_parejas || [];
     const stats = parejas.map((p: any) => {
@@ -807,14 +1129,14 @@ async function avanzarJugadoresALlaves(torneoId: string, groupMatches: any[]) {
       let diffGames = 0;
       let gamesAFavor = 0;
       let gamesEnContra = 0;
-      
+
       groupMatches.forEach((m) => {
         if (m.ronda === g.nombre_grupo && m.ganador) {
           if (m.equipo_a_id === p.inscripcion_id) {
             const setsWon = Number(m.set1_a || 0);
             const setsLost = Number(m.set1_b || 0);
-            diffSets += (setsWon - setsLost);
-            diffGames += (setsWon - setsLost);
+            diffSets += setsWon - setsLost;
+            diffGames += setsWon - setsLost;
             gamesAFavor += setsWon;
             gamesEnContra += setsLost;
             if (m.ganador === p.inscripcion_id) {
@@ -825,8 +1147,8 @@ async function avanzarJugadoresALlaves(torneoId: string, groupMatches: any[]) {
           } else if (m.equipo_b_id === p.inscripcion_id) {
             const setsWon = Number(m.set1_b || 0);
             const setsLost = Number(m.set1_a || 0);
-            diffSets += (setsWon - setsLost);
-            diffGames += (setsWon - setsLost);
+            diffSets += setsWon - setsLost;
+            diffGames += setsWon - setsLost;
             gamesAFavor += setsWon;
             gamesEnContra += setsLost;
             if (m.ganador === p.inscripcion_id) {
@@ -837,9 +1159,16 @@ async function avanzarJugadoresALlaves(torneoId: string, groupMatches: any[]) {
           }
         }
       });
-      return { id: p.inscripcion_id, points, diffSets, diffGames, gamesAFavor, gamesEnContra };
+      return {
+        id: p.inscripcion_id,
+        points,
+        diffSets,
+        diffGames,
+        gamesAFavor,
+        gamesEnContra,
+      };
     });
-    
+
     // Group and sort using FAP tie-breaker rules
     const groupsMap: Record<number, any[]> = {};
     stats.forEach((team) => {
@@ -865,7 +1194,7 @@ async function avanzarJugadoresALlaves(torneoId: string, groupMatches: any[]) {
             m.ronda === g.nombre_grupo &&
             m.ganador &&
             ((m.equipo_a_id === a.id && m.equipo_b_id === b.id) ||
-              (m.equipo_a_id === b.id && m.equipo_b_id === a.id))
+              (m.equipo_a_id === b.id && m.equipo_b_id === a.id)),
         );
         if (partidoDirecto && partidoDirecto.ganador) {
           if (partidoDirecto.ganador === a.id) {
@@ -881,8 +1210,10 @@ async function avanzarJugadoresALlaves(torneoId: string, groupMatches: any[]) {
         tiedTeams.sort((a, b) => {
           if (a.diffSets !== b.diffSets) return b.diffSets - a.diffSets;
           if (a.diffGames !== b.diffGames) return b.diffGames - a.diffGames;
-          if (a.gamesAFavor !== b.gamesAFavor) return b.gamesAFavor - a.gamesAFavor;
-          if (a.gamesEnContra !== b.gamesEnContra) return a.gamesEnContra - b.gamesEnContra;
+          if (a.gamesAFavor !== b.gamesAFavor)
+            return b.gamesAFavor - a.gamesAFavor;
+          if (a.gamesEnContra !== b.gamesEnContra)
+            return a.gamesEnContra - b.gamesEnContra;
           return 0;
         });
         sortedStats.push(...tiedTeams);
@@ -892,13 +1223,13 @@ async function avanzarJugadoresALlaves(torneoId: string, groupMatches: any[]) {
     }
     standingsByGroup[g.nombre_grupo] = sortedStats;
   }
-  
+
   // 3. Obtener nombres de zonas ordenadas (Zona A, Zona B...)
   const groupNames = Object.keys(standingsByGroup).sort();
   const n = groupNames.length;
-  
+
   if (n < 1) return;
-  
+
   // Determinar la cantidad total de parejas clasificadas a playoffs
   const getPlayoffSize = (zonasCount: number): number => {
     if (zonasCount <= 1) return 2;
@@ -909,11 +1240,22 @@ async function avanzarJugadoresALlaves(torneoId: string, groupMatches: any[]) {
   };
 
   const playoffSize = getPlayoffSize(n);
-  const roundName = playoffSize === 4 ? "SEMIS" : playoffSize === 8 ? "CUARTOS" : playoffSize === 16 ? "OCTAVOS" : "FINAL";
-  
+  const roundName =
+    playoffSize === 4
+      ? "SEMIS"
+      : playoffSize === 8
+        ? "CUARTOS"
+        : playoffSize === 16
+          ? "OCTAVOS"
+          : "FINAL";
+
   // 4. Recopilar y ordenar clasificados
-  const ganadores = groupNames.map(name => standingsByGroup[name]?.[0]).filter(Boolean);
-  const segundos = groupNames.map(name => standingsByGroup[name]?.[1]).filter(Boolean);
+  const ganadores = groupNames
+    .map((name) => standingsByGroup[name]?.[0])
+    .filter(Boolean);
+  const segundos = groupNames
+    .map((name) => standingsByGroup[name]?.[1])
+    .filter(Boolean);
 
   const compararEquipos = (a: any, b: any) => {
     if (a.points !== b.points) return b.points - a.points;
@@ -939,19 +1281,19 @@ async function avanzarJugadoresALlaves(torneoId: string, groupMatches: any[]) {
     .eq("torneo_id", torneoId)
     .eq("ronda", roundName)
     .order("orden", { ascending: true });
-     
+
   if (playoffMatches && playoffMatches.length >= playoffSize / 2) {
     for (let k = 0; k < playoffSize / 2; k++) {
       const teamA = clasificados[k]?.id;
       const teamB = clasificados[clasificados.length - 1 - k]?.id;
-       
+
       if (teamA && teamB) {
         await supabaseAdmin
           .from("partidos")
-          .update({ 
-            equipo_a_id: teamA, 
+          .update({
+            equipo_a_id: teamA,
             equipo_b_id: teamB,
-            estado_partido: "Programado"
+            estado_partido: "Programado",
           })
           .eq("id", playoffMatches[k].id);
       }

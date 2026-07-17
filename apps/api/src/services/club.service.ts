@@ -56,7 +56,7 @@ export class ClubService {
 
     let query = supabaseAdmin
       .from("clubes")
-      .select(`*, torneos(count), canchas(count)`, { count: "exact" })
+      .select(`*, torneos!club_id(count), canchas(count)`, { count: "exact" })
       .range(from, to);
 
     if (search) query = query.ilike("nombre", `%${search}%`);
@@ -94,11 +94,11 @@ export class ClubService {
   static async obtenerClubPorId(id: string) {
     const { data, error } = await supabaseAdmin
       .from("clubes")
-      .select(`*, torneos(*), canchas(count)`)
+      .select(`*, torneos!club_id(*), canchas(count)`)
       .eq("id", id)
       .single();
 
-    if (error || !data) throw new Error("Club no encontrado.");
+    if (error || !data) throw new Error("Club no encontrado o error en consulta.");
 
     type SupabaseClubDetalle = Record<string, any> & {
       canchas?: { count: number }[] | null;
