@@ -118,60 +118,47 @@ export default function TorneosPage() {
   };
 
   const handleOpenEdit = (torneo: Torneo) => {
-    setFormData({
-      nombre: torneo.nombre || "",
-      subtitulo: torneo.subtitulo || "",
-      club_id: String(torneo.club_id || ""),
-      fecha: torneo.fecha ? String(torneo.fecha) : "",
-      nivel: torneo.nivel || "5ª",
-      categoria: torneo.categoria || "Masculino",
-      estado: torneo.estado || "Borrador",
-      cupos_maximos: torneo.cupos_maximos || 16,
-      modalidad: torneo.modalidad || "Duplas",
-      formato: torneo.formato || "Eliminatoria Directa",
-      precio_inscripcion: torneo.precio_inscripcion || 0,
-      alcance: torneo.alcance ?? "Provincial",
-      premio_1: torneo.premio_1 ?? "",
-      premio_2: torneo.premio_2 ?? "",
-      premio_3: torneo.premio_3 ?? "",
-      canchas_disponibles: torneo.canchas_disponibles ?? 1,
-      duracion_partido_minutos: torneo.duracion_partido_minutos ?? 90,
-      hora_inicio_jornada: torneo.hora_inicio_jornada ?? "08:00",
-    });
-    setEditingId(String(torneo.id));
-    setIsModalOpen(true);
+    router.push(`/dashboard/torneos/${torneo.id}`);
   };
 
   const handleSaveTorneo = async () => {
     try {
       setSaving(true);
 
-      // Creamos el objeto limpio que espera tu backend
       const payloadToSave: FormTorneoState = {
         ...formData,
         club_id: formData.club_id === "" ? null : formData.club_id,
-        // Construimos el objeto premios que el backend procesa
+        // Set standard defaults for required fields when creating a new tournament
+        nivel: formData.nivel || "5ª",
+        categoria: formData.categoria || "Masculino",
+        estado: formData.estado || "Borrador",
+        cupos_maximos: formData.cupos_maximos || 16,
+        modalidad: formData.modalidad || "Duplas",
+        formato: formData.formato || "Eliminatoria Directa",
+        precio_inscripcion: formData.precio_inscripcion || 0,
+        alcance: formData.alcance ?? "Provincial",
         premios: {
-          uno: formData.premio_1 || "",
-          dos: formData.premio_2 || "",
-          tres: formData.premio_3 || "",
+          uno: "",
+          dos: "",
+          tres: "",
         },
-        // Eliminamos los campos planos para no enviar basura al backend
-        premio_1: undefined,
-        premio_2: undefined,
-        premio_3: undefined,
       };
 
+      let createdTorneo;
       if (editingId) {
-        await TorneosService.update(editingId, payloadToSave);
+        createdTorneo = await TorneosService.update(editingId, payloadToSave);
       } else {
-        await TorneosService.create(payloadToSave);
+        createdTorneo = await TorneosService.create(payloadToSave);
       }
 
       setIsModalOpen(false);
-      router.refresh();
-
-      setRefreshKey((prev) => prev + 1);
+      
+      if (createdTorneo && createdTorneo.id) {
+        router.push(`/dashboard/torneos/${createdTorneo.id}`);
+      } else {
+        router.refresh();
+        setRefreshKey((prev) => prev + 1);
+      }
     } catch (error) {
       console.error("Error al guardar:", error);
       alert("Error al guardar torneo.");

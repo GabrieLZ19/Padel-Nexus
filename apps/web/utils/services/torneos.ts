@@ -59,6 +59,16 @@ export const TorneosService = {
     await api.delete(`/torneos/${id}`);
   },
 
+  async subirBanner(id: string, imagenB64: string): Promise<{ banners: string[] }> {
+    const response = await api.put<{ banners: string[] }>(`/torneos/${id}/banner`, { imagenB64 });
+    return response.data;
+  },
+
+  async eliminarBanner(id: string, bannerUrl: string): Promise<{ banners: string[] }> {
+    const response = await api.delete<{ banners: string[] }>(`/torneos/${id}/banner`, { data: { bannerUrl } });
+    return response.data;
+  },
+
   async getPartidos(torneoId: string): Promise<Partido[]> {
     const response = await api.get<Partido[]>(`/torneos/${torneoId}/partidos`);
     return response.data;
@@ -131,6 +141,17 @@ export const TorneosService = {
     payload: { equipo_a_id: string | null; equipo_b_id: string | null; motivo: string },
   ) {
     const response = await api.put(`/torneos/partidos/${partidoId}/equipos`, payload);
+    return response.data;
+  },
+
+  async guardarSiembra(
+    torneoId: string,
+    payload: {
+      matches: { id: string; equipo_a_id: string | null; equipo_b_id: string | null }[];
+      motivo: string;
+    }
+  ) {
+    const response = await api.post(`/torneos/${torneoId}/guardar-siembra`, payload);
     return response.data;
   },
 };

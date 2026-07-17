@@ -15,7 +15,7 @@ import {
   Sun,
   CloudRain,
 } from "lucide-react";
-import { api } from "@/utils/api";
+import { ClubesService } from "@/utils/services/clubes";
 import type { Cancha, Turno } from "@/utils/types/club.types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal, { FeedbackModalProps } from "@/components/ui/FeedbackModal";
@@ -79,11 +79,11 @@ export default function CanchasAdminPage() {
     setLoading(true);
     try {
       const [clubRes, canchasRes] = await Promise.all([
-        api.get(`/clubes/${clubId}`),
-        api.get(`/clubes/${clubId}/canchas`),
+        ClubesService.getById(clubId),
+        ClubesService.getCanchas(clubId),
       ]);
-      setClub(clubRes.data.data);
-      setCanchas(canchasRes.data.data || []);
+      setClub(clubRes);
+      setCanchas(canchasRes || []);
     } catch (err: any) {
       console.error("Error al cargar datos:", err);
     } finally {
@@ -117,14 +117,14 @@ export default function CanchasAdminPage() {
     try {
       if (editingCancha) {
         // Actualizar cancha existente
-        await api.put(`/clubes/canchas/${editingCancha.id}`, {
+        await ClubesService.updateCancha(editingCancha.id, {
           nombre: formCancha.nombre,
           tipo_suelo: formCancha.tipo_suelo,
           techada: formCancha.techada,
         });
       } else {
         // Crear nueva cancha
-        await api.post(`/clubes/${clubId}/canchas`, {
+        await ClubesService.createCancha(clubId, {
           nombre: formCancha.nombre,
           tipo_suelo: formCancha.tipo_suelo,
           techada: formCancha.techada,
@@ -157,7 +157,7 @@ export default function CanchasAdminPage() {
       onConfirm: async () => {
         setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
         try {
-          await api.delete(`/clubes/canchas/${canchaId}`);
+          await ClubesService.deleteCancha(canchaId);
           await fetchData();
           setFeedbackModal({
             isOpen: true,
@@ -189,7 +189,7 @@ export default function CanchasAdminPage() {
   const saveTurno = async () => {
     setSaving(true);
     try {
-      await api.post(`/clubes/canchas/${turnoParaCancha}/turnos`, {
+      await ClubesService.createTurno(turnoParaCancha, {
         hora_inicio: formFormatedTime(formTurno.hora_inicio),
         hora_fin: formFormatedTime(formTurno.hora_fin),
         precio: Number(formTurno.precio),
@@ -222,7 +222,7 @@ export default function CanchasAdminPage() {
       onConfirm: async () => {
         setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
         try {
-          await api.delete(`/clubes/turnos/${turnoId}`);
+          await ClubesService.deleteTurno(turnoId);
           await fetchData();
           setFeedbackModal({
             isOpen: true,

@@ -20,7 +20,7 @@ import {
   Check,
   ExternalLink,
 } from "lucide-react";
-import { api } from "@/utils/api";
+import { ReservasService } from "@/utils/services/reservas";
 import { getSupabaseBrowserClient } from "@/utils/supabase/client";
 import { sileo } from "sileo";
 
@@ -100,8 +100,7 @@ export default function CheckoutPage() {
             return;
           }
 
-          const { data } = await api.get(`/reservas/turno/${tId}`);
-          const turnData = data.data;
+          const turnData = await ReservasService.getTurnoInfo(tId);
           const hasBankDetails = !!(turnData?.canchas?.clubes?.cbu?.trim() || turnData?.canchas?.clubes?.alias?.trim());
           if (!hasBankDetails) {
             setMetodoPago("efectivo");
@@ -117,8 +116,7 @@ export default function CheckoutPage() {
             turnos: turnData,
           });
         } else {
-          const { data } = await api.get(`/reservas/${reservaId}`);
-          const resData = data.data;
+          const resData = await ReservasService.getReservaById(reservaId);
           const hasBankDetails = !!(resData?.turnos?.canchas?.clubes?.cbu?.trim() || resData?.turnos?.canchas?.clubes?.alias?.trim());
           if (!hasBankDetails) {
             setMetodoPago("efectivo");
@@ -151,7 +149,7 @@ export default function CheckoutPage() {
       if (paymentStatus === "success" || paymentStatus === "approved") {
         setMetodoPago("mercadopago");
         if (paymentId && reservaId !== "new") {
-          api.post(`/reservas/${reservaId}/confirmar-retorno`, { payment_id: paymentId })
+          ReservasService.confirmarRetornoMercadoPago(reservaId, paymentId)
             .then(() => {
               setCompletado(true);
             })
@@ -211,11 +209,11 @@ export default function CheckoutPage() {
 
       // 1. Si la reserva es nueva, la creamos en la base de datos en este instante
       if (reservaId === "new") {
-        const { data: createData } = await api.post("/reservas", {
+        const createData = await ReservasService.crearPreReserva({
           turno_id: reserva.turno_id,
           fecha_reserva: reserva.fecha_reserva,
         });
-        activeReservaId = createData.data.id;
+        activeReservaId = createData.id;
       }
 
       // Subir archivo si es transferencia bancaria
@@ -245,10 +243,8 @@ export default function CheckoutPage() {
       // 2. Procesar el pago de la reserva
       if (metodoPago === "mercadopago") {
         // Generar la preferencia en el backend
-        const { data } = await api.post(
-          `/reservas/${activeReservaId}/preferencia-mp`,
-        );
-        const initPoint = data.data.initPoint || data.data.sandboxInitPoint;
+        const dataMP = await ReservasService.iniciarPagoMercadoPago(activeReservaId);
+        const initPoint = dataMP.initPoint || dataMP.sandboxInitPoint;
         if (initPoint) {
           // Redirigir al usuario al checkout oficial de Mercado Pago
           window.location.href = initPoint;
@@ -259,7 +255,7 @@ export default function CheckoutPage() {
         }
       } else {
         // Métodos de pago offline/manuales
-        await api.post(`/reservas/${activeReservaId}/pagar`, {
+        await ReservasService.pagarReserva(activeReservaId, {
           monto: reserva.turnos.precio,
           metodo_pago: metodoPago,
           referencia_pago: metodoPago === "transferencia" ? referenciaTransferencia : undefined,

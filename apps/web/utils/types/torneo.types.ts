@@ -32,6 +32,7 @@ export interface Torneo {
   canchas_disponibles?: number | null;
   duracion_partido_minutos?: number | null;
   hora_inicio_jornada?: string | null;
+  banners?: string[];
 
   // Relaciones
   clubes?: Partial<Club> | null;

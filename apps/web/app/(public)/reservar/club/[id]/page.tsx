@@ -14,7 +14,8 @@ import {
   Sun,
   CloudRain,
 } from "lucide-react";
-import { api } from "@/utils/api";
+import { ClubesService } from "@/utils/services/clubes";
+import { ReservasService } from "@/utils/services/reservas";
 import type { SlotDisponible } from "@/utils/types/club.types";
 
 interface ClubDetalle {
@@ -48,8 +49,8 @@ export default function ClubHorariosPage() {
   useEffect(() => {
     const fetchClub = async () => {
       try {
-        const { data } = await api.get(`/clubes/${clubId}`);
-        setClub(data.data);
+        const res = await ClubesService.getById(clubId);
+        setClub(res);
       } catch {
         setClub(null);
       }
@@ -62,10 +63,8 @@ export default function ClubHorariosPage() {
     setLoading(true);
     setSelectedSlot(null);
     try {
-      const { data } = await api.get("/reservas/disponibles", {
-        params: { club_id: clubId, fecha: selectedDate },
-      });
-      setSlots(data.data || []);
+      const data = await ReservasService.getReservasDisponibles({ club_id: clubId, fecha: selectedDate });
+      setSlots(data || []);
     } catch {
       setSlots([]);
     } finally {

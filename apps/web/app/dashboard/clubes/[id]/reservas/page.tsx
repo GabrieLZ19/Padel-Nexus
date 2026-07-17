@@ -17,46 +17,43 @@ import {
   XCircle,
   RefreshCw,
 } from "lucide-react";
-import { api } from "@/utils/api";
+import { ClubesService } from "@/utils/services/clubes";
+import { ReservasService } from "@/utils/services/reservas";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 
 interface ReservaAdmin {
   id: string;
   turno_id: string;
-  usuario_id: string;
   fecha_reserva: string;
-  estado_pago: "pendiente" | "completado" | "rechazado";
-  estado_reserva: "confirmada" | "cancelada" | "pendiente";
-  created_at: string;
+  estado_pago: string;
+  estado_reserva: string;
   perfiles: {
-    nombre: string | null;
-    apellido: string | null;
-    email: string | null;
-    telefono: string | null;
-  } | null;
+    id: string;
+    nombre: string;
+    apellido: string;
+    email: string;
+    telefono: string;
+  };
   turnos: {
+    id: string;
     hora_inicio: string;
     hora_fin: string;
     precio: number;
     canchas: {
+      id: string;
       nombre: string;
-    } | null;
-  } | null;
+    };
+  };
 }
 
-interface ClubDetalle {
-  id: string;
-  nombre: string;
-}
-
-export default function ReservasAdminPage() {
+export default function ReservasClubPage() {
   const params = useParams();
   const clubId = params.id as string;
 
-  const [club, setClub] = useState<ClubDetalle | null>(null);
+  const [club, setClub] = useState<{ id: string; nombre: string } | null>(null);
   const [reservas, setReservas] = useState<ReservaAdmin[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(() => {
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
     return new Date().toISOString().split("T")[0];
   });
   const [statusFilter, setStatusFilter] = useState<string>("todos");
@@ -65,8 +62,8 @@ export default function ReservasAdminPage() {
   useEffect(() => {
     const fetchClub = async () => {
       try {
-        const { data } = await api.get(`/clubes/${clubId}`);
-        setClub(data.data);
+        const res = await ClubesService.getById(clubId);
+        setClub(res);
       } catch {
         setClub(null);
       }
@@ -78,10 +75,8 @@ export default function ReservasAdminPage() {
   const fetchReservas = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/reservas/club/${clubId}`, {
-        params: { fecha: selectedDate },
-      });
-      setReservas(data.data || []);
+      const res = await ReservasService.getPorClub(clubId, { fecha: selectedDate });
+      setReservas(res || []);
     } catch {
       setReservas([]);
     } finally {

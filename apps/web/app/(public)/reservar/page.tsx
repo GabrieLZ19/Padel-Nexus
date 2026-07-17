@@ -12,7 +12,7 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react";
-import { api } from "@/utils/api";
+import { ClubesService } from "@/utils/services/clubes";
 import type { ClubCercano } from "@/utils/types/club.types";
 
 // Leaflet se carga dinámicamente para evitar SSR issues
@@ -28,10 +28,11 @@ const MapaClubs = dynamic(() => import("@/components/reservas/MapaClubs"), {
 
 export default function ReservarPage() {
   const router = useRouter();
+
   const [clubes, setClubes] = useState<ClubCercano[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [radio, setRadio] = useState(50);
+  const [radio, setRadio] = useState<number>(30); // Radio de búsqueda en Km
   const [userLocation, setUserLocation] = useState<{
     lat: number;
     lng: number;
@@ -67,11 +68,10 @@ export default function ReservarPage() {
     requestLocation();
   }, [requestLocation]);
 
-  // Fetch de clubes (geográfico o paginado)
   const fetchClubes = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, string | number> = { limit: 50 };
+      const params: any = {};
 
       if (userLocation) {
         params.lat = userLocation.lat;
@@ -83,8 +83,8 @@ export default function ReservarPage() {
         params.search = search.trim();
       }
 
-      const { data } = await api.get("/clubes", { params });
-      setClubes(data.data || []);
+      const res = await ClubesService.getAll(params);
+      setClubes(res.data || []);
     } catch {
       setClubes([]);
     } finally {

@@ -15,7 +15,7 @@ import {
   Loader2,
   ExternalLink,
 } from "lucide-react";
-import { api } from "@/utils/api";
+import { ReservasService } from "@/utils/services/reservas";
 import { sileo } from "sileo";
 
 interface ReservaUsuario {
@@ -23,18 +23,21 @@ interface ReservaUsuario {
   turno_id: string;
   usuario_id: string;
   fecha_reserva: string;
-  estado_pago: "pendiente" | "completado" | "rechazado" | string;
-  estado_reserva: "confirmada" | "cancelada" | "pendiente" | string;
+  estado_pago: string;
+  estado_reserva: string;
   created_at: string;
-  turnos?: {
+  turnos: {
+    id: string;
     hora_inicio: string;
     hora_fin: string;
     precio: number;
-    canchas?: {
+    canchas: {
+      id: string;
       nombre: string;
       tipo_suelo: string | null;
       techada: boolean;
-      clubes?: {
+      clubes: {
+        id: string;
         nombre: string;
         localidad: string;
         provincia: string;
@@ -58,8 +61,8 @@ export default function MisReservasPage() {
   const fetchReservas = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/reservas/mis-reservas");
-      setReservas(data.data || []);
+      const res = await ReservasService.getMisReservas();
+      setReservas(res || []);
     } catch (err: any) {
       console.error("Error al obtener reservas del usuario:", err);
       sileo.error({

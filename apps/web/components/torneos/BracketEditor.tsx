@@ -203,7 +203,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           jugador1_nombre: p.equipo_a_j1 ?? "",
           jugador2_nombre: p.equipo_a_j2 ?? null,
           seed: idx * 2 + 1,
-          club: "",
+          club: (p as any).equipo_a_club || "Sin club asignado",
         });
       }
       if (p.equipo_b_id && p.equipo_b_j1) {
@@ -212,7 +212,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           jugador1_nombre: p.equipo_b_j1 ?? "",
           jugador2_nombre: p.equipo_b_j2 ?? null,
           seed: idx * 2 + 2,
-          club: "",
+          club: (p as any).equipo_b_club || "Sin club asignado",
         });
       }
       return {
@@ -268,14 +268,16 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         try {
           setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
 
-          const ordenSiembra = siembraZonas.flatMap((z) => {
-            const list = [];
-            if (z.parejas[0]?.id) list.push(z.parejas[0].id);
-            if (z.parejas[1]?.id) list.push(z.parejas[1].id);
-            return list;
-          });
+          const matchesPayload = siembraZonas.map((z) => ({
+            id: z.id,
+            equipo_a_id: z.parejas[0]?.id || null,
+            equipo_b_id: z.parejas[1]?.id || null,
+          }));
 
-          await TorneosService.generarCuadro(torneoId, ordenSiembra, motivo);
+          await TorneosService.guardarSiembra(torneoId, {
+            matches: matchesPayload,
+            motivo,
+          });
           setIsSiembraEditing(false);
           setFeedbackModal({
             isOpen: true,

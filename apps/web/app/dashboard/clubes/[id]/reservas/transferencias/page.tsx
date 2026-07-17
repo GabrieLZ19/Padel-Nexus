@@ -18,8 +18,8 @@ import {
   ShieldAlert,
   Search,
 } from "lucide-react";
-import { api } from "@/utils/api";
 import { sileo } from "sileo";
+import { ReservasService } from "@/utils/services/reservas";
 
 interface PagoPendiente {
   id: string;
@@ -48,13 +48,9 @@ interface PagoPendiente {
         id: string;
         nombre: string;
         club_id: string;
-        clubes?: {
-          id: string;
-          nombre: string;
-        } | null;
-      } | null;
-    } | null;
-  } | null;
+      };
+    };
+  };
 }
 
 export default function TransferenciasPendientesPage() {
@@ -70,10 +66,8 @@ export default function TransferenciasPendientesPage() {
   const fetchPendientes = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/reservas/pagos/pendientes", {
-        params: { club_id: clubId },
-      });
-      setPagos(data.data || []);
+      const res = await ReservasService.getPagosPendientes(clubId);
+      setPagos(res || []);
     } catch (err: any) {
       console.error("Error al cargar transferencias pendientes:", err);
       sileo.error({
@@ -92,8 +86,8 @@ export default function TransferenciasPendientesPage() {
   const handleValidar = async (pagoId: string, aprobado: boolean) => {
     setProcessingId(pagoId);
     try {
-      await api.post(`/reservas/pagos/${pagoId}/validar`, { aprobado });
-      
+      await ReservasService.validarPago(pagoId, aprobado);
+
       sileo.success({
         title: aprobado ? "Transferencia Aprobada" : "Transferencia Rechazada",
         description: aprobado
@@ -104,7 +98,10 @@ export default function TransferenciasPendientesPage() {
       // Actualizar lista localmente
       setPagos((prev) => prev.filter((pago) => pago.id !== pagoId));
     } catch (err: any) {
-      const msg = err.response?.data?.error || err.message || "Error al procesar validación.";
+      const msg =
+        err.response?.data?.error ||
+        err.message ||
+        "Error al procesar validación.";
       sileo.error({
         title: "Error al validar",
         description: msg,
@@ -120,12 +117,26 @@ export default function TransferenciasPendientesPage() {
     if (!dateStr) return "";
     const date = new Date(dateStr + "T12:00:00Z");
     const dias = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
-    const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const meses = [
+      "Ene",
+      "Feb",
+      "Mar",
+      "Abr",
+      "May",
+      "Jun",
+      "Jul",
+      "Ago",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dic",
+    ];
     return `${dias[date.getUTCDay()]} ${date.getUTCDate()} de ${meses[date.getUTCMonth()]}`;
   };
 
   const filteredPagos = pagos.filter((p) => {
-    const userName = `${p.perfiles?.apellido || ""} ${p.perfiles?.nombre || ""}`.toLowerCase();
+    const userName =
+      `${p.perfiles?.apellido || ""} ${p.perfiles?.nombre || ""}`.toLowerCase();
     const reference = (p.referencia_pago || "").toLowerCase();
     const query = searchQuery.toLowerCase();
     return userName.includes(query) || reference.includes(query);
@@ -169,9 +180,12 @@ export default function TransferenciasPendientesPage() {
       ) : filteredPagos.length === 0 ? (
         <div className="text-center py-20 bg-brand-card border border-white/5 rounded-3xl max-w-xl mx-auto space-y-4">
           <ShieldAlert className="w-12 h-12 text-gray-600 mx-auto" />
-          <h3 className="text-lg font-semibold text-gray-400">Sin transferencias pendientes</h3>
+          <h3 className="text-lg font-semibold text-gray-400">
+            Sin transferencias pendientes
+          </h3>
           <p className="text-gray-500 text-sm max-w-sm mx-auto">
-            ¡Buen trabajo! No hay solicitudes de validación de pago pendientes de revisión para este club en este momento.
+            ¡Buen trabajo! No hay solicitudes de validación de pago pendientes
+            de revisión para este club en este momento.
           </p>
         </div>
       ) : (
@@ -195,7 +209,9 @@ export default function TransferenciasPendientesPage() {
                     </span>
                     <h3 className="font-bold text-lg mt-2 flex items-center gap-2 text-white">
                       <span>${pago.monto}</span>
-                      <span className="text-xs text-gray-400 font-normal">monto cargado</span>
+                      <span className="text-xs text-gray-400 font-normal">
+                        monto cargado
+                      </span>
                     </h3>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-xs text-gray-400">
                       <div className="flex items-center gap-1">
@@ -205,7 +221,8 @@ export default function TransferenciasPendientesPage() {
                       <div className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-brand-chartreuse" />
                         <span>
-                          {formatHora(turno?.hora_inicio)} - {formatHora(turno?.hora_fin)} Hs
+                          {formatHora(turno?.hora_inicio)} -{" "}
+                          {formatHora(turno?.hora_fin)} Hs
                         </span>
                       </div>
                     </div>
@@ -216,7 +233,9 @@ export default function TransferenciasPendientesPage() {
                     <div className="flex items-center gap-2">
                       <User className="w-3.5 h-3.5 text-gray-500" />
                       <span className="font-semibold text-white">
-                        {perfil ? `${perfil.apellido || ""}, ${perfil.nombre || ""}` : "Usuario desconocido"}
+                        {perfil
+                          ? `${perfil.apellido || ""}, ${perfil.nombre || ""}`
+                          : "Usuario desconocido"}
                       </span>
                     </div>
                     {perfil?.email && (
@@ -237,7 +256,9 @@ export default function TransferenciasPendientesPage() {
                   <div className="bg-white/5 border border-white/5 rounded-xl p-3.5 space-y-2.5">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-gray-400">Referencia:</span>
-                      <span className="font-mono text-white font-bold select-all">{pago.referencia_pago || "Sin código"}</span>
+                      <span className="font-mono text-white font-bold select-all">
+                        {pago.referencia_pago || "Sin código"}
+                      </span>
                     </div>
                     {pago.comprobante_url ? (
                       <button
@@ -296,7 +317,11 @@ export default function TransferenciasPendientesPage() {
             </button>
             <div className="w-full h-full flex items-center justify-center bg-brand-black rounded-3xl overflow-hidden border border-white/10">
               {modalImagenUrl.endsWith(".pdf") ? (
-                <iframe src={modalImagenUrl} className="w-full h-full border-none" title="Comprobante PDF" />
+                <iframe
+                  src={modalImagenUrl}
+                  className="w-full h-full border-none"
+                  title="Comprobante PDF"
+                />
               ) : (
                 <img
                   src={modalImagenUrl}
@@ -311,7 +336,8 @@ export default function TransferenciasPendientesPage() {
               rel="noreferrer"
               className="mt-4 inline-flex items-center gap-1.5 text-xs text-brand-chartreuse hover:underline"
             >
-              Abrir en una nueva pestaña <ExternalLink className="w-3.5 h-3.5" />
+              Abrir en una nueva pestaña{" "}
+              <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
         </div>

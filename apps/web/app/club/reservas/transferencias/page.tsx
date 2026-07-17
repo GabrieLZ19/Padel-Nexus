@@ -19,7 +19,7 @@ import {
   FileText,
   Eye,
 } from "lucide-react";
-import { api } from "@/utils/api";
+import { ReservasService } from "@/utils/services/reservas";
 import { useProfileStore } from "@/store/useProfileStore";
 import { sileo } from "sileo";
 
@@ -50,13 +50,9 @@ interface PagoPendiente {
         id: string;
         nombre: string;
         club_id: string;
-        clubes?: {
-          id: string;
-          nombre: string;
-        } | null;
-      } | null;
-    } | null;
-  } | null;
+      };
+    };
+  };
 }
 
 export default function ClubTransferenciasPendientesPage() {
@@ -74,10 +70,8 @@ export default function ClubTransferenciasPendientesPage() {
     if (!clubId) return;
     setLoading(true);
     try {
-      const { data } = await api.get("/reservas/pagos/pendientes", {
-        params: { club_id: clubId },
-      });
-      const list = data.data || [];
+      const data = await ReservasService.getPagosPendientes(clubId);
+      const list = data || [];
       setPagos(list);
       if (list.length > 0) {
         setSelectedPago(list[0]);
@@ -102,7 +96,7 @@ export default function ClubTransferenciasPendientesPage() {
   const handleValidar = async (pagoId: string, aprobado: boolean) => {
     setProcessingId(pagoId);
     try {
-      await api.post(`/reservas/pagos/${pagoId}/validar`, { aprobado });
+      await ReservasService.validarPago(pagoId, aprobado);
 
       sileo.success({
         title: aprobado ? "Transferencia Aprobada" : "Transferencia Rechazada",

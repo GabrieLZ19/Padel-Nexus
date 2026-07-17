@@ -100,7 +100,13 @@ export const SortablePareja = ({
 }: {
   pareja: ParejaDrag;
   isEditing: boolean;
-  stats: { played: number; won: number; points: number };
+  stats: {
+    played: number;
+    won: number;
+    points: number;
+    diffSets: number;
+    diffGames: number;
+  };
   isClassified?: boolean;
   posNum?: number;
   isSiembra?: boolean;
@@ -180,28 +186,48 @@ export const SortablePareja = ({
       </div>
 
       {!isSiembra && (
-        <div className="flex items-center gap-2.5 shrink-0 px-2 text-xs">
+        <div className="flex items-center gap-2 shrink-0 px-1 text-xs">
           <div className="flex flex-col items-center">
-            <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">
+            <span className="text-[7px] text-gray-500 font-bold uppercase tracking-tight">
               PJ
             </span>
-            <div className="flex items-center justify-center size-7 rounded bg-[#111111] text-white font-bold text-xs">
+            <div className="flex items-center justify-center size-6 rounded bg-[#111111] text-white font-bold text-[10px]">
               {stats.played}
             </div>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-[8px] text-gray-500 font-bold uppercase tracking-tight">
+            <span className="text-[7px] text-gray-500 font-bold uppercase tracking-tight">
               PG
             </span>
-            <div className="flex items-center justify-center size-7 rounded bg-[#111111] text-white font-bold text-xs">
+            <div className="flex items-center justify-center size-6 rounded bg-[#111111] text-white font-bold text-[10px]">
               {stats.won}
             </div>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-[8px] text-brand-chartreuse/60 font-bold uppercase tracking-tight">
+            <span className="text-[7px] text-gray-500 font-bold uppercase tracking-tight">
+              DS
+            </span>
+            <div
+              className={`flex items-center justify-center size-6 rounded bg-[#111111] font-bold text-[10px] ${stats.diffSets > 0 ? "text-emerald-400" : stats.diffSets < 0 ? "text-red-400" : "text-white"}`}
+            >
+              {stats.diffSets > 0 ? `+${stats.diffSets}` : stats.diffSets}
+            </div>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-[7px] text-gray-500 font-bold uppercase tracking-tight">
+              DG
+            </span>
+            <div
+              className={`flex items-center justify-center size-6 rounded bg-[#111111] font-bold text-[10px] ${stats.diffGames > 0 ? "text-emerald-400" : stats.diffGames < 0 ? "text-red-400" : "text-white"}`}
+            >
+              {stats.diffGames > 0 ? `+${stats.diffGames}` : stats.diffGames}
+            </div>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-[7px] text-brand-chartreuse/60 font-bold uppercase tracking-tight">
               PTS
             </span>
-            <div className="flex items-center justify-center size-7 rounded bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20 font-black text-xs">
+            <div className="flex items-center justify-center size-6 rounded bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/25 font-black text-[10px]">
               {stats.points}
             </div>
           </div>
@@ -239,39 +265,94 @@ export const DroppableZona = ({
     let gamesAFavor = 0;
     let gamesEnContra = 0;
 
-    partidos.forEach((p) => {
+    partidos.forEach((p: any) => {
       if (p.ronda === zona.nombre && p.ganador) {
-        if (
-          p.equipo_a_id === inscripcionId ||
-          p.equipo_b_id === inscripcionId
-        ) {
+        const isTeamA = p.equipo_a_id === inscripcionId;
+        const isTeamB = p.equipo_b_id === inscripcionId;
+        if (isTeamA || isTeamB) {
           played++;
 
-          const setA = p.set1_a || 0;
-          const setB = p.set1_b || 0;
+          if (p.es_wo) {
+            if (p.ganador === inscripcionId) {
+              won++;
+              points += 2;
+              diffSets += 2;
+              gamesAFavor += 12;
+            } else {
+              diffSets -= 2;
+              gamesEnContra += 12;
+              points += 0;
+            }
+            return;
+          }
 
-          if (p.equipo_a_id === inscripcionId) {
-            diffSets += setA - setB;
-            diffGames += setA - setB;
-            gamesAFavor += setA;
-            gamesEnContra += setB;
-            if (p.ganador === inscripcionId) {
-              won++;
-              points += 2;
+          let sA_w = 0;
+          let sA_l = 0;
+          let gA_w = 0;
+          let gA_l = 0;
+
+          // Set 1
+          if (p.set1_a !== null && p.set1_b !== null) {
+            const aWon = p.set1_a > p.set1_b;
+            if (isTeamA) {
+              if (aWon) sA_w++;
+              else sA_l++;
+              gA_w += p.set1_a;
+              gA_l += p.set1_b;
             } else {
-              points += 1;
+              if (!aWon) sA_w++;
+              else sA_l++;
+              gA_w += p.set1_b;
+              gA_l += p.set1_a;
             }
+          }
+
+          // Set 2
+          if (p.set2_a !== null && p.set2_b !== null) {
+            const aWon = p.set2_a > p.set2_b;
+            if (isTeamA) {
+              if (aWon) sA_w++;
+              else sA_l++;
+              gA_w += p.set2_a;
+              gA_l += p.set2_b;
+            } else {
+              if (!aWon) sA_w++;
+              else sA_l++;
+              gA_w += p.set2_b;
+              gA_l += p.set2_a;
+            }
+          }
+
+          // Set 3 o Supertiebreak
+          if (p.set3_a !== null && p.set3_b !== null) {
+            const aWon = p.set3_a > p.set3_b;
+            if (isTeamA) {
+              if (aWon) sA_w++;
+              else sA_l++;
+              if (!p.es_supertiebreak) {
+                gA_w += p.set3_a;
+                gA_l += p.set3_b;
+              }
+            } else {
+              if (!aWon) sA_w++;
+              else sA_l++;
+              if (!p.es_supertiebreak) {
+                gA_w += p.set3_b;
+                gA_l += p.set3_a;
+              }
+            }
+          }
+
+          diffSets += sA_w - sA_l;
+          diffGames += gA_w - gA_l;
+          gamesAFavor += gA_w;
+          gamesEnContra += gA_l;
+
+          if (p.ganador === inscripcionId) {
+            won++;
+            points += 2;
           } else {
-            diffSets += setB - setA;
-            diffGames += setB - setA;
-            gamesAFavor += setB;
-            gamesEnContra += setA;
-            if (p.ganador === inscripcionId) {
-              won++;
-              points += 2;
-            } else {
-              points += 1;
-            }
+            points += 1;
           }
         }
       }
@@ -434,16 +515,84 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
 
   const getParejaStatsById = (id: string) => {
     const activeZona = findZonaOfPareja(id);
-    if (!activeZona) return { played: 0, won: 0, points: 0 };
+    if (!activeZona) return { played: 0, won: 0, points: 0, diffSets: 0, diffGames: 0 };
 
     let played = 0;
     let won = 0;
     let points = 0;
+    let diffSets = 0;
+    let diffGames = 0;
 
-    partidos.forEach((p) => {
+    partidos.forEach((p: any) => {
       if (p.ronda === activeZona.nombre && p.ganador) {
-        if (p.equipo_a_id === id || p.equipo_b_id === id) {
+        const isTeamA = p.equipo_a_id === id;
+        const isTeamB = p.equipo_b_id === id;
+        if (isTeamA || isTeamB) {
           played++;
+          
+          if (p.es_wo) {
+            if (p.ganador === id) {
+              won++;
+              points += 2;
+              diffSets += 2;
+            } else {
+              diffSets -= 2;
+              points += 0;
+            }
+            return;
+          }
+
+          let sA_w = 0;
+          let sA_l = 0;
+          let gA_w = 0;
+          let gA_l = 0;
+
+          if (p.set1_a !== null && p.set1_b !== null) {
+            const aWon = p.set1_a > p.set1_b;
+            if (isTeamA) {
+              if (aWon) sA_w++; else sA_l++;
+              gA_w += p.set1_a;
+              gA_l += p.set1_b;
+            } else {
+              if (!aWon) sA_w++; else sA_l++;
+              gA_w += p.set1_b;
+              gA_l += p.set1_a;
+            }
+          }
+
+          if (p.set2_a !== null && p.set2_b !== null) {
+            const aWon = p.set2_a > p.set2_b;
+            if (isTeamA) {
+              if (aWon) sA_w++; else sA_l++;
+              gA_w += p.set2_a;
+              gA_l += p.set2_b;
+            } else {
+              if (!aWon) sA_w++; else sA_l++;
+              gA_w += p.set2_b;
+              gA_l += p.set2_a;
+            }
+          }
+
+          if (p.set3_a !== null && p.set3_b !== null) {
+            const aWon = p.set3_a > p.set3_b;
+            if (isTeamA) {
+              if (aWon) sA_w++; else sA_l++;
+              if (!p.es_supertiebreak) {
+                gA_w += p.set3_a;
+                gA_l += p.set3_b;
+              }
+            } else {
+              if (!aWon) sA_w++; else sA_l++;
+              if (!p.es_supertiebreak) {
+                gA_w += p.set3_b;
+                gA_l += p.set3_a;
+              }
+            }
+          }
+
+          diffSets += (sA_w - sA_l);
+          diffGames += (gA_w - gA_l);
+
           if (p.ganador === id) {
             won++;
             points += 2;
@@ -454,7 +603,7 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
       }
     });
 
-    return { played, won, points };
+    return { played, won, points, diffSets, diffGames };
   };
 
   const handleDragStart = (event: DragStartEvent) => {

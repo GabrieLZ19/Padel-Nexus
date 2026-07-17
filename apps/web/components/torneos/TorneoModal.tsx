@@ -2,19 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Save, Lock } from "lucide-react";
+import { X, Save } from "lucide-react";
 import CustomDropdown from "../ui/CustomDropdown";
 import { Club, FormTorneoState } from "../../utils/types";
-
-import {
-  NIVELES_PADEL,
-  CATEGORIAS_TORNEO,
-  ESTADOS_TORNEO,
-  MODALIDADES_TORNEO,
-  FORMATOS_TORNEO,
-  ALCANCES_TORNEO,
-} from "@/utils/constants/padelConfig";
-import { TorneosService } from "@/utils/services/torneos";
 
 interface TorneoModalProps {
   isOpen: boolean;
@@ -37,57 +27,12 @@ export default function TorneoModal({
   isSaving,
   editingId,
 }: TorneoModalProps) {
-  // 1. Obtenemos el día actual estrictamente en la zona horaria local del usuario
-  const [isCustomCat, setIsCustomCat] = useState(false);
-  const [isCustomNiv, setIsCustomNiv] = useState(false);
-  const [dbCategorias, setDbCategorias] = useState<string[]>([]);
-  const [dbNiveles, setDbNiveles] = useState<string[]>([]);
-
-  // Sincronizar estado cuando se abre el modal
-  useEffect(() => {
-    if (isOpen) {
-      // 1. Obtener todas las categorías y niveles cargados en otros torneos
-      TorneosService.getAll()
-        .then((all) => {
-          const cats = all
-            .map((t) => t.categoria)
-            .filter((c): c is string => !!c)
-            .filter((c) => !CATEGORIAS_TORNEO.some((opt) => opt.value === c));
-          const uniqueCats = Array.from(new Set(cats));
-          setDbCategorias(uniqueCats);
-
-          const nivs = all
-            .map((t) => t.nivel)
-            .filter((n): n is string => !!n)
-            .filter((n) => !NIVELES_PADEL.some((opt) => opt.value === n));
-          const uniqueNivs = Array.from(new Set(nivs));
-          setDbNiveles(uniqueNivs);
-
-          // 2. Determinar si los valores actuales del torneo son completamente nuevos/personalizados
-          const customCat = formData.categoria && 
-            !CATEGORIAS_TORNEO.some((c) => c.value === formData.categoria) &&
-            !uniqueCats.includes(formData.categoria);
-          setIsCustomCat(!!customCat);
-
-          const customNiv = formData.nivel && 
-            !NIVELES_PADEL.some((n) => n.value === formData.nivel) &&
-            !uniqueNivs.includes(formData.nivel);
-          setIsCustomNiv(!!customNiv);
-        })
-        .catch((err) => console.error("Error cargando categorías/niveles:", err));
-    }
-  }, [isOpen]);
-
-  const selectedClub = clubs.find((c) => String(c.id) === String(formData.club_id));
-  const maxCanchas = selectedClub ? selectedClub.canchas : 999;
-
-  // 1. Obtenemos el día actual estrictamente en la zona horaria local del usuario
+  // Day logic in local user timezone
   const hoy = new Date();
   const fechaLocal = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60000)
     .toISOString()
     .split("T")[0];
 
-  // 2. Lógica inteligente para la fecha mínima
   const fechaFormulario = formData.fecha ? formData.fecha.split("T")[0] : "";
   const minDate =
     editingId && fechaFormulario && fechaFormulario < fechaLocal
@@ -99,35 +44,6 @@ export default function TorneoModal({
     label: c.nombre,
   }));
 
-  const opcionesCupos = [4, 8, 16, 32, 64].map((num) => ({
-    value: String(num),
-    label: `${num} ${formData.modalidad === "Individual" ? "Jugadores" : "Duplas"}`,
-  }));
-
-  // Lógica de estados automáticos: si ya tiene llaves generadas, se bloquea la edición de estado.
-  const estadoNormalizado = (formData.estado || "").toLowerCase().trim();
-  const isAutoManaged =
-    estadoNormalizado === "en curso" || estadoNormalizado === "finalizado";
-
-  // Usamos la constante ESTADOS_TORNEO que pediste
-  const opcionesEstado = isAutoManaged
-    ? [{ value: formData.estado, label: formData.estado.toUpperCase() }]
-    : ESTADOS_TORNEO;
-
-  const categoriasOptions = [
-    ...CATEGORIAS_TORNEO,
-    ...dbCategorias.map((c) => ({ value: c, label: c })),
-    { value: "Personalizado", label: "Personalizado..." },
-  ];
-  const selectedCategoriaValue = isCustomCat ? "Personalizado" : formData.categoria;
-
-  const nivelesOptions = [
-    ...NIVELES_PADEL,
-    ...dbNiveles.map((n) => ({ value: n, label: n })),
-    { value: "Personalizado", label: "Personalizado..." },
-  ];
-  const selectedNivelValue = isCustomNiv ? "Personalizado" : formData.nivel;
-
   return (
     <AnimatePresence>
       {isOpen && (
@@ -137,454 +53,88 @@ export default function TorneoModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.2 }}
-            className="bg-[#1a1a1a] p-8 rounded-4xl border border-white/5 w-full max-w-3xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] my-8 relative"
+            className="bg-[#1a1a1a] p-8 rounded-4xl border border-white/5 w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.8)] relative"
           >
-            <div className="flex justify-between items-start mb-8 border-b border-white/10 pb-6">
+            <div className="flex justify-between items-start mb-6 border-b border-white/10 pb-4">
               <div>
-                <h2 className="text-[26px] font-bold text-white tracking-tight leading-none mb-2">
-                  {editingId ? "Editar Torneo" : "Configurar Torneo"}
+                <h2 className="text-xl font-black text-white tracking-tight leading-none mb-1">
+                  {editingId ? "Editar Torneo" : "Nuevo Torneo"}
                 </h2>
-                <p className="text-gray-400 text-sm">
-                  Definí los detalles técnicos, financieros y operativos de la
-                  competencia.
+                <p className="text-gray-400 text-xs mt-1">
+                  Creá el borrador inicial de la competencia.
                 </p>
               </div>
               <button
                 onClick={onClose}
-                className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors shrink-0"
+                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors shrink-0 cursor-pointer"
               >
                 <X className="size-4" />
               </button>
             </div>
 
-            <div className="space-y-6">
-              {/* FILA 1: Nombre y Fecha */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Nombre del Torneo
-                  </label>
-                  <input
-                    placeholder="Ej: Master Series BA"
-                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
-                    value={formData.nombre}
-                    onChange={(e) =>
-                      setFormData({ ...formData, nombre: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Fecha de Inicio
-                  </label>
-                  <input
-                    type="date"
-                    min={minDate}
-                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-brand-white focus:outline-none text-sm transition-colors cursor-pointer"
-                    value={fechaFormulario}
-                    onClick={(e) => {
-                      try {
-                        (e.target as any).showPicker();
-                      } catch (err) {
-                        console.log("Picker not supported:", err);
-                      }
-                    }}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      // MAGIA ANTI-ZONA HORARIA: Inyectamos mediodía con huso horario argentino (-03:00)
-                      // Esto garantiza que en la base de datos caiga exactamente en el día que elegiste.
-                      setFormData({
-                        ...formData,
-                        fecha: val ? `${val}T12:00:00-03:00` : "",
-                      });
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* FILA 2: Sede y Estado */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Sede / Club
-                  </label>
-                  <CustomDropdown
-                    value={formData.club_id ?? ""}
-                    onChange={(val) =>
-                      setFormData({ ...formData, club_id: val })
-                    }
-                    options={opcionesClubes}
-                    placeholder={
-                      clubs.length === 0
-                        ? "No hay clubes creados"
-                        : "Sede a confirmar..."
-                    }
-                    disabled={clubs.length === 0}
-                  />
-                </div>
-                <div>
-                  <label className="flex items-center justify-between text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    <span>Estado de publicación</span>
-                    {isAutoManaged && (
-                      <span className="flex items-center gap-1 text-brand-chartreuse">
-                        <Lock className="size-3" /> Auto
-                      </span>
-                    )}
-                  </label>
-                  <div
-                    className={
-                      isAutoManaged ? "opacity-60 cursor-not-allowed" : ""
-                    }
-                  >
-                    <CustomDropdown
-                      value={formData.estado}
-                      onChange={(val) =>
-                        setFormData({ ...formData, estado: val })
-                      }
-                      options={opcionesEstado}
-                      placeholder="Seleccionar..."
-                      disabled={isAutoManaged}
-                    />
-                  </div>
-                  {isAutoManaged && (
-                    <p className="text-[10px] text-gray-500 mt-1.5">
-                      El sistema gestiona este estado porque el torneo ya tiene
-                      llaves generadas.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* FILA 3: Modalidad, Alcance, Rama y Nivel */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Modalidad
-                  </label>
-                  <CustomDropdown
-                    value={formData.modalidad || "Duplas"}
-                    onChange={(val) =>
-                      setFormData({ ...formData, modalidad: val })
-                    }
-                    options={MODALIDADES_TORNEO}
-                    placeholder="Seleccionar..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Alcance
-                  </label>
-                  <CustomDropdown
-                    value={formData.alcance ?? "Provincial"}
-                    onChange={(val) =>
-                      setFormData({
-                        ...formData,
-                        alcance: val as 'Nacional' | 'Provincial' | 'Local',
-                      })
-                    }
-                    options={ALCANCES_TORNEO}
-                    placeholder="Seleccionar..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Rama / Categoría
-                  </label>
-                  <CustomDropdown
-                    value={selectedCategoriaValue}
-                    onChange={(val) => {
-                      if (val === "Personalizado") {
-                        setIsCustomCat(true);
-                        setFormData({ ...formData, categoria: "" });
-                      } else {
-                        setIsCustomCat(false);
-                        setFormData({ ...formData, categoria: val });
-                      }
-                    }}
-                    options={categoriasOptions}
-                    placeholder="Seleccionar..."
-                  />
-                  {isCustomCat && (
-                    <div className="mt-2">
-                      <input
-                        placeholder="Escribí la categoría..."
-                        className="w-full bg-brand-card p-3 rounded-xl border border-white/5 text-brand-white focus:outline-none text-sm transition-all"
-                        value={formData.categoria}
-                        onChange={(e) =>
-                          setFormData({ ...formData, categoria: e.target.value })
-                        }
-                      />
-                      <p className="text-[10px] text-brand-chartreuse mt-1 flex items-center gap-1 font-medium">
-                        <Save className="size-3" /> Se guardará automáticamente para futuros torneos.
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Nivel
-                  </label>
-                  <CustomDropdown
-                    value={selectedNivelValue}
-                    onChange={(val) => {
-                      if (val === "Personalizado") {
-                        setIsCustomNiv(true);
-                        setFormData({ ...formData, nivel: "" });
-                      } else {
-                        setIsCustomNiv(false);
-                        setFormData({ ...formData, nivel: val });
-                      }
-                    }}
-                    options={nivelesOptions}
-                    placeholder="Seleccionar..."
-                  />
-                  {isCustomNiv && (
-                    <div className="mt-2">
-                      <input
-                        placeholder="Escribí el nivel..."
-                        className="w-full bg-brand-card p-3 rounded-xl border border-white/5 mt-2 text-brand-white focus:outline-none text-sm transition-all"
-                        value={formData.nivel}
-                        onChange={(e) =>
-                          setFormData({ ...formData, nivel: e.target.value })
-                        }
-                      />
-                      <p className="text-[10px] text-brand-chartreuse mt-1 flex items-center gap-1 font-medium">
-                        <Save className="size-3" /> Se guardará automáticamente para futuros torneos.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* FILA 4: Fases, Cupos y Precio */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Formato de Fases
-                  </label>
-                  <CustomDropdown
-                    value={formData.formato || "Eliminatoria Directa"}
-                    onChange={(val) =>
-                      setFormData({ ...formData, formato: val })
-                    }
-                    options={FORMATOS_TORNEO}
-                    placeholder="Seleccionar..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Cupos Máximos
-                  </label>
-                  <CustomDropdown
-                    value={String(formData.cupos_maximos || 16)}
-                    onChange={(val) =>
-                      setFormData({
-                        ...formData,
-                        cupos_maximos: Number(val),
-                      })
-                    }
-                    options={opcionesCupos}
-                    placeholder="Elegir cupos..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Precio Inscripción ($)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej: 24000"
-                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-semibold"
-                    value={formData.precio_inscripcion ?? ""}
-                    onChange={(e) => {
-                       const soloNumeros = e.target.value.replace(/[^0-9]/g, "");
-                       setFormData({
-                         ...formData,
-                         precio_inscripcion:
-                           soloNumeros === "" ? undefined : Number(soloNumeros),
-                       });
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* FILA EXTRA: Planificación Logística y Horarios */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Canchas Disponibles
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max={maxCanchas}
-                    placeholder="Ej: 3"
-                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-brand-white focus:outline-none text-sm transition-colors font-semibold"
-                    value={formData.canchas_disponibles ?? ""}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (raw === "") {
-                        setFormData({
-                          ...formData,
-                          canchas_disponibles: undefined,
-                        });
-                        return;
-                      }
-                      let val = Number(raw);
-                      if (val > maxCanchas) {
-                        val = maxCanchas;
-                      }
-                      setFormData({
-                        ...formData,
-                        canchas_disponibles: val,
-                      });
-                    }}
-                    onBlur={() => {
-                      if (!formData.canchas_disponibles) {
-                        setFormData({
-                          ...formData,
-                          canchas_disponibles: 1,
-                        });
-                      }
-                    }}
-                  />
-                  {selectedClub && (
-                    <span className="text-[10px] text-gray-500 mt-1 block">
-                      Máx. del club: {selectedClub.canchas} {selectedClub.canchas === 1 ? "cancha" : "canchas"}
-                    </span>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Duración Partido (Minutos)
-                  </label>
-                  <input
-                    type="number"
-                    min="10"
-                    placeholder="Ej: 90"
-                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-brand-white focus:outline-none text-sm transition-colors font-semibold"
-                    value={formData.duracion_partido_minutos ?? ""}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (raw === "") {
-                        setFormData({
-                          ...formData,
-                          duracion_partido_minutos: undefined,
-                        });
-                        return;
-                      }
-                      setFormData({
-                        ...formData,
-                        duracion_partido_minutos: Number(raw),
-                      });
-                    }}
-                    onBlur={() => {
-                      if (!formData.duracion_partido_minutos || formData.duracion_partido_minutos < 10) {
-                        setFormData({
-                          ...formData,
-                          duracion_partido_minutos: 90,
-                        });
-                      }
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Hora Inicio Jornada
-                  </label>
-                  <input
-                    type="time"
-                    className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-brand-white focus:outline-none text-sm transition-colors font-semibold font-mono cursor-pointer"
-                    value={formData.hora_inicio_jornada || "08:00"}
-                    onClick={(e) => {
-                      try {
-                        (e.target as any).showPicker();
-                      } catch (err) {}
-                    }}
-                    onChange={(e) => {
-                      setFormData({
-                        ...formData,
-                        hora_inicio_jornada: e.target.value,
-                      });
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* FILA 5: Premios (1º, 2º y 3º) */}
+            <div className="space-y-5">
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">
-                  Estructura de Premios (Dejar en blanco si no hay premios)
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                  Nombre del Torneo
                 </label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-5 h-5 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center font-black text-[10px] border border-yellow-500/30">
-                        1º
-                      </span>
-                      <span className="text-[11px] font-bold text-gray-400">
-                        Campeón
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Ej: $180.000 + Trofeo"
-                      className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
-                      value={formData.premio_1 || ""}
-                      onChange={(e) =>
-                        setFormData({ ...formData, premio_1: e.target.value })
-                      }
-                    />
-                  </div>
+                <input
+                  placeholder="Ej: Master Series BA"
+                  className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
+                  value={formData.nombre}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nombre: e.target.value })
+                  }
+                />
+              </div>
 
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-5 h-5 rounded-full bg-gray-400/20 text-gray-400 flex items-center justify-center font-black text-[10px] border border-gray-400/30">
-                        2º
-                      </span>
-                      <span className="text-[11px] font-bold text-gray-400">
-                        Subcampeón (Opcional)
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Ej: $80.000 + Medalla"
-                      className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
-                      value={formData.premio_2 || ""}
-                      onChange={(e) =>
-                        setFormData({ ...formData, premio_2: e.target.value })
-                      }
-                    />
-                  </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                  Sede / Club Organizador
+                </label>
+                <CustomDropdown
+                  value={formData.club_id ?? ""}
+                  onChange={(val) =>
+                    setFormData({ ...formData, club_id: val })
+                  }
+                  options={opcionesClubes}
+                  placeholder={
+                    clubs.length === 0
+                      ? "No hay clubes creados"
+                      : "Seleccionar Club..."
+                  }
+                  disabled={clubs.length === 0}
+                />
+              </div>
 
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-5 h-5 rounded-full bg-amber-700/20 text-amber-600 flex items-center justify-center font-black text-[10px] border border-amber-700/30">
-                        3º
-                      </span>
-                      <span className="text-[11px] font-bold text-gray-400">
-                        Tercer Puesto (Opcional)
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Ej: Inscripción gratis"
-                      className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
-                      value={formData.premio_3 || ""}
-                      onChange={(e) =>
-                        setFormData({ ...formData, premio_3: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                  Fecha de Inicio
+                </label>
+                <input
+                  type="date"
+                  min={minDate}
+                  className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-brand-white focus:outline-none text-sm transition-colors cursor-pointer"
+                  value={fechaFormulario}
+                  onClick={(e) => {
+                    try {
+                      (e.target as any).showPicker();
+                    } catch (err) {
+                      console.log("Picker not supported:", err);
+                    }
+                  }}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    // MAGIA ANTI-ZONA HORARIA: Inyectamos mediodía con huso horario argentino (-03:00)
+                    setFormData({
+                      ...formData,
+                      fecha: val ? `${val}T12:00:00-03:00` : "",
+                    });
+                  }}
+                />
               </div>
 
               <button
-                disabled={isSaving || !formData.nombre}
+                disabled={isSaving || !formData.nombre || !formData.club_id || !formData.fecha}
                 onClick={onSave}
                 className="w-full bg-brand-chartreuse disabled:opacity-50 text-brand-black font-bold py-4 rounded-xl mt-4 flex items-center justify-center gap-2 transition-all hover:opacity-90 shadow-lg cursor-pointer"
               >
@@ -593,7 +143,7 @@ export default function TorneoModal({
                 ) : (
                   <>
                     <Save className="size-5" />
-                    {editingId ? "Guardar Cambios" : "Publicar Torneo"}
+                    {editingId ? "Guardar Cambios" : "Crear Borrador & Configurar"}
                   </>
                 )}
               </button>
