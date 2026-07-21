@@ -153,11 +153,18 @@ export const LiveArbitrajeRow = ({
 
   return (
     <div className="bg-brand-card border border-white/5 rounded-3xl p-6 space-y-6 shadow-xl transition-all duration-300">
-      {/* Ronda Header */}
-      <div className="flex justify-between items-center border-b border-white/5 pb-4">
-        <span className="text-xs text-brand-chartreuse font-extrabold uppercase tracking-widest bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-3 py-1 rounded-full">
-          {partido.ronda}
-        </span>
+      {/* Ronda y Fecha Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-white/5 pb-4">
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-brand-chartreuse font-extrabold uppercase tracking-widest bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-3 py-1 rounded-full">
+            {partido.ronda}
+          </span>
+          {partido.cancha_asignada && (
+            <span className="text-xs text-gray-400 font-bold">
+              {partido.cancha_asignada}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-4 text-xs">
           <label className="flex items-center gap-1.5 text-gray-400 font-bold cursor-pointer">
             <input
@@ -208,9 +215,16 @@ export const LiveArbitrajeRow = ({
         <div className="space-y-4">
           {/* Fila del Equipo A */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <span className="text-sm sm:text-base font-black text-white truncate max-w-xs">
-              {txtA}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm sm:text-base font-black text-white truncate max-w-xs">
+                {txtA}
+              </span>
+              {setsA >= 2 && (
+                <span className="text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-md uppercase">
+                  ✓ Ganador
+                </span>
+              )}
+            </div>
             <div className="flex gap-3">
               <div className="flex flex-col items-center">
                 <span className="text-[10px] text-gray-500 font-black mb-1">Set 1</span>
@@ -249,9 +263,16 @@ export const LiveArbitrajeRow = ({
 
           {/* Fila del Equipo B */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
-            <span className="text-sm sm:text-base font-black text-white truncate max-w-xs">
-              {txtB}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm sm:text-base font-black text-white truncate max-w-xs">
+                {txtB}
+              </span>
+              {setsB >= 2 && (
+                <span className="text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-md uppercase">
+                  ✓ Ganador
+                </span>
+              )}
+            </div>
             <div className="flex gap-3">
               <div className="flex flex-col items-center">
                 <input

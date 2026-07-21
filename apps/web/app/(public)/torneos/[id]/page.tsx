@@ -18,6 +18,7 @@ import { Partido, Torneo } from "@/utils/types/index";
 import InscripcionModal from "@/components/torneos/InscripcionModal";
 import { useProfileStore } from "@/store/useProfileStore";
 import { MatchCard } from "@/components/torneos/MatchCard";
+import { TablaPosicionesZona } from "@/components/torneos/TablaPosicionesZona";
 
 export default function TorneoDetallePage() {
   const params = useParams();
@@ -26,6 +27,8 @@ export default function TorneoDetallePage() {
 
   const [torneo, setTorneo] = useState<Torneo | null>(null);
   const [partidos, setPartidos] = useState<Partido[]>([]);
+  const [zonas, setZonas] = useState<any[]>([]);
+  const [activeTabPublica, setActiveTabPublica] = useState<"zonas" | "llaves">("zonas");
   const [loading, setLoading] = useState<boolean>(true);
   const [inscribiendo, setInscribiendo] = useState<boolean>(false);
   const [isInscripcionOpen, setIsInscripcionModalOpen] = useState(false);
@@ -43,11 +46,13 @@ export default function TorneoDetallePage() {
     Promise.all([
       TorneosService.getById(torneoId),
       TorneosService.getPartidos(torneoId),
+      TorneosService.getZonas(torneoId).catch(() => []),
     ])
-      .then(([torneoData, partidosData]) => {
+      .then(([torneoData, partidosData, zonasData]) => {
         if (isMounted) {
           setTorneo(torneoData);
           setPartidos(partidosData || []);
+          setZonas(zonasData || []);
           setLoading(false);
         }
       })
@@ -56,10 +61,61 @@ export default function TorneoDetallePage() {
         if (isMounted) setLoading(false);
       });
 
+    // ── Helpers debounced para evitar rafagas de refetches ──────────────
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const debouncedRefreshPartidos = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        TorneosService.getPartidos(torneoId).then((p) => isMounted && setPartidos(p || []));
+        TorneosService.getZonas(torneoId).then((z) => isMounted && setZonas(z || []));
+      }, 500);
+    };
+
+    const handleWebsocketTorneo = (e: any) => {
+      const data = e.detail;
+      if (data?.torneo_id === torneoId) {
+        TorneosService.getById(torneoId).then((t) => isMounted && setTorneo(t));
+        debouncedRefreshPartidos();
+      }
+    };
+
+    const handleWebsocketPartido = (e: any) => {
+      const data = e.detail;
+      if (data?.torneo_id === torneoId) {
+        debouncedRefreshPartidos();
+      }
+    };
+
+    // bracket_actualizado: el cuadro avanzó a la siguiente fase
+    const handleWebsocketBracket = (e: any) => {
+      const data = e.detail;
+      if (data?.torneo_id === torneoId) {
+        debouncedRefreshPartidos();
+        // Si se acaban de generar las llaves principales, cambiar al tab del cuadro
+        if (data?.fase === "llaves_principales_generadas" && isMounted) {
+          setActiveTabPublica("llaves");
+        }
+      }
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("torneo_actualizado", handleWebsocketTorneo);
+      window.addEventListener("partido_actualizado", handleWebsocketPartido);
+      window.addEventListener("bracket_actualizado", handleWebsocketBracket);
+    }
+
     return () => {
       isMounted = false;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      if (typeof window !== "undefined") {
+        window.removeEventListener("torneo_actualizado", handleWebsocketTorneo);
+        window.removeEventListener("partido_actualizado", handleWebsocketPartido);
+        window.removeEventListener("bracket_actualizado", handleWebsocketBracket);
+      }
     };
-  }, [torneoId, refreshKey]);
+  }, [torneoId, torneo?.estado, refreshKey]);
+
 
   const formatFecha = (fechaVal?: string | number | null) => {
     if (!fechaVal) return "Fecha a confirmar";
@@ -275,8 +331,8 @@ export default function TorneoDetallePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
-          {/* COLUMNA IZQUIERDA: CUADRO PRINCIPAL O LISTA DE INSCRIPTOS */}
-          <div className="lg:col-span-2">
+          {/* COLUMNA IZQUIERDA: CUADRO PRINCIPAL / ZONAS O LISTA DE INSCRIPTOS */}
+          <div className={isAbierto ? "lg:col-span-2" : "lg:col-span-3"}>
             {isAbierto ? (
               <div className="bg-brand-card border border-brand-white/5 rounded-3xl p-5 lg:p-10 shadow-xl flex flex-col">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
@@ -371,72 +427,141 @@ export default function TorneoDetallePage() {
                 </div>
               </div>
             ) : (
-              <div className="bg-brand-card border border-brand-white/5 rounded-3xl p-5 lg:p-10 shadow-xl flex flex-col overflow-hidden">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 lg:mb-12">
-                  <h2 className="text-xl md:text-2xl font-bold text-brand-white">
-                    Cuadro principal
-                  </h2>
-                  <div className="flex gap-2">
-                    {isEnCurso && (
-                      <div className="flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold rounded-full uppercase tracking-wider">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                        En vivo
-                      </div>
-                    )}
-                    {isFinalizado && (
-                      <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold rounded-full uppercase tracking-wider">
-                        <CheckCircle2 className="size-3" /> Finalizado
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* CONTENEDOR SCROLLABLE UNIVERSAL */}
-                <div className="w-full overflow-x-auto pb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-                  <div
-                    className="flex gap-6 lg:gap-8 w-max min-w-full px-2 lg:px-0"
-                    style={{ height: `${dynamicHeight}px` }}
+              <div className="space-y-6">
+                {/* Selector de Pestañas Públicas */}
+                <div className="flex bg-brand-card border border-white/5 rounded-2xl p-1.5 gap-2">
+                  {zonas && zonas.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTabPublica("zonas")}
+                      className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        activeTabPublica === "zonas"
+                          ? "bg-brand-chartreuse text-brand-black shadow-lg"
+                          : "text-gray-400 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      Fase de grupos y Posiciones
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTabPublica("llaves")}
+                    className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      activeTabPublica === "llaves" || !zonas || zonas.length === 0
+                        ? "bg-brand-chartreuse text-brand-black shadow-lg"
+                        : "text-gray-400 hover:text-white hover:bg-white/5"
+                    }`}
                   >
-                    {rondasToShow.map((rondaInfo) => {
-                      const roundMatches = getRoundMatches(
-                        rondaInfo.id,
-                        rondaInfo.required,
-                      );
-
-                      return (
-                        <div
-                          key={rondaInfo.id}
-                          className="min-w-50 lg:min-w-60 flex-1 flex flex-col relative h-full"
-                        >
-                          <h3 className="text-center text-[11px] lg:text-xs font-black text-brand-chartreuse uppercase tracking-widest mb-4 absolute -top-8 lg:-top-10 w-full">
-                            {rondaInfo.label}
-                          </h3>
-
-                          <div className="flex flex-col justify-around h-full w-full">
-                            {roundMatches.map((p) => (
-                              <div
-                                key={p.id}
-                                className="relative w-full flex items-center justify-center"
-                              >
-                                <MatchCard partido={p} />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                    Cuadro Principal
+                  </button>
                 </div>
-                <p className="text-center text-xs text-gray-500 mt-2 flex items-center justify-center gap-2 opacity-70">
-                  ↔ Deslizá para ver todas las rondas
-                </p>
+
+                {activeTabPublica === "zonas" && zonas && zonas.length > 0 ? (
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-1 gap-6">
+                      {zonas.map((z: any) => {
+                        const partidosZona = partidos.filter(
+                          (p) => p.ronda?.toUpperCase() === z.nombre_grupo?.toUpperCase(),
+                        );
+                        const parejasFormatted = (z.grupo_parejas || []).map((gp: any) => ({
+                          id: gp.inscripcion_id,
+                          jugador1_nombre: gp.inscripciones?.jugador1_nombre,
+                          jugador2_nombre: gp.inscripciones?.jugador2_nombre,
+                          club: gp.clubName || "Sin club asignado",
+                          cabezaDeSerie: gp.cabezaDeSerie,
+                        }));
+
+                        return (
+                          <div key={z.id} className="space-y-4">
+                            <TablaPosicionesZona
+                              nombreZona={z.nombre_grupo}
+                              parejasInscritas={parejasFormatted}
+                              partidosZona={partidosZona}
+                            />
+
+                            {/* Lista de Partidos de la Zona */}
+                            {partidosZona.length > 0 && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                                {partidosZona.map((p) => (
+                                  <MatchCard key={p.id} partido={p} />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-brand-card border border-brand-white/5 rounded-3xl p-5 lg:p-10 shadow-xl flex flex-col overflow-hidden">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 lg:mb-12">
+                      <h2 className="text-xl md:text-2xl font-bold text-brand-white">
+                        Cuadro principal
+                      </h2>
+                      <div className="flex gap-2">
+                        {isEnCurso && (
+                          <div className="flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold rounded-full uppercase tracking-wider">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                            En vivo
+                          </div>
+                        )}
+                        {isFinalizado && (
+                          <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold rounded-full uppercase tracking-wider">
+                            <CheckCircle2 className="size-3" /> Finalizado
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* CONTENEDOR SCROLLABLE UNIVERSAL */}
+                    <div className="w-full overflow-x-auto pb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+                      <div
+                        className="flex gap-6 lg:gap-8 w-max min-w-full px-2 lg:px-0"
+                        style={{ height: `${dynamicHeight}px` }}
+                      >
+                        {rondasToShow.map((rondaInfo) => {
+                          const roundMatches = getRoundMatches(
+                            rondaInfo.id,
+                            rondaInfo.required,
+                          );
+
+                          return (
+                            <div
+                              key={rondaInfo.id}
+                              className="min-w-50 lg:min-w-60 flex-1 flex flex-col relative h-full"
+                            >
+                              <h3 className="text-center text-[11px] lg:text-xs font-black text-brand-chartreuse uppercase tracking-widest mb-4 absolute -top-8 lg:-top-10 w-full">
+                                {rondaInfo.label}
+                              </h3>
+
+                              <div className="flex flex-col justify-around h-full w-full">
+                                {roundMatches.map((p) => (
+                                  <div
+                                    key={p.id}
+                                    className="relative w-full flex items-center justify-center"
+                                  >
+                                    <MatchCard partido={p} />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <p className="text-center text-xs text-gray-500 mt-2 flex items-center justify-center gap-2 opacity-70">
+                      ↔ Deslizá para ver todas las rondas
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {/* COLUMNA DERECHA: INSCRIPCIÓN Y PREMIOS */}
-          <div className="space-y-6">
-            <div className="bg-brand-card border border-brand-chartreuse/10 rounded-3xl p-6 lg:p-8 shadow-xl relative overflow-hidden">
+          {/* COLUMNA DERECHA: INSCRIPCIÓN Y PREMIOS (SOLO CUANDO EL TORNEO ESTÁ ABIERTO) */}
+          {isAbierto && (
+            <div className="space-y-6">
+              <div className="bg-brand-card border border-brand-chartreuse/10 rounded-3xl p-6 lg:p-8 shadow-xl relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-brand-chartreuse/10 to-transparent" />
               <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
                 Inscripción
@@ -539,6 +664,7 @@ export default function TorneoDetallePage() {
               </div>
             )}
           </div>
+          )}
         </div>
       </div>
 

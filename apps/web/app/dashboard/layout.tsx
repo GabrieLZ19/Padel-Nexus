@@ -23,12 +23,14 @@ import {
   Sun,
   Moon,
   Check,
+  UserCog,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 import { useSocket } from "@/hooks/useSocket";
 import { ChatService } from "@/utils/services/chat";
 import { sileo } from "sileo";
+import { getMenuItemsPorRol } from "@/utils/constants/menuPermissions";
 
 export default function DashboardLayout({
   children,
@@ -173,7 +175,7 @@ export default function DashboardLayout({
     return () => window.removeEventListener("chat_notification", handler);
   }, []);
 
-  const menuItems = [
+  const menuItemsBase = [
     { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
     { name: "Torneos", icon: Trophy, href: "/dashboard/torneos" },
     {
@@ -187,7 +189,11 @@ export default function DashboardLayout({
     { name: "Moderación", icon: Shield, href: "/dashboard/moderacion" },
     { name: "Estadísticas", icon: Activity, href: "/dashboard/estadisticas" },
     { name: "Chat interno", icon: MessageSquare, href: "/dashboard/chat", badge: chatNoLeidos },
+    { name: "Gestión de Usuarios", icon: UserCog, href: "/dashboard/usuarios" },
   ];
+
+  // Filtrar menú según el rol del usuario autenticado
+  const menuItems = getMenuItemsPorRol(profile?.rol, menuItemsBase);
 
   const formatNombreCompleto = (
     apellido?: string | null,
@@ -263,8 +269,22 @@ export default function DashboardLayout({
                 <span className="font-extrabold">padel</span>
                 <span className="font-light">nexus</span>
               </span>
-              <span className="text-[10px] text-brand-chartreuse font-bold tracking-[0.2em] -mt-1">
-                ADMIN CRM
+              <span className={`text-[10px] font-bold tracking-[0.2em] -mt-1 ${
+                profile?.rol === "superadmin"
+                  ? "text-brand-chartreuse"
+                  : profile?.rol === "admin_federacion"
+                    ? "text-purple-400"
+                    : profile?.rol === "admin_provincial"
+                      ? "text-blue-400"
+                      : "text-brand-chartreuse"
+              }`}>
+                {profile?.rol === "superadmin"
+                  ? "SUPERADMIN"
+                  : profile?.rol === "admin_federacion"
+                    ? "FEDERACIÓN NACIONAL"
+                    : profile?.rol === "admin_provincial"
+                      ? "ASOCIACIÓN PROVINCIAL"
+                      : "ADMIN CRM"}
               </span>
             </div>
           </div>

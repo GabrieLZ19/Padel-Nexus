@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { DragDropPairing, ZonaDrag, ParejaDrag } from "./DragDropPairing";
+import { TablaPosicionesZona } from "./TablaPosicionesZona";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Partido, Inscripcion } from "@/utils/types";
 import {
@@ -807,13 +808,35 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               Cargando zonas...
             </div>
           ) : zonas.length > 0 ? (
-            <DragDropPairing
-              zonas={zonas}
-              onZonasChange={setZonas}
-              onMovePareja={handleMovePareja}
-              isEditing={isEditing}
-              partidos={partidos}
-            />
+            <div className="space-y-8">
+              {/* MODO EDICIÓN: drag-and-drop para mover parejas */}
+              {isEditing ? (
+                <DragDropPairing
+                  zonas={zonas}
+                  onZonasChange={setZonas}
+                  onMovePareja={handleMovePareja}
+                  isEditing={isEditing}
+                  partidos={partidos}
+                />
+              ) : (
+                /* VISTA NORMAL: tablas de posiciones estilo FAP */
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {zonas.map((z) => {
+                    const partidosZona = partidos.filter(
+                      (p) => p.ronda?.toUpperCase() === z.nombre?.toUpperCase(),
+                    );
+                    return (
+                      <TablaPosicionesZona
+                        key={z.id}
+                        nombreZona={z.nombre}
+                        parejasInscritas={z.parejas}
+                        partidosZona={partidosZona}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="text-center p-12 text-gray-500 border border-dashed border-white/10 rounded-2xl">
               Las zonas aún no han sido generadas.
@@ -858,17 +881,17 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
                           {/* Horizontal line coming in from left (except first round) */}
                           {rondaIndex > 0 && (
-                            <div className="absolute left-0 top-1/2 w-8 h-[2px] bg-white/10 -translate-y-1/2" />
+                            <div className="absolute left-0 top-1/2 w-8 h-0.5 bg-white/10 -translate-y-1/2" />
                           )}
 
                           {/* Conectores visuales para el bracket (hacia la derecha) */}
                           {rondaIndex < rondasToShow.length - 1 && (
                             <>
-                              <div className="absolute right-0 top-1/2 w-8 h-[2px] bg-white/10 -translate-y-1/2" />
+                              <div className="absolute right-0 top-1/2 w-8 h-0.5 bg-white/10 -translate-y-1/2" />
                               {i % 2 === 0 ? (
-                                <div className="absolute right-0 top-1/2 w-[2px] h-[50%] bg-white/10" />
+                                <div className="absolute right-0 top-1/2 w-0.5 h-[50%] bg-white/10" />
                               ) : (
-                                <div className="absolute right-0 bottom-1/2 w-[2px] h-[50%] bg-white/10" />
+                                <div className="absolute right-0 bottom-1/2 w-0.5 h-[50%] bg-white/10" />
                               )}
                             </>
                           )}
@@ -898,7 +921,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               No se han registrado modificaciones manuales para este torneo.
             </div>
           ) : (
-            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-125 overflow-y-auto pr-1">
               {auditoriaLogs.map((log) => {
                 const fecha = new Date(log.created_at).toLocaleString("es-AR");
                 const adminName = log.perfiles

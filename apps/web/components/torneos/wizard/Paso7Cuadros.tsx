@@ -32,17 +32,24 @@ export const Paso6Cuadros = ({
         type: "warning",
         title: "Cupos insuficientes",
         description: `Se necesitan al menos 4 inscripciones confirmadas para armar llaves. Actual: ${inscripciones.length}.`,
+        confirmText: undefined,
+        onConfirm: undefined,
       }));
       return;
     }
 
-    if (inscripciones.length % 2 !== 0) {
+    const count = inscripciones.length;
+    const cuposValidos = [6, 8, 12, 16, 24, 32, 64];
+
+    if (!cuposValidos.includes(count)) {
       setFeedbackModal((prev: any) => ({
         ...prev,
         isOpen: true,
         type: "warning",
-        title: "Cantidad impar de parejas",
-        description: `Para generar el fixture, la cantidad de participantes confirmados debe ser par. Hay ${inscripciones.length} confirmados.`,
+        title: "Cantidad de inscriptos no reglamentaria",
+        description: `Para armar cuadros o zonas exactas sin libres, la cantidad de confirmados debe ser 6, 8, 12, 16, 24, 32 o 64. Actualmente tenés ${count} inscriptos.`,
+        confirmText: undefined,
+        onConfirm: undefined,
       }));
       return;
     }
@@ -55,6 +62,8 @@ export const Paso6Cuadros = ({
         title: "Inscripciones pendientes",
         description:
           "Existen inscripciones con pago pendiente. Todos deben estar confirmados antes de generar el fixture.",
+        confirmText: undefined,
+        onConfirm: undefined,
       }));
       return;
     }
@@ -72,17 +81,23 @@ export const Paso6Cuadros = ({
         setFeedbackModal((prev: any) => ({
           ...prev,
           isOpen: true,
+          isLoading: false,
           type: "success",
           title: "¡Cuadro Generado!",
           description: "El fixture automático se ha estructurado con éxito.",
+          confirmText: "Entendido",
+          onConfirm: undefined,
         }));
       } catch (error: any) {
         setFeedbackModal((prev: any) => ({
           ...prev,
           isOpen: true,
+          isLoading: false,
           type: "error",
           title: "Error operativo",
           description: error.message || "Fallo la generación.",
+          confirmText: "Entendido",
+          onConfirm: undefined,
         }));
       } finally {
         setGenerando(false);
@@ -118,13 +133,13 @@ export const Paso6Cuadros = ({
 
   return (
     <div className="space-y-6">
-      {partidos.length === 0 && (
+      {partidos.length === 0 && (torneo as any).formato === "Eliminatoria Directa" && (
         <div className="bg-black/20 p-6 rounded-3xl border border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
           <div>
             <h4 className="font-bold text-white">Generar Fixture Oficial</h4>
             <p className="text-xs text-gray-400 mt-1">
-              Estructure los grupos y llaves clasificatorias basándose en las
-              parejas aprobadas.
+              Estructure las llaves eliminatorias basándose en las parejas
+              aprobadas.
             </p>
           </div>
           <button

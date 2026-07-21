@@ -4,6 +4,9 @@ import { ClubesService } from "@/utils/services/clubes";
 import { Torneo, Club } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { Calendar, Layers, Trophy, Settings2, Gift } from "lucide-react";
+import { useProfileStore } from "@/store/useProfileStore";
+import { getAlcancesPermitidos, CUPOS_ESTANDAR_FAP } from "@/utils/constants/fapApaRules";
+import type { RolUsuario } from "@/utils/types/user.types";
 
 interface Paso1DatosProps {
   torneo: Torneo;
@@ -20,11 +23,15 @@ export const Paso1Datos = ({
   triggerRefresh,
   setActiveTab,
 }: Paso1DatosProps) => {
+  const profile = useProfileStore((s) => s.profile);
+  const userRole = (profile?.rol || "admin") as RolUsuario;
+
   // Información General
   const [editNombre, setEditNombre] = useState(torneo.nombre || "");
   const [editSede, setEditSede] = useState(torneo.club_id || "");
   const [editAlcance, setEditAlcance] = useState<string>(torneo.alcance || "Provincial");
   const [editAsociacion, setEditAsociacion] = useState<string>((torneo as any).asociacion || "FAP");
+  const [editFormato, setEditFormato] = useState<string>((torneo as any).formato || "Zonas + Llaves");
 
   // Fechas
   const [editFecha, setEditFecha] = useState(
@@ -122,8 +129,23 @@ export const Paso1Datos = ({
       }
     }
 
+    const nuevosCupos = Number(editCupos);
+    const cuposActuales = torneo.cupos_actuales || 0;
+
+    if (nuevosCupos < cuposActuales) {
+      setFeedbackModal((prev: any) => ({
+        ...prev,
+        isOpen: true,
+        type: "warning",
+        title: "Cupo no permitido",
+        description: `No podés reducir el cupo a ${nuevosCupos} porque ya existen ${cuposActuales} participante(s) / pareja(s) inscripta(s).`,
+      }));
+      return;
+    }
+
     try {
       setGuardandoDatos(true);
+      const precioFinal = esGratis ? 0 : Math.max(0, Number(editPrecio) || 0);
       await TorneosService.update(torneoId, {
         nombre: editNombre,
         fecha: editFecha ? editFecha : null,
@@ -131,7 +153,8 @@ export const Paso1Datos = ({
           ? `${editFechaCierre}T12:00:00-03:00`
           : null,
         fecha_fin: editFechaFin ? `${editFechaFin}T12:00:00-03:00` : null,
-        precio_inscripcion: esGratis ? 0 : Number(editPrecio),
+        es_gratis: esGratis,
+        precio_inscripcion: precioFinal,
         premio_1: premioPrimero || null,
         premio_2: premioSegundo || null,
         premio_3: premioTercero || null,
@@ -140,6 +163,7 @@ export const Paso1Datos = ({
         canchas_disponibles: selectedCanchas.length,
         alcance: editAlcance,
         asociacion: editAsociacion,
+        formato: editFormato,
       } as any);
 
       triggerRefresh();
@@ -211,13 +235,21 @@ export const Paso1Datos = ({
           <CustomDropdown
             value={editAlcance}
             onChange={setEditAlcance}
-            options={[
-              { value: "Local", label: "Local" },
-              { value: "Provincial", label: "Provincial" },
-              { value: "Nacional", label: "Nacional" },
-            ]}
+            options={getAlcancesPermitidos(userRole)
+              .filter((a) => !a.disabled)
+              .map((a) => ({ value: a.value, label: a.label }))}
             placeholder="Seleccionar Alcance..."
           />
+          {(userRole === "admin" || userRole === "admin_club") && (
+            <p className="text-[10px] text-yellow-500/80 mt-1.5 font-semibold">
+              Tu perfil de Club solo permite organizar torneos Locales, Regionales o Provinciales.
+            </p>
+          )}
+          {userRole === "admin_provincial" && (
+            <p className="text-[10px] text-yellow-500/80 mt-1.5 font-semibold">
+              Tu perfil Provincial no permite organizar torneos Nacionales.
+            </p>
+          )}
         </div>
         <div>
           <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
@@ -233,6 +265,28 @@ export const Paso1Datos = ({
             ]}
             placeholder="Seleccionar Reglamento..."
           />
+          <p className="text-[10px] text-gray-500 mt-1.5">
+            El reglamento seleccionado determinará las categorías y niveles disponibles en el Paso 3.
+          </p>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
+            Formato del Torneo
+          </label>
+          <CustomDropdown
+            value={editFormato}
+            onChange={setEditFormato}
+            options={[
+              { value: "Zonas + Llaves", label: "Zonas + Llaves (FAP estándar)" },
+              { value: "Eliminatoria Directa", label: "Eliminatoria Directa (sin fase de grupos)" },
+            ]}
+            placeholder="Seleccionar Formato..."
+          />
+          <p className="text-[10px] text-gray-500 mt-1.5">
+            {editFormato === "Eliminatoria Directa"
+              ? "Los partidos comienzan directamente en llaves (32avos, 16avos, Octavos…). Sin fase de grupos."
+              : "Se juegan primero zonas de grupos y luego los clasificados pasan a la llave de eliminación."}
+          </p>
         </div>
       </div>
 
@@ -318,17 +372,20 @@ export const Paso1Datos = ({
 
               <div>
                 <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">
-                  Cupos Máximos (Parejas)
+                  Cupos Máximos Reglamentarios
                 </label>
-                <input
-                  type="number"
+                <CustomDropdown
                   value={editCupos}
-                  onChange={(e) => setEditCupos(e.target.value)}
-                  className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none"
-                  placeholder="Ej: 16"
-                  min="4"
-                  max="128"
+                  onChange={setEditCupos}
+                  options={CUPOS_ESTANDAR_FAP.map((c) => ({
+                    value: c.value,
+                    label: c.label,
+                  }))}
+                  placeholder="Seleccionar Cupo Recomendado..."
                 />
+                <p className="text-[10px] text-gray-400 mt-1 font-medium">
+                  Garantiza cuadros limpios sin BYEs impares y cruces justos.
+                </p>
               </div>
             </div>
           </div>

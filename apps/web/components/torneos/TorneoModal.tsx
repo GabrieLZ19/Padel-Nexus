@@ -5,6 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Save } from "lucide-react";
 import CustomDropdown from "../ui/CustomDropdown";
 import { Club, FormTorneoState } from "../../utils/types";
+import { useProfileStore } from "../../store/useProfileStore";
+import {
+  RAMAS_PADEL,
+  getAlcancesPermitidos,
+} from "../../utils/constants/fapApaRules";
+import type { RolUsuario } from "../../utils/types/user.types";
 
 interface TorneoModalProps {
   isOpen: boolean;
@@ -27,6 +33,9 @@ export default function TorneoModal({
   isSaving,
   editingId,
 }: TorneoModalProps) {
+  const profile = useProfileStore((s) => s.profile);
+  const userRole = (profile?.rol || "admin") as RolUsuario;
+
   // Day logic in local user timezone
   const hoy = new Date();
   const fechaLocal = new Date(hoy.getTime() - hoy.getTimezoneOffset() * 60000)
@@ -42,6 +51,17 @@ export default function TorneoModal({
   const opcionesClubes = clubs.map((c) => ({
     value: String(c.id),
     label: c.nombre,
+  }));
+
+  // Obtener alcances filtrados por rol
+  const alcancesDisponibles = getAlcancesPermitidos(userRole);
+  const alcanceOptions = alcancesDisponibles
+    .filter((a) => !a.disabled)
+    .map((a) => ({ value: a.value, label: a.label }));
+
+  const ramaOptions = RAMAS_PADEL.map((r) => ({
+    value: r.value,
+    label: r.label,
   }));
 
   return (
@@ -104,6 +124,45 @@ export default function TorneoModal({
                   }
                   disabled={clubs.length === 0}
                 />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                  Rama
+                </label>
+                <CustomDropdown
+                  value={formData.rama || "Masculina"}
+                  onChange={(val) =>
+                    setFormData({ ...formData, rama: val })
+                  }
+                  options={ramaOptions}
+                  placeholder="Seleccionar Rama..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                  Alcance del Torneo
+                </label>
+                <CustomDropdown
+                  value={formData.alcance ?? "Provincial"}
+                  onChange={(val) =>
+                    setFormData({ ...formData, alcance: val as FormTorneoState["alcance"] })
+                  }
+                  options={alcanceOptions}
+                  placeholder="Seleccionar Alcance..."
+                />
+                {/* Indicador de restricción para roles limitados */}
+                {(userRole === "admin" || userRole === "admin_club") && (
+                  <p className="text-[10px] text-yellow-500/80 mt-1.5 font-semibold">
+                    Tu perfil de Club solo permite organizar torneos Locales, Regionales o Provinciales.
+                  </p>
+                )}
+                {userRole === "admin_provincial" && (
+                  <p className="text-[10px] text-yellow-500/80 mt-1.5 font-semibold">
+                    Tu perfil Provincial no permite organizar torneos Nacionales.
+                  </p>
+                )}
               </div>
 
               <div>

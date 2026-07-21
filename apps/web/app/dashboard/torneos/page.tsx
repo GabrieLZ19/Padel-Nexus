@@ -27,13 +27,15 @@ const ESTADO_INICIAL: FormTorneoState = {
   club_id: "",
   fecha: "",
   nivel: "5ª",
-  categoria: "Masculino",
+  rama: "Masculina",
+  categoria: "Libres",
   estado: "Borrador",
   cupos_maximos: 16,
   modalidad: "Duplas",
   formato: "Eliminatoria Directa",
   precio_inscripcion: 0,
   alcance: "Provincial",
+  asociacion: "FAP",
   premio_1: "",
   premio_2: "",
   premio_3: "",
@@ -130,7 +132,8 @@ export default function TorneosPage() {
         club_id: formData.club_id === "" ? null : formData.club_id,
         // Set standard defaults for required fields when creating a new tournament
         nivel: formData.nivel || "5ª",
-        categoria: formData.categoria || "Masculino",
+        rama: formData.rama || "Masculina",
+        categoria: formData.categoria || "Libres",
         estado: formData.estado || "Borrador",
         cupos_maximos: formData.cupos_maximos || 16,
         modalidad: formData.modalidad || "Duplas",
@@ -354,7 +357,7 @@ export default function TorneosPage() {
                           {t.nombre}
                         </div>
                         <div className="text-[13px] text-gray-500 mt-0.5 font-medium">
-                          {t.nivel || "Sin nivel"} · {t.categoria || "General"}
+                          {t.rama || ""}{t.rama ? " · " : ""}{t.nivel || "Sin nivel"} · {t.categoria || "General"}
                         </div>
                       </td>
 

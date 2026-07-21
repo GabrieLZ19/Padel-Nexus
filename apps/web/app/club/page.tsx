@@ -9,6 +9,7 @@ import {
   Clock,
   ArrowRight,
   Grid,
+  Trophy,
 } from "lucide-react";
 import Link from "next/link";
 import { ClubPanelService } from "@/utils/services/club-panel";
@@ -97,19 +98,27 @@ export default function ClubDashboardPage() {
   return (
     <div className="space-y-10">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-black text-brand-white">
-            {club.nombre}
-          </h1>
-          <span className="bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20 px-3 py-1 rounded-full text-xs font-black uppercase">
-            {club.estado}
-          </span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-black text-brand-white">
+              {club.nombre}
+            </h1>
+            <span className="bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20 px-3 py-1 rounded-full text-xs font-black uppercase">
+              {club.estado}
+            </span>
+          </div>
+          <p className="text-sm text-gray-400 mt-2 font-medium">
+            {club.localidad}, {club.provincia} · Panel de administración del club
+          </p>
         </div>
-        <p className="text-sm text-gray-400 mt-2 font-medium">
-          {club.localidad}, {club.provincia} · Panel de administración
-          simplificado
-        </p>
+
+        <Link
+          href="/club/torneos"
+          className="flex items-center justify-center gap-2 bg-brand-chartreuse hover:opacity-90 text-brand-black px-5 py-3 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(204,255,0,0.15)] text-xs uppercase tracking-wider cursor-pointer shrink-0"
+        >
+          <Trophy className="size-4" /> Mis Torneos
+        </Link>
       </div>
 
       {/* Grid de Métricas */}

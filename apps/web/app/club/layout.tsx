@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard,
+  Trophy,
   Grid,
   Calendar,
   Settings,
@@ -140,6 +141,7 @@ export default function ClubLayout({
 
   const menuItems = [
     { name: "Mi Club", icon: LayoutDashboard, href: "/club" },
+    { name: "Torneos", icon: Trophy, href: "/club/torneos" },
     { name: "Canchas", icon: Grid, href: "/club/canchas" },
     { name: "Reservas", icon: Calendar, href: "/club/reservas" },
     { name: "Chat interno", icon: MessageSquare, href: "/club/chat", badge: chatNoLeidos },

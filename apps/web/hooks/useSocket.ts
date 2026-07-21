@@ -71,13 +71,40 @@ export const useSocket = (onNotificationReceived?: (notif: any) => void) => {
       }
     };
 
+    const handleTorneoActualizado = (data: any) => {
+      console.log("🏆 Notificación de torneo en curso recibida por WebSocket:", data);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("torneo_actualizado", { detail: data }));
+      }
+    };
+
+    const handlePartidoActualizado = (data: any) => {
+      console.log("⚡ Notificación de marcador actualizado por WebSocket:", data);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("partido_actualizado", { detail: data }));
+      }
+    };
+
+    const handleBracketActualizado = (data: any) => {
+      console.log("🔀 Notificación de avance de cuadro por WebSocket:", data);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("bracket_actualizado", { detail: data }));
+      }
+    };
+
     socketInstance.on("nueva_notificacion", handleNuevaNotificacion);
     socketInstance.on("chat_notification", handleChatNotificacion);
+    socketInstance.on("torneo_actualizado", handleTorneoActualizado);
+    socketInstance.on("partido_actualizado", handlePartidoActualizado);
+    socketInstance.on("bracket_actualizado", handleBracketActualizado);
 
     return () => {
       if (socketInstance) {
         socketInstance.off("nueva_notificacion", handleNuevaNotificacion);
         socketInstance.off("chat_notification", handleChatNotificacion);
+        socketInstance.off("torneo_actualizado", handleTorneoActualizado);
+        socketInstance.off("partido_actualizado", handlePartidoActualizado);
+        socketInstance.off("bracket_actualizado", handleBracketActualizado);
       }
     };
   }, [profile?.id]);

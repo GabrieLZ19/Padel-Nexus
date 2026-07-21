@@ -117,12 +117,10 @@ export const Paso8Arbitraje = ({
         >
           Atrás
         </button>
-        <button
-          onClick={() => setActiveTab("start_stop")}
-          className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
-        >
-          Siguiente Paso: Publicar & Finalizar
-        </button>
+        <div className="text-xs text-gray-500 font-semibold flex items-center">
+          Al arbitrar el último partido de la Final, el torneo pasa automáticamente a estado Finalizado.
+        </div>
+
       </div>
     </div>
   );

@@ -40,29 +40,64 @@ export const MatchCard = ({
           : "border-white/5"
       } ${isInteractive ? "cursor-pointer hover:border-white/20 transition-colors" : ""}`}
     >
+      {/* Equipo A */}
       <div className="flex justify-between items-center p-3 border-b border-white/5 bg-black/20">
         <span
           className={`font-bold truncate pr-2 ${partido.equipo_a_j1 ? "text-white" : "text-gray-600"}`}
         >
           {renderEquipo(partido.equipo_a_j1, partido.equipo_a_j2)}
         </span>
-        <span
-          className={`w-7 h-7 shrink-0 flex items-center justify-center rounded text-xs font-black ${isA ? "bg-brand-chartreuse text-[#111]" : "bg-white/5 text-gray-400"}`}
-        >
-          {partido.set1_a ?? "-"}
-        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          <span
+            className={`w-7 h-7 flex items-center justify-center rounded text-xs font-black ${isA ? "bg-brand-chartreuse text-[#111]" : "bg-white/5 text-gray-400"}`}
+          >
+            {partido.set1_a ?? "-"}
+          </span>
+          {partido.set2_a !== null && partido.set2_a !== undefined && (
+            <span
+              className={`w-7 h-7 flex items-center justify-center rounded text-xs font-black ${isA ? "bg-brand-chartreuse text-[#111]" : "bg-white/5 text-gray-400"}`}
+            >
+              {partido.set2_a}
+            </span>
+          )}
+          {partido.set3_a !== null && partido.set3_a !== undefined && (
+            <span
+              className={`w-7 h-7 flex items-center justify-center rounded text-xs font-black ${isA ? "bg-brand-chartreuse text-[#111]" : "bg-white/5 text-gray-400"}`}
+            >
+              {partido.set3_a}
+            </span>
+          )}
+        </div>
       </div>
+
+      {/* Equipo B */}
       <div className="flex justify-between items-center p-3 bg-black/20">
         <span
           className={`font-bold truncate pr-2 ${partido.equipo_b_j1 ? "text-white" : "text-gray-600"}`}
         >
           {renderEquipo(partido.equipo_b_j1, partido.equipo_b_j2)}
         </span>
-        <span
-          className={`w-7 h-7 shrink-0 flex items-center justify-center rounded text-xs font-black ${isB ? "bg-brand-chartreuse text-[#111]" : "bg-white/5 text-gray-400"}`}
-        >
-          {partido.set1_b ?? "-"}
-        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          <span
+            className={`w-7 h-7 flex items-center justify-center rounded text-xs font-black ${isB ? "bg-brand-chartreuse text-[#111]" : "bg-white/5 text-gray-400"}`}
+          >
+            {partido.set1_b ?? "-"}
+          </span>
+          {partido.set2_b !== null && partido.set2_b !== undefined && (
+            <span
+              className={`w-7 h-7 flex items-center justify-center rounded text-xs font-black ${isB ? "bg-brand-chartreuse text-[#111]" : "bg-white/5 text-gray-400"}`}
+            >
+              {partido.set2_b}
+            </span>
+          )}
+          {partido.set3_b !== null && partido.set3_b !== undefined && (
+            <span
+              className={`w-7 h-7 flex items-center justify-center rounded text-xs font-black ${isB ? "bg-brand-chartreuse text-[#111]" : "bg-white/5 text-gray-400"}`}
+            >
+              {partido.set3_b}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

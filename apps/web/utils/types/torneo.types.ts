@@ -1,4 +1,5 @@
 import { Club } from "./club.types";
+import type { RamaPadel } from "../constants/fapApaRules";
 
 export type EstadoTorneo =
   | "Borrador"
@@ -18,17 +19,18 @@ export interface Torneo {
   estado: EstadoTorneo;
   cupos_maximos: number;
   cupos_actuales: number;
+  rama?: RamaPadel | string | null;
   nivel?: string | null;
   categoria?: string | null;
   modalidad: string;
   precio_inscripcion: number;
   formato: string;
-  formato_torneo: FormatoTorneo;
   premio_1?: string | null;
   premio_2?: string | null;
   premio_3?: string | null;
   lugar?: string | null;
-  alcance?: 'Nacional' | 'Provincial' | 'Local' | null;
+  alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | null;
+  asociacion?: 'FAP' | 'APA' | 'Amateur' | null;
   canchas_disponibles?: number | null;
   duracion_partido_minutos?: number | null;
   hora_inicio_jornada?: string | null;
@@ -63,6 +65,14 @@ export interface Partido {
   orden: number;
   set1_a?: number | null;
   set1_b?: number | null;
+  set2_a?: number | null;
+  set2_b?: number | null;
+  set3_a?: number | null;
+  set3_b?: number | null;
+  cancha_asignada?: string | null;
+  es_wo?: boolean;
+  es_supertiebreak?: boolean;
+  es_injustificado_wo?: boolean;
   ganador?: string | null; // UUID de la inscripción ganadora
   equipo_a_id?: string | null;
   equipo_b_id?: string | null;
@@ -93,12 +103,14 @@ export interface FormTorneoState {
   estado: string;
   cupos_maximos?: number;
   cupos_actuales?: number;
+  rama: string;
   nivel: string;
   categoria: string;
   modalidad: string;
   precio_inscripcion?: number;
   formato: string;
-  alcance?: 'Nacional' | 'Provincial' | 'Local' | null;
+  alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | null;
+  asociacion?: 'FAP' | 'APA' | 'Amateur' | null;
   premio_1?: string;
   premio_2?: string;
   premio_3?: string;

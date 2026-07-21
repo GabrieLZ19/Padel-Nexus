@@ -52,12 +52,8 @@ export const PROVINCIAS_ARG = [
 
 export const CATEGORIAS_TORNEO = [
   { value: "Libres", label: "Libres" },
+  { value: "Ladies & Veteranos", label: "Ladies & Veteranos" },
   { value: "Menores", label: "Menores" },
-  { value: "Ladies", label: "Ladies" },
-  { value: "Veteranos", label: "Veteranos" },
-  { value: "Masculino", label: "Masculino" },
-  { value: "Femenino", label: "Femenino" },
-  { value: "Mixto", label: "Mixto" },
 ] as const;
 
 export const ESTADOS_TORNEO = [
@@ -78,7 +74,8 @@ export const FORMATOS_TORNEO = [
 ] as const;
 
 export const ALCANCES_TORNEO = [
-  { value: "Local", label: "Local" },
+  { value: "Local", label: "Local / Privado" },
+  { value: "Regional", label: "Regional" },
   { value: "Provincial", label: "Provincial" },
   { value: "Nacional", label: "Nacional" },
 ] as const;

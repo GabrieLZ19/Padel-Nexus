@@ -21,8 +21,27 @@ import { InscripcionesService } from "@/utils/services/inscripciones";
 import { Torneo, Inscripcion } from "@/utils/types";
 import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "@/utils/constants/fap";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
+import { useProfileStore } from "@/store/useProfileStore";
+import DashboardFederacion from "@/components/dashboard/DashboardFederacion";
+import DashboardProvincial from "@/components/dashboard/DashboardProvincial";
 
 export default function DashboardHome() {
+  const profile = useProfileStore((s) => s.profile);
+  const userRole = profile?.rol;
+
+  // Despacho por rol exclusivo
+  if (userRole === "admin_federacion") {
+    return <DashboardFederacion />;
+  }
+  if (userRole === "admin_provincial") {
+    return <DashboardProvincial />;
+  }
+
+  // superadmin, admin genérico o cualquier otro rol ven el Dashboard general
+  return <DashboardGenerico />;
+}
+
+function DashboardGenerico() {
   const [torneos, setTorneos] = useState<Torneo[]>([]);
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
   const [loading, setLoading] = useState(true);

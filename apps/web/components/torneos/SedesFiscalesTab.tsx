@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Search } from "lucide-react";
+import { Plus, Trash2, Search, Info } from "lucide-react";
 import { Club } from "@/utils/types";
 import { api } from "@/utils/api";
 import CustomDropdown from "../ui/CustomDropdown";
 import { ClubesService } from "@/utils/services/clubes";
 import { sileo } from "sileo";
+import { useProfileStore } from "@/store/useProfileStore";
+import type { RolUsuario } from "@/utils/types/user.types";
 
 interface SedesFiscalesTabProps {
   torneoId: string;
@@ -47,6 +49,13 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   const [fechaFinTorneo, setFechaFinTorneo] = useState<string>("");
   const [diasJuego, setDiasJuego] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const profile = useProfileStore((s) => s.profile);
+  const userRole = (profile?.rol || "admin") as RolUsuario;
+  const esEntidadReguladora =
+    userRole === "admin_federacion" ||
+    userRole === "admin_provincial" ||
+    userRole === "superadmin";
 
   // Load Initial Data
   useEffect(() => {
@@ -515,6 +524,29 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
           Sedes (Clubes) Auxiliares
         </h3>
 
+        {/* Badge de entidad reguladora */}
+        {esEntidadReguladora && (
+          <div className="flex items-start gap-3 p-4 bg-brand-chartreuse/5 border border-brand-chartreuse/20 rounded-2xl">
+            <Info className="size-5 text-brand-chartreuse shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-black text-white uppercase tracking-wider">
+                Modo Entidad Reguladora
+              </p>
+              <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                Como{" "}
+                {userRole === "admin_federacion"
+                  ? "Federación Nacional"
+                  : userRole === "admin_provincial"
+                    ? "Asociación Provincial"
+                    : "Superadmin"}
+                , estás contratando los clubes que actuarán como sedes para esta
+                competencia. Podés asignar múltiples clubes, definir canchas y
+                horarios para cada uno.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Selector de sedes */}
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
@@ -613,7 +645,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                 }
                 min={fechaInicioTorneo}
                 max={fechaFinTorneo}
-                className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl text-center font-bold text-sm outline-none focus:border-brand-chartreuse/50 h-[48px]"
+                className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl text-center font-bold text-sm outline-none focus:border-brand-chartreuse/50 h-12"
               />
             </div>
             <div className="sm:col-span-2">
@@ -626,13 +658,13 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                 onChange={(e) =>
                   setCanchaForm({ ...canchaForm, hora_inicio: e.target.value })
                 }
-                className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl text-center font-bold text-sm outline-none focus:border-brand-chartreuse/50 h-[48px]"
+                className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl text-center font-bold text-sm outline-none focus:border-brand-chartreuse/50 h-12"
               />
             </div>
             <div className="sm:col-span-1 flex justify-end">
               <button
                 onClick={handleAddCanchaDisp}
-                className="w-full bg-brand-chartreuse text-brand-black p-3.5 rounded-xl font-bold hover:opacity-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center h-[48px]"
+                className="w-full bg-brand-chartreuse text-brand-black p-3.5 rounded-xl font-bold hover:opacity-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center h-12"
               >
                 <Plus className="size-4" />
               </button>

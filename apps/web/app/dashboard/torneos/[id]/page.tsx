@@ -18,7 +18,7 @@ import { Paso5Cierre } from "@/components/torneos/wizard/Paso6Cierre";
 import { Paso6Cuadros } from "@/components/torneos/wizard/Paso7Cuadros";
 import { Paso7Sedes } from "@/components/torneos/wizard/Paso5Sedes";
 import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso8Arbitraje";
-import { Paso9Publicar } from "@/components/torneos/wizard/Paso9Publicar";
+
 
 const WIZARD_STEPS = [
   { id: "edit", label: "1. Datos", desc: "Información" },
@@ -29,7 +29,6 @@ const WIZARD_STEPS = [
   { id: "cierre", label: "6. Cierre", desc: "Puntuación" },
   { id: "draws", label: "7. Cuadros", desc: "Fixture" },
   { id: "matches", label: "8. Arbitraje", desc: "Marcadores" },
-  { id: "start_stop", label: "9. Publicar", desc: "Fin & Estado" },
 ];
 
 export default function TorneoDetallePage() {
@@ -141,10 +140,8 @@ export default function TorneoDetallePage() {
         {activeTab === "matches" && (
           <Paso8Arbitraje {...commonProps} partidos={partidos} />
         )}
-        {activeTab === "start_stop" && (
-          <Paso9Publicar {...commonProps} partidos={partidos} />
-        )}
       </div>
+
 
       <FeedbackModal {...feedbackModal} />
     </div>
@@ -177,6 +174,7 @@ const HeaderNavegacion = ({ torneo, onBack }: HeaderProps) => (
           </span>
         </h1>
         <p className="text-gray-400 mt-1 text-sm sm:text-base font-medium">
+          {(torneo as any).rama ? `${(torneo as any).rama} · ` : ""}
           {torneo.nivel} · {torneo.categoria} · {torneo.modalidad}
         </p>
       </div>
@@ -233,7 +231,7 @@ const WizardTabs = ({ activeTab, setActiveTab, steps }: WizardTabsProps) => (
             </button>
             {idx < steps.length - 1 && (
               <div
-                className={`h-[2px] w-8 min-w-[20px] shrink-0 ${
+                className={`h-0.5 w-8 min-w-5 shrink-0 ${
                   isCompleted ? "bg-brand-chartreuse" : "bg-white/5"
                 }`}
               />
