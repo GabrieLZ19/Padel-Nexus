@@ -40,6 +40,7 @@ router.get("/", getAllTorneos);
 router.get("/:id", getTorneoById);
 router.get("/:id/partidos", getPartidosByTorneo);
 router.get("/:id/posiciones", obtenerPosicionesZona);
+router.get("/:id/zonas", getZonasByTorneo);
 
 // Rutas Protegidas (Requieren autenticación)
 router.use(authenticate);
@@ -101,11 +102,6 @@ router.put(
   "/partidos/:partido_id/equipos",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   actualizarEquiposPartido,
-);
-router.get(
-  "/:id/zonas",
-  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
-  getZonasByTorneo,
 );
 router.put(
   "/override/mover-pareja",

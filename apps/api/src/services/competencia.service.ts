@@ -360,7 +360,7 @@ export class CompetenciaService {
           id,
           seed,
           inscripcion_id,
-          inscripciones (
+        inscripciones (
             id,
             jugador1_nombre,
             jugador2_nombre,
@@ -464,8 +464,12 @@ export class CompetenciaService {
 
         const cabezaDeSerie = gp.inscripcion_id ? cabezasDeSerieIds.has(gp.inscripcion_id) : false;
 
+        // Excluir usuario_id/usuario2_id de la respuesta pública
+        const { usuario_id: _u1, usuario2_id: _u2, ...inscripcionPublica } = gp.inscripciones || {};
+
         return {
           ...gp,
+          inscripciones: inscripcionPublica,
           clubName,
           cabezaDeSerie,
         };

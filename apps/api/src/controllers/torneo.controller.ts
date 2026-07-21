@@ -68,9 +68,10 @@ export const updateTorneo = async (
     const data = await TorneoService.actualizarTorneo(req.params.id, req.body);
     return res.status(200).json(data);
   } catch (error: any) {
+    console.error("🚨 ERROR EN updateTorneo:", error);
     return res
       .status(500)
-      .json({ message: "Error al actualizar torneo", error: error.message });
+      .json({ message: "Error al actualizar torneo", error: error.message || String(error) });
   }
 };
 
