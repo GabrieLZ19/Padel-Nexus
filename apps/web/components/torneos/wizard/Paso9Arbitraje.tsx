@@ -123,17 +123,19 @@ export const Paso8Arbitraje = ({
               >
                 + Administrar Canchas en Paso 5 (Sedes)
               </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  const { generarPdfGrillaPartidos } =
-                    await import("@/utils/grillaPdf");
-                  generarPdfGrillaPartidos({}, partidos);
-                }}
-                className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl font-bold transition-all text-xs border border-white/10 cursor-pointer shrink-0"
-              >
-                Imprimir Grilla (PDF)
-              </button>
+              {torneo?.estado === "Finalizado" && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const { generarPdfGrillaPartidos } =
+                      await import("@/utils/grillaPdf");
+                    generarPdfGrillaPartidos(torneo, partidos);
+                  }}
+                  className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl font-bold transition-all text-xs border border-white/10 cursor-pointer shrink-0"
+                >
+                  Imprimir Grilla (PDF)
+                </button>
+              )}
             </div>
           </div>
 
@@ -164,11 +166,26 @@ export const Paso8Arbitraje = ({
       {/* DESGLOSE DETALLADO DE PARTIDOS FINALIZADOS ESTILO RANKEDIN */}
       {partidos.filter((p) => p.ganador !== null).length > 0 && (
         <div className="bg-brand-card rounded-3xl border border-white/10 p-6 shadow-xl space-y-4">
-          <h4 className="font-extrabold text-white text-base flex items-center gap-2 border-b border-white/5 pb-3">
-            <span className="size-2.5 rounded-full bg-emerald-400 animate-pulse" />{" "}
-            Desglose Detallado de Resultados Finalizados (
-            {partidos.filter((p) => p.ganador !== null).length})
-          </h4>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/5 pb-3">
+            <h4 className="font-extrabold text-white text-base flex items-center gap-2">
+              <span className="size-2.5 rounded-full bg-emerald-400 animate-pulse" />{" "}
+              Desglose Detallado de Resultados Finalizados (
+              {partidos.filter((p) => p.ganador !== null).length})
+            </h4>
+            {torneo?.estado === "Finalizado" && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const { generarPdfGrillaPartidos } =
+                    await import("@/utils/grillaPdf");
+                  generarPdfGrillaPartidos(torneo, partidos);
+                }}
+                className="flex items-center justify-center gap-2 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse px-4 py-2 rounded-xl font-bold transition-all text-xs border border-brand-chartreuse/30 cursor-pointer shrink-0"
+              >
+                Imprimir Grilla (PDF)
+              </button>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {partidos

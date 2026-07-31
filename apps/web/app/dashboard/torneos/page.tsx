@@ -423,22 +423,24 @@ export default function TorneosPage() {
 
                       <td className="py-4 px-8 text-right">
                         <div className="flex justify-end gap-2 items-center">
-                          {/* 3. Nuevo Botón de Centro de Control */}
-                          <button
-                            onClick={async () => {
-                              try {
-                                const partidos = await TorneosService.getPartidos(t.id);
-                                const { generarPdfGrillaPartidos } = await import("@/utils/grillaPdf");
-                                generarPdfGrillaPartidos(t, partidos || []);
-                              } catch (err) {
-                                console.error("Error al imprimir PDF:", err);
-                              }
-                            }}
-                            className="p-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-lg transition-colors"
-                            title="Imprimir Zonas y Grilla (PDF Rápido)"
-                          >
-                            <Printer className="size-4" />
-                          </button>
+                          {/* Botón de Impresión PDF solo para torneos Finalizados */}
+                          {t.estado === "Finalizado" && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const partidos = await TorneosService.getPartidos(t.id);
+                                  const { generarPdfGrillaPartidos } = await import("@/utils/grillaPdf");
+                                  generarPdfGrillaPartidos(t, partidos || []);
+                                } catch (err) {
+                                  console.error("Error al imprimir PDF:", err);
+                                }
+                              }}
+                              className="p-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-lg transition-colors"
+                              title="Imprimir Grilla de Resultados (PDF)"
+                            >
+                              <Printer className="size-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() =>
                               router.push(`/dashboard/torneos/${t.id}`)
