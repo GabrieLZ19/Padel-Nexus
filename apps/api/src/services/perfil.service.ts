@@ -8,6 +8,8 @@ export interface ActualizarPerfilDTO {
   lado_preferido?: string;
   lugar_residencia?: string;
   dni?: string;
+  sexo?: string;
+  fecha_nacimiento?: string;
   avatar_url?: string;
 }
 
@@ -68,6 +70,8 @@ export class PerfilService {
         lado_preferido: datos.lado_preferido,
         lugar_residencia: datos.lugar_residencia,
         dni: datos.dni,
+        sexo: datos.sexo,
+        fecha_nacimiento: datos.fecha_nacimiento || null,
         avatar_url: datos.avatar_url,
       })
       .eq("id", userId)

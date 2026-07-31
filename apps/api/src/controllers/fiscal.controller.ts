@@ -20,12 +20,34 @@ export const crearFiscal = async (req: Request, res: Response): Promise<Response
   }
 };
 
+export const actualizarFiscal = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const datos = req.body;
+    const actualizado = await FiscalService.actualizarFiscal(id, datos);
+    return res.status(200).json(actualizado);
+  } catch (error: any) {
+    return res.status(400).json({ message: "Error al actualizar fiscal", error: error.message });
+  }
+};
+
+export const cambiarEstadoFiscal = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const { activo } = req.body;
+    const actualizado = await FiscalService.cambiarEstadoFiscal(id, activo);
+    return res.status(200).json(actualizado);
+  } catch (error: any) {
+    return res.status(400).json({ message: "Error al cambiar estado del fiscal", error: error.message });
+  }
+};
+
 export const buscarFiscalPorDni = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { dni } = req.params;
     const fiscal = await FiscalService.buscarPorDni(dni);
     if (!fiscal) {
-      return res.status(404).json({ message: "Fiscal no encontrado" });
+      return res.status(200).json(null);
     }
     return res.status(200).json(fiscal);
   } catch (error: any) {
@@ -46,8 +68,8 @@ export const obtenerFiscalesTorneo = async (req: Request, res: Response): Promis
 export const asignarFiscalesTorneo = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;
-    const { dnis } = req.body;
-    const asignados = await FiscalService.asignarFiscalesTorneo(id, dnis);
+    const items = req.body.fiscal_ids || req.body.dnis || req.body.fiscales || [];
+    const asignados = await FiscalService.asignarFiscalesTorneo(id, items);
     return res.status(200).json({ message: "Fiscales asignados correctamente", asignados });
   } catch (error: any) {
     return res.status(400).json({ message: "Error al asignar fiscales", error: error.message });

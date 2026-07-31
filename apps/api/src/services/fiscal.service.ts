@@ -54,6 +54,37 @@ export class FiscalService {
     return data;
   }
 
+  static async actualizarFiscal(id: string, datos: Partial<FiscalPayload & { direccion?: string; correo?: string }>) {
+    const { data, error } = await supabaseAdmin
+      .from("fiscales")
+      .update({
+        nombre: datos.nombre,
+        apellido: datos.apellido,
+        dni: datos.dni,
+        rango: datos.rango,
+        direccion: datos.direccion,
+        correo: datos.correo,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw new Error(`Error al actualizar fiscal: ${error.message}`);
+    return data;
+  }
+
+  static async cambiarEstadoFiscal(id: string, activo: boolean) {
+    const { data, error } = await supabaseAdmin
+      .from("fiscales")
+      .update({ activo })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw new Error(`Error al cambiar estado de fiscal: ${error.message}`);
+    return data;
+  }
+
   static async buscarPorDni(dni: string) {
     const { data, error } = await supabaseAdmin
       .from("fiscales")
@@ -75,18 +106,21 @@ export class FiscalService {
     return (data || []).map((tf: any) => tf.fiscales).filter(Boolean);
   }
 
-  static async asignarFiscalesTorneo(torneoId: string, dnis: string[]) {
-    if (!dnis || dnis.length === 0) return [];
+  static async asignarFiscalesTorneo(torneoId: string, items: string[]) {
+    if (!items || items.length === 0) {
+      await supabaseAdmin.from("torneo_fiscales").delete().eq("torneo_id", torneoId);
+      return [];
+    }
 
-    // 1. Buscar los fiscales por DNI
+    // 1. Buscar los fiscales por ID o DNI
     const { data: fiscales, error: errF } = await supabaseAdmin
       .from("fiscales")
       .select("id, dni")
-      .in("dni", dnis);
+      .or(`id.in.(${items.map((i) => `"${i}"`).join(",")}),dni.in.(${items.map((i) => `"${i}"`).join(",")})`);
 
     if (errF) throw new Error(errF.message);
     if (!fiscales || fiscales.length === 0) {
-      throw new Error("No se encontraron fiscales con los DNI provistos.");
+      throw new Error("No se encontraron fiscales con los parámetros provistos.");
     }
 
     // 2. Limpiar asignaciones previas
@@ -106,6 +140,7 @@ export class FiscalService {
       .insert(inserts);
 
     if (errIns) throw new Error(errIns.message);
+
     return fiscales;
   }
 }

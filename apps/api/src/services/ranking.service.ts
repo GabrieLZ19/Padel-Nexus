@@ -56,12 +56,22 @@ export class RankingService {
         `
         *, 
         perfiles!inner (
+          id,
           nombre,
           apellido,
+          dni,
           avatar_url,
           lugar_residencia,
           categoria_padel,
-          pais
+          sexo,
+          fecha_nacimiento,
+          pais,
+          club_id,
+          clubes (
+            id,
+            nombre,
+            provincia
+          )
         )
       `,
       );

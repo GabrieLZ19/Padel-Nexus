@@ -72,6 +72,13 @@ export class ReservaService {
     if (reservasError)
       throw new Error("Error al consultar las reservas existentes.");
 
+    // 3b. Obtener partidos de torneo programados en esa fecha para esas canchas
+    const { data: partidosTorneo } = await supabaseAdmin
+      .from("partidos")
+      .select("cancha_id, hora_inicio")
+      .in("cancha_id", canchaIds)
+      .eq("fecha", fecha);
+
     const turnosOcupados = new Set(
       (reservas || []).map((r) => r.turno_id as string),
     );
@@ -81,6 +88,14 @@ export class ReservaService {
 
     const slots: SlotDisponible[] = turnos.map((turno) => {
       const cancha = canchasMap.get(turno.cancha_id);
+      
+      // Verificar si hay un partido de torneo asignado en esta cancha y hora de inicio
+      const tienePartidoTorneo = (partidosTorneo || []).some(
+        (p: any) => p.cancha_id === turno.cancha_id && p.hora_inicio === turno.hora_inicio
+      );
+
+      const estaOcupado = turnosOcupados.has(turno.id) || tienePartidoTorneo;
+
       return {
         turno_id: turno.id,
         cancha_id: turno.cancha_id,
@@ -90,7 +105,7 @@ export class ReservaService {
         hora_inicio: turno.hora_inicio,
         hora_fin: turno.hora_fin,
         precio: turno.precio,
-        disponible: !turnosOcupados.has(turno.id),
+        disponible: !estaOcupado,
       };
     });
 

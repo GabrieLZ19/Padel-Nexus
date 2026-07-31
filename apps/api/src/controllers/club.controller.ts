@@ -6,7 +6,15 @@ export const getAllClubes = async (
   res: Response,
 ): Promise<Response | void> => {
   try {
-    const { page = "1", limit = "10", search, provincia, lat, lng, radio } = req.query;
+    const {
+      page = "1",
+      limit = "10",
+      search,
+      provincia,
+      lat,
+      lng,
+      radio,
+    } = req.query;
 
     // Si se proporcionan coordenadas, usar búsqueda geográfica
     if (lat && lng) {
@@ -15,7 +23,9 @@ export const getAllClubes = async (
       const radioKm = radio ? parseFloat(radio as string) : 50;
 
       if (isNaN(latNum) || isNaN(lngNum)) {
-        return res.status(400).json({ exito: false, error: "Coordenadas inválidas." });
+        return res
+          .status(400)
+          .json({ exito: false, error: "Coordenadas inválidas." });
       }
 
       const data = await ClubService.buscarCercanos(latNum, lngNum, radioKm);
@@ -66,7 +76,17 @@ export const createClub = async (
   res: Response,
 ): Promise<Response | void> => {
   try {
-    const { nombre, provincia, localidad, canchas, estado, latitud, longitud, cbu, alias } = req.body;
+    const {
+      nombre,
+      provincia,
+      localidad,
+      canchas,
+      estado,
+      latitud,
+      longitud,
+      cbu,
+      alias,
+    } = req.body;
 
     if (!nombre || !provincia) {
       return res
@@ -99,7 +119,17 @@ export const updateClub = async (
 ): Promise<Response | void> => {
   try {
     const { id } = req.params;
-    const { nombre, provincia, localidad, estado, canchas, latitud, longitud, cbu, alias } = req.body;
+    const {
+      nombre,
+      provincia,
+      localidad,
+      estado,
+      canchas,
+      latitud,
+      longitud,
+      cbu,
+      alias,
+    } = req.body;
 
     if (!id)
       return res
@@ -156,7 +186,8 @@ export const getCanchasPorClub = async (req: Request, res: Response) => {
     const data = await ClubService.obtenerCanchasPorClub(id);
     return res.status(200).json({ exito: true, data });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error desconocido";
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
     return res.status(500).json({ exito: false, error: message });
   }
 };
@@ -167,13 +198,20 @@ export const createCancha = async (req: Request, res: Response) => {
     const { nombre, tipo_suelo, techada } = req.body;
 
     if (!nombre) {
-      return res.status(400).json({ exito: false, error: "El nombre es obligatorio." });
+      return res
+        .status(400)
+        .json({ exito: false, error: "El nombre es obligatorio." });
     }
 
-    const data = await ClubService.crearCancha(id, { nombre, tipo_suelo, techada });
+    const data = await ClubService.crearCancha(id, {
+      nombre,
+      tipo_suelo,
+      techada,
+    });
     return res.status(201).json({ exito: true, data });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error desconocido";
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
     return res.status(500).json({ exito: false, error: message });
   }
 };
@@ -183,10 +221,16 @@ export const updateCancha = async (req: Request, res: Response) => {
     const { id } = req.params; // canchaId
     const { nombre, tipo_suelo, techada, activa } = req.body;
 
-    const data = await ClubService.actualizarCancha(id, { nombre, tipo_suelo, techada, activa });
+    const data = await ClubService.actualizarCancha(id, {
+      nombre,
+      tipo_suelo,
+      techada,
+      activa,
+    });
     return res.status(200).json({ exito: true, data });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error desconocido";
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
     return res.status(500).json({ exito: false, error: message });
   }
 };
@@ -195,9 +239,12 @@ export const deleteCancha = async (req: Request, res: Response) => {
   try {
     const { id } = req.params; // canchaId
     await ClubService.eliminarCancha(id);
-    return res.status(200).json({ exito: true, message: "Cancha eliminada correctamente." });
+    return res
+      .status(200)
+      .json({ exito: true, message: "Cancha eliminada correctamente." });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error desconocido";
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
     return res.status(500).json({ exito: false, error: message });
   }
 };
@@ -210,13 +257,24 @@ export const createTurno = async (req: Request, res: Response) => {
     const { hora_inicio, hora_fin, precio, dia_semana } = req.body;
 
     if (!hora_inicio || !hora_fin || !precio || dia_semana === undefined) {
-      return res.status(400).json({ exito: false, error: "Todos los campos de turno son obligatorios." });
+      return res
+        .status(400)
+        .json({
+          exito: false,
+          error: "Todos los campos de turno son obligatorios.",
+        });
     }
 
-    const data = await ClubService.crearTurno(id, { hora_inicio, hora_fin, precio, dia_semana });
+    const data = await ClubService.crearTurno(id, {
+      hora_inicio,
+      hora_fin,
+      precio,
+      dia_semana,
+    });
     return res.status(201).json({ exito: true, data });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error desconocido";
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
     return res.status(500).json({ exito: false, error: message });
   }
 };
@@ -225,9 +283,12 @@ export const deleteTurno = async (req: Request, res: Response) => {
   try {
     const { id } = req.params; // turnoId
     await ClubService.eliminarTurno(id);
-    return res.status(200).json({ exito: true, message: "Turno eliminado correctamente." });
+    return res
+      .status(200)
+      .json({ exito: true, message: "Turno eliminado correctamente." });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Error desconocido";
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
     return res.status(500).json({ exito: false, error: message });
   }
 };

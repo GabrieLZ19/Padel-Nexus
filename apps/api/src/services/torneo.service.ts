@@ -112,13 +112,16 @@ export class TorneoService {
       if (result.error) throw new Error(result.error.message);
     }
 
-    let formatted = ((data as DbTorneo[]) || []).map((t) =>
-      TorneoService.evaluateDynamicState({
+    let formatted = ((data as DbTorneo[]) || []).map((t) => {
+      const realInscriptos = Array.isArray(t.inscripciones)
+        ? t.inscripciones.length
+        : t.cupos_actuales || 0;
+      return TorneoService.evaluateDynamicState({
         ...t,
-        cupos_actuales: t.cupos_actuales || 0,
+        cupos_actuales: realInscriptos,
         cupos_maximos: t.cupos_maximos || 0,
-      }),
-    );
+      });
+    });
 
     // Si filtraron específicamente por estado en el query string, volver a filtrar en memoria por si el estado dinámico lo cambió
     if (filtros?.estado) {
@@ -143,23 +146,41 @@ export class TorneoService {
   static async crearTorneo(datos: TorneoPayload) {
     const payload = TorneoService.evaluateDynamicState({ ...datos });
 
+    // Resolver asociacion_id a partir de asociacion sigla o id
+    let resolvedAsociacionId = (datos as any).asociacion_id || null;
+    const asociacionNombre = (datos as any).asociacion ?? "FAP";
+
+    if (!resolvedAsociacionId && asociacionNombre) {
+      const { data: asocData } = await supabaseAdmin
+        .from("asociaciones")
+        .select("id")
+        .or(`sigla.eq."${asociacionNombre}",nombre.eq."${asociacionNombre}"`)
+        .maybeSingle();
+      if (asocData?.id) {
+        resolvedAsociacionId = asocData.id;
+      }
+    }
+
     const { data: torneo, error: torneoError } = await supabaseAdmin
       .from("torneos")
       .insert([
         {
           nombre: payload.nombre,
           subtitulo: payload.subtitulo,
-          club_id: payload.club_id,
+          club_id: payload.club_id || null,
           fecha: payload.fecha,
           estado: payload.estado,
           cupos_maximos: datos.cupos_maximos,
           cupos_actuales: 0,
           nivel: datos.nivel,
+          rama: (datos as any).rama || "Masculina",
           categoria: datos.categoria,
           modalidad: datos.modalidad,
           precio_inscripcion: datos.precio_inscripcion,
           formato: datos.formato,
           alcance: datos.alcance ?? "Provincial",
+          reglamento: (datos as any).reglamento ?? (datos as any).asociacion ?? "FAP",
+          asociacion_id: resolvedAsociacionId,
           premio_1: datos.premios?.uno,
           premio_2: datos.premios?.dos,
           premio_3: datos.premios?.tres,
@@ -190,14 +211,77 @@ export class TorneoService {
     return torneo;
   }
 
+  // Columnas OFICIALES Y EXACTAS de la DDL de la tabla `torneos` en Supabase:
+  private static readonly COLUMNAS_TORNEOS = new Set([
+    "nombre",
+    "subtitulo",
+    "club_id",
+    "fecha",
+    "estado",
+    "cupos_maximos",
+    "cupos_actuales",
+    "nivel",
+    "categoria",
+    "modalidad",
+    "precio_inscripcion",
+    "formato",
+    "premio_1",
+    "premio_2",
+    "premio_3",
+    "canchas_disponibles",
+    "duracion_partido_minutos",
+    "hora_inicio_jornada",
+    "alcance",
+    "reglas_arbitraje",
+    "configuracion_puntos",
+    "logo_url",
+    "banners",
+    "fecha_cierre_inscripcion",
+    "fecha_fin",
+    "validar_edad",
+    "dias_juego",
+    "reglamento",
+    "es_gratis",
+    "rama",
+    "asociacion_id",
+  ]);
+
+  /**
+   * Filtra un objeto dejando solo las claves que corresponden a columnas
+   * válidas de la tabla `torneos`. Evita que campos relacionales, de UI
+   * o calculados (e.g. `clubes`, `inscripciones`, `premios`) lleguen a
+   * PostgREST y provoquen un error 400/500.
+   */
+  private static sanitizeTorneoData(datos: Record<string, any>): Record<string, any> {
+    const clean: Record<string, any> = {};
+    for (const [key, value] of Object.entries(datos)) {
+      if (TorneoService.COLUMNAS_TORNEOS.has(key)) {
+        clean[key] = value;
+      }
+    }
+    return clean;
+  }
+
   static async actualizarTorneo(id: string, datos: any) {
     const { data: torneoActual } = await supabaseAdmin
       .from("torneos")
-      .select("estado, fecha, configuracion")
+      .select("estado, fecha")
       .eq("id", id)
       .single();
 
-    const updateData: Record<string, any> = { ...datos };
+    // Sanitizar: solo columnas válidas de la tabla `torneos`
+    const updateData = TorneoService.sanitizeTorneoData(datos);
+
+    if (updateData.asociacion && !updateData.asociacion_id) {
+      const { data: asocData } = await supabaseAdmin
+        .from("asociaciones")
+        .select("id")
+        .or(`sigla.eq."${updateData.asociacion}",nombre.eq."${updateData.asociacion}"`)
+        .maybeSingle();
+      if (asocData?.id) {
+        updateData.asociacion_id = asocData.id;
+      }
+    }
 
     if (torneoActual) {
       const mergedForEval = { ...torneoActual, ...updateData };
@@ -219,13 +303,6 @@ export class TorneoService {
           `No es posible reducir el cupo máximo a ${datos.cupos_maximos} porque actualmente hay ${inscritos} inscritos en el torneo.`,
         );
       }
-    }
-
-    if (datos.premios) {
-      updateData.premio_1 = datos.premios.uno;
-      updateData.premio_2 = datos.premios.dos;
-      updateData.premio_3 = datos.premios.tres;
-      delete updateData.premios;
     }
 
     const { data, error } = await supabaseAdmin
@@ -418,66 +495,120 @@ export class TorneoService {
       if (startIndex === -1)
         throw new Error("Cantidad de cupos inválida para generar cuadro.");
 
-      const B = cupos - N; // Cantidad de BYEs
-
+      const initialRound = roundsConfig[startIndex];
       const partidosPorRonda: Record<string, any[]> = {};
       for (let i = startIndex; i < roundsConfig.length; i++) {
         partidosPorRonda[roundsConfig[i].name] = [];
       }
 
-      let byeIdx = 0;
-      let realIdx = B;
-      const initialRound = roundsConfig[startIndex];
-      for (let j = 0; j < initialRound.matches; j++) {
-        let equipo_a_id: string | null = null;
-        let equipo_b_id: string | null = null;
+      // ALGORITMO UNIVERSAL DE SIEMBRAS Y BYES FAP / APA PARA CUALQUIER N INSCRIPTOS
+      // 1. Determinar el tamaño de la llave principal (K: 4, 8, 16, 32) y la cantidad de BYEs (B = K - N)
+      const K = cupos;
+      const B = K - N;
+      const numPartidosIniciales = K / 2;
 
-        // Distribución intercalada uniforme de BYEs
-        const isBye = (j * B) % initialRound.matches < B;
+      // Matriz de slots para la ronda inicial (tamaño numPartidosIniciales)
+      const slotsIniciales: Array<{ equipo_a_id: string | null; equipo_b_id: string | null }> = [];
+      for (let i = 0; i < numPartidosIniciales; i++) {
+        slotsIniciales.push({ equipo_a_id: null, equipo_b_id: null });
+      }
 
-        if (isBye) {
-          equipo_a_id = shuffled[byeIdx]?.id || null;
-          equipo_b_id = null;
-          byeIdx++;
-        } else {
-          equipo_a_id = shuffled[realIdx]?.id || null;
-          equipo_b_id = shuffled[realIdx + 1]?.id || null;
-          realIdx += 2;
+      // Orden de asignación de BYEs según el reglamento de siembras FAP (Extremo sup, Extremo inf, Centro...)
+      const orderByeSlots: number[] = [];
+      if (numPartidosIniciales >= 1) orderByeSlots.push(0); // Slot 0 (Cabecera 1)
+      if (numPartidosIniciales >= 2) orderByeSlots.push(numPartidosIniciales - 1); // Último Slot (Cabecera 2)
+      if (numPartidosIniciales >= 4) {
+        orderByeSlots.push(Math.floor(numPartidosIniciales / 2) - 1); // Centro superior (Cabecera 3)
+        orderByeSlots.push(Math.floor(numPartidosIniciales / 2));     // Centro inferior (Cabecera 4)
+      }
+      for (let i = 0; i < numPartidosIniciales; i++) {
+        if (!orderByeSlots.includes(i)) orderByeSlots.push(i);
+      }
+
+      let playerIdx = 0;
+      // 1. Asignar los B BYEs a las primeras posiciones de la lista de siembra
+      for (let b = 0; b < B; b++) {
+        const slotIdx = orderByeSlots[b];
+        if (slotIdx !== undefined && slotsIniciales[slotIdx]) {
+          slotsIniciales[slotIdx].equipo_a_id = shuffled[playerIdx]?.id || null;
+          playerIdx++;
         }
+      }
 
+      // 2. Asignar los jugadores restantes en los partidos de 2 equipos
+      for (let i = 0; i < numPartidosIniciales; i++) {
+        const slot = slotsIniciales[i];
+        if (slot.equipo_a_id === null) {
+          slot.equipo_a_id = shuffled[playerIdx]?.id || null;
+          playerIdx++;
+        }
+        if (slot.equipo_b_id === null && playerIdx < N) {
+          slot.equipo_b_id = shuffled[playerIdx]?.id || null;
+          playerIdx++;
+        }
+      }
+
+      // 3. Construir partidos de la Ronda Inicial y proyectar clasificados directos por BYE a la Siguiente Ronda
+      const nextRoundName = roundsConfig[startIndex + 1]?.name || "SEMIS";
+      const nextRoundMatchesCount = roundsConfig[startIndex + 1]?.matches || Math.floor(numPartidosIniciales / 2);
+      
+      const nextRoundSlots: Array<{ equipo_a_id: string | null; equipo_b_id: string | null }> = [];
+      for (let nr = 0; nr < nextRoundMatchesCount; nr++) {
+        nextRoundSlots.push({ equipo_a_id: null, equipo_b_id: null });
+      }
+
+      for (let j = 0; j < numPartidosIniciales; j++) {
+        const slot = slotsIniciales[j];
         const slotIndex = Math.floor(j / canchasCount);
         const canchaNo = (j % canchasCount) + 1;
         const matchTime = new Date(
           currentRoundStartTime.getTime() + slotIndex * matchDur * 60 * 1000,
         );
 
-        const partido = {
-          torneo_id: id,
-          equipo_a_id,
-          equipo_b_id,
-          ronda: initialRound.name,
-          orden: orden++,
-          estado_partido: "Programado",
-          cancha_asignada: `Cancha ${canchaNo}`,
-          fecha_partido: matchTime.toISOString(),
-          ganador: null as string | null,
-          set1_a: null as number | null,
-          set1_b: null as number | null,
-        };
-
-        if (equipo_a_id && !equipo_b_id) {
-          partido.ganador = equipo_a_id;
-          partido.estado_partido = FAP_ESTADOS_TORNEO.FINALIZADO;
-          partido.set1_a = 0;
-          partido.set1_b = 0;
-        } else if (equipo_b_id && !equipo_a_id) {
-          partido.ganador = equipo_b_id;
-          partido.estado_partido = FAP_ESTADOS_TORNEO.FINALIZADO;
-          partido.set1_a = 0;
-          partido.set1_b = 0;
+        if (slot.equipo_a_id && slot.equipo_b_id) {
+          // Partido real entre 2 contrincantes
+          partidosPorRonda[initialRound.name].push({
+            torneo_id: id,
+            equipo_a_id: slot.equipo_a_id,
+            equipo_b_id: slot.equipo_b_id,
+            ronda: initialRound.name,
+            orden: orden++,
+            estado_partido: "Programado",
+            cancha_asignada: `Cancha ${canchaNo}`,
+            fecha_partido: matchTime.toISOString(),
+            ganador: null,
+          });
+        } else if (slot.equipo_a_id && !slot.equipo_b_id) {
+          // BYE: Clasifica automáticamente a la ronda siguiente
+          const targetNextMatchIdx = Math.floor(j / 2);
+          const isPosA = j % 2 === 0;
+          if (nextRoundSlots[targetNextMatchIdx]) {
+            if (isPosA) {
+              nextRoundSlots[targetNextMatchIdx].equipo_a_id = slot.equipo_a_id;
+            } else {
+              nextRoundSlots[targetNextMatchIdx].equipo_b_id = slot.equipo_a_id;
+            }
+          }
         }
+      }
 
-        partidosPorRonda[initialRound.name].push(partido);
+      // Guardar la ronda siguiente preparada con los clasificados por BYE
+      if (nextRoundName && partidosPorRonda[nextRoundName]) {
+        const matchTimeNext = new Date(currentRoundStartTime.getTime() + matchDur * 60 * 1000);
+        for (let nr = 0; nr < nextRoundMatchesCount; nr++) {
+          const nrSlot = nextRoundSlots[nr];
+          partidosPorRonda[nextRoundName].push({
+            torneo_id: id,
+            equipo_a_id: nrSlot.equipo_a_id,
+            equipo_b_id: nrSlot.equipo_b_id,
+            ronda: nextRoundName,
+            orden: orden++,
+            estado_partido: "Programado",
+            cancha_asignada: `Cancha ${(nr % canchasCount) + 1}`,
+            fecha_partido: matchTimeNext.toISOString(),
+            ganador: null,
+          });
+        }
       }
 
       let roundStartTime = new Date(
@@ -487,43 +618,22 @@ export class TorneoService {
 
       for (let i = startIndex + 1; i < roundsConfig.length; i++) {
         const round = roundsConfig[i];
-        const prevRound = roundsConfig[i - 1];
-        const numMatches = round.matches;
-
-        for (let j = 0; j < numMatches; j++) {
-          const leftMatch = partidosPorRonda[prevRound.name][j * 2];
-          const rightMatch = partidosPorRonda[prevRound.name][j * 2 + 1];
-
-          const equipo_a_id = leftMatch?.ganador || null;
-          const equipo_b_id = rightMatch?.ganador || null;
-
-          const slotIndex = Math.floor(j / canchasCount);
-          const canchaNo = (j % canchasCount) + 1;
-          const matchTime = new Date(
-            roundStartTime.getTime() + slotIndex * matchDur * 60 * 1000,
-          );
-
-          const partido = {
-            torneo_id: id,
-            equipo_a_id,
-            equipo_b_id,
-            ronda: round.name,
-            orden: orden++,
-            estado_partido: "Programado",
-            cancha_asignada: `Cancha ${canchaNo}`,
-            fecha_partido: matchTime.toISOString(),
-            ganador: null as string | null,
-            set1_a: null as number | null,
-            set1_b: null as number | null,
-          };
-
-          partidosPorRonda[round.name].push(partido);
+        if (partidosPorRonda[round.name].length === 0) {
+          const numMatches = round.matches;
+          for (let m = 0; m < numMatches; m++) {
+            partidosPorRonda[round.name].push({
+              torneo_id: id,
+              equipo_a_id: null,
+              equipo_b_id: null,
+              ronda: round.name,
+              orden: orden++,
+              estado_partido: "Programado",
+              cancha_asignada: `Cancha ${(m % canchasCount) + 1}`,
+              fecha_partido: currentRoundStartTime.toISOString(),
+              ganador: null,
+            });
+          }
         }
-
-        const roundSlots = Math.ceil(numMatches / canchasCount);
-        roundStartTime = new Date(
-          roundStartTime.getTime() + roundSlots * matchDur * 60 * 1000,
-        );
       }
 
       partidos.push(...Object.values(partidosPorRonda).flat());
@@ -1249,6 +1359,19 @@ export class TorneoService {
         .insert(inserts);
       if (error) throw new Error(error.message);
     }
+    return true;
+  }
+
+  static async actualizarPartido(
+    partidoId: string,
+    payload: Record<string, any>,
+  ) {
+    const { error } = await supabaseAdmin
+      .from("partidos")
+      .update(payload)
+      .eq("id", partidoId);
+
+    if (error) throw new Error(error.message);
     return true;
   }
 }

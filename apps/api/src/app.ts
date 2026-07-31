@@ -43,10 +43,13 @@ app.get("/health", (req: Request, res: Response) => {
   res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
+import asociacionesRoutes from "./routes/asociacion.routes";
+
 // Registro de Rutas
 app.use("/api/torneos", torneosRoutes);
 app.use("/api/rankings", rankingsRoutes);
 app.use("/api/licencias", licenciasRoutes);
+app.use("/api/asociaciones", asociacionesRoutes);
 app.use("/api/clubes", clubesRoutes);
 app.use("/api/inscripciones", inscripcionesRoutes);
 app.use("/api/partidos", partidosRoutes);

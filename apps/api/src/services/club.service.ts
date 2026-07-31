@@ -41,7 +41,8 @@ export class ClubService {
       max_distancia_km: radioKm,
     });
 
-    if (error) throw new Error(`Error en búsqueda geográfica: ${error.message}`);
+    if (error)
+      throw new Error(`Error en búsqueda geográfica: ${error.message}`);
     return (data as ClubCercano[]) || [];
   }
 
@@ -98,14 +99,16 @@ export class ClubService {
       .eq("id", id)
       .single();
 
-    if (error || !data) throw new Error("Club no encontrado o error en consulta.");
+    if (error || !data)
+      throw new Error("Club no encontrado o error en consulta.");
 
     type SupabaseClubDetalle = Record<string, any> & {
       canchas?: { count: number }[] | null;
     };
 
     const d = data as SupabaseClubDetalle;
-    const canchasCount = d.canchas && d.canchas.length > 0 ? d.canchas[0].count : 0;
+    const canchasCount =
+      d.canchas && d.canchas.length > 0 ? d.canchas[0].count : 0;
     const { canchas, ...resto } = d;
 
     return {
@@ -170,7 +173,10 @@ export class ClubService {
     return data || [];
   }
 
-  static async crearCancha(clubId: string, datos: { nombre: string; tipo_suelo: string; techada: boolean }) {
+  static async crearCancha(
+    clubId: string,
+    datos: { nombre: string; tipo_suelo: string; techada: boolean },
+  ) {
     const { data, error } = await supabaseAdmin
       .from("canchas")
       .insert([
@@ -189,7 +195,15 @@ export class ClubService {
     return data;
   }
 
-  static async actualizarCancha(canchaId: string, datos: { nombre?: string; tipo_suelo?: string; techada?: boolean; activa?: boolean }) {
+  static async actualizarCancha(
+    canchaId: string,
+    datos: {
+      nombre?: string;
+      tipo_suelo?: string;
+      techada?: boolean;
+      activa?: boolean;
+    },
+  ) {
     const { data, error } = await supabaseAdmin
       .from("canchas")
       .update(datos)
@@ -197,7 +211,8 @@ export class ClubService {
       .select()
       .single();
 
-    if (error) throw new Error(`Error al actualizar la cancha: ${error.message}`);
+    if (error)
+      throw new Error(`Error al actualizar la cancha: ${error.message}`);
     return data;
   }
 
@@ -212,7 +227,15 @@ export class ClubService {
 
   // ── Turnos CRUD ───────────────────────────────────────────────────────
 
-  static async crearTurno(canchaId: string, datos: { hora_inicio: string; hora_fin: string; precio: number; dia_semana: number }) {
+  static async crearTurno(
+    canchaId: string,
+    datos: {
+      hora_inicio: string;
+      hora_fin: string;
+      precio: number;
+      dia_semana: number;
+    },
+  ) {
     const { data, error } = await supabaseAdmin
       .from("turnos")
       .insert([
@@ -315,9 +338,10 @@ export class ClubService {
     // Calcular tasa de ocupación aproximada: reservas realizadas / turnos totales disponibles en el mes
     const diasTranscurridos = new Date().getDate();
     const turnosTotalesDisponibles = turnoIds.length * diasTranscurridos;
-    const tasaOcupacion = turnosTotalesDisponibles > 0 
-      ? Math.round((reservasMes / turnosTotalesDisponibles) * 100) 
-      : 0;
+    const tasaOcupacion =
+      turnosTotalesDisponibles > 0
+        ? Math.round((reservasMes / turnosTotalesDisponibles) * 100)
+        : 0;
 
     return {
       canchas_totales: canchaIds.length,
@@ -330,7 +354,13 @@ export class ClubService {
 
   static async obtenerReservasClub(
     clubId: string,
-    filtros: { fecha?: string; estado_pago?: string; cancha_id?: string; page?: number; limit?: number },
+    filtros: {
+      fecha?: string;
+      estado_pago?: string;
+      cancha_id?: string;
+      page?: number;
+      limit?: number;
+    },
   ) {
     const { fecha, estado_pago, cancha_id, page = 1, limit = 20 } = filtros;
     const from = (page - 1) * limit;
@@ -349,10 +379,8 @@ export class ClubService {
     }
 
     // Armar la consulta
-    let query = supabaseAdmin
-      .from("reservas")
-      .select(
-        `
+    let query = supabaseAdmin.from("reservas").select(
+      `
         id,
         fecha_reserva,
         estado_pago,
@@ -367,8 +395,8 @@ export class ClubService {
           canchas(id, nombre)
         )
       `,
-        { count: "exact" },
-      );
+      { count: "exact" },
+    );
 
     // Filtrar por los turnos de las canchas del club
     if (cancha_id) {
@@ -378,7 +406,10 @@ export class ClubService {
         .select("id")
         .eq("cancha_id", cancha_id);
       const tcIds = (turnosCancha || []).map((t) => t.id);
-      query = query.in("turno_id", tcIds.length > 0 ? tcIds : ["00000000-0000-0000-0000-000000000000"]);
+      query = query.in(
+        "turno_id",
+        tcIds.length > 0 ? tcIds : ["00000000-0000-0000-0000-000000000000"],
+      );
     } else {
       // Todos los turnos de todas las canchas del club
       const { data: turnosClub } = await supabaseAdmin
@@ -386,7 +417,10 @@ export class ClubService {
         .select("id")
         .in("cancha_id", canchaIds);
       const tcIds = (turnosClub || []).map((t) => t.id);
-      query = query.in("turno_id", tcIds.length > 0 ? tcIds : ["00000000-0000-0000-0000-000000000000"]);
+      query = query.in(
+        "turno_id",
+        tcIds.length > 0 ? tcIds : ["00000000-0000-0000-0000-000000000000"],
+      );
     }
 
     if (fecha) query = query.eq("fecha_reserva", fecha);
@@ -395,9 +429,9 @@ export class ClubService {
     query = query.order("fecha_reserva", { ascending: false }).range(from, to);
 
     const { data, error, count } = await query;
-    if (error) throw new Error("Error al obtener reservas del club: " + error.message);
+    if (error)
+      throw new Error("Error al obtener reservas del club: " + error.message);
 
     return { data: data || [], total: count || 0 };
   }
 }
-

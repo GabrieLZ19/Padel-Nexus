@@ -130,6 +130,22 @@ export const generarCuadros = async (
   }
 };
 
+export const actualizarPartido = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { partido_id } = req.params;
+    const data = req.body;
+    await TorneoService.actualizarPartido(partido_id, data);
+    return res.status(200).json({ message: "Partido actualizado con éxito" });
+  } catch (error: any) {
+    return res
+      .status(400)
+      .json({ message: "Error al actualizar el partido", error: error.message });
+  }
+};
+
 export const guardarSiembraCustom = async (
   req: Request,
   res: Response,

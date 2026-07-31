@@ -12,6 +12,8 @@ export interface RegistroDTO {
   lugar_residencia: string;
   categoria_padel: string;
   lado_preferido: string;
+  sexo?: string;
+  fecha_nacimiento?: string;
   avatar_base64?: string;
 }
 
@@ -35,7 +37,7 @@ export class AuthService {
     // Al estar aislado, ignora el RLS de forma directa sin caer en bucles de Postgres
     const { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
-      .select("id, nombre, apellido, dni, lugar_residencia, rol, email, ranking_nacional, ranking_provincial")
+      .select("id, nombre, apellido, dni, lugar_residencia, rol, email, sexo, fecha_nacimiento, club_id")
       .eq("id", authData.user.id)
       .single();
 
@@ -82,6 +84,8 @@ export class AuthService {
           lugar_residencia: datos.lugar_residencia,
           categoria_padel: datos.categoria_padel,
           lado_preferido: datos.lado_preferido,
+          sexo: datos.sexo || "masculino",
+          fecha_nacimiento: datos.fecha_nacimiento || null,
         },
       },
     });

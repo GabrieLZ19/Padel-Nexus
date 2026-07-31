@@ -154,14 +154,48 @@ export class InscripcionService {
       );
     }
 
-    // 5. REGLAS ARQUITECTURA NACIONAL
+    // 5. REGLAS ARQUITECTURA NACIONAL Y VALIDACIÓN DE EDAD/SEXO
     const { data: solicitante } = await supabaseAdmin
       .from("perfiles")
-      .select("rol, categoria_padel, nombre")
+      .select("rol, categoria_padel, nombre, fecha_nacimiento, sexo")
       .eq("id", usuarioSolicitanteId)
       .single();
 
     if (!solicitante) throw new Error("Perfil de jugador no encontrado.");
+
+    // Validar edad si el torneo requiere validación o la categoría es Veteranos/Ladies
+    const { data: torneoDetalle } = await supabaseAdmin
+      .from("torneos")
+      .select("validar_edad, categoria, rama")
+      .eq("id", torneoId)
+      .single();
+
+    if (torneoDetalle) {
+      const catName = torneoDetalle.categoria || "";
+      const requiereEdad = torneoDetalle.validar_edad || /\+(30|40|50|60)|veteranos|ladies/i.test(catName);
+
+      if (requiereEdad) {
+        if (!solicitante.fecha_nacimiento) {
+          throw new Error(
+            "Completá tu fecha de nacimiento en tu perfil antes de inscribirte a esta categoría restringida por edad.",
+          );
+        }
+      }
+
+      // Validar rama si la categoría no es Mixta
+      if (torneoDetalle.rama && torneoDetalle.rama !== "Mixta") {
+        if (solicitante.sexo && solicitante.sexo !== "otro") {
+          const ramaEsperada = torneoDetalle.rama.toLowerCase();
+          const sexoJugador = solicitante.sexo.toLowerCase();
+          if (ramaEsperada === "masculina" && sexoJugador === "femenino") {
+            throw new Error("No podés inscribirte a un torneo de rama Masculina.");
+          }
+          if (ramaEsperada === "femenina" && sexoJugador === "masculino") {
+            throw new Error("No podés inscribirte a un torneo de rama Femenina.");
+          }
+        }
+      }
+    }
 
     if (torneo.nivel?.toLowerCase() === "nacional") {
       if (
