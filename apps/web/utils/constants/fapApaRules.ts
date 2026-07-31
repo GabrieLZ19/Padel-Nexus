@@ -16,11 +16,20 @@ export type RamaPadel = (typeof RAMAS_PADEL)[number]["value"];
 // ============================================================================
 export const CUPOS_ESTANDAR_FAP = [
   { value: "6", label: "6 Parejas / Jugadores (2 Zonas de 3)" },
-  { value: "8", label: "8 Parejas / Jugadores (2 Zonas de 4 / Elim. Directa 8)" },
+  {
+    value: "8",
+    label: "8 Parejas / Jugadores (2 Zonas de 4 / Elim. Directa 8)",
+  },
   { value: "12", label: "12 Parejas / Jugadores (4 Zonas de 3)" },
-  { value: "16", label: "16 Parejas / Jugadores (4 Zonas de 4 / Elim. Directa 16)" },
+  {
+    value: "16",
+    label: "16 Parejas / Jugadores (4 Zonas de 4 / Elim. Directa 16)",
+  },
   { value: "24", label: "24 Parejas / Jugadores (8 Zonas de 3)" },
-  { value: "32", label: "32 Parejas / Jugadores (8 Zonas de 4 / Elim. Directa 32)" },
+  {
+    value: "32",
+    label: "32 Parejas / Jugadores (8 Zonas de 4 / Elim. Directa 32)",
+  },
   { value: "64", label: "64 Parejas / Jugadores (Eliminatoria Directa 64)" },
 ] as const;
 
@@ -176,12 +185,17 @@ export function getCategoriasParaAsociacion(
 // ALCANCE POR ROL DE USUARIO
 // Regla de negocio: un Club no puede crear torneos nacionales.
 // ============================================================================
-type AlcanceOption = { value: string; label: string; disabled?: boolean; tooltip?: string };
+type AlcanceOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+  tooltip?: string;
+};
 
 const TODOS_LOS_ALCANCES: AlcanceOption[] = [
   { value: "Local", label: "Local / Privado" },
-  { value: "Regional", label: "Regional" },
   { value: "Provincial", label: "Provincial" },
+  { value: "Regional", label: "Regional" },
   { value: "Nacional", label: "Nacional" },
 ];
 
@@ -195,7 +209,8 @@ export function getAlcancesPermitidos(rol: RolUsuario): AlcanceOption[] {
           return {
             ...a,
             disabled: true,
-            tooltip: "Solo la Federación o Asociación Provincial puede organizar torneos nacionales.",
+            tooltip:
+              "Solo la Federación o Asociación Provincial puede organizar torneos nacionales.",
           };
         }
         return a;
@@ -208,7 +223,8 @@ export function getAlcancesPermitidos(rol: RolUsuario): AlcanceOption[] {
           return {
             ...a,
             disabled: true,
-            tooltip: "Solo la Federación Nacional puede organizar torneos nacionales.",
+            tooltip:
+              "Solo la Federación Nacional puede organizar torneos nacionales.",
           };
         }
         return a;

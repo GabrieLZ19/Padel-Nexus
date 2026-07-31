@@ -178,7 +178,7 @@ export class TorneoService {
           modalidad: datos.modalidad,
           precio_inscripcion: datos.precio_inscripcion,
           formato: datos.formato,
-          alcance: datos.alcance ?? "Provincial",
+          alcance: TorneoService.normalizarAlcance(datos.alcance),
           reglamento: (datos as any).reglamento ?? (datos as any).asociacion ?? "FAP",
           asociacion_id: resolvedAsociacionId,
           premio_1: datos.premios?.uno,
@@ -246,6 +246,18 @@ export class TorneoService {
     "asociacion_id",
   ]);
 
+  public static normalizarAlcance(
+    alcance?: string | null,
+  ): "Nacional" | "Provincial" | "Regional" | "Local" {
+    if (!alcance) return "Provincial";
+    const val = String(alcance).trim();
+    if (/nacional/i.test(val)) return "Nacional";
+    if (/regional/i.test(val)) return "Regional";
+    if (/local|privado/i.test(val)) return "Local";
+    if (/provincial/i.test(val)) return "Provincial";
+    return "Provincial";
+  }
+
   /**
    * Filtra un objeto dejando solo las claves que corresponden a columnas
    * válidas de la tabla `torneos`. Evita que campos relacionales, de UI
@@ -258,6 +270,9 @@ export class TorneoService {
       if (TorneoService.COLUMNAS_TORNEOS.has(key)) {
         clean[key] = value;
       }
+    }
+    if (clean.alcance !== undefined) {
+      clean.alcance = TorneoService.normalizarAlcance(clean.alcance);
     }
     return clean;
   }
