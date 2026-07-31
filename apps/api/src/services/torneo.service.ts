@@ -179,7 +179,8 @@ export class TorneoService {
           precio_inscripcion: datos.precio_inscripcion,
           formato: datos.formato,
           alcance: TorneoService.normalizarAlcance(datos.alcance),
-          reglamento: (datos as any).reglamento ?? (datos as any).asociacion ?? "FAP",
+          reglamento:
+            (datos as any).reglamento ?? (datos as any).asociacion ?? "FAP",
           asociacion_id: resolvedAsociacionId,
           premio_1: datos.premios?.uno,
           premio_2: datos.premios?.dos,
@@ -264,7 +265,9 @@ export class TorneoService {
    * o calculados (e.g. `clubes`, `inscripciones`, `premios`) lleguen a
    * PostgREST y provoquen un error 400/500.
    */
-  private static sanitizeTorneoData(datos: Record<string, any>): Record<string, any> {
+  private static sanitizeTorneoData(
+    datos: Record<string, any>,
+  ): Record<string, any> {
     const clean: Record<string, any> = {};
     for (const [key, value] of Object.entries(datos)) {
       if (TorneoService.COLUMNAS_TORNEOS.has(key)) {
@@ -291,7 +294,9 @@ export class TorneoService {
       const { data: asocData } = await supabaseAdmin
         .from("asociaciones")
         .select("id")
-        .or(`sigla.eq."${updateData.asociacion}",nombre.eq."${updateData.asociacion}"`)
+        .or(
+          `sigla.eq."${updateData.asociacion}",nombre.eq."${updateData.asociacion}"`,
+        )
         .maybeSingle();
       if (asocData?.id) {
         updateData.asociacion_id = asocData.id;
@@ -523,7 +528,10 @@ export class TorneoService {
       const numPartidosIniciales = K / 2;
 
       // Matriz de slots para la ronda inicial (tamaño numPartidosIniciales)
-      const slotsIniciales: Array<{ equipo_a_id: string | null; equipo_b_id: string | null }> = [];
+      const slotsIniciales: Array<{
+        equipo_a_id: string | null;
+        equipo_b_id: string | null;
+      }> = [];
       for (let i = 0; i < numPartidosIniciales; i++) {
         slotsIniciales.push({ equipo_a_id: null, equipo_b_id: null });
       }
@@ -531,10 +539,11 @@ export class TorneoService {
       // Orden de asignación de BYEs según el reglamento de siembras FAP (Extremo sup, Extremo inf, Centro...)
       const orderByeSlots: number[] = [];
       if (numPartidosIniciales >= 1) orderByeSlots.push(0); // Slot 0 (Cabecera 1)
-      if (numPartidosIniciales >= 2) orderByeSlots.push(numPartidosIniciales - 1); // Último Slot (Cabecera 2)
+      if (numPartidosIniciales >= 2)
+        orderByeSlots.push(numPartidosIniciales - 1); // Último Slot (Cabecera 2)
       if (numPartidosIniciales >= 4) {
         orderByeSlots.push(Math.floor(numPartidosIniciales / 2) - 1); // Centro superior (Cabecera 3)
-        orderByeSlots.push(Math.floor(numPartidosIniciales / 2));     // Centro inferior (Cabecera 4)
+        orderByeSlots.push(Math.floor(numPartidosIniciales / 2)); // Centro inferior (Cabecera 4)
       }
       for (let i = 0; i < numPartidosIniciales; i++) {
         if (!orderByeSlots.includes(i)) orderByeSlots.push(i);
@@ -570,9 +579,14 @@ export class TorneoService {
 
       // 3. Construir partidos de la Ronda Inicial y proyectar clasificados directos por BYE a la Siguiente Ronda
       const nextRoundName = roundsConfig[startIndex + 1]?.name || "SEMIS";
-      const nextRoundMatchesCount = roundsConfig[startIndex + 1]?.matches || Math.floor(numPartidosIniciales / 2);
-      
-      const nextRoundSlots: Array<{ equipo_a_id: string | null; equipo_b_id: string | null }> = [];
+      const nextRoundMatchesCount =
+        roundsConfig[startIndex + 1]?.matches ||
+        Math.floor(numPartidosIniciales / 2);
+
+      const nextRoundSlots: Array<{
+        equipo_a_id: string | null;
+        equipo_b_id: string | null;
+      }> = [];
       for (let nr = 0; nr < nextRoundMatchesCount; nr++) {
         nextRoundSlots.push({ equipo_a_id: null, equipo_b_id: null });
       }
@@ -614,7 +628,9 @@ export class TorneoService {
 
       // Guardar la ronda siguiente preparada con los clasificados por BYE
       if (nextRoundName && partidosPorRonda[nextRoundName]) {
-        const matchTimeNext = new Date(currentRoundStartTime.getTime() + matchDur * 60 * 1000);
+        const matchTimeNext = new Date(
+          currentRoundStartTime.getTime() + matchDur * 60 * 1000,
+        );
         for (let nr = 0; nr < nextRoundMatchesCount; nr++) {
           const nrSlot = nextRoundSlots[nr];
           partidosPorRonda[nextRoundName].push({
@@ -685,7 +701,8 @@ export class TorneoService {
             const slotIndex = Math.floor(matchGlobalIdx / canchasCount);
             const canchaNo = (matchGlobalIdx % canchasCount) + 1;
             const matchTime = new Date(
-              currentRoundStartTime.getTime() + slotIndex * matchDur * 60 * 1000,
+              currentRoundStartTime.getTime() +
+                slotIndex * matchDur * 60 * 1000,
             );
 
             partidos.push({

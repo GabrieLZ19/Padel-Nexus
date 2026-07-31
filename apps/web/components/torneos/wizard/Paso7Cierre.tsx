@@ -155,7 +155,7 @@ export const Paso5Cierre = ({
   };
 
   return (
-    <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 space-y-6">
+    <div className="bg-brand-card border border-white/10 rounded-3xl p-6 space-y-6 shadow-xl">
       <h3 className="text-lg font-bold text-white uppercase tracking-wider">
         Paso 6: Cierre de Inscripción y Puntuación
       </h3>
@@ -164,7 +164,7 @@ export const Paso5Cierre = ({
       </p>
 
       {/* JUGADORES Y ESTADO */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-black/20 p-6 rounded-2xl border border-white/5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-brand-input/40 p-6 rounded-2xl border border-white/10 shadow-sm">
         <div>
           <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">
             Jugadores Confirmados
@@ -190,14 +190,14 @@ export const Paso5Cierre = ({
       </div>
 
       {/* INFORMACIÓN SOBRE EL RANKING VINCULADO */}
-      <div className="border-t border-white/5 pt-6 space-y-4">
+      <div className="border-t border-white/10 pt-6 space-y-4">
         <h4 className="text-xs text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
           <Award className="size-4 text-brand-chartreuse" /> Ranking Vinculado
         </h4>
-        <div className="overflow-x-auto rounded-2xl border border-white/5 bg-black/10">
+        <div className="overflow-x-auto rounded-2xl border border-white/10 bg-brand-input/40 shadow-sm">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-white/5 text-[10px] text-gray-500 uppercase font-black">
+              <tr className="border-b border-white/10 text-[10px] text-gray-500 uppercase font-black">
                 <th className="p-4">Nombre del Ranking</th>
                 <th className="p-4">Clase / Nivel</th>
                 <th className="p-4">Estado</th>
@@ -205,7 +205,7 @@ export const Paso5Cierre = ({
               </tr>
             </thead>
             <tbody className="text-xs font-bold text-white">
-              <tr className="border-b border-white/5 hover:bg-white/5 transition-all">
+              <tr className="border-b border-white/10 hover:bg-white/5 transition-all">
                 <td className="p-4">
                   {(() => {
                     const reg = (torneo as any).reglamento || (torneo as any).asociacion || "FAP";
@@ -230,19 +230,19 @@ export const Paso5Cierre = ({
       </div>
 
       {/* SISTEMA DE PUNTUACIÓN DE PARTIDOS */}
-      <div className="border-t border-white/5 pt-6 space-y-6">
+      <div className="border-t border-white/10 pt-6 space-y-6">
         <h4 className="text-xs text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
           <Scale className="size-4 text-brand-chartreuse" /> Sistema de Puntuación de Partidos
         </h4>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-black/15 p-5 rounded-2xl border border-white/5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-brand-input/40 p-5 rounded-2xl border border-white/10 shadow-sm">
           <div className="space-y-4">
             <h5 className="text-[10px] font-black text-white uppercase tracking-widest">Ventajas</h5>
             
-            <div className="flex items-center justify-between p-3.5 bg-black/20 rounded-xl border border-white/5">
+            <div className="flex items-center justify-between p-3.5 bg-brand-input rounded-xl border border-white/10 shadow-xs">
               <div>
                 <p className="text-xs font-extrabold text-white">Punto de Oro</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">Definición directa sin ventajas al llegar a 40-40.</p>
+                <p className="text-[10px] text-gray-400 mt-0.5 font-medium">Definición directa sin ventajas al llegar a 40-40.</p>
               </div>
               <button
                 type="button"
@@ -264,10 +264,10 @@ export const Paso5Cierre = ({
               </button>
             </div>
 
-            <div className="flex items-center justify-between p-3.5 bg-black/20 rounded-xl border border-white/5">
+            <div className="flex items-center justify-between p-3.5 bg-brand-input rounded-xl border border-white/10 shadow-xs">
               <div>
                 <p className="text-xs font-extrabold text-white">Ventaja (Set Point)</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">Definición con ventajas tradicionales (Ventaja / Deuce).</p>
+                <p className="text-[10px] text-gray-400 mt-0.5 font-medium">Definición con ventajas tradicionales (Ventaja / Deuce).</p>
               </div>
               <button
                 type="button"
@@ -344,7 +344,7 @@ export const Paso5Cierre = ({
                       <button
                         type="button"
                         onClick={() => setSupertiebreakDiferencia(!supertiebreakDiferencia)}
-                        className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all border ${supertiebreakDiferencia ? "bg-brand-chartreuse/10 border-brand-chartreuse/30 text-brand-chartreuse" : "bg-white/5 border-white/10 text-gray-400"}`}
+                        className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all border ${supertiebreakDiferencia ? "bg-brand-chartreuse/10 border-brand-chartreuse/30 text-brand-chartreuse" : "bg-brand-input border-white/10 text-gray-400"}`}
                       >
                         {supertiebreakDiferencia ? "Requerida" : "Sin diferencia"}
                       </button>
@@ -358,7 +358,7 @@ export const Paso5Cierre = ({
       </div>
 
       {/* CONFIGURACIÓN Y ASIGNACIÓN DE PUNTOS */}
-      <div className="border-t border-white/5 pt-6 space-y-6">
+      <div className="border-t border-white/10 pt-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h4 className="text-xs text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
@@ -385,7 +385,7 @@ export const Paso5Cierre = ({
         </div>
 
         {puntosActivados && (
-          <div className="space-y-4 bg-black/20 p-5 rounded-2xl border border-white/5 animate-fadeIn">
+          <div className="space-y-4 bg-brand-input/40 p-5 rounded-2xl border border-white/10 animate-fadeIn shadow-sm">
             <h5 className="text-[11px] font-black text-white uppercase tracking-wider flex items-center gap-1 border-b border-white/5 pb-2">
               <Trophy className="size-3.5 text-brand-chartreuse" /> Puntos por Instancia Alcanzada
             </h5>

@@ -193,14 +193,24 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       }
     }
 
-    // Validar choques/superposiciones exactas
-    const existeConflicto = dispList.some(
-      (item) =>
-        String(item.club_id) === String(canchaForm.club_id) &&
-        String(item.cancha_id) === String(canchaForm.cancha_id) &&
-        item.fecha === canchaForm.fecha &&
-        item.hora_inicio === canchaForm.hora_inicio,
-    );
+    // Validar choques/superposiciones exactas (normalizando HH:mm)
+    const normFormHora = canchaForm.hora_inicio.slice(0, 5);
+    const normFormFecha = canchaForm.fecha.split("T")[0];
+
+    const existeConflicto = dispList.some((item) => {
+      const itemClubId = String(item.club_id);
+      const itemCanchaId = String(item.cancha_id);
+      const itemFecha = String(item.fecha || "").split("T")[0];
+      const itemHora = String(item.hora_inicio || "").slice(0, 5);
+
+      return (
+        itemClubId === String(canchaForm.club_id) &&
+        itemCanchaId === String(canchaForm.cancha_id) &&
+        itemFecha === normFormFecha &&
+        itemHora === normFormHora
+      );
+    });
+
     if (existeConflicto) {
       sileo.error({
         title: "Error",
@@ -340,7 +350,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   return (
     <div className="space-y-8">
       {/* 3. MULTI-SEDE & DISPONIBILIDAD DE CANCHAS */}
-      <div className="bg-[#1a1a1a] border border-white/5 rounded-3xl p-6 space-y-6">
+      <div className="bg-brand-card border border-white/10 rounded-3xl p-6 space-y-6 shadow-xl">
         <h3 className="text-lg font-bold text-white uppercase tracking-wider">
           Sedes (Clubes)
         </h3>
@@ -392,18 +402,18 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
         {/* Sedes agregadas */}
         <div className="space-y-3">
           {selectedClubs.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-4 border border-dashed border-white/5 rounded-2xl">
+            <p className="text-sm text-gray-500 text-center py-4 border border-dashed border-white/10 rounded-2xl">
               No hay clubes agregados.
             </p>
           ) : (
             selectedClubs.map((club) => (
               <div
                 key={club.id}
-                className="bg-black/30 border border-white/5 p-4 rounded-2xl flex justify-between items-center gap-4"
+                className="bg-brand-input border border-white/10 p-4 rounded-2xl flex justify-between items-center gap-4 shadow-sm"
               >
                 <div>
                   <p className="text-white font-bold text-sm">{club.nombre}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-xs text-gray-400 mt-0.5 font-medium">
                     {club.provincia} · {club.canchas} canchas
                   </p>
                 </div>
@@ -419,12 +429,12 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
         </div>
 
         {/* Disponibilidad horaria */}
-        <div className="border-t border-white/5 pt-6 space-y-4">
+        <div className="border-t border-white/10 pt-6 space-y-4">
           <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest">
             Disponibilidad de Canchas y Horarios
           </h4>
 
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 p-4 bg-black/20 rounded-2xl border border-white/5 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 p-4 bg-brand-input/40 rounded-2xl border border-white/10 items-end">
             <div className="sm:col-span-3">
               <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
                 Club
@@ -504,7 +514,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
               return (
                 <div
                   key={index}
-                  className="flex justify-between items-center bg-[#222222] p-3 px-4 rounded-xl border border-white/5 text-sm"
+                  className="flex justify-between items-center bg-brand-input p-3 px-4 rounded-xl border border-white/10 text-sm"
                 >
                   <div className="text-gray-300">
                     <span className="font-bold text-white">{clubName}</span> ·{" "}

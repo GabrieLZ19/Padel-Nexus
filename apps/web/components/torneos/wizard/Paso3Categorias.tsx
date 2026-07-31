@@ -113,7 +113,9 @@ export const Paso3Categorias = ({
 
   // Auto-activar o desactivar validación de edad según categoría
   useEffect(() => {
-    const esConEdad = /\+(30|40|50|60)|veteranos|ladies|menores/i.test(categoriaEfectiva);
+    const esConEdad = /\+(30|40|50|60)|veteranos|ladies|menores/i.test(
+      categoriaEfectiva,
+    );
     if (esConEdad) {
       setValidarEdad(true);
     }
@@ -287,7 +289,11 @@ export const Paso3Categorias = ({
         isOpen: true,
         type: "error",
         title: "Error al guardar",
-        description: e?.response?.data?.error || e?.response?.data?.message || e.message || "No se pudieron guardar los cambios.",
+        description:
+          e?.response?.data?.error ||
+          e?.response?.data?.message ||
+          e.message ||
+          "No se pudieron guardar los cambios.",
       }));
     } finally {
       setGuardandoCategorias(false);
@@ -295,7 +301,9 @@ export const Paso3Categorias = ({
   };
 
   return (
-    <div className={`bg-[#111111] border border-white/5 rounded-3xl p-6 space-y-8 ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
+    <div
+      className={`bg-brand-card border border-white/10 rounded-3xl p-6 space-y-8 shadow-xl ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}
+    >
       <div>
         <h3 className="text-lg font-bold text-white uppercase tracking-wider">
           Paso 3: Rama, Categoría, Nivel y Programación
@@ -471,14 +479,15 @@ export const Paso3Categorias = ({
         {editCategoria !== "Libres" && (
           <div className="flex flex-col justify-end">
             <label className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <ShieldCheck className="size-4 text-brand-chartreuse" /> Control de Edad
+              <ShieldCheck className="size-4 text-brand-chartreuse" /> Control
+              de Edad
             </label>
             <div
               onClick={() => setValidarEdad(!validarEdad)}
               className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                 validarEdad
                   ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white shadow-[0_0_15px_rgba(204,255,0,0.1)]"
-                  : "bg-black/20 border-white/5 text-gray-400 hover:border-white/10"
+                  : "bg-brand-input border-white/10 text-gray-400 hover:border-white/20"
               }`}
             >
               <div>
@@ -486,7 +495,8 @@ export const Paso3Categorias = ({
                   Validar Edad según Categoría
                 </p>
                 <p className="text-[10px] text-gray-400 mt-0.5">
-                  Verifica que los participantes cumplan con la edad reglamentaria.
+                  Verifica que los participantes cumplan con la edad
+                  reglamentaria.
                 </p>
               </div>
               <input
@@ -501,18 +511,19 @@ export const Paso3Categorias = ({
       </div>
 
       {/* SECCIÓN CARNET FEDERATIVO */}
-      <div className="border-t border-white/5 pt-6 space-y-4">
+      <div className="border-t border-white/10 pt-6 space-y-4">
         <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-          <ShieldCheck className="size-4 text-brand-chartreuse" /> Carnet Federativo Obligatorio
+          <ShieldCheck className="size-4 text-brand-chartreuse" /> Carnet
+          Federativo Obligatorio
         </h4>
 
-        <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4">
+        <div className="bg-brand-input/40 p-5 rounded-2xl border border-white/10 space-y-4">
           <div
             onClick={() => setRequiereCarnet(!requiereCarnet)}
             className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
               requiereCarnet
                 ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white shadow-[0_0_15px_rgba(204,255,0,0.1)]"
-                : "bg-black/20 border-white/5 text-gray-400 hover:border-white/10"
+                : "bg-brand-input border-white/10 text-gray-400 hover:border-white/20"
             }`}
           >
             <div>
@@ -520,7 +531,8 @@ export const Paso3Categorias = ({
                 ¿Cobra o Exige Carnet Federativo Vigente?
               </p>
               <p className="text-[10px] text-gray-400 mt-0.5">
-                Requerido para competir en torneos oficiales FAP/APA de circuito.
+                Requerido para competir en torneos oficiales FAP/APA de
+                circuito.
               </p>
             </div>
             <input
@@ -586,7 +598,11 @@ export const Paso3Categorias = ({
             disabled={readOnly || guardandoCategorias}
             className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
           >
-            {readOnly ? "Modo Lectura (En curso)" : guardandoCategorias ? "Guardando..." : "Guardar Cambios"}
+            {readOnly
+              ? "Modo Lectura (En curso)"
+              : guardandoCategorias
+                ? "Guardando..."
+                : "Guardar Cambios"}
           </button>
           <button
             onClick={() => setActiveTab("logos")}
@@ -597,7 +613,7 @@ export const Paso3Categorias = ({
         </div>
         <button
           onClick={() => setActiveTab("players")}
-          className="bg-brand-chartreuse/10 border border-brand-chartreuse text-brand-chartreuse px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-brand-chartreuse hover:text-brand-black transition-all cursor-pointer"
+          className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
         >
           Siguiente Paso: Jugadores
         </button>

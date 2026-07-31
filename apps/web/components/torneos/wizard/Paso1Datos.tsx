@@ -210,7 +210,7 @@ export const Paso1Datos = ({
   };
 
   return (
-    <div className={`bg-[#111111] border border-white/5 rounded-3xl p-6 space-y-8 ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
+    <div className={`bg-brand-card border border-white/10 rounded-3xl p-6 space-y-8 shadow-xl ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
       <div>
         <h3 className="text-lg font-bold text-white uppercase tracking-wider">
           Paso 1: Información General y Configuración

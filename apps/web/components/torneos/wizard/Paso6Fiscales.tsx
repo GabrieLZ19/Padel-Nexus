@@ -126,7 +126,7 @@ export const Paso6Fiscales = ({
   };
 
   return (
-    <div className={`bg-[#111111] border border-white/5 rounded-3xl p-6 space-y-8 ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
+    <div className={`bg-brand-card border border-white/10 rounded-3xl p-6 space-y-8 shadow-xl ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
       <div>
         <div className="flex items-center gap-2 text-brand-chartreuse text-xs font-bold uppercase tracking-widest mb-1">
           <Shield className="size-4" /> Autoridad de Juego
@@ -141,7 +141,7 @@ export const Paso6Fiscales = ({
       </div>
 
       {/* Seleccionar del Padrón Oficial o Buscar por DNI */}
-      <div className="bg-black/30 p-6 rounded-2xl border border-white/5 space-y-4">
+      <div className="bg-brand-input/40 p-6 rounded-2xl border border-white/10 space-y-4 shadow-sm">
         <h4 className="text-xs text-gray-400 font-bold uppercase tracking-wider">
           Designar Fiscal del Colegio Homologado
         </h4>
@@ -193,7 +193,7 @@ export const Paso6Fiscales = ({
           </label>
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-4 top-3.5 size-4 text-gray-500" />
+              <Search className="absolute left-4 top-3.5 size-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Ingresar DNI del Fiscal (Solo números)..."
@@ -205,7 +205,7 @@ export const Paso6Fiscales = ({
             <button
               onClick={handleBuscarDni}
               disabled={searching || !searchDni}
-              className="bg-white/10 hover:bg-white/20 text-white px-5 py-3 rounded-xl text-xs font-bold transition-all border border-white/10 disabled:opacity-40 cursor-pointer"
+              className="bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/30 px-5 py-3 rounded-xl text-xs font-bold transition-all disabled:opacity-40 cursor-pointer"
             >
               {searching ? "Buscando..." : "Buscar en Colegio"}
             </button>
@@ -258,13 +258,13 @@ export const Paso6Fiscales = ({
             {fiscalesTorneo.map((f) => (
               <div
                 key={f.id}
-                className="bg-black/20 border border-white/5 p-4 rounded-2xl flex justify-between items-center"
+                className="bg-brand-input border border-white/10 p-4 rounded-2xl flex justify-between items-center shadow-sm"
               >
                 <div>
                   <p className="font-bold text-sm text-white">
                     {f.nombre} {f.apellido}
                   </p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-400 font-medium">
                     DNI: {f.dni} · Alcance: {f.rango || "Provincial"}
                   </p>
                 </div>
@@ -281,10 +281,10 @@ export const Paso6Fiscales = ({
         )}
       </div>
 
-      <div className="flex justify-between items-center pt-4 border-t border-white/5">
+      <div className="flex justify-between items-center pt-4 border-t border-white/10">
         <button
           onClick={() => setActiveTab("times")}
-          className="bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-xs font-bold hover:bg-white/10 transition-all cursor-pointer"
+          className="bg-brand-input border border-white/10 text-white px-6 py-3 rounded-xl text-xs font-bold hover:bg-brand-input/80 transition-all cursor-pointer"
         >
           Atrás: Sedes
         </button>
