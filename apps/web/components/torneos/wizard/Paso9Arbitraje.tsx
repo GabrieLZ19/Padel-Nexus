@@ -39,9 +39,29 @@ export const Paso8Arbitraje = ({
       .catch(() => setDisponibilidadesPaso5([]));
   }, [torneoId]);
 
-  // Filtramos los partidos que ya tienen contrincantes pero no tienen ganador
-  const partidosJugables = partidos.filter(
-    (p) => p.equipo_a_id && p.equipo_b_id && p.ganador === null,
+  // Helper para ordenamiento estable de partidos por Ronda (Zona A, Zona B...) y Orden
+  const sortPartidosEstable = (list: Partido[]) => {
+    return [...list].sort((a, b) => {
+      const rondaA = String(a.ronda || "").toUpperCase();
+      const rondaB = String(b.ronda || "").toUpperCase();
+      if (rondaA !== rondaB) {
+        return rondaA.localeCompare(rondaB, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
+      }
+      const ordenA = a.orden ?? 0;
+      const ordenB = b.orden ?? 0;
+      if (ordenA !== ordenB) {
+        return ordenA - ordenB;
+      }
+      return String(a.id).localeCompare(String(b.id));
+    });
+  };
+
+  // Filtramos los partidos que ya tienen contrincantes pero no tienen ganador con orden estable
+  const partidosJugables = sortPartidosEstable(
+    partidos.filter((p) => p.equipo_a_id && p.equipo_b_id && p.ganador === null),
   );
 
   const handleGuardarResultadoLive = async (
@@ -188,8 +208,7 @@ export const Paso8Arbitraje = ({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {partidos
-              .filter((p) => p.ganador !== null)
+            {sortPartidosEstable(partidos.filter((p) => p.ganador !== null))
               .map((p) => {
                 const isGanadorA = p.ganador === p.equipo_a_id;
                 const isGanadorB = p.ganador === p.equipo_b_id;

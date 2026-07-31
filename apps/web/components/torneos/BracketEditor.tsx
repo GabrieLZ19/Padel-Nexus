@@ -53,7 +53,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   // Siembra (Eliminatoria Directa) drag-and-drop state
   const [siembraZonas, setSiembraZonas] = useState<ZonaDrag[]>([]);
   const [isSiembraEditing, setIsSiembraEditing] = useState(false);
-  const [selectedMatchToEdit, setSelectedMatchToEdit] = useState<Partido | null>(null);
+  const [selectedMatchToEdit, setSelectedMatchToEdit] =
+    useState<Partido | null>(null);
   const [showMatchEditModal, setShowMatchEditModal] = useState(false);
   const [modificacionNoDestructiva, setModificacionNoDestructiva] =
     useState(true);
@@ -69,7 +70,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   const TOUR_STEPS = [
     {
       title: "1. Generación Automática de Zonas",
-      description: `Haz clic en "Regenerar automático" para mezclar y agrupar a todos los jugadores confirmados en grupos. Esto se realiza siguiendo las normas de ranking oficiales de la FAP (Snake Draft).`,
+      description: `Haz clic en "Generar Cuadro" para mezclar y agrupar a todos los jugadores confirmados en grupos. Esto se realiza siguiendo las normas de ranking oficiales de la FAP (Snake Draft).`,
     },
     {
       title: "2. Reubicar Jugadores (Modo Edición)",
@@ -245,7 +246,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         nombre: "Clasificados por BYE (Pase directo)",
         parejas: unassignedInscripciones.map((ins: any, idx) => ({
           id: ins.id,
-          jugador1_nombre: ins.jugador1?.nombre || ins.jugador1_nombre || "Jugador 1",
+          jugador1_nombre:
+            ins.jugador1?.nombre || ins.jugador1_nombre || "Jugador 1",
           jugador2_nombre: ins.jugador2?.nombre || ins.jugador2_nombre || null,
           seed: 99 + idx,
           club: ins.jugador1?.club_nombre || "Pase directo a Semis",
@@ -470,16 +472,19 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     zonas.length || Math.floor((torneo?.cupos_maximos || 8) / 3);
   const rawPlayerCount =
     torneo?.formato === "Eliminatoria Directa"
-      ? (inscripciones?.length || torneo?.cupos_actuales || torneo?.cupos_maximos || 16)
+      ? inscripciones?.length ||
+        torneo?.cupos_actuales ||
+        torneo?.cupos_maximos ||
+        16
       : getPlayoffSize(totalZonas);
 
   const bracketCapacity = Math.max(
     4,
-    Math.pow(2, Math.ceil(Math.log2(Math.max(2, rawPlayerCount))))
+    Math.pow(2, Math.ceil(Math.log2(Math.max(2, rawPlayerCount)))),
   );
 
   const rondasInPartidos = new Set(
-    partidos.map((p) => (p.ronda || "").toUpperCase())
+    partidos.map((p) => (p.ronda || "").toUpperCase()),
   );
 
   const rondasToShow = RONDAS_CONFIG.filter(
@@ -752,8 +757,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     : ""
                 }`}
               >
-                <RefreshCw className="size-4 text-gray-400" /> Regenerar
-                automático
+                <RefreshCw className="size-4 text-gray-400" /> Generar Cuadros
               </button>
 
               <div className="flex-1 sm:flex-initial flex items-center justify-between sm:justify-start gap-2 bg-[#222222] border border-white/5 rounded-xl px-3.5 py-1.5 text-sm text-gray-300 w-full sm:w-auto">
@@ -1086,8 +1090,13 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           <div className="bg-brand-card border border-white/10 rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-2xl">
             <div className="flex justify-between items-center border-b border-white/5 pb-3">
               <div>
-                <h4 className="text-white font-extrabold text-base">Reasignar Partido ({selectedMatchToEdit.ronda})</h4>
-                <p className="text-xs text-gray-400">Seleccioná qué parejainscripta disputará este partido en la llave.</p>
+                <h4 className="text-white font-extrabold text-base">
+                  Reasignar Partido ({selectedMatchToEdit.ronda})
+                </h4>
+                <p className="text-xs text-gray-400">
+                  Seleccioná qué parejainscripta disputará este partido en la
+                  llave.
+                </p>
               </div>
               <button
                 onClick={() => {
@@ -1102,23 +1111,43 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1.5">Equipo / Jugador A:</label>
+                <label className="text-xs font-bold text-gray-300 block mb-1.5">
+                  Equipo / Jugador A:
+                </label>
                 <CustomDropdown
                   value={selectedMatchToEdit.equipo_a_id || ""}
                   onChange={(newId) => {
-                    const found = inscripciones.find((i) => i.id === newId) as any;
+                    const found = inscripciones.find(
+                      (i) => i.id === newId,
+                    ) as any;
                     setSelectedMatchToEdit((prev: any) => ({
                       ...prev,
                       equipo_a_id: newId,
-                      equipo_a_j1: found?.jugador_1_nombre || found?.jugador1_nombre || found?.jugador1?.nombre || prev?.equipo_a_j1,
-                      equipo_a_j2: found?.jugador_2_nombre || found?.jugador2_nombre || found?.jugador2?.nombre || prev?.equipo_a_j2,
+                      equipo_a_j1:
+                        found?.jugador_1_nombre ||
+                        found?.jugador1_nombre ||
+                        found?.jugador1?.nombre ||
+                        prev?.equipo_a_j1,
+                      equipo_a_j2:
+                        found?.jugador_2_nombre ||
+                        found?.jugador2_nombre ||
+                        found?.jugador2?.nombre ||
+                        prev?.equipo_a_j2,
                     }));
                   }}
                   options={[
                     { value: "", label: "Libre / BYE" },
                     ...inscripciones.map((ins: any) => {
-                      const name1 = ins.jugador_1_nombre || ins.jugador1_nombre || ins.jugador1?.nombre || "Jugador 1";
-                      const name2 = ins.jugador_2_nombre || ins.jugador2_nombre || ins.jugador2?.nombre || "";
+                      const name1 =
+                        ins.jugador_1_nombre ||
+                        ins.jugador1_nombre ||
+                        ins.jugador1?.nombre ||
+                        "Jugador 1";
+                      const name2 =
+                        ins.jugador_2_nombre ||
+                        ins.jugador2_nombre ||
+                        ins.jugador2?.nombre ||
+                        "";
                       return {
                         value: ins.id,
                         label: name2 ? `${name1} / ${name2}` : name1,
@@ -1130,23 +1159,43 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1.5">Equipo / Jugador B:</label>
+                <label className="text-xs font-bold text-gray-300 block mb-1.5">
+                  Equipo / Jugador B:
+                </label>
                 <CustomDropdown
                   value={selectedMatchToEdit.equipo_b_id || ""}
                   onChange={(newId) => {
-                    const found = inscripciones.find((i) => i.id === newId) as any;
+                    const found = inscripciones.find(
+                      (i) => i.id === newId,
+                    ) as any;
                     setSelectedMatchToEdit((prev: any) => ({
                       ...prev,
                       equipo_b_id: newId,
-                      equipo_b_j1: found?.jugador_1_nombre || found?.jugador1_nombre || found?.jugador1?.nombre || prev?.equipo_b_j1,
-                      equipo_b_j2: found?.jugador_2_nombre || found?.jugador2_nombre || found?.jugador2?.nombre || prev?.equipo_b_j2,
+                      equipo_b_j1:
+                        found?.jugador_1_nombre ||
+                        found?.jugador1_nombre ||
+                        found?.jugador1?.nombre ||
+                        prev?.equipo_b_j1,
+                      equipo_b_j2:
+                        found?.jugador_2_nombre ||
+                        found?.jugador2_nombre ||
+                        found?.jugador2?.nombre ||
+                        prev?.equipo_b_j2,
                     }));
                   }}
                   options={[
                     { value: "", label: "Libre / BYE" },
                     ...inscripciones.map((ins: any) => {
-                      const name1 = ins.jugador_1_nombre || ins.jugador1_nombre || ins.jugador1?.nombre || "Jugador 1";
-                      const name2 = ins.jugador_2_nombre || ins.jugador2_nombre || ins.jugador2?.nombre || "";
+                      const name1 =
+                        ins.jugador_1_nombre ||
+                        ins.jugador1_nombre ||
+                        ins.jugador1?.nombre ||
+                        "Jugador 1";
+                      const name2 =
+                        ins.jugador_2_nombre ||
+                        ins.jugador2_nombre ||
+                        ins.jugador2?.nombre ||
+                        "";
                       return {
                         value: ins.id,
                         label: name2 ? `${name1} / ${name2}` : name1,
@@ -1171,11 +1220,15 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               <button
                 onClick={async () => {
                   try {
-                    await TorneosService.actualizarEquiposPartido(selectedMatchToEdit.id, {
-                      equipo_a_id: selectedMatchToEdit.equipo_a_id || null,
-                      equipo_b_id: selectedMatchToEdit.equipo_b_id || null,
-                      motivo: "Reasignación manual directa en la Llave de Campeonato",
-                    });
+                    await TorneosService.actualizarEquiposPartido(
+                      selectedMatchToEdit.id,
+                      {
+                        equipo_a_id: selectedMatchToEdit.equipo_a_id || null,
+                        equipo_b_id: selectedMatchToEdit.equipo_b_id || null,
+                        motivo:
+                          "Reasignación manual directa en la Llave de Campeonato",
+                      },
+                    );
                     setShowMatchEditModal(false);
                     setSelectedMatchToEdit(null);
                     onRefresh?.();
@@ -1184,8 +1237,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                       isOpen: true,
                       type: "error",
                       title: "Error al actualizar",
-                      description: err.message || "No se pudo actualizar la pareja del partido.",
-                      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+                      description:
+                        err.message ||
+                        "No se pudo actualizar la pareja del partido.",
+                      onClose: () =>
+                        setFeedbackModal((prev) => ({
+                          ...prev,
+                          isOpen: false,
+                        })),
                     });
                   }
                 }}

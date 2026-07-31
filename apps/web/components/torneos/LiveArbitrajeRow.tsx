@@ -145,11 +145,21 @@ export const LiveArbitrajeRow = ({
     }
   });
 
-  // Opciones de Cancha
+  // Opciones de Cancha (Filtrar solo canchas con al menos 1 slot disponible u ocupado por este partido)
   const mapCanchas = new Set<string>();
   disponibilidades.forEach((d) => {
     const name = getCanchaFullName(d);
-    if (name) mapCanchas.add(name);
+    if (!name) return;
+
+    if (canchaEdit === name) {
+      mapCanchas.add(name);
+      return;
+    }
+
+    const key = `${name}|${d.fecha}|${d.hora_inicio}`;
+    if (!occupiedSlots.has(key)) {
+      mapCanchas.add(name);
+    }
   });
   const canchaOptions = Array.from(mapCanchas).map((c) => ({
     value: c,

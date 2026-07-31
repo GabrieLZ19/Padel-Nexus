@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Search, Info } from "lucide-react";
+import { Plus, Trash2, Search, Info, Calendar, Clock } from "lucide-react";
 import { Club } from "@/utils/types";
 import { api } from "@/utils/api";
 import CustomDropdown from "../ui/CustomDropdown";
@@ -25,6 +25,42 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   const [canchasDisponibles, setCanchasDisponibles] = useState<any[]>([]);
   const [dispList, setDispList] = useState<any[]>([]);
   const [fiscales, setFiscales] = useState<any[]>([]);
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string>("all");
+
+  // Helper de agrupar turnos por fecha para vista Calendario
+  const formatDateLabel = (fStr: string) => {
+    try {
+      const cleanDate = fStr.split("T")[0];
+      const [yyyy, mm, dd] = cleanDate.split("-");
+      const dateObj = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+      const dayName = dateObj.toLocaleDateString("es-AR", { weekday: "short" });
+      const capDay =
+        dayName.charAt(0).toUpperCase() + dayName.slice(1).replace(".", "");
+      return `${capDay} ${dd}/${mm}/${yyyy}`;
+    } catch {
+      return fStr;
+    }
+  };
+
+  const groupedByDate = React.useMemo(() => {
+    const map = new Map<
+      string,
+      { rawFecha: string; items: { item: any; originalIndex: number }[] }
+    >();
+
+    dispList.forEach((item, index) => {
+      const f = String(item.fecha || "").split("T")[0];
+      if (!f) return;
+      if (!map.has(f)) {
+        map.set(f, { rawFecha: f, items: [] });
+      }
+      map.get(f)!.items.push({ item, originalIndex: index });
+    });
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.rawFecha.localeCompare(b.rawFecha),
+    );
+  }, [dispList]);
 
   // Forms state
   const [newClubId, setNewClubId] = useState<string>("");
@@ -502,36 +538,145 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
             </div>
           </div>
 
-          {/* Lista de disponibilidad */}
-          <div className="space-y-2">
-            {dispList.map((d, index) => {
-              const clubName =
-                d.clubes?.nombre ||
-                selectedClubs.find((sc) => String(sc.id) === String(d.club_id))
-                  ?.nombre ||
-                "Sede";
-              const canchaName = d.canchas?.nombre || "Cancha";
-              return (
-                <div
-                  key={index}
-                  className="flex justify-between items-center bg-brand-input p-3 px-4 rounded-xl border border-white/10 text-sm"
+          {/* Filtros de Fecha estilo Calendario */}
+          {groupedByDate.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar className="size-4 text-brand-chartreuse" />{" "}
+                  Seleccionar Fecha para Filtrar
+                </span>
+                <span className="text-[11px] font-bold text-brand-chartreuse">
+                  {dispList.length}{" "}
+                  {dispList.length === 1
+                    ? "turno cargado"
+                    : "turnos cargados en total"}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDateFilter("all")}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all border shrink-0 cursor-pointer ${
+                    selectedDateFilter === "all"
+                      ? "bg-brand-chartreuse text-brand-black border-brand-chartreuse shadow-md scale-105"
+                      : "bg-brand-input border-white/10 text-gray-300 hover:border-white/20"
+                  }`}
                 >
-                  <div className="text-gray-300">
-                    <span className="font-bold text-white">{clubName}</span> ·{" "}
-                    {canchaName} ·{" "}
-                    <span className="font-semibold text-brand-chartreuse">
-                      {d.fecha} {d.hora_inicio}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleRemoveCanchaDisp(index)}
-                    className="text-gray-500 hover:text-red-500 transition-colors cursor-pointer"
+                  Todas las Fechas ({dispList.length})
+                </button>
+                {groupedByDate.map((group) => {
+                  const isSelected = selectedDateFilter === group.rawFecha;
+                  return (
+                    <button
+                      key={group.rawFecha}
+                      type="button"
+                      onClick={() => setSelectedDateFilter(group.rawFecha)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border shrink-0 flex items-center gap-2 cursor-pointer ${
+                        isSelected
+                          ? "bg-brand-chartreuse text-brand-black border-brand-chartreuse shadow-md scale-105"
+                          : "bg-brand-input border-white/10 text-gray-300 hover:border-white/20"
+                      }`}
+                    >
+                      <span>{formatDateLabel(group.rawFecha)}</span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+                          isSelected
+                            ? "bg-brand-black/20 text-brand-black"
+                            : "bg-white/10 text-gray-300"
+                        }`}
+                      >
+                        {group.items.length}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Renderizado de Disponibilidad por Fecha (Vista Calendario Organizada) */}
+          <div className="space-y-4 pt-2">
+            {dispList.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-6 border border-dashed border-white/10 rounded-2xl">
+                No hay disponibilidades de canchas registradas para este torneo.
+              </p>
+            ) : (
+              groupedByDate
+                .filter(
+                  (group) =>
+                    selectedDateFilter === "all" ||
+                    selectedDateFilter === group.rawFecha,
+                )
+                .map((group) => (
+                  <div
+                    key={group.rawFecha}
+                    className="bg-brand-input/30 border border-white/10 rounded-2xl p-4 space-y-3 shadow-xs"
                   >
-                    <Trash2 className="size-4" />
-                  </button>
-                </div>
-              );
-            })}
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="size-4 text-brand-chartreuse" />
+                        <span className="font-extrabold text-sm text-white uppercase tracking-wide">
+                          {formatDateLabel(group.rawFecha)}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-bold text-gray-400">
+                        {group.items.length}{" "}
+                        {group.items.length === 1
+                          ? "turno programado"
+                          : "turnos programados"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {group.items.map(({ item: d, originalIndex }) => {
+                        const clubName =
+                          d.clubes?.nombre ||
+                          selectedClubs.find(
+                            (sc) => String(sc.id) === String(d.club_id),
+                          )?.nombre ||
+                          "Sede";
+                        const canchaName = d.canchas?.nombre || "Cancha";
+                        const horaClean = (d.hora_inicio || "").slice(0, 5);
+
+                        return (
+                          <div
+                            key={originalIndex}
+                            className="flex items-center justify-between bg-brand-input border border-white/10 p-3 rounded-xl shadow-xs hover:border-white/20 transition-all"
+                          >
+                            <div className="min-w-0 pr-2">
+                              <p className="font-bold text-xs text-white truncate">
+                                {clubName}
+                              </p>
+                              <p className="text-[11px] text-gray-400 truncate">
+                                {canchaName}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="inline-flex items-center gap-1 bg-brand-chartreuse/10 border border-brand-chartreuse/30 text-brand-chartreuse px-2.5 py-1 rounded-lg text-xs font-black">
+                                <Clock className="size-3" />
+                                {horaClean} hs
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRemoveCanchaDisp(originalIndex)
+                                }
+                                className="text-gray-500 hover:text-red-500 transition-colors p-1.5 cursor-pointer rounded-lg hover:bg-red-500/10"
+                                title="Eliminar este turno"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+            )}
           </div>
         </div>
       </div>
