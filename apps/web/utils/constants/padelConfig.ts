@@ -1,20 +1,88 @@
 import { FAP_ESTADOS_TORNEO } from "./fap";
 
 // 1. Definimos los tipos para mayor seguridad
-export type NivelPadel = "1ª" | "2ª" | "3ª" | "4ª" | "5ª" | "6ª" | "7ª" | "8ª";
+export type NivelPadel =
+  | "1ª"
+  | "2ª"
+  | "3ª"
+  | "4ª"
+  | "5ª"
+  | "6ª"
+  | "7ª"
+  | "8ª"
+  | "Inicial"
+  | "Sub-10"
+  | "Sub-12"
+  | "Sub-14"
+  | "Sub-16"
+  | "Sub-18"
+  | "Juniors +18"
+  | "Seniors +30"
+  | "Seniors +35"
+  | "Seniors +40"
+  | "Seniors +45"
+  | "Seniors +50"
+  | "Seniors +55"
+  | "Seniors +60"
+  | "Ladies A"
+  | "Ladies B"
+  | "Ladies C"
+  | "Women +35"
+  | "Women +45"
+  | "Women +55";
+
 export type LadoPadel = "Drive" | "Revés" | "Ambos";
 
-// 2. Definimos las constantes
+// 2. Definimos las constantes maestras oficiales FAP / APA
 export const NIVELES_PADEL = [
-  { value: "1ª", label: "1ª Categoría" },
-  { value: "2ª", label: "2ª Categoría" },
-  { value: "3ª", label: "3ª Categoría" },
-  { value: "4ª", label: "4ª Categoría" },
-  { value: "5ª", label: "5ª Categoría" },
-  { value: "6ª", label: "6ª Categoría" },
-  { value: "7ª", label: "7ª Categoría" },
-  { value: "8ª", label: "8ª Categoría" },
-  { value: "Inicial", label: "Inicial" },
+  // Libres
+  { value: "1ª", label: "1ª Categoría (Profesional)", grupo: "Libres" },
+  { value: "2ª", label: "2ª Categoría", grupo: "Libres" },
+  { value: "3ª", label: "3ª Categoría", grupo: "Libres" },
+  { value: "4ª", label: "4ª Categoría", grupo: "Libres" },
+  { value: "5ª", label: "5ª Categoría", grupo: "Libres" },
+  { value: "6ª", label: "6ª Categoría", grupo: "Libres" },
+  { value: "7ª", label: "7ª Categoría", grupo: "Libres" },
+  { value: "8ª", label: "8ª Categoría", grupo: "Libres" },
+  { value: "Inicial", label: "Inicial", grupo: "Libres" },
+
+  // Menores
+  { value: "Sub-10", label: "Sub-10 (Menores)", grupo: "Menores" },
+  { value: "Sub-12", label: "Sub-12 (Menores)", grupo: "Menores" },
+  { value: "Sub-14", label: "Sub-14 (Menores)", grupo: "Menores" },
+  { value: "Sub-16", label: "Sub-16 (Menores)", grupo: "Menores" },
+  { value: "Sub-18", label: "Sub-18 (Menores)", grupo: "Menores" },
+  {
+    value: "Sub-12 Promocional",
+    label: "Sub-12 Promocional",
+    grupo: "Menores",
+  },
+  {
+    value: "Sub-14 Promocional",
+    label: "Sub-14 Promocional",
+    grupo: "Menores",
+  },
+  {
+    value: "Sub-16 Promocional",
+    label: "Sub-16 Promocional",
+    grupo: "Menores",
+  },
+
+  // Ladies & Veteranos / Seniors
+  { value: "Juniors +18", label: "Juniors +18", grupo: "Ladies & Veteranos" },
+  { value: "Seniors +30", label: "Seniors +30", grupo: "Ladies & Veteranos" },
+  { value: "Seniors +35", label: "Seniors +35", grupo: "Ladies & Veteranos" },
+  { value: "Seniors +40", label: "Seniors +40", grupo: "Ladies & Veteranos" },
+  { value: "Seniors +45", label: "Seniors +45", grupo: "Ladies & Veteranos" },
+  { value: "Seniors +50", label: "Seniors +50", grupo: "Ladies & Veteranos" },
+  { value: "Seniors +55", label: "Seniors +55", grupo: "Ladies & Veteranos" },
+  { value: "Seniors +60", label: "Seniors +60", grupo: "Ladies & Veteranos" },
+  { value: "Ladies A", label: "Ladies A", grupo: "Ladies & Veteranos" },
+  { value: "Ladies B", label: "Ladies B", grupo: "Ladies & Veteranos" },
+  { value: "Ladies C", label: "Ladies C", grupo: "Ladies & Veteranos" },
+  { value: "Women +35", label: "Women +35", grupo: "Ladies & Veteranos" },
+  { value: "Women +45", label: "Women +45", grupo: "Ladies & Veteranos" },
+  { value: "Women +55", label: "Women +55", grupo: "Ladies & Veteranos" },
 ] as const;
 
 export const LADOS_PADEL = [

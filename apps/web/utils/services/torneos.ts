@@ -86,7 +86,18 @@ export const TorneosService = {
 
   async actualizarResultado(
     partidoId: string,
-    payload: { ganador_id: string; set1_a: number; set1_b: number },
+    payload: {
+      ganador_id: string;
+      set1_a: number;
+      set1_b: number;
+      set2_a?: number | null;
+      set2_b?: number | null;
+      set3_a?: number | null;
+      set3_b?: number | null;
+      es_supertiebreak?: boolean;
+      es_wo?: boolean;
+      es_injustificado_wo?: boolean;
+    },
   ) {
     const response = await api.put(
       `/torneos/partidos/${partidoId}/resultado`,
@@ -141,6 +152,14 @@ export const TorneosService = {
     payload: { equipo_a_id: string | null; equipo_b_id: string | null; motivo: string },
   ) {
     const response = await api.put(`/torneos/partidos/${partidoId}/equipos`, payload);
+    return response.data;
+  },
+
+  async actualizarPartido(
+    partidoId: string,
+    payload: Record<string, any>,
+  ) {
+    const response = await api.put(`/torneos/partidos/${partidoId}`, payload);
     return response.data;
   },
 

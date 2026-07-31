@@ -4,12 +4,14 @@ interface Paso7SedesProps {
   torneoId: string;
   setActiveTab: (tab: string) => void;
   triggerRefresh: () => void;
+  readOnly?: boolean;
 }
 
 export const Paso7Sedes = ({
   torneoId,
   setActiveTab,
   triggerRefresh,
+  readOnly = false,
 }: Paso7SedesProps) => {
   return (
     <div className="space-y-6">
@@ -26,7 +28,7 @@ export const Paso7Sedes = ({
           onClick={() => setActiveTab("cierre")}
           className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
         >
-          Siguiente Paso: Cierre
+          Siguiente Paso: Fiscales
         </button>
       </div>
     </div>

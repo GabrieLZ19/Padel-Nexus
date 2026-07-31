@@ -22,6 +22,8 @@ export interface RegistroPayload {
   telefono: string;
   dni: string;
   lugar_residencia: string;
+  fecha_nacimiento?: string;
+  sexo?: string;
   categoria_padel: string;
   lado_preferido: string;
   avatar_base64?: string;

@@ -41,6 +41,8 @@ export default function SignUpPage() {
   const [telefono, setTelefono] = useState("");
   const [dni, setDni] = useState("");
   const [residencia, setResidencia] = useState("");
+  const [fechaNacimiento, setFechaNacimiento] = useState("");
+  const [sexo, setSexo] = useState("masculino");
   const [categoria, setCategoria] = useState("");
   const [ladoPreferido, setLadoPreferido] = useState("");
 
@@ -170,6 +172,8 @@ export default function SignUpPage() {
         telefono: telefono.trim(),
         dni: dni.trim().replace(/\./g, ""),
         lugar_residencia: residencia,
+        fecha_nacimiento: fechaNacimiento || undefined,
+        sexo: sexo || "masculino",
         categoria_padel: categoria,
         lado_preferido: ladoPreferido,
         avatar_base64: avatarBase64 || undefined,
@@ -569,6 +573,36 @@ export default function SignUpPage() {
                       {errors.telefono}
                     </p>
                   )}
+                </div>
+              </div>
+
+              {/* Fila 2.5: Fecha de Nacimiento & Sexo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">
+                    Fecha de Nacimiento
+                  </label>
+                  <input
+                    type="date"
+                    value={fechaNacimiento}
+                    onChange={(e) => setFechaNacimiento(e.target.value)}
+                    className="w-full bg-brand-input px-4 py-3.5 rounded-xl border border-white/10 text-white text-sm focus:border-brand-chartreuse outline-none cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">
+                    Sexo / Género
+                  </label>
+                  <CustomDropdown
+                    value={sexo}
+                    onChange={(val) => setSexo(val)}
+                    options={[
+                      { value: "masculino", label: "Masculino" },
+                      { value: "femenino", label: "Femenino" },
+                      { value: "otro", label: "Otro" },
+                    ]}
+                    placeholder="Seleccionar Sexo..."
+                  />
                 </div>
               </div>
 

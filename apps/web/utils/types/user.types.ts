@@ -47,6 +47,8 @@ export interface Perfil {
   avatar_url: string | null;
   dni: string | null;
   lugar_residencia: string | null;
+  fecha_nacimiento?: string | null;
+  sexo?: 'masculino' | 'femenino' | 'otro' | null;
   club_id: string | null;
   created_at?: string;
 

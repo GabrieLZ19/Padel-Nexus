@@ -34,6 +34,8 @@ export interface Torneo {
   canchas_disponibles?: number | null;
   duracion_partido_minutos?: number | null;
   hora_inicio_jornada?: string | null;
+  requiere_carnet_federativo?: boolean | null;
+  monto_carnet?: number | null;
   banners?: string[];
 
   // Relaciones
@@ -122,4 +124,6 @@ export interface FormTorneoState {
   canchas_disponibles?: number;
   duracion_partido_minutos?: number;
   hora_inicio_jornada?: string;
+  requiere_carnet_federativo?: boolean;
+  monto_carnet?: number;
 }

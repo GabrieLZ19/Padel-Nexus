@@ -11,6 +11,7 @@ import {
   Trophy,
   ClipboardList,
   Building2,
+  Landmark,
   Users,
   ShoppingBag,
   Shield,
@@ -24,6 +25,8 @@ import {
   Moon,
   Check,
   UserCog,
+  Star,
+  Award,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
@@ -175,6 +178,10 @@ export default function DashboardLayout({
     return () => window.removeEventListener("chat_notification", handler);
   }, []);
 
+  const esRolFederativo = ["superadmin", "admin_federacion", "admin_provincial"].includes(
+    profile?.rol || "",
+  );
+
   const menuItemsBase = [
     { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
     { name: "Torneos", icon: Trophy, href: "/dashboard/torneos" },
@@ -183,8 +190,19 @@ export default function DashboardLayout({
       icon: ClipboardList,
       href: "/dashboard/inscripciones",
     },
-    { name: "Clubes", icon: Building2, href: "/dashboard/clubes" },
+    {
+      name: "Asociaciones",
+      icon: Landmark,
+      href: "/dashboard/asociaciones",
+    },
+    {
+      name: "Clubes",
+      icon: Building2,
+      href: "/dashboard/clubes",
+    },
     { name: "Jugadores", icon: Users, href: "/dashboard/jugadores" },
+    { name: "Colegio de Fiscales", icon: Shield, href: "/dashboard/fiscales" },
+    { name: "Rankings", icon: Award, href: "/dashboard/rankings" },
     { name: "Marketplace", icon: ShoppingBag, href: "/dashboard/marketplace" },
     { name: "Moderación", icon: Shield, href: "/dashboard/moderacion" },
     { name: "Estadísticas", icon: Activity, href: "/dashboard/estadisticas" },

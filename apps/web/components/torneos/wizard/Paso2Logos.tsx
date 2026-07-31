@@ -9,6 +9,7 @@ interface Paso2LogosProps {
   setFeedbackModal: (modal: any) => void;
   setActiveTab: (tab: string) => void;
   triggerRefresh: () => void;
+  readOnly?: boolean;
 }
 
 export const Paso2Logos = ({
@@ -17,6 +18,7 @@ export const Paso2Logos = ({
   setFeedbackModal,
   setActiveTab,
   triggerRefresh,
+  readOnly = false,
 }: Paso2LogosProps) => {
   const [subiendoBanner, setSubiendoBanner] = useState(false);
 
@@ -74,7 +76,7 @@ export const Paso2Logos = ({
   };
 
   return (
-    <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 space-y-6">
+    <div className={`bg-[#111111] border border-white/5 rounded-3xl p-6 space-y-6 ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
       <h3 className="text-lg font-bold text-white uppercase tracking-wider">
         Paso 2: Logos y Sponsoreo
       </h3>

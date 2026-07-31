@@ -24,8 +24,12 @@ export const Paso5Cierre = ({
   const confirmadasCount = inscripciones.filter(
     (i) => i.estado_pago === "Confirmado",
   ).length;
+  const estadoNorm = (torneo.estado || "").toLowerCase();
   const isOpenState =
-    torneo.estado === "Inscripción" || torneo.estado === "Borrador";
+    estadoNorm === "inscripción" ||
+    estadoNorm === "inscripcion" ||
+    estadoNorm === "borrador" ||
+    estadoNorm === "habilitado";
 
   // Parsear puntos iniciales
   const rawPuntos = (torneo as any).configuracion_puntos || {};
@@ -70,6 +74,9 @@ export const Paso5Cierre = ({
   const [supertiebreakDiferencia, setSupertiebreakDiferencia] = useState(
     rawReglas.supertiebreak_diferencia ?? true
   );
+  const [instanciaLimiteStb, setInstanciaLimiteStb] = useState<string>(
+    rawReglas.instancia_limite_stb || "Todo el Torneo"
+  );
   
   const [guardandoConfig, setGuardandoConfig] = useState(false);
 
@@ -94,6 +101,7 @@ export const Paso5Cierre = ({
           definicion_tercer_set: definicionTercerSet,
           supertiebreak_puntos: Number(supertiebreakPuntos),
           supertiebreak_diferencia: supertiebreakDiferencia,
+          instancia_limite_stb: instanciaLimiteStb,
         },
       } as any);
       triggerRefresh();
@@ -198,7 +206,14 @@ export const Paso5Cierre = ({
             </thead>
             <tbody className="text-xs font-bold text-white">
               <tr className="border-b border-white/5 hover:bg-white/5 transition-all">
-                <td className="p-4">{(torneo as any).asociacion || "FAP"} {torneo.alcance || "Provincial"} Ranking</td>
+                <td className="p-4">
+                  {(() => {
+                    const reg = (torneo as any).reglamento || (torneo as any).asociacion || "FAP";
+                    return reg === "Amateur"
+                      ? "Ranking Amateur / Independiente"
+                      : `${reg} ${torneo.alcance || "Provincial"} Ranking`;
+                  })()}
+                </td>
                 <td className="p-4">{torneo.categoria || "General"} {torneo.nivel || ""}</td>
                 <td className="p-4">
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 text-[10px]">
@@ -231,7 +246,10 @@ export const Paso5Cierre = ({
               </div>
               <button
                 type="button"
-                onClick={() => setPuntoOro(!puntoOro)}
+                onClick={() => {
+                  setPuntoOro(!puntoOro);
+                  if (!puntoOro) setStarPoint(false);
+                }}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${puntoOro ? "bg-brand-chartreuse" : "bg-white/10"}`}
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${puntoOro ? "translate-x-6" : "translate-x-1"}`} />
@@ -240,12 +258,15 @@ export const Paso5Cierre = ({
 
             <div className="flex items-center justify-between p-3.5 bg-black/20 rounded-xl border border-white/5">
               <div>
-                <p className="text-xs font-extrabold text-white">Star Point</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">Definición directa a la tercera ventaja consecutiva.</p>
+                <p className="text-xs font-extrabold text-white">Ventaja (Set Point)</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Definición con ventajas tradicionales (Ventaja / Deuce).</p>
               </div>
               <button
                 type="button"
-                onClick={() => setStarPoint(!starPoint)}
+                onClick={() => {
+                  setStarPoint(!starPoint);
+                  if (!starPoint) setPuntoOro(false);
+                }}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${starPoint ? "bg-brand-chartreuse" : "bg-white/10"}`}
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${starPoint ? "translate-x-6" : "translate-x-1"}`} />
@@ -268,27 +289,50 @@ export const Paso5Cierre = ({
               />
 
               {definicionTercerSet === "Super Tiebreak" && (
-                <div className="grid grid-cols-2 gap-3 pt-2 animate-fadeIn">
+                <div className="space-y-3 pt-2 animate-fadeIn">
                   <div>
-                    <label className="text-[9px] text-gray-500 font-bold uppercase tracking-wider block mb-1">A cuantos puntos</label>
-                    <input
-                      type="number"
-                      value={supertiebreakPuntos}
-                      onChange={(e) => setSupertiebreakPuntos(Number(e.target.value))}
-                      className="w-full bg-brand-input border border-white/10 text-white p-2.5 rounded-xl font-bold text-xs"
-                      min="7"
-                      max="21"
+                    <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                      ¿Hasta qué instancia aplica el Super Tie-break?
+                    </label>
+                    <CustomDropdown
+                      value={instanciaLimiteStb}
+                      onChange={setInstanciaLimiteStb}
+                      options={[
+                        { value: "Todo el Torneo", label: "Todo el torneo" },
+                        { value: "Fase de Grupos", label: "Solo Fase de Grupos" },
+                        { value: "Hasta Octavos", label: "Hasta Octavos de Final" },
+                        { value: "Hasta Cuartos", label: "Hasta Cuartos de Final" },
+                        { value: "Hasta Semifinales", label: "Hasta Semifinales" },
+                      ]}
+                      placeholder="Seleccionar Instancia..."
                     />
                   </div>
-                  <div className="flex flex-col justify-end">
-                    <label className="text-[9px] text-gray-500 font-bold uppercase tracking-wider block mb-1">Diferencia de 2</label>
-                    <button
-                      type="button"
-                      onClick={() => setSupertiebreakDiferencia(!supertiebreakDiferencia)}
-                      className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all border ${supertiebreakDiferencia ? "bg-brand-chartreuse/10 border-brand-chartreuse/30 text-brand-chartreuse" : "bg-white/5 border-white/10 text-gray-400"}`}
-                    >
-                      {supertiebreakDiferencia ? "Requerida" : "Sin diferencia"}
-                    </button>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[9px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                        Puntos Máximos del STB
+                      </label>
+                      <CustomDropdown
+                        value={String(supertiebreakPuntos)}
+                        onChange={(val) => setSupertiebreakPuntos(Number(val))}
+                        options={Array.from({ length: 11 }, (_, i) => ({
+                          value: String(i + 1),
+                          label: `${i + 1} ${i + 1 === 1 ? "punto" : "puntos"}`,
+                        }))}
+                        placeholder="Puntos..."
+                      />
+                    </div>
+                    <div className="flex flex-col justify-end">
+                      <label className="text-[9px] text-gray-500 font-bold uppercase tracking-wider block mb-1">Diferencia de 2</label>
+                      <button
+                        type="button"
+                        onClick={() => setSupertiebreakDiferencia(!supertiebreakDiferencia)}
+                        className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all border ${supertiebreakDiferencia ? "bg-brand-chartreuse/10 border-brand-chartreuse/30 text-brand-chartreuse" : "bg-white/5 border-white/10 text-gray-400"}`}
+                      >
+                        {supertiebreakDiferencia ? "Requerida" : "Sin diferencia"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

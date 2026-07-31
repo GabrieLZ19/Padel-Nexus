@@ -13,11 +13,10 @@ import { Paso1Datos } from "@/components/torneos/wizard/Paso1Datos";
 import { Paso2Logos } from "@/components/torneos/wizard/Paso2Logos";
 import { Paso3Categorias } from "@/components/torneos/wizard/Paso3Categorias";
 import { Paso4Jugadores } from "@/components/torneos/wizard/Paso4Jugadores";
-import { Paso5Cierre } from "@/components/torneos/wizard/Paso6Cierre";
-import { Paso6Cuadros } from "@/components/torneos/wizard/Paso7Cuadros";
+import { Paso5Cierre } from "@/components/torneos/wizard/Paso7Cierre";
+import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
 import { Paso7Sedes } from "@/components/torneos/wizard/Paso5Sedes";
-import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso8Arbitraje";
-
+import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
 
 const WIZARD_STEPS = [
   { id: "edit", label: "1. Datos", desc: "Información" },
@@ -190,7 +189,6 @@ export default function ClubTorneoDetallePage() {
         {activeTab === "matches" && (
           <Paso8Arbitraje {...commonProps} partidos={partidos} />
         )}
-
       </div>
 
       <FeedbackModal {...feedbackModal} />

@@ -39,6 +39,8 @@ export default function FeedbackModal({
   showSelect = false,
   selectOptions = [],
 }: FeedbackModalProps) {
+  // Guard defensivo: si onClose es undefined, usar noop seguro
+  const safeOnClose = onClose || (() => {});
   const [inputValue, setInputValue] = useState("");
   const [selectValue, setSelectValue] = useState("");
 
@@ -48,6 +50,17 @@ export default function FeedbackModal({
       setSelectValue(selectOptions?.[0]?.value || "");
     }
   }, [isOpen]);
+
+  // Cerrar modal con tecla Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isLoading) safeOnClose();
+    };
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [isOpen, isLoading, safeOnClose]);
+
   // Configuraciones visuales dinámicas según el tipo de alerta
   const config = {
     success: {
@@ -97,7 +110,13 @@ export default function FeedbackModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={(e) => {
+            // Cerrar al hacer click en el backdrop (fuera del modal)
+            if (e.target === e.currentTarget && !isLoading) safeOnClose();
+          }}
+        >
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -107,8 +126,8 @@ export default function FeedbackModal({
             {/* Botón Cerrar */}
             {!isLoading && (
               <button
-                onClick={onClose}
-                className="absolute top-5 right-5 text-gray-500 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-2 rounded-full"
+                onClick={safeOnClose}
+                className="absolute top-5 right-5 text-gray-500 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-2 rounded-full cursor-pointer"
               >
                 <X className="size-4" />
               </button>
@@ -180,8 +199,8 @@ export default function FeedbackModal({
               )}
               <button
                 disabled={isLoading}
-                onClick={onClose}
-                className={`w-full py-4 rounded-xl font-bold text-[15px] transition-colors disabled:opacity-50 ${
+                onClick={safeOnClose}
+                className={`w-full py-4 rounded-xl font-bold text-[15px] transition-colors disabled:opacity-50 cursor-pointer ${
                   onConfirm
                     ? "bg-transparent text-gray-400 hover:text-white hover:bg-white/5"
                     : "bg-white/10 text-white hover:bg-white/20"

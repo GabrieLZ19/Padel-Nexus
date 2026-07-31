@@ -11,6 +11,7 @@ interface Paso6CuadrosProps {
   setFeedbackModal: (modal: any) => void;
   setActiveTab: (tab: string) => void;
   triggerRefresh: () => void;
+  isReadOnly?: boolean;
 }
 
 export const Paso6Cuadros = ({
@@ -21,33 +22,18 @@ export const Paso6Cuadros = ({
   setFeedbackModal,
   setActiveTab,
   triggerRefresh,
+  isReadOnly = false,
 }: Paso6CuadrosProps) => {
   const [generando, setGenerando] = useState(false);
 
   const handleGenerarCuadro = async () => {
-    if (inscripciones.length < 4) {
+    if (inscripciones.length < 3) {
       setFeedbackModal((prev: any) => ({
         ...prev,
         isOpen: true,
         type: "warning",
         title: "Cupos insuficientes",
-        description: `Se necesitan al menos 4 inscripciones confirmadas para armar llaves. Actual: ${inscripciones.length}.`,
-        confirmText: undefined,
-        onConfirm: undefined,
-      }));
-      return;
-    }
-
-    const count = inscripciones.length;
-    const cuposValidos = [6, 8, 12, 16, 24, 32, 64];
-
-    if (!cuposValidos.includes(count)) {
-      setFeedbackModal((prev: any) => ({
-        ...prev,
-        isOpen: true,
-        type: "warning",
-        title: "Cantidad de inscriptos no reglamentaria",
-        description: `Para armar cuadros o zonas exactas sin libres, la cantidad de confirmados debe ser 6, 8, 12, 16, 24, 32 o 64. Actualmente tenés ${count} inscriptos.`,
+        description: `Se necesitan al menos 3 inscripciones para armar el cuadro de la competencia. Actual: ${inscripciones.length}.`,
         confirmText: undefined,
         onConfirm: undefined,
       }));
@@ -162,22 +148,25 @@ export const Paso6Cuadros = ({
         partidos={partidos}
         inscripciones={inscripciones}
         onRefresh={triggerRefresh}
+        isReadOnly={isReadOnly}
       />
 
-      <div className="flex justify-between pt-4 border-t border-white/5">
-        <button
-          onClick={() => setActiveTab("cierre")}
-          className="bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-xs font-bold cursor-pointer"
-        >
-          Atrás
-        </button>
-        <button
-          onClick={() => setActiveTab("matches")}
-          className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
-        >
-          Siguiente Paso: Arbitraje
-        </button>
-      </div>
+      {!isReadOnly && (
+        <div className="flex justify-between pt-4 border-t border-white/5">
+          <button
+            onClick={() => setActiveTab("cierre")}
+            className="bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-xs font-bold cursor-pointer"
+          >
+            Atrás
+          </button>
+          <button
+            onClick={() => setActiveTab("matches")}
+            className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+          >
+            Siguiente Paso: Arbitraje
+          </button>
+        </div>
+      )}
     </div>
   );
 };

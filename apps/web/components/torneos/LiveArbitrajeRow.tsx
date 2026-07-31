@@ -1,14 +1,23 @@
 import { Partido } from "@/utils/types";
 import { Loader2, Trophy, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
+import CustomDropdown from "@/components/ui/CustomDropdown";
+import { TorneosService } from "@/utils/services/torneos";
 
 export const LiveArbitrajeRow = ({
   partido,
+  torneo,
+  todosLosPartidos = [],
+  disponibilidades = [],
   onSave,
+  onPartidoUpdated,
   isSaving,
   onError,
 }: {
   partido: Partido;
+  torneo?: any;
+  todosLosPartidos?: Partido[];
+  disponibilidades?: any[];
   onSave: (
     partidoId: string,
     ganadorId: string,
@@ -22,28 +31,85 @@ export const LiveArbitrajeRow = ({
       es_supertiebreak: boolean;
       es_wo: boolean;
       es_injustificado_wo: boolean;
-    }
+    },
   ) => void;
+  onPartidoUpdated?: () => void;
   isSaving: boolean;
   onError: (msg: string) => void;
 }) => {
+  // Extraer configuraciones dinamicas del torneo desde reglas_arbitraje (Paso 7: Cierre)
+  const reglasArb = torneo?.reglas_arbitraje || {};
+  const esTercerSetCompleto = reglasArb.definicion_tercer_set === "Completo";
+  const stbPuntosTarget = Number(
+    reglasArb.supertiebreak_puntos ??
+      torneo?.stb_puntos ??
+      torneo?.puntos_stb ??
+      10,
+  );
+  const stbDiferenciaRequerida = reglasArb.supertiebreak_diferencia !== false;
   // Sets scores states
-  const [s1A, setS1A] = useState<string>(partido.set1_a !== null && partido.set1_a !== undefined ? String(partido.set1_a) : "");
-  const [s1B, setS1B] = useState<string>(partido.set1_b !== null && partido.set1_b !== undefined ? String(partido.set1_b) : "");
-  const [s2A, setS2A] = useState<string>((partido as any).set2_a !== null && (partido as any).set2_a !== undefined ? String((partido as any).set2_a) : "");
-  const [s2B, setS2B] = useState<string>((partido as any).set2_b !== null && (partido as any).set2_b !== undefined ? String((partido as any).set2_b) : "");
-  const [s3A, setS3A] = useState<string>((partido as any).set3_a !== null && (partido as any).set3_a !== undefined ? String((partido as any).set3_a) : "");
-  const [s3B, setS3B] = useState<string>((partido as any).set3_b !== null && (partido as any).set3_b !== undefined ? String((partido as any).set3_b) : "");
+  const [s1A, setS1A] = useState<string>(
+    partido.set1_a !== null && partido.set1_a !== undefined
+      ? String(partido.set1_a)
+      : "",
+  );
+  const [s1B, setS1B] = useState<string>(
+    partido.set1_b !== null && partido.set1_b !== undefined
+      ? String(partido.set1_b)
+      : "",
+  );
+  const [s2A, setS2A] = useState<string>(
+    (partido as any).set2_a !== null && (partido as any).set2_a !== undefined
+      ? String((partido as any).set2_a)
+      : "",
+  );
+  const [s2B, setS2B] = useState<string>(
+    (partido as any).set2_b !== null && (partido as any).set2_b !== undefined
+      ? String((partido as any).set2_b)
+      : "",
+  );
+  const [s3A, setS3A] = useState<string>(
+    (partido as any).set3_a !== null && (partido as any).set3_a !== undefined
+      ? String((partido as any).set3_a)
+      : "",
+  );
+  const [s3B, setS3B] = useState<string>(
+    (partido as any).set3_b !== null && (partido as any).set3_b !== undefined
+      ? String((partido as any).set3_b)
+      : "",
+  );
 
-  // Match options states
-  const [esSupertiebreak, setEsSupertiebreak] = useState<boolean>((partido as any).es_supertiebreak || false);
+  const [esSupertiebreak, setEsSupertiebreak] = useState<boolean>(
+    (partido as any).es_supertiebreak || false,
+  );
   const [esWo, setEsWo] = useState<boolean>((partido as any).es_wo || false);
-  const [esInjustificadoWo, setEsInjustificadoWo] = useState<boolean>((partido as any).es_injustificado_wo || false);
+  const [esInjustificadoWo, setEsInjustificadoWo] = useState<boolean>(
+    (partido as any).es_injustificado_wo || false,
+  );
   const [ganadorWo, setGanadorWo] = useState<"A" | "B">("A");
+
+  // Cancha y hora asignada
+  const [canchaEdit, setCanchaEdit] = useState<string>(
+    partido.cancha_asignada || "Cancha 1",
+  );
+  const [horaEdit, setHoraEdit] = useState<string>(() => {
+    if ((partido as any).fecha_partido) {
+      try {
+        const d = new Date((partido as any).fecha_partido);
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        return `${hh}:${mm}:00`;
+      } catch {
+        return "09:00:00";
+      }
+    }
+    return "09:00:00";
+  });
 
   const cleanName = (name?: string | null) => {
     if (!name) return "";
-    let cleaned = name.trim()
+    let cleaned = name
+      .trim()
       .replace(/^[\s,.\-]+/, "")
       .replace(/[\s,.\-]+$/, "");
     if (cleaned === "," || cleaned === "." || cleaned === "") return "";
@@ -66,30 +132,34 @@ export const LiveArbitrajeRow = ({
   const set1Completado = s1A !== "" && s1B !== "";
   const set2Completado = s2A !== "" && s2B !== "";
 
-  // Determinar ganador por sets (se necesitan 2 sets ganados)
+  // Calcular si los primeros 2 sets quedaron empatados 1-1 (lo que HABILITA y REQUIERE el 3er set)
+  const gA1 = set1Completado && Number(s1A) > Number(s1B) ? 1 : 0;
+  const gB1 = set1Completado && Number(s1B) > Number(s1A) ? 1 : 0;
+  const gA2 = set2Completado && Number(s2A) > Number(s2B) ? 1 : 0;
+  const gB2 = set2Completado && Number(s2B) > Number(s2A) ? 1 : 0;
+
+  const requiereTercerSet =
+    set1Completado && set2Completado && gA1 + gA2 === 1 && gB1 + gB2 === 1;
+
+  // Determinar total de sets ganados incluyendo el 3er set (para definir el ganador)
   const getSetsGanados = () => {
-    let setsA = 0;
-    let setsB = 0;
-    
-    if (set1Completado) {
-      if (Number(s1A) > Number(s1B)) setsA++; else if (Number(s1B) > Number(s1A)) setsB++;
-    }
-    if (set2Completado) {
-      if (Number(s2A) > Number(s2B)) setsA++; else if (Number(s2B) > Number(s2A)) setsB++;
-    }
-    if (s3A !== "" && s3B !== "") {
-      if (Number(s3A) > Number(s3B)) setsA++; else if (Number(s3B) > Number(s3A)) setsB++;
+    let setsA = gA1 + gA2;
+    let setsB = gB1 + gB2;
+
+    if (requiereTercerSet && s3A !== "" && s3B !== "") {
+      if (Number(s3A) > Number(s3B)) setsA++;
+      else if (Number(s3B) > Number(s3A)) setsB++;
     }
 
     return { setsA, setsB };
   };
 
   const { setsA, setsB } = getSetsGanados();
-  const requiereTercerSet = set1Completado && set2Completado && setsA === 1 && setsB === 1;
 
   const handleFinalizar = () => {
     if (esWo) {
-      const ganadorId = ganadorWo === "A" ? partido.equipo_a_id : partido.equipo_b_id;
+      const ganadorId =
+        ganadorWo === "A" ? partido.equipo_a_id : partido.equipo_b_id;
       if (!ganadorId) {
         onError("No se pudo identificar el equipo ganador del W.O.");
         return;
@@ -120,10 +190,102 @@ export const LiveArbitrajeRow = ({
     const n3A = s3A !== "" ? Number(s3A) : null;
     const n3B = s3B !== "" ? Number(s3B) : null;
 
-    // Validar ganador de cada set (no puede haber empates en juegos de un set)
-    if (n1A === n1B || n2A === n2B || (n3A !== null && n3B !== null && n3A === n3B)) {
-      onError("No puede haber empates en los juegos/puntos de un set.");
+    // Helper para validar un set convencional (6 games con diferencia de 2, 7-5 o 7-6)
+    const esSetValido = (a: number, b: number) => {
+      const maxG = Math.max(a, b);
+      const minG = Math.min(a, b);
+      const diff = maxG - minG;
+      if (maxG < 6) return false;
+      if (maxG === 6 && diff >= 2) return true;
+      if (maxG === 7 && (diff === 2 || diff === 1)) return true;
+      return false;
+    };
+
+    if (!esSetValido(n1A, n1B)) {
+      onError(
+        "El Set 1 es inválido. Debe finalizar 6-0, 6-1, 6-2, 6-3, 6-4, 7-5 o 7-6 (Tie-break).",
+      );
       return;
+    }
+
+    if (!esSetValido(n2A, n2B)) {
+      onError(
+        "El Set 2 es inválido. Debe finalizar 6-0, 6-1, 6-2, 6-3, 6-4, 7-5 o 7-6 (Tie-break).",
+      );
+      return;
+    }
+
+    // Si un equipo ya ganó 2-0 los primeros 2 sets, descartar cualquier 3er set cargado por error
+    let finalS3A: number | null = null;
+    let finalS3B: number | null = null;
+
+    if (requiereTercerSet) {
+      if (n3A === null || n3B === null) {
+        onError(
+          "El partido está empatado 1-1 en sets. Debe ingresar el resultado del Set 3.",
+        );
+        return;
+      }
+
+      if (esTercerSetCompleto) {
+        if (!esSetValido(n3A, n3B)) {
+          onError(
+            "El Set 3 es un Set Completo. Debe finalizar 6-0, 6-1, 6-2, 6-3, 6-4, 7-5 o 7-6 (Tie-break).",
+          );
+          return;
+        }
+      } else {
+        const N = stbPuntosTarget;
+        const maxPts = Math.max(n3A, n3B);
+        const minPts = Math.min(n3A, n3B);
+        const diff = maxPts - minPts;
+
+        if (stbDiferenciaRequerida) {
+          // Diferencia mínima de 2 puntos siempre requerida
+          if (diff < 2) {
+            onError(
+              `El Super Tie-break a ${N} puntos requiere una diferencia mínima de 2 puntos para ganar.`,
+            );
+            return;
+          }
+
+          // Caso 1: El perdedor no llegó a deuce previo (minPts < N - 1)
+          if (minPts < N - 1) {
+            if (maxPts !== N) {
+              onError(
+                `El Super Tie-break a ${N} puntos no puede finalizar ${maxPts}-${minPts}. El marcador correcto era ${N}-${minPts}.`,
+              );
+              return;
+            }
+          }
+          // Caso 2: Hubo empate previo en N-1 (ej: 1-1 en STB a 2 pts)
+          else if (minPts === N - 1) {
+            if (maxPts !== N + 1) {
+              onError(
+                `Al empatar ${N - 1}-${N - 1} en un STB a ${N} puntos, el partido finaliza al alcanzar 2 puntos de ventaja (${N + 1}-${N - 1}).`,
+              );
+              return;
+            }
+          }
+          // Caso 3: Alargue por deuce sucesivo (minPts >= N)
+          else {
+            if (diff !== 2) {
+              onError(
+                `En alargue de Super Tie-break, el partido finaliza inmediatamente al lograr 2 puntos de ventaja (${minPts + 2}-${minPts}).`,
+              );
+              return;
+            }
+          }
+        } else {
+          // Sin diferencia requerida: el primero en alcanzar N puntos gana
+          if (maxPts < N) {
+            onError(`El Super Tie-break debe alcanzarse a un mínimo de ${N} puntos.`);
+            return;
+          }
+        }
+      }
+      finalS3A = n3A;
+      finalS3B = n3B;
     }
 
     let ganadorId = null;
@@ -134,7 +296,7 @@ export const LiveArbitrajeRow = ({
     }
 
     if (!ganadorId) {
-      onError("No se ha definido un ganador con 2 sets de ventaja.");
+      onError("No se ha definido un ganador del partido.");
       return;
     }
 
@@ -143,9 +305,9 @@ export const LiveArbitrajeRow = ({
       set1_b: n1B,
       set2_a: n2A,
       set2_b: n2B,
-      set3_a: n3A,
-      set3_b: n3B,
-      es_supertiebreak: esSupertiebreak,
+      set3_a: finalS3A,
+      set3_b: finalS3B,
+      es_supertiebreak: !esTercerSetCompleto,
       es_wo: false,
       es_injustificado_wo: false,
     });
@@ -159,11 +321,126 @@ export const LiveArbitrajeRow = ({
           <span className="text-xs text-brand-chartreuse font-extrabold uppercase tracking-widest bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-3 py-1 rounded-full">
             {partido.ronda}
           </span>
-          {partido.cancha_asignada && (
-            <span className="text-xs text-gray-400 font-bold">
-              {partido.cancha_asignada}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            <CustomDropdown
+              value={canchaEdit}
+              onChange={async (newCancha) => {
+                // Verificar si esta cancha y el horario actual estan ocupados por otro partido
+                const conflicto = todosLosPartidos.find((p) => {
+                  if (p.id === partido.id) return false;
+                  const pCancha = p.cancha_asignada;
+                  let pHora = "";
+                  if ((p as any).fecha_partido) {
+                    const d = new Date((p as any).fecha_partido);
+                    pHora = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:00`;
+                  }
+                  return pCancha === newCancha && pHora === horaEdit;
+                });
+
+                if (conflicto) {
+                  onError(
+                    `La cancha "${newCancha}" ya está asignada al mismo horario (${horaEdit.slice(0, 5)} hs) en otro partido.`,
+                  );
+                  return;
+                }
+
+                setCanchaEdit(newCancha);
+                try {
+                  await TorneosService.actualizarPartido(partido.id, {
+                    cancha_asignada: newCancha,
+                  });
+                  onPartidoUpdated?.();
+                } catch (e) {
+                  console.error("Error al actualizar cancha del partido:", e);
+                }
+              }}
+              options={(() => {
+                const mapCanchas = new Set<string>();
+                disponibilidades.forEach((d) => {
+                  const club = d.clubes?.nombre || "";
+                  const cancha =
+                    d.canchas?.nombre ||
+                    d.cancha_nombre ||
+                    (d.cancha_id ? `Cancha ${d.cancha_id.slice(0, 4)}` : null);
+                  if (cancha) {
+                    mapCanchas.add(club ? `${club} - ${cancha}` : cancha);
+                  }
+                });
+                if (mapCanchas.size === 0) {
+                  [
+                    "Cancha 1",
+                    "Cancha 2",
+                    "Cancha 3",
+                    "Cancha Central",
+                  ].forEach((c) => mapCanchas.add(c));
+                }
+                return Array.from(mapCanchas).map((c) => ({
+                  value: c,
+                  label: c,
+                }));
+              })()}
+              placeholder="Elegir Cancha..."
+            />
+            <CustomDropdown
+              value={horaEdit}
+              onChange={async (newHora) => {
+                // Verificar conflicto de cancha y horario en otro partido
+                const conflicto = todosLosPartidos.find((p) => {
+                  if (p.id === partido.id) return false;
+                  const pCancha = p.cancha_asignada;
+                  let pHora = "";
+                  if ((p as any).fecha_partido) {
+                    const d = new Date((p as any).fecha_partido);
+                    pHora = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:00`;
+                  }
+                  return pCancha === canchaEdit && pHora === newHora;
+                });
+
+                if (conflicto) {
+                  onError(
+                    `El horario (${newHora.slice(0, 5)} hs) ya está ocupado en la cancha "${canchaEdit}" por otro partido.`,
+                  );
+                  return;
+                }
+
+                setHoraEdit(newHora);
+                try {
+                  const baseDate = partido.fecha_partido
+                    ? new Date(partido.fecha_partido)
+                    : new Date();
+                  const [h, m] = newHora.split(":").map(Number);
+                  baseDate.setHours(h || 0, m || 0, 0, 0);
+                  await TorneosService.actualizarPartido(partido.id, {
+                    fecha_partido: baseDate.toISOString(),
+                  });
+                  onPartidoUpdated?.();
+                } catch (e) {
+                  console.error("Error al actualizar hora del partido:", e);
+                }
+              }}
+              options={(() => {
+                const mapHoras = new Set<string>();
+                disponibilidades.forEach((d) => {
+                  if (d.hora_inicio) mapHoras.add(d.hora_inicio);
+                });
+                if (mapHoras.size === 0) {
+                  [
+                    "09:00:00",
+                    "10:30:00",
+                    "12:00:00",
+                    "14:00:00",
+                    "16:00:00",
+                    "18:00:00",
+                    "20:00:00",
+                  ].forEach((h) => mapHoras.add(h));
+                }
+                return Array.from(mapHoras)
+                  .sort()
+                  .map((h) => ({ value: h, label: `${h.slice(0, 5)} hs` }));
+              })()}
+              placeholder="Elegir Hora..."
+            />
+          </div>
         </div>
         <div className="flex items-center gap-4 text-xs">
           <label className="flex items-center gap-1.5 text-gray-400 font-bold cursor-pointer">
@@ -221,39 +498,53 @@ export const LiveArbitrajeRow = ({
               </span>
               {setsA >= 2 && (
                 <span className="text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-md uppercase">
-                  ✓ Ganador
+                  GANADOR
                 </span>
               )}
             </div>
             <div className="flex gap-3">
               <div className="flex flex-col items-center">
-                <span className="text-[10px] text-gray-500 font-black mb-1">Set 1</span>
+                <span className="text-[10px] text-gray-500 font-black mb-1">
+                  Set 1
+                </span>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
                   value={s1A}
-                  onChange={(e) => setS1A(e.target.value)}
+                  onChange={(e) =>
+                    setS1A(e.target.value.replace(/[^0-9]/g, ""))
+                  }
                   className="w-12 h-12 bg-brand-input rounded-xl text-center text-white font-black text-lg outline-none border border-white/10 focus:border-brand-chartreuse"
                 />
               </div>
               <div className="flex flex-col items-center">
-                <span className="text-[10px] text-gray-500 font-black mb-1">Set 2</span>
+                <span className="text-[10px] text-gray-500 font-black mb-1">
+                  Set 2
+                </span>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
                   value={s2A}
-                  onChange={(e) => setS2A(e.target.value)}
+                  onChange={(e) =>
+                    setS2A(e.target.value.replace(/[^0-9]/g, ""))
+                  }
                   className="w-12 h-12 bg-brand-input rounded-xl text-center text-white font-black text-lg outline-none border border-white/10 focus:border-brand-chartreuse"
                 />
               </div>
               {(requiereTercerSet || s3A !== "" || s3B !== "") && (
                 <div className="flex flex-col items-center">
-                  <span className="text-[10px] text-brand-chartreuse font-black mb-1">Set 3</span>
+                  <span className="text-[10px] text-brand-chartreuse font-black mb-1">
+                    {esTercerSetCompleto
+                      ? "Set 3"
+                      : `STB (${stbPuntosTarget} pts)`}
+                  </span>
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="numeric"
                     value={s3A}
-                    onChange={(e) => setS3A(e.target.value)}
+                    onChange={(e) =>
+                      setS3A(e.target.value.replace(/[^0-9]/g, ""))
+                    }
                     className="w-12 h-12 bg-brand-input rounded-xl text-center text-white font-black text-lg outline-none border border-brand-chartreuse"
                   />
                 </div>
@@ -269,36 +560,53 @@ export const LiveArbitrajeRow = ({
               </span>
               {setsB >= 2 && (
                 <span className="text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-md uppercase">
-                  ✓ Ganador
+                  GANADOR
                 </span>
               )}
             </div>
             <div className="flex gap-3">
               <div className="flex flex-col items-center">
+                <span className="text-[10px] text-gray-500 font-black mb-1">
+                  Set 1
+                </span>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
                   value={s1B}
-                  onChange={(e) => setS1B(e.target.value)}
+                  onChange={(e) =>
+                    setS1B(e.target.value.replace(/[^0-9]/g, ""))
+                  }
                   className="w-12 h-12 bg-brand-input rounded-xl text-center text-white font-black text-lg outline-none border border-white/10 focus:border-brand-chartreuse"
                 />
               </div>
               <div className="flex flex-col items-center">
+                <span className="text-[10px] text-gray-500 font-black mb-1">
+                  Set 2
+                </span>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
                   value={s2B}
-                  onChange={(e) => setS2B(e.target.value)}
+                  onChange={(e) =>
+                    setS2B(e.target.value.replace(/[^0-9]/g, ""))
+                  }
                   className="w-12 h-12 bg-brand-input rounded-xl text-center text-white font-black text-lg outline-none border border-white/10 focus:border-brand-chartreuse"
                 />
               </div>
               {(requiereTercerSet || s3A !== "" || s3B !== "") && (
                 <div className="flex flex-col items-center">
+                  <span className="text-[10px] text-brand-chartreuse font-black mb-1">
+                    {esTercerSetCompleto
+                      ? "Set 3"
+                      : `STB (${stbPuntosTarget} pts)`}
+                  </span>
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="numeric"
                     value={s3B}
-                    onChange={(e) => setS3B(e.target.value)}
+                    onChange={(e) =>
+                      setS3B(e.target.value.replace(/[^0-9]/g, ""))
+                    }
                     className="w-12 h-12 bg-brand-input rounded-xl text-center text-white font-black text-lg outline-none border border-brand-chartreuse"
                   />
                 </div>
@@ -306,18 +614,14 @@ export const LiveArbitrajeRow = ({
             </div>
           </div>
 
-          {/* Opción Supertiebreak para el 3er set */}
+          {/* Aclaración reglamentaria de Super Tie-break o Set Completo */}
           {(requiereTercerSet || s3A !== "" || s3B !== "") && (
             <div className="flex justify-end pt-2">
-              <label className="flex items-center gap-1.5 text-xs text-gray-400 font-bold cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={esSupertiebreak}
-                  onChange={(e) => setEsSupertiebreak(e.target.checked)}
-                  className="accent-brand-chartreuse rounded"
-                />
-                El 3er set es un Super Tie-break (definición a 10/11 puntos)
-              </label>
+              <span className="text-xs text-brand-chartreuse/90 font-bold bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-3 py-1 rounded-lg">
+                {esTercerSetCompleto
+                  ? "El 3er set se define por Set Completo convencional a 6 games."
+                  : `El 3er set se define por Super Tie-break a ${stbPuntosTarget} ${stbPuntosTarget === 1 ? "punto" : "puntos"} ${stbDiferenciaRequerida ? "(diferencia mínima de 2 requerida)" : ""}.`}
+              </span>
             </div>
           )}
         </div>

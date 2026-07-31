@@ -21,6 +21,7 @@ interface Paso4JugadoresProps {
   setFeedbackModal: (modal: any) => void;
   setActiveTab: (tab: string) => void;
   triggerRefresh: () => void;
+  readOnly?: boolean;
 }
 
 const cleanName = (name?: string | null) => {
@@ -40,6 +41,7 @@ export const Paso4Jugadores = ({
   setFeedbackModal,
   setActiveTab,
   triggerRefresh,
+  readOnly = false,
 }: Paso4JugadoresProps) => {
   const [importingCSV, setImportingCSV] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -228,7 +230,7 @@ export const Paso4Jugadores = ({
   };
 
   return (
-    <div className="bg-[#111111] rounded-3xl border border-white/5 overflow-hidden shadow-xl">
+    <div className={`bg-[#111111] rounded-3xl border border-white/5 overflow-hidden shadow-xl ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
       {/* Cabecera y botones de acción */}
       <div className="p-6 border-b border-white/5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-black/20">
         <h3 className="font-bold text-white flex items-center gap-2">
@@ -290,10 +292,17 @@ export const Paso4Jugadores = ({
             <tbody className="divide-y divide-white/5">
               {inscripciones.map((ins) => {
                 const isConfirmed = ins.estado_pago === "Confirmado";
+                const isPendienteRegistro = ins.estado_pago === "Pendiente" || (ins as any).registrado === false;
                 return (
                   <tr
                     key={ins.id}
-                    className={`hover:bg-white/2 transition-colors ${isConfirmed ? "bg-green-500/2" : ""}`}
+                    className={`hover:bg-white/5 transition-colors ${
+                      isPendienteRegistro
+                        ? "opacity-50 bg-black/40 grayscale"
+                        : isConfirmed
+                        ? "bg-green-500/5"
+                        : ""
+                    }`}
                   >
                     <td className="px-8 py-5 text-center">
                       <input
@@ -320,11 +329,17 @@ export const Paso4Jugadores = ({
                     </td>
                     <td className="px-6 py-5">
                       <div className="font-bold text-white flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-brand-chartreuse/10 flex items-center justify-center shrink-0">
-                          <User className="size-4 text-brand-chartreuse" />
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                            isPendienteRegistro
+                              ? "bg-gray-800 text-gray-400"
+                              : "bg-brand-chartreuse/10 text-brand-chartreuse"
+                          }`}
+                        >
+                          <User className="size-4" />
                         </div>
                         <div>
-                          {cleanName(ins.jugador1_nombre)}
+                          <span>{cleanName(ins.jugador1_nombre)}</span>
                           {ins.jugador2_nombre &&
                             ins.jugador2_nombre !== "-" && (
                               <span className="text-gray-400 font-medium">
@@ -332,14 +347,23 @@ export const Paso4Jugadores = ({
                                 / {cleanName(ins.jugador2_nombre)}
                               </span>
                             )}
+                          {isPendienteRegistro && (
+                            <span className="block text-[10px] text-amber-400/80 font-bold mt-0.5">
+                              ⚠️ Jugador no registrado en App (Pendiente)
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-5 text-center">
                       <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-bold ${isConfirmed ? "bg-green-500/10 text-green-400 border border-green-500/20" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"}`}
+                        className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                          isConfirmed
+                            ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                            : "bg-gray-500/10 text-gray-400 border border-gray-500/20"
+                        }`}
                       >
-                        {ins.estado_pago || "Pendiente"}
+                        {isConfirmed ? "Confirmado" : "Pendiente en App"}
                       </span>
                     </td>
                     <td className="px-8 py-5 text-right font-semibold text-sm">

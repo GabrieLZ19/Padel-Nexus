@@ -313,6 +313,31 @@ export default function ProfileSettings() {
               )}
             </div>
 
+            {/* Fecha de Nacimiento & Sexo */}
+            <div className="space-y-1">
+              <label className={labelStyles}>Fecha de Nacimiento</label>
+              <input
+                className="w-full bg-brand-input px-4 py-3.5 rounded-xl border border-white/10 text-white text-sm outline-none cursor-pointer focus:border-brand-chartreuse transition-colors"
+                type="date"
+                value={profile.fecha_nacimiento ? profile.fecha_nacimiento.split("T")[0] : ""}
+                onChange={(e) => setProfile({ ...profile, fecha_nacimiento: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className={labelStyles}>Sexo / Género</label>
+              <CustomDropdown
+                value={profile.sexo || "masculino"}
+                onChange={(val) => setProfile({ ...profile, sexo: val as any })}
+                options={[
+                  { value: "masculino", label: "Masculino" },
+                  { value: "femenino", label: "Femenino" },
+                  { value: "otro", label: "Otro" },
+                ]}
+                placeholder="Seleccionar Sexo..."
+              />
+            </div>
+
             <div className="space-y-1 md:col-span-2">
               <label className={labelStyles}>
                 Provincia / Lugar de residencia *

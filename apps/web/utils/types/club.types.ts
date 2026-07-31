@@ -3,6 +3,7 @@ export interface Club {
   nombre: string;
   provincia: string;
   localidad: string;
+  direccion?: string;
   canchas: number;
   estado: string;
   latitud?: number | null;

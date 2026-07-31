@@ -142,16 +142,21 @@ export default function ClubCanchasPage() {
     setIsTurnoModalOpen(true);
   };
 
+  const [selectedDiasTurno, setSelectedDiasTurno] = useState<number[]>([1]);
+
   const handleSaveTurno = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCanchaId) return;
+    if (!selectedCanchaId || selectedDiasTurno.length === 0) return;
     setSaving(true);
     try {
-      await ClubPanelService.crearTurno(selectedCanchaId, {
-        ...turnoForm,
-        hora_inicio: `${turnoForm.hora_inicio}:00`,
-        hora_fin: `${turnoForm.hora_fin}:00`,
-      });
+      for (const dia of selectedDiasTurno) {
+        await ClubPanelService.crearTurno(selectedCanchaId, {
+          ...turnoForm,
+          dia_semana: dia,
+          hora_inicio: `${turnoForm.hora_inicio}:00`,
+          hora_fin: `${turnoForm.hora_fin}:00`,
+        });
+      }
       setIsTurnoModalOpen(false);
       fetchCanchas();
     } catch (err) {
@@ -532,26 +537,42 @@ export default function ClubCanchasPage() {
             <form onSubmit={handleSaveTurno} className="space-y-5">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
-                  Día de la Semana
+                  Días de la Semana (Creación Masiva)
                 </label>
-                <select
-                  value={turnoForm.dia_semana}
-                  onChange={(e) =>
-                    setTurnoForm({
-                      ...turnoForm,
-                      dia_semana: parseInt(e.target.value),
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-brand-black border border-brand-white/5 rounded-xl text-sm text-brand-white focus:outline-none focus:border-brand-chartreuse/50"
-                >
-                  <option value={1}>Lunes</option>
-                  <option value={2}>Martes</option>
-                  <option value={3}>Miércoles</option>
-                  <option value={4}>Jueves</option>
-                  <option value={5}>Viernes</option>
-                  <option value={6}>Sábado</option>
-                  <option value={0}>Domingo</option>
-                </select>
+                <div className="grid grid-cols-4 gap-2 text-xs font-bold text-white">
+                  {[
+                    { id: 1, label: "Lun" },
+                    { id: 2, label: "Mar" },
+                    { id: 3, label: "Mié" },
+                    { id: 4, label: "Jue" },
+                    { id: 5, label: "Vie" },
+                    { id: 6, label: "Sáb" },
+                    { id: 0, label: "Dom" },
+                  ].map((d) => (
+                    <label
+                      key={d.id}
+                      className={`p-2.5 rounded-xl border flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                        selectedDiasTurno.includes(d.id)
+                          ? "bg-brand-chartreuse/20 border-brand-chartreuse text-brand-chartreuse"
+                          : "bg-black/20 border-white/5 text-gray-400"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedDiasTurno.includes(d.id)}
+                        onChange={() => {
+                          setSelectedDiasTurno((prev) =>
+                            prev.includes(d.id)
+                              ? prev.filter((x) => x !== d.id)
+                              : [...prev, d.id],
+                          );
+                        }}
+                        className="hidden"
+                      />
+                      <span>{d.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

@@ -434,7 +434,7 @@ export const DroppableZona = ({
   return (
     <div
       ref={setNodeRef}
-      className="bg-[#2a2a2a] rounded-3xl p-4 flex flex-col h-full min-h-[300px] border border-white/5 shadow-xl"
+      className="bg-[#2a2a2a] rounded-3xl p-4 flex flex-col h-full min-h-75 border border-white/5 shadow-xl"
     >
       <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-3">
         <h4 className="text-white font-black uppercase tracking-widest text-lg">
@@ -471,11 +471,12 @@ export const DroppableZona = ({
         </SortableContext>
 
         {/* Placeholder for dropping new ones or empty state */}
-        {(!isSiembra || (isSiembra && zona.parejas.length < 2)) && (
-          <div className="mt-2 flex items-center justify-center p-3 rounded-2xl border border-dashed border-brand-chartreuse/50 text-brand-chartreuse text-sm font-bold bg-brand-chartreuse/5">
-            + Soltar aquí
-          </div>
-        )}
+        {isEditing &&
+          (!isSiembra || (isSiembra && zona.parejas.length < 2)) && (
+            <div className="mt-2 flex items-center justify-center p-3 rounded-2xl border border-dashed border-brand-chartreuse/50 text-brand-chartreuse text-sm font-bold bg-brand-chartreuse/5">
+              + Soltar aquí
+            </div>
+          )}
       </div>
     </div>
   );
@@ -515,7 +516,8 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
 
   const getParejaStatsById = (id: string) => {
     const activeZona = findZonaOfPareja(id);
-    if (!activeZona) return { played: 0, won: 0, points: 0, diffSets: 0, diffGames: 0 };
+    if (!activeZona)
+      return { played: 0, won: 0, points: 0, diffSets: 0, diffGames: 0 };
 
     let played = 0;
     let won = 0;
@@ -529,7 +531,7 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
         const isTeamB = p.equipo_b_id === id;
         if (isTeamA || isTeamB) {
           played++;
-          
+
           if (p.es_wo) {
             if (p.ganador === id) {
               won++;
@@ -550,11 +552,13 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
           if (p.set1_a !== null && p.set1_b !== null) {
             const aWon = p.set1_a > p.set1_b;
             if (isTeamA) {
-              if (aWon) sA_w++; else sA_l++;
+              if (aWon) sA_w++;
+              else sA_l++;
               gA_w += p.set1_a;
               gA_l += p.set1_b;
             } else {
-              if (!aWon) sA_w++; else sA_l++;
+              if (!aWon) sA_w++;
+              else sA_l++;
               gA_w += p.set1_b;
               gA_l += p.set1_a;
             }
@@ -563,11 +567,13 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
           if (p.set2_a !== null && p.set2_b !== null) {
             const aWon = p.set2_a > p.set2_b;
             if (isTeamA) {
-              if (aWon) sA_w++; else sA_l++;
+              if (aWon) sA_w++;
+              else sA_l++;
               gA_w += p.set2_a;
               gA_l += p.set2_b;
             } else {
-              if (!aWon) sA_w++; else sA_l++;
+              if (!aWon) sA_w++;
+              else sA_l++;
               gA_w += p.set2_b;
               gA_l += p.set2_a;
             }
@@ -576,13 +582,15 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
           if (p.set3_a !== null && p.set3_b !== null) {
             const aWon = p.set3_a > p.set3_b;
             if (isTeamA) {
-              if (aWon) sA_w++; else sA_l++;
+              if (aWon) sA_w++;
+              else sA_l++;
               if (!p.es_supertiebreak) {
                 gA_w += p.set3_a;
                 gA_l += p.set3_b;
               }
             } else {
-              if (!aWon) sA_w++; else sA_l++;
+              if (!aWon) sA_w++;
+              else sA_l++;
               if (!p.es_supertiebreak) {
                 gA_w += p.set3_b;
                 gA_l += p.set3_a;
@@ -590,8 +598,8 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
             }
           }
 
-          diffSets += (sA_w - sA_l);
-          diffGames += (gA_w - gA_l);
+          diffSets += sA_w - sA_l;
+          diffGames += gA_w - gA_l;
 
           if (p.ganador === id) {
             won++;

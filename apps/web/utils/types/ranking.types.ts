@@ -15,6 +15,14 @@ export interface RankingJugador {
   alcance: "Provincial" | "Nacional" | "Global";
   provincia_jurisdiccion?: string | null;
 
+  // Propiedades opcionales / mapeadas
+  nombre?: string;
+  apellido?: string;
+  categoria_padel?: string;
+  ranking_nacional?: number;
+  sexo?: string;
+  provincia?: string;
+
   // Propiedades Virtuales / Relaciones Supabase
   club_nombre?: string; // Suele venir de un JOIN
   perfiles?: Partial<Perfil> & {

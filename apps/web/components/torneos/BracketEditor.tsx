@@ -29,6 +29,7 @@ interface BracketEditorProps {
   partidos?: Partido[];
   inscripciones?: Inscripcion[];
   onRefresh?: () => void;
+  isReadOnly?: boolean;
 }
 
 export const BracketEditor: React.FC<BracketEditorProps> = ({
@@ -37,16 +38,23 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   partidos = [],
   inscripciones = [],
   onRefresh,
+  isReadOnly = false,
 }) => {
+  const formatoLower = torneo?.formato?.toLowerCase() || "";
+  const isEliminatoriaDirecta =
+    formatoLower.includes("eliminatoria") || formatoLower.includes("directa");
+
   const [activeView, setActiveView] = useState<
     "zonas" | "siembra" | "llaves" | "auditoria"
-  >(torneo?.formato === "Eliminatoria Directa" ? "siembra" : "zonas");
+  >(isEliminatoriaDirecta ? "llaves" : "zonas");
   const [zonas, setZonas] = useState<ZonaDrag[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   // Siembra (Eliminatoria Directa) drag-and-drop state
   const [siembraZonas, setSiembraZonas] = useState<ZonaDrag[]>([]);
   const [isSiembraEditing, setIsSiembraEditing] = useState(false);
+  const [selectedMatchToEdit, setSelectedMatchToEdit] = useState<Partido | null>(null);
+  const [showMatchEditModal, setShowMatchEditModal] = useState(false);
   const [modificacionNoDestructiva, setModificacionNoDestructiva] =
     useState(true);
   const [validarCabezasSerie, setValidarCabezasSerie] = useState(true);
@@ -170,17 +178,12 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     loadZonas();
   }, [torneoId]);
 
-  // Construir siembraZonas a partir de los partidos de primera ronda cuando cambian los partidos
+  // Construir siembraZonas a partir de los partidos y las parejas inscriptas confirmadas
   useEffect(() => {
-    if (torneo?.formato !== "Eliminatoria Directa" || partidos.length === 0)
-      return;
-    // Detectar la primera ronda del fixture (la que tiene más partidos)
-    const rondas = [...new Set(partidos.map((p) => p.ronda))];
-    // Excluir SEMIS/FINAL/CUARTOS/OCTAVOS — buscar la ronda con más cantidad de partidos de la primera ronda
+    if (!isEliminatoriaDirecta || partidos.length === 0) return;
+
     const ROUNDS_ORDER = ["OCTAVOS", "CUARTOS", "SEMIS", "FINAL"];
-    const nonPlayoffRondas = rondas.filter(
-      (r) => !ROUNDS_ORDER.includes(r.toUpperCase()),
-    );
+    const rondas = [...new Set(partidos.map((p) => p.ronda))];
     const primeraRonda =
       rondas
         .filter((r) => ROUNDS_ORDER.includes(r.toUpperCase()))
@@ -188,14 +191,22 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           (a, b) =>
             ROUNDS_ORDER.indexOf(a.toUpperCase()) -
             ROUNDS_ORDER.indexOf(b.toUpperCase()),
-        )[0] ?? nonPlayoffRondas[0];
+        )[0] ?? rondas[0];
+
     if (!primeraRonda) return;
+
+    // Obtener los partidos de primera ronda
     const matchesPrimeraRonda = partidos
-      .filter(
-        (p) => p.ronda === primeraRonda && (p.equipo_a_id || p.equipo_b_id),
-      )
+      .filter((p) => p.ronda === primeraRonda)
       .sort((a, b) => a.orden - b.orden);
-    // Cada partido = una "zona" de siembra con hasta 2 "parejas" (los slots equipo_a y equipo_b)
+
+    // Recopilar todos los IDs de parejas asignados a partidos de primera ronda
+    const assignedIds = new Set<string>();
+    matchesPrimeraRonda.forEach((p) => {
+      if (p.equipo_a_id) assignedIds.add(p.equipo_a_id);
+      if (p.equipo_b_id) assignedIds.add(p.equipo_b_id);
+    });
+
     const zonasGeneradas: ZonaDrag[] = matchesPrimeraRonda.map((p, idx) => {
       const parejas: ParejaDrag[] = [];
       if (p.equipo_a_id && p.equipo_a_j1) {
@@ -217,13 +228,33 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         });
       }
       return {
-        id: p.id, // usamos el id del partido como id de la zona
+        id: p.id,
         nombre: `Partido ${idx + 1}`,
         parejas,
       };
     });
+
+    // Identificar las parejas que pasaron directamente por BYE (que estan en partidos posteriores como Semis)
+    const unassignedInscripciones = (inscripciones || []).filter(
+      (ins) => !assignedIds.has(ins.id),
+    );
+
+    if (unassignedInscripciones.length > 0) {
+      zonasGeneradas.push({
+        id: "byes-sembrados",
+        nombre: "Clasificados por BYE (Pase directo)",
+        parejas: unassignedInscripciones.map((ins: any, idx) => ({
+          id: ins.id,
+          jugador1_nombre: ins.jugador1?.nombre || ins.jugador1_nombre || "Jugador 1",
+          jugador2_nombre: ins.jugador2?.nombre || ins.jugador2_nombre || null,
+          seed: 99 + idx,
+          club: ins.jugador1?.club_nombre || "Pase directo a Semis",
+        })),
+      });
+    }
+
     setSiembraZonas(zonasGeneradas);
-  }, [partidos, torneo?.formato]);
+  }, [partidos, inscripciones, isEliminatoriaDirecta]);
 
   const handleMoveSiembra = (
     inscripcionId: string,
@@ -541,53 +572,67 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         </div>
       </div>
 
-      <div className="flex bg-transparent border-b border-white/5 mb-6 gap-2 overflow-x-auto scrollbar-none">
-        {torneo?.formato !== "Eliminatoria Directa" && (
+      <div className="flex justify-between items-center bg-transparent border-b border-white/5 mb-6 gap-2 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-2">
+          {isEliminatoriaDirecta ? (
+            <button
+              onClick={() => setActiveView("siembra")}
+              className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
+                activeView === "siembra"
+                  ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
+                  : "border border-transparent text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              <LayoutGrid className="size-4" /> Zonas
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveView("zonas")}
+              className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
+                activeView === "zonas"
+                  ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
+                  : "border border-transparent text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              <LayoutGrid className="size-4" /> Fase de grupos
+            </button>
+          )}
           <button
-            onClick={() => setActiveView("zonas")}
-            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
-              activeView === "zonas"
+            id="tab-llaves-indicador"
+            onClick={() => setActiveView("llaves")}
+            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-all relative shrink-0 ${
+              activeView === "llaves"
                 ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
                 : "border border-transparent text-gray-500 hover:text-gray-300"
             }`}
           >
-            <LayoutGrid className="size-4" /> Fase de grupos
+            <Trophy className="size-4" /> Llave campeonato
           </button>
-        )}
-        {/* Tab Siembra: solo para Eliminatoria Directa cuando hay partidos */}
-        {torneo?.formato === "Eliminatoria Directa" && partidos.length > 0 && (
           <button
-            onClick={() => setActiveView("siembra")}
+            onClick={() => setActiveView("auditoria")}
             className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
-              activeView === "siembra"
+              activeView === "auditoria"
                 ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
                 : "border border-transparent text-gray-500 hover:text-gray-300"
             }`}
           >
-            <Move className="size-4" /> Zonas
+            <History className="size-4" /> Auditoría
+          </button>
+        </div>
+
+        {!isReadOnly && activeView === "llaves" && (
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+              isEditing
+                ? "bg-brand-chartreuse text-brand-black shadow-[0_0_15px_rgba(204,255,0,0.4)]"
+                : "bg-white/10 border border-white/20 text-white hover:bg-white/20"
+            }`}
+          >
+            <PenLine className="size-4" />
+            {isEditing ? "Finalizar Edición" : "Editar Llave"}
           </button>
         )}
-        <button
-          id="tab-llaves-indicador"
-          onClick={() => setActiveView("llaves")}
-          className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-all relative shrink-0 ${
-            activeView === "llaves"
-              ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
-              : "border border-transparent text-gray-500 hover:text-gray-300"
-          } ${tourStep === 4 ? "ring-2 ring-brand-chartreuse shadow-[0_0_15px_rgba(204,255,0,0.5)] z-101 bg-brand-card text-brand-white" : ""}`}
-        >
-          <Trophy className="size-4" /> Llave campeonato
-        </button>
-        <button
-          onClick={() => setActiveView("auditoria")}
-          className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
-            activeView === "auditoria"
-              ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
-              : "border border-transparent text-gray-500 hover:text-gray-300"
-          }`}
-        >
-          <History className="size-4" /> Auditoría
-        </button>
       </div>
 
       {/* PANEL SIEMBRA — Drag & Drop primera ronda de Eliminatoria Directa */}
@@ -601,43 +646,45 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 los partidos para modificar el cuadro de primera ronda.
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              {isSiembraEditing && (
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-yellow-500/30 text-yellow-500 text-xs font-bold uppercase tracking-wider">
-                  <PenLine className="size-3.5" /> Modo edición
-                </div>
-              )}
-              {isSiembraEditing && (
-                <button
-                  onClick={() => {
-                    setIsSiembraEditing(false);
-                    // Recargar siembra desde partidos originales
-                    onRefresh?.();
-                  }}
-                  className="flex items-center gap-2 px-4 py-2.5 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-              )}
-              <button
-                onClick={
-                  isSiembraEditing
-                    ? handleGuardarSiembra
-                    : () => setIsSiembraEditing(true)
-                }
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#ccff00] text-black hover:bg-[#b3e600] transition-all"
-              >
-                {isSiembraEditing ? (
-                  <>
-                    <Check className="size-4" /> Guardar
-                  </>
-                ) : (
-                  <>
-                    <PenLine className="size-4" /> Editar
-                  </>
+            {!isReadOnly && (
+              <div className="flex items-center gap-3">
+                {isSiembraEditing && (
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-yellow-500/30 text-yellow-500 text-xs font-bold uppercase tracking-wider">
+                    <PenLine className="size-3.5" /> Modo edición
+                  </div>
                 )}
-              </button>
-            </div>
+                {isSiembraEditing && (
+                  <button
+                    onClick={() => {
+                      setIsSiembraEditing(false);
+                      // Recargar siembra desde partidos originales
+                      onRefresh?.();
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                )}
+                <button
+                  onClick={
+                    isSiembraEditing
+                      ? handleGuardarSiembra
+                      : () => setIsSiembraEditing(true)
+                  }
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#ccff00] text-black hover:bg-[#b3e600] transition-all"
+                >
+                  {isSiembraEditing ? (
+                    <>
+                      <Check className="size-4" /> Guardar
+                    </>
+                  ) : (
+                    <>
+                      <PenLine className="size-4" /> Editar
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
           {siembraZonas.length === 0 ? (
             <div className="text-center p-12 text-gray-500 border border-dashed border-white/10 rounded-2xl">
@@ -871,7 +918,12 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                         >
                           <MatchCard
                             partido={partido}
-                            isInteractive={false}
+                            isInteractive={isEditing}
+                            isEditing={isEditing}
+                            onEditSelect={(pToEdit) => {
+                              setSelectedMatchToEdit(pToEdit);
+                              setShowMatchEditModal(true);
+                            }}
                             isActive={
                               partido.ganador === null &&
                               partido.equipo_a_id !== null &&
@@ -1018,6 +1070,123 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             </div>
           </div>
         </>
+      )}
+      {/* MODAL DE EDICIÓN DIRECTA DE PAREJAS EN LA LLAVE DE CAMPEONATO */}
+      {showMatchEditModal && selectedMatchToEdit && (
+        <div className="fixed inset-0 z-110 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-brand-card border border-white/10 rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-white/5 pb-3">
+              <div>
+                <h4 className="text-white font-extrabold text-base">Reasignar Partido ({selectedMatchToEdit.ronda})</h4>
+                <p className="text-xs text-gray-400">Seleccioná qué parejainscripta disputará este partido en la llave.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowMatchEditModal(false);
+                  setSelectedMatchToEdit(null);
+                }}
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-300 block mb-1.5">Equipo / Jugador A:</label>
+                <CustomDropdown
+                  value={selectedMatchToEdit.equipo_a_id || ""}
+                  onChange={(newId) => {
+                    const found = inscripciones.find((i) => i.id === newId) as any;
+                    setSelectedMatchToEdit((prev: any) => ({
+                      ...prev,
+                      equipo_a_id: newId,
+                      equipo_a_j1: found?.jugador_1_nombre || found?.jugador1_nombre || found?.jugador1?.nombre || prev?.equipo_a_j1,
+                      equipo_a_j2: found?.jugador_2_nombre || found?.jugador2_nombre || found?.jugador2?.nombre || prev?.equipo_a_j2,
+                    }));
+                  }}
+                  options={[
+                    { value: "", label: "Libre / BYE" },
+                    ...inscripciones.map((ins: any) => {
+                      const name1 = ins.jugador_1_nombre || ins.jugador1_nombre || ins.jugador1?.nombre || "Jugador 1";
+                      const name2 = ins.jugador_2_nombre || ins.jugador2_nombre || ins.jugador2?.nombre || "";
+                      return {
+                        value: ins.id,
+                        label: name2 ? `${name1} / ${name2}` : name1,
+                      };
+                    }),
+                  ]}
+                  placeholder="Seleccionar Equipo A..."
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-300 block mb-1.5">Equipo / Jugador B:</label>
+                <CustomDropdown
+                  value={selectedMatchToEdit.equipo_b_id || ""}
+                  onChange={(newId) => {
+                    const found = inscripciones.find((i) => i.id === newId) as any;
+                    setSelectedMatchToEdit((prev: any) => ({
+                      ...prev,
+                      equipo_b_id: newId,
+                      equipo_b_j1: found?.jugador_1_nombre || found?.jugador1_nombre || found?.jugador1?.nombre || prev?.equipo_b_j1,
+                      equipo_b_j2: found?.jugador_2_nombre || found?.jugador2_nombre || found?.jugador2?.nombre || prev?.equipo_b_j2,
+                    }));
+                  }}
+                  options={[
+                    { value: "", label: "Libre / BYE" },
+                    ...inscripciones.map((ins: any) => {
+                      const name1 = ins.jugador_1_nombre || ins.jugador1_nombre || ins.jugador1?.nombre || "Jugador 1";
+                      const name2 = ins.jugador_2_nombre || ins.jugador2_nombre || ins.jugador2?.nombre || "";
+                      return {
+                        value: ins.id,
+                        label: name2 ? `${name1} / ${name2}` : name1,
+                      };
+                    }),
+                  ]}
+                  placeholder="Seleccionar Equipo B..."
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-white/5">
+              <button
+                onClick={() => {
+                  setShowMatchEditModal(false);
+                  setSelectedMatchToEdit(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-white/5 border border-white/10 text-gray-300 hover:text-white"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await TorneosService.actualizarEquiposPartido(selectedMatchToEdit.id, {
+                      equipo_a_id: selectedMatchToEdit.equipo_a_id || null,
+                      equipo_b_id: selectedMatchToEdit.equipo_b_id || null,
+                      motivo: "Reasignación manual directa en la Llave de Campeonato",
+                    });
+                    setShowMatchEditModal(false);
+                    setSelectedMatchToEdit(null);
+                    onRefresh?.();
+                  } catch (err: any) {
+                    setFeedbackModal({
+                      isOpen: true,
+                      type: "error",
+                      title: "Error al actualizar",
+                      description: err.message || "No se pudo actualizar la pareja del partido.",
+                      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+                    });
+                  }
+                }}
+                className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-brand-chartreuse text-brand-black hover:bg-[#b3e600]"
+              >
+                Guardar Cambio
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

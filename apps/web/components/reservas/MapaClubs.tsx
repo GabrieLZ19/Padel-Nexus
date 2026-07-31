@@ -8,9 +8,16 @@ import "leaflet/dist/leaflet.css";
 interface MapaClubsProps {
   clubes: ClubCercano[];
   userLocation: { lat: number; lng: number };
+  basePath?: string;
+  buttonLabel?: string;
 }
 
-export default function MapaClubs({ clubes, userLocation }: MapaClubsProps) {
+export default function MapaClubs({
+  clubes,
+  userLocation,
+  basePath,
+  buttonLabel,
+}: MapaClubsProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
 
@@ -128,19 +135,28 @@ export default function MapaClubs({ clubes, userLocation }: MapaClubsProps) {
           ? `<div style="font-size:12px;color:#6E8901;margin-top:4px;">${club.distancia_km.toFixed(1)} km</div>`
           : "";
 
+      const ubicacionStr =
+        [club.direccion, club.localidad, club.provincia]
+          .filter(Boolean)
+          .join(", ") || "Ubicación registrada";
+      const targetUrl = basePath
+        ? `${basePath}/${club.id}`
+        : `/reservar/club/${club.id}`;
+      const btnText = buttonLabel || "Ver horarios";
+
       L.marker([club.latitud, club.longitud], { icon: clubIcon })
         .addTo(map)
         .bindPopup(
           `<div style="color:#0b0b0b;min-width:160px;">
             <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${club.nombre}</div>
-            <div style="font-size:12px;color:#555;">${club.localidad}, ${club.provincia}</div>
+            <div style="font-size:12px;color:#555;">${ubicacionStr}</div>
             ${distText}
-            <a href="/reservar/club/${club.id}" style="
+            <a href="${targetUrl}" style="
               display:inline-block;margin-top:8px;
-              padding:4px 12px;background:#CBFE01;color:#0b0b0b;
-              border-radius:6px;font-size:12px;font-weight:600;
+              padding:6px 12px;background:#CBFE01;color:#0b0b0b;
+              border-radius:8px;font-size:12px;font-weight:700;
               text-decoration:none;
-            ">Ver horarios</a>
+            ">${btnText}</a>
           </div>`,
         );
 
@@ -158,7 +174,7 @@ export default function MapaClubs({ clubes, userLocation }: MapaClubsProps) {
   return (
     <div
       ref={mapRef}
-      className="w-full h-[500px] rounded-2xl border border-white/10 overflow-hidden"
+      className="w-full h-125 rounded-2xl border border-white/10 overflow-hidden"
       style={{ zIndex: 1 }}
     />
   );

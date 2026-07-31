@@ -4,10 +4,14 @@ export const MatchCard = ({
   partido,
   isInteractive = false,
   isActive = false,
+  isEditing = false,
+  onEditSelect,
 }: {
   partido: Partido;
   isInteractive?: boolean;
   isActive?: boolean;
+  isEditing?: boolean;
+  onEditSelect?: (partido: Partido) => void;
 }) => {
   const isA =
     partido.ganador === partido.equipo_a_id && partido.ganador !== null;
@@ -34,12 +38,20 @@ export const MatchCard = ({
 
   return (
     <div
+      onClick={() => isEditing && onEditSelect?.(partido)}
       className={`bg-[#1a1a1a] border rounded-xl overflow-hidden flex flex-col w-full text-sm shadow-[0_4px_20px_rgba(0,0,0,0.3)] relative z-10 ${
-        isActive
+        isEditing
+          ? "border-brand-chartreuse ring-2 ring-brand-chartreuse/60 cursor-pointer hover:scale-[1.02] transition-all"
+          : isActive
           ? "border-brand-chartreuse/50 ring-1 ring-brand-chartreuse/50"
           : "border-white/5"
       } ${isInteractive ? "cursor-pointer hover:border-white/20 transition-colors" : ""}`}
     >
+      {isEditing && (
+        <div className="bg-brand-chartreuse text-brand-black text-[10px] font-black uppercase tracking-wider text-center py-0.5">
+          Haz clic para editar pareja
+        </div>
+      )}
       {/* Equipo A */}
       <div className="flex justify-between items-center p-3 border-b border-white/5 bg-black/20">
         <span

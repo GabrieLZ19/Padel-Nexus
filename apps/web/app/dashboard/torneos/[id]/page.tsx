@@ -9,16 +9,16 @@ import FeedbackModal, {
   FeedbackModalProps,
 } from "../../../../components/ui/FeedbackModal";
 
-// Importación de los 9 pasos modularizados
+// Importación de los pasos modularizados
 import { Paso1Datos } from "@/components/torneos/wizard/Paso1Datos";
 import { Paso2Logos } from "@/components/torneos/wizard/Paso2Logos";
 import { Paso3Categorias } from "@/components/torneos/wizard/Paso3Categorias";
 import { Paso4Jugadores } from "@/components/torneos/wizard/Paso4Jugadores";
-import { Paso5Cierre } from "@/components/torneos/wizard/Paso6Cierre";
-import { Paso6Cuadros } from "@/components/torneos/wizard/Paso7Cuadros";
 import { Paso7Sedes } from "@/components/torneos/wizard/Paso5Sedes";
-import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso8Arbitraje";
-
+import { Paso6Fiscales } from "@/components/torneos/wizard/Paso6Fiscales";
+import { Paso5Cierre } from "@/components/torneos/wizard/Paso7Cierre";
+import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
+import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
 
 const WIZARD_STEPS = [
   { id: "edit", label: "1. Datos", desc: "Información" },
@@ -26,9 +26,10 @@ const WIZARD_STEPS = [
   { id: "categories", label: "3. Categorías", desc: "Clases" },
   { id: "players", label: "4. Jugadores", desc: "Inscripciones" },
   { id: "times", label: "5. Sedes", desc: "Canchas & Horas" },
-  { id: "cierre", label: "6. Cierre", desc: "Puntuación" },
-  { id: "draws", label: "7. Cuadros", desc: "Fixture" },
-  { id: "matches", label: "8. Arbitraje", desc: "Marcadores" },
+  { id: "fiscales", label: "6. Fiscales", desc: "Cuerpo Arbitral" },
+  { id: "cierre", label: "7. Cierre", desc: "Puntuación" },
+  { id: "draws", label: "8. Cuadros", desc: "Fixture" },
+  { id: "matches", label: "9. Resultados", desc: "Marcadores" },
 ];
 
 export default function TorneoDetallePage() {
@@ -118,13 +119,69 @@ export default function TorneoDetallePage() {
         steps={WIZARD_STEPS}
       />
 
+      {/* BANNER AVISO MODO SOLO LECTURA SI EL TORNEO ESTÁ EN CURSO O FINALIZADO */}
+      {(torneo.estado === "En curso" || torneo.estado === "Finalizado") && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center gap-3 text-amber-300 text-xs font-semibold my-2">
+          <div className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+          <span>
+            <strong>Torneo {torneo.estado.toUpperCase()}:</strong> Los pasos de
+            configuración inicial (Paso 1 a 6) se encuentran bloqueados en modo
+            lectura. Solo podés modificar los cuadros (Paso 8) y cargar
+            resultados de los partidos (Paso 9).
+          </span>
+        </div>
+      )}
+
       {/* RENDERIZADO DINÁMICO DE PASOS */}
       <div className="pt-4">
-        {activeTab === "edit" && <Paso1Datos {...commonProps} />}
-        {activeTab === "logos" && <Paso2Logos {...commonProps} />}
-        {activeTab === "categories" && <Paso3Categorias {...commonProps} />}
+        {activeTab === "edit" && (
+          <Paso1Datos
+            {...commonProps}
+            readOnly={
+              torneo.estado === "En curso" || torneo.estado === "Finalizado"
+            }
+          />
+        )}
+        {activeTab === "logos" && (
+          <Paso2Logos
+            {...commonProps}
+            readOnly={
+              torneo.estado === "En curso" || torneo.estado === "Finalizado"
+            }
+          />
+        )}
+        {activeTab === "categories" && (
+          <Paso3Categorias
+            {...commonProps}
+            readOnly={
+              torneo.estado === "En curso" || torneo.estado === "Finalizado"
+            }
+          />
+        )}
         {activeTab === "players" && (
-          <Paso4Jugadores {...commonProps} inscripciones={inscripciones} />
+          <Paso4Jugadores
+            {...commonProps}
+            inscripciones={inscripciones}
+            readOnly={
+              torneo.estado === "En curso" || torneo.estado === "Finalizado"
+            }
+          />
+        )}
+        {activeTab === "times" && (
+          <Paso7Sedes
+            {...commonProps}
+            readOnly={
+              torneo.estado === "En curso" || torneo.estado === "Finalizado"
+            }
+          />
+        )}
+        {activeTab === "fiscales" && (
+          <Paso6Fiscales
+            {...commonProps}
+            readOnly={
+              torneo.estado === "En curso" || torneo.estado === "Finalizado"
+            }
+          />
         )}
         {activeTab === "cierre" && (
           <Paso5Cierre {...commonProps} inscripciones={inscripciones} />
@@ -136,12 +193,10 @@ export default function TorneoDetallePage() {
             partidos={partidos}
           />
         )}
-        {activeTab === "times" && <Paso7Sedes {...commonProps} />}
         {activeTab === "matches" && (
-          <Paso8Arbitraje {...commonProps} partidos={partidos} />
+          <Paso8Arbitraje {...commonProps} torneoId={id} partidos={partidos} />
         )}
       </div>
-
 
       <FeedbackModal {...feedbackModal} />
     </div>

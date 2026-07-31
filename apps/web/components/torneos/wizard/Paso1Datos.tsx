@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { TorneosService } from "@/utils/services/torneos";
 import { ClubesService } from "@/utils/services/clubes";
+import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
 import { Torneo, Club } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { Calendar, Layers, Trophy, Settings2, Gift } from "lucide-react";
@@ -14,6 +15,7 @@ interface Paso1DatosProps {
   setFeedbackModal: (modal: any) => void;
   triggerRefresh: () => void;
   setActiveTab: (tab: string) => void;
+  readOnly?: boolean;
 }
 
 export const Paso1Datos = ({
@@ -22,6 +24,7 @@ export const Paso1Datos = ({
   setFeedbackModal,
   triggerRefresh,
   setActiveTab,
+  readOnly = false,
 }: Paso1DatosProps) => {
   const profile = useProfileStore((s) => s.profile);
   const userRole = (profile?.rol || "admin") as RolUsuario;
@@ -30,7 +33,11 @@ export const Paso1Datos = ({
   const [editNombre, setEditNombre] = useState(torneo.nombre || "");
   const [editSede, setEditSede] = useState(torneo.club_id || "");
   const [editAlcance, setEditAlcance] = useState<string>(torneo.alcance || "Provincial");
-  const [editAsociacion, setEditAsociacion] = useState<string>((torneo as any).asociacion || "FAP");
+  const [editAsociacion, setEditAsociacion] = useState<string>(
+    (torneo as any).reglamento || (torneo as any).asociacion || "FAP",
+  );
+  const [editAsociacionId, setEditAsociacionId] = useState<string>((torneo as any).asociacion_id || "");
+  const [asociacionesList, setAsociacionesList] = useState<Asociacion[]>([]);
   const [editFormato, setEditFormato] = useState<string>((torneo as any).formato || "Zonas + Llaves");
 
   // Fechas
@@ -68,6 +75,14 @@ export const Paso1Datos = ({
     torneo.premio_3 || "",
   );
 
+  // Carnet Federativo
+  const [requiereCarnet, setRequiereCarnet] = useState<boolean>(
+    Boolean((torneo as any).requiere_carnet_federativo),
+  );
+  const [montoCarnet, setMontoCarnet] = useState<string>(
+    (torneo as any).monto_carnet ? String((torneo as any).monto_carnet) : "0",
+  );
+
   // Canchas y Clubes
   const [clubs, setClubs] = useState<Club[]>([]);
   const [canchasClub, setCanchasClub] = useState<any[]>([]);
@@ -76,11 +91,15 @@ export const Paso1Datos = ({
 
   useEffect(() => {
     let isMounted = true;
-    ClubesService.getAll()
-      .then((res) => {
-        if (isMounted) setClubs(res.data || []);
-      })
-      .catch((err) => console.error("Error al cargar clubes:", err));
+    Promise.all([
+      ClubesService.getAll().catch(() => ({ data: [], total: 0 })),
+      AsociacionesService.getAll().catch(() => []),
+    ]).then(([clubesRes, asocsRes]) => {
+      if (isMounted) {
+        setClubs(clubesRes.data || []);
+        setAsociacionesList(asocsRes || []);
+      }
+    });
 
     return () => {
       isMounted = false;
@@ -162,7 +181,8 @@ export const Paso1Datos = ({
         cupos_maximos: Number(editCupos),
         canchas_disponibles: selectedCanchas.length,
         alcance: editAlcance,
-        asociacion: editAsociacion,
+        reglamento: editAsociacion,
+        asociacion_id: editAsociacionId || null,
         formato: editFormato,
       } as any);
 
@@ -190,7 +210,7 @@ export const Paso1Datos = ({
   };
 
   return (
-    <div className="bg-[#111111] border border-white/5 rounded-3xl p-6 space-y-8">
+    <div className={`bg-[#111111] border border-white/5 rounded-3xl p-6 space-y-8 ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
       <div>
         <h3 className="text-lg font-bold text-white uppercase tracking-wider">
           Paso 1: Información General y Configuración
@@ -211,22 +231,23 @@ export const Paso1Datos = ({
             value={editNombre}
             onChange={(e) => setEditNombre(e.target.value)}
             className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none"
-            placeholder="Ej: Torneo Nacional FAP"
+            placeholder="Ej: Torneo FAP 5ª Categoría"
           />
         </div>
         <div>
           <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
-            Club Organizador / Sede Principal
+            Centro de Cómputos (Fijo)
           </label>
-          <CustomDropdown
-            value={editSede}
-            onChange={setEditSede}
-            options={clubs.map((c) => ({
-              value: String(c.id),
-              label: c.nombre,
-            }))}
-            placeholder="Seleccionar Club..."
-          />
+          <div className="w-full bg-brand-input/50 border border-white/5 text-gray-300 p-3.5 rounded-xl font-bold text-sm cursor-not-allowed flex items-center justify-between">
+            <span>
+              {clubs.find((c) => String(c.id) === String(editSede))?.nombre ||
+                torneo.clubes?.nombre ||
+                "Centro de Cómputos Oficial"}
+            </span>
+            <span className="text-[10px] bg-brand-chartreuse/10 text-brand-chartreuse px-2.5 py-1 rounded-full uppercase tracking-wider font-extrabold">
+              No modificable
+            </span>
+          </div>
         </div>
         <div>
           <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
@@ -253,7 +274,7 @@ export const Paso1Datos = ({
         </div>
         <div>
           <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
-            Reglamento / Asociación
+            Reglamento Oficial de Competencia
           </label>
           <CustomDropdown
             value={editAsociacion}
@@ -266,7 +287,27 @@ export const Paso1Datos = ({
             placeholder="Seleccionar Reglamento..."
           />
           <p className="text-[10px] text-gray-500 mt-1.5">
-            El reglamento seleccionado determinará las categorías y niveles disponibles en el Paso 3.
+            El reglamento determina los cortes de edad, categorías y siembras del Paso 3.
+          </p>
+        </div>
+
+        <div>
+          <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
+            Asociación Organizadora
+          </label>
+          <CustomDropdown
+            value={editAsociacionId}
+            onChange={setEditAsociacionId}
+            options={asociacionesList
+              .filter((a) => a.estado === "activo" || (a.estado !== "inactivo" && a.estado !== "pendiente"))
+              .map((a) => ({
+                value: a.id,
+                label: `${a.nombre} (${a.sigla || "SF"}) — ${a.provincia}`,
+              }))}
+            placeholder="-- Seleccionar Asociación del Padrón --"
+          />
+          <p className="text-[10px] text-gray-500 mt-1.5">
+            Asociación del padrón oficial encargada del torneo.
           </p>
         </div>
         <div>
@@ -276,10 +317,23 @@ export const Paso1Datos = ({
           <CustomDropdown
             value={editFormato}
             onChange={setEditFormato}
-            options={[
-              { value: "Zonas + Llaves", label: "Zonas + Llaves (FAP estándar)" },
-              { value: "Eliminatoria Directa", label: "Eliminatoria Directa (sin fase de grupos)" },
-            ]}
+            options={
+              (userRole === "admin_club" || userRole === "admin")
+                ? [
+                    { value: "Zonas + Llaves", label: "Zonas + Llaves" },
+                    { value: "Eliminatoria Directa", label: "Eliminatoria Directa (sin fase de grupos)" },
+                    { value: "Todos contra Todos", label: "Todos contra Todos (Round Robin)" },
+                    { value: "Super 8", label: "Super 8" },
+                    { value: "Super 12", label: "Super 12" },
+                    { value: "Americano", label: "Americano" },
+                    { value: "Suma 8", label: "Suma 8" },
+                    { value: "Suma 12", label: "Suma 12" },
+                  ]
+                : [
+                    { value: "Zonas + Llaves", label: "Zonas + Llaves" },
+                    { value: "Eliminatoria Directa", label: "Eliminatoria Directa (sin fase de grupos)" },
+                  ]
+            }
             placeholder="Seleccionar Formato..."
           />
           <p className="text-[10px] text-gray-500 mt-1.5">
@@ -370,67 +424,84 @@ export const Paso1Datos = ({
                 />
               </div>
 
-              <div>
+              {!esGratis && (
+                <div>
+                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">
+                    Precio por Pareja / Jugador ($)
+                  </label>
+                  <input
+                    type="number"
+                    value={editPrecio}
+                    onChange={(e) => setEditPrecio(e.target.value)}
+                    className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none text-sm"
+                    placeholder="0"
+                  />
+                </div>
+              )}
+                <div>
                 <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">
-                  Cupos Máximos Reglamentarios
+                  Cupos Máximos (Parejas)
                 </label>
                 <CustomDropdown
                   value={editCupos}
                   onChange={setEditCupos}
-                  options={CUPOS_ESTANDAR_FAP.map((c) => ({
-                    value: c.value,
-                    label: c.label,
-                  }))}
-                  placeholder="Seleccionar Cupo Recomendado..."
+                  options={[
+                    { value: "6", label: "6 parejas" },
+                    { value: "8", label: "8 parejas" },
+                    { value: "12", label: "12 parejas" },
+                    { value: "16", label: "16 parejas" },
+                    { value: "24", label: "24 parejas" },
+                    { value: "32", label: "32 parejas" },
+                    { value: "64", label: "64 parejas" },
+                  ]}
+                  placeholder="Seleccionar Máximo de Parejas..."
                 />
-                <p className="text-[10px] text-gray-400 mt-1 font-medium">
-                  Garantiza cuadros limpios sin BYEs impares y cruces justos.
-                </p>
               </div>
             </div>
           </div>
 
           <div className="flex-1 bg-black/20 p-5 rounded-2xl border border-white/5 space-y-5">
             <h5 className="text-xs text-white font-bold uppercase tracking-wider flex items-center gap-2 border-b border-white/10 pb-3">
-              <Gift className="size-4 text-brand-chartreuse" /> Recompensas a
-              Repartir
+              <Gift className="size-4 text-brand-chartreuse" /> Premiación
             </h5>
 
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] text-yellow-500/80 font-black uppercase tracking-wider block mb-2">
-                  1er Puesto (Campeón)
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                  Premio 1° Puesto (Campeones)
                 </label>
                 <input
                   type="text"
                   value={premioPrimero}
                   onChange={(e) => setPremioPrimero(e.target.value)}
-                  className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-yellow-500/50 outline-none"
-                  placeholder="Ej: $50.000 + Paleta + Trofeo"
+                  className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none text-sm"
+                  placeholder="Ej: Trofeos + $100.000 + Paletas"
                 />
               </div>
+
               <div>
-                <label className="text-[10px] text-gray-400 font-black uppercase tracking-wider block mb-2">
-                  2do Puesto (Subcampeón)
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                  Premio 2° Puesto (Subcampeones)
                 </label>
                 <input
                   type="text"
                   value={premioSegundo}
                   onChange={(e) => setPremioSegundo(e.target.value)}
-                  className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-gray-400/50 outline-none"
-                  placeholder="Ej: $20.000 + Indumentaria"
+                  className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none text-sm"
+                  placeholder="Ej: Trofeos + $50.000"
                 />
               </div>
+
               <div>
-                <label className="text-[10px] text-orange-400/80 font-black uppercase tracking-wider block mb-2">
-                  3er Puesto
+                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                  Premio 3° Puesto / Menciones
                 </label>
                 <input
                   type="text"
                   value={premioTercero}
                   onChange={(e) => setPremioTercero(e.target.value)}
-                  className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-orange-400/50 outline-none"
-                  placeholder="Ej: Medalla + Grip"
+                  className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none text-sm"
+                  placeholder="Ej: Trofeos / Menciones"
                 />
               </div>
             </div>
@@ -438,61 +509,13 @@ export const Paso1Datos = ({
         </div>
       </div>
 
-      {/* DISPONIBILIDAD DE CANCHAS */}
-      {editSede && (
-        <div className="border-t border-white/5 pt-6 space-y-4">
-          <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-            <Layers className="size-4" /> Canchas Disponibles de la Sede (
-            {selectedCanchas.length} seleccionadas)
-          </h4>
-          {canchasClub.length === 0 ? (
-            <p className="text-xs text-gray-500">
-              Este club no tiene canchas registradas.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {canchasClub.map((cancha) => {
-                const isSelected = selectedCanchas.includes(String(cancha.id));
-                return (
-                  <div
-                    key={cancha.id}
-                    onClick={() => handleToggleCancha(String(cancha.id))}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                      isSelected
-                        ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white"
-                        : "bg-black/20 border-white/5 text-gray-400 hover:border-white/10"
-                    }`}
-                  >
-                    <div>
-                      <p className="font-extrabold text-sm text-white">
-                        {cancha.nombre || "Sin Nombre"}
-                      </p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">
-                        {cancha.tipo_suelo || "Suelo no especificado"} ·{" "}
-                        {cancha.techada ? "Techada" : "Al aire libre"}
-                      </p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      readOnly
-                      className="size-5 rounded border-white/10 bg-black/50 text-brand-chartreuse focus:ring-brand-chartreuse accent-brand-chartreuse cursor-pointer transition-all"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
       <div className="flex justify-between items-center pt-4 border-t border-white/5">
         <button
           onClick={handleSaveStep1}
-          disabled={guardandoDatos || !editNombre || !editFecha || !editSede}
+          disabled={readOnly || guardandoDatos || !editNombre || !editFecha || !editSede}
           className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
         >
-          {guardandoDatos ? "Guardando..." : "Guardar Cambios"}
+          {readOnly ? "Modo Lectura (En curso)" : guardandoDatos ? "Guardando..." : "Guardar Cambios"}
         </button>
         <button
           onClick={() => setActiveTab("logos")}

@@ -9,6 +9,7 @@ import {
   Trash2,
   Trophy,
   LayoutDashboard,
+  Printer,
 } from "lucide-react";
 import { TorneosService } from "../../../utils/services/torneos";
 import { ClubesService } from "../../../utils/services/clubes";
@@ -381,7 +382,9 @@ export default function TorneosPage() {
                       <td className="py-4 px-6 text-center">
                         <div className="inline-flex items-center justify-center bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
                           <span className="text-[14px] font-black text-white">
-                            {t.cupos_actuales || 0}
+                            {Array.isArray((t as any).inscripciones)
+                              ? (t as any).inscripciones.length
+                              : t.cupos_actuales || 0}
                           </span>
                           <span className="text-[13px] text-gray-500 font-bold ml-1">
                             / {t.cupos_maximos || 32}
@@ -421,6 +424,21 @@ export default function TorneosPage() {
                       <td className="py-4 px-8 text-right">
                         <div className="flex justify-end gap-2 items-center">
                           {/* 3. Nuevo Botón de Centro de Control */}
+                          <button
+                            onClick={async () => {
+                              try {
+                                const partidos = await TorneosService.getPartidos(t.id);
+                                const { generarPdfGrillaPartidos } = await import("@/utils/grillaPdf");
+                                generarPdfGrillaPartidos(t, partidos || []);
+                              } catch (err) {
+                                console.error("Error al imprimir PDF:", err);
+                              }
+                            }}
+                            className="p-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-lg transition-colors"
+                            title="Imprimir Zonas y Grilla (PDF Rápido)"
+                          >
+                            <Printer className="size-4" />
+                          </button>
                           <button
                             onClick={() =>
                               router.push(`/dashboard/torneos/${t.id}`)
