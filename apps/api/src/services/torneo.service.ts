@@ -359,7 +359,9 @@ export class TorneoService {
       .from("partidos")
       .select("*")
       .eq("torneo_id", id)
-      .order("orden", { ascending: true });
+      .order("ronda", { ascending: true })
+      .order("orden", { ascending: true })
+      .order("id", { ascending: true });
 
     if (partidosError) throw new Error(partidosError.message);
 
