@@ -17,6 +17,7 @@ import { Paso5Cierre } from "@/components/torneos/wizard/Paso7Cierre";
 import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
 import { Paso7Sedes } from "@/components/torneos/wizard/Paso5Sedes";
 import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
+import { TournamentWizardNav } from "@/components/torneos/TournamentWizardNav";
 
 const WIZARD_STEPS = [
   { id: "edit", label: "1. Datos", desc: "Información" },
@@ -103,8 +104,8 @@ export default function ClubTorneoDetallePage() {
   };
 
   return (
-    <div className="space-y-8">
-      {/* HEADER DETALLE */}
+    <div className="w-full max-w-[1600px] mx-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+      {/* HEADER NAVEGACIÓN */}
       <div className="flex items-center gap-4">
         <button
           onClick={() => router.push("/club/torneos")}
@@ -128,67 +129,40 @@ export default function ClubTorneoDetallePage() {
         </div>
       </div>
 
-      {/* STEPPER NAVEGABLE */}
-      <div className="bg-brand-card border border-brand-white/5 p-4 sm:p-6 rounded-3xl overflow-x-auto shadow-xl">
-        <div className="flex items-center justify-between min-w-200 gap-2">
-          {WIZARD_STEPS.map((step, idx) => {
-            const isActive = activeTab === step.id;
-            return (
-              <React.Fragment key={step.id}>
-                <button
-                  onClick={() => setActiveTab(step.id)}
-                  className={`flex flex-col items-center gap-1.5 p-2.5 rounded-2xl transition-all cursor-pointer text-center shrink-0 ${
-                    isActive
-                      ? "bg-brand-chartreuse text-brand-black font-extrabold shadow-[0_0_15px_rgba(204,255,0,0.3)]"
-                      : "hover:bg-brand-white/5 text-gray-400"
-                  }`}
-                >
-                  <span
-                    className={`text-[10px] uppercase font-black tracking-wider ${
-                      isActive ? "text-brand-black" : "text-gray-400"
-                    }`}
-                  >
-                    {step.label}
-                  </span>
-                  <span
-                    className={`text-[11px] ${
-                      isActive ? "text-brand-black font-bold" : "text-gray-500"
-                    }`}
-                  >
-                    {step.desc}
-                  </span>
-                </button>
-                {idx < WIZARD_STEPS.length - 1 && (
-                  <div className="h-0.5 w-6 min-w-4 shrink-0 bg-white/5" />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* CONTENIDO DINÁMICO */}
-      <div className="bg-brand-card border border-brand-white/5 p-6 sm:p-8 rounded-4xl shadow-2xl">
-        {activeTab === "edit" && <Paso1Datos {...commonProps} />}
-        {activeTab === "logos" && <Paso2Logos {...commonProps} />}
-        {activeTab === "categories" && <Paso3Categorias {...commonProps} />}
-        {activeTab === "players" && (
-          <Paso4Jugadores {...commonProps} inscripciones={inscripciones} />
-        )}
-        {activeTab === "cierre" && (
-          <Paso5Cierre {...commonProps} inscripciones={inscripciones} />
-        )}
-        {activeTab === "draws" && (
-          <Paso6Cuadros
-            {...commonProps}
-            inscripciones={inscripciones}
-            partidos={partidos}
+      {/* GRID DE LAYOUT NATIVO DE NAVEGACIÓN Y CONTENIDO */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+        {/* NAVEGADOR DE PASOS LATERAL / MOBILE */}
+        <div className="lg:col-span-1 lg:sticky lg:top-6 self-start z-30">
+          <TournamentWizardNav
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            torneoEstado={torneo.estado}
           />
-        )}
-        {activeTab === "times" && <Paso7Sedes {...commonProps} />}
-        {activeTab === "matches" && (
-          <Paso8Arbitraje {...commonProps} partidos={partidos} />
-        )}
+        </div>
+
+        {/* CONTENIDO DINÁMICO DEL PASO ACTIVO */}
+        <div className="lg:col-span-3">
+          {activeTab === "edit" && <Paso1Datos {...commonProps} />}
+          {activeTab === "logos" && <Paso2Logos {...commonProps} />}
+          {activeTab === "categories" && <Paso3Categorias {...commonProps} />}
+          {activeTab === "players" && (
+            <Paso4Jugadores {...commonProps} inscripciones={inscripciones} />
+          )}
+          {activeTab === "times" && <Paso7Sedes {...commonProps} />}
+          {activeTab === "cierre" && (
+            <Paso5Cierre {...commonProps} inscripciones={inscripciones} />
+          )}
+          {activeTab === "draws" && (
+            <Paso6Cuadros
+              {...commonProps}
+              inscripciones={inscripciones}
+              partidos={partidos}
+            />
+          )}
+          {activeTab === "matches" && (
+            <Paso8Arbitraje {...commonProps} partidos={partidos} />
+          )}
+        </div>
       </div>
 
       <FeedbackModal {...feedbackModal} />

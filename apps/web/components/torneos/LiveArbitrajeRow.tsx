@@ -88,23 +88,150 @@ export const LiveArbitrajeRow = ({
   );
   const [ganadorWo, setGanadorWo] = useState<"A" | "B">("A");
 
-  // Cancha y hora asignada
+  // Helper para nombre completo de la cancha
+  const getCanchaFullName = (d: any) => {
+    const club = d.clubes?.nombre || d.club_nombre || "";
+    const cancha =
+      d.canchas?.nombre ||
+      d.cancha_nombre ||
+      (d.cancha_id ? `Cancha ${d.cancha_id.slice(0, 4)}` : null);
+    if (!cancha) return "";
+    return club ? `${club} - ${cancha}` : cancha;
+  };
+
+  // Cancha, fecha y hora asignadas
   const [canchaEdit, setCanchaEdit] = useState<string>(
-    partido.cancha_asignada || "Cancha 1",
+    partido.cancha_asignada || "",
   );
-  const [horaEdit, setHoraEdit] = useState<string>(() => {
-    if ((partido as any).fecha_partido) {
-      try {
-        const d = new Date((partido as any).fecha_partido);
-        const hh = String(d.getHours()).padStart(2, "0");
-        const mm = String(d.getMinutes()).padStart(2, "0");
-        return `${hh}:${mm}:00`;
-      } catch {
-        return "09:00:00";
-      }
+
+  const getInitialFechaHora = (isoStr?: string | null) => {
+    if (!isoStr) return { fecha: "", hora: "" };
+    try {
+      const d = new Date(isoStr);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mins = String(d.getMinutes()).padStart(2, "0");
+      return {
+        fecha: `${yyyy}-${mm}-${dd}`,
+        hora: `${hh}:${mins}:00`,
+      };
+    } catch {
+      return { fecha: "", hora: "" };
     }
-    return "09:00:00";
+  };
+
+  const initialFH = getInitialFechaHora((partido as any).fecha_partido);
+  const [fechaEdit, setFechaEdit] = useState<string>(initialFH.fecha);
+  const [horaEdit, setHoraEdit] = useState<string>(initialFH.hora);
+
+  // Calcular slots de cancha + fecha + hora ocupados por OTROS partidos
+  const occupiedSlots = new Set<string>();
+  todosLosPartidos.forEach((p) => {
+    if (p.id === partido.id) return;
+    if (p.cancha_asignada && (p as any).fecha_partido) {
+      try {
+        const d = new Date((p as any).fecha_partido);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mins = String(d.getMinutes()).padStart(2, "0");
+        const fStr = `${yyyy}-${mm}-${dd}`;
+        const hStr = `${hh}:${mins}:00`;
+        occupiedSlots.add(`${p.cancha_asignada}|${fStr}|${hStr}`);
+      } catch {}
+    }
   });
+
+  // Opciones de Cancha
+  const mapCanchas = new Set<string>();
+  disponibilidades.forEach((d) => {
+    const name = getCanchaFullName(d);
+    if (name) mapCanchas.add(name);
+  });
+  const canchaOptions = Array.from(mapCanchas).map((c) => ({
+    value: c,
+    label: c,
+  }));
+
+  // Opciones de Fecha para la cancha seleccionada
+  const mapFechas = new Set<string>();
+  disponibilidades.forEach((d) => {
+    const name = getCanchaFullName(d);
+    if (!canchaEdit || name === canchaEdit) {
+      if (d.fecha) mapFechas.add(d.fecha);
+    }
+  });
+
+  const formatDateLabel = (fStr: string) => {
+    try {
+      const [yyyy, mm, dd] = fStr.split("-");
+      const dateObj = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+      const dayName = dateObj.toLocaleDateString("es-AR", { weekday: "short" });
+      const capDay =
+        dayName.charAt(0).toUpperCase() + dayName.slice(1).replace(".", "");
+      return `${capDay} ${dd}/${mm}/${yyyy}`;
+    } catch {
+      return fStr;
+    }
+  };
+
+  const fechaOptions = Array.from(mapFechas)
+    .sort()
+    .map((f) => ({
+      value: f,
+      label: formatDateLabel(f),
+    }));
+
+  // Opciones de Hora (filtrando los horarios ocupados por otros partidos)
+  const mapHoras = new Set<string>();
+  disponibilidades.forEach((d) => {
+    const name = getCanchaFullName(d);
+    if (canchaEdit && name !== canchaEdit) return;
+    if (fechaEdit && d.fecha !== fechaEdit) return;
+    if (!d.hora_inicio) return;
+
+    const key = `${canchaEdit || name}|${fechaEdit || d.fecha}|${d.hora_inicio}`;
+    if (!occupiedSlots.has(key)) {
+      mapHoras.add(d.hora_inicio);
+    }
+  });
+
+  const horaOptions = Array.from(mapHoras)
+    .sort()
+    .map((h) => ({
+      value: h,
+      label: `${h.slice(0, 5)} hs`,
+    }));
+
+  const handleSelectDateTimeCourt = async (
+    newCancha: string,
+    newFecha: string,
+    newHora: string,
+  ) => {
+    setCanchaEdit(newCancha);
+    setFechaEdit(newFecha);
+    setHoraEdit(newHora);
+
+    try {
+      let isoStr: string | null = null;
+      if (newFecha && newHora) {
+        const [yyyy, mm, dd] = newFecha.split("-").map(Number);
+        const [hh, mins] = newHora.split(":").map(Number);
+        const d = new Date(yyyy, mm - 1, dd, hh, mins, 0);
+        isoStr = d.toISOString();
+      }
+      await TorneosService.actualizarPartido(partido.id, {
+        cancha_asignada: newCancha || null,
+        fecha_partido: isoStr,
+      });
+      onPartidoUpdated?.();
+    } catch (e) {
+      console.error("Error al actualizar partido:", e);
+    }
+  };
 
   const cleanName = (name?: string | null) => {
     if (!name) return "";
@@ -321,124 +448,50 @@ export const LiveArbitrajeRow = ({
           <span className="text-xs text-brand-chartreuse font-extrabold uppercase tracking-widest bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-3 py-1 rounded-full">
             {partido.ronda}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Dropdown Cancha */}
             <CustomDropdown
               value={canchaEdit}
-              onChange={async (newCancha) => {
-                // Verificar si esta cancha y el horario actual estan ocupados por otro partido
-                const conflicto = todosLosPartidos.find((p) => {
-                  if (p.id === partido.id) return false;
-                  const pCancha = p.cancha_asignada;
-                  let pHora = "";
-                  if ((p as any).fecha_partido) {
-                    const d = new Date((p as any).fecha_partido);
-                    pHora = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:00`;
-                  }
-                  return pCancha === newCancha && pHora === horaEdit;
-                });
-
-                if (conflicto) {
-                  onError(
-                    `La cancha "${newCancha}" ya está asignada al mismo horario (${horaEdit.slice(0, 5)} hs) en otro partido.`,
-                  );
-                  return;
-                }
-
-                setCanchaEdit(newCancha);
-                try {
-                  await TorneosService.actualizarPartido(partido.id, {
-                    cancha_asignada: newCancha,
-                  });
-                  onPartidoUpdated?.();
-                } catch (e) {
-                  console.error("Error al actualizar cancha del partido:", e);
-                }
+              onChange={(val) => {
+                handleSelectDateTimeCourt(val, fechaEdit, horaEdit);
               }}
-              options={(() => {
-                const mapCanchas = new Set<string>();
-                disponibilidades.forEach((d) => {
-                  const club = d.clubes?.nombre || "";
-                  const cancha =
-                    d.canchas?.nombre ||
-                    d.cancha_nombre ||
-                    (d.cancha_id ? `Cancha ${d.cancha_id.slice(0, 4)}` : null);
-                  if (cancha) {
-                    mapCanchas.add(club ? `${club} - ${cancha}` : cancha);
-                  }
-                });
-                if (mapCanchas.size === 0) {
-                  [
-                    "Cancha 1",
-                    "Cancha 2",
-                    "Cancha 3",
-                    "Cancha Central",
-                  ].forEach((c) => mapCanchas.add(c));
-                }
-                return Array.from(mapCanchas).map((c) => ({
-                  value: c,
-                  label: c,
-                }));
-              })()}
-              placeholder="Elegir Cancha..."
+              options={canchaOptions}
+              placeholder={
+                canchaOptions.length === 0
+                  ? "Sin canchas configuradas"
+                  : "Elegir Cancha..."
+              }
+              disabled={canchaOptions.length === 0}
             />
+
+            {/* Dropdown Fecha */}
+            <CustomDropdown
+              value={fechaEdit}
+              onChange={(val) => {
+                handleSelectDateTimeCourt(canchaEdit, val, horaEdit);
+              }}
+              options={fechaOptions}
+              placeholder={
+                fechaOptions.length === 0
+                  ? "Sin fechas configuradas"
+                  : "Elegir Fecha..."
+              }
+              disabled={fechaOptions.length === 0 || !canchaEdit}
+            />
+
+            {/* Dropdown Hora */}
             <CustomDropdown
               value={horaEdit}
-              onChange={async (newHora) => {
-                // Verificar conflicto de cancha y horario en otro partido
-                const conflicto = todosLosPartidos.find((p) => {
-                  if (p.id === partido.id) return false;
-                  const pCancha = p.cancha_asignada;
-                  let pHora = "";
-                  if ((p as any).fecha_partido) {
-                    const d = new Date((p as any).fecha_partido);
-                    pHora = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:00`;
-                  }
-                  return pCancha === canchaEdit && pHora === newHora;
-                });
-
-                if (conflicto) {
-                  onError(
-                    `El horario (${newHora.slice(0, 5)} hs) ya está ocupado en la cancha "${canchaEdit}" por otro partido.`,
-                  );
-                  return;
-                }
-
-                setHoraEdit(newHora);
-                try {
-                  const baseDate = partido.fecha_partido
-                    ? new Date(partido.fecha_partido)
-                    : new Date();
-                  const [h, m] = newHora.split(":").map(Number);
-                  baseDate.setHours(h || 0, m || 0, 0, 0);
-                  await TorneosService.actualizarPartido(partido.id, {
-                    fecha_partido: baseDate.toISOString(),
-                  });
-                  onPartidoUpdated?.();
-                } catch (e) {
-                  console.error("Error al actualizar hora del partido:", e);
-                }
+              onChange={(val) => {
+                handleSelectDateTimeCourt(canchaEdit, fechaEdit, val);
               }}
-              options={(() => {
-                const mapHoras = new Set<string>();
-                disponibilidades.forEach((d) => {
-                  if (d.hora_inicio) mapHoras.add(d.hora_inicio);
-                });
-                if (mapHoras.size === 0) {
-                  [
-                    "09:00:00",
-                    "10:30:00",
-                    "12:00:00",
-                    "14:00:00",
-                    "16:00:00",
-                    "18:00:00",
-                    "20:00:00",
-                  ].forEach((h) => mapHoras.add(h));
-                }
-                return Array.from(mapHoras)
-                  .sort()
-                  .map((h) => ({ value: h, label: `${h.slice(0, 5)} hs` }));
-              })()}
-              placeholder="Elegir Hora..."
+              options={horaOptions}
+              placeholder={
+                horaOptions.length === 0
+                  ? "Sin horarios disponibles"
+                  : "Elegir Hora..."
+              }
+              disabled={horaOptions.length === 0 || !canchaEdit || !fechaEdit}
             />
           </div>
         </div>

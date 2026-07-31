@@ -19,6 +19,7 @@ import { Paso6Fiscales } from "@/components/torneos/wizard/Paso6Fiscales";
 import { Paso5Cierre } from "@/components/torneos/wizard/Paso7Cierre";
 import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
 import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
+import { TournamentWizardNav } from "@/components/torneos/TournamentWizardNav";
 
 const WIZARD_STEPS = [
   { id: "edit", label: "1. Datos", desc: "Información" },
@@ -112,90 +113,97 @@ export default function TorneoDetallePage() {
         onBack={() => router.push("/dashboard/torneos")}
       />
 
-      {/* TABS WIZARD */}
-      <WizardTabs
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        steps={WIZARD_STEPS}
-      />
-
       {/* BANNER AVISO MODO SOLO LECTURA SI EL TORNEO ESTÁ EN CURSO O FINALIZADO */}
       {(torneo.estado === "En curso" || torneo.estado === "Finalizado") && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center gap-3 text-amber-300 text-xs font-semibold my-2">
-          <div className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
-          <span>
-            <strong>Torneo {torneo.estado.toUpperCase()}:</strong> Los pasos de
-            configuración inicial (Paso 1 a 6) se encuentran bloqueados en modo
-            lectura. Solo podés modificar los cuadros (Paso 8) y cargar
-            resultados de los partidos (Paso 9).
-          </span>
+        <div className="bg-black/20 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs my-1 shadow-sm">
+          <div className="flex items-center gap-2.5 text-gray-400">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-chartreuse opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-chartreuse"></span>
+            </span>
+            <span>
+              <strong className="text-white">Modo Lectura ({torneo.estado}):</strong> Los pasos 1 a 6 están bloqueados. Los cuadros (Paso 8) y la carga de resultados (Paso 9) permanecen habilitados.
+            </span>
+          </div>
         </div>
       )}
 
-      {/* RENDERIZADO DINÁMICO DE PASOS */}
-      <div className="pt-4">
-        {activeTab === "edit" && (
-          <Paso1Datos
-            {...commonProps}
-            readOnly={
-              torneo.estado === "En curso" || torneo.estado === "Finalizado"
-            }
+      {/* GRID DE LAYOUT NATIVO DE NAVEGACIÓN Y CONTENIDO */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+        {/* NAVEGADOR DE PASOS LATERAL / MOBILE */}
+        <div className="lg:col-span-1 order-1 lg:order-2 lg:sticky lg:top-6 self-start z-30">
+          <TournamentWizardNav
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            torneoEstado={torneo.estado}
           />
-        )}
-        {activeTab === "logos" && (
-          <Paso2Logos
-            {...commonProps}
-            readOnly={
-              torneo.estado === "En curso" || torneo.estado === "Finalizado"
-            }
-          />
-        )}
-        {activeTab === "categories" && (
-          <Paso3Categorias
-            {...commonProps}
-            readOnly={
-              torneo.estado === "En curso" || torneo.estado === "Finalizado"
-            }
-          />
-        )}
-        {activeTab === "players" && (
-          <Paso4Jugadores
-            {...commonProps}
-            inscripciones={inscripciones}
-            readOnly={
-              torneo.estado === "En curso" || torneo.estado === "Finalizado"
-            }
-          />
-        )}
-        {activeTab === "times" && (
-          <Paso7Sedes
-            {...commonProps}
-            readOnly={
-              torneo.estado === "En curso" || torneo.estado === "Finalizado"
-            }
-          />
-        )}
-        {activeTab === "fiscales" && (
-          <Paso6Fiscales
-            {...commonProps}
-            readOnly={
-              torneo.estado === "En curso" || torneo.estado === "Finalizado"
-            }
-          />
-        )}
-        {activeTab === "cierre" && (
-          <Paso5Cierre {...commonProps} inscripciones={inscripciones} />
-        )}
-        {activeTab === "draws" && (
-          <Paso6Cuadros
-            {...commonProps}
-            inscripciones={inscripciones}
-            partidos={partidos}
-          />
-        )}
-        {activeTab === "matches" && (
-          <Paso8Arbitraje {...commonProps} torneoId={id} partidos={partidos} />
-        )}
+        </div>
+
+        {/* CONTENIDO DEL PASO ACTIVO */}
+        <div className="lg:col-span-3 order-2 lg:order-1">
+          {activeTab === "edit" && (
+            <Paso1Datos
+              {...commonProps}
+              readOnly={
+                torneo.estado === "En curso" || torneo.estado === "Finalizado"
+              }
+            />
+          )}
+          {activeTab === "logos" && (
+            <Paso2Logos
+              {...commonProps}
+              readOnly={
+                torneo.estado === "En curso" || torneo.estado === "Finalizado"
+              }
+            />
+          )}
+          {activeTab === "categories" && (
+            <Paso3Categorias
+              {...commonProps}
+              readOnly={
+                torneo.estado === "En curso" || torneo.estado === "Finalizado"
+              }
+            />
+          )}
+          {activeTab === "players" && (
+            <Paso4Jugadores
+              {...commonProps}
+              inscripciones={inscripciones}
+              readOnly={
+                torneo.estado === "En curso" || torneo.estado === "Finalizado"
+              }
+            />
+          )}
+          {activeTab === "times" && (
+            <Paso7Sedes
+              {...commonProps}
+              readOnly={
+                torneo.estado === "En curso" || torneo.estado === "Finalizado"
+              }
+            />
+          )}
+          {activeTab === "fiscales" && (
+            <Paso6Fiscales
+              {...commonProps}
+              readOnly={
+                torneo.estado === "En curso" || torneo.estado === "Finalizado"
+              }
+            />
+          )}
+          {activeTab === "cierre" && (
+            <Paso5Cierre {...commonProps} inscripciones={inscripciones} />
+          )}
+          {activeTab === "draws" && (
+            <Paso6Cuadros
+              {...commonProps}
+              inscripciones={inscripciones}
+              partidos={partidos}
+            />
+          )}
+          {activeTab === "matches" && (
+            <Paso8Arbitraje {...commonProps} torneoId={id} partidos={partidos} />
+          )}
+        </div>
       </div>
 
       <FeedbackModal {...feedbackModal} />

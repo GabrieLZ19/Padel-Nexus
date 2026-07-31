@@ -101,67 +101,69 @@ export const Paso8Arbitraje = ({
 
   return (
     <div className="space-y-6">
-      <div className="bg-brand-card rounded-3xl border border-white/5 p-6 shadow-xl">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div>
-            <h3 className="font-extrabold text-white text-xl mb-1">
-              Carga de Resultados
-            </h3>
-            <p className="text-gray-400 text-sm">
-              Suma los puntos de cada Partido. El sistema llevará la cuenta y
-              cuando finalices el partido, avanzará la llave.
-            </p>
+      {/* CARGA DE RESULTADOS DE PARTIDOS PENDIENTES */}
+      {!isReadOnly && partidosJugables.length > 0 && (
+        <div className="bg-brand-card rounded-3xl border border-white/5 p-6 shadow-xl space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h3 className="font-extrabold text-white text-xl mb-1">
+                Carga de Resultados
+              </h3>
+              <p className="text-gray-400 text-sm">
+                Suma los puntos de cada Partido. El sistema llevará la cuenta y
+                cuando finalices el partido, avanzará la llave.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setActiveTab("times")}
+                className="flex items-center justify-center gap-2 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse px-4 py-2.5 rounded-xl font-bold transition-all text-xs border border-brand-chartreuse/30 cursor-pointer shrink-0"
+              >
+                + Administrar Canchas en Paso 5 (Sedes)
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const { generarPdfGrillaPartidos } =
+                    await import("@/utils/grillaPdf");
+                  generarPdfGrillaPartidos({}, partidos);
+                }}
+                className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl font-bold transition-all text-xs border border-white/10 cursor-pointer shrink-0"
+              >
+                Imprimir Grilla (PDF)
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setActiveTab("times")}
-              className="flex items-center justify-center gap-2 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse px-4 py-2.5 rounded-xl font-bold transition-all text-xs border border-brand-chartreuse/30 cursor-pointer shrink-0"
-            >
-              + Administrar Canchas en Paso 5 (Sedes)
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                const { generarPdfGrillaPartidos } =
-                  await import("@/utils/grillaPdf");
-                generarPdfGrillaPartidos({}, partidos);
-              }}
-              className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl font-bold transition-all text-xs border border-white/10 cursor-pointer shrink-0"
-            >
-              Imprimir Grilla (PDF)
-            </button>
+          <div className="space-y-6">
+            {partidosJugables.map((partido) => (
+              <LiveArbitrajeRow
+                key={partido.id}
+                partido={partido}
+                torneo={torneo}
+                todosLosPartidos={partidos}
+                disponibilidades={disponibilidadesPaso5}
+                onSave={handleGuardarResultadoLive}
+                onPartidoUpdated={triggerRefresh}
+                isSaving={guardandoPartidoId === partido.id}
+                onError={showErrorModal}
+              />
+            ))}
           </div>
         </div>
+      )}
 
-        {!isReadOnly &&
-          (partidosJugables.length === 0 ? (
-            <div className="text-center p-8 border border-dashed border-white/10 rounded-2xl text-gray-500">
-              No hay partidos pendientes de arbitraje en este momento.
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {partidosJugables.map((partido) => (
-                <LiveArbitrajeRow
-                  key={partido.id}
-                  partido={partido}
-                  torneo={torneo}
-                  todosLosPartidos={partidos}
-                  disponibilidades={disponibilidadesPaso5}
-                  onSave={handleGuardarResultadoLive}
-                  onPartidoUpdated={triggerRefresh}
-                  isSaving={guardandoPartidoId === partido.id}
-                  onError={showErrorModal}
-                />
-              ))}
-            </div>
-          ))}
-      </div>
+      {partidos.length === 0 && (
+        <div className="bg-brand-card rounded-3xl border border-white/5 p-8 text-center text-gray-400 text-sm font-medium">
+          No hay partidos generados en el cuadro para este torneo.
+        </div>
+      )}
 
       {/* DESGLOSE DETALLADO DE PARTIDOS FINALIZADOS ESTILO RANKEDIN */}
       {partidos.filter((p) => p.ganador !== null).length > 0 && (
-        <div className="bg-brand-card rounded-3xl border border-white/5 p-6 shadow-xl space-y-4">
+        <div className="bg-brand-card rounded-3xl border border-white/10 p-6 shadow-xl space-y-4">
           <h4 className="font-extrabold text-white text-base flex items-center gap-2 border-b border-white/5 pb-3">
             <span className="size-2.5 rounded-full bg-emerald-400 animate-pulse" />{" "}
             Desglose Detallado de Resultados Finalizados (
@@ -193,17 +195,46 @@ export const Paso8Arbitraje = ({
 
                 const tieneSet3 = s3A !== null && s3B !== null;
 
+                const formatMatchDateTimeInfo = (
+                  cancha?: string | null,
+                  fechaIso?: string | null,
+                ) => {
+                  const parts: string[] = [];
+                  if (cancha) parts.push(cancha);
+                  if (fechaIso) {
+                    try {
+                      const d = new Date(fechaIso);
+                      const yyyy = d.getFullYear();
+                      const mm = String(d.getMonth() + 1).padStart(2, "0");
+                      const dd = String(d.getDate()).padStart(2, "0");
+                      const dayName = d.toLocaleDateString("es-AR", {
+                        weekday: "short",
+                      });
+                      const capDay =
+                        dayName.charAt(0).toUpperCase() +
+                        dayName.slice(1).replace(".", "");
+                      const hh = String(d.getHours()).padStart(2, "0");
+                      const mins = String(d.getMinutes()).padStart(2, "0");
+                      parts.push(`${capDay} ${dd}/${mm}/${yyyy} · ${hh}:${mins} hs`);
+                    } catch {}
+                  }
+                  return parts.length > 0 ? parts.join(" · ") : "Cancha Principal";
+                };
+
                 return (
                   <div
                     key={p.id}
-                    className="bg-[#141414] border border-white/10 rounded-2xl p-4 space-y-3 shadow-lg"
+                    className="bg-black/40 border border-white/10 rounded-2xl p-4 space-y-3 shadow-lg"
                   >
-                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <div className="flex flex-wrap justify-between items-center border-b border-white/5 pb-2 gap-2">
                       <span className="text-[10px] text-brand-chartreuse font-black uppercase tracking-widest bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2.5 py-0.5 rounded-full">
                         {p.ronda}
                       </span>
                       <span className="text-[10px] text-gray-400 font-bold">
-                        {p.cancha_asignada || "Cancha Principal"}
+                        {formatMatchDateTimeInfo(
+                          p.cancha_asignada,
+                          (p as any).fecha_partido,
+                        )}
                       </span>
                     </div>
 
@@ -211,11 +242,19 @@ export const Paso8Arbitraje = ({
                     <div className="space-y-2">
                       {/* Fila Equipo A */}
                       <div
-                        className={`flex justify-between items-center p-2.5 rounded-xl border transition-all ${isGanadorA ? "bg-brand-chartreuse/10 border-brand-chartreuse/30" : "bg-black/20 border-white/5 opacity-70"}`}
+                        className={`flex justify-between items-center p-2.5 rounded-xl border transition-all ${
+                          isGanadorA
+                            ? "bg-brand-chartreuse/10 border-brand-chartreuse/30"
+                            : "bg-black/20 border-white/5 opacity-80"
+                        }`}
                       >
                         <div className="flex items-center gap-2 truncate pr-2">
                           <span
-                            className={`text-xs font-black truncate ${isGanadorA ? "text-brand-chartreuse" : "text-white"}`}
+                            className={`text-xs font-black truncate ${
+                              isGanadorA
+                                ? "text-brand-chartreuse"
+                                : "text-white"
+                            }`}
                           >
                             {nameA}
                           </span>
@@ -228,21 +267,33 @@ export const Paso8Arbitraje = ({
                         <div className="flex gap-1.5 shrink-0 font-mono">
                           {s1A !== null && (
                             <span
-                              className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded-lg ${Number(s1A) > Number(s1B) ? "bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/40" : "bg-white/5 text-gray-400"}`}
+                              className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded-lg ${
+                                Number(s1A) > Number(s1B)
+                                  ? "bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/40"
+                                  : "bg-white/5 border border-white/10 text-gray-400"
+                              }`}
                             >
                               {s1A}
                             </span>
                           )}
                           {s2A !== null && (
                             <span
-                              className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded-lg ${Number(s2A) > Number(s2B) ? "bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/40" : "bg-white/5 text-gray-400"}`}
+                              className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded-lg ${
+                                Number(s2A) > Number(s2B)
+                                  ? "bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/40"
+                                  : "bg-white/5 border border-white/10 text-gray-400"
+                              }`}
                             >
                               {s2A}
                             </span>
                           )}
                           {tieneSet3 && (
                             <span
-                              className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded-lg ${Number(s3A) > Number(s3B) ? "bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/40" : "bg-white/5 text-gray-400"}`}
+                              className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded-lg ${
+                                Number(s3A) > Number(s3B)
+                                  ? "bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/40"
+                                  : "bg-white/5 border border-white/10 text-gray-400"
+                              }`}
                             >
                               {s3A}
                             </span>
@@ -252,11 +303,19 @@ export const Paso8Arbitraje = ({
 
                       {/* Fila Equipo B */}
                       <div
-                        className={`flex justify-between items-center p-2.5 rounded-xl border transition-all ${isGanadorB ? "bg-brand-chartreuse/10 border-brand-chartreuse/30" : "bg-black/20 border-white/5 opacity-70"}`}
+                        className={`flex justify-between items-center p-2.5 rounded-xl border transition-all ${
+                          isGanadorB
+                            ? "bg-brand-chartreuse/10 border-brand-chartreuse/30"
+                            : "bg-black/20 border-white/5 opacity-80"
+                        }`}
                       >
                         <div className="flex items-center gap-2 truncate pr-2">
                           <span
-                            className={`text-xs font-black truncate ${isGanadorB ? "text-brand-chartreuse" : "text-white"}`}
+                            className={`text-xs font-black truncate ${
+                              isGanadorB
+                                ? "text-brand-chartreuse"
+                                : "text-white"
+                            }`}
                           >
                             {nameB}
                           </span>
@@ -269,21 +328,33 @@ export const Paso8Arbitraje = ({
                         <div className="flex gap-1.5 shrink-0 font-mono">
                           {s1B !== null && (
                             <span
-                              className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded-lg ${Number(s1B) > Number(s1A) ? "bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/40" : "bg-white/5 text-gray-400"}`}
+                              className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded-lg ${
+                                Number(s1B) > Number(s1A)
+                                  ? "bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/40"
+                                  : "bg-white/5 border border-white/10 text-gray-400"
+                              }`}
                             >
                               {s1B}
                             </span>
                           )}
                           {s2B !== null && (
                             <span
-                              className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded-lg ${Number(s2B) > Number(s2A) ? "bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/40" : "bg-white/5 text-gray-400"}`}
+                              className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded-lg ${
+                                Number(s2B) > Number(s2A)
+                                  ? "bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/40"
+                                  : "bg-white/5 border border-white/10 text-gray-400"
+                              }`}
                             >
                               {s2B}
                             </span>
                           )}
                           {tieneSet3 && (
                             <span
-                              className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded-lg ${Number(s3B) > Number(s3A) ? "bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/40" : "bg-white/5 text-gray-400"}`}
+                              className={`w-7 h-7 flex items-center justify-center text-xs font-black rounded-lg ${
+                                Number(s3B) > Number(s3A)
+                                  ? "bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/40"
+                                  : "bg-white/5 border border-white/10 text-gray-400"
+                              }`}
                             >
                               {s3B}
                             </span>

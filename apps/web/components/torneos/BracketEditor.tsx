@@ -468,13 +468,22 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
   const totalZonas =
     zonas.length || Math.floor((torneo?.cupos_maximos || 8) / 3);
-  const advancingPlayers =
+  const rawPlayerCount =
     torneo?.formato === "Eliminatoria Directa"
-      ? torneo?.cupos_maximos || 16
+      ? (inscripciones?.length || torneo?.cupos_actuales || torneo?.cupos_maximos || 16)
       : getPlayoffSize(totalZonas);
 
+  const bracketCapacity = Math.max(
+    4,
+    Math.pow(2, Math.ceil(Math.log2(Math.max(2, rawPlayerCount))))
+  );
+
+  const rondasInPartidos = new Set(
+    partidos.map((p) => (p.ronda || "").toUpperCase())
+  );
+
   const rondasToShow = RONDAS_CONFIG.filter(
-    (r) => r.required <= advancingPlayers / 2,
+    (r) => rondasInPartidos.has(r.id) || r.required <= bracketCapacity / 2,
   );
 
   const getRoundMatches = (round: string, requiredCount: number): Partido[] => {

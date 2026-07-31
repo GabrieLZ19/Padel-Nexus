@@ -250,9 +250,17 @@ export const Paso5Cierre = ({
                   setPuntoOro(!puntoOro);
                   if (!puntoOro) setStarPoint(false);
                 }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${puntoOro ? "bg-brand-chartreuse" : "bg-white/10"}`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors border ${
+                  puntoOro
+                    ? "bg-brand-chartreuse border-brand-chartreuse"
+                    : "bg-zinc-500 border-zinc-600"
+                }`}
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${puntoOro ? "translate-x-6" : "translate-x-1"}`} />
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform ${
+                    puntoOro ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
               </button>
             </div>
 
@@ -267,9 +275,17 @@ export const Paso5Cierre = ({
                   setStarPoint(!starPoint);
                   if (!starPoint) setPuntoOro(false);
                 }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${starPoint ? "bg-brand-chartreuse" : "bg-white/10"}`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors border ${
+                  starPoint
+                    ? "bg-brand-chartreuse border-brand-chartreuse"
+                    : "bg-zinc-500 border-zinc-600"
+                }`}
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-black transition-transform ${starPoint ? "translate-x-6" : "translate-x-1"}`} />
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform ${
+                    starPoint ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
               </button>
             </div>
           </div>
@@ -354,12 +370,14 @@ export const Paso5Cierre = ({
           </div>
           <div
             onClick={() => setPuntosActivados(!puntosActivados)}
-            className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all duration-300 ${
-              puntosActivados ? "bg-brand-chartreuse" : "bg-white/10"
+            className={`w-14 h-7 rounded-full p-1 cursor-pointer transition-all duration-300 border ${
+              puntosActivados
+                ? "bg-brand-chartreuse border-brand-chartreuse"
+                : "bg-zinc-500 border-zinc-600"
             } relative`}
           >
             <div
-              className={`w-5 h-5 rounded-full bg-brand-black transition-all duration-300 ${
+              className={`w-5 h-5 rounded-full bg-white shadow-md transition-all duration-300 ${
                 puntosActivados ? "translate-x-7" : "translate-x-0"
               }`}
             />

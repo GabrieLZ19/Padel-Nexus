@@ -526,19 +526,24 @@ export class TorneoService {
       }
 
       let playerIdx = 0;
+      const byeSlotIndices = new Set<number>();
       // 1. Asignar los B BYEs a las primeras posiciones de la lista de siembra
       for (let b = 0; b < B; b++) {
         const slotIdx = orderByeSlots[b];
         if (slotIdx !== undefined && slotsIniciales[slotIdx]) {
+          byeSlotIndices.add(slotIdx);
           slotsIniciales[slotIdx].equipo_a_id = shuffled[playerIdx]?.id || null;
           playerIdx++;
         }
       }
 
-      // 2. Asignar los jugadores restantes en los partidos de 2 equipos
+      // 2. Asignar los jugadores restantes en los partidos de 2 equipos (omitir slots BYE para que no se llene equipo_b_id)
       for (let i = 0; i < numPartidosIniciales; i++) {
+        if (byeSlotIndices.has(i)) {
+          continue;
+        }
         const slot = slotsIniciales[i];
-        if (slot.equipo_a_id === null) {
+        if (slot.equipo_a_id === null && playerIdx < N) {
           slot.equipo_a_id = shuffled[playerIdx]?.id || null;
           playerIdx++;
         }
