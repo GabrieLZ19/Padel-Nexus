@@ -18,7 +18,7 @@ interface Paso6FiscalesProps {
   torneo: Torneo;
   torneoId: string;
   setFeedbackModal: (modal: any) => void;
-  setActiveTab: (tab: string) => void;
+  setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
   readOnly?: boolean;
 }

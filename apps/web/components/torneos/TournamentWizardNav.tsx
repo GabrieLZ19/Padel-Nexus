@@ -121,7 +121,7 @@ const GROUP_TITLES: Record<string, string> = {
 
 interface TournamentWizardNavProps {
   activeTab: string;
-  setActiveTab: (tab: string) => void;
+  setActiveTab: (tab: string) => void | Promise<void>;
   torneoEstado?: string;
 }
 
@@ -150,7 +150,7 @@ export function TournamentWizardNav({
   const activeStepObj = ALL_STEPS.find((s) => s.id === activeTab) || ALL_STEPS[0];
 
   const handleSelectStep = (stepId: string) => {
-    setActiveTab(stepId);
+    void setActiveTab(stepId);
     setMobileOpen(false);
   };
 

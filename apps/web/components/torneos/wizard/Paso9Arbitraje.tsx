@@ -9,7 +9,7 @@ interface Paso8ArbitrajeProps {
   partidos: Partido[];
   torneoId?: string;
   setFeedbackModal: (modal: any) => void;
-  setActiveTab: (tab: string) => void;
+  setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
   isReadOnly?: boolean;
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
@@ -15,13 +15,15 @@ import {
   getNivelesParaCategoria,
   CUSTOM_OPTION_VALUE,
 } from "@/utils/constants/fapApaRules";
+import type { RegisterSaveHandler } from "./types";
 
 interface Paso3CategoriasProps {
   torneo: Torneo;
   torneoId: string;
   setFeedbackModal: (modal: any) => void;
-  setActiveTab: (tab: string) => void;
+  setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
+  registerSaveHandler?: RegisterSaveHandler;
   readOnly?: boolean;
 }
 
@@ -31,6 +33,7 @@ export const Paso3Categorias = ({
   setFeedbackModal,
   setActiveTab,
   triggerRefresh,
+  registerSaveHandler,
   readOnly = false,
 }: Paso3CategoriasProps) => {
   // Asociación viene del Paso 1
@@ -218,7 +221,11 @@ export const Paso3Categorias = ({
     }
   };
 
-  const handleSaveStep3 = async () => {
+  const handleSaveStep3 = async (options?: {
+    silent?: boolean;
+  }): Promise<boolean> => {
+    if (readOnly) return true;
+
     const finalCategoria = showCustomCategoria
       ? customCategoria
       : editCategoria;
@@ -233,7 +240,7 @@ export const Paso3Categorias = ({
         description:
           "Por favor completá la Categoría y el Nivel antes de guardar.",
       }));
-      return;
+      return false;
     }
 
     const esGratisTorneo = Boolean(
@@ -253,7 +260,7 @@ export const Paso3Categorias = ({
         title: "Monto inválido",
         description: "El monto del carnet federativo no puede ser negativo.",
       }));
-      return;
+      return false;
     }
 
     try {
@@ -274,14 +281,17 @@ export const Paso3Categorias = ({
       } as any);
 
       triggerRefresh();
-      setFeedbackModal((prev: any) => ({
-        ...prev,
-        isOpen: true,
-        type: "success",
-        title: "¡Cambios guardados!",
-        description:
-          "La rama, categoría, nivel y días de juego han sido actualizados con éxito.",
-      }));
+      if (!options?.silent) {
+        setFeedbackModal((prev: any) => ({
+          ...prev,
+          isOpen: true,
+          type: "success",
+          title: "¡Cambios guardados!",
+          description:
+            "La rama, categoría, nivel y días de juego han sido actualizados con éxito.",
+        }));
+      }
+      return true;
     } catch (e: any) {
       console.error("🚨 Error al guardar Paso 3:", e?.response?.data || e);
       setFeedbackModal((prev: any) => ({
@@ -295,10 +305,20 @@ export const Paso3Categorias = ({
           e.message ||
           "No se pudieron guardar los cambios.",
       }));
+      return false;
     } finally {
       setGuardandoCategorias(false);
     }
   };
+
+  const saveRef = useRef(handleSaveStep3);
+  saveRef.current = handleSaveStep3;
+
+  useEffect(() => {
+    if (!registerSaveHandler) return;
+    registerSaveHandler(() => saveRef.current({ silent: true }));
+    return () => registerSaveHandler(null);
+  }, [registerSaveHandler]);
 
   return (
     <div
@@ -594,7 +614,7 @@ export const Paso3Categorias = ({
       <div className="flex justify-between items-center pt-4 border-t border-white/5">
         <div className="flex gap-3">
           <button
-            onClick={handleSaveStep3}
+            onClick={() => void handleSaveStep3()}
             disabled={readOnly || guardandoCategorias}
             className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
           >
@@ -605,15 +625,17 @@ export const Paso3Categorias = ({
                 : "Guardar Cambios"}
           </button>
           <button
-            onClick={() => setActiveTab("logos")}
-            className="bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-xs font-bold hover:bg-white/10 transition-all cursor-pointer"
+            onClick={() => void setActiveTab("logos")}
+            disabled={guardandoCategorias}
+            className="bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-xs font-bold hover:bg-white/10 transition-all cursor-pointer disabled:opacity-40"
           >
             Atrás
           </button>
         </div>
         <button
-          onClick={() => setActiveTab("players")}
-          className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+          onClick={() => void setActiveTab("players")}
+          disabled={guardandoCategorias}
+          className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer disabled:opacity-40"
         >
           Siguiente Paso: Jugadores
         </button>

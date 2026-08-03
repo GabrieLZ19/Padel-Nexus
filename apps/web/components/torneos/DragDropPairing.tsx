@@ -185,7 +185,8 @@ export const SortablePareja = ({
         </div>
       </div>
 
-      {!isSiembra && (
+      {/* Stats solo en vista lectura; en edición el foco es drag-and-drop */}
+      {!isSiembra && !isEditing && (
         <div className="flex items-center gap-2 shrink-0 px-1 text-xs">
           <div className="flex flex-col items-center">
             <span className="text-[7px] text-gray-500 font-bold uppercase tracking-tight">

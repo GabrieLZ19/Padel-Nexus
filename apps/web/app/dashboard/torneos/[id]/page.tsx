@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Trophy, Check } from "lucide-react";
 import { TorneosService } from "../../../../utils/services/torneos";
@@ -20,6 +20,7 @@ import { Paso5Cierre } from "@/components/torneos/wizard/Paso7Cierre";
 import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
 import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
 import { TournamentWizardNav } from "@/components/torneos/TournamentWizardNav";
+import type { SaveStepHandler } from "@/components/torneos/wizard/types";
 
 const WIZARD_STEPS = [
   { id: "edit", label: "1. Datos", desc: "Información" },
@@ -47,6 +48,10 @@ export default function TorneoDetallePage() {
   const [activeTab, setActiveTab] = useState<string>("edit");
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshKey, setRefreshKey] = useState<number>(0);
+  const saveHandlerRef = useRef<SaveStepHandler | null>(null);
+  const activeTabRef = useRef(activeTab);
+  const navigatingRef = useRef(false);
+  activeTabRef.current = activeTab;
 
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
     isOpen: false,
@@ -57,6 +62,26 @@ export default function TorneoDetallePage() {
   });
 
   const triggerRefresh = () => setRefreshKey((p) => p + 1);
+
+  const registerSaveHandler = useCallback((handler: SaveStepHandler | null) => {
+    saveHandlerRef.current = handler;
+  }, []);
+
+  /** Guarda el paso actual (si tiene handler) y luego cambia de tab. */
+  const navigateToTab = useCallback(async (nextTab: string) => {
+    if (nextTab === activeTabRef.current || navigatingRef.current) return;
+    const save = saveHandlerRef.current;
+    if (save) {
+      navigatingRef.current = true;
+      try {
+        const ok = await save();
+        if (!ok) return;
+      } finally {
+        navigatingRef.current = false;
+      }
+    }
+    setActiveTab(nextTab);
+  }, []);
 
   // Carga inicial de datos
   useEffect(() => {
@@ -102,7 +127,8 @@ export default function TorneoDetallePage() {
     torneoId: id,
     setFeedbackModal,
     triggerRefresh,
-    setActiveTab,
+    setActiveTab: navigateToTab,
+    registerSaveHandler,
   };
 
   return (
@@ -134,7 +160,7 @@ export default function TorneoDetallePage() {
         <div className="lg:col-span-1 order-1 lg:order-2 lg:sticky lg:top-6 self-start z-30">
           <TournamentWizardNav
             activeTab={activeTab}
-            setActiveTab={setActiveTab}
+            setActiveTab={navigateToTab}
             torneoEstado={torneo.estado}
           />
         </div>

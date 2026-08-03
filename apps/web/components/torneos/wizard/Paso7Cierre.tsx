@@ -1,16 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Inscripcion } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { Trophy, Settings, Award, CheckCircle, Scale } from "lucide-react";
+import type { RegisterSaveHandler } from "./types";
 
 interface Paso5CierreProps {
   torneo: Torneo;
   torneoId: string;
   inscripciones: Inscripcion[];
   setFeedbackModal: (modal: any) => void;
-  setActiveTab: (tab: string) => void;
+  setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
+  registerSaveHandler?: RegisterSaveHandler;
 }
 
 export const Paso5Cierre = ({
@@ -20,6 +22,7 @@ export const Paso5Cierre = ({
   setFeedbackModal,
   setActiveTab,
   triggerRefresh,
+  registerSaveHandler,
 }: Paso5CierreProps) => {
   const confirmadasCount = inscripciones.filter(
     (i) => i.estado_pago === "Confirmado",
@@ -80,7 +83,9 @@ export const Paso5Cierre = ({
   
   const [guardandoConfig, setGuardandoConfig] = useState(false);
 
-  const handleSaveConfig = async () => {
+  const handleSaveConfig = async (options?: {
+    silent?: boolean;
+  }): Promise<boolean> => {
     try {
       setGuardandoConfig(true);
       await TorneosService.update(torneoId, {
@@ -105,13 +110,17 @@ export const Paso5Cierre = ({
         },
       } as any);
       triggerRefresh();
-      setFeedbackModal((prev: any) => ({
-        ...prev,
-        isOpen: true,
-        type: "success",
-        title: "¡Configuración guardada!",
-        description: "Los valores del ranking y las reglas de puntuación han sido actualizados con éxito.",
-      }));
+      if (!options?.silent) {
+        setFeedbackModal((prev: any) => ({
+          ...prev,
+          isOpen: true,
+          type: "success",
+          title: "¡Configuración guardada!",
+          description:
+            "Los valores del ranking y las reglas de puntuación han sido actualizados con éxito.",
+        }));
+      }
+      return true;
     } catch (e: any) {
       setFeedbackModal((prev: any) => ({
         ...prev,
@@ -120,39 +129,20 @@ export const Paso5Cierre = ({
         title: "Error al guardar",
         description: e.message || "No se pudo actualizar la configuración.",
       }));
+      return false;
     } finally {
       setGuardandoConfig(false);
     }
   };
 
-  const handleCerrarInscripciones = () => {
-    setFeedbackModal((prev: any) => ({
-      ...prev,
-      isOpen: true,
-      type: "danger",
-      title: "¿Cerrar Inscripciones de forma definitiva?",
-      description:
-        "Esta acción bloqueará de manera permanente el ingreso de nuevos jugadores. Una vez cerradas, no podrás volver a abrirlas.",
-      confirmText: "Sí, Cerrar Inscripciones",
-      cancelText: "Cancelar",
-      onConfirm: async () => {
-        try {
-          await TorneosService.update(torneoId, { estado: "Cerrado" } as any);
-          triggerRefresh();
-          setFeedbackModal((prevModal: any) => ({
-            ...prevModal,
-            isOpen: true,
-            type: "success",
-            title: "Inscripciones Cerradas",
-            description:
-              "Las inscripciones han sido cerradas con éxito y el cupo se encuentra congelado.",
-          }));
-        } catch (e: any) {
-          alert("Error al cerrar: " + e.message);
-        }
-      },
-    }));
-  };
+  const saveRef = useRef(handleSaveConfig);
+  saveRef.current = handleSaveConfig;
+
+  useEffect(() => {
+    if (!registerSaveHandler) return;
+    registerSaveHandler(() => saveRef.current({ silent: true }));
+    return () => registerSaveHandler(null);
+  }, [registerSaveHandler]);
 
   return (
     <div className="bg-brand-card border border-white/10 rounded-3xl p-6 space-y-6 shadow-xl">
@@ -160,7 +150,7 @@ export const Paso5Cierre = ({
         Paso 6: Cierre de Inscripción y Puntuación
       </h3>
       <p className="text-sm text-gray-400">
-        Verifique el cupo de inscripciones aprobadas. Puede configurar la asignación de puntos del ranking, definir el sistema de puntuación para los partidos y congelar el cupo de inscripciones para proceder a generar el fixture.
+        Verifique el cupo de inscripciones aprobadas. Configure la asignación de puntos del ranking y el sistema de puntuación de partidos. Las inscripciones se cierran automáticamente al generar los cuadros.
       </p>
 
       {/* JUGADORES Y ESTADO */}
@@ -485,7 +475,7 @@ export const Paso5Cierre = ({
         <div className="flex justify-end pt-2">
           <button
             type="button"
-            onClick={handleSaveConfig}
+            onClick={() => void handleSaveConfig()}
             disabled={guardandoConfig}
             className="bg-brand-chartreuse text-brand-black px-6 py-2.5 rounded-xl font-black text-xs hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
           >
@@ -496,31 +486,19 @@ export const Paso5Cierre = ({
 
       <div className="flex justify-between items-center pt-4 border-t border-white/5">
         <button
-          onClick={() => setActiveTab("times")}
-          className="bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-xs font-bold cursor-pointer"
+          onClick={() => void setActiveTab("fiscales")}
+          disabled={guardandoConfig}
+          className="bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-xs font-bold cursor-pointer disabled:opacity-40"
         >
           Atrás
         </button>
-        <div className="flex gap-3">
-          {isOpenState ? (
-            <button
-              onClick={handleCerrarInscripciones}
-              className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 px-6 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer"
-            >
-              Cerrar Inscripciones
-            </button>
-          ) : (
-            <span className="bg-red-500/10 border border-red-500/20 text-red-400 px-6 py-3 rounded-xl text-xs font-bold select-none">
-              Inscripciones Cerradas
-            </span>
-          )}
-          <button
-            onClick={() => setActiveTab("draws")}
-            className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
-          >
-            Siguiente Paso: Cuadros & Llaves
-          </button>
-        </div>
+        <button
+          onClick={() => void setActiveTab("draws")}
+          disabled={guardandoConfig}
+          className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer disabled:opacity-40"
+        >
+          Siguiente Paso: Cuadros & Llaves
+        </button>
       </div>
     </div>
   );

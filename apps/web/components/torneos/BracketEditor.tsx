@@ -81,8 +81,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       description: `Cuando este switch está activo (ON), puedes mover jugadores manualmente de una zona a otra sin preocuparte por destruir los partidos o resultados que ya hayan sido jugados en la base de datos.`,
     },
     {
-      title: "4. Carga de Resultados (Arbitraje en Vivo)",
-      description: `Una vez conformados los grupos, ve a la pestaña superior "Arbitraje en Vivo" para ingresar los marcadores de cada partido. Las estadísticas (PJ, PG, PTS) de cada zona se calcularán automáticamente en tiempo real bajo los nombres de los jugadores.`,
+      title: "4. Carga de Resultados",
+      description: `Una vez conformados los grupos, avanzá al paso "Resultados" para ingresar los marcadores de cada partido. Las estadísticas (PJ, PG, PTS) de cada zona se calcularán automáticamente en tiempo real bajo los nombres de los jugadores.`,
     },
     {
       title: "5. Generar Cuadro Eliminatorio (Llaves)",

@@ -19,7 +19,7 @@ interface Paso4JugadoresProps {
   torneoId: string;
   inscripciones: Inscripcion[];
   setFeedbackModal: (modal: any) => void;
-  setActiveTab: (tab: string) => void;
+  setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
   readOnly?: boolean;
 }

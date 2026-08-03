@@ -9,7 +9,7 @@ interface Paso6CuadrosProps {
   inscripciones: Inscripcion[];
   partidos: Partido[];
   setFeedbackModal: (modal: any) => void;
-  setActiveTab: (tab: string) => void;
+  setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
   isReadOnly?: boolean;
 }
@@ -163,7 +163,7 @@ export const Paso6Cuadros = ({
             onClick={() => setActiveTab("matches")}
             className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
           >
-            Siguiente Paso: Arbitraje
+            Siguiente Paso: Resultados
           </button>
         </div>
       )}

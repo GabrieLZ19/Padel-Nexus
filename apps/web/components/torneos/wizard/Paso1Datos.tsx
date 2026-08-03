@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { TorneosService } from "@/utils/services/torneos";
 import { ClubesService } from "@/utils/services/clubes";
 import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
@@ -8,13 +8,15 @@ import { Calendar, Layers, Trophy, Settings2, Gift } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import { getAlcancesPermitidos, CUPOS_ESTANDAR_FAP } from "@/utils/constants/fapApaRules";
 import type { RolUsuario } from "@/utils/types/user.types";
+import type { RegisterSaveHandler } from "./types";
 
 interface Paso1DatosProps {
   torneo: Torneo;
   torneoId: string;
   setFeedbackModal: (modal: any) => void;
   triggerRefresh: () => void;
-  setActiveTab: (tab: string) => void;
+  setActiveTab: (tab: string) => void | Promise<void>;
+  registerSaveHandler?: RegisterSaveHandler;
   readOnly?: boolean;
 }
 
@@ -24,6 +26,7 @@ export const Paso1Datos = ({
   setFeedbackModal,
   triggerRefresh,
   setActiveTab,
+  registerSaveHandler,
   readOnly = false,
 }: Paso1DatosProps) => {
   const profile = useProfileStore((s) => s.profile);
@@ -128,7 +131,11 @@ export const Paso1Datos = ({
     );
   };
 
-  const handleSaveStep1 = async () => {
+  const handleSaveStep1 = async (options?: {
+    silent?: boolean;
+  }): Promise<boolean> => {
+    if (readOnly) return true;
+
     // Validación por si lo ingresan a mano saltándose el calendario
     if (editFecha && editFechaFin) {
       const startDate = new Date(editFecha);
@@ -144,7 +151,7 @@ export const Paso1Datos = ({
           description:
             "La fecha de finalización no puede ser anterior a la fecha de inicio del torneo.",
         }));
-        return;
+        return false;
       }
     }
 
@@ -159,7 +166,19 @@ export const Paso1Datos = ({
         title: "Cupo no permitido",
         description: `No podés reducir el cupo a ${nuevosCupos} porque ya existen ${cuposActuales} participante(s) / pareja(s) inscripta(s).`,
       }));
-      return;
+      return false;
+    }
+
+    if (!editNombre || !editFecha || !editSede) {
+      setFeedbackModal((prev: any) => ({
+        ...prev,
+        isOpen: true,
+        type: "warning",
+        title: "Campos incompletos",
+        description:
+          "Completá nombre, fecha y sede antes de guardar o avanzar de paso.",
+      }));
+      return false;
     }
 
     try {
@@ -188,14 +207,17 @@ export const Paso1Datos = ({
 
       triggerRefresh();
 
-      setFeedbackModal((prev: any) => ({
-        ...prev,
-        isOpen: true,
-        type: "success",
-        title: "¡Cambios guardados!",
-        description:
-          "La información básica del torneo ha sido actualizada con éxito.",
-      }));
+      if (!options?.silent) {
+        setFeedbackModal((prev: any) => ({
+          ...prev,
+          isOpen: true,
+          type: "success",
+          title: "¡Cambios guardados!",
+          description:
+            "La información básica del torneo ha sido actualizada con éxito.",
+        }));
+      }
+      return true;
     } catch (e: any) {
       setFeedbackModal((prev: any) => ({
         ...prev,
@@ -204,10 +226,20 @@ export const Paso1Datos = ({
         title: "Error al guardar",
         description: e.message || "No se pudieron guardar los cambios.",
       }));
+      return false;
     } finally {
       setGuardandoDatos(false);
     }
   };
+
+  const saveRef = useRef(handleSaveStep1);
+  saveRef.current = handleSaveStep1;
+
+  useEffect(() => {
+    if (!registerSaveHandler) return;
+    registerSaveHandler(() => saveRef.current({ silent: true }));
+    return () => registerSaveHandler(null);
+  }, [registerSaveHandler]);
 
   return (
     <div className={`bg-brand-card border border-white/10 rounded-3xl p-6 space-y-8 shadow-xl ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
@@ -511,15 +543,16 @@ export const Paso1Datos = ({
 
       <div className="flex justify-between items-center pt-4 border-t border-white/5">
         <button
-          onClick={handleSaveStep1}
+          onClick={() => void handleSaveStep1()}
           disabled={readOnly || guardandoDatos || !editNombre || !editFecha || !editSede}
           className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
         >
           {readOnly ? "Modo Lectura (En curso)" : guardandoDatos ? "Guardando..." : "Guardar Cambios"}
         </button>
         <button
-          onClick={() => setActiveTab("logos")}
-          className="bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-xs font-bold hover:bg-white/10 transition-all cursor-pointer"
+          onClick={() => void setActiveTab("logos")}
+          disabled={guardandoDatos}
+          className="bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-xs font-bold hover:bg-white/10 transition-all cursor-pointer disabled:opacity-40"
         >
           Siguiente Paso: Logos
         </button>

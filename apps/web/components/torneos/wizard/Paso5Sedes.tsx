@@ -2,7 +2,7 @@ import { SedesFiscalesTab } from "@/components/torneos/SedesFiscalesTab";
 
 interface Paso7SedesProps {
   torneoId: string;
-  setActiveTab: (tab: string) => void;
+  setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
   readOnly?: boolean;
 }
@@ -25,7 +25,7 @@ export const Paso7Sedes = ({
           Atrás
         </button>
         <button
-          onClick={() => setActiveTab("cierre")}
+          onClick={() => setActiveTab("fiscales")}
           className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
         >
           Siguiente Paso: Fiscales
