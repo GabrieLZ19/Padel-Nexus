@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { TorneosService } from "../../../utils/services/torneos";
 import { ClubesService } from "../../../utils/services/clubes";
+import { AsociacionesService } from "../../../utils/services/asociaciones";
 import Pagination from "../../../components/ui/Pagination";
 import { Torneo, Club, FormTorneoState } from "../../../utils/types";
 
@@ -37,6 +38,7 @@ const ESTADO_INICIAL: FormTorneoState = {
   precio_inscripcion: 0,
   alcance: "Provincial",
   asociacion: "FAP",
+  asociacion_id: null,
   premio_1: "",
   premio_2: "",
   premio_3: "",
@@ -141,12 +143,31 @@ export default function TorneosPage() {
         formato: formData.formato || "Eliminatoria Directa",
         precio_inscripcion: formData.precio_inscripcion || 0,
         alcance: formData.alcance ?? "Provincial",
+        asociacion: formData.asociacion ?? "FAP",
         premios: {
           uno: "",
           dos: "",
           tres: "",
         },
       };
+
+      if (!payloadToSave.asociacion_id) {
+        try {
+          const asocs = await AsociacionesService.getAll();
+          const fap =
+            asocs.find(
+              (a) =>
+                (a.sigla || "").toUpperCase() === "FAP" ||
+                /federaci[oó]n argentina/i.test(a.nombre || ""),
+            ) || null;
+          if (fap?.id) {
+            payloadToSave.asociacion_id = fap.id;
+            payloadToSave.asociacion = "FAP";
+          }
+        } catch {
+          /* backend también resuelve FAP */
+        }
+      }
 
       let createdTorneo;
       if (editingId) {

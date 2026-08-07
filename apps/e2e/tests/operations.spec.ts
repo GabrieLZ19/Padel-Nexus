@@ -247,8 +247,8 @@ test.describe.serial("8. Generación de Llaves (Admin)", () => {
 // FLUJO 9 — ARBITRAJE EN VIVO
 // ════════════════════════════════════════════════════════════════════════════
 
-test.describe.serial("9. Arbitraje en Vivo (Admin)", () => {
-  test("Navegar a la consola de arbitraje en vivo", async ({ page }) => {
+test.describe.serial("9. Resultados en Vivo (Admin)", () => {
+  test("Navegar a la consola de resultados en vivo", async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto("/dashboard/torneos");
     await expect(page.locator("h1")).toBeVisible({ timeout: 15000 });
@@ -260,12 +260,12 @@ test.describe.serial("9. Arbitraje en Vivo (Admin)", () => {
       await controlBtn.click();
       await expect(page).toHaveURL(/.*dashboard\/torneos\/.*/, { timeout: 10000 });
 
-      // Click en la pestaña "Arbitraje en Vivo"
-      await page.click('button:has-text("Arbitraje en Vivo")');
+      // Click en la pestaña "Resultados"
+      await page.click('button:has-text("Resultados")');
 
-      // Verificar que se muestra la consola
+      // Verificar que se muestra la carga de resultados
       await expect(
-        page.locator("text=Consola de Arbitraje en Vivo"),
+        page.locator("text=Carga de Resultados"),
       ).toBeVisible({ timeout: 10000 });
     } else {
       test.skip();
@@ -284,9 +284,9 @@ test.describe.serial("9. Arbitraje en Vivo (Admin)", () => {
       await controlBtn.click();
       await expect(page).toHaveURL(/.*dashboard\/torneos\/.*/, { timeout: 10000 });
 
-      // Ir a "Arbitraje en Vivo"
-      await page.click('button:has-text("Arbitraje en Vivo")');
-      await expect(page.locator("text=Consola de Arbitraje en Vivo")).toBeVisible({
+      // Ir a "Resultados"
+      await page.click('button:has-text("Resultados")');
+      await expect(page.locator("text=Carga de Resultados")).toBeVisible({
         timeout: 10000,
       });
 
@@ -337,8 +337,8 @@ test.describe.serial("9. Arbitraje en Vivo (Admin)", () => {
       await controlBtn.click();
       await expect(page).toHaveURL(/.*dashboard\/torneos\/.*/, { timeout: 10000 });
 
-      await page.click('button:has-text("Arbitraje en Vivo")');
-      await expect(page.locator("text=Consola de Arbitraje en Vivo")).toBeVisible({
+      await page.click('button:has-text("Resultados")');
+      await expect(page.locator("text=Carga de Resultados")).toBeVisible({
         timeout: 10000,
       });
 

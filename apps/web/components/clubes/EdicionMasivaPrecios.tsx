@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { DollarSign, Percent, Save, X } from "lucide-react";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import { ClubPanelService } from "@/utils/services/club-panel";
 import { sileo } from "sileo";
 
 interface EdicionMasivaPreciosProps {
@@ -35,14 +36,26 @@ export const EdicionMasivaPrecios: React.FC<EdicionMasivaPreciosProps> = ({
 
     try {
       setSaving(true);
+      const result = await ClubPanelService.ajustarPreciosMasivos({
+        cancha_id: canchaId === "todas" ? undefined : canchaId,
+        tipo_ajuste: tipoAjuste,
+        valor: val,
+        franja,
+      });
       sileo.success({
-        title: "Precios Actualizados",
-        description: `Se aplicó un ajuste del ${val}${tipoAjuste === "porcentaje" ? "%" : "$"} a los turnos seleccionados.`,
+        title: "Precios actualizados",
+        description: `Se ajustaron ${result.actualizados} turno${result.actualizados === 1 ? "" : "s"} (${val}${tipoAjuste === "porcentaje" ? "%" : "$"}).`,
       });
       onSuccess();
       onClose();
     } catch (err: any) {
-      sileo.error({ title: "Error", description: err.message || "No se pudieron actualizar los precios." });
+      sileo.error({
+        title: "Error",
+        description:
+          err?.response?.data?.error ||
+          err.message ||
+          "No se pudieron actualizar los precios.",
+      });
     } finally {
       setSaving(false);
     }
@@ -74,6 +87,28 @@ export const EdicionMasivaPrecios: React.FC<EdicionMasivaPreciosProps> = ({
                 ...canchas.map((c) => ({ value: String(c.id), label: c.nombre })),
               ]}
               placeholder="Seleccionar Cancha..."
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">
+              Franja Horaria
+            </label>
+            <CustomDropdown
+              value={franja}
+              onChange={(val) =>
+                setFranja(
+                  val === "pico" || val === "valle" || val === "todos"
+                    ? val
+                    : "todos",
+                )
+              }
+              options={[
+                { value: "todos", label: "Todas las franjas" },
+                { value: "pico", label: "Horario pico (desde 18:00)" },
+                { value: "valle", label: "Horario valle (antes de 18:00)" },
+              ]}
+              placeholder="Franja..."
             />
           </div>
 
@@ -132,9 +167,9 @@ export const EdicionMasivaPrecios: React.FC<EdicionMasivaPreciosProps> = ({
               type="button"
               disabled={saving}
               onClick={handleApply}
-              className="flex-1 py-3 rounded-xl font-bold text-sm bg-brand-chartreuse text-brand-black hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+              className="flex-1 py-3 rounded-xl font-bold text-sm bg-brand-chartreuse text-brand-black hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-40"
             >
-              <Save className="size-4" /> Aplicar Ajuste
+              <Save className="size-4" /> {saving ? "Aplicando..." : "Aplicar Ajuste"}
             </button>
           </div>
         </div>

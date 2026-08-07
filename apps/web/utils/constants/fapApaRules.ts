@@ -1,4 +1,5 @@
 import type { RolUsuario } from "../types/user.types";
+import { esRolFederacionNacional } from "../auth/roles";
 
 // ============================================================================
 // RAMAS (División por sexo)
@@ -10,6 +11,17 @@ export const RAMAS_PADEL = [
 ] as const;
 
 export type RamaPadel = (typeof RAMAS_PADEL)[number]["value"];
+
+export type ReglamentoTorneo = "FAP" | "APA" | "Amateur";
+
+export const REGLAMENTOS_TORNEO: {
+  value: ReglamentoTorneo;
+  label: string;
+}[] = [
+  { value: "FAP", label: "FAP (Federación Argentina de Pádel)" },
+  { value: "APA", label: "APA (Asociación de Pádel Argentina)" },
+  { value: "Amateur", label: "Amateur / Independiente" },
+];
 
 // ============================================================================
 // CUPOS OFICIALES FAP / APA (Sin BYEs impares)
@@ -203,7 +215,7 @@ export function getAlcancesPermitidos(rol: RolUsuario): AlcanceOption[] {
   switch (rol) {
     case "admin":
     case "admin_club":
-      // Club: solo Local y Provincial (clasificatorio)
+      // Club: Local, Regional, Provincial — sin Nacional
       return TODOS_LOS_ALCANCES.map((a) => {
         if (a.value === "Nacional") {
           return {
@@ -217,7 +229,7 @@ export function getAlcancesPermitidos(rol: RolUsuario): AlcanceOption[] {
       });
 
     case "admin_provincial":
-      // Asociación Provincial: Provincial, Regional, Local, Clasificatorio
+      // Asociación Provincial: Provincial, Regional, Local — sin Nacional
       return TODOS_LOS_ALCANCES.map((a) => {
         if (a.value === "Nacional") {
           return {
@@ -232,12 +244,195 @@ export function getAlcancesPermitidos(rol: RolUsuario): AlcanceOption[] {
 
     case "admin_federacion":
     case "superadmin":
-      // Federación Nacional / Superadmin: Todos
-      return TODOS_LOS_ALCANCES;
+      // Federación nacional: sin Local/Privado (solo Provincial / Regional / Nacional)
+      return TODOS_LOS_ALCANCES.filter((a) => a.value !== "Local");
 
     default:
       return TODOS_LOS_ALCANCES;
   }
+}
+
+/** Reglamentos visibles según rol: Amateur oculto solo para federación nacional. */
+export function getReglamentosPermitidos(
+  rol: RolUsuario,
+): { value: ReglamentoTorneo; label: string }[] {
+  if (esRolFederacionNacional(rol)) {
+    return REGLAMENTOS_TORNEO.filter((r) => r.value !== "Amateur");
+  }
+  return [...REGLAMENTOS_TORNEO];
+}
+
+export function esAsociacionActiva(a: {
+  estado?: string | null;
+  estado_aprobacion?: string | null;
+}): boolean {
+  const estado = (a.estado || "").toLowerCase();
+  const aprob = (a.estado_aprobacion || "").toLowerCase();
+  if (estado === "inactivo" || estado === "pendiente") return false;
+  if (aprob === "inactivo" || aprob === "pendiente_aprobacion" || aprob === "rechazado") {
+    return false;
+  }
+  return true;
+}
+
+export function esAsociacionFap(a: {
+  sigla?: string | null;
+  nombre?: string | null;
+  tipo?: string | null;
+}): boolean {
+  const sigla = (a.sigla || "").toUpperCase();
+  if (sigla === "FAP") return true;
+  if (/federaci[oó]n argentina/i.test(a.nombre || "")) return true;
+  if ((a.tipo || "").toLowerCase() === "federacion" && /fap/i.test(a.nombre || "")) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Padrón organizador: FAP + asociaciones/agrupaciones del ecosistema FAP
+ * (excluye otras federaciones madre tipo APA como organizadora del circuito FAP).
+ */
+export function filtrarAsociacionesOrganizadorasFap<
+  T extends {
+    id: string;
+    nombre?: string | null;
+    sigla?: string | null;
+    tipo?: string | null;
+    estado?: string | null;
+    estado_aprobacion?: string | null;
+  },
+>(list: T[]): T[] {
+  return list.filter((a) => {
+    if (!esAsociacionActiva(a)) return false;
+    if (esAsociacionFap(a)) return true;
+    const tipo = (a.tipo || "asociacion").toLowerCase();
+    // Asociaciones / agrupaciones provinciales del padrón FAP
+    if (tipo === "asociacion" || tipo === "agrupacion") return true;
+    // Otras federaciones (ej. APA) no organizan el circuito FAP
+    if (tipo === "federacion") return false;
+    return true;
+  });
+}
+
+export function findFapAsociacion<
+  T extends {
+    id: string;
+    nombre?: string | null;
+    sigla?: string | null;
+    tipo?: string | null;
+  },
+>(list: T[]): T | undefined {
+  return (
+    list.find((a) => esAsociacionFap(a)) ||
+    list.find((a) => (a.tipo || "").toLowerCase() === "federacion")
+  );
+}
+
+/** Alcance Nacional siempre organiza FAP. */
+export function debeForzarOrganizadorFap(alcance: string | null | undefined): boolean {
+  return /nacional/i.test(String(alcance || "").trim());
+}
+
+/** Amateur / Independiente: todos los roles excepto federación nacional. */
+export function puedeUsarReglamentoAmateur(rol: RolUsuario): boolean {
+  return !esRolFederacionNacional(rol);
+}
+
+/**
+ * Armado de zonas según reglamento del Paso 1.
+ * - FAP / APA: preferir 3; resto → zonas de 4 (reglamento oficial)
+ * - Amateur: preferir 4 (formato club / independiente más flexible)
+ */
+export function getCapacidadesZonasPorReglamento(
+  total: number,
+  reglamento?: string | null,
+): number[] {
+  const regl = String(reglamento || "FAP").toUpperCase();
+  if (regl === "AMATEUR") {
+    return getCapacidadesZonasPreferidas(total, 4);
+  }
+  // FAP y APA usan el mismo criterio de grupos
+  return getCapacidadesZonasPreferidas(total, 3);
+}
+
+/** Capacidad de zonas FAP: preferir 3; si sobran 2 → dos zonas de 4. */
+export function getCapacidadesZonasFap(total: number): number[] {
+  return getCapacidadesZonasPreferidas(total, 3);
+}
+
+function getCapacidadesZonasPreferidas(
+  total: number,
+  preferredSize: 3 | 4,
+): number[] {
+  if (total < 3) return total > 0 ? [total] : [];
+  if (preferredSize === 3) {
+    const mod = total % 3;
+    if (mod === 0) return Array(total / 3).fill(3);
+    if (mod === 1) {
+      const count3 = Math.floor((total - 4) / 3);
+      if (count3 >= 0) return [...Array(count3).fill(3), 4];
+    }
+    if (mod === 2) {
+      const count3 = Math.floor((total - 8) / 3);
+      if (count3 >= 0) return [...Array(count3).fill(3), 4, 4];
+    }
+    if (total === 5) return [3, 2];
+    if (total === 4) return [4];
+  } else {
+    const mod = total % 4;
+    if (mod === 0) return Array(total / 4).fill(4);
+    if (mod === 1) {
+      const count4 = Math.floor((total - 9) / 4);
+      if (count4 >= 0) return [...Array(count4).fill(4), 3, 3, 3];
+    }
+    if (mod === 2) {
+      const count4 = Math.floor((total - 6) / 4);
+      if (count4 >= 0) return [...Array(count4).fill(4), 3, 3];
+    }
+    if (mod === 3) {
+      const count4 = Math.floor((total - 3) / 4);
+      if (count4 >= 0) return [...Array(count4).fill(4), 3];
+    }
+    if (total === 5) return [3, 2];
+    if (total === 3) return [3];
+  }
+  const count = Math.max(1, Math.floor(total / preferredSize));
+  const baseCap = Math.floor(total / count);
+  const remainder = total % count;
+  return Array.from({ length: count }).map((_, idx) =>
+    idx < remainder ? baseCap + 1 : baseCap,
+  );
+}
+
+/** Ej: "4 zonas de 3 + 2 de 4" */
+export function resumirCapacidadesZonas(capacidades: number[]): string {
+  if (capacidades.length === 0) return "Sin zonas";
+  const freq = new Map<number, number>();
+  for (const c of capacidades) {
+    freq.set(c, (freq.get(c) || 0) + 1);
+  }
+  const parts = [...freq.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([size, n]) =>
+      n === 1 ? `1 zona de ${size}` : `${n} zonas de ${size}`,
+    );
+  return parts.join(" + ");
+}
+
+/** Torneo del circuito federativo: sin método de pago en confirmación manual. */
+export function esTorneoContextoFederacion(
+  torneo: {
+    alcance?: string | null;
+    reglamento?: string | null;
+    asociacion?: string | null;
+  },
+  rol?: RolUsuario | string | null,
+): boolean {
+  if (rol === "admin_federacion" || rol === "superadmin") return true;
+  if (/nacional/i.test(String(torneo.alcance || ""))) return true;
+  const regl = String(torneo.reglamento || torneo.asociacion || "").toUpperCase();
+  return regl === "FAP";
 }
 
 // Valor especial para opción "crear categoría/nivel personalizado"

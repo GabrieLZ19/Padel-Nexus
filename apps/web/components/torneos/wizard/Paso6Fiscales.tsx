@@ -3,11 +3,10 @@
 import React, { useState, useEffect } from "react";
 import {
   Shield,
-  Plus,
   Search,
-  CheckCircle2,
   UserCheck,
   Trash2,
+  Star,
 } from "lucide-react";
 import { FiscalesService, Fiscal } from "@/utils/services/fiscales";
 import { Torneo } from "@/utils/types";
@@ -21,6 +20,16 @@ interface Paso6FiscalesProps {
   setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
   readOnly?: boolean;
+}
+
+type RolFiscalTorneo = "general" | "auxiliar";
+
+function buildRolesMap(list: Fiscal[]): Record<string, RolFiscalTorneo> {
+  const roles: Record<string, RolFiscalTorneo> = {};
+  list.forEach((f) => {
+    roles[f.id] = f.rol_torneo === "general" ? "general" : "auxiliar";
+  });
+  return roles;
 }
 
 export const Paso6Fiscales = ({
@@ -38,6 +47,8 @@ export const Paso6Fiscales = ({
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [asignando, setAsignando] = useState(false);
+  const [rolAlAsignar, setRolAlAsignar] =
+    useState<RolFiscalTorneo>("auxiliar");
 
   const [todosLosFiscales, setTodosLosFiscales] = useState<Fiscal[]>([]);
 
@@ -58,6 +69,18 @@ export const Paso6Fiscales = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const persistAsignacion = async (
+    list: Fiscal[],
+    rolesOverride?: Record<string, RolFiscalTorneo>,
+  ) => {
+    const roles = rolesOverride || buildRolesMap(list);
+    await FiscalesService.asignarATorneo(
+      torneoId,
+      list.map((f) => f.id),
+      roles,
+    );
   };
 
   const handleBuscarDni = async () => {
@@ -81,42 +104,102 @@ export const Paso6Fiscales = ({
     }
   };
 
-  const handleAsignarFiscal = async (fiscalId: string) => {
+  const handleAsignarFiscal = async (
+    fiscalId: string,
+    rol: RolFiscalTorneo = rolAlAsignar,
+  ) => {
     try {
       setAsignando(true);
-      const idsActuales = fiscalesTorneo.map((f) => f.id);
-      if (!idsActuales.includes(fiscalId)) {
-        const nuevosIds = [...idsActuales, fiscalId];
-        await FiscalesService.asignarATorneo(torneoId, nuevosIds);
-        sileo.success({
-          title: "Fiscal Asignado",
-          description:
-            "El fiscal ha sido designado oficialmente para este torneo.",
-        });
-        setFoundFiscal(null);
-        setSearchDni("");
-        fetchFiscalesTorneo();
-        triggerRefresh();
+      if (fiscalesTorneo.some((f) => f.id === fiscalId)) return;
+
+      const fiscalBase =
+        foundFiscal?.id === fiscalId
+          ? foundFiscal
+          : todosLosFiscales.find((f) => f.id === fiscalId);
+
+      if (!fiscalBase) {
+        throw new Error("Fiscal no encontrado en el padrón.");
       }
+
+      let roles = buildRolesMap(fiscalesTorneo);
+      if (rol === "general") {
+        Object.keys(roles).forEach((id) => {
+          roles[id] = "auxiliar";
+        });
+      }
+      roles[fiscalId] = rol;
+
+      const nuevaLista: Fiscal[] = [
+        ...fiscalesTorneo,
+        { ...fiscalBase, rol_torneo: rol },
+      ].map((f) => ({
+        ...f,
+        rol_torneo: roles[f.id] || "auxiliar",
+      }));
+
+      await persistAsignacion(nuevaLista, roles);
+      sileo.success({
+        title: "Autoridad asignada",
+        description:
+          rol === "general"
+            ? "Fiscal general designado para este torneo."
+            : "Fiscal auxiliar designado para este torneo.",
+      });
+      setFoundFiscal(null);
+      setSearchDni("");
+      setRolAlAsignar("auxiliar");
+      await fetchFiscalesTorneo();
+      triggerRefresh();
     } catch (err: any) {
       sileo.error({
         title: "Error al asignar",
-        description: err.message || "No se pudo asignar el fiscal.",
+        description: err.message || "No se pudo asignar la autoridad.",
       });
     } finally {
       setAsignando(false);
     }
   };
 
+  const handleCambiarRol = async (
+    fiscalId: string,
+    nuevoRol: RolFiscalTorneo,
+  ) => {
+    try {
+      const roles = buildRolesMap(fiscalesTorneo);
+      if (nuevoRol === "general") {
+        Object.keys(roles).forEach((id) => {
+          roles[id] = "auxiliar";
+        });
+      }
+      roles[fiscalId] = nuevoRol;
+
+      const nuevaLista = fiscalesTorneo.map((f) => ({
+        ...f,
+        rol_torneo: roles[f.id] || "auxiliar",
+      }));
+
+      await persistAsignacion(nuevaLista, roles);
+      setFiscalesTorneo(nuevaLista);
+      sileo.success({
+        title: "Rol actualizado",
+        description:
+          nuevoRol === "general"
+            ? "Ahora es el fiscal general del torneo."
+            : "Quedó como fiscal auxiliar.",
+      });
+      triggerRefresh();
+    } catch (err: any) {
+      sileo.error({ title: "Error", description: err.message });
+    }
+  };
+
   const handleDesasignarFiscal = async (fiscalId: string) => {
     try {
-      const nuevosIds = fiscalesTorneo
-        .filter((f) => f.id !== fiscalId)
-        .map((f) => f.id);
-      await FiscalesService.asignarATorneo(torneoId, nuevosIds);
+      const nuevaLista = fiscalesTorneo.filter((f) => f.id !== fiscalId);
+      await persistAsignacion(nuevaLista);
       sileo.success({
-        title: "Designación Removida",
-        description: "El fiscal ya no está asignado.",
+        title: "Designación removida",
+        description: "La autoridad ya no está asignada a este torneo.",
       });
       fetchFiscalesTorneo();
       triggerRefresh();
@@ -125,26 +208,52 @@ export const Paso6Fiscales = ({
     }
   };
 
+  const fiscalesOrdenados = [...fiscalesTorneo].sort((a, b) => {
+    if (a.rol_torneo === "general" && b.rol_torneo !== "general") return -1;
+    if (b.rol_torneo === "general" && a.rol_torneo !== "general") return 1;
+    return `${a.apellido} ${a.nombre}`.localeCompare(
+      `${b.apellido} ${b.nombre}`,
+    );
+  });
+
   return (
-    <div className={`bg-brand-card border border-white/10 rounded-3xl p-6 space-y-8 shadow-xl ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
+    <div
+      className={`bg-brand-card border border-white/10 rounded-3xl p-6 space-y-8 shadow-xl ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}
+    >
       <div>
         <div className="flex items-center gap-2 text-brand-chartreuse text-xs font-bold uppercase tracking-widest mb-1">
-          <Shield className="size-4" /> Autoridad de Juego
+          <Shield className="size-4" /> Autoridades del Torneo
         </div>
         <h3 className="text-xl font-extrabold text-white">
-          Paso 6: Colegio de Fiscales & Autoridades del Torneo
+          Paso 6: Fiscales y Autoridades
         </h3>
         <p className="text-sm text-gray-400 mt-1">
-          Asigná los árbitros y fiscales homologados por el Colegio Oficial de
-          Fiscales para este torneo.
+          Designá el fiscal general y los fiscales auxiliares homologados para
+          este torneo.
         </p>
       </div>
 
-      {/* Seleccionar del Padrón Oficial o Buscar por DNI */}
       <div className="bg-brand-input/40 p-6 rounded-2xl border border-white/10 space-y-4 shadow-sm">
         <h4 className="text-xs text-gray-400 font-bold uppercase tracking-wider">
-          Designar Fiscal del Colegio Homologado
+          Designar autoridad del Colegio
         </h4>
+
+        <div className="space-y-2">
+          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">
+            Rol al designar
+          </label>
+          <CustomDropdown
+            value={rolAlAsignar}
+            onChange={(val) =>
+              setRolAlAsignar(val === "general" ? "general" : "auxiliar")
+            }
+            options={[
+              { value: "auxiliar", label: "Fiscal auxiliar" },
+              { value: "general", label: "Fiscal general (único)" },
+            ]}
+            placeholder="Rol..."
+          />
+        </div>
 
         {todosLosFiscales.length > 0 && (
           <div className="space-y-2">
@@ -159,9 +268,7 @@ export const Paso6Fiscales = ({
             <CustomDropdown
               value=""
               onChange={(val) => {
-                if (val) {
-                  handleAsignarFiscal(val);
-                }
+                if (val) handleAsignarFiscal(val);
               }}
               options={todosLosFiscales
                 .filter((f) => {
@@ -182,21 +289,21 @@ export const Paso6Fiscales = ({
                   value: f.id,
                   label: `${f.nombre} ${f.apellido} (DNI: ${f.dni}) — ${f.rango || "Provincial"}`,
                 }))}
-              placeholder={`-- Seleccionar Fiscal Homologado (${torneo.alcance || "Local"} o Superior) --`}
+              placeholder={`-- Seleccionar fiscal homologado (${torneo.alcance || "Local"} o superior) --`}
             />
           </div>
         )}
 
         <div className="pt-2">
           <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">
-            O Buscar por DNI
+            O buscar por DNI
           </label>
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-3.5 size-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Ingresar DNI del Fiscal (Solo números)..."
+                placeholder="Ingresar DNI del fiscal (solo números)..."
                 value={searchDni}
                 onChange={(e) => setSearchDni(e.target.value.replace(/\D/g, ""))}
                 className="w-full bg-brand-input border border-white/10 text-white pl-11 pr-4 py-3 rounded-xl text-sm font-semibold focus:outline-none focus:border-brand-chartreuse/50"
@@ -217,7 +324,7 @@ export const Paso6Fiscales = ({
         )}
 
         {foundFiscal && (
-          <div className="bg-brand-chartreuse/10 border border-brand-chartreuse/30 p-4 rounded-xl flex items-center justify-between">
+          <div className="bg-brand-chartreuse/10 border border-brand-chartreuse/30 p-4 rounded-xl flex items-center justify-between gap-3">
             <div>
               <p className="font-extrabold text-sm text-white">
                 {foundFiscal.nombre} {foundFiscal.apellido}
@@ -230,53 +337,87 @@ export const Paso6Fiscales = ({
             <button
               onClick={() => handleAsignarFiscal(foundFiscal.id)}
               disabled={asignando}
-              className="bg-brand-chartreuse text-brand-black px-4 py-2 rounded-xl text-xs font-extrabold hover:opacity-90 transition-all cursor-pointer"
+              className="bg-brand-chartreuse text-brand-black px-4 py-2 rounded-xl text-xs font-extrabold hover:opacity-90 transition-all cursor-pointer shrink-0"
             >
-              {asignando ? "Designando..." : "Confirmar Designación"}
+              {asignando ? "Designando..." : "Confirmar designación"}
             </button>
           </div>
         )}
       </div>
 
-      {/* Lista de Fiscales Asignados */}
       <div className="space-y-4">
         <h4 className="text-xs text-gray-400 font-bold uppercase tracking-wider flex items-center gap-2">
-          <UserCheck className="size-4 text-brand-chartreuse" /> Cuerpo Arbitral
-          Asignado ({fiscalesTorneo.length})
+          <UserCheck className="size-4 text-brand-chartreuse" /> Autoridades
+          asignadas ({fiscalesTorneo.length})
         </h4>
 
         {loading ? (
           <div className="text-center p-6 text-gray-500 text-xs">
-            Cargando fiscales asignados...
+            Cargando autoridades asignadas...
           </div>
         ) : fiscalesTorneo.length === 0 ? (
           <div className="p-8 text-center border border-dashed border-white/10 rounded-2xl text-gray-500 text-xs">
-            Aún no hay fiscales asignados a este torneo.
+            Aún no hay autoridades asignadas a este torneo.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {fiscalesTorneo.map((f) => (
-              <div
-                key={f.id}
-                className="bg-brand-input border border-white/10 p-4 rounded-2xl flex justify-between items-center shadow-sm"
-              >
-                <div>
-                  <p className="font-bold text-sm text-white">
-                    {f.nombre} {f.apellido}
-                  </p>
-                  <p className="text-xs text-gray-400 font-medium">
-                    DNI: {f.dni} · Alcance: {f.rango || "Provincial"}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleDesasignarFiscal(f.id)}
-                  className="text-rose-400 hover:text-rose-300 p-2 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
-                  title="Remover fiscal"
+            {fiscalesOrdenados.map((f) => {
+              const esGeneral = f.rol_torneo === "general";
+              return (
+                <div
+                  key={f.id}
+                  className="bg-brand-input border border-white/10 p-4 rounded-2xl flex justify-between items-start gap-3 shadow-sm"
                 >
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-            ))}
+                  <div className="min-w-0 space-y-2">
+                    <div>
+                      <p className="font-bold text-sm text-white">
+                        {f.nombre} {f.apellido}
+                      </p>
+                      <p className="text-xs text-gray-400 font-medium">
+                        DNI: {f.dni} · Alcance: {f.rango || "Provincial"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wide ${
+                          esGeneral
+                            ? "bg-brand-chartreuse/15 text-brand-chartreuse border border-brand-chartreuse/30"
+                            : "bg-white/5 text-gray-300 border border-white/10"
+                        }`}
+                      >
+                        {esGeneral && <Star className="size-3" />}
+                        {esGeneral ? "Fiscal general" : "Fiscal auxiliar"}
+                      </span>
+                      {!esGeneral && (
+                        <button
+                          type="button"
+                          onClick={() => handleCambiarRol(f.id, "general")}
+                          className="text-[10px] font-bold text-brand-chartreuse hover:underline cursor-pointer"
+                        >
+                          Nombrar general
+                        </button>
+                      )}
+                      {esGeneral && (
+                        <button
+                          type="button"
+                          onClick={() => handleCambiarRol(f.id, "auxiliar")}
+                          className="text-[10px] font-bold text-gray-400 hover:underline cursor-pointer"
+                        >
+                          Pasar a auxiliar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDesasignarFiscal(f.id)}
+                    className="text-rose-400 hover:text-rose-300 p-2 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer shrink-0"
+                    title="Remover autoridad"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

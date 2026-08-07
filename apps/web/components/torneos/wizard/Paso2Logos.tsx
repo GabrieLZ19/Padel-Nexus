@@ -1,7 +1,12 @@
 import React, { useState } from "react";
-import { Upload } from "lucide-react";
+import { Upload, Info } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo } from "@/utils/types";
+
+const MAX_BYTES = 5 * 1024 * 1024;
+const RECOMENDADO_PX = 512;
+/** Tolerancia de ratio 1:1 (±20%) — aviso suave, no bloquea. */
+const RATIO_TOLERANCIA = 0.2;
 
 interface Paso2LogosProps {
   torneo: Torneo;
@@ -10,6 +15,32 @@ interface Paso2LogosProps {
   setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
   readOnly?: boolean;
+}
+
+function leerDimensiones(
+  file: File,
+): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const width = img.naturalWidth;
+      const height = img.naturalHeight;
+      URL.revokeObjectURL(url);
+      resolve({ width, height });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("No se pudo leer la imagen"));
+    };
+    img.src = url;
+  });
+}
+
+function ratioFueraDeCuadrado(width: number, height: number): boolean {
+  if (width <= 0 || height <= 0) return false;
+  const ratio = width / height;
+  return Math.abs(ratio - 1) > RATIO_TOLERANCIA;
 }
 
 export const Paso2Logos = ({
@@ -21,14 +52,34 @@ export const Paso2Logos = ({
   readOnly = false,
 }: Paso2LogosProps) => {
   const [subiendoBanner, setSubiendoBanner] = useState(false);
+  const [avisoRatio, setAvisoRatio] = useState<string | null>(null);
 
   const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("La imagen excede el límite de 5MB.");
+    if (file.size > MAX_BYTES) {
+      setFeedbackModal((prev: any) => ({
+        ...prev,
+        isOpen: true,
+        type: "warning",
+        title: "Archivo demasiado grande",
+        description: "La imagen excede el límite de 5 MB. Comprimila e intentá de nuevo.",
+      }));
       return;
+    }
+
+    setAvisoRatio(null);
+    try {
+      const { width, height } = await leerDimensiones(file);
+      if (ratioFueraDeCuadrado(width, height)) {
+        setAvisoRatio(
+          `La imagen mide ${width}×${height}px (ratio ${ (width / height).toFixed(2) }). Se recomienda cuadrado 1:1 (ej. ${RECOMENDADO_PX}×${RECOMENDADO_PX}). Se subirá igual.`,
+        );
+      }
+    } catch {
+      // Sin dimensiones no bloqueamos el upload
     }
 
     const reader = new FileReader();
@@ -47,7 +98,13 @@ export const Paso2Logos = ({
             "La marca patrocinadora se ha cargado correctamente en WebP comprimido.",
         }));
       } catch (err: any) {
-        alert("Error al subir banner: " + (err.message || "Error desconocido"));
+        setFeedbackModal((prev: any) => ({
+          ...prev,
+          isOpen: true,
+          type: "error",
+          title: "Error al subir",
+          description: err.message || "Error desconocido",
+        }));
       } finally {
         setSubiendoBanner(false);
       }
@@ -69,7 +126,13 @@ export const Paso2Logos = ({
           "El banner ha sido removido del torneo y del almacenamiento.",
       }));
     } catch (err: any) {
-      alert("Error al eliminar: " + (err.message || "Error desconocido"));
+      setFeedbackModal((prev: any) => ({
+        ...prev,
+        isOpen: true,
+        type: "error",
+        title: "Error al eliminar",
+        description: err.message || "Error desconocido",
+      }));
     } finally {
       setSubiendoBanner(false);
     }
@@ -85,6 +148,29 @@ export const Paso2Logos = ({
         las llaves y transmisiones en vivo. Subí múltiples banners publicitarios
         optimizados.
       </p>
+
+      <div className="flex gap-3 rounded-2xl border border-brand-chartreuse/20 bg-brand-chartreuse/5 p-4 text-left">
+        <Info className="size-5 text-brand-chartreuse shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <p className="text-xs font-bold text-white uppercase tracking-wider">
+            Recomendaciones de imagen
+          </p>
+          <ul className="text-xs text-gray-400 space-y-0.5 list-disc list-inside">
+            <li>
+              Formato cuadrado <span className="text-gray-300 font-semibold">1:1</span>{" "}
+              (ideal {RECOMENDADO_PX}×{RECOMENDADO_PX} px)
+            </li>
+            <li>PNG o WebP con fondo transparente si aplica</li>
+            <li>Peso máximo 5 MB (se comprime a WebP al subir)</li>
+          </ul>
+        </div>
+      </div>
+
+      {avisoRatio && (
+        <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-xs text-yellow-200/90 font-medium">
+          {avisoRatio}
+        </div>
+      )}
 
       {Array.isArray(torneo?.banners) && torneo.banners.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
@@ -120,7 +206,7 @@ export const Paso2Logos = ({
             Subir nuevo banner publicitario
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            Se optimizará a WebP de bajo peso. Soporta hasta 5MB.
+            Preferí cuadrado 1:1 · PNG/WebP · máx. 5 MB
           </p>
         </div>
         <label
@@ -133,7 +219,7 @@ export const Paso2Logos = ({
 
       <input
         type="file"
-        accept="image/*"
+        accept="image/png,image/webp,image/jpeg,image/*"
         className="hidden"
         id="logo-file-input"
         disabled={subiendoBanner}

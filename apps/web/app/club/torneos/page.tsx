@@ -428,6 +428,7 @@ export default function ClubTorneosPage() {
           clubs={club ? [club] : []}
           isSaving={saving}
           editingId={editingId}
+          sedeFija
         />
       )}
 

@@ -1,8 +1,14 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Partido } from "@/utils/types";
-import { Trophy, CheckCircle2 } from "lucide-react";
+import {
+  Trophy,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Star,
+} from "lucide-react";
 
 export interface ParejaStats {
   inscripcionId: string;
@@ -19,6 +25,8 @@ export interface ParejaStats {
   gc: number;
   dg: number;
   stb: number;
+  cabezaDeSerie: boolean;
+  seed?: number;
 }
 
 interface TablaPosicionesZonaProps {
@@ -29,6 +37,7 @@ interface TablaPosicionesZonaProps {
     jugador2_nombre?: string | null;
     club?: string;
     cabezaDeSerie?: boolean;
+    seed?: number;
   }[];
   partidosZona: Partido[];
 }
@@ -38,6 +47,8 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
   parejasInscritas,
   partidosZona,
 }) => {
+  const [expanded, setExpanded] = useState(false);
+
   const cleanName = (name?: string | null) => {
     if (!name) return "";
     const cleaned = name
@@ -73,6 +84,8 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
         gc: 0,
         dg: 0,
         stb: 0,
+        cabezaDeSerie: Boolean(p.cabezaDeSerie),
+        seed: p.seed,
       };
     });
 
@@ -193,40 +206,56 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
 
   return (
     <div className="bg-[#161616] border border-white/5 rounded-3xl p-5 space-y-4 shadow-xl">
-      <div className="flex items-center justify-between border-b border-white/5 pb-3">
-        <div className="flex items-center gap-2">
-          <Trophy className="size-4 text-brand-chartreuse" />
-          <h4 className="font-extrabold text-white text-sm uppercase tracking-wider">
+      <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Trophy className="size-4 text-brand-chartreuse shrink-0" />
+          <h4 className="font-extrabold text-white text-sm uppercase tracking-wider truncate">
             Posiciones · {nombreZona}
           </h4>
         </div>
-        <span className="text-[10px] font-black bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20 px-2.5 py-0.5 rounded-full uppercase">
-          Clasificación Oficial
-        </span>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="shrink-0 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:border-brand-chartreuse/40 hover:text-brand-chartreuse transition-colors cursor-pointer"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp className="size-3.5" /> Compactar
+            </>
+          ) : (
+            <>
+              <ChevronDown className="size-3.5" /> Ver detalle
+            </>
+          )}
+        </button>
       </div>
 
       <div className="overflow-x-auto scrollbar-thin">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="border-b border-white/10 text-[10px] font-black text-gray-500 uppercase tracking-wider">
-              <th className="py-2.5 px-3 min-w-50">Participantes / Dupla</th>
+              <th className="py-2.5 px-3">Participantes / Dupla</th>
               <th className="py-2.5 px-2 text-center text-brand-chartreuse font-black">
                 Pts
               </th>
               <th className="py-2.5 px-2 text-center">PJ</th>
               <th className="py-2.5 px-2 text-center text-green-400">PG</th>
-              <th className="py-2.5 px-2 text-center text-red-400">PP</th>
-              <th className="py-2.5 px-2 text-center">SF</th>
-              <th className="py-2.5 px-2 text-center">SC</th>
-              <th className="py-2.5 px-2 text-center text-brand-chartreuse">
-                DS
-              </th>
-              <th className="py-2.5 px-2 text-center">GF</th>
-              <th className="py-2.5 px-2 text-center">GC</th>
-              <th className="py-2.5 px-2 text-center text-brand-chartreuse">
-                DG
-              </th>
-              <th className="py-2.5 px-2 text-center">STB</th>
+              {expanded && (
+                <>
+                  <th className="py-2.5 px-2 text-center text-red-400">PP</th>
+                  <th className="py-2.5 px-2 text-center">SF</th>
+                  <th className="py-2.5 px-2 text-center">SC</th>
+                  <th className="py-2.5 px-2 text-center text-brand-chartreuse">
+                    DS
+                  </th>
+                  <th className="py-2.5 px-2 text-center">GF</th>
+                  <th className="py-2.5 px-2 text-center">GC</th>
+                  <th className="py-2.5 px-2 text-center text-brand-chartreuse">
+                    DG
+                  </th>
+                  <th className="py-2.5 px-2 text-center">STB</th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5 font-semibold text-gray-300">
@@ -237,29 +266,37 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
                   key={row.inscripcionId}
                   className={`hover:bg-white/5 transition-colors ${
                     isClasificado ? "bg-brand-chartreuse/5" : ""
-                  }`}
+                  } ${row.cabezaDeSerie ? "bg-amber-500/5" : ""}`}
                 >
                   <td className="py-3 px-3">
                     <div className="flex items-center gap-2">
                       <span
                         className={`size-6 rounded-full flex items-center justify-center font-black text-[10px] shrink-0 ${
-                          idx === 0
-                            ? "bg-brand-chartreuse text-brand-black"
-                            : idx === 1
-                              ? "bg-white/10 text-white"
-                              : "bg-black/40 text-gray-500"
+                          row.cabezaDeSerie
+                            ? "bg-amber-400 text-brand-black"
+                            : idx === 0
+                              ? "bg-brand-chartreuse text-brand-black"
+                              : idx === 1
+                                ? "bg-white/10 text-white"
+                                : "bg-black/40 text-gray-500"
                         }`}
                       >
                         {idx + 1}
                       </span>
-                      <div>
-                        <p className="font-extrabold text-white text-xs flex items-center gap-1.5">
-                          {row.nombre}
+                      <div className="min-w-0">
+                        <p className="font-extrabold text-white text-xs flex flex-wrap items-center gap-1.5">
+                          <span className="truncate">{row.nombre}</span>
+                          {row.cabezaDeSerie && (
+                            <span className="inline-flex items-center gap-0.5 shrink-0 text-[8px] font-black text-amber-300 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                              <Star className="size-2.5 fill-amber-300" />
+                              Cab. Serie
+                            </span>
+                          )}
                           {isClasificado && (
                             <CheckCircle2 className="size-3.5 text-brand-chartreuse shrink-0" />
                           )}
                         </p>
-                        <p className="text-[10px] text-gray-500 font-bold">
+                        <p className="text-[10px] text-gray-500 font-bold truncate">
                           {row.club}
                         </p>
                       </div>
@@ -274,28 +311,38 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
                   <td className="py-3 px-2 text-center font-bold text-green-400">
                     {row.pg}
                   </td>
-                  <td className="py-3 px-2 text-center font-bold text-red-400">
-                    {row.pp}
-                  </td>
-                  <td className="py-3 px-2 text-center">{row.sf}</td>
-                  <td className="py-3 px-2 text-center">{row.sc}</td>
-                  <td className="py-3 px-2 text-center font-extrabold text-brand-chartreuse">
-                    {row.ds > 0 ? `+${row.ds}` : row.ds}
-                  </td>
-                  <td className="py-3 px-2 text-center">{row.gf}</td>
-                  <td className="py-3 px-2 text-center">{row.gc}</td>
-                  <td className="py-3 px-2 text-center font-extrabold text-brand-chartreuse">
-                    {row.dg > 0 ? `+${row.dg}` : row.dg}
-                  </td>
-                  <td className="py-3 px-2 text-center text-gray-500">
-                    {row.stb}
-                  </td>
+                  {expanded && (
+                    <>
+                      <td className="py-3 px-2 text-center font-bold text-red-400">
+                        {row.pp}
+                      </td>
+                      <td className="py-3 px-2 text-center">{row.sf}</td>
+                      <td className="py-3 px-2 text-center">{row.sc}</td>
+                      <td className="py-3 px-2 text-center font-extrabold text-brand-chartreuse">
+                        {row.ds > 0 ? `+${row.ds}` : row.ds}
+                      </td>
+                      <td className="py-3 px-2 text-center">{row.gf}</td>
+                      <td className="py-3 px-2 text-center">{row.gc}</td>
+                      <td className="py-3 px-2 text-center font-extrabold text-brand-chartreuse">
+                        {row.dg > 0 ? `+${row.dg}` : row.dg}
+                      </td>
+                      <td className="py-3 px-2 text-center text-gray-500">
+                        {row.stb}
+                      </td>
+                    </>
+                  )}
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {!expanded && (
+        <p className="text-[10px] text-gray-500 font-medium">
+          Vista compacta · Tocá &quot;Ver detalle&quot; para sets, games y STB.
+        </p>
+      )}
     </div>
   );
 };

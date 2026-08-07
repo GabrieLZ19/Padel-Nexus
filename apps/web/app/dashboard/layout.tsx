@@ -269,7 +269,7 @@ export default function DashboardLayout({
   return (
     <div className="flex h-screen bg-brand-black text-brand-white font-sans overflow-hidden">
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-72 transform bg-[#111111] flex flex-col shrink-0 border-r border-white/5 shadow-2xl transition-transform duration-300 md:relative md:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-30 w-72 transform bg-[#111111] flex flex-col shrink-0 border-r border-white/5 shadow-2xl transition-transform duration-300 lg:relative lg:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="h-28 px-8 flex items-center justify-between gap-3 border-b border-white/5 md:border-none">
           <div className="flex items-center gap-3">
@@ -308,7 +308,7 @@ export default function DashboardLayout({
           </div>
           <button
             onClick={closeMobileMenu}
-            className="md:hidden p-2 rounded-full text-gray-400 hover:text-white"
+            className="lg:hidden p-2 rounded-full text-gray-400 hover:text-white"
           >
             <X className="size-5" />
           </button>
@@ -374,13 +374,13 @@ export default function DashboardLayout({
 
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-20 bg-black/60 md:hidden"
+          className="fixed inset-0 z-20 bg-black/60 lg:hidden"
           onClick={closeMobileMenu}
         ></div>
       )}
 
-      <main className="flex-1 overflow-y-auto bg-brand-black">
-        <div className="md:hidden sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-brand-card/80 backdrop-blur-md border-b border-brand-white/5">
+      <main className="flex-1 overflow-y-auto bg-brand-black min-w-0">
+        <div className="lg:hidden sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4 bg-brand-card/80 backdrop-blur-md border-b border-brand-white/5">
           <button
             onClick={toggleMobileMenu}
             className="p-2.5 rounded-xl bg-brand-card text-brand-white border border-brand-white/10 cursor-pointer hover:bg-brand-card/80 transition-colors"

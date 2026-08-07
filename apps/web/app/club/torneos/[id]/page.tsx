@@ -27,7 +27,7 @@ const WIZARD_STEPS = [
   { id: "times", label: "5. Sedes", desc: "Canchas & Horas" },
   { id: "cierre", label: "6. Cierre", desc: "Puntuación" },
   { id: "draws", label: "7. Cuadros", desc: "Fixture" },
-  { id: "matches", label: "8. Arbitraje", desc: "Marcadores" },
+  { id: "matches", label: "8. Resultados", desc: "Marcadores" },
 ];
 
 export default function ClubTorneoDetallePage() {

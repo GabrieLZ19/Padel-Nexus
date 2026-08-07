@@ -60,6 +60,16 @@ export class ClubPanelService {
     await api.delete(`/club/mi-club/turnos/${turnoId}`);
   }
 
+  static async ajustarPreciosMasivos(datos: {
+    cancha_id?: string;
+    tipo_ajuste: "porcentaje" | "fijo";
+    valor: number;
+    franja?: "todos" | "pico" | "valle";
+  }): Promise<{ actualizados: number }> {
+    const { data } = await api.post("/club/mi-club/turnos/ajuste-precios", datos);
+    return data.data || { actualizados: 0 };
+  }
+
   static async getReservas(filtros: {
     fecha?: string;
     estado_pago?: string;

@@ -2,13 +2,44 @@ import React, { useState, useEffect, useRef } from "react";
 import { TorneosService } from "@/utils/services/torneos";
 import { ClubesService } from "@/utils/services/clubes";
 import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
+import { FederacionesService, Federacion } from "@/utils/services/federaciones";
 import { Torneo, Club } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
-import { Calendar, Layers, Trophy, Settings2, Gift } from "lucide-react";
+import { Calendar, Trophy, Settings2, Gift } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
-import { getAlcancesPermitidos, CUPOS_ESTANDAR_FAP } from "@/utils/constants/fapApaRules";
+import {
+  getAlcancesPermitidos,
+  getReglamentosPermitidos,
+  filtrarAsociacionesOrganizadorasFap,
+  debeForzarOrganizadorFap,
+  puedeUsarReglamentoAmateur,
+  type ReglamentoTorneo,
+} from "@/utils/constants/fapApaRules";
+import { esRolFederacionNacional } from "@/utils/auth/roles";
 import type { RolUsuario } from "@/utils/types/user.types";
 import type { RegisterSaveHandler } from "./types";
+
+const FED_PREFIX = "fed:";
+const ASO_PREFIX = "aso:";
+
+function organizadorValue(kind: "fed" | "aso", id: string) {
+  return kind === "fed" ? `${FED_PREFIX}${id}` : `${ASO_PREFIX}${id}`;
+}
+
+function parseOrganizador(value: string): {
+  federacionId: string | null;
+  asociacionId: string | null;
+} {
+  if (value.startsWith(FED_PREFIX)) {
+    return { federacionId: value.slice(FED_PREFIX.length), asociacionId: null };
+  }
+  if (value.startsWith(ASO_PREFIX)) {
+    return { federacionId: null, asociacionId: value.slice(ASO_PREFIX.length) };
+  }
+  // Legacy: bare UUID = asociación
+  if (value) return { federacionId: null, asociacionId: value };
+  return { federacionId: null, asociacionId: null };
+}
 
 interface Paso1DatosProps {
   torneo: Torneo;
@@ -35,13 +66,54 @@ export const Paso1Datos = ({
   // Información General
   const [editNombre, setEditNombre] = useState(torneo.nombre || "");
   const [editSede, setEditSede] = useState(torneo.club_id || "");
-  const [editAlcance, setEditAlcance] = useState<string>(torneo.alcance || "Provincial");
-  const [editAsociacion, setEditAsociacion] = useState<string>(
-    (torneo as any).reglamento || (torneo as any).asociacion || "FAP",
-  );
-  const [editAsociacionId, setEditAsociacionId] = useState<string>((torneo as any).asociacion_id || "");
+  const [editAlcance, setEditAlcance] = useState<string>(() => {
+    const inicial = torneo.alcance || "Provincial";
+    // Federación nacional no usa Local/Privado
+    if (
+      esRolFederacionNacional(userRole) &&
+      /local|privado/i.test(String(inicial))
+    ) {
+      return "Provincial";
+    }
+    return inicial;
+  });
+  const [editAsociacion, setEditAsociacion] = useState<string>(() => {
+    const raw =
+      (torneo as { reglamento?: string; asociacion?: string }).reglamento ||
+      (torneo as { asociacion?: string }).asociacion ||
+      "FAP";
+    if (raw === "Amateur" && !puedeUsarReglamentoAmateur(userRole)) return "FAP";
+    return raw;
+  });
   const [asociacionesList, setAsociacionesList] = useState<Asociacion[]>([]);
-  const [editFormato, setEditFormato] = useState<string>((torneo as any).formato || "Zonas + Llaves");
+  const [federacionesList, setFederacionesList] = useState<Federacion[]>([]);
+  const [fapFederacionId, setFapFederacionId] = useState<string>("");
+  const [editOrganizador, setEditOrganizador] = useState<string>(() => {
+    const fedId = (torneo as { federacion_id?: string }).federacion_id;
+    const asoId = (torneo as { asociacion_id?: string }).asociacion_id;
+    if (fedId) return organizadorValue("fed", fedId);
+    if (asoId) return organizadorValue("aso", asoId);
+    return "";
+  });
+  const [editFormato, setEditFormato] = useState<string>(
+    (torneo as { formato?: string }).formato || "Zonas + Llaves",
+  );
+
+  const forzarFap = debeForzarOrganizadorFap(editAlcance);
+  const reglamentosDisponibles = getReglamentosPermitidos(userRole);
+  const asociacionesOrganizadoras = filtrarAsociacionesOrganizadorasFap(
+    asociacionesList,
+  );
+  const organizadorOptions = [
+    ...federacionesList.map((f) => ({
+      value: organizadorValue("fed", f.id),
+      label: `${f.sigla || "FED"} — ${f.nombre}`,
+    })),
+    ...asociacionesOrganizadoras.map((a) => ({
+      value: organizadorValue("aso", a.id),
+      label: `${a.nombre} (${a.sigla || "SF"}) — ${a.provincia}`,
+    })),
+  ];
 
   // Fechas
   const [editFecha, setEditFecha] = useState(
@@ -78,14 +150,6 @@ export const Paso1Datos = ({
     torneo.premio_3 || "",
   );
 
-  // Carnet Federativo
-  const [requiereCarnet, setRequiereCarnet] = useState<boolean>(
-    Boolean((torneo as any).requiere_carnet_federativo),
-  );
-  const [montoCarnet, setMontoCarnet] = useState<string>(
-    (torneo as any).monto_carnet ? String((torneo as any).monto_carnet) : "0",
-  );
-
   // Canchas y Clubes
   const [clubs, setClubs] = useState<Club[]>([]);
   const [canchasClub, setCanchasClub] = useState<any[]>([]);
@@ -97,17 +161,48 @@ export const Paso1Datos = ({
     Promise.all([
       ClubesService.getAll().catch(() => ({ data: [], total: 0 })),
       AsociacionesService.getAll().catch(() => []),
-    ]).then(([clubesRes, asocsRes]) => {
-      if (isMounted) {
-        setClubs(clubesRes.data || []);
-        setAsociacionesList(asocsRes || []);
+      FederacionesService.getAll().catch(() => []),
+    ]).then(([clubesRes, asocsRes, fedsRes]) => {
+      if (!isMounted) return;
+      setClubs(clubesRes.data || []);
+      setAsociacionesList(asocsRes || []);
+      const feds = fedsRes || [];
+      setFederacionesList(feds);
+      const fap =
+        feds.find((f) => (f.sigla || "").toUpperCase() === "FAP") ||
+        feds.find((f) => /federaci[oó]n argentina/i.test(f.nombre || ""));
+      if (fap?.id) {
+        setFapFederacionId(fap.id);
+        // Default: FAP (federación), no una asociación provincial
+        if (!editOrganizador) {
+          setEditOrganizador(organizadorValue("fed", fap.id));
+        }
       }
     });
 
     return () => {
       isMounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- carga inicial
   }, []);
+
+  // Alcance Nacional ⇒ organizadora FAP + reglamento FAP
+  useEffect(() => {
+    if (!forzarFap) return;
+    if (fapFederacionId) {
+      setEditOrganizador(organizadorValue("fed", fapFederacionId));
+    }
+    if (editAsociacion !== "FAP") {
+      setEditAsociacion("FAP");
+    }
+  }, [forzarFap, fapFederacionId, editAsociacion]);
+
+  // Si el rol no puede Amateur y quedó seleccionado, corregir
+  useEffect(() => {
+    if (editAsociacion === "Amateur" && !puedeUsarReglamentoAmateur(userRole)) {
+      setEditAsociacion("FAP");
+    }
+  }, [editAsociacion, userRole]);
 
   useEffect(() => {
     if (!editSede) {
@@ -169,14 +264,14 @@ export const Paso1Datos = ({
       return false;
     }
 
-    if (!editNombre || !editFecha || !editSede) {
+    if (!editNombre || !editFecha || !editFechaFin || !editSede) {
       setFeedbackModal((prev: any) => ({
         ...prev,
         isOpen: true,
         type: "warning",
         title: "Campos incompletos",
         description:
-          "Completá nombre, fecha y sede antes de guardar o avanzar de paso.",
+          "Completá nombre, fecha de inicio, fecha de finalización y centro de cómputos antes de guardar o avanzar de paso.",
       }));
       return false;
     }
@@ -184,6 +279,20 @@ export const Paso1Datos = ({
     try {
       setGuardandoDatos(true);
       const precioFinal = esGratis ? 0 : Math.max(0, Number(editPrecio) || 0);
+      const orgParsed = parseOrganizador(
+        forzarFap && fapFederacionId
+          ? organizadorValue("fed", fapFederacionId)
+          : editOrganizador,
+      );
+      const reglamentoFinal = forzarFap
+        ? "FAP"
+        : (editAsociacion as ReglamentoTorneo);
+
+      // Si organiza una asociación del ecosistema FAP, igual vinculamos federacion_id FAP
+      const federacionIdFinal =
+        orgParsed.federacionId ||
+        (orgParsed.asociacionId ? fapFederacionId || null : null);
+
       await TorneosService.update(torneoId, {
         nombre: editNombre,
         fecha: editFecha ? editFecha : null,
@@ -200,8 +309,9 @@ export const Paso1Datos = ({
         cupos_maximos: Number(editCupos),
         canchas_disponibles: selectedCanchas.length,
         alcance: editAlcance,
-        reglamento: editAsociacion,
-        asociacion_id: editAsociacionId || null,
+        reglamento: reglamentoFinal,
+        asociacion_id: orgParsed.asociacionId,
+        federacion_id: federacionIdFinal,
         formato: editFormato,
       } as any);
 
@@ -268,18 +378,25 @@ export const Paso1Datos = ({
         </div>
         <div>
           <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
-            Centro de Cómputos (Fijo)
+            Centro de Cómputos
           </label>
-          <div className="w-full bg-brand-input/50 border border-white/5 text-gray-300 p-3.5 rounded-xl font-bold text-sm cursor-not-allowed flex items-center justify-between">
-            <span>
-              {clubs.find((c) => String(c.id) === String(editSede))?.nombre ||
-                torneo.clubes?.nombre ||
-                "Centro de Cómputos Oficial"}
-            </span>
-            <span className="text-[10px] bg-brand-chartreuse/10 text-brand-chartreuse px-2.5 py-1 rounded-full uppercase tracking-wider font-extrabold">
-              No modificable
-            </span>
-          </div>
+          <CustomDropdown
+            value={editSede}
+            onChange={setEditSede}
+            options={clubs.map((c) => ({
+              value: String(c.id),
+              label: c.nombre,
+            }))}
+            placeholder={
+              clubs.length === 0
+                ? "No hay clubes disponibles"
+                : "Seleccionar centro de cómputos..."
+            }
+            disabled={clubs.length === 0}
+          />
+          <p className="text-[10px] text-gray-500 mt-1.5">
+            Punto de mando de delegados y fiscal general
+          </p>
         </div>
         <div>
           <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
@@ -303,6 +420,11 @@ export const Paso1Datos = ({
               Tu perfil Provincial no permite organizar torneos Nacionales.
             </p>
           )}
+          {esRolFederacionNacional(userRole) && (
+            <p className="text-[10px] text-gray-500 mt-1.5">
+              La federación nacional no organiza torneos Locales / Privados.
+            </p>
+          )}
         </div>
         <div>
           <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
@@ -310,36 +432,37 @@ export const Paso1Datos = ({
           </label>
           <CustomDropdown
             value={editAsociacion}
-            onChange={setEditAsociacion}
-            options={[
-              { value: "FAP", label: "FAP (Federación Argentina de Pádel)" },
-              { value: "APA", label: "APA (Asociación de Pádel Argentina)" },
-              { value: "Amateur", label: "Amateur / Independiente" },
-            ]}
+            onChange={(val) => setEditAsociacion(val as ReglamentoTorneo)}
+            options={reglamentosDisponibles}
             placeholder="Seleccionar Reglamento..."
+            disabled={forzarFap}
           />
           <p className="text-[10px] text-gray-500 mt-1.5">
-            El reglamento determina los cortes de edad, categorías y siembras del Paso 3.
+            {forzarFap
+              ? "Alcance Nacional: se aplica el reglamento FAP."
+              : "El reglamento determina los cortes de edad, categorías y siembras del Paso 3."}
           </p>
         </div>
 
         <div>
           <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
-            Asociación Organizadora
+            Entidad Organizadora
           </label>
           <CustomDropdown
-            value={editAsociacionId}
-            onChange={setEditAsociacionId}
-            options={asociacionesList
-              .filter((a) => a.estado === "activo" || (a.estado !== "inactivo" && a.estado !== "pendiente"))
-              .map((a) => ({
-                value: a.id,
-                label: `${a.nombre} (${a.sigla || "SF"}) — ${a.provincia}`,
-              }))}
-            placeholder="-- Seleccionar Asociación del Padrón --"
+            value={
+              forzarFap && fapFederacionId
+                ? organizadorValue("fed", fapFederacionId)
+                : editOrganizador
+            }
+            onChange={setEditOrganizador}
+            options={organizadorOptions}
+            placeholder="-- FAP o asociación del ecosistema --"
+            disabled={forzarFap}
           />
           <p className="text-[10px] text-gray-500 mt-1.5">
-            Asociación del padrón oficial encargada del torneo.
+            {forzarFap
+              ? "Alcance Nacional: organiza la Federación Argentina de Pádel (FAP)."
+              : "Por defecto FAP. Podés elegir una asociación provincial del ecosistema."}
           </p>
         </div>
         <div>
@@ -413,7 +536,7 @@ export const Paso1Datos = ({
           </div>
           <div>
             <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
-              Fecha de Finalización
+              Fecha de Finalización *
             </label>
             <input
               type="date"

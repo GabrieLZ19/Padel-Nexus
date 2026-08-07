@@ -13,6 +13,9 @@ import { InscripcionesService } from "@/utils/services/inscripciones";
 import { PagosService } from "@/utils/services/pagos";
 import ConfirmarPagoModal from "@/components/inscripciones/ConfirmarPagoModal";
 import InscripcionManualModal from "@/components/inscripciones/InscripcionManualModal";
+import { useProfileStore } from "@/store/useProfileStore";
+import { esTorneoContextoFederacion } from "@/utils/constants/fapApaRules";
+import type { RolUsuario } from "@/utils/types/user.types";
 
 interface Paso4JugadoresProps {
   torneo: Torneo;
@@ -43,6 +46,17 @@ export const Paso4Jugadores = ({
   triggerRefresh,
   readOnly = false,
 }: Paso4JugadoresProps) => {
+  const profile = useProfileStore((s) => s.profile);
+  const userRole = (profile?.rol || "admin") as RolUsuario;
+  const modoFederacion = esTorneoContextoFederacion(
+    {
+      alcance: torneo.alcance,
+      reglamento: (torneo as { reglamento?: string }).reglamento,
+      asociacion: (torneo as { asociacion?: string }).asociacion,
+    },
+    userRole,
+  );
+
   const [importingCSV, setImportingCSV] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [pagoModal, setPagoModal] = useState({
@@ -363,7 +377,13 @@ export const Paso4Jugadores = ({
                             : "bg-gray-500/10 text-gray-400 border border-gray-500/20"
                         }`}
                       >
-                        {isConfirmed ? "Confirmado" : "Pendiente en App"}
+                        {isConfirmed
+                          ? modoFederacion
+                            ? "Pagó"
+                            : "Confirmado"
+                          : modoFederacion
+                            ? "No pagó"
+                            : "Pendiente en App"}
                       </span>
                     </td>
                     <td className="px-8 py-5 text-right font-semibold text-sm">
@@ -404,6 +424,7 @@ export const Paso4Jugadores = ({
         isOpen={pagoModal.isOpen}
         montoSugerido={pagoModal.montoDefecto}
         isLoading={pagoModal.isLoading}
+        modoFederacion={modoFederacion}
         onClose={() => setPagoModal((prev) => ({ ...prev, isOpen: false }))}
         onConfirm={async (monto: number, metodo: string) => {
           setPagoModal((prev) => ({ ...prev, isLoading: true }));
@@ -412,7 +433,9 @@ export const Paso4Jugadores = ({
               entidad_tipo: "inscripcion",
               entidad_id: pagoModal.inscripcionId,
               monto,
-              metodo_pago: metodo || "Efectivo",
+              metodo_pago: modoFederacion
+                ? "Confirmado"
+                : metodo || "Efectivo",
             });
             setPagoModal((prev) => ({ ...prev, isOpen: false }));
             triggerRefresh();

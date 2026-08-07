@@ -6,22 +6,26 @@ import { TablaPosicionesZona } from "./TablaPosicionesZona";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Partido, Inscripcion } from "@/utils/types";
 import {
-  GitMerge,
   LayoutGrid,
   History,
   Check,
   PenLine,
   RefreshCw,
-  Plus,
   Trophy,
   Move,
   X,
+  Printer,
 } from "lucide-react";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
 import { MatchCard } from "./MatchCard";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import {
+  getCapacidadesZonasPorReglamento,
+  resumirCapacidadesZonas,
+} from "@/utils/constants/fapApaRules";
+import { generarPdfZonas } from "@/utils/grillaPdf";
 
 interface BracketEditorProps {
   torneoId: string;
@@ -47,6 +51,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   const [activeView, setActiveView] = useState<
     "zonas" | "siembra" | "llaves" | "auditoria"
   >(isEliminatoriaDirecta ? "llaves" : "zonas");
+  const autoSwitchedToLlave = React.useRef(false);
   const [zonas, setZonas] = useState<ZonaDrag[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -59,7 +64,6 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   const [modificacionNoDestructiva, setModificacionNoDestructiva] =
     useState(true);
   const [validarCabezasSerie, setValidarCabezasSerie] = useState(true);
-  const [tamanioGrupo, setTamanioGrupo] = useState<number>(3);
   const [auditoriaLogs, setAuditoriaLogs] = useState<any[]>([]);
   const [loadingAuditoria, setLoadingAuditoria] = useState(false);
 
@@ -97,6 +101,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     type: "info",
     onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
   });
+  const [matchEditMotivo, setMatchEditMotivo] = useState("");
+  const [matchEditBusy, setMatchEditBusy] = useState(false);
 
   const loadZonas = async () => {
     try {
@@ -134,33 +140,70 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       return;
     }
 
-    try {
-      setLoading(true);
-      await TorneosService.generarZonas(torneoId, tamanioGrupo);
-      await loadZonas();
-      onRefresh?.();
+    const hayResultados = partidos.some((p) => p.ganador);
+    if (modificacionNoDestructiva && hayResultados) {
       setFeedbackModal({
         isOpen: true,
-        type: "success",
-        title: "Zonas Generadas",
+        type: "warning",
+        title: "Modificación no destructiva activa",
         description:
-          "Las zonas se han generado automáticamente según el reglamento FAP.",
+          "Hay partidos con resultados. Desactivá el switch 'Modificación no destructiva' si querés regenerar las zonas (se borrarán resultados).",
         onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
       });
-    } catch (error: any) {
-      setFeedbackModal({
-        isOpen: true,
-        type: "error",
-        title: "Error al generar zonas",
-        description:
-          error.response?.data?.error ||
-          error.message ||
-          "No se pudieron generar las zonas.",
-        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
-      });
-    } finally {
-      setLoading(false);
+      return;
     }
+
+    const runGenerate = async (forzar: boolean) => {
+      try {
+        setLoading(true);
+        await TorneosService.generarZonas(torneoId, undefined, forzar);
+        await loadZonas();
+        onRefresh?.();
+        setFeedbackModal({
+          isOpen: true,
+          type: "success",
+          title: "Zonas Generadas",
+          description:
+            "Las zonas se han generado automáticamente según el reglamento FAP.",
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+      } catch (error: any) {
+        setFeedbackModal({
+          isOpen: true,
+          type: "error",
+          title: "Error al generar zonas",
+          description:
+            error.response?.data?.error ||
+            error.message ||
+            "No se pudieron generar las zonas.",
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (hayResultados && !modificacionNoDestructiva) {
+      setFeedbackModal({
+        isOpen: true,
+        type: "warning",
+        title: "Regeneración destructiva",
+        description:
+          "Se borrarán todos los partidos y resultados del torneo. ¿Confirmás regenerar las zonas?",
+        confirmText: "Sí, regenerar",
+        cancelText: "Cancelar",
+        onConfirm: async () => {
+          setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
+          await runGenerate(true);
+        },
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
+      return;
+    }
+
+    await runGenerate(false);
   };
 
   const loadAuditoria = async () => {
@@ -519,6 +562,222 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     return result;
   };
 
+  const PLAYOFF_ROUND_IDS = ["32AVOS", "16AVOS", "OCTAVOS", "CUARTOS", "SEMIS", "FINAL"];
+  const playoffPartidos = partidos.filter((p) =>
+    PLAYOFF_ROUND_IDS.includes((p.ronda || "").toUpperCase()),
+  );
+
+  const isZonaRonda = (ronda?: string | null) => {
+    const r = String(ronda || "").toUpperCase();
+    if (!r || PLAYOFF_ROUND_IDS.includes(r)) return false;
+    return r.startsWith("ZONA") || r.includes("GRUPO");
+  };
+
+  const partidosZona = partidos.filter((p) => isZonaRonda(p.ronda));
+  const faseZonasCerrada =
+    partidosZona.length > 0 && partidosZona.every((p) => p.ganador != null);
+  const hayResultadoEnZonas = partidosZona.some((p) => p.ganador != null);
+  const hayResultadoEnLlave = playoffPartidos.some((p) => p.ganador != null);
+
+  /**
+   * FAP: una vez confeccionados zonas/draw, no se modifican salvo fiscal.
+   * En CRM: se bloquea edición estructural al cerrar zonas o al cargar el 1er resultado.
+   */
+  const puedeEditarZonas =
+    !isReadOnly &&
+    torneo?.estado !== "Finalizado" &&
+    !faseZonasCerrada &&
+    !hayResultadoEnZonas;
+
+  const puedeEditarLlave =
+    !isReadOnly &&
+    torneo?.estado !== "Finalizado" &&
+    !hayResultadoEnLlave;
+
+  React.useEffect(() => {
+    if (autoSwitchedToLlave.current) return;
+    if (faseZonasCerrada && playoffPartidos.length > 0 && !isEliminatoriaDirecta) {
+      setActiveView("llaves");
+      autoSwitchedToLlave.current = true;
+    }
+  }, [faseZonasCerrada, playoffPartidos.length, isEliminatoriaDirecta]);
+
+  React.useEffect(() => {
+    if (!puedeEditarZonas && !puedeEditarLlave && isEditing) {
+      setIsEditing(false);
+    }
+  }, [puedeEditarZonas, puedeEditarLlave, isEditing]);
+
+  const firstPlayoffRound = PLAYOFF_ROUND_IDS.find((r) =>
+    playoffPartidos.some((p) => (p.ronda || "").toUpperCase() === r),
+  );
+  const firstRoundTeams = new Set<string>();
+  playoffPartidos
+    .filter((p) => (p.ronda || "").toUpperCase() === firstPlayoffRound)
+    .forEach((p) => {
+      if (p.equipo_a_id) firstRoundTeams.add(p.equipo_a_id);
+      if (p.equipo_b_id) firstRoundTeams.add(p.equipo_b_id);
+    });
+
+  const slotsPrimeraRonda =
+    playoffPartidos.filter(
+      (p) => (p.ronda || "").toUpperCase() === firstPlayoffRound,
+    ).length * 2;
+  const ocupadosPrimeraRonda = firstRoundTeams.size;
+  const libresPrimeraRonda = Math.max(0, slotsPrimeraRonda - ocupadosPrimeraRonda);
+
+  const playoffFinalizados = playoffPartidos.filter(
+    (p) => p.ganador != null,
+  ).length;
+  const playoffTotal = playoffPartidos.length;
+  const rondaEnCurso = PLAYOFF_ROUND_IDS.find((r) =>
+    playoffPartidos.some(
+      (p) => (p.ronda || "").toUpperCase() === r && p.ganador == null,
+    ),
+  );
+  const llaveCompleta =
+    playoffTotal > 0 && playoffFinalizados === playoffTotal;
+  const labelRondaEnCurso = rondaEnCurso
+    ? RONDAS_CONFIG.find((r) => r.id === rondaEnCurso)?.label ||
+      ({
+        "32AVOS": "32avos",
+        "16AVOS": "16avos",
+      } as Record<string, string>)[rondaEnCurso] ||
+      rondaEnCurso
+    : null;
+
+  /** Origen de zona por inscripción (seed dentro de la zona = posición provisional). */
+  const origenPorInscripcion = React.useMemo(() => {
+    const map = new Map<string, string>();
+    const sortedZonas = [...zonas].sort((a, b) =>
+      a.nombre.localeCompare(b.nombre, "es"),
+    );
+    for (const zona of sortedZonas) {
+      const zonaNombre = /^zona\s+/i.test(zona.nombre)
+        ? zona.nombre.trim()
+        : `Zona ${zona.nombre.trim()}`;
+      const ordenadas = [...zona.parejas].sort(
+        (a, b) => (a.seed || 999) - (b.seed || 999),
+      );
+      ordenadas.forEach((p, idx) => {
+        const puesto = idx + 1;
+        map.set(String(p.id), `${zonaNombre} ${puesto}°`);
+      });
+    }
+    return map;
+  }, [zonas]);
+
+  const cabezasSerieIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    for (const zona of zonas) {
+      for (const p of zona.parejas) {
+        if (p.cabezaDeSerie) ids.add(String(p.id));
+      }
+    }
+    return ids;
+  }, [zonas]);
+
+  const inscripcionOptions = React.useMemo(() => {
+    return (inscripciones || []).map((ins) => {
+      const row = ins as Inscripcion & {
+        jugador_1_nombre?: string;
+        jugador1_nombre?: string;
+        jugador1?: { nombre?: string };
+        jugador_2_nombre?: string;
+        jugador2_nombre?: string;
+        jugador2?: { nombre?: string };
+      };
+      const name1 =
+        row.jugador_1_nombre ||
+        row.jugador1_nombre ||
+        row.jugador1?.nombre ||
+        "Jugador 1";
+      const name2 =
+        row.jugador_2_nombre ||
+        row.jugador2_nombre ||
+        row.jugador2?.nombre ||
+        "";
+      const enLlave = firstRoundTeams.has(ins.id);
+      return {
+        value: ins.id,
+        label: name2
+          ? `${name1} / ${name2}${enLlave ? " · En llave" : ""}`
+          : `${name1}${enLlave ? " · En llave" : ""}`,
+        name1,
+        name2,
+      };
+    });
+  }, [inscripciones, firstRoundTeams]);
+
+  const applyInscripcionToSlot = (
+    slot: "a" | "b",
+    newId: string,
+  ) => {
+    const found = inscripcionOptions.find((o) => o.value === newId);
+    setSelectedMatchToEdit((prev) => {
+      if (!prev) return prev;
+      if (slot === "a") {
+        return {
+          ...prev,
+          equipo_a_id: newId || null,
+          equipo_a_j1: newId ? found?.name1 || null : null,
+          equipo_a_j2: newId ? found?.name2 || null : null,
+        };
+      }
+      return {
+        ...prev,
+        equipo_b_id: newId || null,
+        equipo_b_j1: newId ? found?.name1 || null : null,
+        equipo_b_j2: newId ? found?.name2 || null : null,
+      };
+    });
+  };
+
+  const handleGuardarMatchEdit = async () => {
+    if (!selectedMatchToEdit) return;
+    if (!matchEditMotivo.trim()) {
+      setFeedbackModal({
+        isOpen: true,
+        type: "warning",
+        title: "Motivo obligatorio",
+        description: "Indicá el motivo del cambio para auditoría.",
+        onClose: () =>
+          setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
+      return;
+    }
+    try {
+      setMatchEditBusy(true);
+      await TorneosService.actualizarEquiposPartido(selectedMatchToEdit.id, {
+        equipo_a_id: selectedMatchToEdit.equipo_a_id || null,
+        equipo_b_id: selectedMatchToEdit.equipo_b_id || null,
+        motivo: matchEditMotivo.trim(),
+      });
+      setShowMatchEditModal(false);
+      setSelectedMatchToEdit(null);
+      setMatchEditMotivo("");
+      onRefresh?.();
+    } catch (err: unknown) {
+      const e = err as {
+        response?: { data?: { error?: string } };
+        message?: string;
+      };
+      setFeedbackModal({
+        isOpen: true,
+        type: "error",
+        title: "Error al actualizar",
+        description:
+          e.response?.data?.error ||
+          e.message ||
+          "No se pudo actualizar la pareja del partido.",
+        onClose: () =>
+          setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
+    } finally {
+      setMatchEditBusy(false);
+    }
+  };
+
   return (
     <div className="bg-[#1a1a1a] border border-white/5 rounded-3xl p-4 sm:p-6 md:p-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -528,14 +787,16 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             {torneo?.categoria || "CATEGORÍA"}
           </h3>
           <p className="text-gray-400 text-sm mt-1">
-            El sistema armó zonas y siembra automáticamente. Podés ajustar
-            manualmente sin borrar resultados.
+            {faseZonasCerrada
+              ? "Fase de grupos finalizada. La competencia continúa en la llave de campeonato."
+              : "El sistema armó zonas y siembra automáticamente. Podés ajustar manualmente sin borrar resultados."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {/* Tutorial y Editar solo en Fase de Grupos */}
+          {/* Tutorial y Editar solo si la fase de grupos aún admite cambios */}
           {torneo?.formato !== "Eliminatoria Directa" &&
-            activeView === "zonas" && (
+            activeView === "zonas" &&
+            puedeEditarZonas && (
               <>
                 <button
                   onClick={() => {
@@ -583,6 +844,15 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 </button>
               </>
             )}
+          {faseZonasCerrada && activeView === "zonas" && (
+            <button
+              type="button"
+              onClick={() => setActiveView("llaves")}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-brand-chartreuse text-brand-black hover:bg-[#b3e600] transition-all"
+            >
+              <Trophy className="size-4" /> Ver llave
+            </button>
+          )}
         </div>
       </div>
 
@@ -633,20 +903,6 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             <History className="size-4" /> Auditoría
           </button>
         </div>
-
-        {!isReadOnly && activeView === "llaves" && (
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-              isEditing
-                ? "bg-brand-chartreuse text-brand-black shadow-[0_0_15px_rgba(204,255,0,0.4)]"
-                : "bg-white/10 border border-white/20 text-white hover:bg-white/20"
-            }`}
-          >
-            <PenLine className="size-4" />
-            {isEditing ? "Finalizar Edición" : "Editar Llave"}
-          </button>
-        )}
       </div>
 
       {/* PANEL SIEMBRA — Drag & Drop primera ronda de Eliminatoria Directa */}
@@ -738,6 +994,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             )}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+              {puedeEditarZonas && (
               <button
                 id="btn-regenerar"
                 onClick={handleRegenerarZonas}
@@ -759,30 +1016,23 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               >
                 <RefreshCw className="size-4 text-gray-400" /> Generar Cuadros
               </button>
+              )}
 
-              <div className="flex-1 sm:flex-initial flex items-center justify-between sm:justify-start gap-2 bg-[#222222] border border-white/5 rounded-xl px-3.5 py-1.5 text-sm text-gray-300 w-full sm:w-auto">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wide shrink-0">
-                  {isIndividual ? "Jugadores" : "Parejas"} por Zona:
-                </span>
-                <div className="w-32 sm:w-40">
-                  <CustomDropdown
-                    value={String(tamanioGrupo)}
-                    onChange={(val) => setTamanioGrupo(Number(val))}
-                    options={[
-                      {
-                        value: "3",
-                        label: isIndividual ? "3 jugadores" : "3 parejas",
-                      },
-                      {
-                        value: "4",
-                        label: isIndividual ? "4 jugadores" : "4 parejas",
-                      },
-                    ]}
-                    placeholder="Seleccionar..."
-                  />
-                </div>
-              </div>
+              <button
+                type="button"
+                disabled={zonas.length === 0}
+                onClick={() => {
+                  if (!torneo || zonas.length === 0) return;
+                  generarPdfZonas(torneo, zonas, partidos);
+                }}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Printer className="size-4 text-gray-400" /> Imprimir zonas
+              </button>
+
+        
             </div>
+            {puedeEditarZonas && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
               <div
                 id="btn-validar-cabezas"
@@ -838,23 +1088,30 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 </div>
               </div>
             </div>
+            )}
           </div>
 
+          {puedeEditarZonas && (
           <div className="flex items-center gap-2 text-gray-500 text-sm">
             <Move className="size-3.5" />{" "}
             {isIndividual
               ? "Arrastrá un jugador a un slot para reubicarlo."
               : "Arrastrá una pareja a un slot para reubicarla."}
           </div>
+          )}
 
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 border-b border-white/5 pb-3">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <h4 className="text-xl font-bold text-white">
-                Zonas de clasificación
+                {faseZonasCerrada
+                  ? "Resultados de zonas"
+                  : "Zonas de clasificación"}
               </h4>
+              {faseZonasCerrada && (
               <span className="px-3 py-1 bg-brand-chartreuse/10 border border-brand-chartreuse/20 text-brand-chartreuse text-xs font-bold rounded-full flex items-center gap-1.5 shrink-0">
                 <Check className="size-3.5" /> Fase consolidada
               </span>
+              )}
             </div>
             <div className="text-gray-500 text-xs sm:text-sm font-medium">
               {zonas.length} zonas · {totalParejas}{" "}
@@ -870,7 +1127,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           ) : zonas.length > 0 ? (
             <div className="space-y-8">
               {/* MODO EDICIÓN: drag-and-drop para mover parejas */}
-              {isEditing ? (
+              {isEditing && puedeEditarZonas ? (
                 <DragDropPairing
                   zonas={zonas}
                   onZonasChange={setZonas}
@@ -906,68 +1163,154 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       )}
 
       {activeView === "llaves" && (
-        <div className="bg-[#111111] rounded-3xl border border-white/5 p-6 overflow-x-auto">
-          {partidos.length === 0 ? (
-            <div className="text-center p-12 text-gray-500 border border-dashed border-white/10 rounded-2xl">
-              Aún no se ha generado el cuadro de eliminatoria para este torneo.
+        <div className="space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+            <div>
+              <h4 className="text-lg font-extrabold text-white tracking-tight">
+                Llave de campeonato
+              </h4>
+              <p className="text-sm text-gray-400 mt-0.5 max-w-xl">
+                {puedeEditarLlave
+                  ? "Tocá un partido para agregar, cambiar o quitar parejas. El motivo queda en auditoría."
+                  : "Estructura fija. Los marcadores se cargan en Resultados."}
+              </p>
             </div>
-          ) : (
-            <div className="flex gap-0 min-w-max pb-8 pt-4">
-              {rondasToShow.map((ronda, rondaIndex) => (
-                <div key={ronda.id} className="flex flex-col w-72">
-                  <h3 className="text-center text-sm font-bold text-gray-500 uppercase tracking-widest mb-8 h-6">
-                    {ronda.label}
-                  </h3>
-                  <div className="flex flex-col flex-1">
-                    {getRoundMatches(ronda.id, ronda.required).map(
-                      (partido, i) => (
-                        <div
-                          key={partido.id}
-                          className={`flex-1 flex flex-col justify-center relative py-4 ${
-                            rondaIndex < rondasToShow.length - 1
-                              ? "pr-8"
-                              : "pr-4"
-                          } ${rondaIndex > 0 ? "pl-8" : "pl-4"}`}
-                        >
-                          <MatchCard
-                            partido={partido}
-                            isInteractive={isEditing}
-                            isEditing={isEditing}
-                            onEditSelect={(pToEdit) => {
-                              setSelectedMatchToEdit(pToEdit);
-                              setShowMatchEditModal(true);
-                            }}
-                            isActive={
-                              partido.ganador === null &&
-                              partido.equipo_a_id !== null &&
-                              partido.equipo_b_id !== null
-                            }
-                          />
+            {playoffPartidos.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-xs font-bold shrink-0">
+                <span className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-gray-300">
+                  {llaveCompleta ? (
+                    <>
+                      Llave{" "}
+                      <span className="text-brand-chartreuse">completada</span>
+                    </>
+                  ) : (
+                    <>
+                      {labelRondaEnCurso ? (
+                        <>
+                          {labelRondaEnCurso}
+                          <span className="text-gray-600 mx-1.5">·</span>
+                        </>
+                      ) : null}
+                      Progreso{" "}
+                      <span className="text-brand-chartreuse tabular-nums">
+                        {playoffFinalizados}
+                      </span>
+                      <span className="text-gray-500">
+                        /{playoffTotal} partidos
+                      </span>
+                    </>
+                  )}
+                </span>
+                {puedeEditarLlave && libresPrimeraRonda > 0 && (
+                  <span className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-amber-400">
+                    Primera ronda {ocupadosPrimeraRonda}/{slotsPrimeraRonda} ·{" "}
+                    {libresPrimeraRonda} libre
+                    {libresPrimeraRonda === 1 ? "" : "s"}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
 
-                          {/* Horizontal line coming in from left (except first round) */}
-                          {rondaIndex > 0 && (
-                            <div className="absolute left-0 top-1/2 w-8 h-0.5 bg-white/10 -translate-y-1/2" />
-                          )}
-
-                          {/* Conectores visuales para el bracket (hacia la derecha) */}
-                          {rondaIndex < rondasToShow.length - 1 && (
-                            <>
-                              <div className="absolute right-0 top-1/2 w-8 h-0.5 bg-white/10 -translate-y-1/2" />
-                              {i % 2 === 0 ? (
-                                <div className="absolute right-0 top-1/2 w-0.5 h-[50%] bg-white/10" />
-                              ) : (
-                                <div className="absolute right-0 bottom-1/2 w-0.5 h-[50%] bg-white/10" />
-                              )}
-                            </>
-                          )}
-                        </div>
-                      ),
-                    )}
-                  </div>
+          <div className="relative rounded-2xl border border-white/10 bg-[#080808] overflow-hidden">
+            <div
+              className="pointer-events-none absolute inset-0 opacity-[0.35]"
+              style={{
+                backgroundImage:
+                  "radial-gradient(ellipse 80% 50% at 20% 0%, rgba(204,255,0,0.06), transparent 55%), radial-gradient(ellipse 60% 40% at 90% 100%, rgba(56,189,248,0.05), transparent 50%)",
+              }}
+            />
+            <div className="relative p-4 sm:p-6 overflow-x-auto">
+              {playoffPartidos.length === 0 && partidos.length === 0 ? (
+                <div className="text-center p-12 text-gray-500 border border-dashed border-white/10 rounded-2xl">
+                  Aún no se ha generado el cuadro de eliminatoria para este
+                  torneo.
                 </div>
-              ))}
+              ) : (
+                <div className="flex gap-0 min-w-max pb-4 pt-1">
+                  {rondasToShow.map((ronda, rondaIndex) => (
+                    <div
+                      key={ronda.id}
+                      className="flex flex-col w-[21rem] sm:w-[24.5rem]"
+                    >
+                      <h3 className="text-center text-[10px] font-black text-gray-500 uppercase tracking-[0.22em] mb-6">
+                        {ronda.label}
+                      </h3>
+                      <div className="flex flex-col flex-1 justify-around gap-10">
+                        {getRoundMatches(ronda.id, ronda.required).map(
+                          (partido, i) => (
+                            <div
+                              key={partido.id}
+                              className={`relative flex flex-col justify-center ${
+                                rondaIndex < rondasToShow.length - 1
+                                  ? "pr-7"
+                                  : "pr-1"
+                              } ${rondaIndex > 0 ? "pl-7" : "pl-1"}`}
+                            >
+                              <MatchCard
+                                partido={partido}
+                                isInteractive={puedeEditarLlave}
+                                origenEquipoA={
+                                  partido.equipo_a_id
+                                    ? origenPorInscripcion.get(
+                                        String(partido.equipo_a_id),
+                                      ) || null
+                                    : null
+                                }
+                                origenEquipoB={
+                                  partido.equipo_b_id
+                                    ? origenPorInscripcion.get(
+                                        String(partido.equipo_b_id),
+                                      ) || null
+                                    : null
+                                }
+                                esCabezaSerieA={
+                                  !!partido.equipo_a_id &&
+                                  cabezasSerieIds.has(
+                                    String(partido.equipo_a_id),
+                                  )
+                                }
+                                esCabezaSerieB={
+                                  !!partido.equipo_b_id &&
+                                  cabezasSerieIds.has(
+                                    String(partido.equipo_b_id),
+                                  )
+                                }
+                                onEditSelect={(pToEdit) => {
+                                  setSelectedMatchToEdit({ ...pToEdit });
+                                  setMatchEditMotivo("");
+                                  setShowMatchEditModal(true);
+                                }}
+                                isActive={
+                                  partido.ganador === null &&
+                                  partido.equipo_a_id !== null &&
+                                  partido.equipo_b_id !== null
+                                }
+                              />
+
+                              {rondaIndex > 0 && (
+                                <div className="absolute left-0 top-1/2 w-7 h-px bg-white/15 -translate-y-1/2 pointer-events-none" />
+                              )}
+                              {rondaIndex < rondasToShow.length - 1 && (
+                                <>
+                                  <div className="absolute right-0 top-1/2 w-7 h-px bg-white/15 -translate-y-1/2 pointer-events-none" />
+                                  {i % 2 === 0 ? (
+                                    <div className="absolute right-0 top-1/2 w-px h-[calc(50%+1rem)] bg-white/15 pointer-events-none" />
+                                  ) : (
+                                    <div className="absolute right-0 bottom-1/2 w-px h-[calc(50%+1rem)] bg-white/15 pointer-events-none" />
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -1084,173 +1427,128 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           </div>
         </>
       )}
-      {/* MODAL DE EDICIÓN DIRECTA DE PAREJAS EN LA LLAVE DE CAMPEONATO */}
+      {/* Modal: gestionar pareja en un partido de la llave */}
       {showMatchEditModal && selectedMatchToEdit && (
-        <div className="fixed inset-0 z-110 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-brand-card border border-white/10 rounded-3xl p-6 max-w-lg w-full space-y-5 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-white/5 pb-3">
+        <div className="fixed inset-0 z-110 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="bg-[#121212] border border-white/10 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-white/8 bg-white/[0.02]">
               <div>
-                <h4 className="text-white font-extrabold text-base">
-                  Reasignar Partido ({selectedMatchToEdit.ronda})
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-chartreuse mb-1">
+                  {selectedMatchToEdit.ronda || "Llave de campeonato"}
+                </p>
+                <h4 className="text-white font-extrabold text-lg tracking-tight">
+                  Gestionar partido
                 </h4>
-                <p className="text-xs text-gray-400">
-                  Seleccioná qué parejainscripta disputará este partido en la
-                  llave.
+                <p className="text-xs text-gray-400 mt-1">
+                  Asigná o vaciá cada lado. Guardar exige un motivo de auditoría.
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   setShowMatchEditModal(false);
                   setSelectedMatchToEdit(null);
+                  setMatchEditMotivo("");
                 }}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/5"
+                aria-label="Cerrar"
               >
                 <X className="size-5" />
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1.5">
-                  Equipo / Jugador A:
-                </label>
+            <div className="p-5 space-y-4">
+              <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-sky-400">
+                    Lado A
+                  </label>
+                  {selectedMatchToEdit.equipo_a_id && (
+                    <button
+                      type="button"
+                      onClick={() => applyInscripcionToSlot("a", "")}
+                      className="text-[10px] font-bold uppercase tracking-wide text-red-400/90 hover:text-red-300"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
                 <CustomDropdown
                   value={selectedMatchToEdit.equipo_a_id || ""}
-                  onChange={(newId) => {
-                    const found = inscripciones.find(
-                      (i) => i.id === newId,
-                    ) as any;
-                    setSelectedMatchToEdit((prev: any) => ({
-                      ...prev,
-                      equipo_a_id: newId,
-                      equipo_a_j1:
-                        found?.jugador_1_nombre ||
-                        found?.jugador1_nombre ||
-                        found?.jugador1?.nombre ||
-                        prev?.equipo_a_j1,
-                      equipo_a_j2:
-                        found?.jugador_2_nombre ||
-                        found?.jugador2_nombre ||
-                        found?.jugador2?.nombre ||
-                        prev?.equipo_a_j2,
-                    }));
-                  }}
+                  onChange={(newId) => applyInscripcionToSlot("a", newId)}
                   options={[
-                    { value: "", label: "Libre / BYE" },
-                    ...inscripciones.map((ins: any) => {
-                      const name1 =
-                        ins.jugador_1_nombre ||
-                        ins.jugador1_nombre ||
-                        ins.jugador1?.nombre ||
-                        "Jugador 1";
-                      const name2 =
-                        ins.jugador_2_nombre ||
-                        ins.jugador2_nombre ||
-                        ins.jugador2?.nombre ||
-                        "";
-                      return {
-                        value: ins.id,
-                        label: name2 ? `${name1} / ${name2}` : name1,
-                      };
-                    }),
+                    { value: "", label: "Vacío / BYE" },
+                    ...inscripcionOptions.map((o) => ({
+                      value: o.value,
+                      label: o.label,
+                    })),
                   ]}
-                  placeholder="Seleccionar Equipo A..."
+                  placeholder="Seleccionar pareja A..."
+                />
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-sky-400">
+                    Lado B
+                  </label>
+                  {selectedMatchToEdit.equipo_b_id && (
+                    <button
+                      type="button"
+                      onClick={() => applyInscripcionToSlot("b", "")}
+                      className="text-[10px] font-bold uppercase tracking-wide text-red-400/90 hover:text-red-300"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
+                <CustomDropdown
+                  value={selectedMatchToEdit.equipo_b_id || ""}
+                  onChange={(newId) => applyInscripcionToSlot("b", newId)}
+                  options={[
+                    { value: "", label: "Vacío / BYE" },
+                    ...inscripcionOptions.map((o) => ({
+                      value: o.value,
+                      label: o.label,
+                    })),
+                  ]}
+                  placeholder="Seleccionar pareja B..."
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-300 block mb-1.5">
-                  Equipo / Jugador B:
+                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1.5">
+                  Motivo (auditoría)
                 </label>
-                <CustomDropdown
-                  value={selectedMatchToEdit.equipo_b_id || ""}
-                  onChange={(newId) => {
-                    const found = inscripciones.find(
-                      (i) => i.id === newId,
-                    ) as any;
-                    setSelectedMatchToEdit((prev: any) => ({
-                      ...prev,
-                      equipo_b_id: newId,
-                      equipo_b_j1:
-                        found?.jugador_1_nombre ||
-                        found?.jugador1_nombre ||
-                        found?.jugador1?.nombre ||
-                        prev?.equipo_b_j1,
-                      equipo_b_j2:
-                        found?.jugador_2_nombre ||
-                        found?.jugador2_nombre ||
-                        found?.jugador2?.nombre ||
-                        prev?.equipo_b_j2,
-                    }));
-                  }}
-                  options={[
-                    { value: "", label: "Libre / BYE" },
-                    ...inscripciones.map((ins: any) => {
-                      const name1 =
-                        ins.jugador_1_nombre ||
-                        ins.jugador1_nombre ||
-                        ins.jugador1?.nombre ||
-                        "Jugador 1";
-                      const name2 =
-                        ins.jugador_2_nombre ||
-                        ins.jugador2_nombre ||
-                        ins.jugador2?.nombre ||
-                        "";
-                      return {
-                        value: ins.id,
-                        label: name2 ? `${name1} / ${name2}` : name1,
-                      };
-                    }),
-                  ]}
-                  placeholder="Seleccionar Equipo B..."
+                <input
+                  type="text"
+                  value={matchEditMotivo}
+                  onChange={(e) => setMatchEditMotivo(e.target.value)}
+                  placeholder="Ej: Reasignación por baja / error de categoría"
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-chartreuse/40"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-white/5">
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/8 bg-white/[0.02]">
               <button
+                type="button"
                 onClick={() => {
                   setShowMatchEditModal(false);
                   setSelectedMatchToEdit(null);
+                  setMatchEditMotivo("");
                 }}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-white/5 border border-white/10 text-gray-300 hover:text-white"
+                className="px-4 py-2.5 rounded-xl text-xs font-bold bg-white/5 border border-white/10 text-gray-300 hover:text-white"
               >
                 Cancelar
               </button>
               <button
-                onClick={async () => {
-                  try {
-                    await TorneosService.actualizarEquiposPartido(
-                      selectedMatchToEdit.id,
-                      {
-                        equipo_a_id: selectedMatchToEdit.equipo_a_id || null,
-                        equipo_b_id: selectedMatchToEdit.equipo_b_id || null,
-                        motivo:
-                          "Reasignación manual directa en la Llave de Campeonato",
-                      },
-                    );
-                    setShowMatchEditModal(false);
-                    setSelectedMatchToEdit(null);
-                    onRefresh?.();
-                  } catch (err: any) {
-                    setFeedbackModal({
-                      isOpen: true,
-                      type: "error",
-                      title: "Error al actualizar",
-                      description:
-                        err.message ||
-                        "No se pudo actualizar la pareja del partido.",
-                      onClose: () =>
-                        setFeedbackModal((prev) => ({
-                          ...prev,
-                          isOpen: false,
-                        })),
-                    });
-                  }
-                }}
-                className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-brand-chartreuse text-brand-black hover:bg-[#b3e600]"
+                type="button"
+                disabled={matchEditBusy}
+                onClick={() => void handleGuardarMatchEdit()}
+                className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-brand-chartreuse text-brand-black hover:bg-[#b3e600] disabled:opacity-40"
               >
-                Guardar Cambio
+                {matchEditBusy ? "Guardando…" : "Guardar"}
               </button>
             </div>
           </div>

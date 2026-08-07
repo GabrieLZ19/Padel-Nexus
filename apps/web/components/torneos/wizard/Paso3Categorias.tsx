@@ -6,7 +6,6 @@ import {
   Layers,
   Calendar,
   ShieldCheck,
-  DollarSign,
   PlusCircle,
 } from "lucide-react";
 import {
@@ -58,20 +57,15 @@ export const Paso3Categorias = ({
   const [editModalidad, setEditModalidad] = useState(
     torneo.modalidad || "Duplas",
   );
-  const [editPrecio, setEditPrecio] = useState(
-    torneo.precio_inscripcion ? String(torneo.precio_inscripcion) : "0",
-  );
   const [validarEdad, setValidarEdad] = useState(
     (torneo as any).validar_edad || false,
   );
   const reglasArbitrajeObj = (torneo as any).reglas_arbitraje || {};
   const [requiereCarnet, setRequiereCarnet] = useState<boolean>(
-    Boolean(reglasArbitrajeObj.requiere_carnet_federativo),
-  );
-  const [montoCarnet, setMontoCarnet] = useState<string>(
-    reglasArbitrajeObj.monto_carnet !== undefined
-      ? String(reglasArbitrajeObj.monto_carnet)
-      : "0",
+    Boolean(
+      reglasArbitrajeObj.requiere_carnet_federativo ??
+        (torneo as { requiere_carnet_federativo?: boolean }).requiere_carnet_federativo,
+    ),
   );
   const [selectedDias, setSelectedDias] = useState<string[]>(() => {
     const raw = (torneo as any).dias_juego;
@@ -243,22 +237,14 @@ export const Paso3Categorias = ({
       return false;
     }
 
-    const esGratisTorneo = Boolean(
-      (torneo as any).es_gratis || Number(torneo.precio_inscripcion) === 0,
-    );
-    const precioFinal = esGratisTorneo
-      ? 0
-      : Math.max(0, Number(editPrecio) || 0);
-
-    const montoCarnetNum = Math.max(0, Number(montoCarnet) || 0);
-
-    if (requiereCarnet && Number(montoCarnet) < 0) {
+    if (selectedDias.length === 0) {
       setFeedbackModal((prev: any) => ({
         ...prev,
         isOpen: true,
         type: "warning",
-        title: "Monto inválido",
-        description: "El monto del carnet federativo no puede ser negativo.",
+        title: "Días de competencia requeridos",
+        description:
+          "Seleccioná al menos un día de competencia antes de guardar o avanzar.",
       }));
       return false;
     }
@@ -270,13 +256,13 @@ export const Paso3Categorias = ({
         categoria: finalCategoria,
         nivel: finalNivel,
         modalidad: editModalidad,
-        precio_inscripcion: precioFinal,
         validar_edad: editCategoria === "Libres" ? false : validarEdad,
         dias_juego: selectedDias,
         reglas_arbitraje: {
           ...((torneo as any).reglas_arbitraje || {}),
           requiere_carnet_federativo: requiereCarnet,
-          monto_carnet: requiereCarnet ? montoCarnetNum : 0,
+          // Precio de carnet eliminado del flujo (solo validación de licencia FAP)
+          monto_carnet: 0,
         },
       } as any);
 
@@ -331,7 +317,7 @@ export const Paso3Categorias = ({
         <p className="text-sm text-gray-400 mt-1">
           Configurá la rama, categoría y nivel según el reglamento{" "}
           <span className="text-brand-chartreuse font-bold">{asociacion}</span>.
-          Marcá los días de competencia.
+          Marcá los días de competencia (obligatorio).
         </p>
       </div>
 
@@ -458,77 +444,38 @@ export const Paso3Categorias = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-white/5 pt-6">
-        {/* PRECIO DE INSCRIPCIÓN */}
-        <div>
+      {editCategoria !== "Libres" && (
+        <div className="border-t border-white/5 pt-6">
           <label className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <DollarSign className="size-4 text-brand-chartreuse" /> Precio de
-            Inscripción
+            <ShieldCheck className="size-4 text-brand-chartreuse" /> Control
+            de Edad
           </label>
-          {(torneo as any).es_gratis === true ? (
-            <div className="bg-brand-card/50 border border-brand-white/10 p-3 rounded-xl flex items-center justify-between text-sm">
-              <span className="text-brand-chartreuse font-extrabold uppercase text-xs tracking-wider">
-                Torneo Gratuito
-              </span>
-              <span className="text-[11px] text-gray-400">
-                Configurado en Paso 1
-              </span>
+          <div
+            onClick={() => setValidarEdad(!validarEdad)}
+            className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+              validarEdad
+                ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white shadow-[0_0_15px_rgba(204,255,0,0.1)]"
+                : "bg-brand-input border-white/10 text-gray-400 hover:border-white/20"
+            }`}
+          >
+            <div>
+              <p className="font-extrabold text-xs text-white">
+                Validar Edad según Categoría
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                Verifica que los participantes cumplan con la edad
+                reglamentaria.
+              </p>
             </div>
-          ) : (
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">
-                $
-              </span>
-              <input
-                type="number"
-                min="0"
-                step="100"
-                value={editPrecio}
-                onChange={(e) => {
-                  const val = Math.max(0, Number(e.target.value) || 0);
-                  setEditPrecio(String(val));
-                }}
-                className="w-full bg-brand-input border border-white/10 text-white pl-8 p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none"
-                placeholder="0"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* CONTROL DE EDAD (Oculto si la categoría es Libres) */}
-        {editCategoria !== "Libres" && (
-          <div className="flex flex-col justify-end">
-            <label className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <ShieldCheck className="size-4 text-brand-chartreuse" /> Control
-              de Edad
-            </label>
-            <div
-              onClick={() => setValidarEdad(!validarEdad)}
-              className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                validarEdad
-                  ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white shadow-[0_0_15px_rgba(204,255,0,0.1)]"
-                  : "bg-brand-input border-white/10 text-gray-400 hover:border-white/20"
-              }`}
-            >
-              <div>
-                <p className="font-extrabold text-xs text-white">
-                  Validar Edad según Categoría
-                </p>
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  Verifica que los participantes cumplan con la edad
-                  reglamentaria.
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={validarEdad}
-                onChange={() => {}}
-                className="size-5 rounded border-white/10 bg-black/50 text-brand-chartreuse focus:ring-brand-chartreuse accent-brand-chartreuse cursor-pointer transition-all"
-              />
-            </div>
+            <input
+              type="checkbox"
+              checked={validarEdad}
+              onChange={() => {}}
+              className="size-5 rounded border-white/10 bg-black/50 text-brand-chartreuse focus:ring-brand-chartreuse accent-brand-chartreuse cursor-pointer transition-all"
+            />
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* SECCIÓN CARNET FEDERATIVO */}
       <div className="border-t border-white/10 pt-6 space-y-4">
@@ -548,11 +495,11 @@ export const Paso3Categorias = ({
           >
             <div>
               <p className="font-extrabold text-xs text-white">
-                ¿Cobra o Exige Carnet Federativo Vigente?
+                Exige carnet federativo FAP vigente
               </p>
               <p className="text-[10px] text-gray-400 mt-0.5">
-                Requerido para competir en torneos oficiales FAP/APA de
-                circuito.
+                Si está activo, ambos jugadores deben tener licencia FAP en
+                estado Activa para inscribirse. Sin precio adicional.
               </p>
             </div>
             <input
@@ -562,26 +509,6 @@ export const Paso3Categorias = ({
               className="size-5 rounded border-white/10 bg-black/50 text-brand-chartreuse focus:ring-brand-chartreuse accent-brand-chartreuse cursor-pointer transition-all"
             />
           </div>
-
-          {requiereCarnet && (
-            <div className="max-w-sm pt-2">
-              <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">
-                Monto del Carnet Federativo ($)
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={montoCarnet}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (Number(val) < 0) return;
-                  setMontoCarnet(val);
-                }}
-                className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none text-xs"
-                placeholder="Ingresá el valor del carnet..."
-              />
-            </div>
-          )}
         </div>
       </div>
 
@@ -589,8 +516,11 @@ export const Paso3Categorias = ({
       <div className="border-t border-white/5 pt-6 space-y-4">
         <h4 className="text-xs text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
           <Calendar className="size-4 text-brand-chartreuse" /> Días de
-          Competencia (Partidos)
+          Competencia (Partidos) *
         </h4>
+        <p className="text-[11px] text-gray-400 -mt-2">
+          Obligatorio: seleccioná al menos un día.
+        </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {playDays.map((dia) => {
             const isSelected = selectedDias.includes(dia.value);

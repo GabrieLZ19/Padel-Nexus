@@ -11,6 +11,8 @@ export interface Fiscal {
   asociacion?: string;
   activo?: boolean;
   created_at?: string;
+  /** Rol en el torneo: general | auxiliar */
+  rol_torneo?: "general" | "auxiliar";
 }
 
 export const FiscalesService = {
@@ -47,9 +49,16 @@ export const FiscalesService = {
     }
   },
 
-  asignarATorneo: async (torneoId: string, fiscalIds: string[]): Promise<boolean> => {
+  asignarATorneo: async (
+    torneoId: string,
+    fiscalIds: string[],
+    rolesById?: Record<string, "general" | "auxiliar">,
+  ): Promise<boolean> => {
     try {
-      await api.post(`/torneos/${torneoId}/fiscales`, { fiscal_ids: fiscalIds });
+      await api.post(`/torneos/${torneoId}/fiscales`, {
+        fiscal_ids: fiscalIds,
+        roles_by_id: rolesById,
+      });
       return true;
     } catch (error) {
       console.error("Error al asignar fiscales al torneo:", error);

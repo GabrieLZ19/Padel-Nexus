@@ -9,6 +9,7 @@ import { ClubesService } from "@/utils/services/clubes";
 import { sileo } from "sileo";
 import { useProfileStore } from "@/store/useProfileStore";
 import type { RolUsuario } from "@/utils/types/user.types";
+import { CATEGORIAS_TORNEO } from "@/utils/constants/padelConfig";
 
 interface SedesFiscalesTabProps {
   torneoId: string;
@@ -69,7 +70,12 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
     cancha_id: "",
     fecha: "",
     hora_inicio: "",
+    hora_fin: "",
+    categoria: "",
   });
+  const [categoriasTorneo, setCategoriasTorneo] = useState<
+    { value: string; label: string }[]
+  >([...CATEGORIAS_TORNEO]);
   const [searchDni, setSearchDni] = useState("");
   const [foundFiscal, setFoundFiscal] = useState<any | null>(null);
   const [searchError, setSearchError] = useState("");
@@ -133,6 +139,17 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
           if (Array.isArray(resTorneo.data.dias_juego)) {
             setDiasJuego(resTorneo.data.dias_juego);
           }
+
+          const opts = [...CATEGORIAS_TORNEO];
+          const cat = resTorneo.data.categoria;
+          const nivel = resTorneo.data.nivel;
+          if (cat && !opts.some((o) => o.value === cat)) {
+            opts.push({ value: cat, label: cat });
+          }
+          if (nivel && !opts.some((o) => o.value === nivel)) {
+            opts.push({ value: nivel, label: nivel });
+          }
+          setCategoriasTorneo(opts);
         }
       } catch (e) {
         console.error("Error loading tournament configuration", e);
@@ -256,11 +273,24 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       return;
     }
 
+    if (
+      canchaForm.hora_fin &&
+      canchaForm.hora_fin.slice(0, 5) <= normFormHora
+    ) {
+      sileo.error({
+        title: "Error",
+        description: "La hora de fin debe ser posterior a la hora de inicio.",
+      });
+      return;
+    }
+
     const newItem = {
       club_id: canchaForm.club_id,
       cancha_id: canchaForm.cancha_id,
       fecha: canchaForm.fecha,
       hora_inicio: canchaForm.hora_inicio,
+      hora_fin: canchaForm.hora_fin || null,
+      categoria: canchaForm.categoria || null,
     };
     const newList = [...dispList, newItem];
     try {
@@ -274,7 +304,12 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
         `/torneos/${torneoId}/canchas-disponibilidad`,
       );
       setDispList(resDisp.data || []);
-      setCanchaForm({ ...canchaForm, cancha_id: "", hora_inicio: "" });
+      setCanchaForm({
+        ...canchaForm,
+        cancha_id: "",
+        hora_inicio: "",
+        hora_fin: "",
+      });
     } catch (e) {
       console.error(e);
     } finally {
@@ -470,8 +505,8 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
             Disponibilidad de Canchas y Horarios
           </h4>
 
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 p-4 bg-brand-input/40 rounded-2xl border border-white/10 items-end">
-            <div className="sm:col-span-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 p-4 bg-brand-input/40 rounded-2xl border border-white/10 items-end">
+            <div className="lg:col-span-3">
               <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
                 Club
               </span>
@@ -484,7 +519,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                 placeholder="Club..."
               />
             </div>
-            <div className="sm:col-span-3">
+            <div className="lg:col-span-3">
               <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
                 Cancha
               </span>
@@ -500,7 +535,23 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                 placeholder="Cancha..."
               />
             </div>
-            <div className="sm:col-span-3">
+            <div className="lg:col-span-3">
+              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                Categoría
+              </span>
+              <CustomDropdown
+                value={canchaForm.categoria}
+                onChange={(val) =>
+                  setCanchaForm({ ...canchaForm, categoria: val })
+                }
+                options={[
+                  { value: "", label: "Sin asignar / Todas" },
+                  ...categoriasTorneo,
+                ]}
+                placeholder="Categoría..."
+              />
+            </div>
+            <div className="lg:col-span-3">
               <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
                 Fecha
               </span>
@@ -515,9 +566,9 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                 className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl text-center font-bold text-sm outline-none focus:border-brand-chartreuse/50 h-12"
               />
             </div>
-            <div className="sm:col-span-2">
+            <div className="lg:col-span-4">
               <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
-                Hora Inicio
+                Hora inicio *
               </span>
               <input
                 type="time"
@@ -528,12 +579,26 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                 className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl text-center font-bold text-sm outline-none focus:border-brand-chartreuse/50 h-12"
               />
             </div>
-            <div className="sm:col-span-1 flex justify-end">
+            <div className="lg:col-span-4">
+              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                Hora fin (opc.)
+              </span>
+              <input
+                type="time"
+                value={canchaForm.hora_fin}
+                onChange={(e) =>
+                  setCanchaForm({ ...canchaForm, hora_fin: e.target.value })
+                }
+                className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl text-center font-bold text-sm outline-none focus:border-brand-chartreuse/50 h-12"
+              />
+            </div>
+            <div className="lg:col-span-4 flex justify-end">
               <button
                 onClick={handleAddCanchaDisp}
-                className="w-full bg-brand-chartreuse text-brand-black p-3.5 rounded-xl font-bold hover:opacity-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center h-12"
+                className="w-full bg-brand-chartreuse text-brand-black p-3.5 rounded-xl font-bold hover:opacity-90 active:scale-95 transition-all cursor-pointer flex items-center justify-center h-12 gap-2"
               >
                 <Plus className="size-4" />
+                Agregar turno
               </button>
             </div>
           </div>
@@ -639,6 +704,10 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                           "Sede";
                         const canchaName = d.canchas?.nombre || "Cancha";
                         const horaClean = (d.hora_inicio || "").slice(0, 5);
+                        const horaFinClean = d.hora_fin
+                          ? String(d.hora_fin).slice(0, 5)
+                          : "";
+                        const categoriaLabel = d.categoria || null;
 
                         return (
                           <div
@@ -651,13 +720,16 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                               </p>
                               <p className="text-[11px] text-gray-400 truncate">
                                 {canchaName}
+                                {categoriaLabel ? ` · ${categoriaLabel}` : ""}
                               </p>
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0">
                               <span className="inline-flex items-center gap-1 bg-brand-chartreuse/10 border border-brand-chartreuse/30 text-brand-chartreuse px-2.5 py-1 rounded-lg text-xs font-black">
                                 <Clock className="size-3" />
-                                {horaClean} hs
+                                {horaFinClean
+                                  ? `${horaClean}–${horaFinClean}`
+                                  : `${horaClean} hs`}
                               </span>
                               <button
                                 type="button"

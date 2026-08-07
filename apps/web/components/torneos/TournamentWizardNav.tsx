@@ -79,9 +79,9 @@ export const ALL_STEPS: StepDefinition[] = [
     id: "fiscales",
     number: 6,
     label: "Fiscales",
-    desc: "Cuerpo arbitral",
+    desc: "Autoridades del torneo",
     group: "logistics",
-    keywords: ["fiscales", "arbitros", "cuerpo arbitral", "juez", "fiscal"],
+    keywords: ["fiscales", "autoridades", "arbitros", "juez", "fiscal", "general", "auxiliar"],
     icon: ShieldCheck,
   },
   {
@@ -286,9 +286,7 @@ export function TournamentWizardNav({
               Índice de Pasos
             </h3>
           </div>
-          <span className="text-[10px] font-black bg-brand-chartreuse/10 text-brand-chartreuse px-2 py-0.5 rounded-full border border-brand-chartreuse/20">
-            9 Pasos
-          </span>
+          
         </div>
 
         {/* Buscador rápido */}

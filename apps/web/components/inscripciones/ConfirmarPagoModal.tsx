@@ -11,6 +11,8 @@ interface ConfirmarPagoModalProps {
   onConfirm: (monto: number, metodo: string) => void;
   montoSugerido?: number;
   isLoading?: boolean;
+  /** Federación: ocultar método de pago; solo confirmar Pagó. */
+  modoFederacion?: boolean;
 }
 
 const PAYMENT_METHODS = [
@@ -25,15 +27,23 @@ export default function ConfirmarPagoModal({
   onConfirm,
   montoSugerido = 0,
   isLoading = false,
+  modoFederacion = false,
 }: ConfirmarPagoModalProps) {
   const [monto, setMonto] = useState<string>(montoSugerido.toString());
   const [metodo, setMetodo] = useState<string>("Efectivo");
+  const [marcoComoPago, setMarcoComoPago] = useState(true);
 
   useEffect(() => {
     setMonto(montoSugerido.toString());
-  }, [montoSugerido]);
+    setMarcoComoPago(true);
+    setMetodo("Efectivo");
+  }, [montoSugerido, isOpen]);
 
   if (!isOpen) return null;
+
+  const canConfirm = modoFederacion
+    ? marcoComoPago
+    : Boolean(monto) && Number(monto) >= 0;
 
   return (
     <AnimatePresence>
@@ -51,16 +61,19 @@ export default function ConfirmarPagoModal({
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
           className="relative w-full max-w-md bg-[#0a0a0a] rounded-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col"
         >
-          {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/5 bg-white/2">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-brand-chartreuse/10 flex items-center justify-center border border-brand-chartreuse/20">
                 <CreditCard className="size-5 text-brand-chartreuse" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">Confirmar Pago</h3>
+                <h3 className="text-lg font-bold text-white">
+                  {modoFederacion ? "Confirmar pago" : "Confirmar Pago"}
+                </h3>
                 <p className="text-sm text-gray-400">
-                  Recepción manual de dinero
+                  {modoFederacion
+                    ? "Marcá si la pareja pagó la inscripción"
+                    : "Recepción manual de dinero"}
                 </p>
               </div>
             </div>
@@ -73,7 +86,6 @@ export default function ConfirmarPagoModal({
             </button>
           </div>
 
-          {/* Body */}
           <div className="p-6 flex flex-col gap-5">
             <div className="bg-brand-chartreuse/5 border border-brand-chartreuse/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
               <p className="text-sm text-gray-400 mb-1">
@@ -85,42 +97,75 @@ export default function ConfirmarPagoModal({
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-300 ml-1">
-                  Monto cobrado
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-gray-500" />
-                  <input
-                    type="number"
-                    value={monto}
-                    readOnly={true}
-                    className="w-full bg-[#111] text-white text-lg font-semibold rounded-xl border border-white/10 pl-11 pr-4 py-3.5 cursor-not-allowed opacity-60 transition-colors"
-                    placeholder="0"
+            {modoFederacion ? (
+              <button
+                type="button"
+                onClick={() => setMarcoComoPago((v) => !v)}
+                className={`w-full p-4 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                  marcoComoPago
+                    ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white"
+                    : "bg-[#111] border-white/10 text-gray-400"
+                }`}
+              >
+                <div>
+                  <p className="font-bold text-sm text-white">
+                    {marcoComoPago ? "Pagó" : "No pagó"}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {marcoComoPago
+                      ? "Se confirmará el pago y se habilitará la inscripción."
+                      : "Activá el checkbox para confirmar el pago."}
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={marcoComoPago}
+                  onChange={() => setMarcoComoPago((v) => !v)}
+                  className="size-5 accent-brand-chartreuse cursor-pointer"
+                />
+              </button>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-300 ml-1">
+                    Monto cobrado
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-gray-500" />
+                    <input
+                      type="number"
+                      value={monto}
+                      readOnly={true}
+                      className="w-full bg-[#111] text-white text-lg font-semibold rounded-xl border border-white/10 pl-11 pr-4 py-3.5 cursor-not-allowed opacity-60 transition-colors"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2 relative z-10">
+                  <label className="text-sm font-semibold text-gray-300 ml-1">
+                    Método de pago
+                  </label>
+                  <CustomDropdown
+                    options={PAYMENT_METHODS}
+                    value={metodo}
+                    onChange={setMetodo}
+                    placeholder="Seleccionar método"
                   />
                 </div>
               </div>
-
-              <div className="space-y-2 relative z-10">
-                <label className="text-sm font-semibold text-gray-300 ml-1">
-                  Método de pago
-                </label>
-                <CustomDropdown
-                  options={PAYMENT_METHODS}
-                  value={metodo}
-                  onChange={setMetodo}
-                  placeholder="Seleccionar método"
-                />
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Footer */}
           <div className="p-6 pt-2 flex flex-col gap-3">
             <button
-              disabled={isLoading || !monto || Number(monto) < 0}
-              onClick={() => onConfirm(Number(monto), metodo)}
+              disabled={isLoading || !canConfirm}
+              onClick={() =>
+                onConfirm(
+                  Number(montoSugerido),
+                  modoFederacion ? "Confirmado" : metodo,
+                )
+              }
               className="w-full py-4 rounded-xl font-bold text-[#111] bg-brand-chartreuse hover:bg-brand-chartreuse/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(203,254,1,0.15)]"
             >
               {isLoading ? (
@@ -128,7 +173,9 @@ export default function ConfirmarPagoModal({
               ) : (
                 <>
                   <CheckCircle2 className="size-5" />
-                  Confirmar y Aceptar Inscripción
+                  {modoFederacion
+                    ? "Confirmar: Pagó"
+                    : "Confirmar y Aceptar Inscripción"}
                 </>
               )}
             </button>

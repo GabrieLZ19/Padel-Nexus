@@ -79,8 +79,8 @@ export const TorneosService = {
     return response.data;
   },
 
-  async generarCuadro(torneoId: string, ordenSiembra?: string[], motivo?: string) {
-    const response = await api.post(`/torneos/${torneoId}/generar-cuadro`, { ordenSiembra, motivo });
+  async generarCuadro(torneoId: string, ordenSiembra?: string[], motivo?: string, forzarDestructivo?: boolean) {
+    const response = await api.post(`/torneos/${torneoId}/generar-cuadro`, { ordenSiembra, motivo, forzarDestructivo });
     return response.data;
   },
 
@@ -111,11 +111,11 @@ export const TorneosService = {
     return response.data;
   },
 
-  async generarZonas(torneoId: string, size?: number) {
+  async generarZonas(torneoId: string, _size?: number, forzarDestructivo?: boolean) {
+    // Tamaño de zona siempre auto FAP (preferredSize=3 en backend)
     const response = await api.post(
       `/torneos/${torneoId}/generar-zonas`,
-      {},
-      { params: size ? { tamanioGrupo: size } : {} }
+      { forzarDestructivo: forzarDestructivo === true },
     );
     return response.data;
   },
@@ -152,6 +152,18 @@ export const TorneosService = {
     payload: { equipo_a_id: string | null; equipo_b_id: string | null; motivo: string },
   ) {
     const response = await api.put(`/torneos/partidos/${partidoId}/equipos`, payload);
+    return response.data;
+  },
+
+  async gestionarParejaLlave(
+    torneoId: string,
+    payload: {
+      accion: "agregar" | "quitar";
+      inscripcion_id: string;
+      motivo: string;
+    },
+  ) {
+    const response = await api.put(`/torneos/${torneoId}/llave/pareja`, payload);
     return response.data;
   },
 

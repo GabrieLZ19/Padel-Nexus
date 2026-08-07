@@ -10,6 +10,7 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
+  DollarSign,
 } from "lucide-react";
 import { ClubPanelService } from "@/utils/services/club-panel";
 import type { Cancha, Turno } from "@/utils/types";
@@ -17,6 +18,7 @@ import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import { EdicionMasivaPrecios } from "@/components/clubes/EdicionMasivaPrecios";
 
 export default function ClubCanchasPage() {
   const [canchas, setCanchas] = useState<Cancha[]>([]);
@@ -26,6 +28,7 @@ export default function ClubCanchasPage() {
   // Modales
   const [isCanchaModalOpen, setIsCanchaModalOpen] = useState(false);
   const [isTurnoModalOpen, setIsTurnoModalOpen] = useState(false);
+  const [isPreciosMasivosOpen, setIsPreciosMasivosOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Form Cancha
@@ -230,12 +233,22 @@ export default function ClubCanchasPage() {
             Configure sus canchas físicas y la plantilla de turnos semanales
           </p>
         </div>
-        <button
-          onClick={() => handleOpenCanchaModal()}
-          className="bg-brand-chartreuse hover:opacity-90 text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm shadow-brand-chartreuse/20 flex items-center gap-2 cursor-pointer w-fit"
-        >
-          <Plus className="size-4" /> Agregar Cancha
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsPreciosMasivosOpen(true)}
+            disabled={canchas.length === 0}
+            className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 cursor-pointer w-fit disabled:opacity-40"
+          >
+            <DollarSign className="size-4" /> Edición masiva de precios
+          </button>
+          <button
+            onClick={() => handleOpenCanchaModal()}
+            className="bg-brand-chartreuse hover:opacity-90 text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm shadow-brand-chartreuse/20 flex items-center gap-2 cursor-pointer w-fit"
+          >
+            <Plus className="size-4" /> Agregar Cancha
+          </button>
+        </div>
       </div>
 
       {/* Grid de Canchas */}
@@ -659,6 +672,15 @@ export default function ClubCanchasPage() {
         confirmText={feedback.confirmText}
         cancelText={feedback.cancelText}
         onConfirm={feedback.onConfirm}
+      />
+
+      <EdicionMasivaPrecios
+        canchas={canchas}
+        isOpen={isPreciosMasivosOpen}
+        onClose={() => setIsPreciosMasivosOpen(false)}
+        onSuccess={() => {
+          void fetchCanchas();
+        }}
       />
     </div>
   );

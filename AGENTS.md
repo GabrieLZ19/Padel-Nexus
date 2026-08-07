@@ -41,7 +41,8 @@ Este workspace contiene el CRM web y la API para Padel Nexus. El foco actual es 
 ## Convenciones del Código
 - Preservar la estructura existente de Next.js App Router y route groups.
 - Mantener los servicios backend responsables de la lógica de negocio; mantener los componentes de página enfocados en UI y orquestación de estado.
-- Usar el cliente API centralizado para requests del frontend.
+- **NUNCA realizar peticiones HTTP directas (axios/fetch) en los componentes o screens de Next.js.** Todas las llamadas a endpoints backend deben realizarse estrictamente a través de los servicios centralizados en `utils/services/`.
+- Usar el cliente API centralizado (`utils/services/`) para requests del frontend.
 - Usar el cliente admin de Supabase solo en el backend.
 - Preferir tipos explícitos sobre `any`.
 - Evitar introducir nuevas abstracciones a menos que eliminen duplicación o arreglen un problema real de consistencia.

@@ -68,6 +68,10 @@ export const Paso5Cierre = ({
   const rawReglas = (torneo as any).reglas_arbitraje || {};
   const [puntoOro, setPuntoOro] = useState(rawReglas.punto_oro || false);
   const [starPoint, setStarPoint] = useState(rawReglas.star_point || false);
+  // Solo ON si estaba guardado explícitamente (no default).
+  const [ventajaSetPoint, setVentajaSetPoint] = useState(
+    rawReglas.ventaja_set_point === true || rawReglas.set_point === true,
+  );
   const [definicionTercerSet, setDefinicionTercerSet] = useState(
     rawReglas.definicion_tercer_set || "Completo"
   );
@@ -103,6 +107,8 @@ export const Paso5Cierre = ({
         reglas_arbitraje: {
           punto_oro: puntoOro,
           star_point: starPoint,
+          ventaja_set_point: !!ventajaSetPoint,
+          set_point: !!ventajaSetPoint,
           definicion_tercer_set: definicionTercerSet,
           supertiebreak_puntos: Number(supertiebreakPuntos),
           supertiebreak_diferencia: supertiebreakDiferencia,
@@ -227,18 +233,63 @@ export const Paso5Cierre = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-brand-input/40 p-5 rounded-2xl border border-white/10 shadow-sm">
           <div className="space-y-4">
-            <h5 className="text-[10px] font-black text-white uppercase tracking-widest">Ventajas</h5>
-            
+            <h5 className="text-[10px] font-black text-white uppercase tracking-widest">
+              Modo de puntuación
+            </h5>
+            <p className="text-[10px] text-gray-500 font-medium -mt-2">
+              Ventaja / Set Point, Punto de Oro y Star Point son mutuamente
+              excluyentes.
+            </p>
+
             <div className="flex items-center justify-between p-3.5 bg-brand-input rounded-xl border border-white/10 shadow-xs">
               <div>
-                <p className="text-xs font-extrabold text-white">Punto de Oro</p>
-                <p className="text-[10px] text-gray-400 mt-0.5 font-medium">Definición directa sin ventajas al llegar a 40-40.</p>
+                <p className="text-xs font-extrabold text-white">
+                  Ventaja / Set Point
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5 font-medium">
+                  Scoring tradicional con deuce y ventajas al 40-40.
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  setPuntoOro(!puntoOro);
-                  if (!puntoOro) setStarPoint(false);
+                  const next = !ventajaSetPoint;
+                  setVentajaSetPoint(next);
+                  if (next) {
+                    setPuntoOro(false);
+                    setStarPoint(false);
+                  }
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors border ${
+                  ventajaSetPoint
+                    ? "bg-brand-chartreuse border-brand-chartreuse"
+                    : "bg-zinc-500 border-zinc-600"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform ${
+                    ventajaSetPoint ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-3.5 bg-brand-input rounded-xl border border-white/10 shadow-xs">
+              <div>
+                <p className="text-xs font-extrabold text-white">Punto de Oro</p>
+                <p className="text-[10px] text-gray-400 mt-0.5 font-medium">
+                  Definición directa sin ventajas al llegar a 40-40.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !puntoOro;
+                  setPuntoOro(next);
+                  if (next) {
+                    setStarPoint(false);
+                    setVentajaSetPoint(false);
+                  }
                 }}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors border ${
                   puntoOro
@@ -256,14 +307,21 @@ export const Paso5Cierre = ({
 
             <div className="flex items-center justify-between p-3.5 bg-brand-input rounded-xl border border-white/10 shadow-xs">
               <div>
-                <p className="text-xs font-extrabold text-white">Ventaja (Set Point)</p>
-                <p className="text-[10px] text-gray-400 mt-0.5 font-medium">Definición con ventajas tradicionales (Ventaja / Deuce).</p>
+                <p className="text-xs font-extrabold text-white">Star Point</p>
+                <p className="text-[10px] text-gray-400 mt-0.5 font-medium">
+                  Variante alternativa al punto de oro (punto decisivo
+                  especial).
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  setStarPoint(!starPoint);
-                  if (!starPoint) setPuntoOro(false);
+                  const next = !starPoint;
+                  setStarPoint(next);
+                  if (next) {
+                    setPuntoOro(false);
+                    setVentajaSetPoint(false);
+                  }
                 }}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors border ${
                   starPoint

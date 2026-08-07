@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Save } from "lucide-react";
 import CustomDropdown from "../ui/CustomDropdown";
@@ -21,6 +20,8 @@ interface TorneoModalProps {
   clubs: Club[];
   isSaving: boolean;
   editingId: string | null;
+  /** Si true, el club_id viene fijado por el contexto (panel club) y no se muestra selector. */
+  sedeFija?: boolean;
 }
 
 export default function TorneoModal({
@@ -32,6 +33,7 @@ export default function TorneoModal({
   clubs,
   isSaving,
   editingId,
+  sedeFija = false,
 }: TorneoModalProps) {
   const profile = useProfileStore((s) => s.profile);
   const userRole = (profile?.rol || "admin") as RolUsuario;
@@ -48,11 +50,6 @@ export default function TorneoModal({
       ? fechaFormulario
       : fechaLocal;
 
-  const opcionesClubes = clubs.map((c) => ({
-    value: String(c.id),
-    label: c.nombre,
-  }));
-
   // Obtener alcances filtrados por rol
   const alcancesDisponibles = getAlcancesPermitidos(userRole);
   const alcanceOptions = alcancesDisponibles
@@ -63,6 +60,15 @@ export default function TorneoModal({
     value: r.value,
     label: r.label,
   }));
+
+  const canSave =
+    Boolean(formData.nombre) &&
+    Boolean(formData.fecha) &&
+    (!sedeFija || Boolean(formData.club_id));
+
+  const sedeNombre =
+    clubs.find((c) => String(c.id) === String(formData.club_id))?.nombre ||
+    null;
 
   return (
     <AnimatePresence>
@@ -81,7 +87,8 @@ export default function TorneoModal({
                   {editingId ? "Editar Torneo" : "Nuevo Torneo"}
                 </h2>
                 <p className="text-gray-400 text-xs mt-1">
-                  Creá el borrador inicial de la competencia.
+                  Creá el borrador inicial. El centro de cómputos se configura en
+                  el Paso 1 del asistente.
                 </p>
               </div>
               <button
@@ -107,24 +114,19 @@ export default function TorneoModal({
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                  Sede / Club Organizador
-                </label>
-                <CustomDropdown
-                  value={formData.club_id ?? ""}
-                  onChange={(val) =>
-                    setFormData({ ...formData, club_id: val })
-                  }
-                  options={opcionesClubes}
-                  placeholder={
-                    clubs.length === 0
-                      ? "No hay clubes creados"
-                      : "Seleccionar Club..."
-                  }
-                  disabled={clubs.length === 0}
-                />
-              </div>
+              {sedeFija && sedeNombre && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    Centro de Cómputos
+                  </label>
+                  <div className="w-full bg-brand-card/50 p-4 rounded-xl border border-white/5 text-gray-300 text-sm font-semibold">
+                    {sedeNombre}
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1.5">
+                    Se asigna automáticamente al club de tu panel.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
@@ -147,20 +149,31 @@ export default function TorneoModal({
                 <CustomDropdown
                   value={formData.alcance ?? "Provincial"}
                   onChange={(val) =>
-                    setFormData({ ...formData, alcance: val as FormTorneoState["alcance"] })
+                    setFormData({
+                      ...formData,
+                      alcance: val as FormTorneoState["alcance"],
+                    })
                   }
                   options={alcanceOptions}
                   placeholder="Seleccionar Alcance..."
                 />
-                {/* Indicador de restricción para roles limitados */}
                 {(userRole === "admin" || userRole === "admin_club") && (
                   <p className="text-[10px] text-yellow-500/80 mt-1.5 font-semibold">
-                    Tu perfil de Club solo permite organizar torneos Locales, Regionales o Provinciales.
+                    Tu perfil de Club solo permite organizar torneos Locales,
+                    Regionales o Provinciales.
                   </p>
                 )}
                 {userRole === "admin_provincial" && (
                   <p className="text-[10px] text-yellow-500/80 mt-1.5 font-semibold">
-                    Tu perfil Provincial no permite organizar torneos Nacionales.
+                    Tu perfil Provincial no permite organizar torneos
+                    Nacionales.
+                  </p>
+                )}
+                {(userRole === "admin_federacion" ||
+                  userRole === "superadmin") && (
+                  <p className="text-[10px] text-gray-500 mt-1.5">
+                    La federación nacional no organiza torneos Locales /
+                    Privados.
                   </p>
                 )}
               </div>
@@ -176,14 +189,13 @@ export default function TorneoModal({
                   value={fechaFormulario}
                   onClick={(e) => {
                     try {
-                      (e.target as any).showPicker();
+                      (e.target as HTMLInputElement).showPicker();
                     } catch (err) {
                       console.log("Picker not supported:", err);
                     }
                   }}
                   onChange={(e) => {
                     const val = e.target.value;
-                    // MAGIA ANTI-ZONA HORARIA: Inyectamos mediodía con huso horario argentino (-03:00)
                     setFormData({
                       ...formData,
                       fecha: val ? `${val}T12:00:00-03:00` : "",
@@ -193,7 +205,7 @@ export default function TorneoModal({
               </div>
 
               <button
-                disabled={isSaving || !formData.nombre || !formData.club_id || !formData.fecha}
+                disabled={isSaving || !canSave}
                 onClick={onSave}
                 className="w-full bg-brand-chartreuse disabled:opacity-50 text-brand-black font-bold py-4 rounded-xl mt-4 flex items-center justify-center gap-2 transition-all hover:opacity-90 shadow-lg cursor-pointer"
               >
@@ -202,7 +214,9 @@ export default function TorneoModal({
                 ) : (
                   <>
                     <Save className="size-5" />
-                    {editingId ? "Guardar Cambios" : "Crear Borrador & Configurar"}
+                    {editingId
+                      ? "Guardar Cambios"
+                      : "Crear Borrador & Configurar"}
                   </>
                 )}
               </button>

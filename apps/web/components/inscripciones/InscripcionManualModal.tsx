@@ -7,6 +7,9 @@ import { Torneo } from "../../utils/types";
 import { InscripcionesService } from "../../utils/services/inscripciones";
 import FeedbackModal, { FeedbackModalProps } from "../ui/FeedbackModal";
 import CustomDropdown from "../ui/CustomDropdown";
+import { useProfileStore } from "../../store/useProfileStore";
+import { esTorneoContextoFederacion } from "../../utils/constants/fapApaRules";
+import type { RolUsuario } from "../../utils/types/user.types";
 
 interface InscripcionManualModalProps {
   isOpen: boolean;
@@ -21,12 +24,24 @@ export default function InscripcionManualModal({
   onSuccess,
   torneo,
 }: InscripcionManualModalProps) {
+  const profile = useProfileStore((s) => s.profile);
+  const userRole = (profile?.rol || "admin") as RolUsuario;
+  const modoFederacion = esTorneoContextoFederacion(
+    {
+      alcance: torneo.alcance,
+      reglamento: (torneo as { reglamento?: string }).reglamento,
+      asociacion: (torneo as { asociacion?: string }).asociacion,
+    },
+    userRole,
+  );
+
   const [j1, setJ1] = useState("");
   const [j2, setJ2] = useState("");
   const [monto, setMonto] = useState<number>(
     Number(torneo.precio_inscripcion || 0),
   );
-  const [metodoPago, setMetodoPago] = useState("");
+  /** "" = No pagó / pendiente; "Confirmado" = Pagó */
+  const [estadoPago, setEstadoPago] = useState("");
   const [loading, setLoading] = useState(false);
 
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
@@ -55,12 +70,16 @@ export default function InscripcionManualModal({
         jugador1_identificador: j1.trim(),
         jugador2_identificador: j2.trim() || undefined,
         monto: Number(monto),
-        metodo_pago: metodoPago || undefined,
+        metodo_pago: modoFederacion
+          ? estadoPago === "Confirmado"
+            ? "Confirmado"
+            : undefined
+          : estadoPago || undefined,
       });
 
       setJ1("");
       setJ2("");
-      setMetodoPago("");
+      setEstadoPago("");
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -82,6 +101,17 @@ export default function InscripcionManualModal({
       setLoading(false);
     }
   };
+
+  const pagoOptions = modoFederacion
+    ? [
+        { value: "", label: "No pagó" },
+        { value: "Confirmado", label: "Pagó" },
+      ]
+    : [
+        { value: "", label: "Pendiente (No Cobrar)" },
+        { value: "Efectivo", label: "Efectivo" },
+        { value: "Transferencia", label: "Transferencia" },
+      ];
 
   return (
     <>
@@ -166,16 +196,12 @@ export default function InscripcionManualModal({
 
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
-                      Método de Pago (Cobro)
+                      {modoFederacion ? "Estado de pago" : "Método de Pago (Cobro)"}
                     </label>
                     <CustomDropdown
-                      value={metodoPago}
-                      onChange={(val) => setMetodoPago(val)}
-                      options={[
-                        { value: "", label: "Pendiente (No Cobrar)" },
-                        { value: "Efectivo", label: "Efectivo" },
-                        { value: "Transferencia", label: "Transferencia" },
-                      ]}
+                      value={estadoPago}
+                      onChange={setEstadoPago}
+                      options={pagoOptions}
                       placeholder="Seleccionar..."
                       haciaArriba={true}
                       className="py-2.5! text-sm!"

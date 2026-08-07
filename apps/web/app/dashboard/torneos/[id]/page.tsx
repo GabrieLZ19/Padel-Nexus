@@ -28,7 +28,7 @@ const WIZARD_STEPS = [
   { id: "categories", label: "3. Categorías", desc: "Clases" },
   { id: "players", label: "4. Jugadores", desc: "Inscripciones" },
   { id: "times", label: "5. Sedes", desc: "Canchas & Horas" },
-  { id: "fiscales", label: "6. Fiscales", desc: "Cuerpo Arbitral" },
+  { id: "fiscales", label: "6. Fiscales", desc: "Autoridades" },
   { id: "cierre", label: "7. Cierre", desc: "Puntuación" },
   { id: "draws", label: "8. Cuadros", desc: "Fixture" },
   { id: "matches", label: "9. Resultados", desc: "Marcadores" },
@@ -155,9 +155,9 @@ export default function TorneoDetallePage() {
       )}
 
       {/* GRID DE LAYOUT NATIVO DE NAVEGACIÓN Y CONTENIDO */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6 items-start">
         {/* NAVEGADOR DE PASOS LATERAL / MOBILE */}
-        <div className="lg:col-span-1 order-1 lg:order-2 lg:sticky lg:top-6 self-start z-30">
+        <div className="lg:col-span-1 order-1 lg:order-2 lg:sticky lg:top-6 self-start z-30 min-w-0">
           <TournamentWizardNav
             activeTab={activeTab}
             setActiveTab={navigateToTab}
@@ -166,7 +166,7 @@ export default function TorneoDetallePage() {
         </div>
 
         {/* CONTENIDO DEL PASO ACTIVO */}
-        <div className="lg:col-span-3 order-2 lg:order-1">
+        <div className="lg:col-span-3 order-2 lg:order-1 min-w-0 overflow-x-hidden">
           {activeTab === "edit" && (
             <Paso1Datos
               {...commonProps}
@@ -224,10 +224,16 @@ export default function TorneoDetallePage() {
               {...commonProps}
               inscripciones={inscripciones}
               partidos={partidos}
+              isReadOnly={torneo.estado === "Finalizado"}
             />
           )}
           {activeTab === "matches" && (
-            <Paso8Arbitraje {...commonProps} torneoId={id} partidos={partidos} />
+            <Paso8Arbitraje
+              {...commonProps}
+              torneoId={id}
+              partidos={partidos}
+              isReadOnly={torneo.estado === "Finalizado"}
+            />
           )}
         </div>
       </div>

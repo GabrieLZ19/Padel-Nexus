@@ -85,8 +85,14 @@ export interface Partido {
   // Datos temporales / desnormalizados para el frontend (MatchCard)
   equipo_a_j1?: string | null;
   equipo_a_j2?: string | null;
+  equipo_a_club?: string | null;
+  equipo_a_avatar_j1?: string | null;
+  equipo_a_avatar_j2?: string | null;
   equipo_b_j1?: string | null;
   equipo_b_j2?: string | null;
+  equipo_b_club?: string | null;
+  equipo_b_avatar_j1?: string | null;
+  equipo_b_avatar_j2?: string | null;
 }
 
 export interface Cuadro {
@@ -113,6 +119,7 @@ export interface FormTorneoState {
   formato: string;
   alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | null;
   asociacion?: 'FAP' | 'APA' | 'Amateur' | null;
+  asociacion_id?: string | null;
   premio_1?: string;
   premio_2?: string;
   premio_3?: string;

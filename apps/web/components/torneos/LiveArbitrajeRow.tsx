@@ -3,6 +3,7 @@ import { Loader2, Trophy, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { TorneosService } from "@/utils/services/torneos";
+import { TeamBox } from "@/components/torneos/MatchTeamBox";
 
 export const LiveArbitrajeRow = ({
   partido,
@@ -243,28 +244,6 @@ export const LiveArbitrajeRow = ({
     }
   };
 
-  const cleanName = (name?: string | null) => {
-    if (!name) return "";
-    let cleaned = name
-      .trim()
-      .replace(/^[\s,.\-]+/, "")
-      .replace(/[\s,.\-]+$/, "");
-    if (cleaned === "," || cleaned === "." || cleaned === "") return "";
-    return cleaned;
-  };
-
-  const j1A = cleanName(partido.equipo_a_j1);
-  const j2A = cleanName(partido.equipo_a_j2);
-  const txtA = j1A
-    ? `${j1A} ${j2A && j2A !== "-" ? `/ ${j2A}` : ""}`
-    : "Equipo A";
-
-  const j1B = cleanName(partido.equipo_b_j1);
-  const j2B = cleanName(partido.equipo_b_j2);
-  const txtB = j1B
-    ? `${j1B} ${j2B && j2B !== "-" ? `/ ${j2B}` : ""}`
-    : "Equipo B";
-
   // Determinar si los sets previos están completos
   const set1Completado = s1A !== "" && s1B !== "";
   const set2Completado = s2A !== "" && s2B !== "";
@@ -293,7 +272,25 @@ export const LiveArbitrajeRow = ({
 
   const { setsA, setsB } = getSetsGanados();
 
+  const programacionCompleta = Boolean(
+    canchaEdit?.trim() && fechaEdit?.trim() && horaEdit?.trim(),
+  );
+
+  const exigirProgramacion = () => {
+    if (programacionCompleta) return true;
+    const faltan: string[] = [];
+    if (!canchaEdit?.trim()) faltan.push("cancha");
+    if (!fechaEdit?.trim()) faltan.push("fecha");
+    if (!horaEdit?.trim()) faltan.push("hora");
+    onError(
+      `Antes de cargar el resultado, asigná ${faltan.join(", ")} del partido.`,
+    );
+    return false;
+  };
+
   const handleFinalizar = () => {
+    if (!exigirProgramacion()) return;
+
     if (esWo) {
       const ganadorId =
         ganadorWo === "A" ? partido.equipo_a_id : partido.equipo_b_id;
@@ -451,15 +448,21 @@ export const LiveArbitrajeRow = ({
   };
 
   return (
-    <div className="bg-brand-card border border-white/5 rounded-3xl p-6 space-y-6 shadow-xl transition-all duration-300">
-      {/* Ronda y Fecha Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-white/5 pb-4">
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-brand-chartreuse font-extrabold uppercase tracking-widest bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-3 py-1 rounded-full">
+    <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-md">
+      {/* Header meta */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-3 py-2.5 bg-white/[0.03] border-b border-white/8">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <span className="text-[10px] font-black text-sky-400 bg-sky-400/10 border border-sky-400/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+            #
+            {(partido.orden != null
+              ? String(partido.orden).padStart(2, "0")
+              : partido.id.slice(0, 4)
+            ).toUpperCase()}
+          </span>
+          <span className="text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-2 py-0.5 rounded-full uppercase shrink-0">
             {partido.ronda}
           </span>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Dropdown Cancha */}
+          <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
             <CustomDropdown
               value={canchaEdit}
               onChange={(val) => {
@@ -467,57 +470,49 @@ export const LiveArbitrajeRow = ({
               }}
               options={canchaOptions}
               placeholder={
-                canchaOptions.length === 0
-                  ? "Sin canchas configuradas"
-                  : "Elegir Cancha..."
+                canchaOptions.length === 0 ? "Sin canchas" : "Cancha..."
               }
               disabled={canchaOptions.length === 0}
             />
-
-            {/* Dropdown Fecha */}
             <CustomDropdown
               value={fechaEdit}
               onChange={(val) => {
                 handleSelectDateTimeCourt(canchaEdit, val, horaEdit);
               }}
               options={fechaOptions}
-              placeholder={
-                fechaOptions.length === 0
-                  ? "Sin fechas configuradas"
-                  : "Elegir Fecha..."
-              }
+              placeholder={fechaOptions.length === 0 ? "Sin fechas" : "Fecha..."}
               disabled={fechaOptions.length === 0 || !canchaEdit}
             />
-
-            {/* Dropdown Hora */}
             <CustomDropdown
               value={horaEdit}
               onChange={(val) => {
                 handleSelectDateTimeCourt(canchaEdit, fechaEdit, val);
               }}
               options={horaOptions}
-              placeholder={
-                horaOptions.length === 0
-                  ? "Sin horarios disponibles"
-                  : "Elegir Hora..."
-              }
+              placeholder={horaOptions.length === 0 ? "Sin horas" : "Hora..."}
               disabled={horaOptions.length === 0 || !canchaEdit || !fechaEdit}
             />
           </div>
         </div>
-        <div className="flex items-center gap-4 text-xs">
-          <label className="flex items-center gap-1.5 text-gray-400 font-bold cursor-pointer">
+        <div className="flex items-center gap-3 text-[10px] shrink-0">
+          <label
+            className={`flex items-center gap-1.5 font-bold ${
+              programacionCompleta
+                ? "text-gray-400 cursor-pointer"
+                : "text-gray-600 cursor-not-allowed opacity-60"
+            }`}
+          >
             <input
               type="checkbox"
               checked={esWo}
+              disabled={!programacionCompleta}
               onChange={(e) => setEsWo(e.target.checked)}
               className="accent-brand-chartreuse rounded"
             />
-            Declarar W.O. (Walkover)
+            W.O.
           </label>
-
           {esWo && (
-            <label className="flex items-center gap-1.5 text-red-500 font-bold cursor-pointer">
+            <label className="flex items-center gap-1.5 text-red-400 font-bold cursor-pointer">
               <input
                 type="checkbox"
                 checked={esInjustificadoWo}
@@ -530,179 +525,218 @@ export const LiveArbitrajeRow = ({
         </div>
       </div>
 
+      {!programacionCompleta && (
+        <div className="mx-3 mt-3 flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-300">
+          <AlertCircle className="size-3.5 shrink-0 mt-0.5" />
+          <span>
+            Seleccioná cancha, fecha y hora para habilitar la carga del
+            marcador.
+          </span>
+        </div>
+      )}
+
       {esWo ? (
-        <div className="bg-[#1e1e1e] p-4 rounded-2xl border border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-2 text-yellow-500 text-sm font-semibold">
-            <AlertCircle className="size-4 shrink-0" />
-            <span>Seleccione quién gana por Walkover (W.O.):</span>
-          </div>
-          <div className="flex gap-3 w-full md:w-auto">
+        <div
+          className={`p-3 space-y-3 ${
+            programacionCompleta ? "" : "opacity-50 pointer-events-none"
+          }`}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
+              type="button"
               onClick={() => setGanadorWo("A")}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-bold transition-all ${ganadorWo === "A" ? "bg-brand-chartreuse text-brand-black" : "bg-white/5 text-gray-400 hover:bg-white/10"}`}
+              disabled={!programacionCompleta}
+              className={`text-left rounded-xl transition-all cursor-pointer ${
+                ganadorWo === "A" ? "ring-2 ring-brand-chartreuse" : ""
+              }`}
             >
-              {txtA}
+              <TeamBox
+                j1={partido.equipo_a_j1}
+                j2={partido.equipo_a_j2}
+                avatarJ1={partido.equipo_a_avatar_j1}
+                avatarJ2={partido.equipo_a_avatar_j2}
+                club={partido.equipo_a_club}
+                align="left"
+                isWinner={ganadorWo === "A"}
+              />
             </button>
             <button
+              type="button"
               onClick={() => setGanadorWo("B")}
-              className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-xs font-bold transition-all ${ganadorWo === "B" ? "bg-brand-chartreuse text-brand-black" : "bg-white/5 text-gray-400 hover:bg-white/10"}`}
+              disabled={!programacionCompleta}
+              className={`text-left rounded-xl transition-all cursor-pointer ${
+                ganadorWo === "B" ? "ring-2 ring-brand-chartreuse" : ""
+              }`}
             >
-              {txtB}
+              <TeamBox
+                j1={partido.equipo_b_j1}
+                j2={partido.equipo_b_j2}
+                avatarJ1={partido.equipo_b_avatar_j1}
+                avatarJ2={partido.equipo_b_avatar_j2}
+                club={partido.equipo_b_club}
+                align="right"
+                isWinner={ganadorWo === "B"}
+              />
             </button>
+          </div>
+          <div className="flex items-center gap-2 text-amber-400 text-[11px] font-semibold">
+            <AlertCircle className="size-3.5 shrink-0" />
+            Tocá el equipo ganador por Walkover.
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
-          {/* Fila del Equipo A */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm sm:text-base font-black text-white truncate max-w-xs">
-                {txtA}
-              </span>
-              {setsA >= 2 && (
-                <span className="text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-md uppercase">
-                  GANADOR
-                </span>
-              )}
-            </div>
-            <div className="flex gap-3">
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] text-gray-500 font-black mb-1">
-                  Set 1
-                </span>
+        <div
+          className={`p-3 space-y-3 ${
+            programacionCompleta ? "" : "opacity-50"
+          }`}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 md:gap-3 items-stretch">
+            <TeamBox
+              j1={partido.equipo_a_j1}
+              j2={partido.equipo_a_j2}
+              avatarJ1={partido.equipo_a_avatar_j1}
+              avatarJ2={partido.equipo_a_avatar_j2}
+              club={partido.equipo_a_club}
+              align="left"
+              isWinner={setsA >= 2}
+            />
+
+            <div className="flex flex-col items-center justify-center gap-1 px-1 py-1 order-first md:order-none self-center">
+              <div className="flex gap-1.5">
+                {(
+                  [
+                    "Set 1",
+                    "Set 2",
+                    requiereTercerSet && !esTercerSetCompleto ? "STB" : "Set 3",
+                  ] as const
+                ).map((label, i) => (
+                  <span
+                    key={label}
+                    className={`text-[8px] font-black uppercase w-10 text-center ${
+                      i === 2 && requiereTercerSet
+                        ? "text-brand-chartreuse"
+                        : "text-gray-500"
+                    }`}
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
                 <input
                   type="text"
                   inputMode="numeric"
+                  aria-label="Set 1 equipo A"
                   value={s1A}
+                  disabled={!programacionCompleta}
                   onChange={(e) =>
                     setS1A(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className="w-12 h-12 bg-brand-input rounded-xl text-center text-white font-black text-lg outline-none border border-white/10 focus:border-brand-chartreuse"
+                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse disabled:cursor-not-allowed disabled:opacity-50"
                 />
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] text-gray-500 font-black mb-1">
-                  Set 2
-                </span>
                 <input
                   type="text"
                   inputMode="numeric"
+                  aria-label="Set 2 equipo A"
                   value={s2A}
+                  disabled={!programacionCompleta}
                   onChange={(e) =>
                     setS2A(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className="w-12 h-12 bg-brand-input rounded-xl text-center text-white font-black text-lg outline-none border border-white/10 focus:border-brand-chartreuse"
+                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse disabled:cursor-not-allowed disabled:opacity-50"
                 />
-              </div>
-              {(requiereTercerSet || s3A !== "" || s3B !== "") && (
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] text-brand-chartreuse font-black mb-1">
-                    {esTercerSetCompleto
-                      ? "Set 3"
-                      : `STB (${stbPuntosTarget} pts)`}
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={s3A}
-                    onChange={(e) =>
-                      setS3A(e.target.value.replace(/[^0-9]/g, ""))
-                    }
-                    className="w-12 h-12 bg-brand-input rounded-xl text-center text-white font-black text-lg outline-none border border-brand-chartreuse"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Fila del Equipo B */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm sm:text-base font-black text-white truncate max-w-xs">
-                {txtB}
-              </span>
-              {setsB >= 2 && (
-                <span className="text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-md uppercase">
-                  GANADOR
-                </span>
-              )}
-            </div>
-            <div className="flex gap-3">
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] text-gray-500 font-black mb-1">
-                  Set 1
-                </span>
                 <input
                   type="text"
                   inputMode="numeric"
+                  aria-label="Set 3 equipo A"
+                  value={s3A}
+                  disabled={!programacionCompleta}
+                  onChange={(e) =>
+                    setS3A(e.target.value.replace(/[^0-9]/g, ""))
+                  }
+                  className={`w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border disabled:cursor-not-allowed disabled:opacity-50 ${
+                    requiereTercerSet
+                      ? "border-brand-chartreuse"
+                      : "border-white/15 focus:border-brand-chartreuse opacity-60"
+                  }`}
+                />
+              </div>
+              <div className="h-px w-full max-w-[8.5rem] bg-white/10 my-0.5" />
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  aria-label="Set 1 equipo B"
                   value={s1B}
+                  disabled={!programacionCompleta}
                   onChange={(e) =>
                     setS1B(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className="w-12 h-12 bg-brand-input rounded-xl text-center text-white font-black text-lg outline-none border border-white/10 focus:border-brand-chartreuse"
+                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse disabled:cursor-not-allowed disabled:opacity-50"
                 />
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] text-gray-500 font-black mb-1">
-                  Set 2
-                </span>
                 <input
                   type="text"
                   inputMode="numeric"
+                  aria-label="Set 2 equipo B"
                   value={s2B}
+                  disabled={!programacionCompleta}
                   onChange={(e) =>
                     setS2B(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className="w-12 h-12 bg-brand-input rounded-xl text-center text-white font-black text-lg outline-none border border-white/10 focus:border-brand-chartreuse"
+                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  aria-label="Set 3 equipo B"
+                  value={s3B}
+                  disabled={!programacionCompleta}
+                  onChange={(e) =>
+                    setS3B(e.target.value.replace(/[^0-9]/g, ""))
+                  }
+                  className={`w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border disabled:cursor-not-allowed disabled:opacity-50 ${
+                    requiereTercerSet
+                      ? "border-brand-chartreuse"
+                      : "border-white/15 focus:border-brand-chartreuse opacity-60"
+                  }`}
                 />
               </div>
-              {(requiereTercerSet || s3A !== "" || s3B !== "") && (
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] text-brand-chartreuse font-black mb-1">
-                    {esTercerSetCompleto
-                      ? "Set 3"
-                      : `STB (${stbPuntosTarget} pts)`}
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={s3B}
-                    onChange={(e) =>
-                      setS3B(e.target.value.replace(/[^0-9]/g, ""))
-                    }
-                    className="w-12 h-12 bg-brand-input rounded-xl text-center text-white font-black text-lg outline-none border border-brand-chartreuse"
-                  />
-                </div>
-              )}
             </div>
+
+            <TeamBox
+              j1={partido.equipo_b_j1}
+              j2={partido.equipo_b_j2}
+              avatarJ1={partido.equipo_b_avatar_j1}
+              avatarJ2={partido.equipo_b_avatar_j2}
+              club={partido.equipo_b_club}
+              align="right"
+              isWinner={setsB >= 2}
+            />
           </div>
 
-          {/* Aclaración reglamentaria de Super Tie-break o Set Completo */}
           {(requiereTercerSet || s3A !== "" || s3B !== "") && (
-            <div className="flex justify-end pt-2">
-              <span className="text-xs text-brand-chartreuse/90 font-bold bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-3 py-1 rounded-lg">
-                {esTercerSetCompleto
-                  ? "El 3er set se define por Set Completo convencional a 6 games."
-                  : `El 3er set se define por Super Tie-break a ${stbPuntosTarget} ${stbPuntosTarget === 1 ? "punto" : "puntos"} ${stbDiferenciaRequerida ? "(diferencia mínima de 2 requerida)" : ""}.`}
-              </span>
-            </div>
+            <p className="text-[10px] text-center text-brand-chartreuse/90 font-bold">
+              {esTercerSetCompleto
+                ? "3er set: completo convencional."
+                : `3er set: Super Tie-break a ${stbPuntosTarget} pts${stbDiferenciaRequerida ? " (diff. 2)" : ""}.`}
+            </p>
           )}
         </div>
       )}
 
-      {/* Acciones */}
-      <div className="flex justify-end border-t border-white/5 pt-4">
+      <div className="flex justify-end px-3 pb-3">
         <button
+          type="button"
           onClick={handleFinalizar}
-          disabled={isSaving}
-          className="bg-brand-chartreuse text-brand-black hover:opacity-90 px-6 py-3.5 rounded-xl text-sm font-black transition-all shadow-[0_5px_20px_rgba(204,255,0,0.2)] active:scale-95 disabled:opacity-40 flex items-center gap-2 cursor-pointer"
+          disabled={isSaving || !programacionCompleta}
+          className="bg-brand-chartreuse text-brand-black hover:opacity-90 px-4 py-2 rounded-xl text-[11px] font-black transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
         >
           {isSaving ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Loader2 className="size-3.5 animate-spin" />
           ) : (
-            <Trophy className="size-4" />
+            <Trophy className="size-3.5" />
           )}
-          Finalizar Partido
+          Finalizar partido
         </button>
       </div>
     </div>
