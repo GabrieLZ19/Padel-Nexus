@@ -118,8 +118,14 @@ export const generarCuadros = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    const { ordenSiembra, motivo } = req.body;
-    const count = await TorneoService.generarCuadroEliminatoria(req.params.id, ordenSiembra, req.user?.id, motivo);
+    const { ordenSiembra, motivo, forzarDestructivo } = req.body;
+    const count = await TorneoService.generarCuadroEliminatoria(
+      req.params.id,
+      ordenSiembra,
+      req.user?.id,
+      motivo,
+      forzarDestructivo === true,
+    );
     return res
       .status(200)
       .json({ message: "Cuadro generado exitosamente", partidosCount: count });
@@ -249,10 +255,44 @@ export const actualizarEquiposPartido = async (
     const { equipo_a_id, equipo_b_id, motivo } = req.body;
     const admin_id = req.user?.id;
     if (!admin_id) return res.status(401).json({ message: "No autorizado" });
-    await TorneoService.actualizarEquiposPartido(partido_id, equipo_a_id ?? null, equipo_b_id ?? null, motivo || "Ajuste manual de rivales", admin_id);
+    if (!motivo?.trim()) {
+      return res.status(400).json({ message: "El motivo es obligatorio" });
+    }
+    await TorneoService.actualizarEquiposPartido(partido_id, equipo_a_id ?? null, equipo_b_id ?? null, motivo, admin_id);
     return res.status(200).json({ message: "Rivales actualizados exitosamente" });
   } catch (error: any) {
     return res.status(500).json({ message: "Error al actualizar rivales", error: error.message });
+  }
+};
+
+export const gestionarParejaLlave = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const torneoId = req.params.id;
+    const { accion, inscripcion_id, motivo } = req.body;
+    const admin_id = req.user?.id;
+    if (!admin_id) return res.status(401).json({ message: "No autorizado" });
+    if (accion !== "agregar" && accion !== "quitar") {
+      return res.status(400).json({ message: "accion debe ser 'agregar' o 'quitar'" });
+    }
+    if (!inscripcion_id) {
+      return res.status(400).json({ message: "inscripcion_id es obligatorio" });
+    }
+    const resultado = await TorneoService.gestionarParejaLlave(
+      torneoId,
+      accion,
+      inscripcion_id,
+      motivo || "",
+      admin_id,
+    );
+    return res.status(200).json(resultado);
+  } catch (error: any) {
+    return res.status(400).json({
+      message: "Error al gestionar pareja en la llave",
+      error: error.message,
+    });
   }
 };
 

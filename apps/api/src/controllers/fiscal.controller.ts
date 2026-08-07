@@ -69,7 +69,10 @@ export const asignarFiscalesTorneo = async (req: Request, res: Response): Promis
   try {
     const { id } = req.params;
     const items = req.body.fiscal_ids || req.body.dnis || req.body.fiscales || [];
-    const asignados = await FiscalService.asignarFiscalesTorneo(id, items);
+    const rolesById = req.body.roles_by_id as
+      | Record<string, "general" | "auxiliar">
+      | undefined;
+    const asignados = await FiscalService.asignarFiscalesTorneo(id, items, rolesById);
     return res.status(200).json({ message: "Fiscales asignados correctamente", asignados });
   } catch (error: any) {
     return res.status(400).json({ message: "Error al asignar fiscales", error: error.message });

@@ -434,4 +434,78 @@ export class ClubService {
 
     return { data: data || [], total: count || 0 };
   }
+
+  /**
+   * Ajuste masivo de precios de turnos del club (% o monto fijo).
+   * franja: todos | pico (>=18:00) | valle (<18:00)
+   */
+  static async ajustarPreciosMasivos(
+    clubId: string,
+    opciones: {
+      cancha_id?: string | null;
+      tipo_ajuste: "porcentaje" | "fijo";
+      valor: number;
+      franja?: "todos" | "pico" | "valle";
+    },
+  ) {
+    const { data: canchas, error: errCanchas } = await supabaseAdmin
+      .from("canchas")
+      .select("id")
+      .eq("club_id", clubId);
+
+    if (errCanchas) throw new Error(errCanchas.message);
+    const canchaIds = (canchas || []).map((c) => c.id);
+    if (canchaIds.length === 0) {
+      return { actualizados: 0 };
+    }
+
+    const targetCanchaIds = opciones.cancha_id
+      ? canchaIds.filter((id) => id === opciones.cancha_id)
+      : canchaIds;
+
+    if (targetCanchaIds.length === 0) {
+      throw new Error("La cancha indicada no pertenece a este club.");
+    }
+
+    const { data: turnos, error: errTurnos } = await supabaseAdmin
+      .from("turnos")
+      .select("id, precio, hora_inicio, cancha_id")
+      .in("cancha_id", targetCanchaIds);
+
+    if (errTurnos) throw new Error(errTurnos.message);
+
+    const franja = opciones.franja || "todos";
+    const filtrados = (turnos || []).filter((t) => {
+      const hora = String(t.hora_inicio || "").slice(0, 5);
+      if (franja === "pico") return hora >= "18:00";
+      if (franja === "valle") return hora < "18:00";
+      return true;
+    });
+
+    if (filtrados.length === 0) {
+      return { actualizados: 0 };
+    }
+
+    const updates = filtrados.map((t) => {
+      const actual = Number(t.precio) || 0;
+      let nuevo =
+        opciones.tipo_ajuste === "porcentaje"
+          ? Math.round(actual * (1 + opciones.valor / 100))
+          : Math.round(actual + opciones.valor);
+      if (nuevo < 0) nuevo = 0;
+      return { id: t.id, precio: nuevo };
+    });
+
+    let actualizados = 0;
+    for (const u of updates) {
+      const { error } = await supabaseAdmin
+        .from("turnos")
+        .update({ precio: u.precio })
+        .eq("id", u.id);
+      if (error) throw new Error(error.message);
+      actualizados += 1;
+    }
+
+    return { actualizados };
+  }
 }

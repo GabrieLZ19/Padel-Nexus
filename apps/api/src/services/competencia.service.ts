@@ -17,7 +17,26 @@ export class CompetenciaService {
   /**
    * Genera las zonas y partidos de la fase de grupos basándose en el reglamento FAP.
    */
-  static async generarFaseGrupos(torneoId: string, size?: number) {
+  static async generarFaseGrupos(
+    torneoId: string,
+    _size?: number,
+    forzarDestructivo = false,
+  ) {
+    // Bloquear regeneración si hay resultados y no se forzó el wipe
+    if (!forzarDestructivo) {
+      const { data: conResultados } = await supabaseAdmin
+        .from("partidos")
+        .select("id")
+        .eq("torneo_id", torneoId)
+        .not("ganador", "is", null)
+        .limit(1);
+      if (conResultados && conResultados.length > 0) {
+        throw new Error(
+          "Hay partidos con resultados cargados. Desactivá 'Modificación no destructiva' y confirmá para regenerar (esto borrará resultados).",
+        );
+      }
+    }
+
     // 0. LIMPIEZA PREVIA PARA EVITAR DUPLICADOS
     await supabaseAdmin.from("partidos").delete().eq("torneo_id", torneoId);
     
@@ -32,7 +51,16 @@ export class CompetenciaService {
     }
     await supabaseAdmin.from("grupos").delete().eq("torneo_id", torneoId);
 
-    // 1. OBTENER INSCRIPCIONES
+    // 1. OBTENER TORNEO + INSCRIPCIONES
+    const { data: torneoMeta } = await supabaseAdmin
+      .from("torneos")
+      .select("reglamento")
+      .eq("id", torneoId)
+      .maybeSingle();
+    const reglamento = String(torneoMeta?.reglamento || "FAP").toUpperCase();
+    // FAP/APA: preferir 3; Amateur: preferir 4
+    const preferredSize: 3 | 4 = reglamento === "AMATEUR" ? 4 : 3;
+
     const { data: todasInscripciones, error: errInsc } = await supabaseAdmin
       .from("inscripciones")
       .select(
@@ -101,9 +129,9 @@ export class CompetenciaService {
     // Ordenamos de mayor a menor ranking (Pareja 1 es la mejor rankeada)
     parejas.sort((a, b) => b.puntosTotales - a.puntosTotales);
 
-    // 3. CALCULAR CANTIDAD DE ZONAS Y CAPACIDADES SEGÚN REGLAMENTO OFICIAL FAP/APA (SUMA TOTAL = totalParejas)
+    // 3. CALCULAR ZONAS SEGÚN REGLAMENTO DEL PASO 1 (FAP / APA / Amateur)
     const totalParejas = parejas.length;
-    const S = Number(size) === 4 ? 4 : 3; // Forzamos a que sea únicamente 3 o 4 por reglamento FAP/APA
+    const S = preferredSize;
 
     const getZonasFAP = (total: number, preferredSize: number): number[] => {
       if (total < 3) return [total];
@@ -553,12 +581,29 @@ export class CompetenciaService {
     grupoId: string,
     nombreGrupo: string,
   ) {
-    // 1. Eliminar partidos previos de este grupo (solo si no tienen resultados cargados)
-    await supabaseAdmin
+    // 1. Conservar partidos con resultado; borrar solo los pendientes
+    const { data: existentes } = await supabaseAdmin
       .from("partidos")
-      .delete()
+      .select("id, equipo_a_id, equipo_b_id, ganador")
       .eq("torneo_id", torneoId)
       .eq("ronda", nombreGrupo);
+
+    const jugados = (existentes || []).filter((m) => m.ganador);
+    const pendientesIds = (existentes || [])
+      .filter((m) => !m.ganador)
+      .map((m) => m.id);
+
+    if (pendientesIds.length > 0) {
+      await supabaseAdmin.from("partidos").delete().in("id", pendientesIds);
+    }
+
+    const pairKey = (a: string | null, b: string | null) => {
+      if (!a || !b) return "";
+      return [a, b].sort().join("|");
+    };
+    const pairsJugados = new Set(
+      jugados.map((m) => pairKey(m.equipo_a_id, m.equipo_b_id)).filter(Boolean),
+    );
 
     // 2. Obtener parejas actuales en el grupo ordenadas por seed
     const { data: parejas } = await supabaseAdmin
@@ -569,62 +614,42 @@ export class CompetenciaService {
 
     if (!parejas || parejas.length < 2) return;
 
-    const partidos = [];
+    const partidos: Record<string, unknown>[] = [];
+    const pushIfNew = (orden: number, aId: string, bId: string) => {
+      if (pairsJugados.has(pairKey(aId, bId))) return;
+      partidos.push({
+        torneo_id: torneoId,
+        ronda: nombreGrupo,
+        orden,
+        equipo_a_id: aId,
+        equipo_b_id: bId,
+      });
+    };
+
     if (parejas.length === 3) {
-      partidos.push({
-        torneo_id: torneoId,
-        ronda: nombreGrupo,
-        orden: 1,
-        equipo_a_id: parejas[0].inscripcion_id,
-        equipo_b_id: parejas[1].inscripcion_id,
-      });
-      partidos.push({
-        torneo_id: torneoId,
-        ronda: nombreGrupo,
-        orden: 2,
-        equipo_a_id: parejas[1].inscripcion_id,
-        equipo_b_id: parejas[2].inscripcion_id,
-      });
-      partidos.push({
-        torneo_id: torneoId,
-        ronda: nombreGrupo,
-        orden: 3,
-        equipo_a_id: parejas[0].inscripcion_id,
-        equipo_b_id: parejas[2].inscripcion_id,
-      });
+      pushIfNew(1, parejas[0].inscripcion_id, parejas[1].inscripcion_id);
+      pushIfNew(2, parejas[1].inscripcion_id, parejas[2].inscripcion_id);
+      pushIfNew(3, parejas[0].inscripcion_id, parejas[2].inscripcion_id);
     } else if (parejas.length === 4) {
-      partidos.push({
-        torneo_id: torneoId,
-        ronda: nombreGrupo,
-        orden: 1,
-        equipo_a_id: parejas[0].inscripcion_id,
-        equipo_b_id: parejas[3].inscripcion_id,
-      });
-      partidos.push({
-        torneo_id: torneoId,
-        ronda: nombreGrupo,
-        orden: 2,
-        equipo_a_id: parejas[1].inscripcion_id,
-        equipo_b_id: parejas[2].inscripcion_id,
-      });
-      partidos.push({
-        torneo_id: torneoId,
-        ronda: nombreGrupo,
-        orden: 4,
-        estado_partido: "Pendiente Perdedores",
-      });
+      pushIfNew(1, parejas[0].inscripcion_id, parejas[3].inscripcion_id);
+      pushIfNew(2, parejas[1].inscripcion_id, parejas[2].inscripcion_id);
+      if (jugados.length === 0) {
+        partidos.push({
+          torneo_id: torneoId,
+          ronda: nombreGrupo,
+          orden: 4,
+          estado_partido: "Pendiente Perdedores",
+        });
+      }
     } else {
-      // Fallback genérico: Todos contra todos (Round Robin) para cualquier otro tamaño
       let orden = 1;
       for (let i = 0; i < parejas.length; i++) {
         for (let j = i + 1; j < parejas.length; j++) {
-          partidos.push({
-            torneo_id: torneoId,
-            ronda: nombreGrupo,
-            orden: orden++,
-            equipo_a_id: parejas[i].inscripcion_id,
-            equipo_b_id: parejas[j].inscripcion_id,
-          });
+          pushIfNew(
+            orden++,
+            parejas[i].inscripcion_id,
+            parejas[j].inscripcion_id,
+          );
         }
       }
     }

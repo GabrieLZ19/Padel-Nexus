@@ -239,4 +239,44 @@ export class ClubPanelController {
       return res.status(400).json({ exito: false, error: message });
     }
   }
+
+  /**
+   * POST /api/club/mi-club/turnos/ajuste-precios
+   */
+  static async ajustarPreciosMasivos(req: Request, res: Response) {
+    try {
+      const clubId = await ClubPanelController.getClubIdDelUsuario(req.user!.id);
+      const { cancha_id, tipo_ajuste, valor, franja } = req.body || {};
+
+      if (tipo_ajuste !== "porcentaje" && tipo_ajuste !== "fijo") {
+        return res.status(400).json({
+          exito: false,
+          error: "tipo_ajuste debe ser 'porcentaje' o 'fijo'.",
+        });
+      }
+
+      const valorNum = Number(valor);
+      if (!Number.isFinite(valorNum) || valorNum === 0) {
+        return res.status(400).json({
+          exito: false,
+          error: "El valor del ajuste debe ser un número distinto de cero.",
+        });
+      }
+
+      const data = await ClubService.ajustarPreciosMasivos(clubId, {
+        cancha_id: cancha_id && cancha_id !== "todas" ? String(cancha_id) : null,
+        tipo_ajuste,
+        valor: valorNum,
+        franja:
+          franja === "pico" || franja === "valle" || franja === "todos"
+            ? franja
+            : "todos",
+      });
+
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  }
 }

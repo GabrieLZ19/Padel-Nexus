@@ -21,6 +21,10 @@ router.delete("/mi-club/canchas/:canchaId", ClubPanelController.eliminarCancha);
 // Turnos
 router.post("/mi-club/canchas/:canchaId/turnos", ClubPanelController.crearTurno);
 router.delete("/mi-club/turnos/:turnoId", ClubPanelController.eliminarTurno);
+router.post(
+  "/mi-club/turnos/ajuste-precios",
+  ClubPanelController.ajustarPreciosMasivos,
+);
 
 // Reservas
 router.get("/mi-club/reservas", ClubPanelController.obtenerReservas);

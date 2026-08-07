@@ -22,6 +22,7 @@ import {
   eliminarBannerTorneo,
   guardarSiembraCustom,
   actualizarPartido,
+  gestionarParejaLlave,
 } from "../controllers/torneo.controller";
 import {
   listarFiscales,
@@ -110,6 +111,11 @@ router.put(
   "/partidos/:partido_id/equipos",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   actualizarEquiposPartido,
+);
+router.put(
+  "/:id/llave/pareja",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  gestionarParejaLlave,
 );
 router.put(
   "/override/mover-pareja",

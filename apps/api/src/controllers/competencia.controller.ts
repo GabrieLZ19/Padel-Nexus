@@ -19,7 +19,14 @@ export const generarZonas = async (
     // if (req.user?.rol === 'usuario') return res.status(403).json({...})
 
     const size = req.query.tamanioGrupo ? Number(req.query.tamanioGrupo) : undefined;
-    const resultado = await CompetenciaService.generarFaseGrupos(torneoId, size);
+    const forzarDestructivo =
+      req.body?.forzarDestructivo === true ||
+      req.query?.forzarDestructivo === "true";
+    const resultado = await CompetenciaService.generarFaseGrupos(
+      torneoId,
+      size,
+      forzarDestructivo,
+    );
 
     return res.status(200).json(resultado);
   } catch (error: unknown) {

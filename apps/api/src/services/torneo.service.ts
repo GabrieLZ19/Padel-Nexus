@@ -14,7 +14,7 @@ export interface FiltrosTorneo {
 export interface TorneoPayload {
   nombre: string;
   subtitulo?: string;
-  club_id: string;
+  club_id?: string | null;
   fecha: string;
   estado: string;
   cupos_maximos: number;
@@ -23,7 +23,7 @@ export interface TorneoPayload {
   modalidad: string;
   precio_inscripcion: number;
   formato: string;
-  alcance?: "Nacional" | "Provincial" | "Local" | null;
+  alcance?: "Nacional" | "Provincial" | "Regional" | "Local" | null;
   premios?: { uno?: string; dos?: string; tres?: string };
   canchas_disponibles?: number;
   duracion_partido_minutos?: number;
@@ -145,12 +145,14 @@ export class TorneoService {
 
   static async crearTorneo(datos: TorneoPayload) {
     const payload = TorneoService.evaluateDynamicState({ ...datos });
+    const alcanceNormalizado = TorneoService.normalizarAlcance(datos.alcance);
+    const forzarFap = alcanceNormalizado === "Nacional";
 
-    // Resolver asociacion_id a partir de asociacion sigla o id
+    // Resolver asociacion_id a partir de asociacion sigla o id; fallback FAP
     let resolvedAsociacionId = (datos as any).asociacion_id || null;
     const asociacionNombre = (datos as any).asociacion ?? "FAP";
 
-    if (!resolvedAsociacionId && asociacionNombre) {
+    if (!resolvedAsociacionId && asociacionNombre && !forzarFap) {
       const { data: asocData } = await supabaseAdmin
         .from("asociaciones")
         .select("id")
@@ -159,6 +161,19 @@ export class TorneoService {
       if (asocData?.id) {
         resolvedAsociacionId = asocData.id;
       }
+    }
+
+    if (!resolvedAsociacionId || forzarFap) {
+      const fapId = await TorneoService.resolveFapAsociacionId();
+      if (fapId) resolvedAsociacionId = fapId;
+    }
+
+    let reglamento =
+      (datos as any).reglamento ?? (datos as any).asociacion ?? "FAP";
+    if (forzarFap) reglamento = "FAP";
+    if (reglamento === "Amateur") {
+      // Amateur solo aplica fuera del circuito federativo nacional
+      if (forzarFap) reglamento = "FAP";
     }
 
     const { data: torneo, error: torneoError } = await supabaseAdmin
@@ -178,9 +193,8 @@ export class TorneoService {
           modalidad: datos.modalidad,
           precio_inscripcion: datos.precio_inscripcion,
           formato: datos.formato,
-          alcance: TorneoService.normalizarAlcance(datos.alcance),
-          reglamento:
-            (datos as any).reglamento ?? (datos as any).asociacion ?? "FAP",
+          alcance: alcanceNormalizado,
+          reglamento,
           asociacion_id: resolvedAsociacionId,
           premio_1: datos.premios?.uno,
           premio_2: datos.premios?.dos,
@@ -210,6 +224,24 @@ export class TorneoService {
     if (cuadroError)
       throw new Error(`Error al inicializar el cuadro: ${cuadroError.message}`);
     return torneo;
+  }
+
+  private static async resolveFapAsociacionId(): Promise<string | null> {
+    const { data: fapBySigla } = await supabaseAdmin
+      .from("asociaciones")
+      .select("id")
+      .ilike("sigla", "FAP")
+      .limit(1)
+      .maybeSingle();
+    if (fapBySigla?.id) return fapBySigla.id;
+
+    const { data: fapByNombre } = await supabaseAdmin
+      .from("asociaciones")
+      .select("id")
+      .ilike("nombre", "%Federacion Argentina%")
+      .limit(1)
+      .maybeSingle();
+    return fapByNombre?.id ?? null;
   }
 
   // Columnas OFICIALES Y EXACTAS de la DDL de la tabla `torneos` en Supabase:
@@ -245,6 +277,7 @@ export class TorneoService {
     "es_gratis",
     "rama",
     "asociacion_id",
+    "federacion_id",
   ]);
 
   public static normalizarAlcance(
@@ -301,6 +334,13 @@ export class TorneoService {
       if (asocData?.id) {
         updateData.asociacion_id = asocData.id;
       }
+    }
+
+    // Alcance Nacional ⇒ organizadora y reglamento FAP
+    if (updateData.alcance === "Nacional") {
+      updateData.reglamento = "FAP";
+      const fapId = await TorneoService.resolveFapAsociacionId();
+      if (fapId) updateData.asociacion_id = fapId;
     }
 
     if (torneoActual) {
@@ -375,9 +415,11 @@ export class TorneoService {
         usuario_id,
         usuario2_id,
         perfiles:perfiles!fk_inscripciones_usuario (
+          avatar_url,
           clubes:clubes!perfiles_club_id_fkey (nombre)
         ),
         perfiles_jugador2:perfiles!fk_inscripciones_usuario2 (
+          avatar_url,
           clubes:clubes!perfiles_club_id_fkey (nombre)
         )
       `,
@@ -399,6 +441,10 @@ export class TorneoService {
         jugador1_nombre: ins.jugador1_nombre,
         jugador2_nombre: ins.jugador2_nombre,
         clubName: clubName || "Sin club asignado",
+        club1: club1 || null,
+        club2: club2 || null,
+        avatar_j1: ins.perfiles?.avatar_url || null,
+        avatar_j2: ins.perfiles_jugador2?.avatar_url || null,
       });
     });
 
@@ -411,9 +457,13 @@ export class TorneoService {
         equipo_a_j1: equipoA ? equipoA.jugador1_nombre : null,
         equipo_a_j2: equipoA ? equipoA.jugador2_nombre : null,
         equipo_a_club: equipoA ? equipoA.clubName : null,
+        equipo_a_avatar_j1: equipoA ? equipoA.avatar_j1 : null,
+        equipo_a_avatar_j2: equipoA ? equipoA.avatar_j2 : null,
         equipo_b_j1: equipoB ? equipoB.jugador1_nombre : null,
         equipo_b_j2: equipoB ? equipoB.jugador2_nombre : null,
         equipo_b_club: equipoB ? equipoB.clubName : null,
+        equipo_b_avatar_j1: equipoB ? equipoB.avatar_j1 : null,
+        equipo_b_avatar_j2: equipoB ? equipoB.avatar_j2 : null,
       };
     });
   }
@@ -423,6 +473,7 @@ export class TorneoService {
     ordenSiembra?: string[],
     adminId?: string,
     motivo?: string,
+    forzarDestructivo = false,
   ) {
     const { data: torneo, error: torneoError } = await supabaseAdmin
       .from("torneos")
@@ -433,6 +484,20 @@ export class TorneoService {
       .single();
 
     if (torneoError || !torneo) throw new Error("Torneo no encontrado");
+
+    if (!forzarDestructivo) {
+      const { data: conResultados } = await supabaseAdmin
+        .from("partidos")
+        .select("id")
+        .eq("torneo_id", id)
+        .not("ganador", "is", null)
+        .limit(1);
+      if (conResultados && conResultados.length > 0) {
+        throw new Error(
+          "Hay partidos con resultados cargados. Desactivá 'Modificación no destructiva' y confirmá para regenerar (esto borrará resultados).",
+        );
+      }
+    }
 
     const { data: todasInscripciones, error: inscError } = await supabaseAdmin
       .from("inscripciones")
@@ -1174,9 +1239,193 @@ export class TorneoService {
       detalles: {
         partido_id: partidoId,
         ronda: partido.ronda,
+        equipo_a_id: equipoAId,
+        equipo_b_id: equipoBId,
         motivo: motivo,
       },
     });
+  }
+
+  /**
+   * Agrega o quita una pareja de la llave de campeonato y redistribuye
+   * solo slots pendientes (no destructivo respecto a partidos ya jugados).
+   * Empareja 1 vs último entre los equipos libres.
+   */
+  static async gestionarParejaLlave(
+    torneoId: string,
+    accion: "agregar" | "quitar",
+    inscripcionId: string,
+    motivo: string,
+    adminId: string,
+  ) {
+    if (!motivo?.trim()) {
+      throw new Error("El motivo es obligatorio para editar la llave.");
+    }
+
+    const { data: insc } = await supabaseAdmin
+      .from("inscripciones")
+      .select("id, estado_pago")
+      .eq("id", inscripcionId)
+      .eq("torneo_id", torneoId)
+      .maybeSingle();
+
+    if (!insc) {
+      throw new Error("La inscripción no pertenece a este torneo.");
+    }
+
+    const PLAYOFF_ROUNDS = [
+      "32AVOS",
+      "16AVOS",
+      "OCTAVOS",
+      "CUARTOS",
+      "SEMIS",
+      "FINAL",
+    ];
+
+    const { data: playoffMatches, error } = await supabaseAdmin
+      .from("partidos")
+      .select("id, ronda, orden, equipo_a_id, equipo_b_id, ganador")
+      .eq("torneo_id", torneoId)
+      .in("ronda", PLAYOFF_ROUNDS)
+      .order("orden", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    if (!playoffMatches || playoffMatches.length === 0) {
+      throw new Error(
+        "No hay partidos de llave de campeonato. Generá el cuadro primero.",
+      );
+    }
+
+    const counts: Record<string, number> = {};
+    playoffMatches.forEach((m) => {
+      counts[m.ronda] = (counts[m.ronda] || 0) + 1;
+    });
+    const primeraRonda = PLAYOFF_ROUNDS.find((r) => (counts[r] || 0) > 0);
+    if (!primeraRonda) {
+      throw new Error("No se pudo determinar la primera ronda de la llave.");
+    }
+
+    const firstRound = playoffMatches
+      .filter((m) => m.ronda === primeraRonda)
+      .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+
+    const lockedTeamIds = new Set<string>();
+    firstRound.forEach((m) => {
+      if (m.ganador) {
+        if (m.equipo_a_id) lockedTeamIds.add(m.equipo_a_id);
+        if (m.equipo_b_id) lockedTeamIds.add(m.equipo_b_id);
+      }
+    });
+
+    let freeTeamIds: string[] = [];
+    firstRound.forEach((m) => {
+      if (m.ganador) return;
+      if (m.equipo_a_id && !lockedTeamIds.has(m.equipo_a_id)) {
+        freeTeamIds.push(m.equipo_a_id);
+      }
+      if (m.equipo_b_id && !lockedTeamIds.has(m.equipo_b_id)) {
+        freeTeamIds.push(m.equipo_b_id);
+      }
+    });
+    freeTeamIds = [...new Set(freeTeamIds)];
+
+    if (accion === "agregar") {
+      if (
+        lockedTeamIds.has(inscripcionId) ||
+        freeTeamIds.includes(inscripcionId)
+      ) {
+        throw new Error("La pareja ya está en la llave de campeonato.");
+      }
+      const maxSlots = firstRound.length * 2;
+      const ocupados = lockedTeamIds.size + freeTeamIds.length;
+      if (ocupados >= maxSlots) {
+        throw new Error(
+          "La llave no tiene slots libres. Liberá un slot o ampliá el cuadro.",
+        );
+      }
+      freeTeamIds.push(inscripcionId);
+    } else {
+      if (lockedTeamIds.has(inscripcionId)) {
+        throw new Error(
+          "No se puede quitar: la pareja ya disputó un partido con resultado en la llave.",
+        );
+      }
+      if (!freeTeamIds.includes(inscripcionId)) {
+        throw new Error("La pareja no está en un slot editable de la llave.");
+      }
+      freeTeamIds = freeTeamIds.filter((id) => id !== inscripcionId);
+    }
+
+    // Redistribuir solo partidos pendientes: pairing 1 vs último
+    const pendingMatches = firstRound.filter((m) => !m.ganador);
+    const slotsNeeded = pendingMatches.length;
+    const cleanPaired: { a: string | null; b: string | null }[] = [];
+    const used = new Set<string>();
+    const ordered = [...freeTeamIds];
+    let left = 0;
+    let right = ordered.length - 1;
+    while (left <= right && cleanPaired.length < slotsNeeded) {
+      const a = ordered[left];
+      const b = left === right ? null : ordered[right];
+      if (a && !used.has(a)) {
+        used.add(a);
+        if (b && !used.has(b)) {
+          used.add(b);
+          cleanPaired.push({ a, b });
+        } else {
+          cleanPaired.push({ a, b: null });
+        }
+      }
+      left += 1;
+      right -= 1;
+    }
+    while (cleanPaired.length < slotsNeeded) {
+      cleanPaired.push({ a: null, b: null });
+    }
+
+    for (let i = 0; i < pendingMatches.length; i++) {
+      const match = pendingMatches[i];
+      const slot = cleanPaired[i] || { a: null, b: null };
+      const isBye = Boolean(slot.a) !== Boolean(slot.b);
+      const ganadorBye = isBye ? slot.a || slot.b : null;
+
+      const { error: updErr } = await supabaseAdmin
+        .from("partidos")
+        .update({
+          equipo_a_id: slot.a,
+          equipo_b_id: slot.b,
+          ganador: ganadorBye,
+          set1_a: ganadorBye ? 0 : null,
+          set1_b: ganadorBye ? 0 : null,
+          estado_partido: ganadorBye ? "Finalizado" : "Programado",
+        })
+        .eq("id", match.id);
+
+      if (updErr) throw new Error(updErr.message);
+    }
+
+    await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: adminId,
+      accion:
+        accion === "agregar"
+          ? "agregar_pareja_llave"
+          : "quitar_pareja_llave",
+      entidad_afectada: torneoId,
+      detalles: {
+        inscripcion_id: inscripcionId,
+        primera_ronda: primeraRonda,
+        equipos_libres: freeTeamIds,
+        motivo,
+      },
+    });
+
+    return {
+      exito: true,
+      mensaje:
+        accion === "agregar"
+          ? "Pareja agregada y llave redistribuida"
+          : "Pareja quitada y llave redistribuida",
+    };
   }
 
   static async guardarSiembraCustom(
@@ -1392,6 +1641,8 @@ export class TorneoService {
         cancha_id: d.cancha_id,
         fecha: d.fecha,
         hora_inicio: d.hora_inicio,
+        hora_fin: d.hora_fin || null,
+        categoria: d.categoria?.trim() ? d.categoria.trim() : null,
       }));
       const { error } = await supabaseAdmin
         .from("torneo_canchas_disponibilidad")

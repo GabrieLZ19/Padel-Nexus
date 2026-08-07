@@ -33,6 +33,25 @@ function formatNombreCompleto(apellido?: string | null, nombre?: string | null):
 }
 
 export class InscripcionService {
+  /** Licencia FAP en estado Activa (al menos una). */
+  private static async assertLicenciaFapActiva(
+    usuarioId: string,
+    etiqueta: string,
+  ): Promise<void> {
+    const { data: licencias, error: licError } = await supabaseAdmin
+      .from("licencias")
+      .select("id, estado")
+      .eq("usuario_id", usuarioId)
+      .eq("estado", FAP_ESTADOS_LICENCIA.ACTIVA)
+      .limit(1);
+
+    if (licError || !licencias || licencias.length === 0) {
+      throw new Error(
+        `${etiqueta}: se requiere licencia FAP vigente y activa para este torneo.`,
+      );
+    }
+  }
+
   static async obtenerInscripcionesPaginadas(
     torneoId?: string,
     page: number = 1,
@@ -113,28 +132,38 @@ export class InscripcionService {
       perfilJugador2 = user2;
     }
 
-    // 2. VALIDAR LICENCIA — tolera múltiples licencias, solo necesita al menos una activa
-    const { data: licencias, error: licError } = await supabaseAdmin
-      .from("licencias")
-      .select("estado")
-      .eq("usuario_id", jugador1Id)
-      .eq("estado", FAP_ESTADOS_LICENCIA.ACTIVA)
-      .limit(1);
-
-    if (licError || !licencias || licencias.length === 0) {
-      throw new Error(
-        "Para inscribirte, debes tener una licencia FAP vigente y activa.",
-      );
-    }
-
-    // 3. OBTENER DATOS DEL TORNEO
+    // 2. OBTENER DATOS DEL TORNEO (incluye flag de carnet)
     const { data: torneo, error: errTorneo } = await supabaseAdmin
       .from("torneos")
-      .select("id, fecha, nivel, cupos_maximos, cupos_actuales, estado")
+      .select(
+        "id, fecha, nivel, cupos_maximos, cupos_actuales, estado, reglas_arbitraje",
+      )
       .eq("id", torneoId)
       .single();
 
     if (errTorneo || !torneo) throw new Error("Torneo no encontrado.");
+
+    const reglas =
+      torneo.reglas_arbitraje &&
+      typeof torneo.reglas_arbitraje === "object" &&
+      !Array.isArray(torneo.reglas_arbitraje)
+        ? (torneo.reglas_arbitraje as Record<string, unknown>)
+        : {};
+    const exigeCarnet = Boolean(reglas.requiere_carnet_federativo);
+
+    // 3. VALIDAR LICENCIA FAP — solo si el torneo exige carnet federativo
+    if (exigeCarnet) {
+      await InscripcionService.assertLicenciaFapActiva(
+        jugador1Id,
+        "Jugador 1",
+      );
+      if (jugador2Id) {
+        await InscripcionService.assertLicenciaFapActiva(
+          jugador2Id,
+          "Jugador 2",
+        );
+      }
+    }
 
     // 4. REGLA FAP: CIERRE 7 DÍAS ANTES
     if (!torneo.fecha)

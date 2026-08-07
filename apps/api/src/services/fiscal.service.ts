@@ -99,14 +99,24 @@ export class FiscalService {
   static async obtenerFiscalesTorneo(torneoId: string) {
     const { data, error } = await supabaseAdmin
       .from("torneo_fiscales")
-      .select("fiscal_id, fiscales(*)")
+      .select("fiscal_id, rol, fiscales(*)")
       .eq("torneo_id", torneoId);
 
     if (error) throw new Error(error.message);
-    return (data || []).map((tf: any) => tf.fiscales).filter(Boolean);
+    return (data || [])
+      .map((tf: any) =>
+        tf.fiscales
+          ? { ...tf.fiscales, rol_torneo: tf.rol || "auxiliar" }
+          : null,
+      )
+      .filter(Boolean);
   }
 
-  static async asignarFiscalesTorneo(torneoId: string, items: string[]) {
+  static async asignarFiscalesTorneo(
+    torneoId: string,
+    items: string[],
+    rolesById?: Record<string, "general" | "auxiliar">,
+  ) {
     if (!items || items.length === 0) {
       await supabaseAdmin.from("torneo_fiscales").delete().eq("torneo_id", torneoId);
       return [];
@@ -129,11 +139,21 @@ export class FiscalService {
       .delete()
       .eq("torneo_id", torneoId);
 
-    // 3. Insertar nuevas asignaciones
-    const inserts = fiscales.map((f) => ({
-      torneo_id: torneoId,
-      fiscal_id: f.id,
-    }));
+    // 3. Insertar nuevas asignaciones (máx. 1 fiscal general)
+    let generalAsignado = false;
+    const inserts = fiscales.map((f) => {
+      const requested = rolesById?.[f.id] || "auxiliar";
+      let rol: "general" | "auxiliar" = requested;
+      if (rol === "general") {
+        if (generalAsignado) rol = "auxiliar";
+        else generalAsignado = true;
+      }
+      return {
+        torneo_id: torneoId,
+        fiscal_id: f.id,
+        rol,
+      };
+    });
 
     const { error: errIns } = await supabaseAdmin
       .from("torneo_fiscales")
