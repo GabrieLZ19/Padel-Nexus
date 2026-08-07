@@ -421,14 +421,29 @@ export class InscripcionService {
       j2 = resolvedJ2;
     }
 
-    // 3. Obtener datos del torneo
+    // 3. Obtener datos del torneo (incluye flag de carnet del Paso 3)
     const { data: torneo, error: errTorneo } = await supabaseAdmin
       .from("torneos")
-      .select("id, cupos_maximos, cupos_actuales, estado")
+      .select("id, cupos_maximos, cupos_actuales, estado, reglas_arbitraje")
       .eq("id", torneoId)
       .single();
 
     if (errTorneo || !torneo) throw new Error("Torneo no encontrado.");
+
+    const reglas =
+      torneo.reglas_arbitraje &&
+      typeof torneo.reglas_arbitraje === "object" &&
+      !Array.isArray(torneo.reglas_arbitraje)
+        ? (torneo.reglas_arbitraje as Record<string, unknown>)
+        : {};
+    const exigeCarnet = Boolean(reglas.requiere_carnet_federativo);
+
+    if (exigeCarnet) {
+      await InscripcionService.assertLicenciaFapActiva(j1.id, "Jugador 1");
+      if (j2) {
+        await InscripcionService.assertLicenciaFapActiva(j2.id, "Jugador 2");
+      }
+    }
 
     // 4. Validar que no estén inscriptos ya
     const idsAValidar = j2
