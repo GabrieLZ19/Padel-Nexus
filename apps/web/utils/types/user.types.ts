@@ -1,5 +1,6 @@
 export type RolUsuario =
   | "usuario"
+  | "fiscal"
   | "admin"
   | "admin_club"
   | "admin_provincial"
@@ -51,6 +52,9 @@ export interface Perfil {
   sexo?: 'masculino' | 'femenino' | 'otro' | null;
   club_id: string | null;
   created_at?: string;
+  es_fiscal?: boolean;
+  fiscal_id?: string | null;
+  fiscal_rango?: "Nacional" | "Provincial" | "Regional" | "Local" | null;
 
   // Relaciones
   licencias?: Licencia[];

@@ -10,9 +10,18 @@ export interface Fiscal {
   rango: "Local" | "Regional" | "Provincial" | "Nacional";
   asociacion?: string;
   activo?: boolean;
+  usuario_id?: string | null;
   created_at?: string;
   /** Rol en el torneo: general | auxiliar */
   rol_torneo?: "general" | "auxiliar";
+}
+
+export interface AccesoFiscal {
+  fiscal_id: string;
+  email: string;
+  password_temporal: string | null;
+  modo: "creado" | "restablecido" | "vinculado";
+  mensaje: string;
 }
 
 export const FiscalesService = {
@@ -84,6 +93,14 @@ export const FiscalesService = {
       console.error("Error al actualizar fiscal:", error);
       throw error;
     }
+  },
+
+  habilitarAcceso: async (
+    id: string,
+    payload?: { email?: string; password?: string },
+  ): Promise<AccesoFiscal> => {
+    const res = await api.post<AccesoFiscal>(`/torneos/fiscales/${id}/acceso`, payload || {});
+    return res.data;
   },
 
   cambiarEstado: async (id: string, activo: boolean): Promise<Fiscal> => {

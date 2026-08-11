@@ -21,6 +21,8 @@ import TorneoModal from "../../../components/torneos/TorneoModal";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "../../../components/ui/FeedbackModal";
+import { useProfileStore } from "@/store/useProfileStore";
+import { esRolFiscal } from "@/utils/auth/roles";
 
 const TABS = ["Todos", "Activos", "Borradores", "Finalizados"];
 
@@ -52,6 +54,13 @@ const PAGE_SIZE = 5;
 export default function TorneosPage() {
   // 2. Inicializamos el router
   const router = useRouter();
+  const profile = useProfileStore((s) => s.profile);
+
+  useEffect(() => {
+    if (esRolFiscal(profile?.rol)) {
+      router.replace("/dashboard/fiscal/torneos");
+    }
+  }, [profile?.rol, router]);
 
   const [activeTab, setActiveTab] = useState<string>("Todos");
   const [search, setSearch] = useState<string>("");

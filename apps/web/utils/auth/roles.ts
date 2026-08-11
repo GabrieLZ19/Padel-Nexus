@@ -1,6 +1,6 @@
 import type { RolUsuario } from "../types";
 
-export type RolAdministrativo = Exclude<RolUsuario, "usuario">;
+export type RolAdministrativo = Exclude<RolUsuario, "usuario" | "fiscal">;
 
 export const ROLES_ADMINISTRATIVOS = [
   "admin",
@@ -22,6 +22,19 @@ export const ROLES_FEDERACION_NACIONAL = [
 export const esRolAdministrativo = (
   rol: RolUsuario | string | null | undefined,
 ) => (rol ? ROLES_ADMINISTRATIVOS.includes(rol as RolAdministrativo) : false);
+
+export const esRolFiscal = (rol: RolUsuario | string | null | undefined) =>
+  rol === "fiscal";
+
+/** Admins del CRM + fiscal (panel operativo, sin config de torneo). */
+export const esRolAccesoCrm = (rol: RolUsuario | string | null | undefined) =>
+  esRolAdministrativo(rol) || esRolFiscal(rol);
+
+export function destinoPostLogin(rol: RolUsuario | string | null | undefined): string {
+  if (rol === "admin_club") return "/club";
+  if (esRolAccesoCrm(rol)) return "/dashboard";
+  return "/";
+}
 
 export const esRolClub = (rol: RolUsuario | string | null | undefined) =>
   Boolean(rol && (ROLES_CLUB as readonly string[]).includes(rol));

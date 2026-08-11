@@ -24,6 +24,7 @@ import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 import { useProfileStore } from "@/store/useProfileStore";
 import DashboardFederacion from "@/components/dashboard/DashboardFederacion";
 import DashboardProvincial from "@/components/dashboard/DashboardProvincial";
+import DashboardFiscal from "@/components/dashboard/DashboardFiscal";
 
 export default function DashboardHome() {
   const profile = useProfileStore((s) => s.profile);
@@ -35,6 +36,9 @@ export default function DashboardHome() {
   }
   if (userRole === "admin_provincial") {
     return <DashboardProvincial />;
+  }
+  if (userRole === "fiscal") {
+    return <DashboardFiscal />;
   }
 
   // superadmin, admin genérico o cualquier otro rol ven el Dashboard general

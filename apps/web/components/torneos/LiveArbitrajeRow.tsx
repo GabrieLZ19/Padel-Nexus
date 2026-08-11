@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { TorneosService } from "@/utils/services/torneos";
 import { TeamBox } from "@/components/torneos/MatchTeamBox";
+import { canchaAsignadaReal } from "@/utils/fiscalPartidos";
 
 export const LiveArbitrajeRow = ({
   partido,
@@ -100,9 +101,9 @@ export const LiveArbitrajeRow = ({
     return club ? `${club} - ${cancha}` : cancha;
   };
 
-  // Cancha, fecha y hora asignadas
+  // Cancha, fecha y hora asignadas (ignora el placeholder "Cancha N" de la generación)
   const [canchaEdit, setCanchaEdit] = useState<string>(
-    partido.cancha_asignada || "",
+    canchaAsignadaReal(partido.cancha_asignada) || "",
   );
 
   const getInitialFechaHora = (isoStr?: string | null) => {
@@ -131,7 +132,7 @@ export const LiveArbitrajeRow = ({
   const occupiedSlots = new Set<string>();
   todosLosPartidos.forEach((p) => {
     if (p.id === partido.id) return;
-    if (p.cancha_asignada && (p as any).fecha_partido) {
+    if (canchaAsignadaReal(p.cancha_asignada) && (p as any).fecha_partido) {
       try {
         const d = new Date((p as any).fecha_partido);
         const yyyy = d.getFullYear();
@@ -162,10 +163,13 @@ export const LiveArbitrajeRow = ({
       mapCanchas.add(name);
     }
   });
-  const canchaOptions = Array.from(mapCanchas).map((c) => ({
-    value: c,
-    label: c,
-  }));
+  const canchaOptions = [
+    { value: "", label: "Pendiente" },
+    ...Array.from(mapCanchas).map((c) => ({
+      value: c,
+      label: c,
+    })),
+  ];
 
   // Opciones de Fecha para la cancha seleccionada
   const mapFechas = new Set<string>();
@@ -470,9 +474,9 @@ export const LiveArbitrajeRow = ({
               }}
               options={canchaOptions}
               placeholder={
-                canchaOptions.length === 0 ? "Sin canchas" : "Cancha..."
+                mapCanchas.size === 0 && !canchaEdit ? "Sin canchas" : "Pendiente"
               }
-              disabled={canchaOptions.length === 0}
+              disabled={mapCanchas.size === 0 && !canchaEdit}
             />
             <CustomDropdown
               value={fechaEdit}

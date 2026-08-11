@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { esRolAdministrativo } from "@/utils/auth/roles";
+import { esRolAccesoCrm } from "@/utils/auth/roles";
 
 export function middleware(request: NextRequest) {
   const token = request.cookies.get("padel_token")?.value;
@@ -11,7 +11,7 @@ export function middleware(request: NextRequest) {
   const isClubRoute = pathname.startsWith("/club");
   const isAuthRoute =
     pathname.startsWith("/login") || pathname.startsWith("/signup");
-  const isAdminOrMod = esRolAdministrativo(userRole);
+  const puedeCrm = esRolAccesoCrm(userRole);
 
   // --- REGLAS DE ACCESO BASADAS EN COOKIES DE API ---
 
@@ -28,14 +28,14 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // 3. Si no es un rol administrativo (usuario común) e intenta ir a dashboard o club
-  if (token && !isAdminOrMod && (isDashboardRoute || isClubRoute)) {
+  // 3. Si no es un rol con acceso al CRM (usuario común) e intenta ir a dashboard o club
+  if (token && !puedeCrm && (isDashboardRoute || isClubRoute)) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
   // 4. Si es admin_club e intenta entrar a /club -> permitido. Si es otro admin y entra a /club -> permitido por flexibilidad
-  // 5. Si es admin general/mod logueado e intenta ir a login/signup o raíz -> Redirigir a dashboard
-  if (token && userRole !== "admin_club" && isAdminOrMod) {
+  // 5. Si es admin / fiscal logueado e intenta ir a login/signup o raíz -> Redirigir a dashboard
+  if (token && userRole !== "admin_club" && puedeCrm) {
     if (isAuthRoute || pathname === "/") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }

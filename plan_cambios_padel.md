@@ -102,6 +102,12 @@ Archivos: `Paso9Arbitraje.tsx` / `LiveArbitrajeRow`.
 - Roles: fiscal general vs auxiliares.
 - Interacción en ficha del jugador; no ratificar hasta fin de torneo (modelo + UI mínima).
 
+### 2.3 Panel operativo del fiscal (Oleada B — definido)
+- Dashboard: torneos asignados filtrados por alcance.
+- Durante el torneo: partidos (sede/cancha/horario/estado), jugadores con DNI + carnet, acta de incidencias, PDF.
+- Ficha: cambio de categoría aplicado y trazable; descalificación/sanción solo registradas (efecto competitivo pendiente Héctor).
+- **Pendiente Héctor:** si el fiscal carga resultados o solo valida; si aplica sanciones o solo las deja en acta.
+
 ---
 
 ## Fase 3 — Responsive + clubes

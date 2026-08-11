@@ -21,6 +21,8 @@ import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
 import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
 import { TournamentWizardNav } from "@/components/torneos/TournamentWizardNav";
 import type { SaveStepHandler } from "@/components/torneos/wizard/types";
+import { useProfileStore } from "@/store/useProfileStore";
+import { esRolFiscal } from "@/utils/auth/roles";
 
 const WIZARD_STEPS = [
   { id: "edit", label: "1. Datos", desc: "Información" },
@@ -38,6 +40,13 @@ export default function TorneoDetallePage() {
   const params = useParams();
   const id = params?.id as string;
   const router = useRouter();
+  const profile = useProfileStore((s) => s.profile);
+
+  useEffect(() => {
+    if (esRolFiscal(profile?.rol) && id) {
+      router.replace(`/dashboard/fiscal/torneos/${id}`);
+    }
+  }, [profile?.rol, id, router]);
 
   // Estados Globales de Datos
   const [torneo, setTorneo] = useState<Torneo | null>(null);

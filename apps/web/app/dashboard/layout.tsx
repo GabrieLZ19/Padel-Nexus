@@ -184,6 +184,7 @@ export default function DashboardLayout({
 
   const menuItemsBase = [
     { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+    { name: "Mis torneos", icon: Trophy, href: "/dashboard/fiscal/torneos" },
     { name: "Torneos", icon: Trophy, href: "/dashboard/torneos" },
     {
       name: "Inscripciones",
@@ -294,7 +295,9 @@ export default function DashboardLayout({
                     ? "text-purple-400"
                     : profile?.rol === "admin_provincial"
                       ? "text-blue-400"
-                      : "text-brand-chartreuse"
+                      : profile?.rol === "fiscal"
+                        ? "text-amber-400"
+                        : "text-brand-chartreuse"
               }`}>
                 {profile?.rol === "superadmin"
                   ? "SUPERADMIN"
@@ -302,7 +305,9 @@ export default function DashboardLayout({
                     ? "FEDERACIÓN NACIONAL"
                     : profile?.rol === "admin_provincial"
                       ? "ASOCIACIÓN PROVINCIAL"
-                      : "ADMIN CRM"}
+                      : profile?.rol === "fiscal"
+                        ? "FISCAL DE FEDERACIÓN"
+                        : "ADMIN CRM"}
               </span>
             </div>
           </div>
@@ -316,7 +321,9 @@ export default function DashboardLayout({
 
         <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
           {menuItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
             return (
               <Link
                 key={item.name}

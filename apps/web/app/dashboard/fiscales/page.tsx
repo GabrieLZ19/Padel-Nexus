@@ -15,8 +15,11 @@ import {
   LayoutGrid,
   List,
   AlertTriangle,
+  KeyRound,
+  Copy,
+  Check,
 } from "lucide-react";
-import { FiscalesService, Fiscal } from "@/utils/services/fiscales";
+import { FiscalesService, Fiscal, AccesoFiscal } from "@/utils/services/fiscales";
 import { sileo } from "sileo";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal, {
@@ -54,6 +57,10 @@ export default function ColegioFiscalesPage() {
     asociacion: "FAP",
   });
   const [saving, setSaving] = useState(false);
+  const [accesoEmail, setAccesoEmail] = useState("");
+  const [generandoAcceso, setGenerandoAcceso] = useState(false);
+  const [credenciales, setCredenciales] = useState<AccesoFiscal | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetchFiscales();
@@ -100,7 +107,45 @@ export default function ColegioFiscalesPage() {
 
   const handleOpenDetail = (f: Fiscal) => {
     setSelectedFiscal(f);
+    setAccesoEmail(f.correo || "");
+    setCredenciales(null);
+    setCopied(false);
     setShowDetailModal(true);
+  };
+
+  const handleHabilitarAcceso = async () => {
+    if (!selectedFiscal) return;
+    const email = accesoEmail.trim() || selectedFiscal.correo || "";
+    if (!email) {
+      sileo.error({
+        title: "Falta el correo",
+        description: "El acceso al panel se hace con email y contraseña, no con el DNI.",
+      });
+      return;
+    }
+    try {
+      setGenerandoAcceso(true);
+      const acceso = await FiscalesService.habilitarAcceso(selectedFiscal.id, { email });
+      setCredenciales(acceso);
+      setSelectedFiscal({
+        ...selectedFiscal,
+        correo: acceso.email,
+        usuario_id: selectedFiscal.usuario_id || "ok",
+      });
+      fetchFiscales();
+      sileo.success({
+        title: acceso.modo === "restablecido" ? "Contraseña restablecida" : "Acceso listo",
+        description: acceso.mensaje,
+      });
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
+      sileo.error({
+        title: "No se pudo crear el acceso",
+        description: axiosErr.response?.data?.message || axiosErr.message || "Error inesperado",
+      });
+    } finally {
+      setGenerandoAcceso(false);
+    }
   };
 
   const requestToggleEstado = (f: Fiscal) => {
@@ -226,11 +271,11 @@ export default function ColegioFiscalesPage() {
             <Shield className="size-4" /> Entidad Reguladora FAP
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">
-            Colegio de Fiscales y Árbitros
+            Colegio de Fiscales
           </h1>
           <p className="text-gray-400 text-sm mt-1">
-            Gestión centralizada del cuerpo arbitral, rangos de alcance,
-            inhabilitaciones y edición.
+            Oficiales de federación con alcance nacional, regional o local.
+            La asignación a torneos es centralizada; no configuran eventos.
           </p>
         </div>
 
@@ -283,7 +328,7 @@ export default function ColegioFiscalesPage() {
       {/* Contenido Principal */}
       {loading ? (
         <div className="p-12 text-center text-gray-500 font-semibold">
-          Cargando cuerpo arbitral...
+          Cargando Colegio de Fiscales...
         </div>
       ) : filteredFiscales.length === 0 ? (
         <div className="p-12 text-center border border-dashed border-white/10 rounded-3xl text-gray-500">
@@ -329,7 +374,7 @@ export default function ColegioFiscalesPage() {
 
                 <div className="space-y-2 text-xs border-t border-b border-white/5 py-4">
                   <div className="flex justify-between text-gray-400">
-                    <span>Alcance Arbitral:</span>
+                    <span>Alcance:</span>
                     <span className="text-brand-chartreuse font-bold">
                       {f.rango || "Provincial"}
                     </span>
@@ -350,6 +395,12 @@ export default function ColegioFiscalesPage() {
                       </span>
                     </div>
                   )}
+                  <div className="flex justify-between text-gray-400">
+                    <span>Acceso al panel:</span>
+                    <span className={f.usuario_id ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}>
+                      {f.usuario_id ? "Habilitado" : "Sin usuario"}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between pt-1">
@@ -393,9 +444,10 @@ export default function ColegioFiscalesPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 text-[10px] text-gray-500 font-bold uppercase tracking-wider bg-black/30">
-                  <th className="px-6 py-4">Fiscal / Árbitro</th>
+                  <th className="px-6 py-4">Fiscal</th>
                   <th className="px-6 py-4">DNI</th>
                   <th className="px-6 py-4">Rango / Alcance</th>
+                  <th className="px-6 py-4">Acceso</th>
                   <th className="px-6 py-4 text-center">Estado</th>
                   <th className="px-6 py-4 text-right">Acciones</th>
                 </tr>
@@ -430,6 +482,13 @@ export default function ColegioFiscalesPage() {
                         <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-brand-chartreuse font-bold">
                           {f.rango || "Provincial"}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-bold">
+                        {f.usuario_id ? (
+                          <span className="text-emerald-400">Con usuario</span>
+                        ) : (
+                          <span className="text-amber-400">Sin usuario</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button
@@ -474,7 +533,7 @@ export default function ColegioFiscalesPage() {
       {/* Modal Crear Fiscal */}
       {showCreateModal && (
         <FormFiscalModal
-          title="Alta de Fiscal u Árbitro Oficial"
+          title="Alta de Fiscal Oficial"
           form={form}
           setForm={setForm}
           saving={saving}
@@ -502,7 +561,7 @@ export default function ColegioFiscalesPage() {
             <div className="flex justify-between items-start border-b border-white/10 pb-4">
               <div>
                 <span className="text-[10px] font-black text-brand-chartreuse uppercase tracking-wider block mb-1">
-                  Legajo Oficial Arbitral
+                  Legajo del Colegio de Fiscales
                 </span>
                 <h3 className="text-xl font-extrabold text-white">
                   {selectedFiscal.nombre} {selectedFiscal.apellido}
@@ -524,7 +583,7 @@ export default function ColegioFiscalesPage() {
                 </span>
               </div>
               <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 flex items-center justify-between">
-                <span className="text-gray-400 font-bold">Rango Arbitral:</span>
+                <span className="text-gray-400 font-bold">Alcance:</span>
                 <span className="text-brand-chartreuse font-bold">
                   {selectedFiscal.rango || "Provincial"}
                 </span>
@@ -546,6 +605,70 @@ export default function ColegioFiscalesPage() {
                 <span className="text-white font-semibold block">
                   {selectedFiscal.direccion || "No registrada"}
                 </span>
+              </div>
+              <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400 font-bold flex items-center gap-1.5">
+                    <KeyRound className="size-3.5 text-brand-chartreuse" />
+                    Acceso al panel
+                  </span>
+                  <span className={`font-bold ${selectedFiscal.usuario_id ? "text-emerald-400" : "text-amber-400"}`}>
+                    {selectedFiscal.usuario_id ? "Con usuario" : "Sin usuario"}
+                  </span>
+                </div>
+                <p className="text-gray-500">
+                  El fiscal entra con email y contraseña, no con el DNI.
+                </p>
+                <input
+                  type="email"
+                  value={accesoEmail}
+                  onChange={(e) => setAccesoEmail(e.target.value)}
+                  placeholder="correo@federacion.org"
+                  className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-semibold outline-none focus:border-brand-chartreuse/50"
+                />
+                <button
+                  type="button"
+                  onClick={handleHabilitarAcceso}
+                  disabled={generandoAcceso}
+                  className="w-full py-2.5 bg-brand-chartreuse text-brand-black rounded-xl font-bold disabled:opacity-50 cursor-pointer"
+                >
+                  {generandoAcceso
+                    ? "Generando…"
+                    : selectedFiscal.usuario_id
+                      ? "Restablecer contraseña"
+                      : "Crear acceso"}
+                </button>
+                {credenciales && (
+                  <div className="bg-[#111] border border-brand-chartreuse/20 rounded-xl p-3 space-y-2">
+                    <p className="text-brand-chartreuse font-bold">
+                      {credenciales.mensaje}
+                    </p>
+                    <p className="text-white">
+                      Email: <span className="font-mono">{credenciales.email}</span>
+                    </p>
+                    {credenciales.password_temporal && (
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-white">
+                          Contraseña:{" "}
+                          <span className="font-mono">{credenciales.password_temporal}</span>
+                        </p>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(
+                              `Email: ${credenciales.email}\nContraseña: ${credenciales.password_temporal}`,
+                            );
+                            setCopied(true);
+                          }}
+                          className="p-2 bg-white/5 rounded-lg text-gray-300 hover:text-white cursor-pointer"
+                          title="Copiar"
+                        >
+                          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="bg-black/30 p-3.5 rounded-xl border border-white/5 flex items-center justify-between">
                 <span className="text-gray-400 font-bold">
@@ -604,7 +727,7 @@ function FormFiscalModal({
       <div className="bg-[#1a1a1a] p-8 rounded-3xl border border-white/10 w-full max-w-md shadow-2xl relative">
         <h3 className="text-xl font-extrabold text-white mb-2">{title}</h3>
         <p className="text-gray-400 text-xs mb-6">
-          Completá los datos del fiscal u árbitro oficial homologado.
+          Completá los datos del fiscal oficial homologado.
         </p>
 
         <form onSubmit={onSubmit} className="space-y-4">
@@ -680,7 +803,7 @@ function FormFiscalModal({
 
           <div>
             <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">
-              Alcance / Rango Arbitral
+              Alcance
             </label>
             <CustomDropdown
               value={form.rango}

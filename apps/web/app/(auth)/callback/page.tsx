@@ -6,6 +6,7 @@ import { ShieldCheck, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import { PerfilService } from "@/utils/services/perfil";
 import { getSupabaseBrowserClient } from "@/utils/supabase/client";
+import { destinoPostLogin } from "@/utils/auth/roles";
 
 type AuthStatus = "loading" | "success" | "error";
 
@@ -69,8 +70,8 @@ export default function OAuthCallbackPage() {
           );
 
           setTimeout(() => {
-            router.push(data.usuario.rol !== "usuario" ? "/dashboard" : "/");
-          }, 1400); // Damos espacio a que se aprecie la animación elástica de éxito
+            router.push(destinoPostLogin(data.usuario.rol));
+          }, 1400);
         } else {
           setStatus("error");
           setMensaje("La API rechazó la validación de la firma.");

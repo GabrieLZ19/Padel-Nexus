@@ -16,7 +16,7 @@ import {
 import { isAxiosError } from "axios";
 import { PerfilService } from "@/utils/services/perfil";
 import { useProfileStore } from "@/store/useProfileStore";
-import { esRolAdministrativo } from "@/utils/auth/roles";
+import { destinoPostLogin } from "@/utils/auth/roles";
 
 export default function AuthPage() {
   const [email, setEmail] = useState("");
@@ -60,15 +60,7 @@ export default function AuthPage() {
 
         setProfile(data.usuario);
 
-        // Definimos quién va a qué panel
-        const rol = data.usuario.rol;
-        if (rol === "admin_club") {
-          router.push("/club");
-        } else if (esRolAdministrativo(rol)) {
-          router.push("/dashboard");
-        } else {
-          router.push("/");
-        }
+        router.push(destinoPostLogin(data.usuario.rol));
       } else {
         setError("No se pudo procesar la sesión. Formato inválido.");
       }
