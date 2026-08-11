@@ -47,9 +47,16 @@ function labelTipo(tipo: IncidenciaFiscal["tipo"]): string {
   }
 }
 
-function esCompanero(j: ParejaFiscal["jugador2"]): boolean {
+function esCompanero(
+  j: ParejaFiscal["jugador2"],
+): j is NonNullable<ParejaFiscal["jugador2"]> {
   if (!j) return false;
-  return Boolean(j.id || j.dni || nombreJugadorVisible(j.nombre_completo) || nombreJugadorVisible(j.nombre));
+  return Boolean(
+    j.id ||
+      j.dni ||
+      nombreJugadorVisible(j.nombre_completo) ||
+      nombreJugadorVisible(j.nombre),
+  );
 }
 
 export function generarActaFiscalPdf(reporte: ReporteFiscal) {
