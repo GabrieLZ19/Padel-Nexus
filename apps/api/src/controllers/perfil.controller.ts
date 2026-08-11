@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { PerfilService, ActualizarPerfilDTO } from "../services/perfil.service";
 import { AuthService, RegistroDTO } from "../services/auth.service";
+import { FiscalSesionService } from "../services/fiscal-sesion.service";
 import { env } from "../config/env.config";
 
 export const PerfilController = {
@@ -18,7 +19,8 @@ export const PerfilController = {
       }
 
       const perfil = await PerfilService.obtenerPerfilCompleto(userId);
-      return res.status(200).json({ exito: true, data: perfil });
+      const perfilSesion = await FiscalSesionService.enriquecerPerfil(perfil);
+      return res.status(200).json({ exito: true, data: perfilSesion });
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Error al obtener tu perfil.";

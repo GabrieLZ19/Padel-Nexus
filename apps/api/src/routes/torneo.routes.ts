@@ -32,6 +32,7 @@ import {
   buscarFiscalPorDni,
   obtenerFiscalesTorneo,
   asignarFiscalesTorneo,
+  habilitarAccesoFiscal,
 } from "../controllers/fiscal.controller";
 import { generarZonas } from "../controllers/competencia.controller";
 import { obtenerPosicionesZona } from "../controllers/clasificacion.controller";
@@ -153,6 +154,11 @@ router.patch(
   "/fiscales/:id/estado",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   cambiarEstadoFiscal,
+);
+router.post(
+  "/fiscales/:id/acceso",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  habilitarAccesoFiscal,
 );
 router.get(
   "/fiscales/dni/:dni",

@@ -31,6 +31,19 @@ export const actualizarFiscal = async (req: Request, res: Response): Promise<Res
   }
 };
 
+export const habilitarAccesoFiscal = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const email = typeof req.body?.email === "string" ? req.body.email : undefined;
+    const password = typeof req.body?.password === "string" ? req.body.password : undefined;
+    const acceso = await FiscalService.habilitarAcceso(id, email, password);
+    return res.status(200).json(acceso);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error al habilitar el acceso";
+    return res.status(400).json({ message, error: message });
+  }
+};
+
 export const cambiarEstadoFiscal = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;

@@ -675,7 +675,7 @@ export class TorneoService {
             ronda: initialRound.name,
             orden: orden++,
             estado_partido: "Programado",
-            cancha_asignada: `Cancha ${canchaNo}`,
+            cancha_asignada: null,
             fecha_partido: matchTime.toISOString(),
             ganador: null,
           });
@@ -707,7 +707,7 @@ export class TorneoService {
             ronda: nextRoundName,
             orden: orden++,
             estado_partido: "Programado",
-            cancha_asignada: `Cancha ${(nr % canchasCount) + 1}`,
+            cancha_asignada: null,
             fecha_partido: matchTimeNext.toISOString(),
             ganador: null,
           });
@@ -731,7 +731,7 @@ export class TorneoService {
               ronda: round.name,
               orden: orden++,
               estado_partido: "Programado",
-              cancha_asignada: `Cancha ${(m % canchasCount) + 1}`,
+              cancha_asignada: null,
               fecha_partido: currentRoundStartTime.toISOString(),
               ganador: null,
             });
@@ -779,7 +779,7 @@ export class TorneoService {
               ronda: nombreZona,
               orden: orden++,
               estado_partido: "Programado",
-              cancha_asignada: `Cancha ${canchaNo}`,
+              cancha_asignada: null,
               fecha_partido: matchTime.toISOString(),
               ganador: null,
               set1_a: null,

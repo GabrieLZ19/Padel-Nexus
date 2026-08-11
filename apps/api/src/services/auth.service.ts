@@ -1,5 +1,6 @@
 import { supabase, supabaseAdmin } from "../config/supabase";
 import { env } from "../config/env.config";
+import { FiscalSesionService } from "./fiscal-sesion.service";
 
 // DTO para el registro unificado FAP
 export interface RegistroDTO {
@@ -49,7 +50,7 @@ export class AuthService {
     }
 
     return {
-      usuario: perfil,
+      usuario: await FiscalSesionService.enriquecerPerfil(perfil),
       token: authData.session?.access_token,
     };
   }
@@ -247,7 +248,7 @@ export class AuthService {
     }
 
     return {
-      usuario: perfil,
+      usuario: await FiscalSesionService.enriquecerPerfil(perfil),
       token: data.session.access_token,
     };
   }
@@ -306,7 +307,7 @@ export class AuthService {
     }
 
     return {
-      usuario: perfil,
+      usuario: await FiscalSesionService.enriquecerPerfil(perfil),
       token: accessToken,
     };
   }
