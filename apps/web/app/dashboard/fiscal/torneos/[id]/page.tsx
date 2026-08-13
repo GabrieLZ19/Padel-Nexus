@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -10,18 +10,17 @@ import {
   Shield,
   Users,
   AlertTriangle,
-  Plus,
 } from "lucide-react";
 import {
   FiscalPanelService,
+  MOTIVOS_INFORME_LABELS,
   nombreSedeFiscal,
-  type CrearIncidenciaPayload,
   type FiscalTorneo,
   type IncidenciaFiscal,
   type ParejaFiscal,
-  type TipoIncidenciaFiscal,
 } from "@/utils/services/fiscal-panel";
 import { generarActaFiscalPdf } from "@/utils/actaFiscalPdf";
+import { generarInformePreliminarPdf } from "@/utils/informePreliminarPdf";
 import type { Partido } from "@/utils/types";
 import {
   esModalidadIndividual,
@@ -33,26 +32,18 @@ import {
   canchaAsignadaReal,
   etiquetaCanchaAsignada,
   etiquetaCruce,
-  labelRonda,
   partidosDefinidosOrdenados,
 } from "@/utils/fiscalPartidos";
-import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal, {
   type FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
 
-type TabId = "partidos" | "jugadores" | "incidencias";
+type TabId = "partidos" | "jugadores" | "informes";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "partidos", label: "Partidos" },
   { id: "jugadores", label: "Jugadores" },
-  { id: "incidencias", label: "Acta" },
-];
-
-const TIPOS_REGISTRO: { value: TipoIncidenciaFiscal; label: string }[] = [
-  { value: "incidencia", label: "Incidencia" },
-  { value: "sancion", label: "Sanción (solo registro)" },
-  { value: "descalificacion", label: "Descalificación (solo registro)" },
+  { id: "informes", label: "Informes" },
 ];
 
 function formatFecha(iso?: string | null) {
@@ -82,8 +73,9 @@ export default function FiscalTorneoOperativoPage() {
   const [parejas, setParejas] = useState<ParejaFiscal[]>([]);
   const [incidencias, setIncidencias] = useState<IncidenciaFiscal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [descargando, setDescargando] = useState(false);
-  const [showForm, setShowForm] = useState(false);
+  const [descargandoGrillas, setDescargandoGrillas] = useState(false);
 
   const [feedback, setFeedback] = useState<FeedbackModalProps>({
     isOpen: false,
@@ -95,13 +87,15 @@ export default function FiscalTorneoOperativoPage() {
 
   const cargar = useCallback(async () => {
     if (!id) return;
-    const [t, p, j, i] = await Promise.all([
-      FiscalPanelService.getTorneo(id),
-      FiscalPanelService.getPartidos(id),
-      FiscalPanelService.getJugadores(id),
+    setLoadError(null);
+    const torneoData = await FiscalPanelService.getTorneo(id);
+    setTorneo(torneoData);
+
+    const [p, j, i] = await Promise.all([
+      FiscalPanelService.getPartidos(id).catch(() => [] as Partido[]),
+      FiscalPanelService.getJugadores(id).catch(() => [] as ParejaFiscal[]),
       FiscalPanelService.getIncidencias(id),
     ]);
-    setTorneo(t);
     setPartidos(p);
     setParejas(j);
     setIncidencias(i);
@@ -111,16 +105,23 @@ export default function FiscalTorneoOperativoPage() {
     let mounted = true;
     const defer = setTimeout(() => {
       cargar()
-        .catch(() => {
-          if (mounted) {
-            setFeedback({
-              isOpen: true,
-              title: "Sin acceso",
-              description: "No estás asignado a este torneo o falló la carga.",
-              type: "error",
-              onClose: () => router.push("/dashboard/fiscal/torneos"),
-            });
-          }
+        .catch((err: unknown) => {
+          if (!mounted) return;
+          const axiosMsg =
+            typeof err === "object" &&
+            err &&
+            "response" in err &&
+            typeof (err as { response?: { data?: { message?: string } } }).response
+              ?.data?.message === "string"
+              ? (err as { response: { data: { message: string } } }).response.data
+                  .message
+              : null;
+          const message =
+            axiosMsg ||
+            (err instanceof Error ? err.message : null) ||
+            "No estás asignado a este torneo o falló la carga.";
+          setLoadError(message);
+          setTorneo(null);
         })
         .finally(() => {
           if (mounted) setLoading(false);
@@ -130,19 +131,45 @@ export default function FiscalTorneoOperativoPage() {
       mounted = false;
       clearTimeout(defer);
     };
-  }, [cargar, router]);
+  }, [cargar]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") === "informes") setTab("informes");
+  }, []);
 
   const handlePdf = async () => {
-    if (!id) return;
+    if (!id || !torneo) return;
+    if (torneo.estado !== "Finalizado") {
+      setFeedback({
+        isOpen: true,
+        title: "Acta disponible al cierre",
+        description:
+          "El acta consolidada se descarga cuando el torneo está Finalizado. Mientras está en curso usá los informes preliminares y las grillas por cancha.",
+        type: "info",
+        onClose: () => setFeedback((p) => ({ ...p, isOpen: false })),
+      });
+      return;
+    }
     setDescargando(true);
     try {
       const reporte = await FiscalPanelService.getReporte(id);
       generarActaFiscalPdf(reporte);
-    } catch {
+    } catch (error: unknown) {
+      const axiosMsg =
+        typeof error === "object" &&
+        error &&
+        "response" in error &&
+        typeof (error as { response?: { data?: { message?: string } } }).response
+          ?.data?.message === "string"
+          ? (error as { response: { data: { message: string } } }).response.data
+              .message
+          : null;
       setFeedback({
         isOpen: true,
         title: "No se pudo generar el PDF",
-        description: "Reintentá en unos segundos.",
+        description: axiosMsg || "Reintentá en unos segundos.",
         type: "error",
         onClose: () => setFeedback((p) => ({ ...p, isOpen: false })),
       });
@@ -151,11 +178,50 @@ export default function FiscalTorneoOperativoPage() {
     }
   };
 
-  if (loading || !torneo) {
+  const handleGrillasCancha = async () => {
+    if (!torneo) return;
+    setDescargandoGrillas(true);
+    try {
+      const { generarPdfGrillasPorCancha } = await import("@/utils/grillaPdf");
+      generarPdfGrillasPorCancha(torneo, partidos);
+    } catch {
+      setFeedback({
+        isOpen: true,
+        title: "No se pudo generar la grilla",
+        description: "Reintentá en unos segundos.",
+        type: "error",
+        onClose: () => setFeedback((p) => ({ ...p, isOpen: false })),
+      });
+    } finally {
+      setDescargandoGrillas(false);
+    }
+  };
+
+  if (loading) {
     return (
       <div className="w-full max-w-[1400px] mx-auto px-4 py-8 md:px-10 animate-pulse space-y-6">
         <div className="h-8 w-48 bg-white/10 rounded-lg" />
         <div className="h-40 bg-[#151515] border border-white/5 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (!torneo) {
+    return (
+      <div className="w-full max-w-lg mx-auto px-4 py-16 text-center space-y-4">
+        <Shield className="size-10 text-gray-600 mx-auto" />
+        <h1 className="text-xl font-extrabold text-white">No se pudo abrir el torneo</h1>
+        <p className="text-sm text-gray-400">
+          {loadError ||
+            "No estás asignado a este torneo o hubo un error al cargar los datos."}
+        </p>
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard/fiscal/torneos")}
+          className="inline-flex items-center gap-2 bg-brand-chartreuse text-brand-black font-bold px-5 py-3 rounded-xl text-sm cursor-pointer"
+        >
+          <ArrowLeft className="size-4" /> Volver a mis torneos
+        </button>
       </div>
     );
   }
@@ -191,15 +257,38 @@ export default function FiscalTorneoOperativoPage() {
             <span>{torneo.modalidad || "Duplas"}</span>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handlePdf}
-          disabled={descargando}
-          className="flex items-center justify-center gap-2 bg-brand-chartreuse text-brand-black font-bold px-5 py-3 rounded-xl text-sm cursor-pointer disabled:opacity-60"
-        >
-          <Download className="size-4" />
-          {descargando ? "Generando…" : "Descargar acta PDF"}
-        </button>
+        <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+          <button
+            type="button"
+            onClick={handleGrillasCancha}
+            disabled={descargandoGrillas}
+            className="inline-flex h-11 items-center justify-center gap-2 bg-white/10 hover:bg-white/15 text-white font-bold px-5 rounded-xl text-sm cursor-pointer disabled:opacity-60 border border-white/10 whitespace-nowrap"
+          >
+            <Download className="size-4 shrink-0" />
+            {descargandoGrillas ? "Generando…" : "Grillas por cancha"}
+          </button>
+          <div className="flex flex-col gap-1">
+            <button
+              type="button"
+              onClick={handlePdf}
+              disabled={descargando || torneo.estado !== "Finalizado"}
+              title={
+                torneo.estado !== "Finalizado"
+                  ? "Disponible cuando el torneo esté Finalizado"
+                  : "Descargar acta consolidada"
+              }
+              className="inline-flex h-11 items-center justify-center gap-2 bg-brand-chartreuse text-brand-black font-bold px-5 rounded-xl text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              <Download className="size-4 shrink-0" />
+              {descargando ? "Generando…" : "Acta consolidada PDF"}
+            </button>
+            {torneo.estado !== "Finalizado" && (
+              <p className="text-[10px] text-gray-500 sm:text-center">
+                Disponible al finalizar el torneo
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-2 border-b border-white/10 pb-2">
@@ -235,28 +324,14 @@ export default function FiscalTorneoOperativoPage() {
           }
         />
       )}
-      {tab === "incidencias" && (
-        <SeccionIncidencias
+      {tab === "informes" && (
+        <SeccionInformes
+          torneoId={id}
+          torneo={torneo}
           incidencias={incidencias}
-          showForm={showForm}
-          onToggleForm={() => setShowForm((v) => !v)}
-          partidos={partidos}
-          parejas={parejas}
-          onSubmit={async (payload) => {
-            await FiscalPanelService.registrarIncidencia(id, payload);
-            await cargar();
-            setShowForm(false);
-            setFeedback({
-              isOpen: true,
-              title: "Registrado en el acta",
-              description:
-                payload.tipo === "incidencia"
-                  ? "La incidencia quedó trazada."
-                  : "Quedó registrada. El efecto competitivo se confirma con la federación.",
-              type: "success",
-              onClose: () => setFeedback((p) => ({ ...p, isOpen: false })),
-            });
-          }}
+          esGeneral={torneo.rol_torneo === "general"}
+          onRefresh={cargar}
+          onFeedback={setFeedback}
         />
       )}
 
@@ -569,196 +644,215 @@ function CeldaJugador({
   );
 }
 
-function SeccionIncidencias({
+function SeccionInformes({
+  torneoId,
+  torneo,
   incidencias,
-  showForm,
-  onToggleForm,
-  partidos,
-  parejas,
-  onSubmit,
+  esGeneral,
+  onRefresh,
+  onFeedback,
 }: {
+  torneoId: string;
+  torneo: FiscalTorneo;
   incidencias: IncidenciaFiscal[];
-  showForm: boolean;
-  onToggleForm: () => void;
-  partidos: Partido[];
-  parejas: ParejaFiscal[];
-  onSubmit: (payload: CrearIncidenciaPayload) => Promise<void>;
+  esGeneral: boolean;
+  onRefresh: () => Promise<void>;
+  onFeedback: (modal: FeedbackModalProps) => void;
 }) {
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={onToggleForm}
-          className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-xl text-sm font-bold cursor-pointer"
-        >
-          <Plus className="size-4" />
-          {showForm ? "Cerrar formulario" : "Registrar en acta"}
-        </button>
-      </div>
-
-      {showForm && (
-        <FormIncidencia
-          partidos={partidos}
-          parejas={parejas}
-          onSubmit={onSubmit}
-        />
-      )}
-
-      {incidencias.length === 0 ? (
-        <div className="bg-[#151515] border border-white/5 rounded-2xl p-10 text-center text-gray-500 text-sm">
-          Todavía no hay incidencias ni sanciones en este torneo.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {incidencias.map((inc) => (
-            <div
-              key={inc.id}
-              className="bg-[#151515] border border-white/5 rounded-2xl p-5"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] uppercase tracking-widest text-brand-chartreuse font-bold">
-                    {inc.tipo} · {inc.estado}
-                  </p>
-                  <p className="text-white font-bold mt-1">{inc.descripcion}</p>
-                  <p className="text-sm text-gray-400 mt-2">Motivo: {inc.motivo}</p>
-                </div>
-                <AlertTriangle className="size-4 text-yellow-400 shrink-0" />
-              </div>
-              <p className="text-xs text-gray-500 mt-3">
-                {inc.perfiles
-                  ? `${inc.perfiles.apellido}, ${inc.perfiles.nombre} · DNI ${inc.perfiles.dni || "—"}`
-                  : "Sin jugador vinculado"}{" "}
-                · {formatFecha(inc.created_at)}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FormIncidencia({
-  partidos,
-  parejas,
-  onSubmit,
-}: {
-  partidos: Partido[];
-  parejas: ParejaFiscal[];
-  onSubmit: (payload: CrearIncidenciaPayload) => Promise<void>;
-}) {
-  const [tipo, setTipo] = useState<TipoIncidenciaFiscal>("incidencia");
-  const [jugadorId, setJugadorId] = useState("");
-  const [partidoId, setPartidoId] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [motivo, setMotivo] = useState("");
-  const [gravedad, setGravedad] = useState("");
+  const [revisandoId, setRevisandoId] = useState<string | null>(null);
+  const [decision, setDecision] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const jugadoresOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    parejas.forEach((p) => {
-      if (p.jugador1.id) {
-        map.set(p.jugador1.id, `${p.jugador1.nombre_completo} · DNI ${p.jugador1.dni || "—"}`);
-      }
-      if (p.jugador2?.id) {
-        map.set(p.jugador2.id, `${p.jugador2.nombre_completo} · DNI ${p.jugador2.dni || "—"}`);
-      }
-    });
-    return [{ value: "", label: "Sin jugador (opcional)" }, ...Array.from(map.entries()).map(([value, label]) => ({ value, label }))];
-  }, [parejas]);
-
-  const partidosOptions = useMemo(
-    () => [
-      { value: "", label: "Sin partido (opcional)" },
-      ...partidosDefinidosOrdenados(partidos).map((p) => ({
-        value: p.id,
-        label: `${labelRonda(p.ronda)} · ${etiquetaCruce(p.equipo_a_j1, p.equipo_a_j2)} vs ${etiquetaCruce(p.equipo_b_j1, p.equipo_b_j2)}`,
-      })),
-    ],
-    [partidos],
-  );
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRevisar = async (incidenciaId: string, estado: "aplicada" | "anulada") => {
+    if (!decision.trim()) {
+      onFeedback({
+        isOpen: true,
+        title: "Falta la decisión",
+        description: "Indicá la decisión del Fiscal General.",
+        type: "warning",
+        onClose: () => onFeedback({ isOpen: false, title: "", description: "", type: "info", onClose: () => {} }),
+      });
+      return;
+    }
     setSaving(true);
     try {
-      await onSubmit({
-        tipo,
-        descripcion,
-        motivo,
-        gravedad: (gravedad || null) as CrearIncidenciaPayload["gravedad"],
-        jugador_id: jugadorId || null,
-        partido_id: partidoId || null,
+      await FiscalPanelService.revisarInforme(torneoId, incidenciaId, {
+        estado,
+        decision_general: decision.trim(),
       });
-      setDescripcion("");
-      setMotivo("");
+      setRevisandoId(null);
+      setDecision("");
+      await onRefresh();
+      onFeedback({
+        isOpen: true,
+        title: estado === "aplicada" ? "Informe tomado" : "Informe anulado",
+        description:
+          "Quedó registrado internamente. No modifica el perfil público del jugador.",
+        type: "success",
+        onClose: () =>
+          onFeedback({
+            isOpen: false,
+            title: "",
+            description: "",
+            type: "info",
+            onClose: () => {},
+          }),
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "No se pudo revisar.";
+      onFeedback({
+        isOpen: true,
+        title: "Error",
+        description: message,
+        type: "error",
+        onClose: () =>
+          onFeedback({
+            isOpen: false,
+            title: "",
+            description: "",
+            type: "info",
+            onClose: () => {},
+          }),
+      });
     } finally {
       setSaving(false);
     }
   };
 
+  const handlePdfInforme = async (inc: IncidenciaFiscal) => {
+    if (!inc.jugador_id) return;
+    try {
+      const ficha = await FiscalPanelService.getJugador(inc.jugador_id);
+      generarInformePreliminarPdf({
+        torneo,
+        jugador: ficha,
+        informe: inc,
+        fiscalNombre: inc.fiscales
+          ? `${inc.fiscales.apellido}, ${inc.fiscales.nombre}`
+          : "Fiscal",
+      });
+    } catch {
+      onFeedback({
+        isOpen: true,
+        title: "No se pudo generar el PDF",
+        description: "Reintentá en unos segundos.",
+        type: "error",
+        onClose: () =>
+          onFeedback({
+            isOpen: false,
+            title: "",
+            description: "",
+            type: "info",
+            onClose: () => {},
+          }),
+      });
+    }
+  };
+
+  if (incidencias.length === 0) {
+    return (
+      <div className="bg-[#151515] border border-white/5 rounded-2xl p-10 text-center text-gray-500 text-sm space-y-2">
+        <p>Todavía no hay informes preliminares en este torneo.</p>
+        <p className="text-xs">
+          Emítelos desde la ficha de un jugador (pestaña Jugadores).
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-[#151515] border border-white/5 rounded-2xl p-5 space-y-4"
-    >
+    <div className="space-y-3">
       <p className="text-xs text-gray-500">
-        Las sanciones y descalificaciones se dejan en el acta. No se aplican
-        solas al cuadro hasta que la federación lo confirme.
+        Informes internos. El informe final de competencia se elabora fuera del
+        sistema con estos preliminares.
+        {esGeneral
+          ? " Como Fiscal General podés aplicar o anular cada informe."
+          : " Solo el Fiscal General puede cerrar decisiones."}
       </p>
-      <CustomDropdown
-        value={tipo}
-        onChange={(val) => setTipo(val as TipoIncidenciaFiscal)}
-        options={TIPOS_REGISTRO}
-        placeholder="Tipo"
-      />
-      <CustomDropdown
-        value={jugadorId}
-        onChange={setJugadorId}
-        options={jugadoresOptions}
-        placeholder="Jugador"
-      />
-      <CustomDropdown
-        value={partidoId}
-        onChange={setPartidoId}
-        options={partidosOptions}
-        placeholder="Partido"
-      />
-      <CustomDropdown
-        value={gravedad}
-        onChange={setGravedad}
-        options={[
-          { value: "", label: "Sin gravedad" },
-          { value: "leve", label: "Leve" },
-          { value: "grave", label: "Grave" },
-          { value: "muy_grave", label: "Muy grave" },
-        ]}
-        placeholder="Gravedad"
-      />
-      <textarea
-        required
-        value={descripcion}
-        onChange={(e) => setDescripcion(e.target.value)}
-        placeholder="Descripción del hecho"
-        className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 text-sm text-white min-h-24"
-      />
-      <textarea
-        required
-        value={motivo}
-        onChange={(e) => setMotivo(e.target.value)}
-        placeholder="Motivo (obligatorio para la traza)"
-        className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 text-sm text-white min-h-20"
-      />
-      <button
-        type="submit"
-        disabled={saving}
-        className="bg-brand-chartreuse text-brand-black font-bold px-5 py-3 rounded-xl text-sm cursor-pointer disabled:opacity-60"
-      >
-        {saving ? "Guardando…" : "Guardar en acta"}
-      </button>
-    </form>
+      {incidencias.map((inc) => (
+        <div
+          key={inc.id}
+          className="bg-[#151515] border border-white/5 rounded-2xl p-5 space-y-3"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-brand-chartreuse font-bold">
+                {inc.motivo_informe
+                  ? MOTIVOS_INFORME_LABELS[inc.motivo_informe]
+                  : inc.tipo}{" "}
+                · {inc.estado}
+              </p>
+              <p className="text-white font-bold mt-1">{inc.descripcion}</p>
+              <p className="text-sm text-gray-400 mt-2">
+                Traza: {inc.motivo || "—"}
+              </p>
+              {inc.decision_general && (
+                <p className="text-sm text-brand-chartreuse mt-2">
+                  Decisión: {inc.decision_general}
+                </p>
+              )}
+            </div>
+            <AlertTriangle className="size-4 text-yellow-400 shrink-0" />
+          </div>
+          <p className="text-xs text-gray-500">
+            {inc.perfiles
+              ? `${inc.perfiles.apellido}, ${inc.perfiles.nombre} · DNI ${inc.perfiles.dni || "—"}`
+              : "Sin jugador vinculado"}{" "}
+            · {formatFecha(inc.created_at)}
+            {inc.fiscales
+              ? ` · Fiscal ${inc.fiscales.apellido}, ${inc.fiscales.nombre}`
+              : ""}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => handlePdfInforme(inc)}
+              className="text-xs font-bold px-3 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 cursor-pointer"
+            >
+              Descargar PDF
+            </button>
+            {esGeneral && inc.estado === "registrada" && (
+              <button
+                type="button"
+                onClick={() =>
+                  setRevisandoId(revisandoId === inc.id ? null : inc.id)
+                }
+                className="text-xs font-bold px-3 py-2 rounded-lg bg-brand-chartreuse/15 text-brand-chartreuse border border-brand-chartreuse/30 cursor-pointer"
+              >
+                Revisar
+              </button>
+            )}
+          </div>
+          {esGeneral && revisandoId === inc.id && (
+            <div className="space-y-2 border-t border-white/5 pt-3">
+              <textarea
+                value={decision}
+                onChange={(e) => setDecision(e.target.value)}
+                placeholder="Decisión del Fiscal General"
+                className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 text-sm text-white min-h-20"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => handleRevisar(inc.id, "aplicada")}
+                  className="bg-brand-chartreuse text-brand-black font-bold px-4 py-2 rounded-xl text-xs cursor-pointer disabled:opacity-60"
+                >
+                  Aplicar decisión
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => handleRevisar(inc.id, "anulada")}
+                  className="bg-red-500/15 text-red-400 border border-red-500/20 font-bold px-4 py-2 rounded-xl text-xs cursor-pointer disabled:opacity-60"
+                >
+                  Anular informe
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }

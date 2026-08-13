@@ -1393,3 +1393,179 @@ export function generarPdfZonas(
     : "Padel_Nexus";
   doc.save(`Zonas_${cleanNombre}.pdf`);
 }
+
+/**
+ * Grillas imprimibles por cancha para planilleros / largadores.
+ * Una sección (página nueva) por cancha_asignada, orden horario, ID de partido visible.
+ */
+export function generarPdfGrillasPorCancha(
+  torneo: Partial<Torneo>,
+  partidos: Partido[],
+) {
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const PRIMARY_DARK = [15, 23, 42] as const;
+  const BRAND_ACCENT = [163, 230, 53] as const;
+
+  const formatNames = (j1?: string | null, j2?: string | null) => {
+    const list = [j1, j2].filter((n) => n && n !== "-" && n !== "Libre");
+    return list.length > 0 ? list.join(" / ") : "A definir";
+  };
+
+  const formatMatchDateTimeStr = (fechaIso?: string | null) => {
+    if (!fechaIso) return "Sin horario";
+    try {
+      const d = new Date(fechaIso);
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mins = String(d.getMinutes()).padStart(2, "0");
+      return `${dd}/${mm} · ${hh}:${mins}`;
+    } catch {
+      return "Sin horario";
+    }
+  };
+
+  const matchCode = (p: Partido) =>
+    p.orden != null
+      ? String(p.orden).padStart(2, "0")
+      : p.id && !String(p.id).startsWith("empty-")
+        ? String(p.id).slice(0, 8).toUpperCase()
+        : "—";
+
+  const canchaKey = (p: Partido) => {
+    const raw = String(p.cancha_asignada || "").trim();
+    return raw || "Sin cancha";
+  };
+
+  const definidos = partidos.filter((p) => {
+    const a = formatNames(p.equipo_a_j1, p.equipo_a_j2);
+    const b = formatNames(p.equipo_b_j1, p.equipo_b_j2);
+    return a !== "A definir" || b !== "A definir";
+  });
+
+  const porCancha = new Map<string, Partido[]>();
+  for (const p of definidos) {
+    const key = canchaKey(p);
+    const list = porCancha.get(key) || [];
+    list.push(p);
+    porCancha.set(key, list);
+  }
+
+  const canchas = Array.from(porCancha.keys()).sort((a, b) =>
+    a.localeCompare(b, "es"),
+  );
+
+  if (canchas.length === 0) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Sin partidos asignados a canchas.", 14, 20);
+    doc.save(
+      `Grillas_Cancha_${(torneo.nombre || "Torneo").replace(/\s+/g, "_")}.pdf`,
+    );
+    return;
+  }
+
+  canchas.forEach((cancha, idx) => {
+    if (idx > 0) doc.addPage();
+
+    const lista = (porCancha.get(cancha) || []).slice().sort((a, b) => {
+      const ta = a.fecha_partido ? new Date(a.fecha_partido).getTime() : 0;
+      const tb = b.fecha_partido ? new Date(b.fecha_partido).getTime() : 0;
+      if (ta !== tb) return ta - tb;
+      return Number(a.orden || 0) - Number(b.orden || 0);
+    });
+
+    doc.setFillColor(...PRIMARY_DARK);
+    doc.rect(0, 0, pageWidth, 28, "F");
+    doc.setFillColor(...BRAND_ACCENT);
+    doc.rect(0, 28, pageWidth, 1.5, "F");
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("PLANILLERO — GRILLA POR CANCHA", 14, 12);
+    doc.setFontSize(9);
+    doc.text((torneo.nombre || "TORNEO").toUpperCase(), 14, 19);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(186, 198, 214);
+    doc.text(
+      `Cancha: ${cancha}  ·  ${lista.length} partidos  ·  Impreso ${new Date().toLocaleString("es-AR")}`,
+      14,
+      25,
+    );
+
+    let y = 36;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(...PRIMARY_DARK);
+    doc.text("ID", 14, y);
+    doc.text("Horario", 28, y);
+    doc.text("Parejas / jugadores", 58, y);
+    doc.text("Ctrl.", pageWidth - 28, y);
+    y += 3;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(14, y, pageWidth - 14, y);
+    y += 5;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+
+    for (const p of lista) {
+      if (y > pageHeight - 18) {
+        doc.addPage();
+        y = 20;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(...PRIMARY_DARK);
+        doc.text(`${cancha} (cont.)`, 14, y);
+        y += 8;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+      }
+
+      const idPartido = matchCode(p);
+      const horario = formatMatchDateTimeStr(p.fecha_partido);
+      const a = formatNames(p.equipo_a_j1, p.equipo_a_j2);
+      const b = formatNames(p.equipo_b_j1, p.equipo_b_j2);
+      const cruce = `${a}  vs  ${b}`;
+
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(14, y - 3.5, pageWidth - 28, 12, 1.5, 1.5, "F");
+
+      doc.setTextColor(...PRIMARY_DARK);
+      doc.setFont("helvetica", "bold");
+      doc.text(idPartido, 16, y + 2);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(71, 85, 105);
+      doc.text(horario, 28, y + 2);
+      const lines = doc.splitTextToSize(cruce, pageWidth - 95);
+      doc.setTextColor(...PRIMARY_DARK);
+      doc.text(lines, 58, y + 2);
+      doc.setDrawColor(203, 213, 225);
+      doc.rect(pageWidth - 28, y - 1, 10, 6);
+
+      y += Math.max(14, lines.length * 4 + 8);
+    }
+
+    doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text(
+      "Verificar identidad de quienes juegan. Anotar resultado y pasar a organización para carga.",
+      14,
+      pageHeight - 8,
+    );
+  });
+
+  const cleanNombre = torneo.nombre
+    ? torneo.nombre.replace(/\s+/g, "_")
+    : "Padel_Nexus";
+  doc.save(`Grillas_Cancha_${cleanNombre}.pdf`);
+}

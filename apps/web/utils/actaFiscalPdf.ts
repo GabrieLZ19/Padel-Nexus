@@ -42,6 +42,8 @@ function labelTipo(tipo: IncidenciaFiscal["tipo"]): string {
       return "Descalificación";
     case "cambio_categoria":
       return "Cambio de categoría";
+    case "informe_preliminar":
+      return "Informe preliminar";
     default:
       return tipo;
   }

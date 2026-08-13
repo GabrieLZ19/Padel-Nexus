@@ -26,6 +26,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   const [canchasDisponibles, setCanchasDisponibles] = useState<any[]>([]);
   const [dispList, setDispList] = useState<any[]>([]);
   const [fiscales, setFiscales] = useState<any[]>([]);
+  const [colegioEntidadId, setColegioEntidadId] = useState<string | null>(null);
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>("all");
 
   // Helper de agrupar turnos por fecha para vista Calendario
@@ -124,6 +125,9 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
         // Fetch tournament main club
         const resTorneo = await api.get(`/torneos/${torneoId}`);
         if (resTorneo.data) {
+          setColegioEntidadId(
+            resTorneo.data.federacion_id || resTorneo.data.asociacion_id || null,
+          );
           if (resTorneo.data.club_id) {
             setMainClub({
               id: resTorneo.data.club_id,
@@ -338,7 +342,11 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
     setFoundFiscal(null);
     setShowCreateForm(false);
     try {
-      const res = await api.get(`/torneos/fiscales/dni/${searchDni}`);
+      const res = await api.get(`/torneos/fiscales/dni/${searchDni}`, {
+        params: colegioEntidadId
+          ? { asociacion_id: colegioEntidadId }
+          : undefined,
+      });
       setFoundFiscal(res.data);
     } catch (e: any) {
       setSearchError("No se encontró ningún fiscal con este DNI.");
@@ -354,6 +362,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
         apellido: createForm.apellido,
         dni: searchDni,
         rango: createForm.rango,
+        asociacion_id: colegioEntidadId || undefined,
       });
       const newFiscal = resNew.data;
 

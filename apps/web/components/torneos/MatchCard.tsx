@@ -60,6 +60,11 @@ export const MatchCard = ({
     partido.ganador === partido.equipo_b_id && partido.ganador !== null;
   const finalizado = partido.ganador != null;
 
+  const hasA = Boolean(partido.equipo_a_j1 || partido.equipo_a_j2 || partido.equipo_a_id);
+  const hasB = Boolean(partido.equipo_b_j1 || partido.equipo_b_j2 || partido.equipo_b_id);
+  const slotAEsBye = !hasA && hasB && !finalizado;
+  const slotBEsBye = !hasB && hasA && !finalizado;
+
   const formatMeta = () => {
     const parts: string[] = [];
     if (partido.cancha_asignada) parts.push(partido.cancha_asignada);
@@ -86,6 +91,7 @@ export const MatchCard = ({
     origen?: string | null,
     won?: boolean,
     esCabezaSerie?: boolean,
+    esBye?: boolean,
   ) => {
     const empty = !j1 && !j2;
     const hasJ2 = Boolean(j2 && j2 !== "-");
@@ -105,7 +111,7 @@ export const MatchCard = ({
             ) : null}
           {!origen && !esCabezaSerie && empty ? (
             <span className="text-[9px] font-bold uppercase tracking-wider text-gray-600">
-              Slot libre
+              {esBye ? "Bye" : "Slot libre"}
             </span>
           ) : null}
         </div>
@@ -114,7 +120,7 @@ export const MatchCard = ({
           <div className="flex items-center gap-2.5 min-h-[2.75rem]">
             <PlayerAvatar src={null} size="lg" />
             <p className="text-[13px] font-medium text-gray-500 italic">
-              Esperando rival…
+              {esBye ? "Pase directo (BYE)" : "Esperando rival…"}
             </p>
           </div>
         ) : (
@@ -222,6 +228,7 @@ export const MatchCard = ({
           origenEquipoA,
           isA,
           esCabezaSerieA,
+          slotAEsBye,
         )}
         {renderSets(
           partido.set1_a,
@@ -246,6 +253,7 @@ export const MatchCard = ({
           origenEquipoB,
           isB,
           esCabezaSerieB,
+          slotBEsBye,
         )}
         {renderSets(
           partido.set1_b,

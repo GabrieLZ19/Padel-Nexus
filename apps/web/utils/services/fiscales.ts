@@ -8,6 +8,7 @@ export interface Fiscal {
   direccion?: string;
   correo?: string;
   rango: "Local" | "Regional" | "Provincial" | "Nacional";
+  asociacion_id?: string;
   asociacion?: string;
   activo?: boolean;
   usuario_id?: string | null;
@@ -25,9 +26,11 @@ export interface AccesoFiscal {
 }
 
 export const FiscalesService = {
-  getAll: async (): Promise<Fiscal[]> => {
+  getAll: async (asociacionId?: string | null): Promise<Fiscal[]> => {
     try {
-      const res = await api.get("/torneos/fiscales/lista");
+      const res = await api.get("/torneos/fiscales/lista", {
+        params: asociacionId ? { asociacion_id: asociacionId } : undefined,
+      });
       return res.data?.data || res.data || [];
     } catch (error) {
       console.warn("Error al obtener fiscales des del servicio:", error);
@@ -35,14 +38,25 @@ export const FiscalesService = {
     }
   },
 
-  getByDni: async (dni: string): Promise<Fiscal | null> => {
+  getByDni: async (
+    dni: string,
+    asociacionId?: string | null,
+  ): Promise<Fiscal | null> => {
     try {
-      const res = await api.get(`/torneos/fiscales/dni/${dni}`);
+      const res = await api.get(`/torneos/fiscales/dni/${dni}`, {
+        params: asociacionId ? { asociacion_id: asociacionId } : undefined,
+      });
       return res.data?.data || res.data || null;
-    } catch (error: any) {
-      if (error?.response?.status === 404) {
-        return null;
-      }
+    } catch (error: unknown) {
+      const status =
+        typeof error === "object" &&
+        error &&
+        "response" in error &&
+        typeof (error as { response?: { status?: number } }).response?.status ===
+          "number"
+          ? (error as { response: { status: number } }).response.status
+          : null;
+      if (status === 404) return null;
       console.warn(`No se encontró fiscal para el DNI ${dni}`);
       return null;
     }

@@ -52,12 +52,18 @@ export const Paso6Fiscales = ({
 
   const [todosLosFiscales, setTodosLosFiscales] = useState<Fiscal[]>([]);
 
+  const colegioEntidadId =
+    (torneo as { federacion_id?: string | null; asociacion_id?: string | null })
+      .federacion_id ||
+    (torneo as { asociacion_id?: string | null }).asociacion_id ||
+    null;
+
   useEffect(() => {
     fetchFiscalesTorneo();
-    FiscalesService.getAll()
+    FiscalesService.getAll(colegioEntidadId)
       .then((res) => setTodosLosFiscales(res || []))
       .catch((err) => console.error("Error al cargar padrón de fiscales:", err));
-  }, [torneoId]);
+  }, [torneoId, colegioEntidadId]);
 
   const fetchFiscalesTorneo = async () => {
     try {
@@ -89,7 +95,10 @@ export const Paso6Fiscales = ({
       setSearching(true);
       setSearchError("");
       setFoundFiscal(null);
-      const fiscal = await FiscalesService.getByDni(searchDni.trim());
+      const fiscal = await FiscalesService.getByDni(
+        searchDni.trim(),
+        colegioEntidadId,
+      );
       if (fiscal) {
         setFoundFiscal(fiscal);
       } else {

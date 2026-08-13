@@ -575,6 +575,17 @@ export const PasoResultados = ({
             >
               Hoja de ruta PDF
             </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const { generarPdfGrillasPorCancha } =
+                  await import("@/utils/grillaPdf");
+                generarPdfGrillasPorCancha(torneo, partidos);
+              }}
+              className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl font-bold transition-all text-xs border border-white/10 cursor-pointer shrink-0"
+            >
+              Grillas por cancha
+            </button>
             {torneo?.estado === "Finalizado" && (
               <button
                 type="button"

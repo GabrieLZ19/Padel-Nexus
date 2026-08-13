@@ -530,42 +530,48 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     partidos.map((p) => (p.ronda || "").toUpperCase()),
   );
 
-  const rondasToShow = RONDAS_CONFIG.filter(
-    (r) => rondasInPartidos.has(r.id) || r.required <= bracketCapacity / 2,
-  );
-
-  const getRoundMatches = (round: string, requiredCount: number): Partido[] => {
-    const found = partidos
-      .filter((p) => p.ronda === round)
-      .sort((a, b) => a.orden - b.orden);
-    const result: Partido[] = [];
-    for (let i = 0; i < requiredCount; i++) {
-      if (found[i]) result.push(found[i]);
-      else {
-        result.push({
-          id: `empty-${round}-${i}`,
-          torneo_id: torneoId,
-          ronda: round,
-          orden: i + 1,
-          equipo_a_id: null,
-          equipo_a_j1: null,
-          equipo_a_j2: null,
-          equipo_b_id: null,
-          equipo_b_j1: null,
-          equipo_b_j2: null,
-          set1_a: null,
-          set1_b: null,
-          ganador: null,
-        });
-      }
-    }
-    return result;
-  };
-
   const PLAYOFF_ROUND_IDS = ["32AVOS", "16AVOS", "OCTAVOS", "CUARTOS", "SEMIS", "FINAL"];
   const playoffPartidos = partidos.filter((p) =>
     PLAYOFF_ROUND_IDS.includes((p.ronda || "").toUpperCase()),
   );
+
+  const rondasToShow = RONDAS_CONFIG.filter((r) => {
+    if (rondasInPartidos.has(r.id)) return true;
+    // Sin partidos aún: mostrar rondas del tamaño de llave. Con partidos ya generados,
+    // no inventar rondas vacías (evita cuartos fantasma en draws con BYE).
+    if (playoffPartidos.length > 0) return false;
+    return r.required <= bracketCapacity / 2;
+  });
+
+  const getRoundMatches = (round: string, requiredCount: number): Partido[] => {
+    const found = partidos
+      .filter((p) => (p.ronda || "").toUpperCase() === round.toUpperCase())
+      .sort((a, b) => a.orden - b.orden);
+
+    // Si la ronda ya tiene partidos reales (p.ej. 2 cuartos + 2 BYEs en semis),
+    // no rellenar slots fantasma: eso rompe visualmente llaves de 6, 12, etc.
+    if (found.length > 0) return found;
+
+    const result: Partido[] = [];
+    for (let i = 0; i < requiredCount; i++) {
+      result.push({
+        id: `empty-${round}-${i}`,
+        torneo_id: torneoId,
+        ronda: round,
+        orden: i + 1,
+        equipo_a_id: null,
+        equipo_a_j1: null,
+        equipo_a_j2: null,
+        equipo_b_id: null,
+        equipo_b_j1: null,
+        equipo_b_j2: null,
+        set1_a: null,
+        set1_b: null,
+        ganador: null,
+      });
+    }
+    return result;
+  };
 
   const isZonaRonda = (ronda?: string | null) => {
     const r = String(ronda || "").toUpperCase();

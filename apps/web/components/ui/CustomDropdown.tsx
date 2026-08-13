@@ -53,7 +53,7 @@ export default function CustomDropdown({
       {/* BOTÓN PRINCIPAL */}
       <div
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full bg-brand-input px-4 py-3.5 rounded-xl border text-sm md:text-base flex justify-between items-center transition-all duration-200 select-none ${
+        className={`w-full bg-brand-input px-4 py-3.5 rounded-xl border text-sm md:text-base flex justify-between items-center gap-2 transition-all duration-200 select-none min-w-0 ${
           isOpen
             ? "border-brand-chartreuse ring-1 ring-brand-chartreuse shadow-[0_0_15px_rgba(203,254,1,0.05)]"
             : hasError
@@ -67,7 +67,9 @@ export default function CustomDropdown({
       >
         <span
           className={
-            selectedOption ? "text-brand-white font-medium" : "text-gray-500"
+            selectedOption
+              ? "text-brand-white font-medium truncate pr-2 min-w-0"
+              : "text-gray-500 truncate pr-2"
           }
         >
           {selectedOption ? selectedOption.label : placeholder}

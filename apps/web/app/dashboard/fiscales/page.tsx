@@ -20,14 +20,19 @@ import {
   Check,
 } from "lucide-react";
 import { FiscalesService, Fiscal, AccesoFiscal } from "@/utils/services/fiscales";
+import { AsociacionesService, type Asociacion } from "@/utils/services/asociaciones";
 import { sileo } from "sileo";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
 
+const FAP_ID = "818c6a07-f056-41dc-9a07-b8c03d88cee1";
+
 export default function ColegioFiscalesPage() {
   const [fiscales, setFiscales] = useState<Fiscal[]>([]);
+  const [federaciones, setFederaciones] = useState<Asociacion[]>([]);
+  const [colegioId, setColegioId] = useState(FAP_ID);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
@@ -54,7 +59,7 @@ export default function ColegioFiscalesPage() {
     direccion: "",
     correo: "",
     rango: "Provincial" as "Local" | "Regional" | "Provincial" | "Nacional",
-    asociacion: "FAP",
+    asociacion_id: FAP_ID,
   });
   const [saving, setSaving] = useState(false);
   const [accesoEmail, setAccesoEmail] = useState("");
@@ -62,14 +67,47 @@ export default function ColegioFiscalesPage() {
   const [credenciales, setCredenciales] = useState<AccesoFiscal | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const colegioLabel =
+    federaciones.find((f) => f.id === colegioId)?.sigla ||
+    federaciones.find((f) => f.id === colegioId)?.nombre ||
+    "Entidad nacional";
+
   useEffect(() => {
-    fetchFiscales();
+    AsociacionesService.getAll()
+      .then((list) => {
+        const feds = list
+          .filter((a) => a.tipo === "federacion" && a.estado !== "inactivo")
+          .sort((a, b) =>
+            String(a.sigla || a.nombre).localeCompare(
+              String(b.sigla || b.nombre),
+              "es",
+            ),
+          );
+        // Fallback: si aún no hay federaciones tipadas, incluir FAP por id/sigla
+        const resolved =
+          feds.length > 0
+            ? feds
+            : list.filter((a) => a.id === FAP_ID || a.sigla === "FAP");
+        setFederaciones(resolved.length > 0 ? resolved : list);
+        const preferida =
+          resolved.find((a) => a.sigla === "FAP")?.id ||
+          resolved[0]?.id ||
+          list[0]?.id ||
+          FAP_ID;
+        setColegioId(preferida);
+      })
+      .catch((err) => console.error("Error al cargar entidades:", err));
   }, []);
+
+  useEffect(() => {
+    if (!colegioId) return;
+    fetchFiscales();
+  }, [colegioId]);
 
   const fetchFiscales = async () => {
     try {
       setLoading(true);
-      const data = await FiscalesService.getAll();
+      const data = await FiscalesService.getAll(colegioId);
       setFiscales(data);
     } catch (err) {
       console.error("Error al cargar colegio de fiscales:", err);
@@ -86,7 +124,7 @@ export default function ColegioFiscalesPage() {
       direccion: "",
       correo: "",
       rango: "Provincial",
-      asociacion: "FAP",
+      asociacion_id: colegioId,
     });
     setShowCreateModal(true);
   };
@@ -100,7 +138,7 @@ export default function ColegioFiscalesPage() {
       direccion: f.direccion || "",
       correo: f.correo || "",
       rango: f.rango || "Provincial",
-      asociacion: f.asociacion || "FAP",
+      asociacion_id: f.asociacion_id || colegioId,
     });
     setShowEditModal(true);
   };
@@ -208,10 +246,13 @@ export default function ColegioFiscalesPage() {
 
     try {
       setSaving(true);
-      await FiscalesService.create(form);
+      await FiscalesService.create({
+        ...form,
+        asociacion_id: form.asociacion_id || colegioId,
+      });
       sileo.success({
         title: "Fiscal Registrado",
-        description: `${form.nombre} ${form.apellido} ha sido añadido al Colegio de Fiscales.`,
+        description: `${form.nombre} ${form.apellido} ha sido añadido al Colegio de ${colegioLabel}.`,
       });
       setShowCreateModal(false);
       fetchFiscales();
@@ -268,14 +309,14 @@ export default function ColegioFiscalesPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-white/10 pb-6">
         <div>
           <div className="flex items-center gap-2 text-brand-chartreuse text-xs font-bold uppercase tracking-widest mb-1">
-            <Shield className="size-4" /> Entidad Reguladora FAP
+            <Shield className="size-4" /> Colegio · {colegioLabel}
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">
             Colegio de Fiscales
           </h1>
           <p className="text-gray-400 text-sm mt-1">
-            Oficiales de federación con alcance nacional, regional o local.
-            La asignación a torneos es centralizada; no configuran eventos.
+            Cada entidad nacional tiene su propio padrón. La asignación a torneos
+            es centralizada; los fiscales no configuran eventos.
           </p>
         </div>
 
@@ -288,16 +329,39 @@ export default function ColegioFiscalesPage() {
       </div>
 
       {/* Barra de Filtros y Conmutador de Vista */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative w-full sm:max-w-md">
-          <Search className="absolute left-4 top-3.5 size-4 text-gray-500" />
-          <input
-            type="text"
-            placeholder="Buscar por Nombre, Apellido o DNI..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-brand-card border border-white/10 text-white pl-11 pr-4 py-3 rounded-xl text-sm font-semibold focus:outline-none focus:border-brand-chartreuse/50"
-          />
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 w-full lg:max-w-3xl min-w-0">
+          <div className="w-full sm:w-[min(100%,320px)] sm:min-w-[260px] sm:max-w-[340px] shrink-0">
+            <CustomDropdown
+              value={colegioId}
+              onChange={setColegioId}
+              options={federaciones.map((f) => ({
+                value: f.id,
+                label: f.sigla
+                  ? `${f.sigla} — ${f.nombre}`
+                  : f.nombre,
+              }))}
+              placeholder="Entidad nacional"
+              className="!py-3"
+            />
+            <p className="text-[10px] text-gray-500 mt-1.5 px-1">
+              {federaciones.length}{" "}
+              {federaciones.length === 1
+                ? "entidad nacional"
+                : "entidades nacionales"}{" "}
+              con colegio propio
+            </p>
+          </div>
+          <div className="relative w-full min-w-0">
+            <Search className="absolute left-4 top-3.5 size-4 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Buscar por Nombre, Apellido o DNI..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-brand-card border border-white/10 text-white pl-11 pr-4 py-3 rounded-xl text-sm font-semibold focus:outline-none focus:border-brand-chartreuse/50"
+            />
+          </div>
         </div>
 
         {/* Conmutador Tabla / Cards */}
