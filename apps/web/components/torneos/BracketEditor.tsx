@@ -1033,7 +1033,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 }}
                 className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <Printer className="size-4 text-gray-400" /> Imprimir zonas
+                <Printer className="size-4 text-gray-400" /> Publicar zonas
               </button>
 
         

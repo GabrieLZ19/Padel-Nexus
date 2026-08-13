@@ -466,7 +466,7 @@ export default function TorneosPage() {
                                 }
                               }}
                               className="p-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-lg transition-colors"
-                              title="Imprimir Grilla de Resultados (PDF)"
+                              title="Informe de resultados (PDF)"
                             >
                               <Printer className="size-4" />
                             </button>

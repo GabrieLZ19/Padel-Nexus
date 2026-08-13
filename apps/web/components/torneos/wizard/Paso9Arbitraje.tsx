@@ -572,8 +572,9 @@ export const PasoResultados = ({
                 generarPdfHojaRuta(torneo, partidos);
               }}
               className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl font-bold transition-all text-xs border border-white/10 cursor-pointer shrink-0"
+              title="Grilla de Partidos | Auxiliares de Cancha"
             >
-              Hoja de ruta PDF
+              Grilla auxiliares
             </button>
             <button
               type="button"
@@ -596,7 +597,7 @@ export const PasoResultados = ({
                 }}
                 className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl font-bold transition-all text-xs border border-white/10 cursor-pointer shrink-0"
               >
-                Grilla PDF
+                Informe resultados
               </button>
             )}
           </div>

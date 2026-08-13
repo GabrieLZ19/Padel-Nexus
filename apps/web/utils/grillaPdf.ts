@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { esModalidadIndividual } from "@/utils/formatFecha";
 import { Partido, Torneo } from "@/utils/types";
 
 export function generarPdfGrillaPartidos(
@@ -65,7 +66,7 @@ export function generarPdfGrillaPartidos(
   doc.setFont("helvetica", "bold");
   doc.setTextColor(255, 255, 255);
   doc.text(
-    `PADEL NEXUS  —  ${(torneo.nombre || "TORNEO").toUpperCase()}`,
+    `INFORME DE RESULTADOS  —  ${(torneo.nombre || "TORNEO").toUpperCase()}`,
     14,
     14,
   );
@@ -521,13 +522,13 @@ export function generarPdfGrillaPartidos(
 
   // Guardar archivo PDF
   const cleanNombre = torneo.nombre ? torneo.nombre.replace(/\s+/g, "_") : "Padel_Nexus";
-  doc.save(`Informe_Torneo_${cleanNombre}.pdf`);
+  doc.save(`Informe_Resultados_${cleanNombre}.pdf`);
 }
 
 /**
- * Hoja de ruta / planillero para coordinadores de cancha.
- * Disponible con el torneo en curso (no requiere estado Finalizado).
- * Muestra duplas separadas + historial de resultado si el partido ya finalizó.
+ * Grilla de Partidos | Coordinadores / Auxiliares de Cancha.
+ * Formato tabular (estilo planillero): complejo, partido, horario,
+ * resultado en blanco y firmas. Distingue Individual vs Duplas.
  */
 export function generarPdfHojaRuta(
   torneo: Partial<Torneo>,
@@ -546,26 +547,30 @@ export function generarPdfHojaRuta(
   const SLATE_100 = [241, 245, 249] as const;
   const SLATE_200 = [226, 232, 240] as const;
   const SLATE_500 = [100, 116, 139] as const;
-  const SLATE_700 = [51, 65, 85] as const;
-  const WINNER_BG = [236, 252, 203] as const;
+  const isIndividual = esModalidadIndividual(torneo.modalidad);
 
-  const splitName = (full?: string | null) => {
-    if (!full || full === "-" || full === "Libre") {
-      return { apellido: "—", nombre: "" };
-    }
+  const shortName = (full?: string | null) => {
+    if (!full || full === "-" || full === "Libre") return "—";
     const cleaned = full.trim();
     const idx = cleaned.indexOf(",");
     if (idx === -1) {
       const parts = cleaned.split(/\s+/);
-      return {
-        apellido: parts[0] || "—",
-        nombre: parts.slice(1).join(" "),
-      };
+      const ap = (parts[0] || "—").toUpperCase();
+      const nom = parts.slice(1).join(" ");
+      return nom ? `${ap}, ${nom}` : ap;
     }
-    return {
-      apellido: cleaned.slice(0, idx).trim() || "—",
-      nombre: cleaned.slice(idx + 1).trim(),
-    };
+    const ap = cleaned.slice(0, idx).trim().toUpperCase();
+    const nom = cleaned.slice(idx + 1).trim();
+    return nom ? `${ap}, ${nom}` : ap;
+  };
+
+  const sideLabel = (j1?: string | null, j2?: string | null) => {
+    if (isIndividual) return shortName(j1);
+    const a = shortName(j1);
+    const b = shortName(j2);
+    if (a === "—" && b === "—") return "A definir";
+    if (b === "—") return a;
+    return `${a} / ${b}`;
   };
 
   const formatDateTime = (fechaIso?: string | null) => {
@@ -579,7 +584,7 @@ export function generarPdfHojaRuta(
       const dayName = d.toLocaleDateString("es-AR", { weekday: "short" });
       const capDay =
         dayName.charAt(0).toUpperCase() + dayName.slice(1).replace(".", "");
-      return `${capDay} ${dd}/${mm} · ${hh}:${mins}`;
+      return `${capDay} ${dd}/${mm} ${hh}:${mins}`;
     } catch {
       return "Sin horario";
     }
@@ -592,58 +597,9 @@ export function generarPdfHojaRuta(
         ? p.id.slice(0, 6).toUpperCase()
         : "—";
 
-  const drawDuplaBox = (
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    j1?: string | null,
-    j2?: string | null,
-    isWinner = false,
-  ) => {
-    if (isWinner) {
-      doc.setFillColor(WINNER_BG[0], WINNER_BG[1], WINNER_BG[2]);
-    } else {
-      doc.setFillColor(255, 255, 255);
-    }
-    doc.setDrawColor(SLATE_200[0], SLATE_200[1], SLATE_200[2]);
-    doc.setLineWidth(0.35);
-    doc.roundedRect(x, y, w, h, 1.5, 1.5, "FD");
-
-    const p1 = splitName(j1);
-    const p2 = splitName(j2);
-    const mid = y + h / 2;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(15, 23, 42);
-    doc.text(p1.apellido.toUpperCase().slice(0, 22), x + 2.5, y + 5);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-    if (p1.nombre) doc.text(p1.nombre.slice(0, 24), x + 2.5, y + 8.5);
-
-    doc.setDrawColor(SLATE_200[0], SLATE_200[1], SLATE_200[2]);
-    doc.setLineWidth(0.2);
-    doc.line(x + 2, mid, x + w - 2, mid);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(15, 23, 42);
-    doc.text(p2.apellido.toUpperCase().slice(0, 22), x + 2.5, mid + 4.5);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-    if (p2.nombre) doc.text(p2.nombre.slice(0, 24), x + 2.5, mid + 8);
-  };
-
   const sorted = [...partidos]
     .filter((p) => p.equipo_a_id || p.equipo_b_id)
     .sort((a, b) => {
-      // Primero en curso / pendientes; al final los finalizados
-      const doneA = a.ganador != null ? 1 : 0;
-      const doneB = b.ganador != null ? 1 : 0;
-      if (doneA !== doneB) return doneA - doneB;
       const fa = a.fecha_partido
         ? new Date(a.fecha_partido).getTime()
         : Number.MAX_SAFE_INTEGER;
@@ -657,214 +613,210 @@ export function generarPdfHojaRuta(
       return (a.orden ?? 0) - (b.orden ?? 0);
     });
 
-  doc.setFillColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
-  doc.rect(0, 0, pageWidth, 28, "F");
-  doc.setFontSize(14);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(255, 255, 255);
-  doc.text("HOJA DE RUTA — COORDINADORES", 14, 12);
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(200, 200, 200);
-  doc.text(
-    `${(torneo.nombre || "TORNEO").toUpperCase()}  |  ${torneo.categoria || "Libres"}  |  Impreso: ${new Date().toLocaleString("es-AR")}`,
-    14,
-    21,
-  );
+  const fileSlug = torneo.nombre
+    ? torneo.nombre.replace(/\s+/g, "_")
+    : "Padel_Nexus";
 
-  let y = 34;
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(SLATE_700[0], SLATE_700[1], SLATE_700[2]);
-  doc.text(
-    "Primero partidos en curso · al final los finalizados (marcador en casillas de sets).",
-    14,
-    y,
-  );
-  y += 7;
+  const detalleCompetencia = [
+    (torneo.nombre || "TORNEO").toUpperCase(),
+    isIndividual ? "Individual" : "Duplas",
+    torneo.categoria || null,
+    torneo.rama || null,
+    torneo.lugar || null,
+  ]
+    .filter(Boolean)
+    .join("  ·  ");
+
+  const marginX = 12;
+  const contentW = pageWidth - marginX * 2;
+  // Anchos que suman exactamente contentW (~186 mm en A4)
+  const cols = {
+    complejo: 32,
+    partido: 62,
+    horario: 34,
+    resultado: 26,
+    firmaA: (contentW - 32 - 62 - 34 - 26) / 2,
+    firmaB: (contentW - 32 - 62 - 34 - 26) / 2,
+  };
+
+  const drawHeader = (startY: number) => {
+    doc.setFillColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
+    doc.rect(0, 0, pageWidth, 28, "F");
+    doc.setFillColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
+    doc.rect(0, 28, pageWidth, 1.5, "F");
+
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
+    doc.text("PADEL NEXUS", marginX, 8);
+    doc.setFontSize(11);
+    doc.setTextColor(255, 255, 255);
+    doc.text("Grilla de Partidos | Auxiliares de Cancha", marginX, 14.5);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
+    doc.text(detalleCompetencia.slice(0, 90), marginX, 20.5);
+    doc.setFontSize(6.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(186, 198, 214);
+    doc.text(
+      `Impreso: ${new Date().toLocaleString("es-AR")}  ·  Completar resultado y firmas al finalizar.`,
+      marginX,
+      25.5,
+    );
+
+    let y = startY;
+    doc.setFillColor(SLATE_100[0], SLATE_100[1], SLATE_100[2]);
+    doc.setDrawColor(SLATE_200[0], SLATE_200[1], SLATE_200[2]);
+    doc.setLineWidth(0.3);
+    doc.rect(marginX, y, contentW, 7, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(71, 85, 105);
+    let x = marginX;
+    const headers: Array<[string, number]> = [
+      ["Complejo", cols.complejo],
+      ["Partido", cols.partido],
+      ["Dia / Hora", cols.horario],
+      ["Resultado", cols.resultado],
+      ["Firma A", cols.firmaA],
+      ["Firma B", cols.firmaB],
+    ];
+    headers.forEach(([label, w]) => {
+      doc.text(label, x + 2, y + 4.6);
+      x += w;
+    });
+    return y + 7;
+  };
+
+  let y = drawHeader(32);
 
   if (sorted.length === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
-    doc.text("No hay partidos asignados para imprimir.", 14, y);
-    const cleanNombre = torneo.nombre
-      ? torneo.nombre.replace(/\s+/g, "_")
-      : "Padel_Nexus";
-    doc.save(`Hoja_Ruta_${cleanNombre}.pdf`);
+    doc.text("No hay partidos asignados para imprimir.", marginX, y + 8);
+    doc.save(`Grilla_Partidos_${fileSlug}.pdf`);
     return;
   }
 
-  const marginX = 12;
-  const cardW = pageWidth - marginX * 2;
-  const rowH = 40;
+  const rowH = isIndividual ? 16 : 18;
 
   for (const p of sorted) {
-    if (y + rowH > pageHeight - 14) {
+    if (y + rowH > pageHeight - 12) {
       doc.addPage();
-      y = 16;
+      y = drawHeader(32);
     }
 
-    const finalizado = p.ganador != null;
-    const winnerA = finalizado && p.ganador === p.equipo_a_id;
-    const winnerB = finalizado && p.ganador === p.equipo_b_id;
+    const code = matchCode(p);
+    const cancha = p.cancha_asignada || "Cancha s/d";
+    const ronda = String(p.ronda || "Ronda").toUpperCase();
+    const cat = torneo.categoria || "Libres";
+    const sideA = sideLabel(p.equipo_a_j1, p.equipo_a_j2);
+    const sideB = sideLabel(p.equipo_b_j1, p.equipo_b_j2);
+    const horario = formatDateTime(p.fecha_partido);
 
-    doc.setFillColor(SLATE_100[0], SLATE_100[1], SLATE_100[2]);
+    doc.setFillColor(255, 255, 255);
     doc.setDrawColor(SLATE_200[0], SLATE_200[1], SLATE_200[2]);
-    doc.setLineWidth(0.35);
-    doc.roundedRect(marginX, y, cardW, rowH - 2, 2, 2, "FD");
+    doc.setLineWidth(0.3);
+    doc.rect(marginX, y, contentW, rowH, "FD");
 
-    // Badge código
-    doc.setFillColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
-    doc.roundedRect(marginX + 2.5, y + 2.5, 14, 6.5, 1.2, 1.2, "F");
-    doc.setFontSize(7.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(15, 23, 42);
-    doc.text(`#${matchCode(p)}`, marginX + 9.5, y + 6.8, { align: "center" });
-
-    doc.setFontSize(7.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-    doc.text(
-      `${String(p.ronda || "Ronda").toUpperCase()} · Orden ${p.orden ?? "—"}`,
-      marginX + 19,
-      y + 6.5,
-    );
-
-    if (finalizado) {
-      doc.setFillColor(163, 230, 53);
-      doc.roundedRect(marginX + 72, y + 2.5, 18, 6.5, 1.2, 1.2, "F");
-      doc.setFontSize(6.5);
-      doc.setTextColor(15, 23, 42);
-      doc.text("FINALIZADO", marginX + 81, y + 6.8, { align: "center" });
+    let gx = marginX;
+    const widths = [
+      cols.complejo,
+      cols.partido,
+      cols.horario,
+      cols.resultado,
+      cols.firmaA,
+      cols.firmaB,
+    ];
+    for (let i = 0; i < widths.length - 1; i++) {
+      gx += widths[i];
+      doc.line(gx, y, gx, y + rowH);
     }
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text(
-      `${formatDateTime(p.fecha_partido)}  |  ${p.cancha_asignada || "Cancha s/d"}`,
-      pageWidth - marginX - 3,
-      y + 6.5,
-      { align: "right" },
-    );
-
-    const boxY = y + 11;
-    const boxH = 20;
-    const boxW = (cardW - 48) / 2;
-    const leftX = marginX + 3;
-    const rightX = marginX + 3 + boxW + 14;
-
-    drawDuplaBox(
-      leftX,
-      boxY,
-      boxW,
-      boxH,
-      p.equipo_a_j1,
-      p.equipo_a_j2,
-      Boolean(winnerA),
-    );
-
+    // Complejo
+    let cx = marginX;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-    doc.text("VS", leftX + boxW + 7, boxY + boxH / 2 + 1, { align: "center" });
-
-    drawDuplaBox(
-      rightX,
-      boxY,
-      boxW,
-      boxH,
-      p.equipo_b_j1,
-      p.equipo_b_j2,
-      Boolean(winnerB),
-    );
-
-    // Score area — casillas de sets (rellenas si hay resultado)
-    const scoreX = marginX + cardW - 28;
+    doc.setTextColor(37, 99, 235);
+    doc.text(`#${code}`, cx + 2, y + 5.5);
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(6);
+    doc.setTextColor(51, 65, 85);
+    const canchaLines = doc.splitTextToSize(cancha, cols.complejo - 4);
+    doc.text(canchaLines.slice(0, 2), cx + 2, y + 10);
+
+    // Partido
+    cx += cols.complejo;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`${cat} · ${ronda}`.slice(0, 40), cx + 2, y + 4.5);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-    doc.text("SETS", scoreX + 10, boxY + 2, { align: "center" });
+    doc.setFontSize(7);
+    doc.setTextColor(15, 23, 42);
+    const cruce = `${sideA}  vs  ${sideB}`;
+    const cruceLines = doc.splitTextToSize(cruce, cols.partido - 4);
+    doc.text(cruceLines.slice(0, 2), cx + 2, y + 9.5);
 
-    const setPairs: Array<[number | null | undefined, number | null | undefined]> =
-      p.es_wo
-        ? [
-            [winnerA ? 6 : 0, winnerB ? 6 : 0],
-            [winnerA ? 6 : 0, winnerB ? 6 : 0],
-            [null, null],
-          ]
-        : [
-            [p.set1_a, p.set1_b],
-            [p.set2_a, p.set2_b],
-            [p.set3_a, p.set3_b],
-          ];
+    // Dia / Hora
+    cx += cols.partido;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(37, 99, 235);
+    const horaLines = doc.splitTextToSize(horario, cols.horario - 4);
+    doc.text(horaLines.slice(0, 2), cx + 2, y + 7);
 
-    const labels = ["1", "2", "3"];
-    labels.forEach((lab, i) => {
-      const sy = boxY + 4 + i * 5.5;
-      const [va, vb] = setPairs[i];
-      const hasA = va !== null && va !== undefined;
-      const hasB = vb !== null && vb !== undefined;
-      const aWins = hasA && hasB && Number(va) > Number(vb);
-      const bWins = hasA && hasB && Number(vb) > Number(va);
-
+    // Resultado en blanco
+    cx += cols.horario;
+    const boxW = 6;
+    const gap = 2;
+    const boxesTotal = boxW * 3 + gap * 2;
+    const boxStart = cx + (cols.resultado - boxesTotal) / 2;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(5);
+    doc.setTextColor(148, 163, 184);
+    [0, 1, 2].forEach((i) => {
+      const bx = boxStart + i * (boxW + gap);
+      doc.text(String(i + 1), bx + boxW / 2, y + 4, { align: "center" });
       doc.setDrawColor(148, 163, 184);
       doc.setLineWidth(0.35);
-      if (hasA && aWins) {
-        doc.setFillColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
-        doc.rect(scoreX, sy, 7, 4.5, "FD");
-      } else {
-        doc.setFillColor(255, 255, 255);
-        doc.rect(scoreX, sy, 7, 4.5, "FD");
-      }
-      doc.setFontSize(5.5);
-      doc.setTextColor(148, 163, 184);
-      doc.text(lab, scoreX - 2.5, sy + 3.2);
-      doc.text("-", scoreX + 9, sy + 3.2);
-
-      if (hasB && bWins) {
-        doc.setFillColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
-        doc.rect(scoreX + 12, sy, 7, 4.5, "FD");
-      } else {
-        doc.setFillColor(255, 255, 255);
-        doc.rect(scoreX + 12, sy, 7, 4.5, "FD");
-      }
-
-      if (hasA) {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(7);
-        doc.setTextColor(aWins ? 15 : 30, aWins ? 23 : 41, aWins ? 42 : 59);
-        doc.text(String(va), scoreX + 3.5, sy + 3.3, { align: "center" });
-      }
-      if (hasB) {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(7);
-        doc.setTextColor(bWins ? 15 : 30, bWins ? 23 : 41, bWins ? 42 : 59);
-        doc.text(String(vb), scoreX + 15.5, sy + 3.3, { align: "center" });
-      }
+      doc.setFillColor(255, 255, 255);
+      doc.rect(bx, y + 5.5, boxW, 7.5, "FD");
     });
 
-    if (finalizado && p.es_wo) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
-      doc.setTextColor(180, 83, 9);
-      doc.text("Resultado: W.O.", marginX + 4, y + rowH - 5);
-    }
+    // Firmas A / B
+    cx += cols.resultado;
+    doc.setDrawColor(148, 163, 184);
+    doc.setLineWidth(0.35);
+    const firmaPad = 2.5;
+    doc.line(
+      cx + firmaPad,
+      y + rowH - 4,
+      cx + cols.firmaA - firmaPad,
+      y + rowH - 4,
+    );
+    cx += cols.firmaA;
+    doc.line(
+      cx + firmaPad,
+      y + rowH - 4,
+      cx + cols.firmaB - firmaPad,
+      y + rowH - 4,
+    );
 
     y += rowH;
   }
 
-  doc.setFontSize(7);
+  doc.setFontSize(6.5);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    "Hoja de ruta Padel Nexus — cruzar código # con la carga de resultados del CRM.",
-    14,
-    pageHeight - 8,
+    "Cruzar codigo # con la carga de resultados del CRM · Resultado y firmas a completar en cancha.",
+    marginX,
+    pageHeight - 7,
   );
 
-  const cleanNombre = torneo.nombre
-    ? torneo.nombre.replace(/\s+/g, "_")
-    : "Padel_Nexus";
-  doc.save(`Hoja_Ruta_${cleanNombre}.pdf`);
+  doc.save(`Grilla_Partidos_${fileSlug}.pdf`);
 }
 
 export type ZonaPdfRow = {
@@ -879,7 +831,7 @@ export type ZonaPdfRow = {
   }[];
 };
 
-/** PDF de zonas: posiciones + partidos con marcador en cuadros de sets. */
+/** PDF de publicación de zonas (Reglamento FAP): composición + programación + posiciones. */
 export function generarPdfZonas(
   torneo: Partial<Torneo>,
   zonas: ZonaPdfRow[],
@@ -900,6 +852,8 @@ export function generarPdfZonas(
   const SLATE_200 = [226, 232, 240] as const;
   const SLATE_500 = [100, 116, 139] as const;
   const WINNER_BG = [236, 252, 203] as const;
+  const isIndividual = esModalidadIndividual(torneo.modalidad);
+  const unidad = isIndividual ? "jugadores" : "parejas";
 
   const splitName = (full?: string | null) => {
     if (!full || full === "-" || full === "Libre") {
@@ -922,6 +876,12 @@ export function generarPdfZonas(
 
   const pairLabel = (j1?: string | null, j2?: string | null) => {
     const a = splitName(j1);
+    if (isIndividual) {
+      return {
+        line1: `${a.apellido.toUpperCase()}${a.nombre ? `, ${a.nombre}` : ""}`,
+        line2: "",
+      };
+    }
     const b = splitName(j2);
     return {
       line1: `${a.apellido.toUpperCase()}${a.nombre ? `, ${a.nombre}` : ""}`,
@@ -931,8 +891,23 @@ export function generarPdfZonas(
 
   const shortPair = (j1?: string | null, j2?: string | null) => {
     const a = splitName(j1).apellido.toUpperCase();
+    if (isIndividual) return a;
     const b = splitName(j2).apellido.toUpperCase();
     return `${a} / ${b}`;
+  };
+
+  const formatProg = (fechaIso?: string | null) => {
+    if (!fechaIso) return "Sin horario";
+    try {
+      const d = new Date(fechaIso);
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mins = String(d.getMinutes()).padStart(2, "0");
+      return `${dd}/${mm} ${hh}:${mins}`;
+    } catch {
+      return "Sin horario";
+    }
   };
 
   const normalizeRonda = (r?: string | null) =>
@@ -960,7 +935,16 @@ export function generarPdfZonas(
         if (pairIds.size > 0 && aIn && bIn) return true;
         return byRondaSafe(r, zn);
       })
-      .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+      .sort((a, b) => {
+        const fa = a.fecha_partido
+          ? new Date(a.fecha_partido).getTime()
+          : Number.MAX_SAFE_INTEGER;
+        const fb = b.fecha_partido
+          ? new Date(b.fecha_partido).getTime()
+          : Number.MAX_SAFE_INTEGER;
+        if (fa !== fb) return fa - fb;
+        return (a.orden ?? 0) - (b.orden ?? 0);
+      });
   };
 
   type Standing = {
@@ -1056,7 +1040,17 @@ export function generarPdfZonas(
       B.sf += sB;
       B.sc += sA;
 
-      if (m.ganador === m.equipo_a_id) {
+      if (m.es_wo) {
+        if (m.ganador === m.equipo_a_id) {
+          A.pg += 1;
+          A.pts += 2;
+          B.pp += 1;
+        } else {
+          B.pg += 1;
+          B.pts += 2;
+          A.pp += 1;
+        }
+      } else if (m.ganador === m.equipo_a_id) {
         A.pg += 1;
         A.pts += 2;
         B.pp += 1;
@@ -1077,93 +1071,50 @@ export function generarPdfZonas(
       const dgA = a.gf - a.gc;
       const dgB = b.gf - b.gc;
       if (dgB !== dgA) return dgB - dgA;
+      if (b.gf !== a.gf) return b.gf - a.gf;
+      if (a.gc !== b.gc) return a.gc - b.gc;
       return (a.seed || 999) - (b.seed || 999);
     });
   };
 
-  const drawSetBoxes = (
-    x: number,
-    y: number,
-    m: Partido,
-    winnerA: boolean,
-    winnerB: boolean,
-  ) => {
-    const pairs: Array<[number | null | undefined, number | null | undefined]> =
-      m.es_wo
-        ? [
-            [winnerA ? 6 : 0, winnerB ? 6 : 0],
-            [winnerA ? 6 : 0, winnerB ? 6 : 0],
-            [null, null],
-          ]
-        : [
-            [m.set1_a, m.set1_b],
-            [m.set2_a, m.set2_b],
-            [m.set3_a, m.set3_b],
-          ];
-
-    doc.setFontSize(5.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-    doc.text("S1", x + 3.5, y, { align: "center" });
-    doc.text("S2", x + 12.5, y, { align: "center" });
-    doc.text("S3", x + 21.5, y, { align: "center" });
-
-    pairs.forEach(([va, vb], i) => {
-      const bx = x + i * 9;
-      const has = va != null && vb != null;
-      const aW = has && Number(va) > Number(vb);
-      const bW = has && Number(vb) > Number(va);
-
-      doc.setDrawColor(148, 163, 184);
-      doc.setLineWidth(0.3);
-      doc.setFillColor(
-        aW ? BRAND_ACCENT[0] : 255,
-        aW ? BRAND_ACCENT[1] : 255,
-        aW ? BRAND_ACCENT[2] : 255,
-      );
-      doc.rect(bx, y + 1.5, 7, 5, "FD");
-      doc.setFillColor(
-        bW ? BRAND_ACCENT[0] : 255,
-        bW ? BRAND_ACCENT[1] : 255,
-        bW ? BRAND_ACCENT[2] : 255,
-      );
-      doc.rect(bx, y + 7, 7, 5, "FD");
-
-      if (va != null) {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(7);
-        doc.setTextColor(15, 23, 42);
-        doc.text(String(va), bx + 3.5, y + 5, { align: "center" });
-      }
-      if (vb != null) {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(7);
-        doc.setTextColor(15, 23, 42);
-        doc.text(String(vb), bx + 3.5, y + 10.5, { align: "center" });
-      }
-    });
+  const reglaZona = (n: number) => {
+    if (n <= 3) {
+      return [
+        "Modalidad: todos contra todos. Clasifican 1ro y 2do a la llave campeonato.",
+        "Empate: dif. de sets, luego dif. de games, games a favor, games en contra, resultado en cancha.",
+      ];
+    }
+    return [
+      "Modalidad: 1ro vs 4to y 2do vs 3ro; luego ganadores entre si y perdedores entre si.",
+      "Quien gana ambos partidos es 1ro; quien pierde ambos queda eliminado (salvo descalificacion).",
+    ];
   };
 
   doc.setFillColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
-  doc.rect(0, 0, pageWidth, 28, "F");
-  doc.setFontSize(15);
+  doc.rect(0, 0, pageWidth, 30, "F");
+  doc.setFillColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
+  doc.rect(0, 30, pageWidth, 1.2, "F");
+  doc.setFontSize(7);
   doc.setFont("helvetica", "bold");
+  doc.setTextColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
+  doc.text("PADEL NEXUS  ·  REGLAMENTO FAP", 14, 8);
+  doc.setFontSize(13);
   doc.setTextColor(255, 255, 255);
-  doc.text(
-    `PADEL NEXUS  —  ZONAS  —  ${(torneo.nombre || "TORNEO").toUpperCase()}`,
-    14,
-    14,
-  );
+  doc.text("Publicación de zonas de competencia", 14, 15);
   doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
+  doc.text((torneo.nombre || "TORNEO").toUpperCase(), 14, 21.5);
+  doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(200, 200, 200);
+  doc.setTextColor(186, 198, 214);
   doc.text(
-    `Categoría: ${torneo.categoria || "Libres"}  |  ${zonas.length} zona${zonas.length === 1 ? "" : "s"}  |  Impreso: ${new Date().toLocaleDateString("es-AR")}`,
+    `Categoría: ${torneo.categoria || "Libres"}  ·  ${isIndividual ? "Individual" : "Duplas"}  ·  ${zonas.length} zona${zonas.length === 1 ? "" : "s"}  ·  Impreso: ${new Date().toLocaleString("es-AR")}`,
     14,
-    22,
+    27,
   );
 
-  let y = 34;
+  let y = 36;
   const marginX = 12;
   const contentW = pageWidth - marginX * 2;
 
@@ -1177,58 +1128,79 @@ export function generarPdfZonas(
     );
     const matches = matchesZona(zona.nombre, pairIds);
     const standings = buildStandings(zona, matches);
+    const hasResults = matches.some((m) => m.ganador != null);
+    const nParejas = zona.parejas.length;
 
-    if (y + 50 > pageHeight - 12) {
+    if (y + 55 > pageHeight - 14) {
       doc.addPage();
       y = 16;
     }
 
     doc.setFillColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
-    doc.roundedRect(marginX, y, contentW, 9, 1.5, 1.5, "F");
+    doc.roundedRect(marginX, y, contentW, 8, 1.5, 1.5, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setTextColor(15, 23, 42);
     doc.text(
-      `${zona.nombre.toUpperCase()}  ·  ${zona.parejas.length} parejas  ·  ${matches.length} partidos`,
+      `${zona.nombre.toUpperCase()}  ·  ${nParejas} ${unidad}`,
       marginX + 4,
-      y + 6,
+      y + 5.5,
     );
-    y += 12;
+    y += 10;
+
+    // Aclaracion FAP en caja legible (sin caracteres especiales)
+    const reglas = reglaZona(nParejas);
+    const reglaBoxH = 6 + reglas.length * 4.2;
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.35);
+    doc.roundedRect(marginX, y, contentW, reglaBoxH, 1.5, 1.5, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text(`Regla FAP · Zona de ${nParejas}`, marginX + 3.5, y + 4);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(71, 85, 105);
+    reglas.forEach((line, i) => {
+      doc.text(line, marginX + 3.5, y + 8.2 + i * 4.2);
+    });
+    y += reglaBoxH + 5;
 
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-    doc.text("POSICIONES", marginX + 2, y);
-    y += 3;
+    doc.text("COMPOSICION (orden de ranking / seed)", marginX + 2, y);
+    y += 4;
 
-    const cols = [
-      { label: "#", w: 7 },
-      { label: "DUPLA", w: 52 },
-      { label: "PJ", w: 9 },
-      { label: "PG", w: 9 },
-      { label: "PP", w: 9 },
-      { label: "Sets", w: 14 },
-      { label: "Juegos", w: 16 },
-      { label: "Pts", w: 10 },
-      { label: "Cabeza de serie", w: 30 },
+    const compCols = [
+      { label: "#", w: 8 },
+      { label: isIndividual ? "Jugador" : "Pareja", w: 62 },
+      { label: "Institución / Club", w: 55 },
+      { label: "Seed", w: 14 },
+      { label: "Cabeza de serie", w: contentW - 8 - 62 - 55 - 14 },
     ];
     let cx = marginX;
     doc.setFillColor(SLATE_100[0], SLATE_100[1], SLATE_100[2]);
     doc.roundedRect(marginX, y, contentW, 6, 1, 1, "F");
     doc.setFontSize(6.5);
     doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-    cols.forEach((c) => {
+    compCols.forEach((c) => {
       doc.text(c.label, cx + 2, y + 4);
       cx += c.w;
     });
     y += 7;
 
-    standings.forEach((s, i) => {
-      if (y + 10 > pageHeight - 12) {
+    const composicion = [...zona.parejas].sort(
+      (a, b) => (a.seed || 999) - (b.seed || 999),
+    );
+
+    composicion.forEach((p, i) => {
+      if (y + 10 > pageHeight - 14) {
         doc.addPage();
         y = 16;
       }
-      const rowH = 9;
+      const rowH = isIndividual ? 7 : 9;
       if (i % 2 === 0) {
         doc.setFillColor(SLATE_50[0], SLATE_50[1], SLATE_50[2]);
       } else {
@@ -1242,61 +1214,72 @@ export function generarPdfZonas(
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8);
       doc.setTextColor(15, 23, 42);
-      doc.text(String(i + 1), x + 4, y + 5.5);
-      x += cols[0].w;
+      doc.text(String(i + 1), x + 4, y + (isIndividual ? 4.5 : 5.5));
+      x += compCols[0].w;
 
-      const names = pairLabel(s.j1, s.j2);
+      const names = pairLabel(p.jugador1_nombre, p.jugador2_nombre);
       doc.setFontSize(7);
-      doc.text(names.line1.slice(0, 34), x + 2, y + 3.8);
+      doc.text(names.line1.slice(0, 40), x + 2, y + (isIndividual ? 4.5 : 3.8));
+      if (!isIndividual && names.line2) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5);
+        doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
+        doc.text(names.line2.slice(0, 40), x + 2, y + 7.2);
+      }
+      x += compCols[1].w;
+
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.5);
-      doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-      doc.text(names.line2.slice(0, 34), x + 2, y + 7.2);
-      x += cols[1].w;
+      doc.setFontSize(7);
+      doc.setTextColor(15, 23, 42);
+      doc.text(
+        String(p.club || "—").slice(0, 36),
+        x + 2,
+        y + (isIndividual ? 4.5 : 5.5),
+      );
+      x += compCols[2].w;
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.5);
-      doc.setTextColor(15, 23, 42);
-      const vals = [
-        String(s.pj),
-        String(s.pg),
-        String(s.pp),
-        `${s.sf}-${s.sc}`,
-        `${s.gf}-${s.gc}`,
-        String(s.pts),
-      ];
-      vals.forEach((v, vi) => {
-        doc.text(v, x + cols[vi + 2].w / 2, y + 5.5, { align: "center" });
-        x += cols[vi + 2].w;
-      });
+      doc.text(
+        p.seed != null ? String(p.seed) : "—",
+        x + compCols[3].w / 2,
+        y + (isIndividual ? 4.5 : 5.5),
+        { align: "center" },
+      );
+      x += compCols[3].w;
 
-      if (s.cs) {
+      if (p.cabezaDeSerie) {
         doc.setFillColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
-        doc.roundedRect(x + 1, y + 2, 26, 5, 1, 1, "F");
+        doc.roundedRect(x + 1, y + (isIndividual ? 1.2 : 2), 26, 5, 1, 1, "F");
         doc.setFontSize(5.5);
         doc.setTextColor(15, 23, 42);
-        doc.text("Cabeza de serie", x + 14, y + 5.3, { align: "center" });
+        doc.text("Cabeza de serie", x + 14, y + (isIndividual ? 4.5 : 5.3), {
+          align: "center",
+        });
       }
 
       y += rowH + 1;
     });
 
-    y += 4;
+    y += 3;
+    if (y + 20 > pageHeight - 14) {
+      doc.addPage();
+      y = 16;
+    }
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-    doc.text("RESULTADOS DE LA ZONA", marginX + 2, y);
+    doc.text("PROGRAMACION (horario y complejo)", marginX + 2, y);
     y += 4;
 
     if (matches.length === 0) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(148, 163, 184);
-      doc.text("Sin partidos cargados aún en esta zona.", marginX + 2, y + 4);
+      doc.text("Sin partidos programados aún en esta zona.", marginX + 2, y + 4);
       y += 12;
     } else {
       for (const m of matches) {
-        if (y + 18 > pageHeight - 12) {
+        if (y + 14 > pageHeight - 14) {
           doc.addPage();
           y = 16;
         }
@@ -1307,91 +1290,201 @@ export function generarPdfZonas(
         doc.setFillColor(SLATE_50[0], SLATE_50[1], SLATE_50[2]);
         doc.setDrawColor(SLATE_200[0], SLATE_200[1], SLATE_200[2]);
         doc.setLineWidth(0.3);
-        doc.roundedRect(marginX, y, contentW, 16, 1.5, 1.5, "FD");
+        doc.roundedRect(marginX, y, contentW, 12, 1.5, 1.5, "FD");
 
         const code =
           m.orden != null
             ? String(m.orden).padStart(2, "0")
             : m.id.slice(0, 4).toUpperCase();
         doc.setFillColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
-        doc.roundedRect(marginX + 2, y + 4.5, 12, 7, 1, 1, "F");
+        doc.roundedRect(marginX + 2, y + 2.5, 12, 7, 1, 1, "F");
         doc.setFont("helvetica", "bold");
         doc.setFontSize(7);
         doc.setTextColor(15, 23, 42);
-        doc.text(`#${code}`, marginX + 8, y + 9, { align: "center" });
+        doc.text(`#${code}`, marginX + 8, y + 7, { align: "center" });
 
-        const boxWA = (contentW - 55) / 2;
-        const ax = marginX + 16;
+        doc.setFontSize(6.5);
+        doc.setTextColor(37, 99, 235);
+        doc.text(formatProg(m.fecha_partido), marginX + 16, y + 4.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(71, 85, 105);
+        doc.text(
+          String(m.cancha_asignada || "Complejo s/d").slice(0, 42),
+          marginX + 16,
+          y + 9,
+        );
+
+        const vsX = marginX + 58;
+        const boxW = (contentW - 100) / 2;
         if (winnerA) {
           doc.setFillColor(WINNER_BG[0], WINNER_BG[1], WINNER_BG[2]);
         } else {
           doc.setFillColor(255, 255, 255);
         }
         doc.setDrawColor(SLATE_200[0], SLATE_200[1], SLATE_200[2]);
-        doc.roundedRect(ax, y + 2, boxWA, 12, 1, 1, "FD");
+        doc.roundedRect(vsX, y + 2, boxW, 8, 1, 1, "FD");
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(7);
+        doc.setFontSize(6.5);
         doc.setTextColor(15, 23, 42);
         doc.text(
-          shortPair(m.equipo_a_j1, m.equipo_a_j2).slice(0, 36),
-          ax + 2,
-          y + 9,
+          shortPair(m.equipo_a_j1, m.equipo_a_j2).slice(0, 28),
+          vsX + 2,
+          y + 7,
         );
 
-        doc.setFontSize(7);
+        doc.setFontSize(6);
         doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-        doc.text("VS", ax + boxWA + 5, y + 9, { align: "center" });
+        doc.text("VS", vsX + boxW + 4, y + 7, { align: "center" });
 
-        const bx = ax + boxWA + 10;
+        const bx = vsX + boxW + 8;
         if (winnerB) {
           doc.setFillColor(WINNER_BG[0], WINNER_BG[1], WINNER_BG[2]);
         } else {
           doc.setFillColor(255, 255, 255);
         }
         doc.setDrawColor(SLATE_200[0], SLATE_200[1], SLATE_200[2]);
-        doc.roundedRect(bx, y + 2, boxWA, 12, 1, 1, "FD");
+        doc.roundedRect(bx, y + 2, boxW, 8, 1, 1, "FD");
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(7);
+        doc.setFontSize(6.5);
         doc.setTextColor(15, 23, 42);
         doc.text(
-          shortPair(m.equipo_b_j1, m.equipo_b_j2).slice(0, 36),
+          shortPair(m.equipo_b_j1, m.equipo_b_j2).slice(0, 28),
           bx + 2,
-          y + 9,
+          y + 7,
         );
 
-        drawSetBoxes(
-          marginX + contentW - 30,
-          y + 1.5,
-          m,
-          winnerA,
-          winnerB,
-        );
+        const scoreX = marginX + contentW - 28;
+        const setPairs: Array<
+          [number | null | undefined, number | null | undefined]
+        > = done
+          ? m.es_wo
+            ? [
+                [winnerA ? 6 : 0, winnerB ? 6 : 0],
+                [winnerA ? 6 : 0, winnerB ? 6 : 0],
+                [null, null],
+              ]
+            : [
+                [m.set1_a, m.set1_b],
+                [m.set2_a, m.set2_b],
+                [m.set3_a, m.set3_b],
+              ]
+          : [
+              [null, null],
+              [null, null],
+              [null, null],
+            ];
+        setPairs.forEach(([va, vb], i) => {
+          const sx = scoreX + i * 9;
+          doc.setDrawColor(148, 163, 184);
+          doc.setLineWidth(0.25);
+          doc.setFillColor(255, 255, 255);
+          doc.rect(sx, y + 2, 7.5, 8, "FD");
+          if (va != null && vb != null) {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(6);
+            doc.setTextColor(15, 23, 42);
+            doc.text(`${va}-${vb}`, sx + 3.75, y + 7, { align: "center" });
+          }
+        });
 
-        if (m.es_wo && done) {
-          doc.setFontSize(6);
-          doc.setTextColor(180, 83, 9);
-          doc.text("W.O.", marginX + contentW - 32, y + 14.5);
-        }
-
-        y += 18;
+        y += 14;
       }
+    }
+
+    if (hasResults) {
+      y += 2;
+      if (y + 30 > pageHeight - 14) {
+        doc.addPage();
+        y = 16;
+      }
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
+      doc.text("TABLA DE POSICIONES", marginX + 2, y);
+      y += 3;
+
+      const cols = [
+        { label: "#", w: 7 },
+        { label: isIndividual ? "Jugador" : "Dupla", w: 48 },
+        { label: "PJ", w: 9 },
+        { label: "PG", w: 9 },
+        { label: "PP", w: 9 },
+        { label: "Sets", w: 14 },
+        { label: "Juegos", w: 16 },
+        { label: "Pts", w: 10 },
+        {
+          label: "Institución",
+          w: contentW - 7 - 48 - 9 - 9 - 9 - 14 - 16 - 10,
+        },
+      ];
+      let hx = marginX;
+      doc.setFillColor(SLATE_100[0], SLATE_100[1], SLATE_100[2]);
+      doc.roundedRect(marginX, y, contentW, 6, 1, 1, "F");
+      doc.setFontSize(6.5);
+      doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
+      cols.forEach((c) => {
+        doc.text(c.label, hx + 2, y + 4);
+        hx += c.w;
+      });
+      y += 7;
+
+      standings.forEach((s, i) => {
+        if (y + 9 > pageHeight - 14) {
+          doc.addPage();
+          y = 16;
+        }
+        const rowH = 8;
+        if (i % 2 === 0) {
+          doc.setFillColor(SLATE_50[0], SLATE_50[1], SLATE_50[2]);
+        } else {
+          doc.setFillColor(255, 255, 255);
+        }
+        doc.setDrawColor(SLATE_200[0], SLATE_200[1], SLATE_200[2]);
+        doc.roundedRect(marginX, y, contentW, rowH, 1, 1, "FD");
+
+        let x = marginX;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text(String(i + 1), x + 3.5, y + 5.2);
+        x += cols[0].w;
+        doc.setFontSize(6.5);
+        doc.text(shortPair(s.j1, s.j2).slice(0, 32), x + 2, y + 5.2);
+        x += cols[1].w;
+        const vals = [
+          String(s.pj),
+          String(s.pg),
+          String(s.pp),
+          `${s.sf}-${s.sc}`,
+          `${s.gf}-${s.gc}`,
+          String(s.pts),
+        ];
+        vals.forEach((v, vi) => {
+          doc.text(v, x + cols[vi + 2].w / 2, y + 5.2, { align: "center" });
+          x += cols[vi + 2].w;
+        });
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6);
+        doc.text(String(s.club || "—").slice(0, 22), x + 2, y + 5.2);
+        y += rowH + 1;
+      });
     }
 
     y += 8;
   }
 
-  doc.setFontSize(7);
-  doc.setTextColor(148, 163, 184);
-  doc.text(
-    "Pts: ganado 2 / jugado-perdido 1 / W.O. 0  ·  Sets y Juegos = a favor-en contra (suma de games de cada set)  ·  Padel Nexus",
-    14,
-    pageHeight - 8,
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  const footer = doc.splitTextToSize(
+    "Pts FAP: ganado 2 / jugado-perdido 1 / W.O. 0 · Zonas y draws no se modifican salvo error o fuerza mayor (Fiscal General) · Clasifican a llave campeonato según reglamento · Padel Nexus",
+    pageWidth - 28,
   );
+  doc.text(footer, 14, pageHeight - 10);
 
   const cleanNombre = torneo.nombre
     ? torneo.nombre.replace(/\s+/g, "_")
     : "Padel_Nexus";
-  doc.save(`Zonas_${cleanNombre}.pdf`);
+  doc.save(`Publicacion_Zonas_${cleanNombre}.pdf`);
 }
 
 /**
