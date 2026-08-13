@@ -1,11 +1,18 @@
 import { Request, Response } from "express";
-import { FiscalPanelService, type CrearIncidenciaDTO } from "../services/fiscal-panel.service";
+import {
+  FiscalPanelService,
+  type CrearIncidenciaDTO,
+  type RevisarInformeDTO,
+} from "../services/fiscal-panel.service";
 
 function handleError(res: Response, error: unknown, fallback: string): Response {
   const message = error instanceof Error ? error.message : fallback;
-  const status = message.includes("asignado") || message.includes("requiere")
-    ? 403
-    : 400;
+  const status =
+    message.includes("asignado") ||
+    message.includes("requiere") ||
+    message.includes("Solo el Fiscal General")
+      ? 403
+      : 400;
   return res.status(status).json({ message, error: message });
 }
 
@@ -103,7 +110,26 @@ export const FiscalPanelController = {
       );
       return res.status(201).json(data);
     } catch (error: unknown) {
-      return handleError(res, error, "Error al registrar la incidencia");
+      return handleError(res, error, "Error al registrar el informe");
+    }
+  },
+
+  async patchIncidencia(req: Request, res: Response): Promise<Response> {
+    try {
+      if (!req.fiscal || !req.user?.id) {
+        return res.status(403).json({ message: "Ficha de fiscal no resuelta." });
+      }
+      const payload = req.body as RevisarInformeDTO;
+      const data = await FiscalPanelService.revisarInforme(
+        req.params.id,
+        req.params.incidenciaId,
+        req.fiscal,
+        req.user.id,
+        payload,
+      );
+      return res.status(200).json(data);
+    } catch (error: unknown) {
+      return handleError(res, error, "Error al revisar el informe");
     }
   },
 

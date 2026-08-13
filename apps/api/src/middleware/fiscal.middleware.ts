@@ -6,6 +6,7 @@ declare global {
   namespace Express {
     interface Request {
       fiscal?: FiscalSesion;
+      fiscalRolTorneo?: "general" | "auxiliar";
     }
   }
 }
@@ -56,5 +57,39 @@ export const requireFiscalAsignadoAlTorneo = async (
     });
   }
 
+  req.fiscalRolTorneo = data.rol === "general" ? "general" : "auxiliar";
+  next();
+};
+
+export const requireFiscalGeneral = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  if (req.fiscalRolTorneo === "general") {
+    return next();
+  }
+
+  const fiscalId = req.fiscal?.id;
+  const torneoId = req.params.id || req.params.torneoId;
+
+  if (!fiscalId || !torneoId) {
+    return res.status(400).json({ message: "Falta el torneo o la ficha del fiscal." });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("torneo_fiscales")
+    .select("rol")
+    .eq("torneo_id", torneoId)
+    .eq("fiscal_id", fiscalId)
+    .maybeSingle();
+
+  if (error || !data || data.rol !== "general") {
+    return res.status(403).json({
+      message: "Solo el Fiscal General puede revisar informes en este torneo.",
+    });
+  }
+
+  req.fiscalRolTorneo = "general";
   next();
 };

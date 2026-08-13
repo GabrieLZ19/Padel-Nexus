@@ -6,7 +6,8 @@ export interface FiscalPayload {
   nombre: string;
   apellido: string;
   dni: string;
-  rango: 'Nacional' | 'Provincial' | 'Regional' | 'Local';
+  rango: "Nacional" | "Provincial" | "Regional" | "Local";
+  asociacion_id: string;
   entidad_carga?: string;
   usuario_id?: string | null;
   correo?: string;
@@ -35,19 +36,66 @@ export interface AccesoFiscalResultado {
   mensaje: string;
 }
 
+const FAP_FEDERACION_ID = "818c6a07-f056-41dc-9a07-b8c03d88cee1";
+
 export class FiscalService {
-  static async listarFiscales() {
+  /** Resuelve la entidad nacional dueña del colegio a partir de una asociación o federación. */
+  static async resolverColegioEntidadId(
+    asociacionOFederacionId?: string | null,
+  ): Promise<string> {
+    const id = String(asociacionOFederacionId || "").trim();
+    if (!id) return FAP_FEDERACION_ID;
+
+    const { data } = await supabaseAdmin
+      .from("asociaciones")
+      .select("id, tipo, federacion_id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (!data) return FAP_FEDERACION_ID;
+    if (data.tipo === "federacion") return data.id;
+    if (data.federacion_id) return data.federacion_id;
+    return data.id;
+  }
+
+  static async resolverColegioDeTorneo(torneoId: string): Promise<string> {
+    const { data: torneo, error } = await supabaseAdmin
+      .from("torneos")
+      .select("id, asociacion_id, federacion_id")
+      .eq("id", torneoId)
+      .maybeSingle();
+
+    if (error || !torneo) {
+      throw new Error("Torneo no encontrado.");
+    }
+
+    if (torneo.federacion_id) {
+      return this.resolverColegioEntidadId(torneo.federacion_id);
+    }
+    return this.resolverColegioEntidadId(torneo.asociacion_id);
+  }
+
+  static async listarFiscales(asociacionId?: string | null) {
+    const colegioId = await this.resolverColegioEntidadId(asociacionId);
     const { data, error } = await supabaseAdmin
       .from("fiscales")
-      .select("*")
+      .select("*, asociaciones:asociacion_id(id, nombre, sigla, tipo)")
+      .eq("asociacion_id", colegioId)
       .order("apellido", { ascending: true });
 
     if (error) throw new Error(error.message);
-    return data || [];
+    return (data || []).map((f) => ({
+      ...f,
+      asociacion: f.asociaciones?.sigla || f.asociaciones?.nombre || null,
+    }));
   }
 
   static async crearFiscal(datos: FiscalPayload) {
-    // Buscar si el usuario ya existe con ese DNI para vincularlo de inmediato
+    if (!datos.asociacion_id) {
+      throw new Error("Indicá la entidad nacional dueña del colegio (asociacion_id).");
+    }
+    const colegioId = await this.resolverColegioEntidadId(datos.asociacion_id);
+
     let usuarioId = datos.usuario_id || null;
     if (!usuarioId) {
       const { data: perfil } = await supabaseAdmin
@@ -60,6 +108,12 @@ export class FiscalService {
       }
     }
 
+    const { data: asoc } = await supabaseAdmin
+      .from("asociaciones")
+      .select("sigla, nombre")
+      .eq("id", colegioId)
+      .maybeSingle();
+
     const { data, error } = await supabaseAdmin
       .from("fiscales")
       .insert([
@@ -68,37 +122,51 @@ export class FiscalService {
           apellido: datos.apellido,
           dni: datos.dni,
           rango: datos.rango,
-          entidad_carga: datos.entidad_carga,
+          asociacion_id: colegioId,
+          entidad_carga: datos.entidad_carga || asoc?.sigla || asoc?.nombre || null,
           correo: datos.correo || null,
           direccion: datos.direccion || null,
           usuario_id: usuarioId,
           activo: true,
         },
       ])
-      .select()
+      .select("*, asociaciones:asociacion_id(id, nombre, sigla, tipo)")
       .single();
 
     if (error) throw new Error(`Error al crear fiscal: ${error.message}`);
-    return data;
+    return {
+      ...data,
+      asociacion: data.asociaciones?.sigla || data.asociaciones?.nombre || null,
+    };
   }
 
-  static async actualizarFiscal(id: string, datos: Partial<FiscalPayload & { direccion?: string; correo?: string }>) {
+  static async actualizarFiscal(
+    id: string,
+    datos: Partial<FiscalPayload & { direccion?: string; correo?: string }>,
+  ) {
+    const patch: Record<string, unknown> = {};
+    if (datos.nombre !== undefined) patch.nombre = datos.nombre;
+    if (datos.apellido !== undefined) patch.apellido = datos.apellido;
+    if (datos.dni !== undefined) patch.dni = datos.dni;
+    if (datos.rango !== undefined) patch.rango = datos.rango;
+    if (datos.direccion !== undefined) patch.direccion = datos.direccion;
+    if (datos.correo !== undefined) patch.correo = datos.correo;
+    if (datos.asociacion_id) {
+      patch.asociacion_id = await this.resolverColegioEntidadId(datos.asociacion_id);
+    }
+
     const { data, error } = await supabaseAdmin
       .from("fiscales")
-      .update({
-        nombre: datos.nombre,
-        apellido: datos.apellido,
-        dni: datos.dni,
-        rango: datos.rango,
-        direccion: datos.direccion,
-        correo: datos.correo,
-      })
+      .update(patch)
       .eq("id", id)
-      .select()
+      .select("*, asociaciones:asociacion_id(id, nombre, sigla, tipo)")
       .single();
 
     if (error) throw new Error(`Error al actualizar fiscal: ${error.message}`);
-    return data;
+    return {
+      ...data,
+      asociacion: data.asociaciones?.sigla || data.asociaciones?.nombre || null,
+    };
   }
 
   static async cambiarEstadoFiscal(id: string, activo: boolean) {
@@ -106,11 +174,14 @@ export class FiscalService {
       .from("fiscales")
       .update({ activo })
       .eq("id", id)
-      .select()
+      .select("*, asociaciones:asociacion_id(id, nombre, sigla, tipo)")
       .single();
 
     if (error) throw new Error(`Error al cambiar estado de fiscal: ${error.message}`);
-    return data;
+    return {
+      ...data,
+      asociacion: data.asociaciones?.sigla || data.asociaciones?.nombre || null,
+    };
   }
 
   static generarPasswordTemporal(): string {
@@ -161,10 +232,7 @@ export class FiscalService {
         .from("perfiles")
         .update({ email: correo })
         .eq("id", fiscal.usuario_id);
-      await supabaseAdmin
-        .from("fiscales")
-        .update({ correo })
-        .eq("id", fiscalId);
+      await supabaseAdmin.from("fiscales").update({ correo }).eq("id", fiscalId);
 
       return {
         fiscal_id: fiscalId,
@@ -195,8 +263,7 @@ export class FiscalService {
 
     const perfilCandidato = porDni || porEmail;
     const perfilEsLaMismaPersona =
-      Boolean(perfilCandidato) &&
-      mismoNombrePersona(fiscal, perfilCandidato);
+      Boolean(perfilCandidato) && mismoNombrePersona(fiscal, perfilCandidato);
 
     if (perfilCandidato && !perfilEsLaMismaPersona) {
       throw new Error(
@@ -297,30 +364,44 @@ export class FiscalService {
     };
   }
 
-  static async buscarPorDni(dni: string) {
+  static async buscarPorDni(dni: string, asociacionId?: string | null) {
+    const colegioId = await this.resolverColegioEntidadId(asociacionId);
     const { data, error } = await supabaseAdmin
       .from("fiscales")
-      .select("*")
+      .select("*, asociaciones:asociacion_id(id, nombre, sigla, tipo)")
       .eq("dni", dni)
+      .eq("asociacion_id", colegioId)
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    return data;
+    if (!data) return null;
+    return {
+      ...data,
+      asociacion: data.asociaciones?.sigla || data.asociaciones?.nombre || null,
+    };
   }
 
   static async obtenerFiscalesTorneo(torneoId: string) {
     const { data, error } = await supabaseAdmin
       .from("torneo_fiscales")
-      .select("fiscal_id, rol, fiscales(*)")
+      .select("fiscal_id, rol, fiscales(*, asociaciones:asociacion_id(id, nombre, sigla, tipo))")
       .eq("torneo_id", torneoId);
 
     if (error) throw new Error(error.message);
+
     return (data || [])
-      .map((tf: any) =>
-        tf.fiscales
-          ? { ...tf.fiscales, rol_torneo: tf.rol || "auxiliar" }
-          : null,
-      )
+      .map((tf) => {
+        const fiscalRaw = tf.fiscales;
+        const fiscal = Array.isArray(fiscalRaw) ? fiscalRaw[0] : fiscalRaw;
+        if (!fiscal) return null;
+        const asocRaw = fiscal.asociaciones;
+        const asoc = Array.isArray(asocRaw) ? asocRaw[0] : asocRaw;
+        return {
+          ...fiscal,
+          asociacion: asoc?.sigla || asoc?.nombre || null,
+          rol_torneo: tf.rol || "auxiliar",
+        };
+      })
       .filter(Boolean);
   }
 
@@ -334,24 +415,25 @@ export class FiscalService {
       return [];
     }
 
-    // 1. Buscar los fiscales por ID o DNI
+    const colegioId = await this.resolverColegioDeTorneo(torneoId);
+
     const { data: fiscales, error: errF } = await supabaseAdmin
       .from("fiscales")
-      .select("id, dni")
-      .or(`id.in.(${items.map((i) => `"${i}"`).join(",")}),dni.in.(${items.map((i) => `"${i}"`).join(",")})`);
+      .select("id, dni, asociacion_id")
+      .eq("asociacion_id", colegioId)
+      .or(
+        `id.in.(${items.map((i) => `"${i}"`).join(",")}),dni.in.(${items.map((i) => `"${i}"`).join(",")})`,
+      );
 
     if (errF) throw new Error(errF.message);
     if (!fiscales || fiscales.length === 0) {
-      throw new Error("No se encontraron fiscales con los parámetros provistos.");
+      throw new Error(
+        "No se encontraron fiscales del colegio de esta entidad con los parámetros provistos.",
+      );
     }
 
-    // 2. Limpiar asignaciones previas
-    await supabaseAdmin
-      .from("torneo_fiscales")
-      .delete()
-      .eq("torneo_id", torneoId);
+    await supabaseAdmin.from("torneo_fiscales").delete().eq("torneo_id", torneoId);
 
-    // 3. Insertar nuevas asignaciones (máx. 1 fiscal general)
     let generalAsignado = false;
     const inserts = fiscales.map((f) => {
       const requested = rolesById?.[f.id] || "auxiliar";
