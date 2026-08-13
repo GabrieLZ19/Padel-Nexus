@@ -130,6 +130,8 @@ export const createInscripcionManual = async (
       jugador2_identificador,
       monto,
       metodo_pago,
+      omitir_validaciones,
+      motivo,
     } = req.body;
 
     const adminId = req.user?.id;
@@ -148,6 +150,8 @@ export const createInscripcionManual = async (
       monto: Number(monto),
       metodoPago: metodo_pago,
       adminId,
+      omitirValidaciones: Boolean(omitir_validaciones),
+      motivo: typeof motivo === "string" ? motivo : undefined,
     });
 
     return res.status(201).json(nuevaInscripcion);
@@ -156,6 +160,43 @@ export const createInscripcionManual = async (
       error instanceof Error ? error.message : "Error desconocido";
     return res.status(400).json({
       message: "No se pudo procesar la inscripción manual.",
+      error: message,
+    });
+  }
+};
+
+export const getElegibilidadInscripcion = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    const torneoId =
+      typeof req.query.torneo_id === "string" ? req.query.torneo_id : "";
+    const usuario2Email =
+      typeof req.query.usuario2_email === "string"
+        ? req.query.usuario2_email
+        : undefined;
+    const usuarioId = req.user?.id;
+
+    if (!usuarioId) {
+      return res.status(401).json({ message: "No autorizado." });
+    }
+    if (!torneoId) {
+      return res.status(400).json({ message: "torneo_id es obligatorio." });
+    }
+
+    const data = await InscripcionService.evaluarElegibilidad({
+      torneoId,
+      usuarioId,
+      usuario2Email,
+    });
+
+    return res.status(200).json({ exito: true, ...data });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    return res.status(400).json({
+      message: "No se pudo evaluar la elegibilidad.",
       error: message,
     });
   }

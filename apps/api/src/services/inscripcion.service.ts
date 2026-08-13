@@ -9,9 +9,14 @@ import {
   assertEdad,
   assertInscripcionAbierta,
   assertRama,
+  runSyncCheck,
+  torneoExigeAfiliacionOrganizadora,
   torneoExigeCarnet,
+  type CheckResult,
   type PerfilElegibilidad,
+  type TorneoElegibilidad,
 } from "../utils/inscripcionElegibilidad";
+import { AFILIACION_ESTADOS } from "../constants/afiliacion";
 
 interface RegistroInscripcionDTO {
   torneoId: string;
@@ -60,6 +65,245 @@ export class InscripcionService {
         `${etiqueta}: se requiere licencia FAP vigente y activa para este torneo.`,
       );
     }
+  }
+
+  /** Afiliación activa al club u asociación organizadora del torneo. */
+  private static async assertAfiliacionOrganizadora(
+    usuarioId: string,
+    torneo: TorneoElegibilidad,
+    etiqueta: string,
+  ): Promise<void> {
+    if (!torneoExigeAfiliacionOrganizadora(torneo)) return;
+
+    if (!torneo.club_id && !torneo.asociacion_id) {
+      throw new Error(
+        "El torneo exige afiliación organizadora pero no tiene club ni asociación configurados.",
+      );
+    }
+
+    let query = supabaseAdmin
+      .from("afiliaciones")
+      .select("id")
+      .eq("usuario_id", usuarioId)
+      .eq("estado", AFILIACION_ESTADOS.ACTIVO)
+      .limit(1);
+
+    if (torneo.club_id && torneo.asociacion_id) {
+      query = query.or(
+        `club_id.eq.${torneo.club_id},asociacion_id.eq.${torneo.asociacion_id}`,
+      );
+    } else if (torneo.club_id) {
+      query = query.eq("club_id", torneo.club_id);
+    } else if (torneo.asociacion_id) {
+      query = query.eq("asociacion_id", torneo.asociacion_id);
+    }
+
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) {
+      throw new Error(
+        `${etiqueta}: se requiere afiliación activa al club o asociación organizadora del torneo.`,
+      );
+    }
+  }
+
+  private static async cargarTorneoElegibilidad(
+    torneoId: string,
+  ): Promise<TorneoElegibilidad> {
+    const { data: torneo, error } = await supabaseAdmin
+      .from("torneos")
+      .select(
+        "id, fecha, fecha_cierre_inscripcion, nivel, categoria, rama, validar_edad, cupos_maximos, cupos_actuales, estado, reglas_arbitraje, club_id, asociacion_id",
+      )
+      .eq("id", torneoId)
+      .single();
+
+    if (error || !torneo) throw new Error("Torneo no encontrado.");
+    return torneo;
+  }
+
+  private static async aplicarReglasJugador(
+    perfil: PerfilElegibilidad,
+    torneo: TorneoElegibilidad,
+    etiqueta: string,
+  ): Promise<void> {
+    assertCategoria(perfil, torneo.nivel, etiqueta);
+    assertRama(perfil, torneo.rama, etiqueta);
+    assertEdad(perfil, torneo, etiqueta);
+    if (torneoExigeCarnet(torneo)) {
+      await InscripcionService.assertLicenciaFapActiva(perfil.id, etiqueta);
+    }
+    await InscripcionService.assertAfiliacionOrganizadora(
+      perfil.id,
+      torneo,
+      etiqueta,
+    );
+  }
+
+  private static async construirChecksJugador(
+    perfil: PerfilElegibilidad,
+    torneo: TorneoElegibilidad,
+    etiqueta: string,
+  ): Promise<CheckResult[]> {
+    const checks: CheckResult[] = [
+      runSyncCheck("categoria", `${etiqueta} · categoría`, () =>
+        assertCategoria(perfil, torneo.nivel, etiqueta),
+      ),
+      runSyncCheck("rama", `${etiqueta} · rama`, () =>
+        assertRama(perfil, torneo.rama, etiqueta),
+      ),
+      runSyncCheck("edad", `${etiqueta} · edad`, () =>
+        assertEdad(perfil, torneo, etiqueta),
+      ),
+    ];
+
+    if (torneoExigeCarnet(torneo)) {
+      try {
+        await InscripcionService.assertLicenciaFapActiva(perfil.id, etiqueta);
+        checks.push({
+          code: "carnet",
+          label: `${etiqueta} · carnet FAP`,
+          passed: true,
+        });
+      } catch (error: unknown) {
+        checks.push({
+          code: "carnet",
+          label: `${etiqueta} · carnet FAP`,
+          passed: false,
+          message:
+            error instanceof Error ? error.message : "Sin carnet activo",
+        });
+      }
+    } else {
+      checks.push({
+        code: "carnet",
+        label: `${etiqueta} · carnet FAP`,
+        passed: true,
+        message: "No requerido",
+      });
+    }
+
+    if (torneoExigeAfiliacionOrganizadora(torneo)) {
+      try {
+        await InscripcionService.assertAfiliacionOrganizadora(
+          perfil.id,
+          torneo,
+          etiqueta,
+        );
+        checks.push({
+          code: "afiliacion",
+          label: `${etiqueta} · afiliación`,
+          passed: true,
+        });
+      } catch (error: unknown) {
+        checks.push({
+          code: "afiliacion",
+          label: `${etiqueta} · afiliación`,
+          passed: false,
+          message:
+            error instanceof Error ? error.message : "Sin afiliación válida",
+        });
+      }
+    }
+
+    return checks;
+  }
+
+  /** Preflight: elegibilidad J1 (+ J2 por email) sin insertar. */
+  static async evaluarElegibilidad(params: {
+    torneoId: string;
+    usuarioId: string;
+    usuario2Email?: string;
+  }) {
+    const torneo = await InscripcionService.cargarTorneoElegibilidad(
+      params.torneoId,
+    );
+
+    const { data: perfilJ1, error: errJ1 } = await supabaseAdmin
+      .from("perfiles")
+      .select(
+        "id, nombre, apellido, email, categoria_padel, fecha_nacimiento, sexo",
+      )
+      .eq("id", params.usuarioId)
+      .single();
+
+    if (errJ1 || !perfilJ1) {
+      throw new Error("Perfil de jugador no encontrado.");
+    }
+
+    const checksTorneo: CheckResult[] = [
+      runSyncCheck("cierre", "Inscripción abierta", () =>
+        assertInscripcionAbierta(torneo),
+      ),
+    ];
+
+    const checksJ1 = await InscripcionService.construirChecksJugador(
+      perfilJ1,
+      torneo,
+      "Jugador 1",
+    );
+
+    let jugador2: {
+      id: string;
+      nombre: string;
+      email: string | null;
+      categoria_padel: string | null;
+    } | null = null;
+    let checksJ2: CheckResult[] = [];
+
+    const email2 = params.usuario2Email?.trim();
+    if (email2) {
+      const { data: perfilJ2, error: errJ2 } = await supabaseAdmin
+        .from("perfiles")
+        .select(
+          "id, nombre, apellido, email, categoria_padel, fecha_nacimiento, sexo",
+        )
+        .eq("email", email2)
+        .maybeSingle();
+
+      if (errJ2 || !perfilJ2) {
+        checksJ2 = [
+          {
+            code: "existe",
+            label: "Jugador 2 · registrado",
+            passed: false,
+            message: "El email del compañero no está registrado en la plataforma.",
+          },
+        ];
+      } else {
+        jugador2 = {
+          id: perfilJ2.id,
+          nombre: formatNombreCompleto(perfilJ2.apellido, perfilJ2.nombre),
+          email: perfilJ2.email,
+          categoria_padel: perfilJ2.categoria_padel,
+        };
+        checksJ2 = await InscripcionService.construirChecksJugador(
+          perfilJ2,
+          torneo,
+          "Jugador 2",
+        );
+      }
+    }
+
+    const allChecks = [...checksTorneo, ...checksJ1, ...checksJ2];
+    return {
+      ok: allChecks.every((c) => c.passed),
+      torneo: {
+        id: torneo.id,
+        nivel: torneo.nivel,
+        rama: torneo.rama,
+        requiere_carnet: torneoExigeCarnet(torneo),
+        requiere_afiliacion: torneoExigeAfiliacionOrganizadora(torneo),
+      },
+      jugador1: {
+        id: perfilJ1.id,
+        nombre: formatNombreCompleto(perfilJ1.apellido, perfilJ1.nombre),
+        categoria_padel: perfilJ1.categoria_padel,
+      },
+      jugador2,
+      checks: allChecks,
+      checks_j1: [...checksTorneo, ...checksJ1],
+      checks_j2: checksJ2,
+    };
   }
 
   static async obtenerInscripcionesPaginadas(
@@ -141,16 +385,8 @@ export class InscripcionService {
       perfilJugador2 = user2;
     }
 
-    // 2. DATOS DEL TORNEO (restricciones en una sola query)
-    const { data: torneo, error: errTorneo } = await supabaseAdmin
-      .from("torneos")
-      .select(
-        "id, fecha, fecha_cierre_inscripcion, nivel, categoria, rama, validar_edad, cupos_maximos, cupos_actuales, estado, reglas_arbitraje",
-      )
-      .eq("id", torneoId)
-      .single();
-
-    if (errTorneo || !torneo) throw new Error("Torneo no encontrado.");
+    // 2. DATOS DEL TORNEO
+    const torneo = await InscripcionService.cargarTorneoElegibilidad(torneoId);
 
     // 3. INSCRIPCIÓN ABIERTA
     assertInscripcionAbierta(torneo);
@@ -174,29 +410,17 @@ export class InscripcionService {
 
     if (!solicitante) throw new Error("Perfil de jugador no encontrado.");
 
-    // 5. CARNET FAP — solo si el torneo lo exige
-    if (torneoExigeCarnet(torneo)) {
-      await InscripcionService.assertLicenciaFapActiva(jugador1Id, "Jugador 1");
-      if (jugador2Id) {
-        await InscripcionService.assertLicenciaFapActiva(
-          jugador2Id,
-          "Jugador 2",
-        );
-      }
-    }
-
-    // 6. CATEGORÍA / RAMA / EDAD — J1 y J2
-    assertCategoria(perfilJ1, torneo.nivel, "Jugador 1");
-    assertRama(perfilJ1, torneo.rama, "Jugador 1");
-    assertEdad(perfilJ1, torneo, "Jugador 1");
-
+    // 5. REGLAS J1 / J2 (categoría, rama, edad, carnet, afiliación)
+    await InscripcionService.aplicarReglasJugador(perfilJ1, torneo, "Jugador 1");
     if (perfilJugador2) {
-      assertCategoria(perfilJugador2, torneo.nivel, "Jugador 2");
-      assertRama(perfilJugador2, torneo.rama, "Jugador 2");
-      assertEdad(perfilJugador2, torneo, "Jugador 2");
+      await InscripcionService.aplicarReglasJugador(
+        perfilJugador2,
+        torneo,
+        "Jugador 2",
+      );
     }
 
-    // 7. REGLA NACIONAL (legacy sobre nivel)
+    // 6. REGLA NACIONAL (legacy sobre nivel)
     if (torneo.nivel?.toLowerCase() === "nacional") {
       if (
         solicitante.rol !== "admin_provincial" &&
@@ -213,7 +437,7 @@ export class InscripcionService {
       }
     }
 
-    // 8. DUPLICADOS
+    // 7. DUPLICADOS
     const idsAValidar = jugador2Id
       ? `usuario_id.in.("${jugador1Id}","${jugador2Id}"),usuario2_id.in.("${jugador1Id}","${jugador2Id}")`
       : `usuario_id.eq."${jugador1Id}",usuario2_id.eq."${jugador1Id}"`;
@@ -229,7 +453,7 @@ export class InscripcionService {
       );
     }
 
-    // 9. CUPOS
+    // 8. CUPOS
     if ((torneo.cupos_actuales || 0) >= (torneo.cupos_maximos || 32)) {
       throw new Error("El torneo ha alcanzado el límite máximo de cupos.");
     }
@@ -332,8 +556,8 @@ export class InscripcionService {
 
   /**
    * Inscripción manual admin.
-   * A.1: mantiene skips de categoría/edad/rama/cierre (solo carnet + cupos + duplicados).
-   * TODO A.2: aplicar mismas reglas por defecto + override con motivo auditable.
+   * Por defecto aplica las mismas reglas de elegibilidad.
+   * `omitirValidaciones` + `motivo` (≥10 chars) permite override auditable.
    */
   static async registrarInscripcionManual(datos: {
     torneoId: string;
@@ -342,6 +566,8 @@ export class InscripcionService {
     monto: number;
     metodoPago?: string;
     adminId: string;
+    omitirValidaciones?: boolean;
+    motivo?: string;
   }) {
     const {
       torneoId,
@@ -350,11 +576,22 @@ export class InscripcionService {
       monto,
       metodoPago,
       adminId,
+      omitirValidaciones = false,
+      motivo,
     } = datos;
+
+    if (omitirValidaciones) {
+      const motivoLimpio = (motivo || "").trim();
+      if (motivoLimpio.length < 10) {
+        throw new Error(
+          "Para omitir validaciones debés indicar un motivo de al menos 10 caracteres.",
+        );
+      }
+    }
 
     const { data: j1, error: j1Error } = await supabaseAdmin
       .from("perfiles")
-      .select("id, nombre, apellido")
+      .select("id, nombre, apellido, categoria_padel, fecha_nacimiento, sexo")
       .or(
         `dni.eq."${jugador1Identificador}",email.eq."${jugador1Identificador}"`,
       )
@@ -366,8 +603,15 @@ export class InscripcionService {
       );
     }
 
-    let j2: { id: string; nombre: string | null; apellido: string | null } | null =
-      null;
+    let j2: {
+      id: string;
+      nombre: string | null;
+      apellido: string | null;
+      categoria_padel: string | null;
+      fecha_nacimiento: string | null;
+      sexo: string | null;
+    } | null = null;
+
     if (
       jugador2Identificador &&
       jugador2Identificador.trim() !== "" &&
@@ -375,7 +619,7 @@ export class InscripcionService {
     ) {
       const { data: resolvedJ2, error: j2Error } = await supabaseAdmin
         .from("perfiles")
-        .select("id, nombre, apellido")
+        .select("id, nombre, apellido, categoria_padel, fecha_nacimiento, sexo")
         .or(
           `dni.eq."${jugador2Identificador}",email.eq."${jugador2Identificador}"`,
         )
@@ -389,18 +633,13 @@ export class InscripcionService {
       j2 = resolvedJ2;
     }
 
-    const { data: torneo, error: errTorneo } = await supabaseAdmin
-      .from("torneos")
-      .select("id, cupos_maximos, cupos_actuales, estado, reglas_arbitraje")
-      .eq("id", torneoId)
-      .single();
+    const torneo = await InscripcionService.cargarTorneoElegibilidad(torneoId);
 
-    if (errTorneo || !torneo) throw new Error("Torneo no encontrado.");
-
-    if (torneoExigeCarnet(torneo)) {
-      await InscripcionService.assertLicenciaFapActiva(j1.id, "Jugador 1");
+    if (!omitirValidaciones) {
+      assertInscripcionAbierta(torneo);
+      await InscripcionService.aplicarReglasJugador(j1, torneo, "Jugador 1");
       if (j2) {
-        await InscripcionService.assertLicenciaFapActiva(j2.id, "Jugador 2");
+        await InscripcionService.aplicarReglasJugador(j2, torneo, "Jugador 2");
       }
     }
 
@@ -459,13 +698,21 @@ export class InscripcionService {
 
     await supabaseAdmin.from("logs_auditoria").insert({
       usuario_id_admin: adminId,
-      accion: "PAGO_MANUAL_INSCRIPCION_MANUAL",
+      accion: omitirValidaciones
+        ? "INSCRIPCION_MANUAL_OVERRIDE"
+        : "PAGO_MANUAL_INSCRIPCION_MANUAL",
       entidad_afectada: `inscripciones_id: ${inscripcionInsertada.id}`,
       detalles: {
         monto,
         metodo_pago: metodoPago || "No especificado",
         fecha_pago: new Date().toISOString(),
-        observaciones: "Inscripción manual directa desde CRM.",
+        observaciones: omitirValidaciones
+          ? "Inscripción manual con override de validaciones."
+          : "Inscripción manual directa desde CRM.",
+        omitir_validaciones: omitirValidaciones,
+        motivo: omitirValidaciones ? (motivo || "").trim() : null,
+        jugador1_id: j1.id,
+        jugador2_id: j2?.id || null,
       },
     });
 

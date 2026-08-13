@@ -21,6 +21,8 @@ export type TorneoElegibilidad = {
   cupos_actuales?: number | null;
   estado?: string | null;
   reglas_arbitraje?: unknown;
+  club_id?: string | null;
+  asociacion_id?: string | null;
 };
 
 export function parseReglasArbitraje(
@@ -36,6 +38,41 @@ export function torneoExigeCarnet(torneo: TorneoElegibilidad): boolean {
   return Boolean(
     parseReglasArbitraje(torneo.reglas_arbitraje).requiere_carnet_federativo,
   );
+}
+
+export function torneoExigeAfiliacionOrganizadora(
+  torneo: TorneoElegibilidad,
+): boolean {
+  return Boolean(
+    parseReglasArbitraje(torneo.reglas_arbitraje)
+      .requiere_afiliacion_organizadora,
+  );
+}
+
+export type CheckResult = {
+  code: string;
+  label: string;
+  passed: boolean;
+  message?: string;
+};
+
+/** Ejecuta un assert síncrono y lo convierte en check no-throw. */
+export function runSyncCheck(
+  code: string,
+  label: string,
+  fn: () => void,
+): CheckResult {
+  try {
+    fn();
+    return { code, label, passed: true };
+  } catch (error: unknown) {
+    return {
+      code,
+      label,
+      passed: false,
+      message: error instanceof Error ? error.message : "Validación fallida",
+    };
+  }
 }
 
 /** Edad mínima parseada de la categoría (+30, +40, …). Sin umbral numérico → solo exige fecha de nacimiento. */
