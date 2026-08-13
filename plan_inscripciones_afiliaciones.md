@@ -1,6 +1,6 @@
 # Plan — Inscripciones a torneos + Afiliación club/federación
 
-**Estado:** Parte A.1 implementada — pendiente verificación manual en ambiente  
+**Estado:** Parte A.1 lista · Parte B implementada (afiliaciones club con aprobación) — pendiente QA manual  
 **Prioridad de ejecución:** primero **Parte A (inscripciones)**, después **Parte B (afiliaciones)**  
 **Proyecto Supabase:** `tsmgxvygmdskhyhnjqvv`  
 **Complementa:** `plan_cambios_padel.md` (§1.3 carnet) y `AGENTS.md` (reglas FAP de inscripción)
@@ -271,11 +271,11 @@ Ajustar `LicenciaService.cambiarEstado` para reutilizar el mismo helper de afili
 
 ## B.4 — Criterios de aceptación — Parte B
 
-- [ ] Jugador solicita afiliación a club sin pasar por carnet
-- [ ] Admin aprueba → aparece en perfil como Activa con FK
-- [ ] Duplicado pendiente/activa al mismo club → rechazado
-- [ ] Licencia aprobada también deja afiliación consistente (FK + entidad)
-- [ ] Rankings/brackets siguen resolviendo nombre de club (preferir FK, fallback `entidad`)
+- [x] Jugador solicita afiliación a club sin pasar por carnet
+- [x] Admin aprueba → aparece en perfil como Activa con FK
+- [x] Duplicado pendiente/activa al mismo club → rechazado
+- [x] Licencia aprobada también deja afiliación consistente (FK + entidad)
+- [ ] Rankings/brackets siguen resolviendo nombre de club (preferir FK, fallback `entidad`) — sin cambios de ranking en este slice; fallback entidad se mantiene
 
 ## B.5 — Commits sugeridos
 

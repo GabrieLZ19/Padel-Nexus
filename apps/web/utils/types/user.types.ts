@@ -15,6 +15,8 @@ export interface Afiliacion {
   fecha_vencimiento: string;
   vencimiento?: string; // Para compatibilidad de esquema según requerimiento
   created_at?: string;
+  club_id?: string | null;
+  asociacion_id?: string | null;
 }
 
 export interface Licencia {

@@ -16,6 +16,7 @@ import { useProfileStore } from "@/store/useProfileStore";
 import { useSocket } from "@/hooks/useSocket";
 import CredencialDigital from "@/components/perfil/CredencialDigital";
 import LicenciaModal from "@/components/perfil/LicenciaModal";
+import AfiliacionModal from "@/components/perfil/AfiliacionModal";
 
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-white/5 rounded-3xl ${className}`} />
@@ -25,11 +26,19 @@ const LICENSE_RELATED_TITLES = [
   "Licencia Aprobada",
   "Licencia Suspendida",
   "Solicitud de Alta Rechazada",
+  "Afiliación aprobada",
+  "Afiliación rechazada",
 ];
+
+function afiliacionVisible(estado?: string | null) {
+  const e = (estado || "").toLowerCase();
+  return e !== "suspendido" && e !== "rechazado" && e !== "baja";
+}
 
 export default function PlayerDashboard() {
   const { profile, fetchProfile } = useProfileStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAfiliacionOpen, setIsAfiliacionOpen] = useState(false);
   const [activeLicenciaIndex, setActiveLicenciaIndex] = useState(0);
 
   useEffect(() => {
@@ -192,49 +201,49 @@ export default function PlayerDashboard() {
                 )}
               </div>
 
-              {/* Afiliaciones cruzadas */}
-              {profile.licencias && profile.licencias.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-brand-white/5 w-full relative z-10 flex flex-col items-center">
-                  {profile.afiliaciones &&
-                  profile.afiliaciones.filter(
-                    (af) => af.estado !== "suspendido",
-                  ).length > 0 ? (
-                    <>
-                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2">
-                        Clubes Afiliados (
-                        {
-                          profile.afiliaciones.filter(
-                            (af) => af.estado !== "suspendido",
-                          ).length
-                        }
-                        )
-                      </p>
-                      <div className="flex flex-wrap justify-center gap-1.5 max-h-24 overflow-y-auto pr-1 mb-3 w-full">
-                        {profile.afiliaciones
-                          .filter((af) => af.estado !== "suspendido")
-                          .map((af) => (
-                            <span
-                              key={af.id}
-                              className="px-2.5 py-1 bg-brand-chartreuse/10 border border-brand-chartreuse/25 rounded-lg text-[9px] text-brand-chartreuse font-extrabold uppercase tracking-wider"
-                            >
-                              {af.entidad}
-                            </span>
-                          ))}
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-xs text-gray-500 italic mb-3">
-                      Sin clubes activos.
+              {/* Afiliaciones a clubes (independiente del carnet FAP) */}
+              <div className="mt-4 pt-4 border-t border-brand-white/5 w-full relative z-10 flex flex-col items-center">
+                {profile.afiliaciones &&
+                profile.afiliaciones.filter((af) => afiliacionVisible(af.estado))
+                  .length > 0 ? (
+                  <>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2">
+                      Clubes afiliados (
+                      {
+                        profile.afiliaciones.filter((af) =>
+                          afiliacionVisible(af.estado),
+                        ).length
+                      }
+                      )
                     </p>
-                  )}
-                  <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="w-full max-w-50 py-2 bg-brand-white/5 hover:bg-brand-white/10 text-brand-white border border-brand-white/10 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    + Afiliarse a otro club
-                  </button>
-                </div>
-              )}
+                    <div className="flex flex-wrap justify-center gap-1.5 max-h-24 overflow-y-auto pr-1 mb-3 w-full">
+                      {profile.afiliaciones
+                        .filter((af) => afiliacionVisible(af.estado))
+                        .map((af) => (
+                          <span
+                            key={af.id}
+                            className="px-2.5 py-1 bg-brand-chartreuse/10 border border-brand-chartreuse/25 rounded-lg text-[9px] text-brand-chartreuse font-extrabold uppercase tracking-wider"
+                          >
+                            {af.entidad}
+                            {af.estado?.toLowerCase() === "pendiente"
+                              ? " · pendiente"
+                              : ""}
+                          </span>
+                        ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-500 italic mb-3">
+                    Sin clubes activos.
+                  </p>
+                )}
+                <button
+                  onClick={() => setIsAfiliacionOpen(true)}
+                  className="w-full max-w-50 py-2 bg-brand-white/5 hover:bg-brand-white/10 text-brand-white border border-brand-white/10 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                >
+                  + Asociarme a un club
+                </button>
+              </div>
             </div>
 
             {/* Columnas del Centro (Columna 2 y 3) */}
@@ -359,6 +368,15 @@ export default function PlayerDashboard() {
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
+          fetchProfile();
+        }}
+        userProfile={profile}
+        fetchProfile={fetchProfile}
+      />
+      <AfiliacionModal
+        isOpen={isAfiliacionOpen}
+        onClose={() => {
+          setIsAfiliacionOpen(false);
           fetchProfile();
         }}
         userProfile={profile}

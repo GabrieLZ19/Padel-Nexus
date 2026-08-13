@@ -192,6 +192,11 @@ export default function DashboardLayout({
       href: "/dashboard/inscripciones",
     },
     {
+      name: "Afiliaciones",
+      icon: Building2,
+      href: "/dashboard/afiliaciones",
+    },
+    {
       name: "Asociaciones",
       icon: Landmark,
       href: "/dashboard/asociaciones",
