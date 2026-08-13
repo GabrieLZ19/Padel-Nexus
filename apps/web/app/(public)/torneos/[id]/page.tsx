@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   CreditCard,
   ChevronLeft,
-  CheckCircle2,
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { Partido, Torneo } from "@/utils/types/index";
@@ -19,6 +18,7 @@ import InscripcionModal from "@/components/torneos/InscripcionModal";
 import { useProfileStore } from "@/store/useProfileStore";
 import { MatchCard } from "@/components/torneos/MatchCard";
 import { TablaPosicionesZona } from "@/components/torneos/TablaPosicionesZona";
+import PublicBracketView from "@/components/torneos/PublicBracketView";
 import {
   allChecksPassed,
   buildChecksElegibilidadJ1,
@@ -33,11 +33,12 @@ export default function TorneoDetallePage() {
   const [torneo, setTorneo] = useState<Torneo | null>(null);
   const [partidos, setPartidos] = useState<Partido[]>([]);
   const [zonas, setZonas] = useState<any[]>([]);
-  const [activeTabPublica, setActiveTabPublica] = useState<"zonas" | "llaves">("zonas");
-  const [loading, setLoading] = useState<boolean>(true);
-  const [inscribiendo, setInscribiendo] = useState<boolean>(false);
+  const [activeTabPublica, setActiveTabPublica] = useState<"zonas" | "llaves">(
+    "zonas",
+  );
+  const [loading, setLoading] = useState(true);
   const [isInscripcionOpen, setIsInscripcionModalOpen] = useState(false);
-  const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const { profile } = useProfileStore();
 
@@ -66,14 +67,17 @@ export default function TorneoDetallePage() {
         if (isMounted) setLoading(false);
       });
 
-    // ── Helpers debounced para evitar rafagas de refetches ──────────────
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     const debouncedRefreshPartidos = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        TorneosService.getPartidos(torneoId).then((p) => isMounted && setPartidos(p || []));
-        TorneosService.getZonas(torneoId).then((z) => isMounted && setZonas(z || []));
+        TorneosService.getPartidos(torneoId).then(
+          (p) => isMounted && setPartidos(p || []),
+        );
+        TorneosService.getZonas(torneoId).then(
+          (z) => isMounted && setZonas(z || []),
+        );
       }, 500);
     };
 
@@ -87,17 +91,13 @@ export default function TorneoDetallePage() {
 
     const handleWebsocketPartido = (e: any) => {
       const data = e.detail;
-      if (data?.torneo_id === torneoId) {
-        debouncedRefreshPartidos();
-      }
+      if (data?.torneo_id === torneoId) debouncedRefreshPartidos();
     };
 
-    // bracket_actualizado: el cuadro avanzó a la siguiente fase
     const handleWebsocketBracket = (e: any) => {
       const data = e.detail;
       if (data?.torneo_id === torneoId) {
         debouncedRefreshPartidos();
-        // Si se acaban de generar las llaves principales, cambiar al tab del cuadro
         if (data?.fase === "llaves_principales_generadas" && isMounted) {
           setActiveTabPublica("llaves");
         }
@@ -115,12 +115,17 @@ export default function TorneoDetallePage() {
       if (debounceTimer) clearTimeout(debounceTimer);
       if (typeof window !== "undefined") {
         window.removeEventListener("torneo_actualizado", handleWebsocketTorneo);
-        window.removeEventListener("partido_actualizado", handleWebsocketPartido);
-        window.removeEventListener("bracket_actualizado", handleWebsocketBracket);
+        window.removeEventListener(
+          "partido_actualizado",
+          handleWebsocketPartido,
+        );
+        window.removeEventListener(
+          "bracket_actualizado",
+          handleWebsocketBracket,
+        );
       }
     };
   }, [torneoId, torneo?.estado, refreshKey]);
-
 
   const formatFecha = (fechaVal?: string | number | null) => {
     if (!fechaVal) return "Fecha a confirmar";
@@ -142,23 +147,22 @@ export default function TorneoDetallePage() {
       router.push("/mis-inscripciones");
       return;
     }
-    // Abrir modal también si no es elegible: el checklist explica qué falta
+    const checks = buildChecksElegibilidadJ1(torneo!, profile);
+    const failed = checks.find((c) => !c.passed);
+    if (failed?.actionHref) {
+      router.push(failed.actionHref);
+      return;
+    }
     setIsInscripcionModalOpen(true);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-brand-black text-brand-white">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8 animate-pulse">
-          <div className="w-32 h-4 bg-brand-white/5 rounded-md mb-8"></div>
-          <div className="bg-brand-card rounded-3xl p-8 lg:p-12 mb-8 h-80 lg:h-60"></div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            <div className="lg:col-span-2 bg-brand-card border border-brand-white/5 rounded-3xl p-6 h-150"></div>
-            <div className="space-y-6">
-              <div className="bg-brand-card border border-brand-white/5 rounded-3xl p-8 h-64"></div>
-              <div className="bg-brand-card border border-brand-white/5 rounded-3xl p-8 h-48"></div>
-            </div>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-8 animate-pulse space-y-6">
+          <div className="h-4 w-28 bg-white/5 rounded" />
+          <div className="h-40 bg-brand-card rounded-2xl" />
+          <div className="h-96 bg-brand-card rounded-2xl" />
         </div>
       </div>
     );
@@ -167,16 +171,16 @@ export default function TorneoDetallePage() {
   if (!torneo) {
     return (
       <div className="min-h-[calc(100vh-88px)] flex flex-col items-center justify-center text-center px-4 bg-brand-black">
-        <Trophy className="size-16 text-gray-600 mb-4" />
-        <h2 className="text-2xl font-bold text-brand-white mb-2">
+        <Trophy className="size-14 text-gray-600 mb-4" />
+        <h2 className="text-2xl font-bold text-white mb-2">
           Torneo no encontrado
         </h2>
-        <p className="text-gray-400 mb-6">
+        <p className="text-gray-400 mb-6 text-sm">
           El torneo que buscás no existe o fue eliminado.
         </p>
         <button
           onClick={() => router.push("/torneos")}
-          className="bg-brand-white/10 hover:bg-brand-white/20 text-brand-white px-6 py-2.5 rounded-xl font-semibold transition-colors cursor-pointer"
+          className="bg-white/10 hover:bg-white/15 text-white px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
         >
           Explorar torneos
         </button>
@@ -184,17 +188,20 @@ export default function TorneoDetallePage() {
     );
   }
 
-  const estadoBase = (torneo?.estado || "").toLowerCase().trim();
+  const estadoBase = (torneo.estado || "").toLowerCase().trim();
   const isEnCurso = estadoBase === "en curso";
   const isFinalizado = estadoBase === "finalizado";
   const isAbierto = estadoBase === "inscripción" || estadoBase === "borrador";
   const isCierreVencido = !isInscripcionTemporalmenteAbierta(torneo);
   const isIndividual = torneo.modalidad === "Individual";
   const hasPremios = torneo.premio_1 || torneo.premio_2 || torneo.premio_3;
-
   const cuposActuales = torneo.cupos_actuales || 0;
   const cuposMaximos = torneo.cupos_maximos || 16;
   const isLleno = cuposActuales >= cuposMaximos;
+  const cuposPct = Math.min(
+    100,
+    Math.round((cuposActuales / Math.max(cuposMaximos, 1)) * 100),
+  );
 
   const elegibilidadChecks = profile
     ? buildChecksElegibilidadJ1(torneo, profile)
@@ -209,492 +216,304 @@ export default function TorneoDetallePage() {
   if (isAlreadyEnrolled) {
     btnText = "Ver mi inscripción";
     btnClass =
-      "bg-brand-white/10 text-brand-white hover:bg-brand-white/20 border border-brand-white/20";
+      "bg-white/10 text-white hover:bg-white/15 border border-white/15";
   } else if (!isAbierto || isCierreVencido) {
-    btnText = "Inscripciones Cerradas";
+    btnText = "Inscripciones cerradas";
     btnClass =
-      "bg-brand-white/5 text-gray-500 border border-brand-white/10 cursor-not-allowed opacity-80 shadow-none";
+      "bg-white/5 text-gray-500 border border-white/10 cursor-not-allowed opacity-80";
     isDisabled = true;
   } else if (isLleno) {
-    btnText = "Cupos Agotados";
+    btnText = "Cupos agotados";
     btnClass =
-      "bg-red-500/20 text-red-500 border border-red-500/20 cursor-not-allowed opacity-80 shadow-none";
+      "bg-red-500/15 text-red-400 border border-red-500/20 cursor-not-allowed";
     isDisabled = true;
   } else if (!profile) {
     btnText = "Ingresar para inscribirte";
-    btnClass =
-      "bg-brand-chartreach text-brand-black hover:opacity-95 shadow-[0_0_30px_rgba(203,254,1,0.15)]";
+    btnClass = "bg-brand-chartreuse text-brand-black hover:opacity-95";
   } else if (!isElegible) {
+    const needsCarnet = firstFailedCheck?.code === "carnet";
     const needsProfile =
       firstFailedCheck?.code === "edad" ||
       firstFailedCheck?.code === "rama" ||
       firstFailedCheck?.actionHref === "/mi-perfil/ajustes";
-    const needsCarnet = firstFailedCheck?.code === "carnet";
     btnText = needsCarnet
       ? "Requiere carnet FAP"
       : needsProfile
         ? "Completar perfil"
-        : "No elegible — ver requisitos";
+        : "Ver requisitos";
     btnClass =
-      "bg-brand-white/10 text-brand-white hover:bg-brand-white/20 border border-brand-white/20";
+      "bg-white/10 text-white hover:bg-white/15 border border-white/15";
   } else {
     btnText = isIndividual ? "Inscribirme" : "Inscribir mi dupla";
-    btnClass =
-      "bg-brand-chartreuse text-brand-black hover:opacity-95 shadow-[0_0_30px_rgba(203,254,1,0.15)]";
+    btnClass = "bg-brand-chartreuse text-brand-black hover:opacity-95";
   }
 
-  const RONDAS_CONFIG = [
-    { id: "16AVOS", label: "16avos", required: 16 },
-    { id: "OCTAVOS", label: "Octavos", required: 8 },
-    { id: "CUARTOS", label: "Cuartos", required: 4 },
-    { id: "SEMIS", label: "Semis", required: 2 },
-    { id: "FINAL", label: "Final", required: 1 },
-  ];
-
-  const activeRounds = new Set(
-    (partidos || []).map((p) => p.ronda.toUpperCase()),
-  );
-  const rondasToShow = RONDAS_CONFIG.filter((r) => activeRounds.has(r.id));
-
-  const getRoundMatches = (round: string, requiredCount: number): Partido[] => {
-    const found = partidos
-      .filter((p) => p.ronda === round)
-      .sort((a, b) => a.orden - b.orden);
-    const result: Partido[] = [];
-
-    for (let i = 0; i < requiredCount; i++) {
-      if (found[i]) {
-        result.push(found[i]);
-      } else {
-        result.push({
-          id: `empty-${round}-${i}`,
-          torneo_id: torneoId,
-          ronda: round,
-          orden: i + 1,
-          equipo_a_j1: null,
-          equipo_a_j2: null,
-          equipo_b_j1: null,
-          equipo_b_j2: null,
-          set1_a: null,
-          set1_b: null,
-          ganador: null,
-        });
-      }
-    }
-    return result;
-  };
-
-  const maxMatches = rondasToShow.reduce((max, rondaInfo) => {
-    const count = getRoundMatches(rondaInfo.id, rondaInfo.required).length;
-    return count > max ? count : max;
-  }, 1);
-
-  const dynamicHeight = Math.max(580, maxMatches * 115);
+  const showZonasTab = Boolean(zonas && zonas.length > 0);
 
   return (
-    <div className="min-h-screen bg-brand-black text-brand-white font-sans selection:bg-brand-chartreuse selection:text-brand-black">
-      <div className="max-w-7xl mx-auto px-5 lg:px-10 py-6 lg:py-8 animate-in fade-in duration-300">
+    <div className="min-h-screen bg-brand-black text-brand-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 lg:py-8">
         <button
           onClick={() => router.push("/torneos")}
-          className="flex items-center gap-2 text-gray-400 hover:text-brand-white transition-colors text-sm font-semibold mb-6 lg:mb-8 cursor-pointer"
+          className="inline-flex items-center gap-1.5 text-gray-500 hover:text-white transition-colors text-sm font-medium mb-5 cursor-pointer"
         >
-          <ChevronLeft className="size-4" /> Volver a torneos
+          <ChevronLeft className="size-4" /> Torneos
         </button>
 
-        {/* ENCABEZADO DEL TORNEO */}
-        <div className="bg-linear-to-r from-brand-chartreuse/10 to-brand-card rounded-3xl p-6 lg:p-12 mb-8 relative overflow-hidden flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 border border-brand-white/5 shadow-xl">
-          <div className="absolute top-0 right-0 w-125 h-125 bg-brand-chartreuse/5 blur-[120px] rounded-full pointer-events-none transform translate-x-1/4 -translate-y-1/4"></div>
-
-          <div className="relative z-10 space-y-4 lg:space-y-5 flex-1">
-            <div className="inline-flex items-center gap-2 bg-brand-chartreuse text-brand-black px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-sm">
-              {torneo.nivel} {torneo.categoria} ·{" "}
-              {isAbierto ? "Inscripción Abierta" : torneo.estado}
-            </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-brand-white tracking-tight">
-              {torneo.nombre}
-            </h1>
-            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-x-6 gap-y-3 text-sm font-medium text-gray-300">
-              <span className="flex items-center gap-2">
-                <MapPin className="size-4 text-brand-chartreuse" />{" "}
-                {torneo.clubes?.nombre || "Sede a confirmar"}
-              </span>
-              <span className="flex items-center gap-2 capitalize">
-                <Calendar className="size-4 text-brand-chartreuse" />{" "}
-                {formatFecha(torneo.fecha)}
-              </span>
-              <span
-                className={`flex items-center gap-2 ${isAbierto && isLleno ? "text-red-400" : ""}`}
-              >
-                {isIndividual ? (
-                  <User
-                    className={`size-4 ${isAbierto && isLleno ? "text-red-400" : "text-brand-chartreuse"}`}
-                  />
-                ) : (
-                  <Users
-                    className={`size-4 ${isAbierto && isLleno ? "text-red-400" : "text-brand-chartreuse"}`}
-                  />
-                )}
-                {cuposActuales}/{cuposMaximos}{" "}
-                {isIndividual ? "jugadores" : "duplas"}
-                {isAbierto && isLleno && " (Agotado)"}
-              </span>
-              {hasPremios && (
-                <span className="flex items-center gap-2">
-                  <Trophy className="size-4 text-brand-chartreuse" /> Premios en
-                  juego
+        {/* Hero compacto */}
+        <header className="rounded-2xl border border-white/8 bg-[#0f0f0f] p-5 lg:p-7 mb-6 relative overflow-hidden">
+          <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(ellipse_at_top_right,rgba(203,254,1,0.08),transparent_60%)] pointer-events-none" />
+          <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+            <div className="min-w-0 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md bg-brand-chartreuse text-brand-black">
+                  {torneo.nivel || "Cat."}
+                  {torneo.categoria ? ` · ${torneo.categoria}` : ""}
                 </span>
-              )}
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/5 text-gray-400 border border-white/8">
+                  {torneo.estado}
+                </span>
+                {torneo.rama ? (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/5 text-gray-400 border border-white/8">
+                    {torneo.rama}
+                  </span>
+                ) : null}
+              </div>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white leading-tight">
+                {torneo.nombre}
+              </h1>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-400">
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="size-3.5 text-brand-chartreuse/80" />
+                  {torneo.clubes?.nombre || torneo.lugar || "Sede a confirmar"}
+                </span>
+                <span className="inline-flex items-center gap-1.5 capitalize">
+                  <Calendar className="size-3.5 text-brand-chartreuse/80" />
+                  {formatFecha(torneo.fecha)}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  {isIndividual ? (
+                    <User className="size-3.5 text-brand-chartreuse/80" />
+                  ) : (
+                    <Users className="size-3.5 text-brand-chartreuse/80" />
+                  )}
+                  {cuposActuales}/{cuposMaximos}{" "}
+                  {isIndividual ? "jugadores" : "duplas"}
+                </span>
+              </div>
             </div>
+
+            <button
+              onClick={handleInscripcion}
+              disabled={isDisabled}
+              className={`relative shrink-0 w-full lg:w-auto px-6 py-3 rounded-xl font-bold text-sm transition-all cursor-pointer ${btnClass}`}
+            >
+              {btnText}
+            </button>
           </div>
+        </header>
 
-          <button
-            onClick={handleInscripcion}
-            disabled={inscribiendo || isDisabled}
-            className={`relative z-10 shrink-0 w-full lg:w-auto px-8 py-4 rounded-xl font-bold text-base lg:text-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] ${btnClass}`}
-          >
-            {btnText}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
-          {/* COLUMNA IZQUIERDA: CUADRO PRINCIPAL / ZONAS O LISTA DE INSCRIPTOS */}
-          <div className={isAbierto ? "lg:col-span-2" : "lg:col-span-3"}>
+        <div
+          className={`grid grid-cols-1 gap-6 items-start ${
+            isAbierto ? "lg:grid-cols-[1fr_300px]" : ""
+          }`}
+        >
+          <div className="min-w-0 space-y-5">
             {isAbierto ? (
-              <div className="bg-brand-card border border-brand-white/5 rounded-3xl p-5 lg:p-10 shadow-xl flex flex-col">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+              <section className="rounded-2xl border border-white/8 bg-[#0f0f0f] p-5 lg:p-6">
+                <div className="flex items-start justify-between gap-3 mb-4">
                   <div>
-                    <h2 className="text-xl md:text-2xl font-black text-brand-white flex items-center gap-3">
-                      <Users className="size-6 text-brand-chartreuse" />
-                      Inscriptos
-                    </h2>
-                    <p className="text-gray-400 text-sm mt-1">
-                      Lista de participantes registrados en el torneo.
+                    <h2 className="text-lg font-bold text-white">Cupos</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {isIndividual ? "Jugadores" : "Duplas"} registradas
                     </p>
                   </div>
-                  <span className="bg-brand-chartreuse/10 text-brand-chartreuse px-4 py-1.5 rounded-full text-sm font-bold border border-brand-chartreuse/20">
-                    {cuposActuales} / {cuposMaximos}{" "}
-                    {isIndividual ? "Jugadores" : "Duplas"}
+                  <span className="text-sm font-black text-brand-chartreuse tabular-nums">
+                    {cuposActuales}/{cuposMaximos}
                   </span>
                 </div>
-
-                {/* Visualización de Cupos (Ocupados / Disponibles) */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {Array.from({ length: cuposMaximos }).map((_, index) => {
-                    const isOcupado = index < cuposActuales;
-                    return (
-                      <div
-                        key={index}
-                        className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 transition-all duration-200 ${
-                          isOcupado
-                            ? "bg-brand-white/2 border-brand-white/5 opacity-60 font-medium"
-                            : "bg-brand-chartreuse/5 border-brand-chartreuse/10 hover:border-brand-chartreuse/35"
-                        }`}
-                      >
-                        <div
-                          className={`size-10 rounded-full flex items-center justify-center font-bold text-sm ${
-                            isOcupado
-                              ? "bg-brand-white/5 text-gray-400"
-                              : "bg-brand-chartreuse/15 text-brand-chartreuse shadow-[0_0_15px_rgba(203,254,1,0.1)]"
-                          }`}
-                        >
-                          {index + 1}
-                        </div>
-                        <span
-                          className={`text-xs font-bold uppercase tracking-wider ${
-                            isOcupado
-                              ? "text-gray-500"
-                              : "text-brand-chartreuse"
-                          }`}
-                        >
-                          {isOcupado
-                            ? isIndividual
-                              ? "Ocupado"
-                              : "Dupla Inscripta"
-                            : "Disponible"}
-                        </span>
-                      </div>
-                    );
-                  })}
+                <div className="h-2 rounded-full bg-white/5 overflow-hidden mb-5">
+                  <div
+                    className="h-full rounded-full bg-brand-chartreuse transition-all"
+                    style={{ width: `${cuposPct}%` }}
+                  />
                 </div>
-
-                {/* Sección informativa adicional */}
-                <div className="mt-8 pt-8 border-t border-brand-white/5 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-brand-white/1 border border-brand-white/5 rounded-2xl p-5">
-                    <h4 className="text-sm font-bold text-brand-chartreuse uppercase tracking-widest mb-3">
-                      Reglamento y Formato
-                    </h4>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      Este torneo se juega bajo la modalidad{" "}
-                      <span className="text-brand-white font-semibold">
-                        {torneo.modalidad}
-                      </span>{" "}
-                      con formato de{" "}
-                      <span className="text-brand-white font-semibold">
-                        {torneo.formato || "Eliminatoria Directa"}
-                      </span>
-                      . Las reglas oficiales de la federación aplican para todas
-                      las categorías.
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                      Formato
+                    </p>
+                    <p className="text-sm text-white font-medium">
+                      {torneo.modalidad} · {torneo.formato || "Eliminatoria"}
                     </p>
                   </div>
-                  <div className="bg-brand-white/1 border border-brand-white/5 rounded-2xl p-5">
-                    <h4 className="text-sm font-bold text-brand-chartreuse uppercase tracking-widest mb-3">
-                      Sede y Canchas
-                    </h4>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      Los encuentros se disputarán en{" "}
-                      <span className="text-brand-white font-semibold">
-                        {torneo.clubes?.nombre ||
-                          torneo.lugar ||
-                          "Sede central"}
-                      </span>
-                      . El complejo cuenta con canchas profesionales.
+                  <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                      Sede
+                    </p>
+                    <p className="text-sm text-white font-medium truncate">
+                      {torneo.clubes?.nombre ||
+                        torneo.lugar ||
+                        "Sede a confirmar"}
                     </p>
                   </div>
                 </div>
-              </div>
+              </section>
             ) : (
-              <div className="space-y-6">
-                {/* Selector de Pestañas Públicas */}
-                <div className="flex bg-brand-card border border-white/5 rounded-2xl p-1.5 gap-2">
-                  {zonas && zonas.length > 0 && (
+              <>
+                {showZonasTab ? (
+                  <div className="flex p-1 rounded-xl bg-[#0f0f0f] border border-white/8 gap-1">
                     <button
                       type="button"
                       onClick={() => setActiveTabPublica("zonas")}
-                      className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      className={`flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                         activeTabPublica === "zonas"
-                          ? "bg-brand-chartreuse text-brand-black shadow-lg"
-                          : "text-gray-400 hover:text-white hover:bg-white/5"
+                          ? "bg-brand-chartreuse text-brand-black"
+                          : "text-gray-400 hover:text-white"
                       }`}
                     >
-                      Fase de grupos y Posiciones
+                      Grupos
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setActiveTabPublica("llaves")}
-                    className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                      activeTabPublica === "llaves" || !zonas || zonas.length === 0
-                        ? "bg-brand-chartreuse text-brand-black shadow-lg"
-                        : "text-gray-400 hover:text-white hover:bg-white/5"
-                    }`}
-                  >
-                    Cuadro Principal
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTabPublica("llaves")}
+                      className={`flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                        activeTabPublica === "llaves"
+                          ? "bg-brand-chartreuse text-brand-black"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Cuadro
+                    </button>
+                  </div>
+                ) : null}
 
-                {activeTabPublica === "zonas" && zonas && zonas.length > 0 ? (
-                  <div className="space-y-8">
-                    <div className="grid grid-cols-1 gap-6">
-                      {zonas.map((z: any) => {
-                        const partidosZona = partidos.filter(
-                          (p) => p.ronda?.toUpperCase() === z.nombre_grupo?.toUpperCase(),
-                        );
-                        const parejasFormatted = (z.grupo_parejas || []).map((gp: any) => ({
+                {activeTabPublica === "zonas" && showZonasTab ? (
+                  <div className="space-y-6">
+                    {zonas.map((z: any) => {
+                      const partidosZona = partidos.filter(
+                        (p) =>
+                          p.ronda?.toUpperCase() ===
+                          z.nombre_grupo?.toUpperCase(),
+                      );
+                      const parejasFormatted = (z.grupo_parejas || []).map(
+                        (gp: any) => ({
                           id: gp.inscripcion_id,
                           jugador1_nombre: gp.inscripciones?.jugador1_nombre,
                           jugador2_nombre: gp.inscripciones?.jugador2_nombre,
                           club: gp.clubName || "Sin club asignado",
                           cabezaDeSerie: gp.cabezaDeSerie,
-                        }));
+                        }),
+                      );
 
-                        return (
-                          <div key={z.id} className="space-y-4">
-                            <TablaPosicionesZona
-                              nombreZona={z.nombre_grupo}
-                              parejasInscritas={parejasFormatted}
-                              partidosZona={partidosZona}
-                            />
-
-                            {/* Lista de Partidos de la Zona */}
-                            {partidosZona.length > 0 && (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                                {partidosZona.map((p) => (
-                                  <MatchCard key={p.id} partido={p} />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                      return (
+                        <div key={z.id} className="space-y-3">
+                          <TablaPosicionesZona
+                            nombreZona={z.nombre_grupo}
+                            parejasInscritas={parejasFormatted}
+                            partidosZona={partidosZona}
+                          />
+                          {partidosZona.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {partidosZona.map((p) => (
+                                <MatchCard key={p.id} partido={p} />
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <div className="bg-brand-card border border-brand-white/5 rounded-3xl p-5 lg:p-10 shadow-xl flex flex-col overflow-hidden">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 lg:mb-12">
-                      <h2 className="text-xl md:text-2xl font-bold text-brand-white">
-                        Cuadro principal
-                      </h2>
-                      <div className="flex gap-2">
-                        {isEnCurso && (
-                          <div className="flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold rounded-full uppercase tracking-wider">
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                            En vivo
-                          </div>
-                        )}
-                        {isFinalizado && (
-                          <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold rounded-full uppercase tracking-wider">
-                            <CheckCircle2 className="size-3" /> Finalizado
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* CONTENEDOR SCROLLABLE UNIVERSAL */}
-                    <div className="w-full overflow-x-auto pb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-                      <div
-                        className="flex gap-6 lg:gap-8 w-max min-w-full px-2 lg:px-0"
-                        style={{ height: `${dynamicHeight}px` }}
-                      >
-                        {rondasToShow.map((rondaInfo) => {
-                          const roundMatches = getRoundMatches(
-                            rondaInfo.id,
-                            rondaInfo.required,
-                          );
-
-                          return (
-                            <div
-                              key={rondaInfo.id}
-                              className="min-w-50 lg:min-w-60 flex-1 flex flex-col relative h-full"
-                            >
-                              <h3 className="text-center text-[11px] lg:text-xs font-black text-brand-chartreuse uppercase tracking-widest mb-4 absolute -top-8 lg:-top-10 w-full">
-                                {rondaInfo.label}
-                              </h3>
-
-                              <div className="flex flex-col justify-around h-full w-full">
-                                {roundMatches.map((p) => (
-                                  <div
-                                    key={p.id}
-                                    className="relative w-full flex items-center justify-center"
-                                  >
-                                    <MatchCard partido={p} />
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <p className="text-center text-xs text-gray-500 mt-2 flex items-center justify-center gap-2 opacity-70">
-                      ↔ Deslizá para ver todas las rondas
-                    </p>
-                  </div>
+                  <PublicBracketView
+                    partidos={partidos}
+                    torneoId={torneoId}
+                    isLive={isEnCurso}
+                    isFinished={isFinalizado}
+                  />
                 )}
-              </div>
+              </>
             )}
           </div>
 
-          {/* COLUMNA DERECHA: INSCRIPCIÓN Y PREMIOS (SOLO CUANDO EL TORNEO ESTÁ ABIERTO) */}
-          {isAbierto && (
-            <div className="space-y-6">
-              <div className="bg-brand-card border border-brand-chartreuse/10 rounded-3xl p-6 lg:p-8 shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-brand-chartreuse/10 to-transparent" />
-              <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                Inscripción
-              </div>
-              <div className="flex items-end gap-2 mb-6">
-                {Number(torneo.precio_inscripcion || 0) === 0 ? (
-                  <span className="text-4xl lg:text-5xl font-black text-brand-chartreuse tracking-tight">
-                    Gratis
-                  </span>
-                ) : (
-                  <>
-                    <span className="text-4xl lg:text-5xl font-black text-brand-chartreuse tracking-tight">
-                      $
-                      {Number(torneo.precio_inscripcion || 0).toLocaleString(
-                        "es-AR",
-                      )}
-                    </span>
-                    <span className="text-gray-400 font-semibold mb-1 text-sm lg:text-base">
-                      / {isIndividual ? "jugador" : "dupla"}
-                    </span>
-                  </>
-                )}
-              </div>
-              <ul className="space-y-3 lg:space-y-4 mb-8">
-                <li className="flex items-center gap-3 text-xs lg:text-sm font-medium text-gray-300">
-                  {isIndividual ? (
-                    <User className="size-4 lg:size-5 text-brand-chartreuse shrink-0" />
-                  ) : (
-                    <Users className="size-4 lg:size-5 text-brand-chartreuse shrink-0" />
-                  )}
-                  Inscripción {isIndividual ? "individual" : "por dupla"}
-                </li>
-                <li className="flex items-center gap-3 text-xs lg:text-sm font-medium text-gray-300">
-                  <ShieldCheck className="size-4 lg:size-5 text-brand-chartreuse shrink-0" />{" "}
-                  Formato: {torneo.formato || "Eliminatoria"}
-                </li>
-                <li className="flex items-center gap-3 text-xs lg:text-sm font-medium text-gray-300">
-                  <CreditCard className="size-4 lg:size-5 text-brand-chartreuse shrink-0" />{" "}
-                  Pago total o 50% parcial
-                </li>
-              </ul>
-
-              {isAbierto ? (
+          {isAbierto ? (
+            <aside className="space-y-4 lg:sticky lg:top-24">
+              <div className="rounded-2xl border border-brand-chartreuse/20 bg-[#0f0f0f] p-5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">
+                  Inscripción
+                </p>
+                <p className="text-3xl font-black text-brand-chartreuse tabular-nums mb-4">
+                  {Number(torneo.precio_inscripcion || 0) === 0
+                    ? "Gratis"
+                    : `$${Number(torneo.precio_inscripcion || 0).toLocaleString("es-AR")}`}
+                </p>
+                <ul className="space-y-2.5 mb-5 text-xs text-gray-400">
+                  <li className="flex items-center gap-2">
+                    {isIndividual ? (
+                      <User className="size-3.5 text-brand-chartreuse shrink-0" />
+                    ) : (
+                      <Users className="size-3.5 text-brand-chartreuse shrink-0" />
+                    )}
+                    {isIndividual ? "Individual" : "Por dupla"}
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <ShieldCheck className="size-3.5 text-brand-chartreuse shrink-0" />
+                    {torneo.formato || "Eliminatoria"}
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CreditCard className="size-3.5 text-brand-chartreuse shrink-0" />
+                    Pago validado por admin
+                  </li>
+                </ul>
                 <button
                   onClick={handleInscripcion}
-                  disabled={inscribiendo || isDisabled}
-                  className={`w-full py-3.5 lg:py-4 rounded-xl font-bold text-base lg:text-lg transition-all flex items-center justify-center cursor-pointer active:scale-[0.99] ${btnClass}`}
+                  disabled={isDisabled}
+                  className={`w-full py-3 rounded-xl font-bold text-sm transition-all cursor-pointer ${btnClass}`}
                 >
                   {btnText}
                 </button>
-              ) : (
-                <div className="w-full bg-brand-white/5 border border-brand-white/10 text-gray-500 py-3.5 lg:py-4 rounded-xl font-bold text-center cursor-not-allowed flex flex-col items-center justify-center select-none">
-                  <span className="text-brand-white text-sm lg:text-base">
-                    Inscripciones Cerradas
-                  </span>
-                  <span className="text-[10px] lg:text-xs font-normal mt-1">
-                    El torneo se encuentra {torneo.estado?.toLowerCase()}.
-                  </span>
-                </div>
-              )}
-            </div>
+              </div>
 
-            {hasPremios && (
-              <div className="bg-brand-card border border-brand-white/5 rounded-3xl p-6 lg:p-8 shadow-xl">
-                <h3 className="text-base lg:text-lg font-bold text-brand-white mb-5 lg:mb-6">
-                  Premios
-                </h3>
-                <div className="space-y-4 lg:space-y-5">
-                  {torneo.premio_1 && (
-                    <div className="flex items-center gap-3 lg:gap-4">
-                      <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center font-black text-xs lg:text-sm border border-amber-500/20 shrink-0">
-                        1º
-                      </div>
-                      <div className="font-semibold text-gray-300 text-xs lg:text-sm">
+              {hasPremios ? (
+                <div className="rounded-2xl border border-white/8 bg-[#0f0f0f] p-5">
+                  <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    <Trophy className="size-4 text-brand-chartreuse" />
+                    Premios
+                  </h3>
+                  <div className="space-y-3">
+                    {torneo.premio_1 ? (
+                      <div className="flex items-center gap-3 text-sm text-gray-300">
+                        <span className="size-7 rounded-full bg-amber-500/15 text-amber-400 text-[11px] font-black flex items-center justify-center border border-amber-500/25">
+                          1
+                        </span>
                         {torneo.premio_1}
                       </div>
-                    </div>
-                  )}
-                  {torneo.premio_2 && (
-                    <div className="flex items-center gap-3 lg:gap-4">
-                      <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-full bg-slate-400/10 text-slate-400 flex items-center justify-center font-black text-xs lg:text-sm border border-slate-400/20 shrink-0">
-                        2º
-                      </div>
-                      <div className="font-semibold text-gray-300 text-xs lg:text-sm">
+                    ) : null}
+                    {torneo.premio_2 ? (
+                      <div className="flex items-center gap-3 text-sm text-gray-300">
+                        <span className="size-7 rounded-full bg-slate-400/15 text-slate-300 text-[11px] font-black flex items-center justify-center border border-slate-400/25">
+                          2
+                        </span>
                         {torneo.premio_2}
                       </div>
-                    </div>
-                  )}
-                  {torneo.premio_3 && (
-                    <div className="flex items-center gap-3 lg:gap-4">
-                      <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-full bg-amber-700/10 text-amber-600 flex items-center justify-center font-black text-xs lg:text-sm border border-amber-700/20 shrink-0">
-                        3º
-                      </div>
-                      <div className="font-semibold text-gray-300 text-xs lg:text-sm">
+                    ) : null}
+                    {torneo.premio_3 ? (
+                      <div className="flex items-center gap-3 text-sm text-gray-300">
+                        <span className="size-7 rounded-full bg-amber-700/15 text-amber-600 text-[11px] font-black flex items-center justify-center border border-amber-700/25">
+                          3
+                        </span>
                         {torneo.premio_3}
                       </div>
-                    </div>
-                  )}
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-          )}
+              ) : null}
+            </aside>
+          ) : null}
         </div>
       </div>
 
-      {torneo && (
+      {torneo ? (
         <InscripcionModal
           isOpen={isInscripcionOpen}
           onClose={() => {
@@ -704,7 +523,7 @@ export default function TorneoDetallePage() {
           }}
           torneo={torneo}
         />
-      )}
+      ) : null}
     </div>
   );
 }
