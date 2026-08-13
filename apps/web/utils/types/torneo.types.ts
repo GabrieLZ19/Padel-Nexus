@@ -36,6 +36,9 @@ export interface Torneo {
   hora_inicio_jornada?: string | null;
   requiere_carnet_federativo?: boolean | null;
   monto_carnet?: number | null;
+  fecha_cierre_inscripcion?: string | null;
+  validar_edad?: boolean | null;
+  reglas_arbitraje?: Record<string, unknown> | null;
   banners?: string[];
 
   // Relaciones

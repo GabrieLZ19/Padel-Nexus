@@ -19,6 +19,11 @@ import InscripcionModal from "@/components/torneos/InscripcionModal";
 import { useProfileStore } from "@/store/useProfileStore";
 import { MatchCard } from "@/components/torneos/MatchCard";
 import { TablaPosicionesZona } from "@/components/torneos/TablaPosicionesZona";
+import {
+  allChecksPassed,
+  buildChecksElegibilidadJ1,
+  isInscripcionTemporalmenteAbierta,
+} from "@/utils/inscripcionElegibilidad";
 
 export default function TorneoDetallePage() {
   const params = useParams();
@@ -137,6 +142,7 @@ export default function TorneoDetallePage() {
       router.push("/mis-inscripciones");
       return;
     }
+    // Abrir modal también si no es elegible: el checklist explica qué falta
     setIsInscripcionModalOpen(true);
   };
 
@@ -182,12 +188,19 @@ export default function TorneoDetallePage() {
   const isEnCurso = estadoBase === "en curso";
   const isFinalizado = estadoBase === "finalizado";
   const isAbierto = estadoBase === "inscripción" || estadoBase === "borrador";
+  const isCierreVencido = !isInscripcionTemporalmenteAbierta(torneo);
   const isIndividual = torneo.modalidad === "Individual";
   const hasPremios = torneo.premio_1 || torneo.premio_2 || torneo.premio_3;
 
   const cuposActuales = torneo.cupos_actuales || 0;
   const cuposMaximos = torneo.cupos_maximos || 16;
   const isLleno = cuposActuales >= cuposMaximos;
+
+  const elegibilidadChecks = profile
+    ? buildChecksElegibilidadJ1(torneo, profile)
+    : [];
+  const isElegible = profile ? allChecksPassed(elegibilidadChecks) : true;
+  const firstFailedCheck = elegibilidadChecks.find((c) => !c.passed);
 
   let btnText = "";
   let btnClass = "";
@@ -197,7 +210,7 @@ export default function TorneoDetallePage() {
     btnText = "Ver mi inscripción";
     btnClass =
       "bg-brand-white/10 text-brand-white hover:bg-brand-white/20 border border-brand-white/20";
-  } else if (!isAbierto) {
+  } else if (!isAbierto || isCierreVencido) {
     btnText = "Inscripciones Cerradas";
     btnClass =
       "bg-brand-white/5 text-gray-500 border border-brand-white/10 cursor-not-allowed opacity-80 shadow-none";
@@ -211,6 +224,19 @@ export default function TorneoDetallePage() {
     btnText = "Ingresar para inscribirte";
     btnClass =
       "bg-brand-chartreach text-brand-black hover:opacity-95 shadow-[0_0_30px_rgba(203,254,1,0.15)]";
+  } else if (!isElegible) {
+    const needsProfile =
+      firstFailedCheck?.code === "edad" ||
+      firstFailedCheck?.code === "rama" ||
+      firstFailedCheck?.actionHref === "/mi-perfil/ajustes";
+    const needsCarnet = firstFailedCheck?.code === "carnet";
+    btnText = needsCarnet
+      ? "Requiere carnet FAP"
+      : needsProfile
+        ? "Completar perfil"
+        : "No elegible — ver requisitos";
+    btnClass =
+      "bg-brand-white/10 text-brand-white hover:bg-brand-white/20 border border-brand-white/20";
   } else {
     btnText = isIndividual ? "Inscribirme" : "Inscribir mi dupla";
     btnClass =

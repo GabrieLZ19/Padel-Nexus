@@ -1,5 +1,6 @@
 import { api } from "../api";
 import { Torneo, FormTorneoState, Partido } from "../types";
+import { hydrateTorneoRestrictions } from "../inscripcionElegibilidad";
 
 export interface PaginatedTorneos {
   data: Torneo[];
@@ -42,7 +43,7 @@ export const TorneosService = {
 
   async getById(id: string): Promise<Torneo> {
     const response = await api.get<Torneo>(`/torneos/${id}`);
-    return response.data;
+    return hydrateTorneoRestrictions(response.data);
   },
 
   async create(torneoData: FormTorneoState): Promise<Torneo> {

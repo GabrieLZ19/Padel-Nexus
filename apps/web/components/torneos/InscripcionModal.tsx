@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -11,12 +11,19 @@ import {
   User,
   Calendar,
   MapPin,
+  AlertCircle,
 } from "lucide-react";
+import Link from "next/link";
 import { Torneo } from "../../utils/types";
 import { InscripcionesService } from "../../utils/services/inscripciones";
 import FeedbackModal, { FeedbackModalProps } from "../ui/FeedbackModal";
 import { useProfileStore } from "@/store/useProfileStore";
 import { useRouter } from "next/navigation";
+import {
+  allChecksPassed,
+  buildChecksElegibilidadJ1,
+  hydrateTorneoRestrictions,
+} from "@/utils/inscripcionElegibilidad";
 
 interface InscripcionModalProps {
   isOpen: boolean;
@@ -27,25 +34,29 @@ interface InscripcionModalProps {
 export default function InscripcionModal({
   isOpen,
   onClose,
-  torneo,
+  torneo: torneoRaw,
 }: InscripcionModalProps) {
   const router = useRouter();
+  const torneo = useMemo(
+    () => hydrateTorneoRestrictions(torneoRaw),
+    [torneoRaw],
+  );
   const [step, setStep] = useState<"form" | "success">("form");
   const [loading, setLoading] = useState(false);
   const [email2, setEmail2] = useState("");
   const { profile } = useProfileStore();
 
-  const userLevel = profile?.categoria_padel || "";
-  const requiredLevel = torneo.nivel || "";
-  const isLevelValid = userLevel === requiredLevel;
   const isIndividual = torneo.modalidad === "Individual";
+  const checks = useMemo(
+    () => buildChecksElegibilidadJ1(torneo, profile),
+    [torneo, profile],
+  );
+  const j1Eligible = allChecksPassed(checks);
 
-  // El nombre del jugador 1 viene del perfil — no se pide al usuario
   const jugador1Nombre = profile
     ? `${profile.apellido?.toUpperCase() ?? ""}, ${profile.nombre ?? ""}`.trim()
     : "";
 
-  // Estado para el modal de errores
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
     isOpen: false,
     title: "",
@@ -53,12 +64,11 @@ export default function InscripcionModal({
     onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
   });
 
-  // El botón queda habilitado si el nivel coincide y, en duplas, si hay email del compañero
   const canSubmit =
-    isLevelValid && (isIndividual || email2.includes("@")) && !!profile;
+    j1Eligible && (isIndividual || email2.includes("@")) && !!profile;
 
   const handleSubmit = async () => {
-    if (!profile) return;
+    if (!profile || !canSubmit) return;
 
     setLoading(true);
     try {
@@ -105,7 +115,6 @@ export default function InscripcionModal({
     onClose();
   };
 
-  // Formatear fecha del torneo
   const formatFechaTorneo = (iso?: string | null) => {
     if (!iso) return "—";
     const parts = iso.split("T")[0].split("-");
@@ -123,7 +132,7 @@ export default function InscripcionModal({
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-[#111] border border-white/10 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative"
+              className="bg-[#111] border border-white/10 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative max-h-[90vh] overflow-y-auto"
             >
               <button
                 onClick={handleClose}
@@ -134,7 +143,6 @@ export default function InscripcionModal({
 
               {step === "form" ? (
                 <div className="p-8">
-                  {/* Header */}
                   <div className="mb-7">
                     <div className="inline-flex items-center gap-2 bg-brand-chartreuse/10 text-brand-chartreuse px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 border border-brand-chartreuse/20">
                       Confirmar Inscripción
@@ -144,7 +152,6 @@ export default function InscripcionModal({
                     </h2>
                   </div>
 
-                  {/* Datos del torneo */}
                   <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6 space-y-2.5">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-400 flex items-center gap-2">
@@ -177,7 +184,55 @@ export default function InscripcionModal({
                     )}
                   </div>
 
-                  {/* Jugador 1 — sólo lectura, viene del perfil */}
+                  {/* Requisitos del torneo */}
+                  <div className="mb-5">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                      Requisitos del torneo
+                    </p>
+                    <ul className="bg-white/5 border border-white/10 rounded-2xl divide-y divide-white/5 overflow-hidden">
+                      {checks.map((check) => (
+                        <li
+                          key={check.code}
+                          className="px-4 py-3 flex items-start gap-3"
+                        >
+                          {check.passed ? (
+                            <CheckCircle2 className="size-4 text-brand-chartreuse shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertCircle className="size-4 text-red-400 shrink-0 mt-0.5" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`text-sm font-semibold ${
+                                check.passed ? "text-white" : "text-red-300"
+                              }`}
+                            >
+                              {check.label}
+                            </p>
+                            {check.message && (
+                              <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
+                                {check.message}
+                              </p>
+                            )}
+                            {check.actionHref && check.actionLabel && (
+                              <Link
+                                href={check.actionHref}
+                                className="inline-block mt-1.5 text-[11px] font-bold text-brand-chartreuse hover:underline"
+                              >
+                                {check.actionLabel}
+                              </Link>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    {!isIndividual && (
+                      <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                        Tu compañero/a también debe cumplir categoría, carnet,
+                        rama y edad. Se valida al confirmar.
+                      </p>
+                    )}
+                  </div>
+
                   <div className="mb-5">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                       <User className="size-3 text-brand-chartreuse" />
@@ -191,12 +246,11 @@ export default function InscripcionModal({
                         {jugador1Nombre || profile?.email || "—"}
                       </span>
                       <span className="ml-auto text-[10px] bg-brand-chartreuse/10 text-brand-chartreuse px-2 py-0.5 rounded-full border border-brand-chartreuse/20 font-bold uppercase">
-                        {userLevel || "Sin categoría"}
+                        {profile?.categoria_padel || "Sin categoría"}
                       </span>
                     </div>
                   </div>
 
-                  {/* Jugador 2 email — solo si es duplas */}
                   {!isIndividual && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
@@ -220,7 +274,6 @@ export default function InscripcionModal({
                     </motion.div>
                   )}
 
-                  {/* Precio */}
                   <div className="bg-brand-chartreuse/5 border border-brand-chartreuse/10 p-4 rounded-2xl flex justify-between items-center mb-5">
                     <div>
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -238,20 +291,6 @@ export default function InscripcionModal({
                     </p>
                   </div>
 
-                  {/* Alerta de nivel inválido */}
-                  {!isLevelValid && (
-                    <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl flex items-start gap-3 mb-5">
-                      <X className="size-4 text-red-500 shrink-0 mt-0.5" />
-                      <p className="text-[12px] text-red-300 leading-relaxed">
-                        Tu categoría actual{" "}
-                        <strong>({userLevel || "sin definir"})</strong> no
-                        coincide con la requerida{" "}
-                        <strong>({requiredLevel})</strong>.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Aviso pago fase 2 */}
                   <div className="flex items-start gap-3 mb-6">
                     <ShieldCheck className="size-6 text-gray-500 shrink-0 mt-0.5" />
                     <p className="text-[15px] text-gray-500 leading-relaxed">
@@ -278,7 +317,6 @@ export default function InscripcionModal({
                   </button>
                 </div>
               ) : (
-                /* ÉXITO */
                 <div className="p-10 text-center flex flex-col items-center">
                   <div className="w-20 h-20 bg-brand-chartreuse rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(203,254,1,0.3)]">
                     <CheckCircle2 className="size-10 text-[#111]" />
