@@ -2,9 +2,16 @@ import { supabaseAdmin } from "../config/supabase";
 import {
   FAP_ESTADOS_LICENCIA,
   FAP_ESTADOS_PAGO,
-  FAP_REGLAS,
 } from "../constants/fap";
 import { NotificacionService } from "./notificacion.service";
+import {
+  assertCategoria,
+  assertEdad,
+  assertInscripcionAbierta,
+  assertRama,
+  torneoExigeCarnet,
+  type PerfilElegibilidad,
+} from "../utils/inscripcionElegibilidad";
 
 interface RegistroInscripcionDTO {
   torneoId: string;
@@ -17,7 +24,10 @@ interface RegistroInscripcionDTO {
   letraPrioridad?: string;
 }
 
-function formatNombreCompleto(apellido?: string | null, nombre?: string | null): string {
+function formatNombreCompleto(
+  apellido?: string | null,
+  nombre?: string | null,
+): string {
   const ap = (apellido || "").trim();
   const nom = (nombre || "").trim();
   if (ap && nom) {
@@ -79,7 +89,6 @@ export class InscripcionService {
         "Error interno al obtener inscripciones en la base de datos.",
       );
 
-    // Evitamos el 'any' tipando temporalmente la respuesta de Supabase
     type SupabaseInscripcion = Record<string, unknown> & {
       jugador1_nombre?: string;
       perfiles?: { nombre?: string; apellido?: string };
@@ -112,14 +121,14 @@ export class InscripcionService {
       letraPrioridad,
     } = datos;
 
-    // 1. RESOLVER JUGADOR 2
-    let jugador2Id = null;
-    let perfilJugador2 = null;
+    // 1. RESOLVER JUGADOR 2 (perfil completo para elegibilidad)
+    let jugador2Id: string | null = null;
+    let perfilJugador2: PerfilElegibilidad | null = null;
 
     if (jugador2Email) {
       const { data: user2, error: user2Error } = await supabaseAdmin
         .from("perfiles")
-        .select("id, categoria_padel")
+        .select("id, categoria_padel, fecha_nacimiento, sexo, nombre")
         .eq("email", jugador2Email)
         .single();
 
@@ -132,31 +141,42 @@ export class InscripcionService {
       perfilJugador2 = user2;
     }
 
-    // 2. OBTENER DATOS DEL TORNEO (incluye flag de carnet)
+    // 2. DATOS DEL TORNEO (restricciones en una sola query)
     const { data: torneo, error: errTorneo } = await supabaseAdmin
       .from("torneos")
       .select(
-        "id, fecha, nivel, cupos_maximos, cupos_actuales, estado, reglas_arbitraje",
+        "id, fecha, fecha_cierre_inscripcion, nivel, categoria, rama, validar_edad, cupos_maximos, cupos_actuales, estado, reglas_arbitraje",
       )
       .eq("id", torneoId)
       .single();
 
     if (errTorneo || !torneo) throw new Error("Torneo no encontrado.");
 
-    const reglas =
-      torneo.reglas_arbitraje &&
-      typeof torneo.reglas_arbitraje === "object" &&
-      !Array.isArray(torneo.reglas_arbitraje)
-        ? (torneo.reglas_arbitraje as Record<string, unknown>)
-        : {};
-    const exigeCarnet = Boolean(reglas.requiere_carnet_federativo);
+    // 3. INSCRIPCIÓN ABIERTA
+    assertInscripcionAbierta(torneo);
 
-    // 3. VALIDAR LICENCIA FAP — solo si el torneo exige carnet federativo
-    if (exigeCarnet) {
-      await InscripcionService.assertLicenciaFapActiva(
-        jugador1Id,
-        "Jugador 1",
-      );
+    // 4. PERFILES
+    const { data: perfilJ1, error: errJ1 } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, rol, categoria_padel, nombre, fecha_nacimiento, sexo")
+      .eq("id", jugador1Id)
+      .single();
+
+    if (errJ1 || !perfilJ1) {
+      throw new Error("Perfil del Jugador 1 no encontrado.");
+    }
+
+    const { data: solicitante } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, rol, categoria_padel, nombre, fecha_nacimiento, sexo")
+      .eq("id", usuarioSolicitanteId)
+      .single();
+
+    if (!solicitante) throw new Error("Perfil de jugador no encontrado.");
+
+    // 5. CARNET FAP — solo si el torneo lo exige
+    if (torneoExigeCarnet(torneo)) {
+      await InscripcionService.assertLicenciaFapActiva(jugador1Id, "Jugador 1");
       if (jugador2Id) {
         await InscripcionService.assertLicenciaFapActiva(
           jugador2Id,
@@ -165,67 +185,18 @@ export class InscripcionService {
       }
     }
 
-    // 4. REGLA FAP: CIERRE 7 DÍAS ANTES
-    if (!torneo.fecha)
-      throw new Error("El torneo no tiene una fecha definida.");
-    const fechaTorneo = new Date(torneo.fecha);
-    fechaTorneo.setHours(0, 0, 0, 0);
-    const fechaActual = new Date();
-    fechaActual.setHours(0, 0, 0, 0);
+    // 6. CATEGORÍA / RAMA / EDAD — J1 y J2
+    assertCategoria(perfilJ1, torneo.nivel, "Jugador 1");
+    assertRama(perfilJ1, torneo.rama, "Jugador 1");
+    assertEdad(perfilJ1, torneo, "Jugador 1");
 
-    if (
-      Math.ceil(
-        (fechaTorneo.getTime() - fechaActual.getTime()) / (1000 * 60 * 60 * 24),
-      ) < FAP_REGLAS.DIAS_CIERRE_INSCRIPCION
-    ) {
-      throw new Error(
-        "Las inscripciones cerraron automáticamente (7 días antes del inicio).",
-      );
+    if (perfilJugador2) {
+      assertCategoria(perfilJugador2, torneo.nivel, "Jugador 2");
+      assertRama(perfilJugador2, torneo.rama, "Jugador 2");
+      assertEdad(perfilJugador2, torneo, "Jugador 2");
     }
 
-    // 5. REGLAS ARQUITECTURA NACIONAL Y VALIDACIÓN DE EDAD/SEXO
-    const { data: solicitante } = await supabaseAdmin
-      .from("perfiles")
-      .select("rol, categoria_padel, nombre, fecha_nacimiento, sexo")
-      .eq("id", usuarioSolicitanteId)
-      .single();
-
-    if (!solicitante) throw new Error("Perfil de jugador no encontrado.");
-
-    // Validar edad si el torneo requiere validación o la categoría es Veteranos/Ladies
-    const { data: torneoDetalle } = await supabaseAdmin
-      .from("torneos")
-      .select("validar_edad, categoria, rama")
-      .eq("id", torneoId)
-      .single();
-
-    if (torneoDetalle) {
-      const catName = torneoDetalle.categoria || "";
-      const requiereEdad = torneoDetalle.validar_edad || /\+(30|40|50|60)|veteranos|ladies/i.test(catName);
-
-      if (requiereEdad) {
-        if (!solicitante.fecha_nacimiento) {
-          throw new Error(
-            "Completá tu fecha de nacimiento en tu perfil antes de inscribirte a esta categoría restringida por edad.",
-          );
-        }
-      }
-
-      // Validar rama si la categoría no es Mixta
-      if (torneoDetalle.rama && torneoDetalle.rama !== "Mixta") {
-        if (solicitante.sexo && solicitante.sexo !== "otro") {
-          const ramaEsperada = torneoDetalle.rama.toLowerCase();
-          const sexoJugador = solicitante.sexo.toLowerCase();
-          if (ramaEsperada === "masculina" && sexoJugador === "femenino") {
-            throw new Error("No podés inscribirte a un torneo de rama Masculina.");
-          }
-          if (ramaEsperada === "femenina" && sexoJugador === "masculino") {
-            throw new Error("No podés inscribirte a un torneo de rama Femenina.");
-          }
-        }
-      }
-    }
-
+    // 7. REGLA NACIONAL (legacy sobre nivel)
     if (torneo.nivel?.toLowerCase() === "nacional") {
       if (
         solicitante.rol !== "admin_provincial" &&
@@ -235,27 +206,14 @@ export class InscripcionService {
           "Seguridad: Las inscripciones nacionales solo pueden ser gestionadas por un Administrador.",
         );
       }
-      if (!letraPrioridad)
+      if (!letraPrioridad) {
         throw new Error(
           "La letra de prioridad es obligatoria en torneos Nacionales.",
         );
+      }
     }
 
-    // 6. VALIDACIÓN CATEGORÍAS (Jugador 1 y Jugador 2)
-    // Nota: El torneo requiere un "nivel" o "categoria" (ej: '7ª'). Lo validamos contra perfil.categoria_padel
-    if (solicitante.categoria_padel !== torneo.nivel) {
-      throw new Error(
-        `Tu categoría (${solicitante.categoria_padel}) no coincide con la requerida (${torneo.nivel}).`,
-      );
-    }
-
-    if (perfilJugador2 && perfilJugador2.categoria_padel !== torneo.nivel) {
-      throw new Error(
-        `El Jugador 2 tiene categoría (${perfilJugador2.categoria_padel}) y no coincide con el torneo (${torneo.nivel}).`,
-      );
-    }
-
-    // 7. BLOQUEO POR DUPLICIDAD
+    // 8. DUPLICADOS
     const idsAValidar = jugador2Id
       ? `usuario_id.in.("${jugador1Id}","${jugador2Id}"),usuario2_id.in.("${jugador1Id}","${jugador2Id}")`
       : `usuario_id.eq."${jugador1Id}",usuario2_id.eq."${jugador1Id}"`;
@@ -271,12 +229,12 @@ export class InscripcionService {
       );
     }
 
-    // 8. CUPOS
+    // 9. CUPOS
     if ((torneo.cupos_actuales || 0) >= (torneo.cupos_maximos || 32)) {
       throw new Error("El torneo ha alcanzado el límite máximo de cupos.");
     }
 
-    // 9. INSERCIÓN
+    // 10. INSERCIÓN
     const { data: inscripcionInsertada, error: errInsert } = await supabaseAdmin
       .from("inscripciones")
       .insert([
@@ -295,30 +253,35 @@ export class InscripcionService {
       .select()
       .single();
 
-    if (errInsert)
+    if (errInsert) {
       throw new Error(
         `Error al registrar la inscripción: ${errInsert.message}`,
       );
+    }
 
-    // 10. ATOMICIDAD CUPOS
+    // 11. CUPOS
     await supabaseAdmin
       .from("torneos")
       .update({ cupos_actuales: (torneo.cupos_actuales || 0) + 1 })
       .eq("id", torneoId);
 
-    // 11. NOTIFICAR A LOS ADMINISTRADORES
-    const isPareja = jugador2Nombre && jugador2Nombre.trim() !== "" && jugador2Nombre !== "-";
+    // 12. NOTIFICAR ADMINS
+    const isPareja =
+      Boolean(jugador2Nombre) &&
+      jugador2Nombre!.trim() !== "" &&
+      jugador2Nombre !== "-";
     const jugadoresTexto = isPareja
       ? `${jugador1Nombre || solicitante.nombre} y ${jugador2Nombre}`
       : `${jugador1Nombre || solicitante.nombre}`;
     const verbo = isPareja ? "se han inscripto" : "se ha inscripto";
-    
-    // Fire and forget (no await to avoid blocking response)
+
     NotificacionService.notificarAdmins({
       titulo: "Nueva Inscripción",
       mensaje: `${jugadoresTexto} ${verbo} en el torneo.`,
       tipo: "info",
-    }).catch(err => console.error("Error al notificar admins de nueva inscripcion:", err));
+    }).catch((err) =>
+      console.error("Error al notificar admins de nueva inscripcion:", err),
+    );
 
     return inscripcionInsertada;
   }
@@ -337,7 +300,6 @@ export class InscripcionService {
   }
 
   static async cancelarInscripcion(id: string) {
-    // 1. Obtener ID del torneo
     const { data: inscripcion, error: fetchError } = await supabaseAdmin
       .from("inscripciones")
       .select("torneo_id")
@@ -347,7 +309,6 @@ export class InscripcionService {
     if (fetchError || !inscripcion)
       throw new Error("Inscripción no encontrada.");
 
-    // 2. Borrar inscripción
     const { error: delError } = await supabaseAdmin
       .from("inscripciones")
       .delete()
@@ -355,7 +316,6 @@ export class InscripcionService {
 
     if (delError) throw new Error("Error interno al eliminar la inscripción.");
 
-    // 3. Liberar cupo
     const { data: torneo } = await supabaseAdmin
       .from("torneos")
       .select("cupos_actuales")
@@ -370,6 +330,11 @@ export class InscripcionService {
     }
   }
 
+  /**
+   * Inscripción manual admin.
+   * A.1: mantiene skips de categoría/edad/rama/cierre (solo carnet + cupos + duplicados).
+   * TODO A.2: aplicar mismas reglas por defecto + override con motivo auditable.
+   */
   static async registrarInscripcionManual(datos: {
     torneoId: string;
     jugador1Identificador: string;
@@ -387,11 +352,12 @@ export class InscripcionService {
       adminId,
     } = datos;
 
-    // 1. Resolver jugador 1 por DNI o Email
     const { data: j1, error: j1Error } = await supabaseAdmin
       .from("perfiles")
       .select("id, nombre, apellido")
-      .or(`dni.eq."${jugador1Identificador}",email.eq."${jugador1Identificador}"`)
+      .or(
+        `dni.eq."${jugador1Identificador}",email.eq."${jugador1Identificador}"`,
+      )
       .maybeSingle();
 
     if (j1Error || !j1) {
@@ -400,8 +366,8 @@ export class InscripcionService {
       );
     }
 
-    // 2. Resolver jugador 2 por DNI o Email (si aplica)
-    let j2 = null;
+    let j2: { id: string; nombre: string | null; apellido: string | null } | null =
+      null;
     if (
       jugador2Identificador &&
       jugador2Identificador.trim() !== "" &&
@@ -410,7 +376,9 @@ export class InscripcionService {
       const { data: resolvedJ2, error: j2Error } = await supabaseAdmin
         .from("perfiles")
         .select("id, nombre, apellido")
-        .or(`dni.eq."${jugador2Identificador}",email.eq."${jugador2Identificador}"`)
+        .or(
+          `dni.eq."${jugador2Identificador}",email.eq."${jugador2Identificador}"`,
+        )
         .maybeSingle();
 
       if (j2Error || !resolvedJ2) {
@@ -421,7 +389,6 @@ export class InscripcionService {
       j2 = resolvedJ2;
     }
 
-    // 3. Obtener datos del torneo (incluye flag de carnet del Paso 3)
     const { data: torneo, error: errTorneo } = await supabaseAdmin
       .from("torneos")
       .select("id, cupos_maximos, cupos_actuales, estado, reglas_arbitraje")
@@ -430,22 +397,13 @@ export class InscripcionService {
 
     if (errTorneo || !torneo) throw new Error("Torneo no encontrado.");
 
-    const reglas =
-      torneo.reglas_arbitraje &&
-      typeof torneo.reglas_arbitraje === "object" &&
-      !Array.isArray(torneo.reglas_arbitraje)
-        ? (torneo.reglas_arbitraje as Record<string, unknown>)
-        : {};
-    const exigeCarnet = Boolean(reglas.requiere_carnet_federativo);
-
-    if (exigeCarnet) {
+    if (torneoExigeCarnet(torneo)) {
       await InscripcionService.assertLicenciaFapActiva(j1.id, "Jugador 1");
       if (j2) {
         await InscripcionService.assertLicenciaFapActiva(j2.id, "Jugador 2");
       }
     }
 
-    // 4. Validar que no estén inscriptos ya
     const idsAValidar = j2
       ? `usuario_id.in.("${j1.id}","${j2.id}"),usuario2_id.in.("${j1.id}","${j2.id}")`
       : `usuario_id.eq."${j1.id}",usuario2_id.eq."${j1.id}"`;
@@ -461,7 +419,6 @@ export class InscripcionService {
       );
     }
 
-    // 5. Cupos
     if ((torneo.cupos_actuales || 0) >= (torneo.cupos_maximos || 32)) {
       throw new Error("El torneo ha alcanzado el límite máximo de cupos.");
     }
@@ -470,11 +427,8 @@ export class InscripcionService {
       ? FAP_ESTADOS_PAGO.CONFIRMADO
       : FAP_ESTADOS_PAGO.PENDIENTE;
     const j1Nombre = formatNombreCompleto(j1.apellido, j1.nombre);
-    const j2Nombre = j2
-      ? formatNombreCompleto(j2.apellido, j2.nombre)
-      : "-";
+    const j2Nombre = j2 ? formatNombreCompleto(j2.apellido, j2.nombre) : "-";
 
-    // 6. Insertar inscripción
     const { data: inscripcionInsertada, error: errInsert } = await supabaseAdmin
       .from("inscripciones")
       .insert([
@@ -498,13 +452,11 @@ export class InscripcionService {
       );
     }
 
-    // 7. Actualizar cupo
     await supabaseAdmin
       .from("torneos")
       .update({ cupos_actuales: (torneo.cupos_actuales || 0) + 1 })
       .eq("id", torneoId);
 
-    // 8. Registrar log de auditoría
     await supabaseAdmin.from("logs_auditoria").insert({
       usuario_id_admin: adminId,
       accion: "PAGO_MANUAL_INSCRIPCION_MANUAL",
