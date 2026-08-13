@@ -6,13 +6,13 @@ import {
   X,
   Users,
   CreditCard,
-  ShieldCheck,
   CheckCircle2,
   User,
   Calendar,
   MapPin,
   AlertCircle,
   Loader2,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { Torneo } from "../../utils/types";
@@ -35,6 +35,40 @@ interface InscripcionModalProps {
   torneo: Torneo;
 }
 
+function CheckRow({ check }: { check: CheckElegibilidadApi & { actionHref?: string; actionLabel?: string } }) {
+  return (
+    <li className="flex items-start gap-2.5 py-2">
+      {check.passed ? (
+        <CheckCircle2 className="size-3.5 text-brand-chartreuse shrink-0 mt-0.5" />
+      ) : (
+        <AlertCircle className="size-3.5 text-red-400 shrink-0 mt-0.5" />
+      )}
+      <div className="min-w-0 flex-1">
+        <p
+          className={`text-[13px] font-semibold leading-snug ${
+            check.passed ? "text-white/90" : "text-red-300"
+          }`}
+        >
+          {check.label}
+        </p>
+        {check.message && (
+          <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+            {check.message}
+          </p>
+        )}
+        {"actionHref" in check && check.actionHref && check.actionLabel ? (
+          <Link
+            href={check.actionHref}
+            className="inline-block mt-1 text-[11px] font-bold text-brand-chartreuse hover:underline"
+          >
+            {check.actionLabel}
+          </Link>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
 export default function InscripcionModal({
   isOpen,
   onClose,
@@ -51,6 +85,7 @@ export default function InscripcionModal({
   const [checkingJ2, setCheckingJ2] = useState(false);
   const [jugador2Nombre, setJugador2Nombre] = useState<string | null>(null);
   const [checksJ2, setChecksJ2] = useState<CheckElegibilidadApi[]>([]);
+  const [showAllChecks, setShowAllChecks] = useState(false);
   const { profile } = useProfileStore();
 
   const isIndividual = torneo.modalidad === "Individual";
@@ -58,6 +93,18 @@ export default function InscripcionModal({
     () => buildChecksElegibilidadJ1(torneo, profile),
     [torneo, profile],
   );
+  const failedChecks = checks.filter((c) => !c.passed);
+  const passedCount = checks.filter((c) => c.passed).length;
+  const visibleChecks = showAllChecks
+    ? checks
+    : failedChecks.length > 0
+      ? failedChecks
+      : checks.slice(0, 2);
+  const canToggleChecks =
+    failedChecks.length > 0
+      ? checks.length > failedChecks.length
+      : checks.length > 2;
+
   const j1Eligible = allChecksPassed(checks);
   const j2Eligible =
     isIndividual ||
@@ -170,6 +217,7 @@ export default function InscripcionModal({
     setEmail2("");
     setChecksJ2([]);
     setJugador2Nombre(null);
+    setShowAllChecks(false);
     onClose();
   };
 
@@ -185,250 +233,212 @@ export default function InscripcionModal({
     <>
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/5 backdrop-blur-sm">
+          <div className="fixed inset-0 z-40 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-[2px]">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-[#111] border border-white/10 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative max-h-[90vh] overflow-y-auto"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 16 }}
+              transition={{ type: "spring", duration: 0.45, bounce: 0.2 }}
+              className="bg-[#121212] border border-white/10 w-full sm:max-w-[420px] rounded-t-3xl sm:rounded-3xl shadow-2xl relative max-h-[92vh] flex flex-col overflow-hidden"
             >
               <button
                 onClick={handleClose}
-                className="absolute top-5 right-5 text-gray-500 hover:text-white transition-colors z-10 p-1.5 rounded-full hover:bg-white/5 cursor-pointer"
+                className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors z-10 p-1.5 rounded-full hover:bg-white/5 cursor-pointer"
+                aria-label="Cerrar"
               >
                 <X className="size-5" />
               </button>
 
               {step === "form" ? (
-                <div className="p-8">
-                  <div className="mb-7">
-                    <div className="inline-flex items-center gap-2 bg-brand-chartreuse/10 text-brand-chartreuse px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 border border-brand-chartreuse/20">
-                      Confirmar Inscripción
-                    </div>
-                    <h2 className="text-2xl font-bold text-white tracking-tight leading-tight">
+                <>
+                  <div className="px-6 pt-6 pb-4 border-b border-white/5 shrink-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-chartreuse mb-1.5">
+                      Confirmar inscripción
+                    </p>
+                    <h2 className="text-xl font-bold text-white tracking-tight leading-snug pr-8">
                       {torneo.nombre}
                     </h2>
-                  </div>
-
-                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6 space-y-2.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400 flex items-center gap-2">
-                        <Calendar className="size-3.5 text-brand-chartreuse" />
-                        Fecha
-                      </span>
-                      <span className="text-white font-semibold">
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/8 px-2 py-1 text-[11px] text-gray-300">
+                        <Calendar className="size-3 text-brand-chartreuse/80" />
                         {formatFechaTorneo(torneo.fecha)}
                       </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400 flex items-center gap-2">
-                        <Users className="size-3.5 text-brand-chartreuse" />
-                        Modalidad
-                      </span>
-                      <span className="text-white font-semibold">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/8 px-2 py-1 text-[11px] text-gray-300">
+                        <Users className="size-3 text-brand-chartreuse/80" />
                         {torneo.modalidad}
                       </span>
+                      {(torneo.lugar || torneo.clubes?.nombre) && (
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/8 px-2 py-1 text-[11px] text-gray-300 max-w-full">
+                          <MapPin className="size-3 text-brand-chartreuse/80 shrink-0" />
+                          <span className="truncate">
+                            {torneo.lugar || torneo.clubes?.nombre}
+                          </span>
+                        </span>
+                      )}
                     </div>
-                    {(torneo.lugar || torneo.clubes?.nombre) && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-400 flex items-center gap-2">
-                          <MapPin className="size-3.5 text-brand-chartreuse" />
-                          Lugar
-                        </span>
-                        <span className="text-white font-semibold text-right">
-                          {torneo.lugar || torneo.clubes?.nombre}
-                        </span>
-                      </div>
-                    )}
                   </div>
 
-                  <div className="mb-5">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-                      Requisitos (vos)
-                    </p>
-                    <ul className="bg-white/5 border border-white/10 rounded-2xl divide-y divide-white/5 overflow-hidden">
-                      {checks.map((check) => (
-                        <li
-                          key={check.code}
-                          className="px-4 py-3 flex items-start gap-3"
+                  <div className="px-6 py-4 overflow-y-auto flex-1 space-y-4">
+                    {/* Elegibilidad compacta */}
+                    <section>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                          Tu elegibilidad
+                        </p>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            j1Eligible
+                              ? "bg-brand-chartreuse/15 text-brand-chartreuse"
+                              : "bg-red-500/15 text-red-300"
+                          }`}
                         >
-                          {check.passed ? (
-                            <CheckCircle2 className="size-4 text-brand-chartreuse shrink-0 mt-0.5" />
-                          ) : (
-                            <AlertCircle className="size-4 text-red-400 shrink-0 mt-0.5" />
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p
-                              className={`text-sm font-semibold ${
-                                check.passed ? "text-white" : "text-red-300"
-                              }`}
-                            >
-                              {check.label}
-                            </p>
-                            {check.message && (
-                              <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
-                                {check.message}
-                              </p>
-                            )}
-                            {check.actionHref && check.actionLabel && (
-                              <Link
-                                href={check.actionHref}
-                                className="inline-block mt-1.5 text-[11px] font-bold text-brand-chartreuse hover:underline"
-                              >
-                                {check.actionLabel}
-                              </Link>
-                            )}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="mb-5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                      <User className="size-3 text-brand-chartreuse" />
-                      {isIndividual ? "Jugador" : "Jugador 1 (vos)"}
-                    </label>
-                    <div className="w-full bg-white/5 border border-white/10 px-4 py-3.5 rounded-2xl text-gray-300 text-sm flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-full bg-brand-chartreuse/10 border border-brand-chartreuse/20 flex items-center justify-center shrink-0">
-                        <User className="size-3.5 text-brand-chartreuse" />
+                          {passedCount}/{checks.length} OK
+                        </span>
                       </div>
-                      <span className="font-semibold text-white">
-                        {jugador1Nombre || profile?.email || "—"}
-                      </span>
-                      <span className="ml-auto text-[10px] bg-brand-chartreuse/10 text-brand-chartreuse px-2 py-0.5 rounded-full border border-brand-chartreuse/20 font-bold uppercase">
-                        {profile?.categoria_padel || "Sin categoría"}
-                      </span>
-                    </div>
+
+                      <ul className="rounded-xl border border-white/8 bg-white/[0.02] px-3 divide-y divide-white/5">
+                        {visibleChecks.map((check) => (
+                          <CheckRow key={check.code} check={check} />
+                        ))}
+                      </ul>
+
+                      {canToggleChecks && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAllChecks((v) => !v)}
+                          className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-gray-400 hover:text-white cursor-pointer"
+                        >
+                          <ChevronDown
+                            className={`size-3.5 transition-transform ${
+                              showAllChecks ? "rotate-180" : ""
+                            }`}
+                          />
+                          {showAllChecks
+                            ? "Ver menos"
+                            : `Ver todos los requisitos (${checks.length})`}
+                        </button>
+                      )}
+                    </section>
+
+                    {/* Jugadores */}
+                    <section className="space-y-3">
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                          {isIndividual ? "Jugador" : "Jugador 1"}
+                        </p>
+                        <div className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2.5">
+                          <div className="size-8 rounded-full bg-brand-chartreuse/10 border border-brand-chartreuse/25 flex items-center justify-center shrink-0">
+                            <User className="size-3.5 text-brand-chartreuse" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-white truncate">
+                              {jugador1Nombre || profile?.email || "—"}
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-md shrink-0">
+                            {profile?.categoria_padel || "S/C"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {!isIndividual && (
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                            Compañero/a
+                          </p>
+                          <input
+                            type="email"
+                            placeholder="email@ejemplo.com"
+                            className="w-full bg-white/[0.03] border border-white/10 px-3.5 py-2.5 rounded-xl text-white text-sm focus:outline-none focus:border-brand-chartreuse/45 transition-colors placeholder:text-gray-600"
+                            value={email2}
+                            onChange={(e) => setEmail2(e.target.value)}
+                          />
+                          {checkingJ2 && (
+                            <p className="text-[11px] text-gray-500 mt-1.5 flex items-center gap-1.5">
+                              <Loader2 className="size-3 animate-spin" />
+                              Verificando…
+                            </p>
+                          )}
+                          {!checkingJ2 && jugador2Nombre && (
+                            <p className="text-[12px] text-brand-chartreuse mt-1.5 font-semibold">
+                              {jugador2Nombre}
+                            </p>
+                          )}
+                          {!checkingJ2 &&
+                            checksJ2.some((c) => !c.passed) && (
+                              <ul className="mt-2 rounded-xl border border-red-500/20 bg-red-500/5 px-3 divide-y divide-red-500/10">
+                                {checksJ2
+                                  .filter((c) => !c.passed)
+                                  .map((check) => (
+                                    <CheckRow
+                                      key={`${check.code}-${check.label}`}
+                                      check={check}
+                                    />
+                                  ))}
+                              </ul>
+                            )}
+                        </div>
+                      )}
+                    </section>
                   </div>
 
-                  {!isIndividual && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      className="mb-5"
+                  {/* Footer sticky */}
+                  <div className="px-6 py-4 border-t border-white/8 bg-[#0e0e0e] shrink-0 space-y-3">
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                          Total
+                        </p>
+                        <p className="text-2xl font-black text-brand-chartreuse tabular-nums leading-none mt-0.5">
+                          $
+                          {Number(torneo.precio_inscripcion).toLocaleString(
+                            "es-AR",
+                          )}
+                        </p>
+                      </div>
+                      <p className="text-[10px] text-gray-500 text-right max-w-[9.5rem] leading-snug">
+                        El admin valida el pago después.
+                      </p>
+                    </div>
+                    <button
+                      disabled={!canSubmit || loading}
+                      onClick={handleSubmit}
+                      className="w-full bg-brand-chartreuse disabled:opacity-35 disabled:grayscale hover:bg-[#b3e600] text-[#111] py-3.5 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                        <Users className="size-3 text-brand-chartreuse" />
-                        Email de tu compañero/a
-                      </label>
-                      <input
-                        type="email"
-                        placeholder="compañero@email.com"
-                        className="w-full bg-white/5 border border-white/10 px-4 py-3.5 rounded-2xl text-white text-sm focus:outline-none focus:border-brand-chartreuse/50 transition-all placeholder:text-gray-500"
-                        value={email2}
-                        onChange={(e) => setEmail2(e.target.value)}
-                      />
-                      {checkingJ2 && (
-                        <p className="text-[11px] text-gray-500 mt-1.5 flex items-center gap-1.5">
-                          <Loader2 className="size-3 animate-spin" />
-                          Verificando compañero…
-                        </p>
+                      {loading ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="size-4 animate-spin" />
+                          Procesando…
+                        </span>
+                      ) : (
+                        <>
+                          Confirmar inscripción
+                          <CreditCard className="size-4" />
+                        </>
                       )}
-                      {!checkingJ2 && jugador2Nombre && (
-                        <p className="text-[11px] text-brand-chartreuse mt-1.5 font-semibold">
-                          Compañero: {jugador2Nombre}
-                        </p>
-                      )}
-                      {!checkingJ2 && checksJ2.length > 0 && (
-                        <ul className="mt-3 bg-white/5 border border-white/10 rounded-2xl divide-y divide-white/5 overflow-hidden">
-                          {checksJ2.map((check) => (
-                            <li
-                              key={`${check.code}-${check.label}`}
-                              className="px-4 py-2.5 flex items-start gap-3"
-                            >
-                              {check.passed ? (
-                                <CheckCircle2 className="size-3.5 text-brand-chartreuse shrink-0 mt-0.5" />
-                              ) : (
-                                <AlertCircle className="size-3.5 text-red-400 shrink-0 mt-0.5" />
-                              )}
-                              <div>
-                                <p
-                                  className={`text-xs font-semibold ${
-                                    check.passed ? "text-white" : "text-red-300"
-                                  }`}
-                                >
-                                  {check.label}
-                                </p>
-                                {check.message && (
-                                  <p className="text-[10px] text-gray-500 mt-0.5">
-                                    {check.message}
-                                  </p>
-                                )}
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </motion.div>
-                  )}
-
-                  <div className="bg-brand-chartreuse/5 border border-brand-chartreuse/10 p-4 rounded-2xl flex justify-between items-center mb-5">
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                        Total a pagar
-                      </p>
-                      <p className="text-2xl font-black text-brand-chartreuse">
-                        $
-                        {Number(torneo.precio_inscripcion).toLocaleString(
-                          "es-AR",
-                        )}
-                      </p>
-                    </div>
-                    <p className="text-[11px] text-gray-500 text-right max-w-[140px] leading-relaxed">
-                      El pago se valida manualmente por el administrador.
-                    </p>
+                    </button>
                   </div>
-
-                  <div className="flex items-start gap-3 mb-6">
-                    <ShieldCheck className="size-6 text-gray-500 shrink-0 mt-0.5" />
-                    <p className="text-[15px] text-gray-500 leading-relaxed">
-                      Al inscribirte reservás tu lugar.
-                    </p>
-                  </div>
-
-                  <button
-                    disabled={!canSubmit || loading}
-                    onClick={handleSubmit}
-                    className="w-full bg-brand-chartreuse disabled:opacity-30 disabled:grayscale hover:bg-[#b3e600] text-[#111] py-4 rounded-2xl font-black text-base transition-all shadow-[0_0_30px_rgba(203,254,1,0.15)] flex items-center justify-center gap-3 cursor-pointer"
-                  >
-                    {loading ? (
-                      <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                        Procesando...
-                      </span>
-                    ) : (
-                      <>
-                        Confirmar inscripción
-                        <CreditCard className="size-5" />
-                      </>
-                    )}
-                  </button>
-                </div>
+                </>
               ) : (
-                <div className="p-10 text-center flex flex-col items-center">
-                  <div className="w-20 h-20 bg-brand-chartreuse rounded-full flex items-center justify-center mb-6 shadow-[0_0_40px_rgba(203,254,1,0.3)]">
-                    <CheckCircle2 className="size-10 text-[#111]" />
+                <div className="p-8 text-center flex flex-col items-center">
+                  <div className="w-16 h-16 bg-brand-chartreuse rounded-full flex items-center justify-center mb-5 shadow-[0_0_32px_rgba(203,254,1,0.25)]">
+                    <CheckCircle2 className="size-8 text-[#111]" />
                   </div>
-                  <h2 className="text-3xl font-black text-white mb-3">
+                  <h2 className="text-2xl font-black text-white mb-2">
                     ¡Inscripción enviada!
                   </h2>
-                  <p className="text-gray-400 text-sm leading-relaxed mb-2">
+                  <p className="text-gray-400 text-sm leading-relaxed mb-6">
                     Tu solicitud para{" "}
                     <span className="text-white font-semibold">
                       {torneo.nombre}
                     </span>{" "}
-                    fue recibida con éxito.
-                  </p>
-                  <p className="text-gray-500 text-xs leading-relaxed mb-8">
-                    El administrador revisará los datos y confirmará tu lugar.
-                    Recibirás una notificación cuando tu pago sea validado.
+                    fue recibida. Te avisamos cuando confirmen el pago.
                   </p>
                   <button
                     onClick={handleClose}
-                    className="w-full bg-white/5 hover:bg-white/10 text-white py-4 rounded-2xl font-bold transition-all cursor-pointer"
+                    className="w-full bg-white/5 hover:bg-white/10 text-white py-3.5 rounded-xl font-bold transition-all cursor-pointer"
                   >
-                    Entendido, volver
+                    Entendido
                   </button>
                 </div>
               )}
