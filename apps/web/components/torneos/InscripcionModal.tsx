@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -12,10 +12,14 @@ import {
   Calendar,
   MapPin,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { Torneo } from "../../utils/types";
-import { InscripcionesService } from "../../utils/services/inscripciones";
+import {
+  CheckElegibilidadApi,
+  InscripcionesService,
+} from "../../utils/services/inscripciones";
 import FeedbackModal, { FeedbackModalProps } from "../ui/FeedbackModal";
 import { useProfileStore } from "@/store/useProfileStore";
 import { useRouter } from "next/navigation";
@@ -44,6 +48,9 @@ export default function InscripcionModal({
   const [step, setStep] = useState<"form" | "success">("form");
   const [loading, setLoading] = useState(false);
   const [email2, setEmail2] = useState("");
+  const [checkingJ2, setCheckingJ2] = useState(false);
+  const [jugador2Nombre, setJugador2Nombre] = useState<string | null>(null);
+  const [checksJ2, setChecksJ2] = useState<CheckElegibilidadApi[]>([]);
   const { profile } = useProfileStore();
 
   const isIndividual = torneo.modalidad === "Individual";
@@ -52,6 +59,12 @@ export default function InscripcionModal({
     [torneo, profile],
   );
   const j1Eligible = allChecksPassed(checks);
+  const j2Eligible =
+    isIndividual ||
+    (email2.includes("@") &&
+      !checkingJ2 &&
+      checksJ2.length > 0 &&
+      checksJ2.every((c) => c.passed));
 
   const jugador1Nombre = profile
     ? `${profile.apellido?.toUpperCase() ?? ""}, ${profile.nombre ?? ""}`.trim()
@@ -64,8 +77,51 @@ export default function InscripcionModal({
     onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
   });
 
+  useEffect(() => {
+    if (!isOpen || isIndividual || !email2.includes("@")) {
+      setChecksJ2([]);
+      setJugador2Nombre(null);
+      setCheckingJ2(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setCheckingJ2(true);
+      try {
+        const result = await InscripcionesService.chequearElegibilidad({
+          torneo_id: torneo.id,
+          usuario2_email: email2.trim(),
+        });
+        if (cancelled) return;
+        setJugador2Nombre(result.jugador2?.nombre || null);
+        setChecksJ2(result.checks_j2 || []);
+      } catch {
+        if (cancelled) return;
+        setJugador2Nombre(null);
+        setChecksJ2([
+          {
+            code: "lookup",
+            label: "Jugador 2",
+            passed: false,
+            message: "No se pudo verificar al compañero.",
+          },
+        ]);
+      } finally {
+        if (!cancelled) setCheckingJ2(false);
+      }
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [email2, isIndividual, isOpen, torneo.id]);
+
   const canSubmit =
-    j1Eligible && (isIndividual || email2.includes("@")) && !!profile;
+    j1Eligible &&
+    !!profile &&
+    (isIndividual || (email2.includes("@") && j2Eligible));
 
   const handleSubmit = async () => {
     if (!profile || !canSubmit) return;
@@ -77,7 +133,7 @@ export default function InscripcionModal({
         usuario_id: profile.id,
         usuario2_email: isIndividual ? null : email2,
         jugador1_nombre: jugador1Nombre,
-        jugador2_nombre: isIndividual ? "-" : "",
+        jugador2_nombre: isIndividual ? "-" : jugador2Nombre || "",
         monto: Number(torneo.precio_inscripcion),
       });
 
@@ -112,6 +168,8 @@ export default function InscripcionModal({
   const handleClose = () => {
     setStep("form");
     setEmail2("");
+    setChecksJ2([]);
+    setJugador2Nombre(null);
     onClose();
   };
 
@@ -184,10 +242,9 @@ export default function InscripcionModal({
                     )}
                   </div>
 
-                  {/* Requisitos del torneo */}
                   <div className="mb-5">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-                      Requisitos del torneo
+                      Requisitos (vos)
                     </p>
                     <ul className="bg-white/5 border border-white/10 rounded-2xl divide-y divide-white/5 overflow-hidden">
                       {checks.map((check) => (
@@ -225,12 +282,6 @@ export default function InscripcionModal({
                         </li>
                       ))}
                     </ul>
-                    {!isIndividual && (
-                      <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
-                        Tu compañero/a también debe cumplir categoría, carnet,
-                        rama y edad. Se valida al confirmar.
-                      </p>
-                    )}
                   </div>
 
                   <div className="mb-5">
@@ -268,9 +319,47 @@ export default function InscripcionModal({
                         value={email2}
                         onChange={(e) => setEmail2(e.target.value)}
                       />
-                      <p className="text-[11px] text-gray-500 mt-1.5">
-                        El compañero debe estar registrado en Padel Nexus.
-                      </p>
+                      {checkingJ2 && (
+                        <p className="text-[11px] text-gray-500 mt-1.5 flex items-center gap-1.5">
+                          <Loader2 className="size-3 animate-spin" />
+                          Verificando compañero…
+                        </p>
+                      )}
+                      {!checkingJ2 && jugador2Nombre && (
+                        <p className="text-[11px] text-brand-chartreuse mt-1.5 font-semibold">
+                          Compañero: {jugador2Nombre}
+                        </p>
+                      )}
+                      {!checkingJ2 && checksJ2.length > 0 && (
+                        <ul className="mt-3 bg-white/5 border border-white/10 rounded-2xl divide-y divide-white/5 overflow-hidden">
+                          {checksJ2.map((check) => (
+                            <li
+                              key={`${check.code}-${check.label}`}
+                              className="px-4 py-2.5 flex items-start gap-3"
+                            >
+                              {check.passed ? (
+                                <CheckCircle2 className="size-3.5 text-brand-chartreuse shrink-0 mt-0.5" />
+                              ) : (
+                                <AlertCircle className="size-3.5 text-red-400 shrink-0 mt-0.5" />
+                              )}
+                              <div>
+                                <p
+                                  className={`text-xs font-semibold ${
+                                    check.passed ? "text-white" : "text-red-300"
+                                  }`}
+                                >
+                                  {check.label}
+                                </p>
+                                {check.message && (
+                                  <p className="text-[10px] text-gray-500 mt-0.5">
+                                    {check.message}
+                                  </p>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </motion.div>
                   )}
 

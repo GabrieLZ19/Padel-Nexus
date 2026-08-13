@@ -199,11 +199,11 @@ Orden de prioridad del botón:
 
 ## A.2 — Mejoras siguientes (después de A.1 / puede solaparse con B)
 
-1. Endpoint `GET /inscripciones/elegibilidad` (checks J1+J2)
-2. Lookup de compañero por email antes del submit (nombre, categoría, carnet)
-3. Inscripción manual: mismas reglas por defecto; `omitir_validaciones` + `motivo` + auditoría
-4. Flag de torneo `requiere_afiliacion_organizadora` (o inferir por `alcance`/reglamento) que use afiliaciones de Parte B
-5. Tests unitarios de helpers de edad/cierre/rama en API
+1. [x] Endpoint `GET /inscripciones/elegibilidad` (checks J1+J2)
+2. [x] Lookup de compañero por email antes del submit (nombre, categoría, carnet)
+3. [x] Inscripción manual: mismas reglas por defecto; `omitir_validaciones` + `motivo` + auditoría
+4. [x] Flag `reglas_arbitraje.requiere_afiliacion_organizadora` (validación en API)
+5. [ ] Tests unitarios de helpers de edad/cierre/rama en API (sin runner en `apps/api` aún)
 
 ---
 

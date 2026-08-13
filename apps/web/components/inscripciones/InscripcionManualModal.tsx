@@ -42,6 +42,8 @@ export default function InscripcionManualModal({
   );
   /** "" = No pagó / pendiente; "Confirmado" = Pagó */
   const [estadoPago, setEstadoPago] = useState("");
+  const [omitirValidaciones, setOmitirValidaciones] = useState(false);
+  const [motivoOverride, setMotivoOverride] = useState("");
   const [loading, setLoading] = useState(false);
 
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
@@ -63,6 +65,18 @@ export default function InscripcionManualModal({
       return;
     }
 
+    if (omitirValidaciones && motivoOverride.trim().length < 10) {
+      setFeedbackModal({
+        isOpen: true,
+        type: "warning",
+        title: "Motivo requerido",
+        description:
+          "Para omitir validaciones indicá un motivo de al menos 10 caracteres.",
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       await InscripcionesService.inscribirManual({
@@ -75,11 +89,15 @@ export default function InscripcionManualModal({
             ? "Confirmado"
             : undefined
           : estadoPago || undefined,
+        omitir_validaciones: omitirValidaciones,
+        motivo: omitirValidaciones ? motivoOverride.trim() : undefined,
       });
 
       setJ1("");
       setJ2("");
       setEstadoPago("");
+      setOmitirValidaciones(false);
+      setMotivoOverride("");
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -208,11 +226,39 @@ export default function InscripcionManualModal({
                     />
                   </div>
                 </div>
+
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={omitirValidaciones}
+                      onChange={(e) => setOmitirValidaciones(e.target.checked)}
+                      className="mt-0.5 accent-[#cbfe01]"
+                    />
+                    <span className="text-xs text-amber-200/90 leading-relaxed">
+                      Omitir validaciones de elegibilidad (categoría, carnet,
+                      rama, edad, cierre). Requiere motivo auditable.
+                    </span>
+                  </label>
+                  {omitirValidaciones && (
+                    <textarea
+                      value={motivoOverride}
+                      onChange={(e) => setMotivoOverride(e.target.value)}
+                      placeholder="Motivo del override (mín. 10 caracteres)"
+                      rows={3}
+                      className="w-full bg-[#111] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-amber-400/40"
+                    />
+                  )}
+                </div>
               </div>
 
               <button
                 onClick={handleSubmit}
-                disabled={loading || !j1}
+                disabled={
+                  loading ||
+                  !j1 ||
+                  (omitirValidaciones && motivoOverride.trim().length < 10)
+                }
                 className="w-full bg-brand-chartreuse hover:bg-[#b3e600] disabled:opacity-30 text-brand-black font-black py-4 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-brand-chartreuse/10"
               >
                 {loading ? (
