@@ -201,79 +201,33 @@ export class LicenciaService {
 
     // 5. Si se activa o se suspende, actualizamos la afiliación correspondiente
     if (data.datos_solicitud) {
-      const datosSol = data.datos_solicitud as Record<string, any>;
-      if (datosSol.club_id) {
+      const datosSol = data.datos_solicitud as Record<string, unknown>;
+      const clubId =
+        typeof datosSol.club_id === "string" ? datosSol.club_id : null;
+
+      if (clubId) {
         try {
-          // Buscamos el nombre del club
-          const { data: club } = await supabaseAdmin
-            .from("clubes")
-            .select("nombre")
-            .eq("id", datosSol.club_id)
-            .single();
-
-          const clubNombre = club?.nombre || `Club ID: ${datosSol.club_id}`;
-
-          // Verificamos todas las afiliaciones existentes para este usuario con la misma entidad
-          const { data: afiliacionesExistentes } = await supabaseAdmin
-            .from("afiliaciones")
-            .select("id")
-            .eq("usuario_id", data.usuario_id)
-            .eq("entidad", clubNombre);
-
-          const tieneAfiliaciones = afiliacionesExistentes && afiliacionesExistentes.length > 0;
-
           if (estado === "Activa") {
-            if (tieneAfiliaciones) {
-              // Si ya existe, actualizamos su fecha de vencimiento y estado a activo
-              await supabaseAdmin
-                .from("afiliaciones")
-                .update({
-                  fecha_vencimiento: data.fecha_vencimiento || fechaVencimiento,
-                  estado: "activo",
-                })
-                .eq("id", afiliacionesExistentes[0].id);
-
-              // Si hay registros duplicados, los eliminamos
-              if (afiliacionesExistentes.length > 1) {
-                const idsToDelete = afiliacionesExistentes.slice(1).map(a => a.id);
-                await supabaseAdmin
-                  .from("afiliaciones")
-                  .delete()
-                  .in("id", idsToDelete);
-              }
-            } else {
-              // Si no existe, creamos la afiliación activa
-              await supabaseAdmin.from("afiliaciones").insert([
-                {
-                  usuario_id: data.usuario_id,
-                  entidad: clubNombre,
-                  estado: "activo",
-                  fecha_vencimiento: data.fecha_vencimiento || fechaVencimiento,
-                },
-              ]);
-            }
+            const { AfiliacionService } = await import(
+              "./afiliacion.service"
+            );
+            await AfiliacionService.upsertActivaPorClub({
+              usuarioId: data.usuario_id,
+              clubId,
+              fechaVencimiento: data.fecha_vencimiento || fechaVencimiento,
+            });
           } else if (estado === "Suspendida") {
-            if (tieneAfiliaciones) {
-              // Si existe, cambiamos el estado de la afiliación a suspendido
-              await supabaseAdmin
-                .from("afiliaciones")
-                .update({
-                  estado: "suspendido",
-                })
-                .eq("id", afiliacionesExistentes[0].id);
-
-              // Si hay registros duplicados, los eliminamos
-              if (afiliacionesExistentes.length > 1) {
-                const idsToDelete = afiliacionesExistentes.slice(1).map(a => a.id);
-                await supabaseAdmin
-                  .from("afiliaciones")
-                  .delete()
-                  .in("id", idsToDelete);
-              }
-            }
+            await supabaseAdmin
+              .from("afiliaciones")
+              .update({ estado: "suspendido" })
+              .eq("usuario_id", data.usuario_id)
+              .eq("club_id", clubId);
           }
         } catch (err) {
-          console.error("Error al registrar/actualizar afiliación en cambio de estado:", err);
+          console.error(
+            "Error al registrar/actualizar afiliación en cambio de estado:",
+            err,
+          );
         }
       }
     }
