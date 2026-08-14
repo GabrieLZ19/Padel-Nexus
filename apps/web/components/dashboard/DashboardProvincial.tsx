@@ -9,7 +9,6 @@ import {
   Users,
   BadgeDollarSign,
   Shield,
-  Plus,
   ArrowRight,
   Activity,
   TrendingUp,
@@ -213,16 +212,8 @@ export default function DashboardProvincial() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <button
-            onClick={() => router.push("/dashboard/torneos")}
-            className="flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.15)] text-sm cursor-pointer"
-          >
-            <Plus className="size-4" /> Nuevo Clasificatorio
-          </button>
-          <div className="hidden md:block">
-            <NotificationCenter />
-          </div>
+        <div className="hidden md:block">
+          <NotificationCenter />
         </div>
       </div>
 

@@ -25,12 +25,16 @@ import { useProfileStore } from "@/store/useProfileStore";
 import DashboardFederacion from "@/components/dashboard/DashboardFederacion";
 import DashboardProvincial from "@/components/dashboard/DashboardProvincial";
 import DashboardFiscal from "@/components/dashboard/DashboardFiscal";
+import DashboardSuperadmin from "@/components/dashboard/DashboardSuperadmin";
 
 export default function DashboardHome() {
   const profile = useProfileStore((s) => s.profile);
   const userRole = profile?.rol;
 
   // Despacho por rol exclusivo
+  if (userRole === "superadmin") {
+    return <DashboardSuperadmin />;
+  }
   if (userRole === "admin_federacion") {
     return <DashboardFederacion />;
   }
@@ -41,7 +45,7 @@ export default function DashboardHome() {
     return <DashboardFiscal />;
   }
 
-  // superadmin, admin genérico o cualquier otro rol ven el Dashboard general
+  // Admin genérico u otro rol operativo ven el Dashboard general
   return <DashboardGenerico />;
 }
 
