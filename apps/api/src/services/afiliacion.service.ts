@@ -253,7 +253,7 @@ export class AfiliacionService {
     let query = supabaseAdmin
       .from("afiliaciones")
       .select(
-        `*, perfiles:usuario_id(id, nombre, apellido, email, dni), clubes:club_id(id, nombre, provincia)`,
+        `*, perfiles!fk_afiliaciones_usuario(id, nombre, apellido, email, dni), clubes:club_id(id, nombre, provincia)`,
         { count: "exact" },
       )
       .order("created_at", { ascending: false })

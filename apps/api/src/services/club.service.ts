@@ -508,4 +508,148 @@ export class ClubService {
 
     return { actualizados };
   }
+
+  /**
+   * Crea una plantilla de turnos (varios horarios × días) en una o más canchas del club.
+   * Omite combinaciones que ya existen (misma cancha, día y hora de inicio).
+   */
+  static async crearTurnosPlantilla(
+    clubId: string,
+    opciones: {
+      cancha_ids: string[];
+      dias: number[];
+      slots: Array<{ hora_inicio: string; hora_fin: string; precio: number }>;
+    },
+  ) {
+    const dias = [...new Set(opciones.dias)].filter(
+      (d) => Number.isInteger(d) && d >= 0 && d <= 6,
+    );
+    if (dias.length === 0) {
+      throw new Error("Seleccioná al menos un día de la semana.");
+    }
+
+    const normalizeTime = (raw: string) => {
+      const v = String(raw || "").trim();
+      const m = v.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+      if (!m) throw new Error(`Horario inválido: ${raw}`);
+      const hh = String(Number(m[1])).padStart(2, "0");
+      const mm = m[2];
+      const ss = m[3] || "00";
+      return `${hh}:${mm}:${ss}`;
+    };
+
+    const toMinutes = (t: string) => {
+      const [hh, mm] = t.split(":").map(Number);
+      return hh * 60 + mm;
+    };
+
+    const slots = opciones.slots.map((s) => {
+      const hora_inicio = normalizeTime(s.hora_inicio);
+      const hora_fin = normalizeTime(s.hora_fin);
+      const precio = Number(s.precio);
+      if (!Number.isFinite(precio) || precio < 0) {
+        throw new Error("Cada turno debe tener un precio válido.");
+      }
+      if (toMinutes(hora_fin) <= toMinutes(hora_inicio)) {
+        throw new Error(
+          `La hora de fin debe ser posterior al inicio (${hora_inicio.slice(0, 5)}).`,
+        );
+      }
+      return { hora_inicio, hora_fin, precio: Math.round(precio) };
+    });
+
+    if (slots.length === 0) {
+      throw new Error("Agregá al menos un horario (ej. 08:00 a 09:30).");
+    }
+
+    const sorted = [...slots].sort(
+      (a, b) => toMinutes(a.hora_inicio) - toMinutes(b.hora_inicio),
+    );
+    for (let i = 1; i < sorted.length; i++) {
+      if (toMinutes(sorted[i].hora_inicio) < toMinutes(sorted[i - 1].hora_fin)) {
+        throw new Error(
+          "Hay horarios superpuestos en la plantilla. Ajustalos antes de aplicar.",
+        );
+      }
+    }
+
+    const { data: canchas, error: errCanchas } = await supabaseAdmin
+      .from("canchas")
+      .select("id")
+      .eq("club_id", clubId);
+
+    if (errCanchas) throw new Error(errCanchas.message);
+    const clubCanchaIds = new Set((canchas || []).map((c) => c.id));
+    if (clubCanchaIds.size === 0) {
+      throw new Error("El club no tiene canchas.");
+    }
+
+    const requested = [...new Set(opciones.cancha_ids.filter(Boolean))];
+    if (requested.length === 0) {
+      throw new Error("Seleccioná al menos una cancha.");
+    }
+
+    const targetCanchaIds = requested.filter((id) => clubCanchaIds.has(id));
+    if (targetCanchaIds.length === 0) {
+      throw new Error("Las canchas indicadas no pertenecen a este club.");
+    }
+    if (targetCanchaIds.length !== requested.length) {
+      throw new Error("Alguna cancha no pertenece a este club.");
+    }
+
+    const { data: existentes, error: errExist } = await supabaseAdmin
+      .from("turnos")
+      .select("cancha_id, dia_semana, hora_inicio")
+      .in("cancha_id", targetCanchaIds);
+
+    if (errExist) throw new Error(errExist.message);
+
+    const existingKeys = new Set(
+      (existentes || []).map(
+        (t) =>
+          `${t.cancha_id}|${t.dia_semana}|${String(t.hora_inicio).slice(0, 5)}`,
+      ),
+    );
+
+    const rows: Array<{
+      cancha_id: string;
+      hora_inicio: string;
+      hora_fin: string;
+      precio: number;
+      dia_semana: number;
+    }> = [];
+
+    for (const canchaId of targetCanchaIds) {
+      for (const dia of dias) {
+        for (const slot of slots) {
+          const key = `${canchaId}|${dia}|${slot.hora_inicio.slice(0, 5)}`;
+          if (existingKeys.has(key)) continue;
+          existingKeys.add(key);
+          rows.push({
+            cancha_id: canchaId,
+            hora_inicio: slot.hora_inicio,
+            hora_fin: slot.hora_fin,
+            precio: slot.precio,
+            dia_semana: dia,
+          });
+        }
+      }
+    }
+
+    if (rows.length === 0) {
+      return { creados: 0, omitidos: targetCanchaIds.length * dias.length * slots.length };
+    }
+
+    const chunkSize = 200;
+    let creados = 0;
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const chunk = rows.slice(i, i + chunkSize);
+      const { error } = await supabaseAdmin.from("turnos").insert(chunk);
+      if (error) throw new Error(`Error al crear turnos: ${error.message}`);
+      creados += chunk.length;
+    }
+
+    const totalPosibles = targetCanchaIds.length * dias.length * slots.length;
+    return { creados, omitidos: totalPosibles - creados };
+  }
 }

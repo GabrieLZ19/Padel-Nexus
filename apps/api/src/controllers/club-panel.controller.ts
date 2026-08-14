@@ -279,4 +279,45 @@ export class ClubPanelController {
       return res.status(400).json({ exito: false, error: message });
     }
   }
+
+  /**
+   * POST /api/club/mi-club/turnos/plantilla-masiva
+   */
+  static async crearTurnosPlantilla(req: Request, res: Response) {
+    try {
+      const clubId = await ClubPanelController.getClubIdDelUsuario(req.user!.id);
+      const body = req.body as {
+        cancha_ids?: unknown;
+        dias?: unknown;
+        slots?: unknown;
+      };
+
+      const canchaIds = Array.isArray(body.cancha_ids)
+        ? body.cancha_ids.filter((id): id is string => typeof id === "string")
+        : [];
+      const dias = Array.isArray(body.dias)
+        ? body.dias.map((d) => Number(d)).filter((d) => Number.isInteger(d))
+        : [];
+      const slots = Array.isArray(body.slots)
+        ? body.slots
+            .filter((s): s is Record<string, unknown> => Boolean(s) && typeof s === "object")
+            .map((s) => ({
+              hora_inicio: String(s.hora_inicio || ""),
+              hora_fin: String(s.hora_fin || ""),
+              precio: Number(s.precio),
+            }))
+        : [];
+
+      const data = await ClubService.crearTurnosPlantilla(clubId, {
+        cancha_ids: canchaIds,
+        dias,
+        slots,
+      });
+
+      return res.status(201).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  }
 }

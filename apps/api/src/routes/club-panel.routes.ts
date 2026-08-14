@@ -25,6 +25,10 @@ router.post(
   "/mi-club/turnos/ajuste-precios",
   ClubPanelController.ajustarPreciosMasivos,
 );
+router.post(
+  "/mi-club/turnos/plantilla-masiva",
+  ClubPanelController.crearTurnosPlantilla,
+);
 
 // Reservas
 router.get("/mi-club/reservas", ClubPanelController.obtenerReservas);
