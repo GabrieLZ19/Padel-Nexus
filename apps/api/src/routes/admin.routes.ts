@@ -8,6 +8,8 @@ const router = Router();
 router.use(authenticate);
 router.use(authorize(["superadmin", "admin_federacion", "admin_provincial"]));
 
+router.get("/crm-metricas", authorize(["superadmin"]), AdminController.getCrmMetricas);
+
 // Endpoint maestro para arrastrar/soltar o modificar slots en las llaves/grupos
 router.put("/override/partidos/:partido_id", AdminController.overridePartido);
 

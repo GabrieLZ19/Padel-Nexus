@@ -1,7 +1,19 @@
 import { Request, Response } from "express";
 import { AdminService } from "../services/admin.service";
+import { CrmDashboardService } from "../services/crm-dashboard.service";
 
 export const AdminController = {
+  async getCrmMetricas(_req: Request, res: Response): Promise<Response> {
+    try {
+      const data = await CrmDashboardService.obtenerMetricas();
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al obtener métricas del CRM.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
   /**
    * PUT /api/admin/override/partidos/:partido_id
    * Permite alterar un partido a mano registrando al responsable en la auditoría
