@@ -10,6 +10,7 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
+  Copy,
   DollarSign,
 } from "lucide-react";
 import { ClubPanelService } from "@/utils/services/club-panel";
@@ -19,6 +20,7 @@ import FeedbackModal, {
 } from "@/components/ui/FeedbackModal";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { EdicionMasivaPrecios } from "@/components/clubes/EdicionMasivaPrecios";
+import { PlantillaTurnosMasiva } from "@/components/clubes/PlantillaTurnosMasiva";
 
 export default function ClubCanchasPage() {
   const [canchas, setCanchas] = useState<Cancha[]>([]);
@@ -27,8 +29,8 @@ export default function ClubCanchasPage() {
 
   // Modales
   const [isCanchaModalOpen, setIsCanchaModalOpen] = useState(false);
-  const [isTurnoModalOpen, setIsTurnoModalOpen] = useState(false);
   const [isPreciosMasivosOpen, setIsPreciosMasivosOpen] = useState(false);
+  const [isPlantillaOpen, setIsPlantillaOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Form Cancha
@@ -38,15 +40,7 @@ export default function ClubCanchasPage() {
     techada: false,
   });
   const [editingCanchaId, setEditingCanchaId] = useState<string | null>(null);
-
-  // Form Turno
   const [selectedCanchaId, setSelectedCanchaId] = useState<string | null>(null);
-  const [turnoForm, setTurnoForm] = useState({
-    hora_inicio: "18:00",
-    hora_fin: "19:30",
-    precio: 8000,
-    dia_semana: 1, // Lunes
-  });
 
   // Filtro de día activo para visualización de turnos
   const [activeDayTab, setActiveDayTab] = useState<number>(1);
@@ -136,37 +130,7 @@ export default function ClubCanchasPage() {
 
   const handleOpenTurnoModal = (canchaId: string) => {
     setSelectedCanchaId(canchaId);
-    setTurnoForm({
-      hora_inicio: "18:00",
-      hora_fin: "19:30",
-      precio: 8000,
-      dia_semana: 1,
-    });
-    setIsTurnoModalOpen(true);
-  };
-
-  const [selectedDiasTurno, setSelectedDiasTurno] = useState<number[]>([1]);
-
-  const handleSaveTurno = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCanchaId || selectedDiasTurno.length === 0) return;
-    setSaving(true);
-    try {
-      for (const dia of selectedDiasTurno) {
-        await ClubPanelService.crearTurno(selectedCanchaId, {
-          ...turnoForm,
-          dia_semana: dia,
-          hora_inicio: `${turnoForm.hora_inicio}:00`,
-          hora_fin: `${turnoForm.hora_fin}:00`,
-        });
-      }
-      setIsTurnoModalOpen(false);
-      fetchCanchas();
-    } catch (err) {
-      console.error("Error al guardar turno:", err);
-    } finally {
-      setSaving(false);
-    }
+    setIsPlantillaOpen(true);
   };
 
   const handleDeleteTurno = (turnoId: string) => {
@@ -189,19 +153,6 @@ export default function ClubCanchasPage() {
         }
       },
     });
-  };
-
-  const getDiaSemanaNombre = (dia: number) => {
-    const dias = [
-      "Domingo",
-      "Lunes",
-      "Martes",
-      "Miércoles",
-      "Jueves",
-      "Viernes",
-      "Sábado",
-    ];
-    return dias[dia] || String(dia);
   };
 
   const formatHora = (time: string) => {
@@ -234,6 +185,17 @@ export default function ClubCanchasPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCanchaId(canchas[0]?.id || null);
+              setIsPlantillaOpen(true);
+            }}
+            disabled={canchas.length === 0}
+            className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 cursor-pointer w-fit disabled:opacity-40"
+          >
+            <Copy className="size-4" /> Plantilla de horarios
+          </button>
           <button
             type="button"
             onClick={() => setIsPreciosMasivosOpen(true)}
@@ -272,7 +234,7 @@ export default function ClubCanchasPage() {
         <div className="flex flex-col gap-6">
           {canchas.map((cancha) => {
             const isExpanded = expandedCanchaId === cancha.id;
-            const turnosList = (cancha as any).turnos || [];
+            const turnosList = cancha.turnos || [];
 
             return (
               <div
@@ -540,129 +502,6 @@ export default function ClubCanchasPage() {
         </div>
       )}
 
-      {/* Modal Turno */}
-      {isTurnoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="bg-brand-card border border-brand-white/10 rounded-3xl p-6 lg:p-8 max-w-md w-full shadow-2xl">
-            <h2 className="text-xl font-black text-brand-white mb-6">
-              Agregar Turno Semanal
-            </h2>
-            <form onSubmit={handleSaveTurno} className="space-y-5">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
-                  Días de la Semana (Creación Masiva)
-                </label>
-                <div className="grid grid-cols-4 gap-2 text-xs font-bold text-white">
-                  {[
-                    { id: 1, label: "Lun" },
-                    { id: 2, label: "Mar" },
-                    { id: 3, label: "Mié" },
-                    { id: 4, label: "Jue" },
-                    { id: 5, label: "Vie" },
-                    { id: 6, label: "Sáb" },
-                    { id: 0, label: "Dom" },
-                  ].map((d) => (
-                    <label
-                      key={d.id}
-                      className={`p-2.5 rounded-xl border flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
-                        selectedDiasTurno.includes(d.id)
-                          ? "bg-brand-chartreuse/20 border-brand-chartreuse text-brand-chartreuse"
-                          : "bg-black/20 border-white/5 text-gray-400"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedDiasTurno.includes(d.id)}
-                        onChange={() => {
-                          setSelectedDiasTurno((prev) =>
-                            prev.includes(d.id)
-                              ? prev.filter((x) => x !== d.id)
-                              : [...prev, d.id],
-                          );
-                        }}
-                        className="hidden"
-                      />
-                      <span>{d.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
-                    Hora Inicio
-                  </label>
-                  <input
-                    type="time"
-                    required
-                    value={turnoForm.hora_inicio}
-                    onChange={(e) =>
-                      setTurnoForm({
-                        ...turnoForm,
-                        hora_inicio: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-3 bg-brand-black border border-brand-white/5 rounded-xl text-sm text-brand-white focus:outline-none focus:border-brand-chartreuse/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
-                    Hora Fin
-                  </label>
-                  <input
-                    type="time"
-                    required
-                    value={turnoForm.hora_fin}
-                    onChange={(e) =>
-                      setTurnoForm({ ...turnoForm, hora_fin: e.target.value })
-                    }
-                    className="w-full px-4 py-3 bg-brand-black border border-brand-white/5 rounded-xl text-sm text-brand-white focus:outline-none focus:border-brand-chartreuse/50"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
-                  Precio (ARS)
-                </label>
-                <input
-                  type="number"
-                  required
-                  min={0}
-                  value={turnoForm.precio}
-                  onChange={(e) =>
-                    setTurnoForm({
-                      ...turnoForm,
-                      precio: parseInt(e.target.value) || 0,
-                    })
-                  }
-                  placeholder="Ej. 8000"
-                  className="w-full px-4 py-3 bg-brand-black border border-brand-white/5 rounded-xl text-sm text-brand-white focus:outline-none focus:border-brand-chartreuse/50"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsTurnoModalOpen(false)}
-                  className="flex-1 py-3 bg-brand-white/5 hover:bg-brand-white/10 text-brand-white rounded-xl text-sm font-bold transition-all cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 py-3 bg-brand-chartreuse text-brand-black rounded-xl text-sm font-black transition-all disabled:opacity-50 cursor-pointer"
-                >
-                  {saving ? "Guardando..." : "Guardar"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      {/* Feedback Modal para confirmaciones de borrado */}
       <FeedbackModal
         isOpen={feedback.isOpen}
         onClose={feedback.onClose}
@@ -672,6 +511,16 @@ export default function ClubCanchasPage() {
         confirmText={feedback.confirmText}
         cancelText={feedback.cancelText}
         onConfirm={feedback.onConfirm}
+      />
+
+      <PlantillaTurnosMasiva
+        canchas={canchas}
+        isOpen={isPlantillaOpen}
+        canchaOrigenId={selectedCanchaId}
+        onClose={() => setIsPlantillaOpen(false)}
+        onSuccess={() => {
+          void fetchCanchas();
+        }}
       />
 
       <EdicionMasivaPrecios

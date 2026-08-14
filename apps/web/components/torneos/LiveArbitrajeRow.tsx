@@ -1,6 +1,6 @@
 import { Partido } from "@/utils/types";
-import { Loader2, Trophy, AlertCircle } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Loader2, Trophy, AlertCircle, CalendarClock } from "lucide-react";
+import { useState } from "react";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { TorneosService } from "@/utils/services/torneos";
 import { TeamBox } from "@/components/torneos/MatchTeamBox";
@@ -124,17 +124,18 @@ export const LiveArbitrajeRow = ({
     }
   };
 
-  const initialFH = getInitialFechaHora((partido as any).fecha_partido);
+  const initialFH = getInitialFechaHora(partido.fecha_partido);
   const [fechaEdit, setFechaEdit] = useState<string>(initialFH.fecha);
   const [horaEdit, setHoraEdit] = useState<string>(initialFH.hora);
+  const [showProgramacion, setShowProgramacion] = useState(false);
 
   // Calcular slots de cancha + fecha + hora ocupados por OTROS partidos
   const occupiedSlots = new Set<string>();
   todosLosPartidos.forEach((p) => {
     if (p.id === partido.id) return;
-    if (canchaAsignadaReal(p.cancha_asignada) && (p as any).fecha_partido) {
+    if (canchaAsignadaReal(p.cancha_asignada) && p.fecha_partido) {
       try {
-        const d = new Date((p as any).fecha_partido);
+        const d = new Date(p.fecha_partido);
         const yyyy = d.getFullYear();
         const mm = String(d.getMonth() + 1).padStart(2, "0");
         const dd = String(d.getDate()).padStart(2, "0");
@@ -276,25 +277,15 @@ export const LiveArbitrajeRow = ({
 
   const { setsA, setsB } = getSetsGanados();
 
-  const programacionCompleta = Boolean(
-    canchaEdit?.trim() && fechaEdit?.trim() && horaEdit?.trim(),
-  );
-
-  const exigirProgramacion = () => {
-    if (programacionCompleta) return true;
-    const faltan: string[] = [];
-    if (!canchaEdit?.trim()) faltan.push("cancha");
-    if (!fechaEdit?.trim()) faltan.push("fecha");
-    if (!horaEdit?.trim()) faltan.push("hora");
-    onError(
-      `Antes de cargar el resultado, asigná ${faltan.join(", ")} del partido.`,
-    );
-    return false;
-  };
+  const programacionLabel = (() => {
+    const parts: string[] = [];
+    if (canchaEdit?.trim()) parts.push(canchaEdit.trim());
+    if (fechaEdit?.trim()) parts.push(formatDateLabel(fechaEdit));
+    if (horaEdit?.trim()) parts.push(`${horaEdit.slice(0, 5)} hs`);
+    return parts.length > 0 ? parts.join(" · ") : null;
+  })();
 
   const handleFinalizar = () => {
-    if (!exigirProgramacion()) return;
-
     if (esWo) {
       const ganadorId =
         ganadorWo === "A" ? partido.equipo_a_id : partido.equipo_b_id;
@@ -453,8 +444,7 @@ export const LiveArbitrajeRow = ({
 
   return (
     <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-md">
-      {/* Header meta */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-3 py-2.5 bg-white/[0.03] border-b border-white/8">
+      <div className="flex flex-col gap-2 px-3 py-2.5 bg-white/[0.03] border-b border-white/8">
         <div className="flex flex-wrap items-center gap-2 min-w-0">
           <span className="text-[10px] font-black text-sky-400 bg-sky-400/10 border border-sky-400/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
             #
@@ -466,7 +456,48 @@ export const LiveArbitrajeRow = ({
           <span className="text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-2 py-0.5 rounded-full uppercase shrink-0">
             {partido.ronda}
           </span>
-          <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
+          {programacionLabel ? (
+            <span className="text-[10px] font-bold text-emerald-400/90 truncate min-w-0">
+              {programacionLabel}
+            </span>
+          ) : (
+            <span className="text-[10px] font-semibold text-gray-500">
+              Sede y horario del cuadro
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowProgramacion((v) => !v)}
+            className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-white border border-white/10 hover:border-white/20 bg-white/5 px-2 py-1 rounded-lg cursor-pointer shrink-0"
+          >
+            <CalendarClock className="size-3" />
+            {showProgramacion ? "Ocultar" : "Ajustar sede"}
+          </button>
+          <div className="flex items-center gap-3 text-[10px] shrink-0 sm:ml-auto">
+            <label className="flex items-center gap-1.5 font-bold text-gray-400 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={esWo}
+                onChange={(e) => setEsWo(e.target.checked)}
+                className="accent-brand-chartreuse rounded"
+              />
+              W.O.
+            </label>
+            {esWo && (
+              <label className="flex items-center gap-1.5 text-red-400 font-bold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={esInjustificadoWo}
+                  onChange={(e) => setEsInjustificadoWo(e.target.checked)}
+                  className="accent-red-500 rounded"
+                />
+                Injustificado
+              </label>
+            )}
+          </div>
+        </div>
+        {showProgramacion && (
+          <div className="flex flex-wrap items-center gap-1.5">
             <CustomDropdown
               value={canchaEdit}
               onChange={(val) => {
@@ -497,59 +528,15 @@ export const LiveArbitrajeRow = ({
               disabled={horaOptions.length === 0 || !canchaEdit || !fechaEdit}
             />
           </div>
-        </div>
-        <div className="flex items-center gap-3 text-[10px] shrink-0">
-          <label
-            className={`flex items-center gap-1.5 font-bold ${
-              programacionCompleta
-                ? "text-gray-400 cursor-pointer"
-                : "text-gray-600 cursor-not-allowed opacity-60"
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={esWo}
-              disabled={!programacionCompleta}
-              onChange={(e) => setEsWo(e.target.checked)}
-              className="accent-brand-chartreuse rounded"
-            />
-            W.O.
-          </label>
-          {esWo && (
-            <label className="flex items-center gap-1.5 text-red-400 font-bold cursor-pointer">
-              <input
-                type="checkbox"
-                checked={esInjustificadoWo}
-                onChange={(e) => setEsInjustificadoWo(e.target.checked)}
-                className="accent-red-500 rounded"
-              />
-              Injustificado
-            </label>
-          )}
-        </div>
+        )}
       </div>
 
-      {!programacionCompleta && (
-        <div className="mx-3 mt-3 flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-300">
-          <AlertCircle className="size-3.5 shrink-0 mt-0.5" />
-          <span>
-            Seleccioná cancha, fecha y hora para habilitar la carga del
-            marcador.
-          </span>
-        </div>
-      )}
-
       {esWo ? (
-        <div
-          className={`p-3 space-y-3 ${
-            programacionCompleta ? "" : "opacity-50 pointer-events-none"
-          }`}
-        >
+        <div className="p-3 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setGanadorWo("A")}
-              disabled={!programacionCompleta}
               className={`text-left rounded-xl transition-all cursor-pointer ${
                 ganadorWo === "A" ? "ring-2 ring-brand-chartreuse" : ""
               }`}
@@ -567,7 +554,6 @@ export const LiveArbitrajeRow = ({
             <button
               type="button"
               onClick={() => setGanadorWo("B")}
-              disabled={!programacionCompleta}
               className={`text-left rounded-xl transition-all cursor-pointer ${
                 ganadorWo === "B" ? "ring-2 ring-brand-chartreuse" : ""
               }`}
@@ -589,11 +575,7 @@ export const LiveArbitrajeRow = ({
           </div>
         </div>
       ) : (
-        <div
-          className={`p-3 space-y-3 ${
-            programacionCompleta ? "" : "opacity-50"
-          }`}
-        >
+        <div className="p-3 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 md:gap-3 items-stretch">
             <TeamBox
               j1={partido.equipo_a_j1}
@@ -632,33 +614,30 @@ export const LiveArbitrajeRow = ({
                   inputMode="numeric"
                   aria-label="Set 1 equipo A"
                   value={s1A}
-                  disabled={!programacionCompleta}
                   onChange={(e) =>
                     setS1A(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
                 />
                 <input
                   type="text"
                   inputMode="numeric"
                   aria-label="Set 2 equipo A"
                   value={s2A}
-                  disabled={!programacionCompleta}
                   onChange={(e) =>
                     setS2A(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
                 />
                 <input
                   type="text"
                   inputMode="numeric"
                   aria-label="Set 3 equipo A"
                   value={s3A}
-                  disabled={!programacionCompleta}
                   onChange={(e) =>
                     setS3A(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className={`w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border disabled:cursor-not-allowed disabled:opacity-50 ${
+                  className={`w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border ${
                     requiereTercerSet
                       ? "border-brand-chartreuse"
                       : "border-white/15 focus:border-brand-chartreuse opacity-60"
@@ -672,33 +651,30 @@ export const LiveArbitrajeRow = ({
                   inputMode="numeric"
                   aria-label="Set 1 equipo B"
                   value={s1B}
-                  disabled={!programacionCompleta}
                   onChange={(e) =>
                     setS1B(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
                 />
                 <input
                   type="text"
                   inputMode="numeric"
                   aria-label="Set 2 equipo B"
                   value={s2B}
-                  disabled={!programacionCompleta}
                   onChange={(e) =>
                     setS2B(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
                 />
                 <input
                   type="text"
                   inputMode="numeric"
                   aria-label="Set 3 equipo B"
                   value={s3B}
-                  disabled={!programacionCompleta}
                   onChange={(e) =>
                     setS3B(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className={`w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border disabled:cursor-not-allowed disabled:opacity-50 ${
+                  className={`w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border ${
                     requiereTercerSet
                       ? "border-brand-chartreuse"
                       : "border-white/15 focus:border-brand-chartreuse opacity-60"
@@ -732,7 +708,7 @@ export const LiveArbitrajeRow = ({
         <button
           type="button"
           onClick={handleFinalizar}
-          disabled={isSaving || !programacionCompleta}
+          disabled={isSaving}
           className="bg-brand-chartreuse text-brand-black hover:opacity-90 px-4 py-2 rounded-xl text-[11px] font-black transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
         >
           {isSaving ? (

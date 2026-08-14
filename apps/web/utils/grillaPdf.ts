@@ -527,8 +527,8 @@ export function generarPdfGrillaPartidos(
 
 /**
  * Grilla de Partidos | Coordinadores / Auxiliares de Cancha.
- * Formato tabular (estilo planillero): complejo, partido, horario,
- * resultado en blanco y firmas. Distingue Individual vs Duplas.
+ * Formato tabular (estilo planillero): cada partido en dos filas
+ * (P1/P2), con resultado por set y firma de cada pareja.
  */
 export function generarPdfHojaRuta(
   torneo: Partial<Torneo>,
@@ -627,17 +627,27 @@ export function generarPdfHojaRuta(
     .filter(Boolean)
     .join("  ·  ");
 
+  const pairLines = (j1?: string | null, j2?: string | null): string[] => {
+    if (isIndividual) return [sideLabel(j1, j2)];
+    const a = shortName(j1);
+    const b = shortName(j2);
+    if (a === "—" && b === "—") return ["A definir"];
+    if (b === "—") return [a];
+    return [a, b];
+  };
+
   const marginX = 12;
   const contentW = pageWidth - marginX * 2;
-  // Anchos que suman exactamente contentW (~186 mm en A4)
   const cols = {
-    complejo: 32,
-    partido: 62,
-    horario: 34,
-    resultado: 26,
-    firmaA: (contentW - 32 - 62 - 34 - 26) / 2,
-    firmaB: (contentW - 32 - 62 - 34 - 26) / 2,
+    complejo: 30,
+    pareja: 58,
+    horario: 28,
+    resultado: 42,
+    firma: contentW - 30 - 58 - 28 - 42,
   };
+  const boxW = 8;
+  const boxGap = 3;
+  const boxesTotal = boxW * 3 + boxGap * 2;
 
   const drawHeader = (startY: number) => {
     doc.setFillColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
@@ -660,33 +670,49 @@ export function generarPdfHojaRuta(
     doc.setFont("helvetica", "normal");
     doc.setTextColor(186, 198, 214);
     doc.text(
-      `Impreso: ${new Date().toLocaleString("es-AR")}  ·  Completar resultado y firmas al finalizar.`,
+      `Impreso: ${new Date().toLocaleString("es-AR")}  ·  Games de cada set en la fila de cada pareja (ej. 6 / 3 / 6).`,
       marginX,
       25.5,
     );
 
-    let y = startY;
+    const y = startY;
     doc.setFillColor(SLATE_100[0], SLATE_100[1], SLATE_100[2]);
     doc.setDrawColor(SLATE_200[0], SLATE_200[1], SLATE_200[2]);
     doc.setLineWidth(0.3);
-    doc.rect(marginX, y, contentW, 7, "FD");
+    doc.rect(marginX, y, contentW, 8, "FD");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(6.5);
     doc.setTextColor(71, 85, 105);
-    let x = marginX;
+
+    const parejaHeader = isIndividual ? "Jugador" : "Pareja";
     const headers: Array<[string, number]> = [
       ["Complejo", cols.complejo],
-      ["Partido", cols.partido],
+      [parejaHeader, cols.pareja],
       ["Dia / Hora", cols.horario],
       ["Resultado", cols.resultado],
-      ["Firma A", cols.firmaA],
-      ["Firma B", cols.firmaB],
+      ["Firmas", cols.firma],
     ];
+    let x = marginX;
     headers.forEach(([label, w]) => {
-      doc.text(label, x + 2, y + 4.6);
+      if (label === "Resultado") {
+        const boxStart = x + (w - boxesTotal) / 2;
+        doc.text("Resultado", x + 2, y + 3.2);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(5.5);
+        doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
+        [0, 1, 2].forEach((i) => {
+          const bx = boxStart + i * (boxW + boxGap);
+          doc.text(`Set ${i + 1}`, bx + boxW / 2, y + 6.6, { align: "center" });
+        });
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(6.5);
+        doc.setTextColor(71, 85, 105);
+      } else {
+        doc.text(label, x + 2, y + 5);
+      }
       x += w;
     });
-    return y + 7;
+    return y + 8;
   };
 
   let y = drawHeader(32);
@@ -700,7 +726,55 @@ export function generarPdfHojaRuta(
     return;
   }
 
-  const rowH = isIndividual ? 16 : 18;
+  const subH = isIndividual ? 10 : 12;
+  const rowH = subH * 2;
+  const tagW = 8;
+
+  const drawSetBoxes = (colX: number, rowY: number) => {
+    const boxStart = colX + (cols.resultado - boxesTotal) / 2;
+    const boxY = rowY + (subH - 7) / 2;
+    [0, 1, 2].forEach((i) => {
+      const bx = boxStart + i * (boxW + boxGap);
+      doc.setDrawColor(148, 163, 184);
+      doc.setLineWidth(0.35);
+      doc.setFillColor(255, 255, 255);
+      doc.rect(bx, boxY, boxW, 7, "FD");
+    });
+  };
+
+  const drawPairRow = (
+    colX: number,
+    rowY: number,
+    tag: string,
+    names: string[],
+  ) => {
+    doc.setFillColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
+    doc.roundedRect(colX + 1.5, rowY + (subH - 5.2) / 2, tagW, 5.2, 0.8, 0.8, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(5.5);
+    doc.setTextColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
+    doc.text(tag, colX + 1.5 + tagW / 2, rowY + subH / 2 + 1.4, {
+      align: "center",
+    });
+
+    const nameX = colX + tagW + 3.5;
+    const nameW = cols.pareja - tagW - 6;
+    doc.setTextColor(15, 23, 42);
+    if (names.length === 1) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      const lines = doc.splitTextToSize(names[0], nameW);
+      doc.text(lines.slice(0, 2), nameX, rowY + (subH === 10 ? 6.2 : 7));
+      return;
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    doc.text(names[0].slice(0, 42), nameX, rowY + 4.6);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6);
+    doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
+    doc.text(names[1].slice(0, 42), nameX, rowY + 9.2);
+  };
 
   for (const p of sorted) {
     if (y + rowH > pageHeight - 12) {
@@ -712,9 +786,12 @@ export function generarPdfHojaRuta(
     const cancha = p.cancha_asignada || "Cancha s/d";
     const ronda = String(p.ronda || "Ronda").toUpperCase();
     const cat = torneo.categoria || "Libres";
-    const sideA = sideLabel(p.equipo_a_j1, p.equipo_a_j2);
-    const sideB = sideLabel(p.equipo_b_j1, p.equipo_b_j2);
+    const namesA = pairLines(p.equipo_a_j1, p.equipo_a_j2);
+    const namesB = pairLines(p.equipo_b_j1, p.equipo_b_j2);
     const horario = formatDateTime(p.fecha_partido);
+    const tagA = isIndividual ? "J1" : "P1";
+    const tagB = isIndividual ? "J2" : "P2";
+    const midY = y + subH;
 
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(SLATE_200[0], SLATE_200[1], SLATE_200[2]);
@@ -724,86 +801,67 @@ export function generarPdfHojaRuta(
     let gx = marginX;
     const widths = [
       cols.complejo,
-      cols.partido,
+      cols.pareja,
       cols.horario,
       cols.resultado,
-      cols.firmaA,
-      cols.firmaB,
+      cols.firma,
     ];
     for (let i = 0; i < widths.length - 1; i++) {
       gx += widths[i];
       doc.line(gx, y, gx, y + rowH);
     }
 
-    // Complejo
+    const pairStartX = marginX + cols.complejo;
+    doc.setDrawColor(SLATE_200[0], SLATE_200[1], SLATE_200[2]);
+    doc.setLineWidth(0.25);
+    doc.line(pairStartX, midY, marginX + contentW, midY);
+
     let cx = marginX;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.setTextColor(37, 99, 235);
-    doc.text(`#${code}`, cx + 2, y + 5.5);
+    doc.text(`#${code}`, cx + 2, y + 6);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(5.5);
+    doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
+    doc.text(`${cat} · ${ronda}`.slice(0, 28), cx + 2, y + 10.2);
     doc.setFontSize(6);
     doc.setTextColor(51, 65, 85);
     const canchaLines = doc.splitTextToSize(cancha, cols.complejo - 4);
-    doc.text(canchaLines.slice(0, 2), cx + 2, y + 10);
+    doc.text(canchaLines.slice(0, 2), cx + 2, y + 14.4);
 
-    // Partido
     cx += cols.complejo;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`${cat} · ${ronda}`.slice(0, 40), cx + 2, y + 4.5);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(15, 23, 42);
-    const cruce = `${sideA}  vs  ${sideB}`;
-    const cruceLines = doc.splitTextToSize(cruce, cols.partido - 4);
-    doc.text(cruceLines.slice(0, 2), cx + 2, y + 9.5);
+    drawPairRow(cx, y, tagA, namesA);
+    drawPairRow(cx, midY, tagB, namesB);
 
-    // Dia / Hora
-    cx += cols.partido;
+    cx += cols.pareja;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(6.5);
     doc.setTextColor(37, 99, 235);
     const horaLines = doc.splitTextToSize(horario, cols.horario - 4);
-    doc.text(horaLines.slice(0, 2), cx + 2, y + 7);
+    const horaBlockH = horaLines.length * 3.4;
+    doc.text(horaLines.slice(0, 3), cx + 2, y + (rowH - horaBlockH) / 2 + 3.2);
 
-    // Resultado en blanco
     cx += cols.horario;
-    const boxW = 6;
-    const gap = 2;
-    const boxesTotal = boxW * 3 + gap * 2;
-    const boxStart = cx + (cols.resultado - boxesTotal) / 2;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(5);
-    doc.setTextColor(148, 163, 184);
-    [0, 1, 2].forEach((i) => {
-      const bx = boxStart + i * (boxW + gap);
-      doc.text(String(i + 1), bx + boxW / 2, y + 4, { align: "center" });
-      doc.setDrawColor(148, 163, 184);
-      doc.setLineWidth(0.35);
-      doc.setFillColor(255, 255, 255);
-      doc.rect(bx, y + 5.5, boxW, 7.5, "FD");
-    });
+    drawSetBoxes(cx, y);
+    drawSetBoxes(cx, midY);
 
-    // Firmas A / B
     cx += cols.resultado;
     doc.setDrawColor(148, 163, 184);
     doc.setLineWidth(0.35);
     const firmaPad = 2.5;
+    doc.line(cx + firmaPad, y + subH - 3.2, cx + cols.firma - firmaPad, y + subH - 3.2);
     doc.line(
       cx + firmaPad,
-      y + rowH - 4,
-      cx + cols.firmaA - firmaPad,
-      y + rowH - 4,
+      y + rowH - 3.2,
+      cx + cols.firma - firmaPad,
+      y + rowH - 3.2,
     );
-    cx += cols.firmaA;
-    doc.line(
-      cx + firmaPad,
-      y + rowH - 4,
-      cx + cols.firmaB - firmaPad,
-      y + rowH - 4,
-    );
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(5);
+    doc.setTextColor(148, 163, 184);
+    doc.text(tagA, cx + firmaPad, y + 3.4);
+    doc.text(tagB, cx + firmaPad, midY + 3.4);
 
     y += rowH;
   }
@@ -811,7 +869,7 @@ export function generarPdfHojaRuta(
   doc.setFontSize(6.5);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    "Cruzar codigo # con la carga de resultados del CRM · Resultado y firmas a completar en cancha.",
+    "Cada fila es una pareja: anotar games ganados por set (ej. P1: 6 3 6  /  P2: 3 6 4). Cruzar # con la carga del CRM.",
     marginX,
     pageHeight - 7,
   );

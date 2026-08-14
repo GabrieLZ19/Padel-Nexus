@@ -1,5 +1,5 @@
 import { api } from "../api";
-import { Club, Cancha, Reserva } from "../types";
+import { Club, Cancha, Reserva, Turno } from "../types";
 
 export class ClubPanelService {
   static async getMiClub(): Promise<Club> {
@@ -51,7 +51,7 @@ export class ClubPanelService {
       precio: number;
       dia_semana: number;
     },
-  ): Promise<any> {
+  ): Promise<Turno> {
     const { data } = await api.post(`/club/mi-club/canchas/${canchaId}/turnos`, datos);
     return data.data;
   }
@@ -68,6 +68,15 @@ export class ClubPanelService {
   }): Promise<{ actualizados: number }> {
     const { data } = await api.post("/club/mi-club/turnos/ajuste-precios", datos);
     return data.data || { actualizados: 0 };
+  }
+
+  static async crearPlantillaTurnos(datos: {
+    cancha_ids: string[];
+    dias: number[];
+    slots: Array<{ hora_inicio: string; hora_fin: string; precio: number }>;
+  }): Promise<{ creados: number; omitidos: number }> {
+    const { data } = await api.post("/club/mi-club/turnos/plantilla-masiva", datos);
+    return data.data || { creados: 0, omitidos: 0 };
   }
 
   static async getReservas(filtros: {

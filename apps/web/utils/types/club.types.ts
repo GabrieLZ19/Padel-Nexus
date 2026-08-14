@@ -26,6 +26,19 @@ export interface Cancha {
   techada: boolean;
   activa: boolean;
   created_at?: string;
+  turnos?: Turno[];
+}
+
+export interface TurnoPlantillaSlot {
+  hora_inicio: string;
+  hora_fin: string;
+  precio: number;
+}
+
+export interface TurnoPlantillaMasivaPayload {
+  cancha_ids: string[];
+  dias: number[];
+  slots: TurnoPlantillaSlot[];
 }
 
 export interface Turno {
