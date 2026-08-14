@@ -54,7 +54,7 @@ function NavLink({
       >
         <item.icon className="size-4 shrink-0" />
         <span className="text-[13px] flex-1 truncate">{item.name}</span>
-        {item.badge && item.badge > 0 ? (
+        {(item.badge ?? 0) > 0 ? (
           <span
             className={`min-w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-black px-1 ${
               active
@@ -62,7 +62,7 @@ function NavLink({
                 : "bg-brand-chartreuse text-brand-black"
             }`}
           >
-            {item.badge > 99 ? "99+" : item.badge}
+            {item.badge! > 99 ? "99+" : item.badge}
           </span>
         ) : null}
       </div>

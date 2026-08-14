@@ -13,9 +13,11 @@ import {
   Loader2,
   Sun,
   CloudRain,
+  LogIn,
 } from "lucide-react";
 import { ClubesService } from "@/utils/services/clubes";
 import { ReservasService } from "@/utils/services/reservas";
+import { useProfileStore } from "@/store/useProfileStore";
 import type { SlotDisponible } from "@/utils/types/club.types";
 
 interface ClubDetalle {
@@ -30,6 +32,8 @@ export default function ClubHorariosPage() {
   const router = useRouter();
   const clubId = params.id as string;
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const { profile, fetchProfile } = useProfileStore();
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   const getLocalIsoDate = (date: Date) => {
     const yyyy = date.getFullYear();
@@ -45,8 +49,26 @@ export default function ClubHorariosPage() {
   const [selectedSlot, setSelectedSlot] = useState<SlotDisponible | null>(null);
   const [reservando, setReservando] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    const checkSession = async () => {
+      if (profile?.id) {
+        if (!cancelled) setSessionChecked(true);
+        return;
+      }
+      await fetchProfile();
+      if (!cancelled) setSessionChecked(true);
+    };
+    void checkSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id, fetchProfile]);
+
   // Fetch club data
   useEffect(() => {
+    if (!sessionChecked || !profile?.id) return;
+
     const fetchClub = async () => {
       try {
         const res = await ClubesService.getById(clubId);
@@ -55,11 +77,16 @@ export default function ClubHorariosPage() {
         setClub(null);
       }
     };
-    fetchClub();
-  }, [clubId]);
+    void fetchClub();
+  }, [clubId, sessionChecked, profile?.id]);
 
   // Fetch disponibilidad
   const fetchDisponibilidad = useCallback(async () => {
+    if (!sessionChecked || !profile?.id) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setSelectedSlot(null);
     try {
@@ -70,7 +97,7 @@ export default function ClubHorariosPage() {
     } finally {
       setLoading(false);
     }
-  }, [clubId, selectedDate]);
+  }, [clubId, selectedDate, sessionChecked, profile?.id]);
 
   useEffect(() => {
     fetchDisponibilidad();
@@ -204,6 +231,42 @@ export default function ClubHorariosPage() {
             </div>
           )}
         </div>
+
+        {sessionChecked && !profile?.id ? (
+          <div className="max-w-xl mx-auto">
+            <div className="relative overflow-hidden rounded-2xl border border-brand-chartreuse/20 bg-brand-card px-6 py-12 sm:px-10 text-center">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(203,254,1,0.08),transparent_55%)]" />
+              <div className="relative">
+                <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-brand-chartreuse/10 border border-brand-chartreuse/20">
+                  <LogIn className="size-6 text-brand-chartreuse" />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  Iniciá sesión para ver horarios
+                </h2>
+                <p className="mt-3 text-sm sm:text-base text-gray-400 max-w-md mx-auto">
+                  Los turnos disponibles y la reserva de cancha requieren una
+                  cuenta.
+                </p>
+                <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <Link
+                    href={`/login?redirect=${encodeURIComponent(`/reservar/club/${clubId}`)}`}
+                    className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 rounded-xl bg-brand-chartreuse text-brand-black font-bold text-sm hover:opacity-90 transition-opacity"
+                  >
+                    <LogIn className="size-4" />
+                    Iniciar sesión
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="inline-flex items-center justify-center w-full sm:w-auto px-6 py-3 rounded-xl border border-white/10 text-white text-sm font-semibold hover:bg-white/5 transition-colors"
+                  >
+                    Crear cuenta
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
 
         {/* ── Selector de Fecha con Cápsulas Premium ──────── */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -405,6 +468,8 @@ export default function ClubHorariosPage() {
               </div>
             </div>
           </div>
+        )}
+          </>
         )}
       </section>
     </main>

@@ -6,9 +6,17 @@ import {
   AfiliacionesService,
   AfiliacionConRelaciones,
 } from "@/utils/services/afiliaciones";
+import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
+
+const ESTADO_FILTRO_OPTIONS = [
+  { value: "pendiente", label: "Pendientes" },
+  { value: "activo", label: "Activas" },
+  { value: "rechazado", label: "Rechazadas" },
+  { value: "todas", label: "Todas" },
+] as const;
 
 export default function AfiliacionesAdminPage() {
   const [rows, setRows] = useState<AfiliacionConRelaciones[]>([]);
@@ -27,7 +35,7 @@ export default function AfiliacionesAdminPage() {
     setLoading(true);
     try {
       const { data } = await AfiliacionesService.listarAdmin({
-        estado: estadoFiltro || undefined,
+        estado: estadoFiltro === "todas" ? undefined : estadoFiltro,
         limit: 50,
         search: search || undefined,
       });
@@ -87,7 +95,7 @@ export default function AfiliacionesAdminPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl mx-auto">
+    <div className="p-6 lg:p-8 max-w-full mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-black text-white tracking-tight">
           Afiliaciones
@@ -107,16 +115,15 @@ export default function AfiliacionesAdminPage() {
             className="w-full bg-brand-card border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-brand-chartreuse/40"
           />
         </div>
-        <select
-          value={estadoFiltro}
-          onChange={(e) => setEstadoFiltro(e.target.value)}
-          className="bg-brand-card border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none"
-        >
-          <option value="pendiente">Pendientes</option>
-          <option value="activo">Activas</option>
-          <option value="rechazado">Rechazadas</option>
-          <option value="">Todas</option>
-        </select>
+        <div className="w-full sm:w-56 shrink-0">
+          <CustomDropdown
+            value={estadoFiltro}
+            onChange={setEstadoFiltro}
+            options={ESTADO_FILTRO_OPTIONS}
+            placeholder="Filtrar por estado"
+            className="!py-2.5 text-sm"
+          />
+        </div>
       </div>
 
       <div className="bg-brand-card border border-white/5 rounded-2xl overflow-hidden">

@@ -346,6 +346,10 @@ export default function DashboardLayout({
               const isActive =
                 pathname === item.href ||
                 (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
+              const unread =
+                "badge" in item
+                  ? Number((item as { badge?: number }).badge) || 0
+                  : 0;
               return (
                 <Link
                   key={item.name}
@@ -357,11 +361,11 @@ export default function DashboardLayout({
                   >
                     <item.icon className="size-5" />
                     <span className="text-[14px] flex-1">{item.name}</span>
-                    {('badge' in item) && (item as { badge?: number }).badge && (item as { badge?: number }).badge! > 0 && (
+                    {unread > 0 ? (
                       <span className="min-w-5 h-5 flex items-center justify-center bg-brand-chartreuse text-brand-black rounded-full text-[10px] font-black px-1 shadow-[0_0_8px_rgba(203,254,1,0.3)]">
-                        {(item as { badge: number }).badge > 99 ? "99+" : (item as { badge: number }).badge}
+                        {unread > 99 ? "99+" : unread}
                       </span>
-                    )}
+                    ) : null}
                   </motion.div>
                 </Link>
               );

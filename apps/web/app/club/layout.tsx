@@ -227,11 +227,13 @@ export default function ClubLayout({
                 >
                   <item.icon className="size-5" />
                   <span className="text-[14px] flex-1">{item.name}</span>
-                  {("badge" in item) && (item as any).badge > 0 && (
+                  {Number((item as { badge?: number }).badge) > 0 ? (
                     <span className="min-w-5 h-5 flex items-center justify-center bg-brand-chartreuse text-brand-black rounded-full text-[10px] font-black px-1 shadow-[0_0_8px_rgba(203,254,1,0.3)]">
-                      {(item as any).badge > 99 ? "99+" : (item as any).badge}
+                      {(item as { badge: number }).badge > 99
+                        ? "99+"
+                        : (item as { badge: number }).badge}
                     </span>
-                  )}
+                  ) : null}
                 </div>
               </Link>
             );
