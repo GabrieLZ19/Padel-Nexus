@@ -42,12 +42,18 @@ export interface Producto {
   destacado: boolean;
   activo: boolean;
   created_at: string;
+  promedio_valoraciones?: number;
+  total_valoraciones?: number;
   vendedor: {
     id: string;
+    usuario_id?: string;
     nombre_tienda: string;
     tipo: string;
+    descripcion?: string;
+    logo_url?: string;
     provincia?: string;
     valoracion_promedio: number;
+    total_ventas?: number;
   };
   categoria: {
     id: string;

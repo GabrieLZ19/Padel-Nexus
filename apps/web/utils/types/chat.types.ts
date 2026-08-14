@@ -1,8 +1,17 @@
+export interface ChatProductoContexto {
+  id: string;
+  nombre: string;
+  precio: number;
+  thumbnail_url: string | null;
+  imagenes: string[] | null;
+}
+
 export interface ChatConversacion {
   id: string;
   creado_por: string;
-  tipo: "directo" | "soporte";
+  tipo: "directo" | "soporte" | "marketplace";
   created_at: string;
+  producto_id?: string | null;
   otro_participante: {
     id: string;
     nombre: string | null;
@@ -16,6 +25,7 @@ export interface ChatConversacion {
     remitente_id: string;
   } | null;
   no_leidos: number;
+  producto?: ChatProductoContexto | null;
 }
 
 export interface ChatMensaje {

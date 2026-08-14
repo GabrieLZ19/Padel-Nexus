@@ -23,9 +23,24 @@ export class ChatService {
 
   static async iniciarChat(
     destinatarioId: string,
+    productoId?: string,
+  ): Promise<{ id: string; nueva: boolean }> {
+    const payload: { destinatario_id: string; producto_id?: string } = {
+      destinatario_id: destinatarioId,
+    };
+    if (productoId) {
+      payload.producto_id = productoId;
+    }
+
+    const { data } = await api.post("/mensajes/conversaciones", payload);
+    return data.data;
+  }
+
+  static async iniciarChatProducto(
+    productoId: string,
   ): Promise<{ id: string; nueva: boolean }> {
     const { data } = await api.post("/mensajes/conversaciones", {
-      destinatario_id: destinatarioId,
+      producto_id: productoId,
     });
     return data.data;
   }

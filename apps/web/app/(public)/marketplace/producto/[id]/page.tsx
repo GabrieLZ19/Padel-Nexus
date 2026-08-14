@@ -7,7 +7,9 @@ import {
   Producto,
   Valoracion,
 } from "@/utils/services/marketplace";
+import { ChatService } from "@/utils/services/chat";
 import { useCartStore } from "@/store/useCartStore";
+import { useProfileStore } from "@/store/useProfileStore";
 import {
   ShoppingBag,
   Heart,
@@ -28,7 +30,7 @@ import { sileo } from "sileo";
 export default function ProductoDetallePage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
-  const [producto, setProducto] = useState<any>(null);
+  const [producto, setProducto] = useState<Producto | null>(null);
   const [valoraciones, setValoraciones] = useState<Valoracion[]>([]);
   const [relacionados, setRelacionados] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,8 +39,15 @@ export default function ProductoDetallePage() {
   const [favorito, setFavorito] = useState(false);
   const [paginaVal, setPaginaVal] = useState(1);
   const [totalVal, setTotalVal] = useState(0);
+  const [contactando, setContactando] = useState(false);
 
   const { agregarItem } = useCartStore();
+  const { profile } = useProfileStore();
+
+  const esDueno =
+    !!profile?.id &&
+    !!producto?.vendedor?.usuario_id &&
+    profile.id === producto.vendedor.usuario_id;
 
   useEffect(() => {
     if (!id) return;
@@ -124,6 +133,38 @@ export default function ProductoDetallePage() {
     });
   };
 
+  const handlePreguntarVendedor = async () => {
+    if (!producto) return;
+
+    if (!profile?.id) {
+      router.push(
+        `/login?redirect=${encodeURIComponent(`/marketplace/producto/${producto.id}`)}`,
+      );
+      return;
+    }
+
+    if (esDueno) {
+      sileo.error({
+        title: "No disponible",
+        description: "No podés chatear sobre tu propio producto.",
+      });
+      return;
+    }
+
+    setContactando(true);
+    try {
+      const conv = await ChatService.iniciarChatProducto(producto.id);
+      router.push(`/mensajes?c=${conv.id}`);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { error?: string } } })?.response?.data
+          ?.error || "No se pudo iniciar el chat con el vendedor.";
+      sileo.error({ title: "Error", description: message });
+    } finally {
+      setContactando(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-brand-black text-brand-white flex items-center justify-center">
@@ -139,10 +180,13 @@ export default function ProductoDetallePage() {
 
   if (!producto) return null;
 
-  const imagenes =
+  const imagenes: string[] =
     producto.imagenes?.length > 0
       ? producto.imagenes
-      : [producto.thumbnail_url].filter(Boolean);
+      : ([producto.thumbnail_url].filter(Boolean) as string[]);
+
+  const promedioValoraciones = producto.promedio_valoraciones ?? 0;
+  const totalValoraciones = producto.total_valoraciones ?? 0;
 
   return (
     <div className="min-h-screen bg-brand-black text-brand-white pb-20">
@@ -239,7 +283,7 @@ export default function ProductoDetallePage() {
                     <Star
                       key={i}
                       className={`size-4 ${
-                        i < Math.round(producto.promedio_valoraciones)
+                        i < Math.round(promedioValoraciones)
                           ? "fill-amber-400"
                           : "text-gray-600"
                       }`}
@@ -247,9 +291,9 @@ export default function ProductoDetallePage() {
                   ))}
                 </div>
                 <span className="font-bold text-brand-white">
-                  {producto.promedio_valoraciones}
+                  {promedioValoraciones}
                 </span>
-                <span>({producto.total_valoraciones} valoraciones)</span>
+                <span>({totalValoraciones} valoraciones)</span>
               </div>
 
               {/* Descripción */}
@@ -345,6 +389,19 @@ export default function ProductoDetallePage() {
                   <span>Añadir al Carrito</span>
                 </button>
 
+                {!esDueno && (
+                  <button
+                    onClick={handlePreguntarVendedor}
+                    disabled={contactando}
+                    className="flex-1 border border-brand-chartreuse/40 text-brand-chartreuse font-bold text-sm py-4 px-6 rounded-2xl hover:bg-brand-chartreuse/10 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <MessageSquare className="size-4.5" />
+                    <span>
+                      {contactando ? "Abriendo..." : "Preguntar al vendedor"}
+                    </span>
+                  </button>
+                )}
+
                 <button
                   onClick={handleToggleFavorito}
                   className="size-13 rounded-2xl border border-brand-white/10 hover:border-brand-white/20 flex items-center justify-center text-gray-400 hover:text-brand-white transition-colors cursor-pointer"
@@ -389,34 +446,47 @@ export default function ProductoDetallePage() {
             </div>
           </div>
 
-          <div className="flex gap-8 border-t md:border-t-0 border-brand-white/5 pt-4 md:pt-0">
-            <div className="text-center">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                Valoración
-              </span>
-              <div className="flex items-center gap-1 mt-1 justify-center">
-                <Star className="size-4 text-amber-400 fill-amber-400" />
-                <span className="font-black text-sm">
-                  {producto.vendedor.valoracion_promedio}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 md:gap-6">
+            <div className="flex gap-8 border-t md:border-t-0 border-brand-white/5 pt-4 md:pt-0">
+              <div className="text-center">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Valoración
+                </span>
+                <div className="flex items-center gap-1 mt-1 justify-center">
+                  <Star className="size-4 text-amber-400 fill-amber-400" />
+                  <span className="font-black text-sm">
+                    {producto.vendedor.valoracion_promedio}
+                  </span>
+                </div>
+              </div>
+              <div className="text-center">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Ventas
+                </span>
+                <span className="font-black text-sm block mt-1">
+                  {producto.vendedor.total_ventas}
+                </span>
+              </div>
+              <div className="text-center">
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+                  Provincia
+                </span>
+                <span className="font-bold text-sm block mt-1 text-gray-300">
+                  {producto.vendedor.provincia || "No especificada"}
                 </span>
               </div>
             </div>
-            <div className="text-center">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                Ventas
-              </span>
-              <span className="font-black text-sm block mt-1">
-                {producto.vendedor.total_ventas}
-              </span>
-            </div>
-            <div className="text-center">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-                Provincia
-              </span>
-              <span className="font-bold text-sm block mt-1 text-gray-300">
-                {producto.vendedor.provincia || "No especificada"}
-              </span>
-            </div>
+
+            {!esDueno && (
+              <button
+                onClick={handlePreguntarVendedor}
+                disabled={contactando}
+                className="shrink-0 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/30 font-bold text-sm py-3 px-5 rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <MessageSquare className="size-4" />
+                {contactando ? "Abriendo..." : "Contactar"}
+              </button>
+            )}
           </div>
         </div>
 

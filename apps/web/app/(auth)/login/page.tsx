@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -18,7 +18,13 @@ import { PerfilService } from "@/utils/services/perfil";
 import { useProfileStore } from "@/store/useProfileStore";
 import { destinoPostLogin } from "@/utils/auth/roles";
 
-export default function AuthPage() {
+function safeRedirectPath(raw: string | null): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  return raw;
+}
+
+function AuthPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -27,6 +33,8 @@ export default function AuthPage() {
   const [rememberMe, setRememberMe] = useState(false);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = safeRedirectPath(searchParams.get("redirect"));
   const { setProfile } = useProfileStore();
 
   // Cargar email guardado si existe "Recordarme"
@@ -60,7 +68,7 @@ export default function AuthPage() {
 
         setProfile(data.usuario);
 
-        router.push(destinoPostLogin(data.usuario.rol));
+        router.push(redirectTo || destinoPostLogin(data.usuario.rol));
       } else {
         setError("No se pudo procesar la sesión. Formato inválido.");
       }
@@ -307,5 +315,19 @@ export default function AuthPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-dvh items-center justify-center bg-brand-black">
+          <div className="size-8 border-2 border-brand-chartreuse border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <AuthPageContent />
+    </Suspense>
   );
 }

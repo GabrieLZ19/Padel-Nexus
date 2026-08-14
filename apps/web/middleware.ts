@@ -7,6 +7,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isPlayerRoute = pathname.startsWith("/mi-perfil");
+  const isMensajesRoute = pathname.startsWith("/mensajes");
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isClubRoute = pathname.startsWith("/club");
   const isAuthRoute =
@@ -16,8 +17,15 @@ export function middleware(request: NextRequest) {
   // --- REGLAS DE ACCESO BASADAS EN COOKIES DE API ---
 
   // 1. Si no hay token e intenta entrar a áreas privadas
-  if (!token && (isPlayerRoute || isDashboardRoute || isClubRoute)) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (
+    !token &&
+    (isPlayerRoute || isMensajesRoute || isDashboardRoute || isClubRoute)
+  ) {
+    const loginUrl = new URL("/login", request.url);
+    if (isMensajesRoute) {
+      loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
+    }
+    return NextResponse.redirect(loginUrl);
   }
 
   // 2. Si es admin_club

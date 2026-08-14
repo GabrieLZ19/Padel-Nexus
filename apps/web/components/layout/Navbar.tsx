@@ -17,10 +17,12 @@ import {
   Sun,
   Moon,
   ShoppingCart,
+  MessageSquare,
 } from "lucide-react";
 import Image from "next/image";
 import { useProfileStore } from "@/store/useProfileStore";
 import { useCartStore } from "@/store/useCartStore";
+import { ChatService } from "@/utils/services/chat";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 import CartDrawer from "@/components/marketplace/CartDrawer";
 
@@ -32,6 +34,7 @@ export default function Navbar() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartMounted, setCartMounted] = useState(false);
+  const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0);
 
   const { totalItems } = useCartStore();
 
@@ -41,6 +44,29 @@ export default function Navbar() {
 
   // Consumo exclusivo del Store de Zustand centralizado
   const { profile, fetchProfile, clearProfile } = useProfileStore();
+
+  useEffect(() => {
+    if (!profile?.id) {
+      setMensajesNoLeidos(0);
+      return;
+    }
+
+    const loadNoLeidos = () => {
+      ChatService.getNoLeidos()
+        .then(setMensajesNoLeidos)
+        .catch(() => setMensajesNoLeidos(0));
+    };
+
+    loadNoLeidos();
+    const interval = setInterval(loadNoLeidos, 30000);
+    const onNotification = () => loadNoLeidos();
+    window.addEventListener("chat_notification", onNotification);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("chat_notification", onNotification);
+    };
+  }, [profile?.id]);
 
   const [theme, setTheme] = useState<"light" | "dark">("dark");
 
@@ -104,6 +130,7 @@ export default function Navbar() {
     { name: "Torneos", path: "/torneos" },
     { name: "Ranking", path: "/ranking" },
     { name: "Reservar", path: "/reservar" },
+    { name: "Partidos", path: "/partidos" },
     { name: "Marketplace", path: "/marketplace" },
     { name: "Clubes", path: "/clubes" },
   ];
@@ -192,6 +219,22 @@ export default function Navbar() {
           {/* Centro de Notificaciones */}
           <NotificationCenter />
 
+          {/* Mensajes */}
+          {profile && (
+            <Link
+              href="/mensajes"
+              className="w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200 relative"
+              title="Mensajes"
+            >
+              <MessageSquare className="size-5" />
+              {mensajesNoLeidos > 0 && (
+                <span className="absolute -top-1 -right-1 bg-brand-chartreuse text-brand-black text-[10px] font-bold rounded-full min-w-4.5 h-4.5 px-1 flex items-center justify-center">
+                  {mensajesNoLeidos > 99 ? "99+" : mensajesNoLeidos}
+                </span>
+              )}
+            </Link>
+          )}
+
           {/* Icono de Carrito con Badge */}
           <button
             onClick={() => setIsCartOpen(true)}
@@ -267,6 +310,20 @@ export default function Navbar() {
                       >
                         <LayoutDashboard className="size-4 text-gray-400" /> Mi
                         Panel
+                      </Link>
+
+                      <Link
+                        href="/mensajes"
+                        onClick={() => setIsDropdownOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-brand-white hover:bg-brand-white/5 transition-colors"
+                      >
+                        <MessageSquare className="size-4 text-gray-400" />{" "}
+                        Mensajes
+                        {mensajesNoLeidos > 0 && (
+                          <span className="ml-auto bg-brand-chartreuse text-brand-black text-[10px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
+                            {mensajesNoLeidos > 99 ? "99+" : mensajesNoLeidos}
+                          </span>
+                        )}
                       </Link>
 
                       <Link
@@ -393,6 +450,18 @@ export default function Navbar() {
                     className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white rounded-2xl transition-colors"
                   >
                     <LayoutDashboard className="size-4" /> Mi Panel
+                  </Link>
+                  <Link
+                    href="/mensajes"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white rounded-2xl transition-colors"
+                  >
+                    <MessageSquare className="size-4" /> Mensajes
+                    {mensajesNoLeidos > 0 && (
+                      <span className="ml-auto bg-brand-chartreuse text-brand-black text-[10px] font-bold rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">
+                        {mensajesNoLeidos > 99 ? "99+" : mensajesNoLeidos}
+                      </span>
+                    )}
                   </Link>
                   <Link
                     href="/mi-perfil/ajustes"

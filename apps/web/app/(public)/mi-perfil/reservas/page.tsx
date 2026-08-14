@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
   Calendar,
@@ -14,8 +15,13 @@ import {
   XCircle,
   Loader2,
   ExternalLink,
+  UserPlus,
+  X,
 } from "lucide-react";
+import { isAxiosError } from "axios";
 import { ReservasService } from "@/utils/services/reservas";
+import { PartidosService } from "@/utils/services/partidos";
+import { NIVELES_PARTIDO } from "@/utils/types";
 import { sileo } from "sileo";
 
 interface ReservaUsuario {
@@ -55,15 +61,41 @@ interface ReservaUsuario {
 }
 
 export default function MisReservasPage() {
+  const router = useRouter();
   const [reservas, setReservas] = useState<ReservaUsuario[]>([]);
   const [loading, setLoading] = useState(true);
+  const [partidosPorReserva, setPartidosPorReserva] = useState<
+    Record<string, { id: string; estado: string }>
+  >({});
+
+  const [modalReserva, setModalReserva] = useState<ReservaUsuario | null>(null);
+  const [nivel, setNivel] = useState<string>(NIVELES_PARTIDO[1]);
+  const [cupos, setCupos] = useState(1);
+  const [notas, setNotas] = useState("");
+  const [publicando, setPublicando] = useState(false);
 
   const fetchReservas = useCallback(async () => {
     setLoading(true);
     try {
       const res = await ReservasService.getMisReservas();
-      setReservas(res || []);
-    } catch (err: any) {
+      const lista = res || [];
+      setReservas(lista);
+
+      const map: Record<string, { id: string; estado: string }> = {};
+      await Promise.all(
+        lista
+          .filter((r: ReservaUsuario) => r.estado_reserva === "confirmada")
+          .map(async (r: ReservaUsuario) => {
+            try {
+              const partido = await PartidosService.getPorReserva(r.id);
+              if (partido) map[r.id] = partido;
+            } catch {
+              // ignore
+            }
+          }),
+      );
+      setPartidosPorReserva(map);
+    } catch (err: unknown) {
       console.error("Error al obtener reservas del usuario:", err);
       sileo.error({
         title: "Error al Cargar",
@@ -110,9 +142,52 @@ export default function MisReservasPage() {
     return `${dias[date.getUTCDay()]} ${date.getUTCDate()} de ${meses[date.getUTCMonth()]}`;
   };
 
+  const esReservaFutura = (fecha: string) => {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const f = new Date(`${fecha}T12:00:00`);
+    return f >= hoy;
+  };
+
+  const openModal = (reserva: ReservaUsuario) => {
+    setModalReserva(reserva);
+    setNivel(NIVELES_PARTIDO[1]);
+    setCupos(1);
+    setNotas("");
+  };
+
+  const handlePublicar = async () => {
+    if (!modalReserva) return;
+    setPublicando(true);
+    try {
+      const partido = await PartidosService.publicar({
+        reserva_id: modalReserva.id,
+        nivel_requerido: nivel,
+        jugadores_faltantes: cupos,
+        notas: notas.trim() || undefined,
+      });
+      sileo.success({
+        title: "Partido publicado",
+        description: "Tu convocatoria ya está visible en Partidos.",
+      });
+      setModalReserva(null);
+      setPartidosPorReserva((prev) => ({
+        ...prev,
+        [modalReserva.id]: { id: partido.id, estado: partido.estado },
+      }));
+      router.push("/partidos");
+    } catch (err: unknown) {
+      const message = isAxiosError(err)
+        ? err.response?.data?.error || "No se pudo publicar el partido."
+        : "No se pudo publicar el partido.";
+      sileo.error({ title: "Error", description: message });
+    } finally {
+      setPublicando(false);
+    }
+  };
+
   return (
     <main className="max-w-5xl mx-auto p-5 md:p-10 space-y-8 min-h-screen">
-      {/* Encabezado */}
       <header className="border-b border-brand-white/5 pb-6">
         <Link
           href="/mi-perfil"
@@ -124,11 +199,11 @@ export default function MisReservasPage() {
           Mis Reservas
         </h1>
         <p className="text-gray-400 mt-1.5 text-sm">
-          Consultá el estado de tus turnos reservados y pagos pendientes.
+          Consultá el estado de tus turnos reservados y publicá “Busco 4to”
+          desde una reserva confirmada.
         </p>
       </header>
 
-      {/* Listado */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-brand-chartreuse" />
@@ -165,26 +240,36 @@ export default function MisReservasPage() {
 
             const isPaid = reserva.estado_pago === "completado";
             const isPayPending = reserva.estado_pago === "pendiente";
-            const isPayRejected = reserva.estado_pago === "rechazado";
 
-            // Buscar pago activo/reciente
-            const activePayment = reserva.pagos && reserva.pagos.length > 0
-              ? reserva.pagos[0]
-              : null;
+            const activePayment =
+              reserva.pagos && reserva.pagos.length > 0
+                ? reserva.pagos[0]
+                : null;
 
-            // Determinar si es transferencia pendiente de aprobación (en revisión)
-            const isWaitingValidation = activePayment &&
+            const isWaitingValidation =
+              activePayment &&
               activePayment.metodo_pago === "transferencia" &&
               activePayment.estado === "pendiente";
 
-            // Etiqueta del método de pago
             let paymentMethodLabel = "";
             if (activePayment) {
-              if (activePayment.metodo_pago === "transferencia") paymentMethodLabel = "Transferencia";
-              else if (activePayment.metodo_pago === "efectivo") paymentMethodLabel = "Efectivo";
-              else if (activePayment.metodo_pago === "mercadopago" || activePayment.metodo_pago === "MercadoPago") paymentMethodLabel = "MercadoPago";
+              if (activePayment.metodo_pago === "transferencia")
+                paymentMethodLabel = "Transferencia";
+              else if (activePayment.metodo_pago === "efectivo")
+                paymentMethodLabel = "Efectivo";
+              else if (
+                activePayment.metodo_pago === "mercadopago" ||
+                activePayment.metodo_pago === "MercadoPago"
+              )
+                paymentMethodLabel = "MercadoPago";
               else paymentMethodLabel = activePayment.metodo_pago;
             }
+
+            const partidoExistente = partidosPorReserva[reserva.id];
+            const puedePublicar =
+              isConfirmed &&
+              esReservaFutura(reserva.fecha_reserva) &&
+              !partidoExistente;
 
             return (
               <div
@@ -192,7 +277,6 @@ export default function MisReservasPage() {
                 className="bg-brand-card border border-white/10 rounded-2xl p-6 flex flex-col justify-between gap-5 hover:border-white/20 transition-all duration-300 relative overflow-hidden"
               >
                 <div className="space-y-4">
-                  {/* Fila superior: Club y Estado de la reserva */}
                   <div className="flex justify-between items-start ">
                     <div className="flex items-start gap-2.5">
                       <Building2 className="w-4 h-4 text-brand-chartreuse shrink-0 mt-1" />
@@ -235,7 +319,6 @@ export default function MisReservasPage() {
                     </span>
                   </div>
 
-                  {/* Detalles de la cancha y horario */}
                   <div className="border-t border-white/5 pt-3.5 grid grid-cols-2 gap-4 text-xs text-gray-300">
                     <div className="space-y-1">
                       <p className="text-gray-500 uppercase tracking-wider font-semibold">
@@ -266,57 +349,169 @@ export default function MisReservasPage() {
                   </div>
                 </div>
 
-                {/* Pie: Precio y estado del pago */}
-                <div className="border-t border-white/5 pt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-auto">
-                  <div className="flex items-center gap-1.5 text-sm text-gray-400">
-                    <DollarSign className="w-4 h-4 text-gray-500" />
-                    <span>Precio:</span>
-                    <span className="text-white font-extrabold text-lg">
-                      ${turno?.precio ?? 0}
-                    </span>
+                <div className="border-t border-white/5 pt-4 flex flex-col gap-3 mt-auto">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-1.5 text-sm text-gray-400">
+                      <DollarSign className="w-4 h-4 text-gray-500" />
+                      <span>Precio:</span>
+                      <span className="text-white font-extrabold text-lg">
+                        ${turno?.precio ?? 0}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {paymentMethodLabel && (
+                        <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider px-2 py-1 bg-white/5 border border-white/10 text-gray-300 rounded-lg">
+                          {paymentMethodLabel}
+                        </span>
+                      )}
+
+                      {isPaid && (
+                        <span className="inline-flex items-center gap-1 text-[9px] md:text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-lg">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Pago Aprobado
+                        </span>
+                      )}
+
+                      {isWaitingValidation && (
+                        <span className="inline-flex items-center gap-1.5 text-[9px] md:text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-yellow-500/10 text-yellow-400 border border-yellow-500/25 rounded-lg animate-pulse">
+                          <Loader2 className="w-3 h-3 animate-spin text-yellow-400" />{" "}
+                          En revisión
+                        </span>
+                      )}
+
+                      {isPayPending && !isWaitingValidation && (
+                        <span className="inline-flex items-center gap-1 text-[9px] md:text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg">
+                          <AlertTriangle className="w-3.5 h-3.5" /> Pago
+                          Pendiente
+                        </span>
+                      )}
+
+                      {isPayPending && !isCancelled && !isWaitingValidation && (
+                        <Link
+                          href={`/reservar/checkout/${reserva.id}`}
+                          className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-brand-chartreuse hover:brightness-110 text-black font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer ml-1"
+                        >
+                          Pagar Ahora <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* Método de pago utilizado */}
-                    {paymentMethodLabel && (
-                      <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider px-2 py-1 bg-white/5 border border-white/10 text-gray-300 rounded-lg">
-                        {paymentMethodLabel}
-                      </span>
-                    )}
+                  {puedePublicar && (
+                    <button
+                      onClick={() => openModal(reserva)}
+                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-brand-chartreuse/40 text-brand-chartreuse text-sm font-bold hover:bg-brand-chartreuse/10 transition-colors cursor-pointer"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      Busco 4to
+                    </button>
+                  )}
 
-                    {/* Badge de estado de pago */}
-                    {isPaid && (
-                      <span className="inline-flex items-center gap-1 text-[9px] md:text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-lg">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Pago Aprobado
-                      </span>
-                    )}
-
-                    {isWaitingValidation && (
-                      <span className="inline-flex items-center gap-1.5 text-[9px] md:text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-yellow-500/10 text-yellow-400 border border-yellow-500/25 rounded-lg animate-pulse">
-                        <Loader2 className="w-3 h-3 animate-spin text-yellow-400" /> En revisión
-                      </span>
-                    )}
-
-                    {isPayPending && !isWaitingValidation && (
-                      <span className="inline-flex items-center gap-1 text-[9px] md:text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg">
-                        <AlertTriangle className="w-3.5 h-3.5" /> Pago Pendiente
-                      </span>
-                    )}
-
-                    {/* Botón Pagar Ahora */}
-                    {isPayPending && !isCancelled && !isWaitingValidation && (
-                      <Link
-                        href={`/reservar/checkout/${reserva.id}`}
-                        className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-brand-chartreuse hover:brightness-110 text-black font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer ml-1"
-                      >
-                        Pagar Ahora <ExternalLink className="w-3 h-3" />
-                      </Link>
-                    )}
-                  </div>
+                  {partidoExistente && (
+                    <Link
+                      href="/partidos"
+                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl bg-brand-white/5 border border-brand-white/10 text-gray-300 text-xs font-bold hover:text-brand-white transition-colors"
+                    >
+                      Partido publicado ({partidoExistente.estado}) — Ver
+                      listado
+                    </Link>
+                  )}
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {modalReserva && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/70"
+            aria-label="Cerrar"
+            onClick={() => setModalReserva(null)}
+          />
+          <div className="relative w-full max-w-md bg-brand-card border border-brand-white/10 rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black text-white">Busco 4to</h2>
+                <p className="text-xs text-gray-400 mt-1">
+                  Publicá tu reserva para completar el partido.
+                </p>
+              </div>
+              <button
+                onClick={() => setModalReserva(null)}
+                className="p-2 rounded-xl hover:bg-brand-white/5 text-gray-400 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-gray-400 bg-brand-black/40 border border-brand-white/5 rounded-xl px-3 py-2.5 space-y-1">
+              <p className="font-bold text-white">
+                {modalReserva.turnos?.canchas?.clubes?.nombre || "Club"}
+              </p>
+              <p>
+                {formatFecha(modalReserva.fecha_reserva)} ·{" "}
+                {formatHora(modalReserva.turnos?.hora_inicio)} -{" "}
+                {formatHora(modalReserva.turnos?.hora_fin)}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
+                Nivel requerido
+              </label>
+              <select
+                value={nivel}
+                onChange={(e) => setNivel(e.target.value)}
+                className="w-full bg-brand-black border border-brand-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-chartreuse/50"
+              >
+                {NIVELES_PARTIDO.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
+                Jugadores faltantes
+              </label>
+              <select
+                value={cupos}
+                onChange={(e) => setCupos(Number(e.target.value))}
+                className="w-full bg-brand-black border border-brand-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-chartreuse/50"
+              >
+                <option value={1}>1 jugador</option>
+                <option value={2}>2 jugadores</option>
+                <option value={3}>3 jugadores</option>
+              </select>
+
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
+                Notas (opcional)
+              </label>
+              <textarea
+                value={notas}
+                onChange={(e) => setNotas(e.target.value)}
+                rows={3}
+                placeholder="Ej: traer pelotas, nivel amistoso..."
+                className="w-full bg-brand-black border border-brand-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 resize-none"
+              />
+            </div>
+
+            <button
+              onClick={handlePublicar}
+              disabled={publicando}
+              className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-brand-chartreuse text-black font-bold text-sm hover:opacity-90 disabled:opacity-50 cursor-pointer"
+            >
+              {publicando ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <UserPlus className="w-4 h-4" />
+              )}
+              Publicar convocatoria
+            </button>
+          </div>
         </div>
       )}
     </main>

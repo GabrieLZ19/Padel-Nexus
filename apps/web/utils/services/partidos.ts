@@ -1,29 +1,36 @@
 import { api } from "../api";
-import { Partido } from "../types";
+import type {
+  FiltrosPartidosAbiertos,
+  PartidoAbierto,
+  PublicarPartidoAbiertoPayload,
+} from "../types";
 
 export const PartidosService = {
-  async getAbiertos(params?: {
-    categoria?: string;
-    club_id?: string;
-  }): Promise<Partido[]> {
-    const response = await api.get<Partido[]>("/partidos/abiertos", { params });
-    return response.data;
+  async getAbiertos(
+    params?: FiltrosPartidosAbiertos,
+  ): Promise<PartidoAbierto[]> {
+    const { data } = await api.get("/partidos/abiertos", { params });
+    return data.data || [];
   },
 
-  async publicar(data: {
-    club_id: string;
-    categoria: string;
-    franja_horaria: string;
-    cupos_totales: number;
-  }): Promise<Partido> {
-    const response = await api.post<Partido>("/partidos/publicar", data);
-    return response.data;
+  async publicar(
+    payload: PublicarPartidoAbiertoPayload,
+  ): Promise<PartidoAbierto> {
+    const { data } = await api.post("/partidos/publicar", payload);
+    return data.data;
   },
 
-  async unirse(partidoId: string | number): Promise<{ message: string }> {
-    const response = await api.post<{ message: string }>(
-      `/partidos/${partidoId}/unirse`,
-    );
-    return response.data;
+  async unirse(
+    partidoId: string,
+  ): Promise<{ nuevosFaltantes: number; estado: string; mensaje?: string }> {
+    const { data } = await api.post(`/partidos/${partidoId}/unirse`);
+    return data;
+  },
+
+  async getPorReserva(
+    reservaId: string,
+  ): Promise<{ id: string; estado: string } | null> {
+    const { data } = await api.get(`/partidos/por-reserva/${reservaId}`);
+    return data.data || null;
   },
 };
