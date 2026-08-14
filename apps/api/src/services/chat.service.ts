@@ -1,6 +1,16 @@
 import { supabaseAdmin } from "../config/supabase";
 import { ROLES_ADMINISTRATIVOS } from "../constants/roles";
 
+type ChatTipo = "directo" | "soporte" | "marketplace";
+
+interface ChatProductoResumen {
+  id: string;
+  nombre: string;
+  precio: number;
+  thumbnail_url: string | null;
+  imagenes: string[] | null;
+}
+
 export class ChatService {
   /**
    * Lista las conversaciones del usuario con último mensaje, perfil del otro participante y no leídos.
@@ -20,12 +30,32 @@ export class ChatService {
     // 2. Obtener datos de cada conversación
     const { data: conversaciones, error: convError } = await supabaseAdmin
       .from("chat_conversaciones")
-      .select("id, creado_por, tipo, created_at")
+      .select("id, creado_por, tipo, created_at, producto_id")
       .in("id", convIds)
       .order("created_at", { ascending: false });
 
     if (convError) throw new Error("Error al obtener datos de conversaciones.");
     if (!conversaciones) return [];
+
+    const productoIds = [
+      ...new Set(
+        conversaciones
+          .map((c) => c.producto_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+
+    const productosMap = new Map<string, ChatProductoResumen>();
+    if (productoIds.length > 0) {
+      const { data: productos } = await supabaseAdmin
+        .from("marketplace_productos")
+        .select("id, nombre, precio, thumbnail_url, imagenes")
+        .in("id", productoIds);
+
+      for (const p of productos || []) {
+        productosMap.set(p.id, p);
+      }
+    }
 
     // 3. Para cada conversación, obtener el otro participante + último mensaje + no leídos
     const resultado = await Promise.all(
@@ -76,11 +106,16 @@ export class ChatService {
           .neq("remitente_id", usuarioId)
           .eq("leido", false);
 
+        const producto = conv.producto_id
+          ? productosMap.get(conv.producto_id) || null
+          : null;
+
         return {
           ...conv,
           otro_participante: otroParticipante,
           ultimo_mensaje: ultimoMensaje || null,
           no_leidos: noLeidos || 0,
+          producto,
         };
       }),
     );
@@ -145,12 +180,13 @@ export class ChatService {
   }
 
   /**
-   * Inicia una conversación directa. Si ya existe una entre ambos, la reutiliza.
+   * Inicia una conversación directa o de marketplace. Si ya existe, la reutiliza.
    */
   static async iniciarConversacion(
     creadorId: string,
     destinatarioId: string,
-    tipo: "directo" | "soporte" = "directo",
+    tipo: ChatTipo = "directo",
+    productoId?: string | null,
   ) {
     // Verificar que el destinatario existe
     const { data: destinatario } = await supabaseAdmin
@@ -163,6 +199,9 @@ export class ChatService {
       throw new Error("El usuario destinatario no existe.");
     }
 
+    const productoIdNormalizado =
+      tipo === "marketplace" ? productoId || null : null;
+
     // Buscar conversación existente del mismo tipo entre ambos
     const { data: convExistente } = await supabaseAdmin.rpc(
       "buscar_conversacion_existente",
@@ -170,6 +209,7 @@ export class ChatService {
         usuario_a: creadorId,
         usuario_b: destinatarioId,
         tipo_conv: tipo,
+        p_producto_id: productoIdNormalizado,
       },
     );
 
@@ -179,9 +219,19 @@ export class ChatService {
     }
 
     // Crear nueva conversación
+    const insertPayload: {
+      creado_por: string;
+      tipo: ChatTipo;
+      producto_id?: string;
+    } = { creado_por: creadorId, tipo };
+
+    if (productoIdNormalizado) {
+      insertPayload.producto_id = productoIdNormalizado;
+    }
+
     const { data: nuevaConv, error: convError } = await supabaseAdmin
       .from("chat_conversaciones")
-      .insert({ creado_por: creadorId, tipo })
+      .insert(insertPayload)
       .select("id")
       .single();
 
@@ -202,6 +252,55 @@ export class ChatService {
     }
 
     return { id: nuevaConv.id, nueva: true };
+  }
+
+  /**
+   * Inicia chat de marketplace ligado a un producto.
+   * Resuelve el vendedor desde el listing y reutiliza conversación existente.
+   */
+  static async iniciarConversacionMarketplace(
+    compradorId: string,
+    productoId: string,
+  ) {
+    const { data: producto, error } = await supabaseAdmin
+      .from("marketplace_productos")
+      .select(
+        "id, activo, vendedor:marketplace_vendedores!inner(usuario_id, estado)",
+      )
+      .eq("id", productoId)
+      .single();
+
+    if (error || !producto) {
+      throw new Error("El producto no existe.");
+    }
+
+    if (!producto.activo) {
+      throw new Error("El producto no está disponible.");
+    }
+
+    const vendedor = producto.vendedor as unknown as {
+      usuario_id: string;
+      estado: string;
+    };
+
+    if (!vendedor?.usuario_id) {
+      throw new Error("No se pudo resolver el vendedor del producto.");
+    }
+
+    if (vendedor.estado !== "activo") {
+      throw new Error("El vendedor no está activo.");
+    }
+
+    if (vendedor.usuario_id === compradorId) {
+      throw new Error("No puede chatear consigo mismo sobre su propio producto.");
+    }
+
+    return this.iniciarConversacion(
+      compradorId,
+      vendedor.usuario_id,
+      "marketplace",
+      productoId,
+    );
   }
 
   /**

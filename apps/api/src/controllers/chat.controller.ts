@@ -40,17 +40,31 @@ export class ChatController {
 
   /**
    * POST /api/mensajes/conversaciones
-   * Inicia una conversación directa con otro usuario.
+   * Inicia una conversación directa o de marketplace (con producto_id).
    */
   static async iniciarConversacion(req: Request, res: Response) {
     try {
       const creadorId = req.user!.id;
-      const { destinatario_id } = req.body;
+      const { destinatario_id, producto_id } = req.body as {
+        destinatario_id?: string;
+        producto_id?: string;
+      };
+
+      if (producto_id) {
+        const data = await ChatService.iniciarConversacionMarketplace(
+          creadorId,
+          producto_id,
+        );
+        return res
+          .status(data.nueva ? 201 : 200)
+          .json({ exito: true, data });
+      }
 
       if (!destinatario_id) {
-        return res
-          .status(400)
-          .json({ exito: false, error: "Se requiere destinatario_id." });
+        return res.status(400).json({
+          exito: false,
+          error: "Se requiere destinatario_id o producto_id.",
+        });
       }
 
       if (destinatario_id === creadorId) {

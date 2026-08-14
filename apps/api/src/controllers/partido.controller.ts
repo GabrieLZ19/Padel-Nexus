@@ -14,12 +14,10 @@ export const PartidosController = {
         !jugadores_faltantes ||
         !creadorId
       ) {
-        return res
-          .status(400)
-          .json({
-            exito: false,
-            error: "Faltan datos obligatorios para abrir el partido.",
-          });
+        return res.status(400).json({
+          exito: false,
+          error: "Faltan datos obligatorios para abrir el partido.",
+        });
       }
 
       const data = await PartidoService.publicarPartidoAbierto({
@@ -36,16 +34,33 @@ export const PartidosController = {
         error instanceof Error
           ? error.message
           : "Error al crear el partido abierto.";
-      return res.status(500).json({ exito: false, error: message });
+      const status =
+        message.includes("Solo") ||
+        message.includes("Ya existe") ||
+        message.includes("debe ser") ||
+        message.includes("obligatorio") ||
+        message.includes("no existe")
+          ? 400
+          : 500;
+      return res.status(status).json({ exito: false, error: message });
     }
   },
 
   async getPartidosAbiertos(req: Request, res: Response): Promise<Response> {
     try {
-      const { nivel_requerido } = req.query;
-      const data = await PartidoService.obtenerPartidosAbiertos(
-        nivel_requerido as string | undefined,
-      );
+      const { nivel_requerido, provincia, localidad, franja } = req.query;
+
+      const franjaValida =
+        franja === "manana" || franja === "tarde" || franja === "noche"
+          ? franja
+          : undefined;
+
+      const data = await PartidoService.obtenerPartidosAbiertos({
+        nivelRequerido: (nivel_requerido as string | undefined) || undefined,
+        provincia: (provincia as string | undefined) || undefined,
+        localidad: (localidad as string | undefined) || undefined,
+        franja: franjaValida,
+      });
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {
       const message =
@@ -62,9 +77,10 @@ export const PartidosController = {
       const jugadorId = req.user?.id;
 
       if (!partido_id || !jugadorId) {
-        return res
-          .status(400)
-          .json({ exito: false, error: "Parámetros de solicitud inválidos." });
+        return res.status(400).json({
+          exito: false,
+          error: "Parámetros de solicitud inválidos.",
+        });
       }
 
       const resultado = await PartidoService.unirseAPartidoExistente(
@@ -82,6 +98,24 @@ export const PartidosController = {
           ? error.message
           : "Error al intentar unirse al partido.";
       return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
+  async partidoPorReserva(req: Request, res: Response): Promise<Response> {
+    try {
+      const { reserva_id } = req.params;
+      if (!reserva_id) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "reserva_id requerido." });
+      }
+
+      const data = await PartidoService.tienePartidoParaReserva(reserva_id);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al consultar partido.";
+      return res.status(500).json({ exito: false, error: message });
     }
   },
 };
