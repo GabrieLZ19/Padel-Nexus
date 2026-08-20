@@ -81,8 +81,12 @@ export class SocketService {
               );
 
               if (!destEstaEnSala) {
+                const tipo = await ChatService.obtenerTipoConversacion(
+                  data.conversacion_id,
+                );
                 this.emitirAPersona(destId, "chat_notification", {
                   conversacion_id: data.conversacion_id,
+                  tipo,
                   mensaje,
                 });
               }

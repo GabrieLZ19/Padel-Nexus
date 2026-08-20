@@ -108,11 +108,19 @@ export class ChatController {
   /**
    * GET /api/mensajes/no-leidos
    * Retorna el total de mensajes no leídos del usuario.
+   * Query opcional: ?tipo=directo|soporte|marketplace
    */
   static async contarNoLeidos(req: Request, res: Response) {
     try {
       const usuarioId = req.user!.id;
-      const total = await ChatService.contarNoLeidos(usuarioId);
+      const tipoRaw = typeof req.query.tipo === "string" ? req.query.tipo : undefined;
+      const tipoValido =
+        tipoRaw === "directo" ||
+        tipoRaw === "soporte" ||
+        tipoRaw === "marketplace"
+          ? tipoRaw
+          : undefined;
+      const total = await ChatService.contarNoLeidos(usuarioId, tipoValido);
       return res.status(200).json({ exito: true, total });
     } catch (error: unknown) {
       const message =

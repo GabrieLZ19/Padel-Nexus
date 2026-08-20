@@ -386,7 +386,10 @@ export class ChatService {
   /**
    * Cuenta el total de mensajes no leídos del usuario en todas sus conversaciones.
    */
-  static async contarNoLeidos(usuarioId: string) {
+  static async contarNoLeidos(
+    usuarioId: string,
+    tipo?: ChatTipo,
+  ) {
     // Obtener las conversaciones del usuario
     const { data: participaciones } = await supabaseAdmin
       .from("chat_participantes")
@@ -395,7 +398,18 @@ export class ChatService {
 
     if (!participaciones || participaciones.length === 0) return 0;
 
-    const convIds = participaciones.map((p) => p.conversacion_id);
+    let convIds = participaciones.map((p) => p.conversacion_id);
+
+    if (tipo) {
+      const { data: conversaciones } = await supabaseAdmin
+        .from("chat_conversaciones")
+        .select("id")
+        .in("id", convIds)
+        .eq("tipo", tipo);
+
+      convIds = (conversaciones || []).map((c) => c.id);
+      if (convIds.length === 0) return 0;
+    }
 
     const { count } = await supabaseAdmin
       .from("chat_mensajes")
@@ -405,6 +419,18 @@ export class ChatService {
       .eq("leido", false);
 
     return count || 0;
+  }
+
+  static async obtenerTipoConversacion(
+    conversacionId: string,
+  ): Promise<ChatTipo | null> {
+    const { data } = await supabaseAdmin
+      .from("chat_conversaciones")
+      .select("tipo")
+      .eq("id", conversacionId)
+      .single();
+
+    return (data?.tipo as ChatTipo) || null;
   }
 
   /**
