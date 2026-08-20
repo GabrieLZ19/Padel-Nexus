@@ -139,11 +139,17 @@ export default function SoporteChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensajes, isTyping]);
 
-  // ── Chat notification listener (para no leídos cuando está cerrado) ─
+  // ── Chat notification listener (solo soporte, no directos/marketplace) ─
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      if (detail?.conversacion_id === conversacionId && !isOpen) {
+      if (isOpen) return;
+
+      const esSoporte =
+        detail?.tipo === "soporte" ||
+        (conversacionId && detail?.conversacion_id === conversacionId);
+
+      if (esSoporte) {
         setNoLeidos((prev) => prev + 1);
       }
     };
@@ -152,9 +158,9 @@ export default function SoporteChat() {
     return () => window.removeEventListener("chat_notification", handler);
   }, [conversacionId, isOpen]);
 
-  // ── Cargar no leídos al montar ──────────────────────────────────────
+  // ── Cargar no leídos de soporte al montar ───────────────────────────
   useEffect(() => {
-    ChatService.getNoLeidos()
+    ChatService.getNoLeidos("soporte")
       .then((total) => setNoLeidos(total))
       .catch(() => {});
   }, []);

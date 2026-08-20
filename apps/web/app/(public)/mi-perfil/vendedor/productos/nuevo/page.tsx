@@ -8,13 +8,13 @@ import {
   Upload, 
   Trash2, 
   Eye, 
-  FileText, 
   Sparkles,
   ShoppingBag
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { sileo } from "sileo";
+import CustomDropdown from "@/components/ui/CustomDropdown";
 
 function FormularioProductoContent() {
   const router = useRouter();
@@ -222,21 +222,14 @@ function FormularioProductoContent() {
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">Categoría</label>
-                <select
-                  required
+                <CustomDropdown
                   value={categoriaId}
-                  onChange={(e) => setCategoriaId(e.target.value)}
-                  className="w-full bg-brand-input border border-brand-white/10 rounded-xl px-4 py-3 text-sm focus:border-brand-chartreuse focus:outline-none transition-colors text-brand-white"
-                >
-                  <option value="">Selecciona categoría</option>
-                  {categorias
+                  onChange={setCategoriaId}
+                  placeholder="Selecciona categoría"
+                  options={categorias
                     .filter((c) => c.tipo === tipo)
-                    .map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.nombre}
-                      </option>
-                    ))}
-                </select>
+                    .map((cat) => ({ value: cat.id, label: cat.nombre }))}
+                />
               </div>
             </div>
 
@@ -319,15 +312,18 @@ function FormularioProductoContent() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-brand-black/25 p-5 rounded-2xl border border-brand-white/5">
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-brand-chartreuse uppercase">Modalidad del Servicio *</label>
-                  <select
+                  <CustomDropdown
                     value={modalidadServicio}
-                    onChange={(e: any) => setModalidadServicio(e.target.value)}
-                    className="w-full bg-brand-input border border-brand-white/10 rounded-xl px-4 py-3 text-sm focus:border-brand-chartreuse focus:outline-none transition-colors text-brand-white"
-                  >
-                    <option value="presencial">Presencial</option>
-                    <option value="online">Online / Remoto</option>
-                    <option value="ambas">Ambas modalidades</option>
-                  </select>
+                    onChange={(val) =>
+                      setModalidadServicio(val as "presencial" | "online" | "ambas")
+                    }
+                    placeholder="Selecciona modalidad"
+                    options={[
+                      { value: "presencial", label: "Presencial" },
+                      { value: "online", label: "Online / Remoto" },
+                      { value: "ambas", label: "Ambas modalidades" },
+                    ]}
+                  />
                 </div>
 
                 <div className="space-y-2">

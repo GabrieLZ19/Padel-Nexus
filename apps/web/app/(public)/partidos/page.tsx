@@ -23,6 +23,7 @@ import {
   type PartidoAbierto,
 } from "@/utils/types";
 import { sileo } from "sileo";
+import CustomDropdown from "@/components/ui/CustomDropdown";
 
 function formatFecha(fecha: string) {
   return new Date(`${fecha}T12:00:00`).toLocaleDateString("es-AR", {
@@ -144,18 +145,15 @@ export default function PartidosAbiertosPage() {
             Filtros
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <select
+            <CustomDropdown
               value={nivel}
-              onChange={(e) => setNivel(e.target.value)}
-              className="w-full bg-brand-black border border-brand-white/10 rounded-xl px-3 py-2.5 text-sm text-brand-white focus:outline-none focus:border-brand-chartreuse/50"
-            >
-              <option value="">Todos los niveles</option>
-              {NIVELES_PARTIDO.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
+              onChange={setNivel}
+              placeholder="Todos los niveles"
+              options={[
+                { value: "", label: "Todos los niveles" },
+                ...NIVELES_PARTIDO.map((n) => ({ value: n, label: n })),
+              ]}
+            />
 
             <input
               type="text"
@@ -176,18 +174,17 @@ export default function PartidosAbiertosPage() {
               className="w-full bg-brand-black border border-brand-white/10 rounded-xl px-3 py-2.5 text-sm text-brand-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50"
             />
 
-            <select
+            <CustomDropdown
               value={franja}
-              onChange={(e) =>
-                setFranja(e.target.value as "" | FranjaPartido)
-              }
-              className="w-full bg-brand-black border border-brand-white/10 rounded-xl px-3 py-2.5 text-sm text-brand-white focus:outline-none focus:border-brand-chartreuse/50"
-            >
-              <option value="">Cualquier franja</option>
-              <option value="manana">Mañana (&lt; 12hs)</option>
-              <option value="tarde">Tarde (12–18hs)</option>
-              <option value="noche">Noche (≥ 18hs)</option>
-            </select>
+              onChange={(val) => setFranja(val as "" | FranjaPartido)}
+              placeholder="Cualquier franja"
+              options={[
+                { value: "", label: "Cualquier franja" },
+                { value: "manana", label: "Mañana (< 12hs)" },
+                { value: "tarde", label: "Tarde (12–18hs)" },
+                { value: "noche", label: "Noche (≥ 18hs)" },
+              ]}
+            />
           </div>
         </div>
 

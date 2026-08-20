@@ -170,17 +170,18 @@ function AuthPageContent() {
               </div>
             )}
 
-            {/* BOTÓN INTERNACIONAL DE GOOGLE REDISEÑADO CON COMPATIBILIDAD V4 */}
+            {/* Google: colores literales (no brand-*) para no invertir en html.light */}
             <button
               onClick={handleGoogleOAuth}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 py-3.5 sm:py-4 bg-brand-white text-brand-black font-semibold rounded-xl border border-brand-white/20 hover:bg-gray-100 transition-all shadow-sm disabled:cursor-not-allowed disabled:opacity-70 text-sm sm:text-base cursor-pointer"
+              className="w-full flex items-center justify-center gap-3 py-3.5 sm:py-4 bg-white text-[#1f1f1f] font-semibold rounded-xl border border-[#dadce0] hover:bg-[#f8f9fa] hover:border-[#c6c6c6] transition-all shadow-sm disabled:cursor-not-allowed disabled:opacity-70 text-sm sm:text-base cursor-pointer"
             >
-              <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-brand-white shadow-sm">
+              <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white">
                 <svg
                   className="h-4 w-4 sm:h-5 sm:w-5"
                   viewBox="0 0 533.5 544.3"
                   xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden
                 >
                   <path
                     d="M533.5 278.4c0-17.4-1.4-34.1-4.1-50.3H272v95.1h146.9c-6.4 34.6-25.8 63.9-55 83.5v69.4h88.9c52.1-48 81.7-118.4 81.7-197.7z"

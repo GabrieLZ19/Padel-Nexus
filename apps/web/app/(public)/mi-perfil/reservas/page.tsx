@@ -23,6 +23,7 @@ import { ReservasService } from "@/utils/services/reservas";
 import { PartidosService } from "@/utils/services/partidos";
 import { NIVELES_PARTIDO } from "@/utils/types";
 import { sileo } from "sileo";
+import CustomDropdown from "@/components/ui/CustomDropdown";
 
 interface ReservaUsuario {
   id: string;
@@ -462,30 +463,26 @@ export default function MisReservasPage() {
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Nivel requerido
               </label>
-              <select
+              <CustomDropdown
                 value={nivel}
-                onChange={(e) => setNivel(e.target.value)}
-                className="w-full bg-brand-black border border-brand-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-chartreuse/50"
-              >
-                {NIVELES_PARTIDO.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+                onChange={setNivel}
+                placeholder="Selecciona nivel"
+                options={NIVELES_PARTIDO.map((n) => ({ value: n, label: n }))}
+              />
 
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Jugadores faltantes
               </label>
-              <select
-                value={cupos}
-                onChange={(e) => setCupos(Number(e.target.value))}
-                className="w-full bg-brand-black border border-brand-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand-chartreuse/50"
-              >
-                <option value={1}>1 jugador</option>
-                <option value={2}>2 jugadores</option>
-                <option value={3}>3 jugadores</option>
-              </select>
+              <CustomDropdown
+                value={String(cupos)}
+                onChange={(val) => setCupos(Number(val))}
+                placeholder="Selecciona cupos"
+                options={[
+                  { value: "1", label: "1 jugador" },
+                  { value: "2", label: "2 jugadores" },
+                  { value: "3", label: "3 jugadores" },
+                ]}
+              />
 
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Notas (opcional)

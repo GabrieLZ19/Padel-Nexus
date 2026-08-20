@@ -50,8 +50,12 @@ export class ChatService {
     return data.data;
   }
 
-  static async getNoLeidos(): Promise<number> {
-    const { data } = await api.get("/mensajes/no-leidos");
+  static async getNoLeidos(
+    tipo?: "directo" | "soporte" | "marketplace",
+  ): Promise<number> {
+    const { data } = await api.get("/mensajes/no-leidos", {
+      params: tipo ? { tipo } : undefined,
+    });
     const total = Number(data?.total);
     return Number.isFinite(total) && total > 0 ? total : 0;
   }

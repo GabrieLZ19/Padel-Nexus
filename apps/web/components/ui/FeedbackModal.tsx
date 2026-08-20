@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, AlertTriangle, Trash2, Info, X, XCircle } from "lucide-react";
+import CustomDropdown from "@/components/ui/CustomDropdown";
 
 export interface FeedbackModalProps {
   isOpen: boolean;
@@ -156,17 +157,13 @@ export default function FeedbackModal({
                     <label className="block text-xs font-bold text-gray-400 mb-1">
                       Método
                     </label>
-                    <select
+                    <CustomDropdown
                       value={selectValue}
-                      onChange={(e) => setSelectValue(e.target.value)}
-                      className="w-full bg-[#111111] text-white rounded-xl border border-white/10 px-4 py-3 focus:border-brand-chartreuse focus:ring-1 focus:ring-brand-chartreuse transition-colors"
-                    >
-                      {selectOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setSelectValue}
+                      placeholder="Selecciona método"
+                      options={selectOptions}
+                      haciaArriba
+                    />
                   </div>
                 )}
                 {showInput && (

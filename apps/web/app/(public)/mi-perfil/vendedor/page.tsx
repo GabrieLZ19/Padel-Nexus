@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { sileo } from "sileo";
+import CustomDropdown from "@/components/ui/CustomDropdown";
+import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
 
 export default function VendedorPerfilPage() {
   const { profile } = useProfileStore();
@@ -29,7 +31,17 @@ export default function VendedorPerfilPage() {
     "jugador" | "club" | "entrenador" | "tienda"
   >("jugador");
   const [descripcion, setDescripcion] = useState("");
-  const [provincia, setProvincia] = useState("La Rioja");
+  const [provincia, setProvincia] = useState("");
+
+  useEffect(() => {
+    const residencia = profile?.lugar_residencia?.trim();
+    if (
+      residencia &&
+      PROVINCIAS_ARG.some((p) => p.value === residencia)
+    ) {
+      setProvincia(residencia);
+    }
+  }, [profile?.lugar_residencia]);
 
   useEffect(() => {
     cargarDatosVendedor();
@@ -62,6 +74,13 @@ export default function VendedorPerfilPage() {
         title: "Error",
         description:
           "Por favor ingresa el nombre de tu tienda o perfil vendedor.",
+      });
+      return;
+    }
+    if (!provincia) {
+      sileo.error({
+        title: "Provincia requerida",
+        description: "Seleccioná tu provincia de la lista.",
       });
       return;
     }
@@ -142,35 +161,42 @@ export default function VendedorPerfilPage() {
               <label className="text-xs font-bold text-gray-400 uppercase">
                 Tipo de Vendedor *
               </label>
-              <select
+              <CustomDropdown
                 value={tipoVendedor}
-                onChange={(e: any) => setTipoVendedor(e.target.value)}
-                className="w-full bg-brand-input border border-brand-white/10 rounded-xl px-4 py-3 text-sm focus:border-brand-chartreuse focus:outline-none transition-colors text-brand-white"
-              >
-                <option value="jugador">
-                  Jugador Particular (Venta de equipamiento usado/nuevo)
-                </option>
-                <option value="club">
-                  Club Deportivo (Servicios, canchas, insumos)
-                </option>
-                <option value="entrenador">
-                  Profesor / Entrenador (Clases, academias)
-                </option>
-                <option value="tienda">Tienda Comercial / Marca</option>
-              </select>
+                onChange={(val) =>
+                  setTipoVendedor(
+                    val as "jugador" | "club" | "entrenador" | "tienda",
+                  )
+                }
+                placeholder="Selecciona tipo de vendedor"
+                options={[
+                  {
+                    value: "jugador",
+                    label:
+                      "Jugador Particular (Venta de equipamiento usado/nuevo)",
+                  },
+                  {
+                    value: "club",
+                    label: "Club Deportivo (Servicios, canchas, insumos)",
+                  },
+                  {
+                    value: "entrenador",
+                    label: "Profesor / Entrenador (Clases, academias)",
+                  },
+                  { value: "tienda", label: "Tienda Comercial / Marca" },
+                ]}
+              />
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-400 uppercase">
                 Provincia *
               </label>
-              <input
-                type="text"
-                required
-                placeholder="La Rioja, Córdoba, Buenos Aires..."
+              <CustomDropdown
                 value={provincia}
-                onChange={(e) => setProvincia(e.target.value)}
-                className="w-full bg-brand-input border border-brand-white/10 rounded-xl px-4 py-3 text-sm focus:border-brand-chartreuse focus:outline-none transition-colors text-brand-white"
+                onChange={setProvincia}
+                placeholder="Selecciona provincia"
+                options={PROVINCIAS_ARG}
               />
             </div>
 
