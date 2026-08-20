@@ -14,6 +14,7 @@ router.post("/recuperar-password", PerfilController.solicitarRecuperarPassword);
 router.get("/google", PerfilController.iniciarGoogleAuth);
 router.get("/google/callback", PerfilController.googleCallback);
 router.post("/google/verificar", PerfilController.verificarGoogleAuthToken);
+router.get("/publico/:id", PerfilController.getPerfilPublico);
 
 // ==========================================
 //  MIDDLEWARE DE INTERCEPTACIÓN GLOBAL
@@ -30,10 +31,16 @@ router.put("/me", PerfilController.updatePerfil);
 router.post("/avatar", PerfilController.subirAvatar);
 router.delete("/avatar", PerfilController.eliminarAvatar);
 
-// Acceso restringido exclusivamente a las jerarquías de administración FAP
+// Acceso restringido a jerarquías de administración (incl. admin de club)
 router.get(
   "/:id",
-  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  authorize([
+    "superadmin",
+    "admin_federacion",
+    "admin_provincial",
+    "admin",
+    "admin_club",
+  ]),
   PerfilController.getPerfilById,
 );
 

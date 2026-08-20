@@ -14,6 +14,7 @@ export type TorneoElegibilidad = {
   fecha?: string | null;
   fecha_cierre_inscripcion?: string | null;
   nivel?: string | null;
+  alcance?: string | null;
   categoria?: string | null;
   rama?: string | null;
   validar_edad?: boolean | null;
@@ -24,6 +25,15 @@ export type TorneoElegibilidad = {
   club_id?: string | null;
   asociacion_id?: string | null;
 };
+
+/** Torneo del circuito nacional FAP (alcance o nivel legacy). */
+export function esTorneoNacional(torneo: {
+  alcance?: string | null;
+  nivel?: string | null;
+}): boolean {
+  if (/nacional/i.test(String(torneo.alcance || "").trim())) return true;
+  return String(torneo.nivel || "").toLowerCase() === "nacional";
+}
 
 export function parseReglasArbitraje(
   raw: unknown,

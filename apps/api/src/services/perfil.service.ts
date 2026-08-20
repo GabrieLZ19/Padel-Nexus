@@ -20,7 +20,7 @@ export class PerfilService {
   static async obtenerPerfilCompleto(userId: string) {
     const { data, error } = await supabaseAdmin
       .from("perfiles")
-      .select("*, licencias:licencias!fk_licencias_usuario(*), afiliaciones:afiliaciones!fk_afiliaciones_usuario(*)")
+      .select("*, licencias:licencias!fk_licencias_usuario(*), afiliaciones:afiliaciones!fk_afiliaciones_usuario(*), clubes:clubes!perfiles_club_id_fkey(id, nombre)")
       .eq("id", userId)
       .single();
 
@@ -35,6 +35,25 @@ export class PerfilService {
         ...af,
         vencimiento: af.fecha_vencimiento,
       }));
+    }
+
+    return data;
+  }
+
+  /**
+   * Ficha pública: sin datos sensibles de contacto ni documento.
+   */
+  static async obtenerPerfilPublico(userId: string) {
+    const { data, error } = await supabaseAdmin
+      .from("perfiles")
+      .select(
+        "id, nombre, apellido, avatar_url, categoria_padel, lado_preferido, lugar_residencia, sexo, clubes:clubes!perfiles_club_id_fkey(id, nombre)",
+      )
+      .eq("id", userId)
+      .single();
+
+    if (error || !data) {
+      throw new Error("Perfil de usuario no encontrado en la plataforma.");
     }
 
     return data;

@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../config/supabase";
 import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "../constants/fap";
+import { enrichInscripcionDenominacion } from "../utils/denominacionNacional";
 
 interface ParejaRanking {
   inscripcionId: string;
@@ -394,12 +395,15 @@ export class CompetenciaService {
             jugador2_nombre,
             usuario_id,
             usuario2_id,
+            letra_prioridad,
             perfiles:perfiles!fk_inscripciones_usuario (
               club_id,
+              lugar_residencia,
               clubes:clubes!perfiles_club_id_fkey (nombre)
             ),
             perfiles_jugador2:perfiles!fk_inscripciones_usuario2 (
               club_id,
+              lugar_residencia,
               clubes:clubes!perfiles_club_id_fkey (nombre)
             )
           )
@@ -492,12 +496,15 @@ export class CompetenciaService {
 
         const cabezaDeSerie = gp.inscripcion_id ? cabezasDeSerieIds.has(gp.inscripcion_id) : false;
 
-        // Excluir usuario_id/usuario2_id de la respuesta pública
-        const { usuario_id: _u1, usuario2_id: _u2, ...inscripcionPublica } = gp.inscripciones || {};
+        const enriched = enrichInscripcionDenominacion(gp.inscripciones || {});
 
         return {
           ...gp,
-          inscripciones: inscripcionPublica,
+          inscripciones: {
+            ...(gp.inscripciones || {}),
+            provincia: enriched.provincia,
+            denominacion_nacional: enriched.denominacion_nacional,
+          },
           clubName,
           cabezaDeSerie,
         };

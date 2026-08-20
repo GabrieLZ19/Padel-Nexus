@@ -132,6 +132,8 @@ export const createInscripcionManual = async (
       metodo_pago,
       omitir_validaciones,
       motivo,
+      letra_prioridad,
+      letraPrioridad,
     } = req.body;
 
     const adminId = req.user?.id;
@@ -152,6 +154,12 @@ export const createInscripcionManual = async (
       adminId,
       omitirValidaciones: Boolean(omitir_validaciones),
       motivo: typeof motivo === "string" ? motivo : undefined,
+      letraPrioridad:
+        typeof letra_prioridad === "string"
+          ? letra_prioridad
+          : typeof letraPrioridad === "string"
+            ? letraPrioridad
+            : undefined,
     });
 
     return res.status(201).json(nuevaInscripcion);

@@ -29,6 +29,30 @@ export const PerfilController = {
   },
 
   /**
+   * GET /api/perfil/publico/:id
+   * Ficha pública sin datos sensibles
+   */
+  async getPerfilPublico(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "El ID del perfil es requerido." });
+      }
+
+      const perfil = await PerfilService.obtenerPerfilPublico(id);
+      return res.status(200).json({ exito: true, data: perfil });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al obtener el perfil solicitado.";
+      return res.status(404).json({ exito: false, error: message });
+    }
+  },
+
+  /**
    * GET /api/perfiles/:id
    * Permite a administradores consultar fichas técnicas de otros jugadores
    */

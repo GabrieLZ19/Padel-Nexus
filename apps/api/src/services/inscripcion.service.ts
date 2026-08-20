@@ -15,6 +15,7 @@ import {
   type CheckResult,
   type PerfilElegibilidad,
   type TorneoElegibilidad,
+  esTorneoNacional,
 } from "../utils/inscripcionElegibilidad";
 import { AFILIACION_ESTADOS } from "../constants/afiliacion";
 
@@ -112,7 +113,7 @@ export class InscripcionService {
     const { data: torneo, error } = await supabaseAdmin
       .from("torneos")
       .select(
-        "id, fecha, fecha_cierre_inscripcion, nivel, categoria, rama, validar_edad, cupos_maximos, cupos_actuales, estado, reglas_arbitraje, club_id, asociacion_id",
+        "id, fecha, fecha_cierre_inscripcion, nivel, alcance, categoria, rama, validar_edad, cupos_maximos, cupos_actuales, estado, reglas_arbitraje, club_id, asociacion_id",
       )
       .eq("id", torneoId)
       .single();
@@ -420,11 +421,13 @@ export class InscripcionService {
       );
     }
 
-    // 6. REGLA NACIONAL (legacy sobre nivel)
-    if (torneo.nivel?.toLowerCase() === "nacional") {
+    // 6. REGLA NACIONAL (alcance o nivel legacy)
+    if (esTorneoNacional(torneo)) {
       if (
         solicitante.rol !== "admin_provincial" &&
-        solicitante.rol !== "admin_federacion"
+        solicitante.rol !== "admin_federacion" &&
+        solicitante.rol !== "superadmin" &&
+        solicitante.rol !== "admin"
       ) {
         throw new Error(
           "Seguridad: Las inscripciones nacionales solo pueden ser gestionadas por un Administrador.",
@@ -471,7 +474,9 @@ export class InscripcionService {
           monto,
           estado_pago: FAP_ESTADOS_PAGO.PENDIENTE,
           tipo: "Inscripción torneo",
-          letra_prioridad: letraPrioridad || null,
+          letra_prioridad: letraPrioridad
+            ? String(letraPrioridad).trim().toUpperCase()
+            : null,
         },
       ])
       .select()
@@ -568,6 +573,7 @@ export class InscripcionService {
     adminId: string;
     omitirValidaciones?: boolean;
     motivo?: string;
+    letraPrioridad?: string;
   }) {
     const {
       torneoId,
@@ -578,6 +584,7 @@ export class InscripcionService {
       adminId,
       omitirValidaciones = false,
       motivo,
+      letraPrioridad,
     } = datos;
 
     if (omitirValidaciones) {
@@ -635,6 +642,12 @@ export class InscripcionService {
 
     const torneo = await InscripcionService.cargarTorneoElegibilidad(torneoId);
 
+    if (esTorneoNacional(torneo) && !letraPrioridad?.trim()) {
+      throw new Error(
+        "La letra de prioridad es obligatoria en torneos Nacionales.",
+      );
+    }
+
     if (!omitirValidaciones) {
       assertInscripcionAbierta(torneo);
       await InscripcionService.aplicarReglasJugador(j1, torneo, "Jugador 1");
@@ -680,6 +693,7 @@ export class InscripcionService {
           monto,
           estado_pago: estadoPago,
           tipo: "Inscripción torneo",
+          letra_prioridad: letraPrioridad?.trim().toUpperCase() || null,
         },
       ])
       .select()

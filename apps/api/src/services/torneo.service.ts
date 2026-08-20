@@ -5,6 +5,52 @@ import {
   FAP_ESTADOS_TORNEO,
   FAP_REGLAS,
 } from "../constants/fap";
+import { enrichInscripcionDenominacion } from "../utils/denominacionNacional";
+
+function mapInscripcionPartido(ins: Record<string, unknown>) {
+  const perfiles = ins.perfiles as
+    | {
+        avatar_url?: string | null;
+        lugar_residencia?: string | null;
+        clubes?: { nombre?: string } | null;
+      }
+    | null
+    | undefined;
+  const perfilesJ2 = ins.perfiles_jugador2 as
+    | {
+        avatar_url?: string | null;
+        lugar_residencia?: string | null;
+        clubes?: { nombre?: string } | null;
+      }
+    | null
+    | undefined;
+
+  const club1 = perfiles?.clubes?.nombre;
+  const club2 = perfilesJ2?.clubes?.nombre;
+  let clubName: string | null = null;
+  if (club1 && club2) clubName = `${club1} / ${club2}`;
+  else if (club1) clubName = club1;
+  else if (club2) clubName = club2;
+
+  const enriched = enrichInscripcionDenominacion({
+    letra_prioridad: ins.letra_prioridad as string | null | undefined,
+    usuario_id: ins.usuario_id as string | null | undefined,
+    usuario2_id: ins.usuario2_id as string | null | undefined,
+    perfiles: perfiles ?? null,
+    perfiles_jugador2: perfilesJ2 ?? null,
+  });
+
+  return {
+    jugador1_nombre: (ins.jugador1_nombre as string | null) ?? null,
+    jugador2_nombre: (ins.jugador2_nombre as string | null) ?? null,
+    clubName: clubName || "Sin club asignado",
+    club1: club1 || null,
+    club2: club2 || null,
+    avatar_j1: perfiles?.avatar_url || null,
+    avatar_j2: perfilesJ2?.avatar_url || null,
+    ...enriched,
+  };
+}
 
 export interface FiltrosTorneo {
   search?: string;
@@ -386,12 +432,34 @@ export class TorneoService {
   static async obtenerInscripciones(id: string) {
     const { data, error } = await supabaseAdmin
       .from("inscripciones")
-      .select("*")
+      .select(
+        `
+        *,
+        perfiles:perfiles!fk_inscripciones_usuario (
+          lugar_residencia,
+          avatar_url,
+          clubes:clubes!perfiles_club_id_fkey (nombre)
+        ),
+        perfiles_jugador2:perfiles!fk_inscripciones_usuario2 (
+          lugar_residencia,
+          avatar_url,
+          clubes:clubes!perfiles_club_id_fkey (nombre)
+        )
+      `,
+      )
       .eq("torneo_id", id)
       .order("created_at", { ascending: true });
 
     if (error) throw new Error(error.message);
-    return data || [];
+
+    return (data || []).map((ins: Record<string, unknown>) => {
+      const enriched = enrichInscripcionDenominacion(ins as Parameters<typeof enrichInscripcionDenominacion>[0]);
+      return {
+        ...ins,
+        provincia: enriched.provincia,
+        denominacion_nacional: enriched.denominacion_nacional,
+      };
+    });
   }
 
   static async obtenerPartidosFormateados(id: string) {
@@ -414,12 +482,15 @@ export class TorneoService {
         jugador2_nombre,
         usuario_id,
         usuario2_id,
+        letra_prioridad,
         perfiles:perfiles!fk_inscripciones_usuario (
           avatar_url,
+          lugar_residencia,
           clubes:clubes!perfiles_club_id_fkey (nombre)
         ),
         perfiles_jugador2:perfiles!fk_inscripciones_usuario2 (
           avatar_url,
+          lugar_residencia,
           clubes:clubes!perfiles_club_id_fkey (nombre)
         )
       `,
@@ -428,24 +499,9 @@ export class TorneoService {
 
     if (insError) throw new Error(insError.message);
 
-    const insMap = new Map<string, any>();
-    (inscripciones || []).forEach((ins: any) => {
-      const club1 = ins.perfiles?.clubes?.nombre;
-      const club2 = ins.perfiles_jugador2?.clubes?.nombre;
-      let clubName = null;
-      if (club1 && club2) clubName = `${club1} / ${club2}`;
-      else if (club1) clubName = club1;
-      else if (club2) clubName = club2;
-
-      insMap.set(ins.id, {
-        jugador1_nombre: ins.jugador1_nombre,
-        jugador2_nombre: ins.jugador2_nombre,
-        clubName: clubName || "Sin club asignado",
-        club1: club1 || null,
-        club2: club2 || null,
-        avatar_j1: ins.perfiles?.avatar_url || null,
-        avatar_j2: ins.perfiles_jugador2?.avatar_url || null,
-      });
+    const insMap = new Map<string, ReturnType<typeof mapInscripcionPartido>>();
+    (inscripciones || []).forEach((ins: Record<string, unknown>) => {
+      insMap.set(String(ins.id), mapInscripcionPartido(ins));
     });
 
     return (partidos || []).map((p) => {
@@ -459,11 +515,21 @@ export class TorneoService {
         equipo_a_club: equipoA ? equipoA.clubName : null,
         equipo_a_avatar_j1: equipoA ? equipoA.avatar_j1 : null,
         equipo_a_avatar_j2: equipoA ? equipoA.avatar_j2 : null,
+        equipo_a_usuario_id: equipoA ? equipoA.usuario_id : null,
+        equipo_a_usuario2_id: equipoA ? equipoA.usuario2_id : null,
+        equipo_a_letra_prioridad: equipoA ? equipoA.letra_prioridad : null,
+        equipo_a_provincia: equipoA ? equipoA.provincia : null,
+        equipo_a_denominacion: equipoA ? equipoA.denominacion_nacional : null,
         equipo_b_j1: equipoB ? equipoB.jugador1_nombre : null,
         equipo_b_j2: equipoB ? equipoB.jugador2_nombre : null,
         equipo_b_club: equipoB ? equipoB.clubName : null,
         equipo_b_avatar_j1: equipoB ? equipoB.avatar_j1 : null,
         equipo_b_avatar_j2: equipoB ? equipoB.avatar_j2 : null,
+        equipo_b_usuario_id: equipoB ? equipoB.usuario_id : null,
+        equipo_b_usuario2_id: equipoB ? equipoB.usuario2_id : null,
+        equipo_b_letra_prioridad: equipoB ? equipoB.letra_prioridad : null,
+        equipo_b_provincia: equipoB ? equipoB.provincia : null,
+        equipo_b_denominacion: equipoB ? equipoB.denominacion_nacional : null,
       };
     });
   }
