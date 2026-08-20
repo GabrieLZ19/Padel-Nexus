@@ -3,6 +3,7 @@ import {
   getAllTorneos,
   getTorneoById,
   createTorneo,
+  replicarTorneo,
   updateTorneo,
   deleteTorneo,
   actualizarResultado,
@@ -54,6 +55,11 @@ router.post(
   "/",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   createTorneo,
+);
+router.post(
+  "/:id/replicar",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  replicarTorneo,
 );
 router.put(
   "/:id",

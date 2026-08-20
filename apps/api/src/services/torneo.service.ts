@@ -272,6 +272,178 @@ export class TorneoService {
     return torneo;
   }
 
+  private static ramaCorta(rama?: string | null): string {
+    const r = String(rama || "").toLowerCase();
+    if (r.startsWith("fem")) return "Fem.";
+    if (r.startsWith("mix")) return "Mix.";
+    return "Masc.";
+  }
+
+  private static nombreReplicado(
+    nombreOrigen: string,
+    nivelOrigen: string | null | undefined,
+    ramaOrigen: string | null | undefined,
+    nivelNuevo: string,
+    ramaNueva: string,
+  ): string {
+    let base = (nombreOrigen || "Torneo").trim();
+    const sufijos = [
+      `${nivelOrigen || ""} ${TorneoService.ramaCorta(ramaOrigen)}`,
+      nivelOrigen || "",
+      TorneoService.ramaCorta(ramaOrigen),
+      ramaOrigen || "",
+    ]
+      .filter((s) => s.trim().length > 0)
+      .map((s) => s.trim());
+
+    for (const s of sufijos) {
+      const re = new RegExp(
+        `[\\s—\\-–]*${s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`,
+        "i",
+      );
+      base = base.replace(re, "").trim();
+    }
+
+    return `${base} — ${nivelNuevo} ${TorneoService.ramaCorta(ramaNueva)}`;
+  }
+
+  /**
+   * Clona un torneo base a otras combinaciones nivel/rama.
+   * No copia inscripciones, partidos, zonas ni fiscales.
+   */
+  static async replicarTorneo(
+    id: string,
+    opciones: {
+      niveles: string[];
+      ramas?: string[];
+      soloMismaRama?: boolean;
+    },
+    adminId?: string,
+  ) {
+    const niveles = (opciones.niveles || [])
+      .map((n) => String(n || "").trim())
+      .filter(Boolean);
+    if (niveles.length === 0) {
+      throw new Error("Debés seleccionar al menos un nivel para replicar.");
+    }
+
+    const { data: origen, error } = await supabaseAdmin
+      .from("torneos")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !origen) throw new Error("Torneo origen no encontrado.");
+
+    const ramaOrigen = origen.rama || "Masculina";
+    let ramasDestino = (opciones.ramas || [])
+      .map((r) => String(r || "").trim())
+      .filter(Boolean);
+
+    if (opciones.soloMismaRama || ramasDestino.length === 0) {
+      ramasDestino = [ramaOrigen];
+    }
+
+    const pares: Array<{ rama: string; nivel: string }> = [];
+    for (const rama of ramasDestino) {
+      for (const nivel of niveles) {
+        if (rama === ramaOrigen && nivel === origen.nivel) continue;
+        pares.push({ rama, nivel });
+      }
+    }
+
+    if (pares.length === 0) {
+      throw new Error(
+        "No hay combinaciones nuevas para crear (todas coinciden con el torneo origen).",
+      );
+    }
+
+    const creados: unknown[] = [];
+    const omitidos: Array<{ rama: string; nivel: string; motivo: string }> = [];
+
+    for (const par of pares) {
+      try {
+        const nombre = TorneoService.nombreReplicado(
+          origen.nombre,
+          origen.nivel,
+          ramaOrigen,
+          par.nivel,
+          par.rama,
+        );
+
+        const payload: TorneoPayload & Record<string, unknown> = {
+          nombre,
+          subtitulo: origen.subtitulo || undefined,
+          club_id: origen.club_id,
+          fecha: origen.fecha,
+          estado: FAP_ESTADOS_TORNEO.BORRADOR,
+          cupos_maximos: origen.cupos_maximos || 16,
+          nivel: par.nivel,
+          categoria: origen.categoria || "Libres",
+          modalidad: origen.modalidad || "Duplas",
+          precio_inscripcion: Number(origen.precio_inscripcion || 0),
+          formato: origen.formato || "Eliminatoria Directa",
+          alcance: origen.alcance,
+          premios: {
+            uno: origen.premio_1 || undefined,
+            dos: origen.premio_2 || undefined,
+            tres: origen.premio_3 || undefined,
+          },
+          canchas_disponibles: origen.canchas_disponibles || 1,
+          duracion_partido_minutos: origen.duracion_partido_minutos || 90,
+          hora_inicio_jornada: origen.hora_inicio_jornada || "08:00",
+          rama: par.rama,
+          reglamento: origen.reglamento,
+          asociacion_id: origen.asociacion_id,
+          asociacion: origen.reglamento || "FAP",
+        };
+
+        const creado = await TorneoService.crearTorneo(payload as TorneoPayload);
+
+        const extras: Record<string, unknown> = {};
+        if (origen.banners) extras.banners = origen.banners;
+        if (origen.reglas_arbitraje)
+          extras.reglas_arbitraje = origen.reglas_arbitraje;
+        if (origen.fecha_cierre_inscripcion)
+          extras.fecha_cierre_inscripcion = origen.fecha_cierre_inscripcion;
+        if (origen.federacion_id) extras.federacion_id = origen.federacion_id;
+        if (origen.validar_edad != null) extras.validar_edad = origen.validar_edad;
+
+        if (Object.keys(extras).length > 0) {
+          await supabaseAdmin
+            .from("torneos")
+            .update(extras)
+            .eq("id", (creado as { id: string }).id);
+        }
+
+        creados.push({ ...(creado as object), ...extras });
+      } catch (err: unknown) {
+        omitidos.push({
+          rama: par.rama,
+          nivel: par.nivel,
+          motivo: err instanceof Error ? err.message : "Error al crear",
+        });
+      }
+    }
+
+    if (adminId) {
+      await supabaseAdmin.from("logs_auditoria").insert({
+        usuario_id_admin: adminId,
+        accion: "TORNEO_REPLICAR",
+        entidad_afectada: `torneos_id: ${id}`,
+        detalles: {
+          origen_id: id,
+          creados: creados.length,
+          omitidos: omitidos.length,
+          niveles,
+          ramas: ramasDestino,
+        },
+      });
+    }
+
+    return { creados, omitidos };
+  }
+
   private static async resolveFapAsociacionId(): Promise<string | null> {
     const { data: fapBySigla } = await supabaseAdmin
       .from("asociaciones")

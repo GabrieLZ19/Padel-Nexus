@@ -60,6 +60,41 @@ export const createTorneo = async (
   }
 };
 
+export const replicarTorneo = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { niveles, ramas } = req.body as {
+      niveles?: string[];
+      ramas?: string[];
+    };
+    const rol = req.user?.rol;
+    const soloMismaRama = rol === "admin_club";
+
+    const resultado = await TorneoService.replicarTorneo(
+      req.params.id,
+      {
+        niveles: Array.isArray(niveles) ? niveles : [],
+        ramas: Array.isArray(ramas) ? ramas : undefined,
+        soloMismaRama,
+      },
+      req.user?.id,
+    );
+
+    return res.status(201).json({
+      exito: true,
+      ...resultado,
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Error";
+    return res.status(400).json({
+      message: "No se pudo replicar el torneo.",
+      error: msg,
+    });
+  }
+};
+
 export const updateTorneo = async (
   req: Request,
   res: Response,
