@@ -51,6 +51,22 @@ export const TorneosService = {
     return response.data;
   },
 
+  async replicar(
+    id: string,
+    payload: { niveles: string[]; ramas?: string[] },
+  ): Promise<{
+    exito?: boolean;
+    creados: Torneo[];
+    omitidos: Array<{ rama: string; nivel: string; motivo: string }>;
+  }> {
+    const response = await api.post<{
+      exito?: boolean;
+      creados: Torneo[];
+      omitidos: Array<{ rama: string; nivel: string; motivo: string }>;
+    }>(`/torneos/${id}/replicar`, payload);
+    return response.data;
+  },
+
   async update(id: string, torneoData: FormTorneoState): Promise<Torneo> {
     const response = await api.put<Torneo>(`/torneos/${id}`, torneoData);
     return response.data;

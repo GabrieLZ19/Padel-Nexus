@@ -10,6 +10,7 @@ import {
   Trophy,
   LayoutDashboard,
   Printer,
+  Copy,
 } from "lucide-react";
 import { TorneosService } from "../../../utils/services/torneos";
 import { ClubesService } from "../../../utils/services/clubes";
@@ -18,6 +19,7 @@ import Pagination from "../../../components/ui/Pagination";
 import { Torneo, Club, FormTorneoState } from "../../../utils/types";
 
 import TorneoModal from "../../../components/torneos/TorneoModal";
+import ReplicarTorneoModal from "../../../components/torneos/ReplicarTorneoModal";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "../../../components/ui/FeedbackModal";
@@ -77,6 +79,8 @@ export default function TorneosPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<FormTorneoState>(ESTADO_INICIAL);
+
+  const [replicarTorneo, setReplicarTorneo] = useState<Torneo | null>(null);
 
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
     isOpen: false,
@@ -482,6 +486,14 @@ export default function TorneosPage() {
                           </button>
 
                           <button
+                            onClick={() => setReplicarTorneo(t)}
+                            className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-brand-chartreuse transition-colors"
+                            title="Replicar a otras categorías"
+                          >
+                            <Copy className="size-4" />
+                          </button>
+
+                          <button
                             onClick={() => handleOpenEdit(t)}
                             className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
                             title="Editar Torneo"
@@ -523,6 +535,33 @@ export default function TorneosPage() {
         clubs={clubs}
         isSaving={saving}
         editingId={editingId}
+      />
+
+      <ReplicarTorneoModal
+        isOpen={Boolean(replicarTorneo)}
+        torneo={replicarTorneo}
+        onClose={() => setReplicarTorneo(null)}
+        onSuccess={(n) => {
+          setRefreshKey((k) => k + 1);
+          setFeedbackModal({
+            isOpen: true,
+            type: "success",
+            title: "Torneos creados",
+            description: `Se generaron ${n} torneo${n === 1 ? "" : "s"} en borrador.`,
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        }}
+        onError={(message) => {
+          setFeedbackModal({
+            isOpen: true,
+            type: "error",
+            title: "No se pudo replicar",
+            description: message,
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        }}
       />
 
       <FeedbackModal {...feedbackModal} />

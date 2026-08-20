@@ -10,12 +10,14 @@ import {
   Trophy,
   Building2,
   Calendar,
+  Copy,
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { ClubPanelService } from "@/utils/services/club-panel";
 import Pagination from "@/components/ui/Pagination";
 import { Torneo, Club, FormTorneoState } from "@/utils/types";
 import TorneoModal from "@/components/torneos/TorneoModal";
+import ReplicarTorneoModal from "@/components/torneos/ReplicarTorneoModal";
 import FeedbackModal, { FeedbackModalProps } from "@/components/ui/FeedbackModal";
 
 const TABS = ["Todos", "Activos", "Borradores", "Finalizados"];
@@ -34,6 +36,7 @@ export default function ClubTorneosPage() {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [replicarTorneo, setReplicarTorneo] = useState<Torneo | null>(null);
 
   const [formData, setFormData] = useState<FormTorneoState>({
     nombre: "",
@@ -383,6 +386,13 @@ export default function ClubTorneosPage() {
                     <td className="py-4 px-6 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => setReplicarTorneo(t)}
+                          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-brand-chartreuse transition-colors cursor-pointer"
+                          title="Replicar a otras categorías"
+                        >
+                          <Copy className="size-4" />
+                        </button>
+                        <button
                           onClick={() => handleOpenEditModal(t)}
                           className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors cursor-pointer"
                           title="Editar torneo"
@@ -431,6 +441,34 @@ export default function ClubTorneosPage() {
           sedeFija
         />
       )}
+
+      <ReplicarTorneoModal
+        isOpen={Boolean(replicarTorneo)}
+        torneo={replicarTorneo}
+        modoClub
+        onClose={() => setReplicarTorneo(null)}
+        onSuccess={(n) => {
+          loadData();
+          setFeedbackModal({
+            isOpen: true,
+            type: "success",
+            title: "Torneos creados",
+            description: `Se generaron ${n} torneo${n === 1 ? "" : "s"} en borrador.`,
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        }}
+        onError={(message) => {
+          setFeedbackModal({
+            isOpen: true,
+            type: "error",
+            title: "No se pudo replicar",
+            description: message,
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        }}
+      />
 
       {/* MODAL DE FEEDBACK DE CONFIRMACIÓN */}
       <FeedbackModal {...feedbackModal} />
