@@ -16,6 +16,10 @@ import InscripcionManualModal from "@/components/inscripciones/InscripcionManual
 import { useProfileStore } from "@/store/useProfileStore";
 import { esTorneoContextoFederacion } from "@/utils/constants/fapApaRules";
 import type { RolUsuario } from "@/utils/types/user.types";
+import {
+  PairDisplay,
+  esAlcanceNacional,
+} from "@/components/torneos/PairDisplay";
 
 interface Paso4JugadoresProps {
   torneo: Torneo;
@@ -26,16 +30,6 @@ interface Paso4JugadoresProps {
   triggerRefresh: () => void;
   readOnly?: boolean;
 }
-
-const cleanName = (name?: string | null) => {
-  if (!name) return "Desconocido";
-  let cleaned = name
-    .trim()
-    .replace(/^[\s,]+/, "")
-    .replace(/[\s,]+$/, "");
-  if (cleaned === "," || cleaned === "") return "Desconocido";
-  return cleaned;
-};
 
 export const Paso4Jugadores = ({
   torneo,
@@ -56,6 +50,7 @@ export const Paso4Jugadores = ({
     },
     userRole,
   );
+  const nacional = esAlcanceNacional(torneo.alcance);
 
   const [importingCSV, setImportingCSV] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -72,26 +67,39 @@ export const Paso4Jugadores = ({
 
   const handleDescargarPlantilla = () => {
     const isIndiv = torneo.modalidad === "Individual";
+    const esNacional = /nacional/i.test(String(torneo.alcance || ""));
     const headers = isIndiv
       ? [
           "Jugador (DNI o Email)",
+          ...(esNacional ? ["Letra (A-Z)"] : []),
           "Metodo de Pago (Efectivo / Transferencia / Dejar vacio)",
         ]
       : [
           "Jugador 1 (DNI o Email)",
           "Jugador 2 (DNI o Email)",
+          ...(esNacional ? ["Letra (A-Z)"] : []),
           "Metodo de Pago",
         ];
 
     const exampleRows = isIndiv
-      ? [
-          ["jugador@email.com", "Efectivo"],
-          ["40123456", "Transferencia"],
-        ]
-      : [
-          ["j1@email.com", "j2@email.com", "Efectivo"],
-          ["40123456", "41765432", "Transferencia"],
-        ];
+      ? esNacional
+        ? [
+            ["jugador@email.com", "A", "Efectivo"],
+            ["40123456", "B", "Transferencia"],
+          ]
+        : [
+            ["jugador@email.com", "Efectivo"],
+            ["40123456", "Transferencia"],
+          ]
+      : esNacional
+        ? [
+            ["j1@email.com", "j2@email.com", "A", "Efectivo"],
+            ["40123456", "41765432", "B", "Transferencia"],
+          ]
+        : [
+            ["j1@email.com", "j2@email.com", "Efectivo"],
+            ["40123456", "41765432", "Transferencia"],
+          ];
 
     const csvContent =
       "data:text/csv;charset=utf-8,\uFEFF" +
@@ -138,6 +146,14 @@ export const Paso4Jugadores = ({
       let errors: string[] = [];
       const dataRows = lines.slice(1);
       const isIndiv = torneo.modalidad === "Individual";
+      const esNacional = /nacional/i.test(String(torneo.alcance || ""));
+      const metodosPago = [
+        "efectivo",
+        "transferencia",
+        "mercado_pago",
+        "mercadopago",
+        "confirmado",
+      ];
 
       for (let i = 0; i < dataRows.length; i++) {
         const parts = dataRows[i]
@@ -147,34 +163,66 @@ export const Paso4Jugadores = ({
         try {
           if (isIndiv) {
             if (!parts[0]) continue;
+            let letra: string | undefined;
+            let metodo: string | undefined;
+            if (esNacional) {
+              letra = parts[1] || undefined;
+              metodo = parts[2] || undefined;
+            } else {
+              metodo = parts[1] || undefined;
+            }
             await InscripcionesService.inscribirManual({
               torneo_id: torneo.id,
               jugador1_identificador: parts[0],
               monto: Number(torneo.precio_inscripcion || 0),
-              metodo_pago: parts[1] || undefined,
+              metodo_pago: metodo || undefined,
+              letra_prioridad: letra,
             });
           } else {
             if (!parts[0]) continue;
-            let [j1, j2, metodo] = parts;
-            if (
+            let j1 = parts[0];
+            let j2 = parts[1] || "";
+            let letra: string | undefined;
+            let metodo: string | undefined;
+
+            if (esNacional) {
+              // j1, j2, letra, metodo — o j1, j2, letra
+              if (
+                parts.length >= 3 &&
+                parts[2] &&
+                !metodosPago.includes(parts[2].toLowerCase())
+              ) {
+                letra = parts[2];
+                metodo = parts[3] || undefined;
+              } else if (
+                parts.length === 2 &&
+                j2 &&
+                metodosPago.includes(j2.toLowerCase())
+              ) {
+                metodo = j2;
+                j2 = "";
+              } else {
+                letra = parts[2] || undefined;
+                metodo = parts[3] || undefined;
+              }
+            } else if (
               parts.length === 2 &&
               j2 &&
-              [
-                "efectivo",
-                "transferencia",
-                "mercado_pago",
-                "mercadopago",
-              ].includes(j2.toLowerCase())
+              metodosPago.includes(j2.toLowerCase())
             ) {
               metodo = j2;
               j2 = "";
+            } else {
+              metodo = parts[2] || undefined;
             }
+
             await InscripcionesService.inscribirManual({
               torneo_id: torneo.id,
               jugador1_identificador: j1,
               jugador2_identificador: j2 || undefined,
               monto: Number(torneo.precio_inscripcion || 0),
               metodo_pago: metodo || undefined,
+              letra_prioridad: letra,
             });
           }
           successCount++;
@@ -353,14 +401,16 @@ export const Paso4Jugadores = ({
                           <User className="size-4" />
                         </div>
                         <div>
-                          <span>{cleanName(ins.jugador1_nombre)}</span>
-                          {ins.jugador2_nombre &&
-                            ins.jugador2_nombre !== "-" && (
-                              <span className="text-gray-400 font-medium">
-                                {" "}
-                                / {cleanName(ins.jugador2_nombre)}
-                              </span>
-                            )}
+                          <PairDisplay
+                            j1={ins.jugador1_nombre}
+                            j2={ins.jugador2_nombre}
+                            usuarioId={ins.usuario_id}
+                            usuario2Id={ins.usuario2_id}
+                            denominacion={ins.denominacion_nacional}
+                            alcanceNacional={nacional}
+                            showAvatars={false}
+                            variant="inline"
+                          />
                           {isPendienteRegistro && (
                             <span className="block text-[10px] text-amber-400/80 font-bold mt-0.5">
                               ⚠️ Jugador no registrado en App (Pendiente)

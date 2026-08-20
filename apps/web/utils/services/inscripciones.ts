@@ -103,6 +103,7 @@ export const InscripcionesService = {
     metodo_pago?: string;
     omitir_validaciones?: boolean;
     motivo?: string;
+    letra_prioridad?: string;
   }) {
     const response = await api.post("/inscripciones/manual", data);
     return response.data;

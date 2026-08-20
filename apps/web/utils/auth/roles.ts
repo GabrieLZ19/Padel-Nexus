@@ -42,3 +42,8 @@ export const esRolClub = (rol: RolUsuario | string | null | undefined) =>
 export const esRolFederacionNacional = (
   rol: RolUsuario | string | null | undefined,
 ) => Boolean(rol && (ROLES_FEDERACION_NACIONAL as readonly string[]).includes(rol));
+
+/** Admins autorizados a ver ficha completa de un jugador (contralor). */
+export const puedeVerFichaCompleta = (
+  rol: RolUsuario | string | null | undefined,
+) => esRolAdministrativo(rol);

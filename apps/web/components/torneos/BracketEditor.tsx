@@ -118,6 +118,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           jugador2_nombre: gp.inscripciones.jugador2_nombre,
           club: gp.clubName || "Sin club asignado",
           cabezaDeSerie: gp.cabezaDeSerie,
+          usuario_id: gp.inscripciones?.usuario_id ?? null,
+          usuario2_id: gp.inscripciones?.usuario2_id ?? null,
+          denominacion_nacional:
+            gp.inscripciones?.denominacion_nacional ?? null,
         })),
       }));
       setZonas(formattedZonas);
@@ -259,7 +263,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           jugador1_nombre: p.equipo_a_j1 ?? "",
           jugador2_nombre: p.equipo_a_j2 ?? null,
           seed: idx * 2 + 1,
-          club: (p as any).equipo_a_club || "Sin club asignado",
+          club: p.equipo_a_club || "Sin club asignado",
+          usuario_id: p.equipo_a_usuario_id ?? null,
+          usuario2_id: p.equipo_a_usuario2_id ?? null,
+          denominacion_nacional: p.equipo_a_denominacion ?? null,
         });
       }
       if (p.equipo_b_id && p.equipo_b_j1) {
@@ -268,7 +275,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           jugador1_nombre: p.equipo_b_j1 ?? "",
           jugador2_nombre: p.equipo_b_j2 ?? null,
           seed: idx * 2 + 2,
-          club: (p as any).equipo_b_club || "Sin club asignado",
+          club: p.equipo_b_club || "Sin club asignado",
+          usuario_id: p.equipo_b_usuario_id ?? null,
+          usuario2_id: p.equipo_b_usuario2_id ?? null,
+          denominacion_nacional: p.equipo_b_denominacion ?? null,
         });
       }
       return {
@@ -287,13 +297,15 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       zonasGeneradas.push({
         id: "byes-sembrados",
         nombre: "Clasificados por BYE (Pase directo)",
-        parejas: unassignedInscripciones.map((ins: any, idx) => ({
+        parejas: unassignedInscripciones.map((ins: Inscripcion, idx) => ({
           id: ins.id,
-          jugador1_nombre:
-            ins.jugador1?.nombre || ins.jugador1_nombre || "Jugador 1",
-          jugador2_nombre: ins.jugador2?.nombre || ins.jugador2_nombre || null,
+          jugador1_nombre: ins.jugador1_nombre || "Jugador 1",
+          jugador2_nombre: ins.jugador2_nombre || null,
           seed: 99 + idx,
-          club: ins.jugador1?.club_nombre || "Pase directo a Semis",
+          club: "Pase directo a Semis",
+          usuario_id: ins.usuario_id ?? null,
+          usuario2_id: ins.usuario2_id ?? null,
+          denominacion_nacional: ins.denominacion_nacional ?? null,
         })),
       });
     }
@@ -1154,6 +1166,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                         nombreZona={z.nombre}
                         parejasInscritas={z.parejas}
                         partidosZona={partidosZona}
+                        alcance={torneo?.alcance}
                       />
                     );
                   })}
@@ -1256,6 +1269,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                               <MatchCard
                                 partido={partido}
                                 isInteractive={puedeEditarLlave}
+                                alcance={torneo?.alcance}
                                 origenEquipoA={
                                   partido.equipo_a_id
                                     ? origenPorInscripcion.get(

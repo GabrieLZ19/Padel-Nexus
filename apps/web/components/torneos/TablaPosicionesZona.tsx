@@ -9,6 +9,10 @@ import {
   ChevronUp,
   Star,
 } from "lucide-react";
+import {
+  PairDisplay,
+  esAlcanceNacional,
+} from "@/components/torneos/PairDisplay";
 
 export interface ParejaStats {
   inscripcionId: string;
@@ -27,6 +31,11 @@ export interface ParejaStats {
   stb: number;
   cabezaDeSerie: boolean;
   seed?: number;
+  jugador1_nombre?: string | null;
+  jugador2_nombre?: string | null;
+  usuario_id?: string | null;
+  usuario2_id?: string | null;
+  denominacion_nacional?: string | null;
 }
 
 interface TablaPosicionesZonaProps {
@@ -38,16 +47,22 @@ interface TablaPosicionesZonaProps {
     club?: string;
     cabezaDeSerie?: boolean;
     seed?: number;
+    usuario_id?: string | null;
+    usuario2_id?: string | null;
+    denominacion_nacional?: string | null;
   }[];
   partidosZona: Partido[];
+  alcance?: string | null;
 }
 
 export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
   nombreZona,
   parejasInscritas,
   partidosZona,
+  alcance,
 }) => {
   const [expanded, setExpanded] = useState(false);
+  const nacional = esAlcanceNacional(alcance);
 
   const cleanName = (name?: string | null) => {
     if (!name) return "";
@@ -86,6 +101,11 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
         stb: 0,
         cabezaDeSerie: Boolean(p.cabezaDeSerie),
         seed: p.seed,
+        jugador1_nombre: p.jugador1_nombre,
+        jugador2_nombre: p.jugador2_nombre,
+        usuario_id: p.usuario_id,
+        usuario2_id: p.usuario2_id,
+        denominacion_nacional: p.denominacion_nacional,
       };
     });
 
@@ -284,8 +304,18 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
                         {idx + 1}
                       </span>
                       <div className="min-w-0">
-                        <p className="font-extrabold text-white text-xs flex flex-wrap items-center gap-1.5">
-                          <span className="truncate">{row.nombre}</span>
+                        <div className="font-extrabold text-white text-xs flex flex-wrap items-center gap-1.5">
+                          <PairDisplay
+                            j1={row.jugador1_nombre}
+                            j2={row.jugador2_nombre}
+                            usuarioId={row.usuario_id}
+                            usuario2Id={row.usuario2_id}
+                            denominacion={row.denominacion_nacional}
+                            alcanceNacional={nacional}
+                            showAvatars={false}
+                            variant="inline"
+                            compact
+                          />
                           {row.cabezaDeSerie && (
                             <span className="inline-flex items-center gap-0.5 shrink-0 text-[8px] font-black text-amber-300 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
                               <Star className="size-2.5 fill-amber-300" />
@@ -295,7 +325,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
                           {isClasificado && (
                             <CheckCircle2 className="size-3.5 text-brand-chartreuse shrink-0" />
                           )}
-                        </p>
+                        </div>
                         <p className="text-[10px] text-gray-500 font-bold truncate">
                           {row.club}
                         </p>

@@ -58,6 +58,8 @@ export interface Inscripcion {
   estado_pago: "Pendiente" | "Confirmado" | "Rechazado";
   tipo: string;
   letra_prioridad?: string | null;
+  provincia?: string | null;
+  denominacion_nacional?: string | null;
   torneo_nombre?: string;
   cancha_nombre?: string;
   categoria?: string;
@@ -91,11 +93,21 @@ export interface Partido {
   equipo_a_club?: string | null;
   equipo_a_avatar_j1?: string | null;
   equipo_a_avatar_j2?: string | null;
+  equipo_a_usuario_id?: string | null;
+  equipo_a_usuario2_id?: string | null;
+  equipo_a_letra_prioridad?: string | null;
+  equipo_a_provincia?: string | null;
+  equipo_a_denominacion?: string | null;
   equipo_b_j1?: string | null;
   equipo_b_j2?: string | null;
   equipo_b_club?: string | null;
   equipo_b_avatar_j1?: string | null;
   equipo_b_avatar_j2?: string | null;
+  equipo_b_usuario_id?: string | null;
+  equipo_b_usuario2_id?: string | null;
+  equipo_b_letra_prioridad?: string | null;
+  equipo_b_provincia?: string | null;
+  equipo_b_denominacion?: string | null;
 }
 
 export interface Cuadro {

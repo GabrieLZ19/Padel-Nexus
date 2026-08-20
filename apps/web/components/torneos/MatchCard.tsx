@@ -1,74 +1,6 @@
 import { Partido } from "@/utils/types";
-import {
-  PlayerAvatar,
-  splitPlayerName,
-} from "@/components/torneos/MatchTeamBox";
-
-function formatShortName(fullName?: string | null): string {
-  const { apellido, nombre } = splitPlayerName(fullName);
-  if (!nombre) return apellido;
-  const inicial = nombre.trim().charAt(0);
-  return inicial ? `${apellido} ${inicial}.` : apellido;
-}
-
-function TeamPlayers({
-  j1,
-  j2,
-  avatarJ1,
-  avatarJ2,
-  won,
-}: {
-  j1?: string | null;
-  j2?: string | null;
-  avatarJ1?: string | null;
-  avatarJ2?: string | null;
-  won?: boolean;
-}) {
-  const hasJ2 = Boolean(j2 && j2 !== "-");
-  const line = hasJ2
-    ? `${formatShortName(j1)} / ${formatShortName(j2)}`
-    : formatShortName(j1);
-  const { apellido: ap1, nombre: nom1 } = splitPlayerName(j1);
-
-  return (
-    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-      <div className="relative shrink-0 flex items-center">
-        <PlayerAvatar src={avatarJ1} size="md" />
-        {hasJ2 ? (
-          <span className="-ml-2.5 relative z-[1]">
-            <PlayerAvatar src={avatarJ2} size="md" />
-          </span>
-        ) : null}
-      </div>
-      <div className="min-w-0 leading-tight">
-        {hasJ2 ? (
-          <p
-            className={`text-[12px] sm:text-[13px] font-bold tracking-tight truncate ${
-              won ? "text-brand-chartreuse" : "text-white"
-            }`}
-          >
-            {line}
-          </p>
-        ) : (
-          <>
-            <p
-              className={`text-[13px] font-bold tracking-tight truncate ${
-                won ? "text-brand-chartreuse" : "text-white"
-              }`}
-            >
-              {ap1}
-            </p>
-            {nom1 ? (
-              <p className="text-[11px] text-gray-400 truncate font-medium">
-                {nom1}
-              </p>
-            ) : null}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
+import { PairDisplay, esAlcanceNacional } from "@/components/torneos/PairDisplay";
+import { PlayerAvatar } from "@/components/torneos/MatchTeamBox";
 
 export const MatchCard = ({
   partido,
@@ -79,6 +11,7 @@ export const MatchCard = ({
   origenEquipoB,
   esCabezaSerieA = false,
   esCabezaSerieB = false,
+  alcance,
 }: {
   partido: Partido;
   isInteractive?: boolean;
@@ -88,12 +21,14 @@ export const MatchCard = ({
   origenEquipoB?: string | null;
   esCabezaSerieA?: boolean;
   esCabezaSerieB?: boolean;
+  alcance?: string | null;
 }) => {
   const isA =
     partido.ganador === partido.equipo_a_id && partido.ganador !== null;
   const isB =
     partido.ganador === partido.equipo_b_id && partido.ganador !== null;
   const finalizado = partido.ganador != null;
+  const nacional = esAlcanceNacional(alcance);
 
   const hasA = Boolean(
     partido.equipo_a_j1 || partido.equipo_a_j2 || partido.equipo_a_id,
@@ -123,15 +58,24 @@ export const MatchCard = ({
   };
 
   const renderEquipo = (
-    j1?: string | null,
-    j2?: string | null,
-    avatarJ1?: string | null,
-    avatarJ2?: string | null,
+    side: "a" | "b",
     origen?: string | null,
     won?: boolean,
     esCabezaSerie?: boolean,
     esBye?: boolean,
   ) => {
+    const j1 = side === "a" ? partido.equipo_a_j1 : partido.equipo_b_j1;
+    const j2 = side === "a" ? partido.equipo_a_j2 : partido.equipo_b_j2;
+    const avatarJ1 =
+      side === "a" ? partido.equipo_a_avatar_j1 : partido.equipo_b_avatar_j1;
+    const avatarJ2 =
+      side === "a" ? partido.equipo_a_avatar_j2 : partido.equipo_b_avatar_j2;
+    const usuarioId =
+      side === "a" ? partido.equipo_a_usuario_id : partido.equipo_b_usuario_id;
+    const usuario2Id =
+      side === "a" ? partido.equipo_a_usuario2_id : partido.equipo_b_usuario2_id;
+    const denominacion =
+      side === "a" ? partido.equipo_a_denominacion : partido.equipo_b_denominacion;
     const empty = !j1 && !j2;
 
     return (
@@ -162,12 +106,18 @@ export const MatchCard = ({
             </p>
           </div>
         ) : (
-          <TeamPlayers
+          <PairDisplay
             j1={j1}
             j2={j2}
             avatarJ1={avatarJ1}
             avatarJ2={avatarJ2}
+            usuarioId={usuarioId}
+            usuario2Id={usuario2Id}
+            denominacion={denominacion}
+            alcanceNacional={nacional}
             won={won}
+            compact
+            variant="stacked"
           />
         )}
       </div>
@@ -197,14 +147,14 @@ export const MatchCard = ({
             <span
               key={idx}
               className={`w-7 h-8 sm:w-8 sm:h-9 flex items-center justify-center rounded-md text-[11px] sm:text-xs font-black tabular-nums ${
-                setWon
-                  ? "bg-brand-chartreuse text-brand-black"
-                  : has
-                    ? "bg-white/10 text-white"
-                    : "bg-transparent text-gray-700 border border-white/10"
+                !has
+                  ? "text-gray-700 bg-transparent"
+                  : setWon
+                    ? "bg-brand-chartreuse text-brand-black"
+                    : "bg-white/5 text-gray-300"
               }`}
             >
-              {has ? String(val) : "·"}
+              {has ? val : "–"}
             </span>
           );
         })}
@@ -219,14 +169,14 @@ export const MatchCard = ({
       type="button"
       disabled={!isInteractive}
       onClick={() => {
-        if (isInteractive) onEditSelect?.(partido);
+        if (isInteractive && onEditSelect) onEditSelect(partido);
       }}
-      className={`text-left bg-[#0e0e0e] border rounded-2xl overflow-hidden flex flex-col w-full relative z-10 transition-all duration-200 ${
-        isInteractive
-          ? "cursor-pointer border-white/12 hover:border-brand-chartreuse/50 hover:bg-[#131313] hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(0,0,0,0.5),0_0_0_1px_rgba(204,255,0,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-chartreuse/40"
-          : isActive && !finalizado
-            ? "border-brand-chartreuse/35 cursor-default"
-            : "border-white/10 cursor-default"
+      className={`w-full text-left rounded-2xl border overflow-hidden transition-all ${
+        isInteractive ? "cursor-pointer hover:border-brand-chartreuse/40" : ""
+      } ${
+        isActive
+          ? "border-brand-chartreuse/50 shadow-[0_0_0_1px_rgba(203,254,1,0.15)]"
+          : "border-white/10 bg-[#121212]"
       }`}
     >
       <div className="flex items-center justify-between gap-3 px-3.5 py-2 bg-black/35 border-b border-white/5 min-h-[2rem]">
@@ -259,16 +209,7 @@ export const MatchCard = ({
           isA ? "bg-brand-chartreuse/[0.06]" : ""
         }`}
       >
-        {renderEquipo(
-          partido.equipo_a_j1,
-          partido.equipo_a_j2,
-          partido.equipo_a_avatar_j1,
-          partido.equipo_a_avatar_j2,
-          origenEquipoA,
-          isA,
-          esCabezaSerieA,
-          slotAEsBye,
-        )}
+        {renderEquipo("a", origenEquipoA, isA, esCabezaSerieA, slotAEsBye)}
         {renderSets(
           partido.set1_a,
           partido.set2_a,
@@ -284,16 +225,7 @@ export const MatchCard = ({
           isB ? "bg-brand-chartreuse/[0.06]" : ""
         }`}
       >
-        {renderEquipo(
-          partido.equipo_b_j1,
-          partido.equipo_b_j2,
-          partido.equipo_b_avatar_j1,
-          partido.equipo_b_avatar_j2,
-          origenEquipoB,
-          isB,
-          esCabezaSerieB,
-          slotBEsBye,
-        )}
+        {renderEquipo("b", origenEquipoB, isB, esCabezaSerieB, slotBEsBye)}
         {renderSets(
           partido.set1_b,
           partido.set2_b,

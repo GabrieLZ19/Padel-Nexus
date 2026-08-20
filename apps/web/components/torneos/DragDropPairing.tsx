@@ -26,6 +26,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { MatchCard } from "./MatchCard";
 import { Partido } from "@/utils/types";
+import { PairDisplay } from "@/components/torneos/PairDisplay";
 
 const cleanName = (name?: string | null) => {
   if (!name) return "";
@@ -69,6 +70,9 @@ export interface ParejaDrag {
   seed: number;
   club?: string;
   cabezaDeSerie?: boolean;
+  usuario_id?: string | null;
+  usuario2_id?: string | null;
+  denominacion_nacional?: string | null;
 }
 
 export interface ZonaDrag {
@@ -128,11 +132,7 @@ export const SortablePareja = ({
 
   const j1 = cleanName(pareja.jugador1_nombre);
   const j2 = cleanName(pareja.jugador2_nombre);
-  const nombreCompleto = j1
-    ? j2 && j2 !== "-"
-      ? `${j1} / ${j2}`
-      : j1
-    : "DESCONOCIDO";
+  const usaDenominacion = Boolean(pareja.denominacion_nacional);
 
   return (
     <div
@@ -166,8 +166,18 @@ export const SortablePareja = ({
 
       <div className="flex-1 min-w-0 py-0.5">
         <div className="flex flex-wrap items-center gap-1.5">
-          <div className="text-[11.5px] font-black text-white uppercase leading-snug tracking-wide wrap-break-word break-all">
-            {nombreCompleto}
+          <div className="text-[11.5px] font-black text-white uppercase leading-snug tracking-wide min-w-0">
+            <PairDisplay
+              j1={j1 || pareja.jugador1_nombre}
+              j2={j2 || pareja.jugador2_nombre}
+              usuarioId={pareja.usuario_id}
+              usuario2Id={pareja.usuario2_id}
+              denominacion={pareja.denominacion_nacional}
+              alcanceNacional={usaDenominacion}
+              showAvatars={false}
+              variant="inline"
+              compact
+            />
           </div>
           {pareja.cabezaDeSerie && (
             <span className="shrink-0 text-[8px] font-black text-[#ccff00] bg-[#ccff00]/10 border border-[#ccff00]/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider">

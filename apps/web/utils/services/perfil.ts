@@ -67,6 +67,16 @@ export const PerfilService = {
   },
 
   /**
+   * Ficha pública (sin datos sensibles). No requiere autenticación.
+   */
+  async getPublico(id: string): Promise<Partial<Perfil>> {
+    const response = await api.get<ApiResponse<Partial<Perfil>>>(
+      `/perfil/publico/${id}`,
+    );
+    return response.data.data;
+  },
+
+  /**
    * Despacha credenciales al backend para autenticación centralizada
    */
   async loginConEmail(email: string, password: string): Promise<AuthResponse> {

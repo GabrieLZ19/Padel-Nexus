@@ -403,6 +403,10 @@ export default function TorneoDetallePage() {
                           jugador2_nombre: gp.inscripciones?.jugador2_nombre,
                           club: gp.clubName || "Sin club asignado",
                           cabezaDeSerie: gp.cabezaDeSerie,
+                          usuario_id: gp.inscripciones?.usuario_id ?? null,
+                          usuario2_id: gp.inscripciones?.usuario2_id ?? null,
+                          denominacion_nacional:
+                            gp.inscripciones?.denominacion_nacional ?? null,
                         }),
                       );
 
@@ -412,11 +416,16 @@ export default function TorneoDetallePage() {
                             nombreZona={z.nombre_grupo}
                             parejasInscritas={parejasFormatted}
                             partidosZona={partidosZona}
+                            alcance={torneo.alcance}
                           />
                           {partidosZona.length > 0 ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               {partidosZona.map((p) => (
-                                <MatchCard key={p.id} partido={p} />
+                                <MatchCard
+                                  key={p.id}
+                                  partido={p}
+                                  alcance={torneo.alcance}
+                                />
                               ))}
                             </div>
                           ) : null}
@@ -430,6 +439,7 @@ export default function TorneoDetallePage() {
                     torneoId={torneoId}
                     isLive={isEnCurso}
                     isFinished={isFinalizado}
+                    alcance={torneo.alcance}
                   />
                 )}
               </>

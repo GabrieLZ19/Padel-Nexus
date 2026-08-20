@@ -37,6 +37,7 @@ export default function InscripcionManualModal({
 
   const [j1, setJ1] = useState("");
   const [j2, setJ2] = useState("");
+  const [letraPrioridad, setLetraPrioridad] = useState("");
   const [monto, setMonto] = useState<number>(
     Number(torneo.precio_inscripcion || 0),
   );
@@ -53,6 +54,8 @@ export default function InscripcionManualModal({
     onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
   });
 
+  const esNacional = /nacional/i.test(String(torneo.alcance || ""));
+
   const handleSubmit = async () => {
     if (!j1) {
       setFeedbackModal({
@@ -60,6 +63,18 @@ export default function InscripcionManualModal({
         type: "warning",
         title: "Campo requerido",
         description: "Debes ingresar al menos el identificador del Jugador 1.",
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
+      return;
+    }
+
+    if (esNacional && !letraPrioridad.trim()) {
+      setFeedbackModal({
+        isOpen: true,
+        type: "warning",
+        title: "Letra requerida",
+        description:
+          "En torneos nacionales debés indicar la letra de prioridad (A, B, C…).",
         onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
       });
       return;
@@ -91,10 +106,12 @@ export default function InscripcionManualModal({
           : estadoPago || undefined,
         omitir_validaciones: omitirValidaciones,
         motivo: omitirValidaciones ? motivoOverride.trim() : undefined,
+        letra_prioridad: esNacional ? letraPrioridad.trim().toUpperCase() : undefined,
       });
 
       setJ1("");
       setJ2("");
+      setLetraPrioridad("");
       setEstadoPago("");
       setOmitirValidaciones(false);
       setMotivoOverride("");
@@ -195,6 +212,28 @@ export default function InscripcionManualModal({
                   </div>
                 )}
 
+                {esNacional && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                      Letra de prioridad (denominación) *
+                    </label>
+                    <CustomDropdown
+                      value={letraPrioridad}
+                      onChange={setLetraPrioridad}
+                      options={Array.from({ length: 12 }, (_, i) => {
+                        const letter = String.fromCharCode(65 + i);
+                        return { value: letter, label: letter };
+                      })}
+                      placeholder="A, B, C…"
+                      className="py-2.5! text-sm!"
+                    />
+                    <p className="text-[10px] text-gray-500 mt-1.5">
+                      Se mostrará como provincia + letra (ej. NEUQUÉN A) según la
+                      residencia del jugador 1.
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
@@ -257,6 +296,7 @@ export default function InscripcionManualModal({
                 disabled={
                   loading ||
                   !j1 ||
+                  (esNacional && !letraPrioridad.trim()) ||
                   (omitirValidaciones && motivoOverride.trim().length < 10)
                 }
                 className="w-full bg-brand-chartreuse hover:bg-[#b3e600] disabled:opacity-30 text-brand-black font-black py-4 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-brand-chartreuse/10"

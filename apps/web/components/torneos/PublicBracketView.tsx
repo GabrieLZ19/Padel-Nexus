@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Partido } from "@/utils/types";
 import {
-  PlayerAvatar,
-  splitPlayerName,
-} from "@/components/torneos/MatchTeamBox";
+  PairDisplay,
+  esAlcanceNacional,
+} from "@/components/torneos/PairDisplay";
 
 const RONDAS_CONFIG = [
   { id: "32AVOS", label: "32avos" },
@@ -22,24 +22,15 @@ const CONNECTOR_GAP = 56;
 const ROW_H = 128;
 const HEADER_H = 36;
 
-function shortName(full?: string | null): string {
-  const { apellido, nombre } = splitPlayerName(full);
-  if (!nombre) return apellido;
-  const ini = nombre.trim().charAt(0);
-  return ini ? `${apellido} ${ini}.` : apellido;
-}
-
-function teamLabel(j1?: string | null, j2?: string | null): string {
-  const a = shortName(j1);
-  if (!j2 || j2 === "-") return a === "—" ? "" : a;
-  return `${a} · ${shortName(j2)}`;
-}
-
 function BracketTeamRow({
   j1,
   j2,
   avatarJ1,
   avatarJ2,
+  usuarioId,
+  usuario2Id,
+  denominacion,
+  alcanceNacional,
   won,
   emptyLabel,
 }: {
@@ -47,12 +38,14 @@ function BracketTeamRow({
   j2?: string | null;
   avatarJ1?: string | null;
   avatarJ2?: string | null;
+  usuarioId?: string | null;
+  usuario2Id?: string | null;
+  denominacion?: string | null;
+  alcanceNacional?: boolean;
   won?: boolean;
   emptyLabel?: string;
 }) {
-  const empty = !j1 && !j2;
-  const hasJ2 = Boolean(j2 && j2 !== "-");
-  const label = empty ? emptyLabel || "—" : teamLabel(j1, j2);
+  const empty = !j1 && !j2 && !denominacion;
 
   return (
     <div
@@ -60,29 +53,31 @@ function BracketTeamRow({
         won ? "bg-brand-chartreuse/10" : ""
       }`}
     >
-      {!empty ? (
-        <div className="relative shrink-0 flex items-center">
-          <PlayerAvatar src={avatarJ1} size="sm" />
-          {hasJ2 ? (
-            <span className="-ml-2 relative z-[1]">
-              <PlayerAvatar src={avatarJ2} size="sm" />
-            </span>
-          ) : null}
-        </div>
+      {empty ? (
+        <>
+          <span className="size-7 rounded-full border border-dashed border-white/15 shrink-0" />
+          <p className="text-xs sm:text-[13px] font-medium truncate leading-tight text-gray-600 italic">
+            {emptyLabel || "—"}
+          </p>
+        </>
       ) : (
-        <span className="size-7 rounded-full border border-dashed border-white/15 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <PairDisplay
+            j1={j1}
+            j2={j2}
+            avatarJ1={avatarJ1}
+            avatarJ2={avatarJ2}
+            usuarioId={usuarioId}
+            usuario2Id={usuario2Id}
+            denominacion={denominacion}
+            alcanceNacional={alcanceNacional}
+            won={won}
+            compact
+            showAvatars
+            variant="stacked"
+          />
+        </div>
       )}
-      <p
-        className={`text-xs sm:text-[13px] font-semibold truncate leading-tight ${
-          empty
-            ? "text-gray-600 italic font-medium"
-            : won
-              ? "text-brand-chartreuse"
-              : "text-white"
-        }`}
-      >
-        {label}
-      </p>
     </div>
   );
 }
@@ -90,17 +85,23 @@ function BracketTeamRow({
 function BracketMatchCell({
   partido,
   width,
+  alcanceNacional,
 }: {
   partido: Partido;
   width: number;
+  alcanceNacional?: boolean;
 }) {
   const isA =
     partido.ganador === partido.equipo_a_id && partido.ganador != null;
   const isB =
     partido.ganador === partido.equipo_b_id && partido.ganador != null;
   const finalizado = partido.ganador != null;
-  const hasA = Boolean(partido.equipo_a_j1 || partido.equipo_a_j2);
-  const hasB = Boolean(partido.equipo_b_j1 || partido.equipo_b_j2);
+  const hasA = Boolean(
+    partido.equipo_a_j1 || partido.equipo_a_j2 || partido.equipo_a_denominacion,
+  );
+  const hasB = Boolean(
+    partido.equipo_b_j1 || partido.equipo_b_j2 || partido.equipo_b_denominacion,
+  );
   const scoreA = [partido.set1_a, partido.set2_a, partido.set3_a]
     .filter((v) => v != null)
     .join("-");
@@ -122,6 +123,10 @@ function BracketMatchCell({
             j2={partido.equipo_a_j2}
             avatarJ1={partido.equipo_a_avatar_j1}
             avatarJ2={partido.equipo_a_avatar_j2}
+            usuarioId={partido.equipo_a_usuario_id}
+            usuario2Id={partido.equipo_a_usuario2_id}
+            denominacion={partido.equipo_a_denominacion}
+            alcanceNacional={alcanceNacional}
             won={isA}
             emptyLabel={hasB && !hasA ? "BYE" : "TBD"}
           />
@@ -143,6 +148,10 @@ function BracketMatchCell({
             j2={partido.equipo_b_j2}
             avatarJ1={partido.equipo_b_avatar_j1}
             avatarJ2={partido.equipo_b_avatar_j2}
+            usuarioId={partido.equipo_b_usuario_id}
+            usuario2Id={partido.equipo_b_usuario2_id}
+            denominacion={partido.equipo_b_denominacion}
+            alcanceNacional={alcanceNacional}
             won={isB}
             emptyLabel={hasA && !hasB ? "BYE" : "TBD"}
           />
@@ -204,14 +213,17 @@ export default function PublicBracketView({
   torneoId,
   isLive = false,
   isFinished = false,
+  alcance,
 }: {
   partidos: Partido[];
   torneoId: string;
   isLive?: boolean;
   isFinished?: boolean;
+  alcance?: string | null;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [viewportW, setViewportW] = useState(0);
+  const nacional = esAlcanceNacional(alcance);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -365,7 +377,11 @@ export default function PublicBracketView({
                       className="absolute left-0 -translate-y-1/2"
                       style={{ top: (centers[matchIdx] ?? 0) - HEADER_H }}
                     >
-                      <BracketMatchCell partido={match} width={cardW} />
+                      <BracketMatchCell
+                        partido={match}
+                        width={cardW}
+                        alcanceNacional={nacional}
+                      />
                     </div>
                   ))}
                 </div>
