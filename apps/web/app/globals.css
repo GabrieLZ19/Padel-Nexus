@@ -54,7 +54,9 @@ html.light .text-white {
 }
 
 /* Sobrescribir fondos oscuros en modo claro */
+html.light .bg-\[\#080808\],
 html.light .bg-\[\#0a0a0a\],
+html.light .bg-\[\#0c0c0c\],
 html.light .bg-\[\#0d0d0d\],
 html.light .bg-\[\#0f0f0f\],
 html.light .bg-\[\#0f0f0f\/90\],
@@ -65,6 +67,7 @@ html.light .bg-black {
 
 html.light .bg-\[\#111111\],
 html.light .bg-\[\#111\],
+html.light .bg-\[\#121212\],
 html.light .bg-\[\#141414\],
 html.light .bg-\[\#151515\],
 html.light .bg-\[\#161616\],
@@ -79,12 +82,30 @@ html.light .bg-brand-card {
 }
 
 html.light .bg-black\/20,
+html.light .bg-black\/35,
 html.light .bg-black\/40,
 html.light .bg-white\/5,
 html.light .bg-white\/10,
+html.light .bg-white\/15,
 html.light .hover\:bg-white\/5:hover,
 html.light .hover\:bg-white\/10:hover {
   background-color: #f1f5f9 !important;
+}
+
+html.light .border-white\/5,
+html.light .border-white\/6,
+html.light .border-white\/8,
+html.light .border-white\/10,
+html.light .border-white\/14,
+html.light .border-white\/15,
+html.light .border-brand-white\/5,
+html.light .border-brand-white\/10 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Conectores de llaves / brackets en modo claro */
+html.light .bracket-connector {
+  stroke: #94a3b8 !important;
 }
 
 /* Estilos para inputs en modo claro */
@@ -137,13 +158,6 @@ html.light .bg-brand-chartreuse\/10 {
 
 html.light .border-brand-chartreuse\/20 {
   border-color: rgba(60, 94, 27, 0.2) !important;
-}
-
-html.light .border-white\/5,
-html.light .border-white\/10,
-html.light .border-brand-white\/5,
-html.light .border-brand-white\/10 {
-  border-color: #e2e8f0 !important;
 }
 
 html.light .divide-white\/5 > *,

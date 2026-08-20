@@ -29,7 +29,7 @@ function PlayerNameLink({
   const label = nombre ? `${apellido}, ${nombre}` : apellido;
   const href = jugadorHref(userId);
   const base = `${className || ""} ${
-    won ? "text-brand-chartreuse" : "text-white"
+    won ? "text-brand-chartreuse" : "text-brand-white"
   } hover:underline underline-offset-2`;
 
   if (!href) {
@@ -153,7 +153,7 @@ export function PairDisplay({
                 fullName={j2}
                 userId={usuario2Id}
                 won={won}
-                className="font-bold text-sm text-gray-300"
+                className="font-bold text-sm text-gray-500"
               />
             </>
           ) : null}
@@ -174,7 +174,7 @@ export function PairDisplay({
         className={`inline-flex items-center gap-1.5 max-w-full rounded-lg px-2 py-1 transition-colors cursor-pointer ${
           won
             ? "bg-brand-chartreuse/15 text-brand-chartreuse"
-            : "bg-white/5 text-white hover:bg-white/10"
+            : "bg-brand-input text-brand-white hover:bg-brand-input/80"
         } ${isRight ? "flex-row-reverse" : ""}`}
         aria-expanded={expanded}
       >

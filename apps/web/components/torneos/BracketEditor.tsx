@@ -797,10 +797,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   };
 
   return (
-    <div className="bg-[#1a1a1a] border border-white/5 rounded-3xl p-4 sm:p-6 md:p-8">
+    <div className="bg-brand-card border border-brand-input rounded-3xl p-4 sm:p-6 md:p-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h3 className="font-extrabold text-xl sm:text-2xl text-white tracking-tight uppercase">
+          <h3 className="font-extrabold text-xl sm:text-2xl text-brand-white tracking-tight uppercase">
             EDITOR DE LLAVES — {torneo?.nombre || "TORNEO"} ·{" "}
             {torneo?.categoria || "CATEGORÍA"}
           </h3>
@@ -1231,17 +1231,17 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             )}
           </div>
 
-          <div className="relative rounded-2xl border border-white/10 bg-[#080808] overflow-hidden">
+          <div className="relative rounded-2xl border border-brand-input bg-brand-card overflow-hidden">
             <div
-              className="pointer-events-none absolute inset-0 opacity-[0.35]"
+              className="pointer-events-none absolute inset-0 opacity-40 dark:opacity-[0.35]"
               style={{
                 backgroundImage:
-                  "radial-gradient(ellipse 80% 50% at 20% 0%, rgba(204,255,0,0.06), transparent 55%), radial-gradient(ellipse 60% 40% at 90% 100%, rgba(56,189,248,0.05), transparent 50%)",
+                  "radial-gradient(ellipse 80% 50% at 20% 0%, rgba(110,137,1,0.08), transparent 55%), radial-gradient(ellipse 60% 40% at 90% 100%, rgba(56,189,248,0.06), transparent 50%)",
               }}
             />
             <div className="relative p-4 sm:p-6 overflow-x-auto">
               {playoffPartidos.length === 0 && partidos.length === 0 ? (
-                <div className="text-center p-12 text-gray-500 border border-dashed border-white/10 rounded-2xl">
+                <div className="text-center p-12 text-gray-500 border border-dashed border-brand-input rounded-2xl">
                   Aún no se ha generado el cuadro de eliminatoria para este
                   torneo.
                 </div>
@@ -1309,15 +1309,15 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                               />
 
                               {rondaIndex > 0 && (
-                                <div className="absolute left-0 top-1/2 w-7 h-px bg-white/15 -translate-y-1/2 pointer-events-none" />
+                                <div className="absolute left-0 top-1/2 w-7 h-px bg-brand-input -translate-y-1/2 pointer-events-none" />
                               )}
                               {rondaIndex < rondasToShow.length - 1 && (
                                 <>
-                                  <div className="absolute right-0 top-1/2 w-7 h-px bg-white/15 -translate-y-1/2 pointer-events-none" />
+                                  <div className="absolute right-0 top-1/2 w-7 h-px bg-brand-input -translate-y-1/2 pointer-events-none" />
                                   {i % 2 === 0 ? (
-                                    <div className="absolute right-0 top-1/2 w-px h-[calc(50%+1rem)] bg-white/15 pointer-events-none" />
+                                    <div className="absolute right-0 top-1/2 w-px h-[calc(50%+1rem)] bg-brand-input pointer-events-none" />
                                   ) : (
-                                    <div className="absolute right-0 bottom-1/2 w-px h-[calc(50%+1rem)] bg-white/15 pointer-events-none" />
+                                    <div className="absolute right-0 bottom-1/2 w-px h-[calc(50%+1rem)] bg-brand-input pointer-events-none" />
                                   )}
                                 </>
                               )}

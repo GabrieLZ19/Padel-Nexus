@@ -82,17 +82,17 @@ export const MatchCard = ({
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-1 min-h-[1rem]">
           {origen ? (
-            <span className="text-[9px] font-bold tracking-wide text-brand-chartreuse/90 bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
+            <span className="text-[9px] font-bold tracking-wide text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
               {origen}
             </span>
           ) : null}
           {esCabezaSerie ? (
-            <span className="text-[9px] font-bold tracking-wide text-amber-300 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded">
+            <span className="text-[9px] font-bold tracking-wide text-amber-500 bg-amber-400/15 border border-amber-400/30 px-1.5 py-0.5 rounded">
               #1
             </span>
           ) : null}
           {!origen && !esCabezaSerie && empty ? (
-            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-600">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">
               {esBye ? "Bye" : "Libre"}
             </span>
           ) : null}
@@ -148,10 +148,10 @@ export const MatchCard = ({
               key={idx}
               className={`w-7 h-8 sm:w-8 sm:h-9 flex items-center justify-center rounded-md text-[11px] sm:text-xs font-black tabular-nums ${
                 !has
-                  ? "text-gray-700 bg-transparent"
+                  ? "text-gray-400 bg-transparent"
                   : setWon
                     ? "bg-brand-chartreuse text-brand-black"
-                    : "bg-white/5 text-gray-300"
+                    : "bg-brand-input text-brand-white"
               }`}
             >
               {has ? val : "–"}
@@ -171,18 +171,18 @@ export const MatchCard = ({
       onClick={() => {
         if (isInteractive && onEditSelect) onEditSelect(partido);
       }}
-      className={`w-full text-left rounded-2xl border overflow-hidden transition-all ${
+      className={`w-full text-left rounded-2xl border overflow-hidden transition-all bg-brand-card ${
         isInteractive ? "cursor-pointer hover:border-brand-chartreuse/40" : ""
       } ${
         isActive
-          ? "border-brand-chartreuse/50 shadow-[0_0_0_1px_rgba(203,254,1,0.15)]"
-          : "border-white/10 bg-[#121212]"
+          ? "border-brand-chartreuse/50 shadow-sm"
+          : "border-brand-input"
       }`}
     >
-      <div className="flex items-center justify-between gap-3 px-3.5 py-2 bg-black/35 border-b border-white/5 min-h-[2rem]">
+      <div className="flex items-center justify-between gap-3 px-3.5 py-2 bg-brand-input/60 border-b border-brand-input min-h-[2rem]">
         <div className="flex items-center gap-2 min-w-0">
           {partido.es_wo && (
-            <span className="text-[9px] font-black text-amber-400 uppercase">
+            <span className="text-[9px] font-black text-amber-500 uppercase">
               W.O.
             </span>
           )}
@@ -198,15 +198,15 @@ export const MatchCard = ({
           )}
         </div>
         {isInteractive && !finalizado && (
-          <span className="text-[9px] font-bold text-brand-chartreuse/80 uppercase tracking-wide shrink-0">
+          <span className="text-[9px] font-bold text-brand-chartreuse uppercase tracking-wide shrink-0">
             Editar
           </span>
         )}
       </div>
 
       <div
-        className={`flex justify-between items-center gap-2 px-3.5 py-3 border-b border-white/5 min-h-[4.25rem] ${
-          isA ? "bg-brand-chartreuse/[0.06]" : ""
+        className={`flex justify-between items-center gap-2 px-3.5 py-3 border-b border-brand-input min-h-[4.25rem] ${
+          isA ? "bg-brand-chartreuse/10" : ""
         }`}
       >
         {renderEquipo("a", origenEquipoA, isA, esCabezaSerieA, slotAEsBye)}
@@ -222,7 +222,7 @@ export const MatchCard = ({
 
       <div
         className={`flex justify-between items-center gap-2 px-3.5 py-3 min-h-[4.25rem] ${
-          isB ? "bg-brand-chartreuse/[0.06]" : ""
+          isB ? "bg-brand-chartreuse/10" : ""
         }`}
       >
         {renderEquipo("b", origenEquipoB, isB, esCabezaSerieB, slotBEsBye)}
@@ -237,8 +237,8 @@ export const MatchCard = ({
       </div>
 
       {meta && (
-        <div className="px-3.5 py-2 border-t border-white/5 bg-black/40">
-          <p className="text-[10px] font-semibold text-emerald-400/85 truncate">
+        <div className="px-3.5 py-2 border-t border-brand-input bg-brand-input/40">
+          <p className="text-[10px] font-semibold text-emerald-600 truncate">
             {meta}
           </p>
         </div>

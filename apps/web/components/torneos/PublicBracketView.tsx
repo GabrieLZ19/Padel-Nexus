@@ -111,12 +111,12 @@ function BracketMatchCell({
 
   return (
     <div
-      className={`rounded-xl border overflow-hidden bg-[#121212] shadow-[0_1px_0_rgba(255,255,255,0.04)] ${
-        finalizado ? "border-white/14" : "border-white/10"
+      className={`rounded-xl border overflow-hidden bg-brand-card ${
+        finalizado ? "border-brand-input" : "border-brand-input"
       }`}
       style={{ width }}
     >
-      <div className="flex items-stretch border-b border-white/6">
+      <div className="flex items-stretch border-b border-brand-input">
         <div className="min-w-0 flex-1">
           <BracketTeamRow
             j1={partido.equipo_a_j1}
@@ -132,7 +132,7 @@ function BracketMatchCell({
           />
         </div>
         <div
-          className={`w-9 shrink-0 flex items-center justify-center border-l border-white/6 text-[11px] font-black tabular-nums ${
+          className={`w-9 shrink-0 flex items-center justify-center border-l border-brand-input text-[11px] font-black tabular-nums ${
             isA
               ? "text-brand-chartreuse bg-brand-chartreuse/10"
               : "text-gray-500"
@@ -157,7 +157,7 @@ function BracketMatchCell({
           />
         </div>
         <div
-          className={`w-9 shrink-0 flex items-center justify-center border-l border-white/6 text-[11px] font-black tabular-nums ${
+          className={`w-9 shrink-0 flex items-center justify-center border-l border-brand-input text-[11px] font-black tabular-nums ${
             isB
               ? "text-brand-chartreuse bg-brand-chartreuse/10"
               : "text-gray-500"
@@ -246,7 +246,7 @@ export default function PublicBracketView({
 
   if (activeRounds.length === 0) {
     return (
-      <div className="rounded-2xl border border-white/8 bg-[#0c0c0c] px-6 py-16 text-center">
+      <div className="rounded-2xl border border-brand-input bg-brand-card px-6 py-16 text-center">
         <p className="text-sm text-gray-500">
           El cuadro aún no está disponible.
         </p>
@@ -310,10 +310,10 @@ export default function PublicBracketView({
   }
 
   return (
-    <div className="rounded-2xl border border-white/8 bg-[#0c0c0c] overflow-hidden w-full">
-      <div className="flex items-center justify-between gap-3 px-5 lg:px-8 py-4 border-b border-white/6">
+    <div className="rounded-2xl border border-brand-input bg-brand-card overflow-hidden w-full">
+      <div className="flex items-center justify-between gap-3 px-5 lg:px-8 py-4 border-b border-brand-input">
         <div>
-          <h2 className="text-lg font-bold text-white tracking-tight">
+          <h2 className="text-lg font-bold text-brand-white tracking-tight">
             Cuadro principal
           </h2>
           <p className="text-[11px] text-gray-500 mt-0.5">
@@ -321,13 +321,13 @@ export default function PublicBracketView({
           </p>
         </div>
         {isLive ? (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/25 text-red-400 text-[10px] font-bold uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/25 text-red-500 text-[10px] font-bold uppercase tracking-wider">
             <span className="size-1.5 rounded-full bg-red-500 animate-pulse" />
             En vivo
           </span>
         ) : null}
         {isFinished ? (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-input border border-brand-input text-gray-500 text-[10px] font-bold uppercase tracking-wider">
             Finalizado
           </span>
         ) : null}
@@ -349,7 +349,8 @@ export default function PublicBracketView({
                 key={i}
                 d={d}
                 fill="none"
-                stroke="rgba(255,255,255,0.18)"
+                stroke="currentColor"
+                className="bracket-connector text-gray-400"
                 strokeWidth={1.5}
               />
             ))}

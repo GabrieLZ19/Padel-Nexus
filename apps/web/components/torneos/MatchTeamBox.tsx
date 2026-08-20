@@ -83,7 +83,7 @@ export function PlayerLine({
       <PlayerAvatar src={avatarUrl} size={size} />
       <div className="min-w-0 leading-tight">
         <p
-          className={`font-black text-white truncate ${
+          className={`font-black text-brand-white truncate ${
             size === "sm" ? "text-[11px]" : "text-xs"
           }`}
         >
@@ -127,8 +127,8 @@ export function TeamBox({
     <div
       className={`rounded-lg border px-2.5 py-2.5 min-w-0 h-full ${
         isWinner
-          ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 shadow-[inset_0_0_0_1px_rgba(196,255,0,0.12)]"
-          : "bg-[#0d0d0d] border-white/12"
+          ? "bg-brand-chartreuse/10 border-brand-chartreuse/40"
+          : "bg-brand-card border-brand-input"
       } ${isRight ? "text-right" : "text-left"}`}
     >
       <div
@@ -139,7 +139,7 @@ export function TeamBox({
         {isWinner && (
           <CheckCircle2 className="size-3.5 text-brand-chartreuse shrink-0" />
         )}
-        <p className="text-[9px] font-black uppercase tracking-wider text-rose-400/90 truncate">
+        <p className="text-[9px] font-black uppercase tracking-wider text-rose-500 truncate">
           {club && club !== "Sin club asignado" ? club : "Sin club"}
         </p>
       </div>
