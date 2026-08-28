@@ -3,12 +3,19 @@ import { supabaseAdmin } from "../config/supabase";
 import {
   MARKETPLACE_ESTADOS_ORDEN,
   MARKETPLACE_ESTADOS_VENDEDOR,
+  type AudienciaPromocion,
+  type EntidadMarketplaceTipo,
 } from "../constants/marketplace";
 import { MarketplaceStorageService } from "./marketplace-storage.service";
 import { NotificacionService } from "./notificacion.service";
+import {
+  MarketplaceEntityAuthService,
+  type EntidadMarketplaceRef,
+} from "./marketplace-entity-auth.service";
 
 interface FiltrosProducto {
   categoria_id?: string;
+  vendedor_id?: string;
   busqueda?: string;
   precio_min?: number;
   precio_max?: number;
@@ -33,9 +40,15 @@ interface DatosEnvio {
 
 interface DatosVendedor {
   nombre_tienda: string;
-  tipo: "jugador" | "club" | "entrenador" | "tienda";
+  tipo: EntidadMarketplaceTipo;
   descripcion?: string;
   provincia?: string;
+}
+
+interface DatosTiendaEntidad extends DatosVendedor {
+  entidad_tipo: EntidadMarketplaceTipo;
+  entidad_id: string;
+  logo_base64?: string;
 }
 
 interface DatosProducto {
@@ -43,12 +56,35 @@ interface DatosProducto {
   nombre: string;
   descripcion?: string;
   precio: number;
-  precio_anterior?: number;
+  precio_anterior?: number | null;
   stock: number;
   marca?: string;
   tipo: "producto" | "servicio";
   modalidad_servicio?: string;
   ubicacion_servicio?: string;
+}
+
+function pickDatosProductoUpdate(
+  datos: Partial<DatosProducto> & Record<string, unknown>,
+): Partial<DatosProducto> {
+  const payload: Partial<DatosProducto> = {};
+  if (datos.categoria_id !== undefined) payload.categoria_id = datos.categoria_id;
+  if (datos.nombre !== undefined) payload.nombre = datos.nombre;
+  if (datos.descripcion !== undefined) payload.descripcion = datos.descripcion;
+  if (datos.precio !== undefined) payload.precio = datos.precio;
+  if (datos.precio_anterior !== undefined) {
+    payload.precio_anterior = datos.precio_anterior ?? null;
+  }
+  if (datos.stock !== undefined) payload.stock = datos.stock;
+  if (datos.marca !== undefined) payload.marca = datos.marca;
+  if (datos.tipo !== undefined) payload.tipo = datos.tipo;
+  if (datos.modalidad_servicio !== undefined) {
+    payload.modalidad_servicio = datos.modalidad_servicio;
+  }
+  if (datos.ubicacion_servicio !== undefined) {
+    payload.ubicacion_servicio = datos.ubicacion_servicio;
+  }
+  return payload;
 }
 
 const ITEMS_POR_PAGINA = 12;
@@ -85,20 +121,44 @@ export class MarketplaceService {
     const desde = (pagina - 1) * porPagina;
     const hasta = desde + porPagina - 1;
 
+    const { data: vendedoresActivos } = await supabaseAdmin
+      .from("marketplace_vendedores")
+      .select("id")
+      .eq("estado", MARKETPLACE_ESTADOS_VENDEDOR.ACTIVO)
+      .not("entidad_id", "is", null);
+
+    const vendedorIds = vendedoresActivos?.map((v) => v.id) || [];
+    if (vendedorIds.length === 0) {
+      return {
+        productos: [],
+        total: 0,
+        pagina,
+        por_pagina: porPagina,
+        total_paginas: 0,
+      };
+    }
+
     let query = supabaseAdmin
       .from("marketplace_productos")
       .select(
         `
         id, nombre, precio, precio_anterior, stock, marca, thumbnail_url, imagenes, tipo, destacado, created_at,
-        vendedor:marketplace_vendedores!inner(id, nombre_tienda, tipo, provincia, valoracion_promedio),
+        vendedor:marketplace_vendedores!inner(
+          id, nombre_tienda, tipo, provincia, valoracion_promedio,
+          entidad_tipo, entidad_id, logo_url
+        ),
         categoria:marketplace_categorias!inner(id, nombre, slug)
       `,
         { count: "exact" },
       )
-      .eq("activo", true);
+      .eq("activo", true)
+      .in("vendedor_id", vendedorIds);
 
     if (filtros.categoria_id) {
       query = query.eq("categoria_id", filtros.categoria_id);
+    }
+    if (filtros.vendedor_id) {
+      query = query.eq("vendedor_id", filtros.vendedor_id);
     }
     if (filtros.tipo) {
       query = query.eq("tipo", filtros.tipo);
@@ -206,23 +266,45 @@ export class MarketplaceService {
     return marcasUnicas.sort();
   }
 
-  static async registrarVendedor(usuarioId: string, datos: DatosVendedor) {
+  static async registrarTiendaEntidad(
+    usuarioId: string,
+    rol: string | undefined,
+    datos: DatosTiendaEntidad,
+  ) {
+    const ref: EntidadMarketplaceRef = {
+      entidad_tipo: datos.entidad_tipo,
+      entidad_id: datos.entidad_id,
+    };
+
+    await MarketplaceEntityAuthService.verificarAccesoEntidad(
+      usuarioId,
+      rol,
+      ref,
+    );
+
     const { data: existente } = await supabaseAdmin
       .from("marketplace_vendedores")
       .select("id")
-      .eq("usuario_id", usuarioId)
-      .single();
+      .eq("entidad_tipo", datos.entidad_tipo)
+      .eq("entidad_id", datos.entidad_id)
+      .maybeSingle();
 
     if (existente) {
-      throw new Error("Ya estás registrado como vendedor.");
+      throw new Error("Esta entidad ya tiene una tienda registrada.");
     }
+
+    const nombreEntidad =
+      await MarketplaceEntityAuthService.obtenerNombreEntidad(ref);
 
     const { data, error } = await supabaseAdmin
       .from("marketplace_vendedores")
       .insert({
         usuario_id: usuarioId,
-        nombre_tienda: datos.nombre_tienda,
-        tipo: datos.tipo,
+        creado_por: usuarioId,
+        entidad_tipo: datos.entidad_tipo,
+        entidad_id: datos.entidad_id,
+        nombre_tienda: datos.nombre_tienda || nombreEntidad,
+        tipo: datos.entidad_tipo,
         descripcion: datos.descripcion || null,
         provincia: datos.provincia || null,
         estado: MARKETPLACE_ESTADOS_VENDEDOR.ACTIVO,
@@ -230,35 +312,111 @@ export class MarketplaceService {
       .select()
       .single();
 
-    if (error) throw new Error(`Error al registrar vendedor: ${error.message}`);
+    if (error) throw new Error(`Error al registrar tienda: ${error.message}`);
+
+    if (datos.logo_base64) {
+      const logoUrl = await MarketplaceStorageService.subirLogoTienda(
+        data.id,
+        datos.logo_base64,
+      );
+      const { data: actualizada } = await supabaseAdmin
+        .from("marketplace_vendedores")
+        .update({ logo_url: logoUrl })
+        .eq("id", data.id)
+        .select()
+        .single();
+      return actualizada || data;
+    }
+
     return data;
   }
 
-  static async obtenerMiPerfilVendedor(usuarioId: string) {
+  static async obtenerTiendaEntidad(ref: EntidadMarketplaceRef) {
     const { data, error } = await supabaseAdmin
       .from("marketplace_vendedores")
       .select("*")
-      .eq("usuario_id", usuarioId)
-      .single();
+      .eq("entidad_tipo", ref.entidad_tipo)
+      .eq("entidad_id", ref.entidad_id)
+      .maybeSingle();
 
-    if (error || !data) return null;
+    if (error) throw new Error(`Error al obtener tienda: ${error.message}`);
     return data;
   }
 
-  static async actualizarPerfilVendedor(
+  static async assertGestionTiendaEntidad(
     usuarioId: string,
-    datos: Partial<DatosVendedor> & { logo_url?: string },
+    rol: string | undefined,
+    ref: EntidadMarketplaceRef,
   ) {
+    await MarketplaceEntityAuthService.verificarAccesoEntidad(
+      usuarioId,
+      rol,
+      ref,
+    );
+
+    const tienda = await this.obtenerTiendaEntidad(ref);
+    if (!tienda) {
+      throw new Error(
+        "La entidad no tiene tienda activa. Registrala desde el módulo Marketplace.",
+      );
+    }
+    if (tienda.estado !== MARKETPLACE_ESTADOS_VENDEDOR.ACTIVO) {
+      throw new Error("La tienda de esta entidad está suspendida.");
+    }
+    return tienda;
+  }
+
+  /** @deprecated Registro libre de usuarios — usar registrarTiendaEntidad */
+  static async registrarVendedor(usuarioId: string, _datos: DatosVendedor) {
+    void usuarioId;
+    throw new Error(
+      "El registro de vendedores individuales fue deshabilitado. Solo entidades pueden vender desde el CRM.",
+    );
+  }
+
+  /** @deprecated Usar obtenerTiendaEntidad */
+  static async obtenerMiPerfilVendedor(_usuarioId: string) {
+    return null;
+  }
+
+  static async actualizarTiendaEntidad(
+    usuarioId: string,
+    rol: string | undefined,
+    ref: EntidadMarketplaceRef,
+    datos: Partial<DatosVendedor> & { logo_url?: string; logo_base64?: string },
+  ) {
+    const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+
+    const { logo_base64, ...rest } = datos;
+    const updatePayload: Record<string, unknown> = { ...rest };
+
+    if (logo_base64) {
+      updatePayload.logo_url = await MarketplaceStorageService.subirLogoTienda(
+        tienda.id,
+        logo_base64,
+      );
+    }
+
     const { data, error } = await supabaseAdmin
       .from("marketplace_vendedores")
-      .update(datos)
-      .eq("usuario_id", usuarioId)
+      .update(updatePayload)
+      .eq("id", tienda.id)
       .select()
       .single();
 
     if (error)
-      throw new Error(`Error al actualizar perfil: ${error.message}`);
+      throw new Error(`Error al actualizar tienda: ${error.message}`);
     return data;
+  }
+
+  /** @deprecated */
+  static async actualizarPerfilVendedor(
+    _usuarioId: string,
+    _datos: Partial<DatosVendedor> & { logo_url?: string },
+  ) {
+    throw new Error(
+      "La gestión de tienda se realiza desde el módulo Marketplace del CRM.",
+    );
   }
 
   static async listarMisProductos(vendedorId: string, pagina: number = 1) {
@@ -363,7 +521,7 @@ export class MarketplaceService {
       throw new Error("Producto no encontrado o no tienes permiso para editarlo.");
     }
 
-    let imagenesUpdate: Record<string, any> = {};
+    let imagenesUpdate: Record<string, unknown> = {};
     if (imagenesNuevasBase64.length > 0 || imagenesExistentes.length > 0) {
       const { imagenes, thumbnailUrl } =
         await MarketplaceStorageService.actualizarImagenes(
@@ -375,9 +533,13 @@ export class MarketplaceService {
       imagenesUpdate = { imagenes, thumbnail_url: thumbnailUrl };
     }
 
+    const updatePayload = pickDatosProductoUpdate(
+      datos as Partial<DatosProducto> & Record<string, unknown>,
+    );
+
     const { data, error } = await supabaseAdmin
       .from("marketplace_productos")
-      .update({ ...datos, ...imagenesUpdate })
+      .update({ ...updatePayload, ...imagenesUpdate })
       .eq("id", productoId)
       .select()
       .single();
@@ -397,6 +559,20 @@ export class MarketplaceService {
 
     if (error)
       throw new Error(`Error al desactivar producto: ${error.message}`);
+    return data;
+  }
+
+  static async activarProducto(vendedorId: string, productoId: string) {
+    const { data, error } = await supabaseAdmin
+      .from("marketplace_productos")
+      .update({ activo: true })
+      .eq("id", productoId)
+      .eq("vendedor_id", vendedorId)
+      .select()
+      .single();
+
+    if (error)
+      throw new Error(`Error al activar producto: ${error.message}`);
     return data;
   }
 
@@ -702,6 +878,37 @@ export class MarketplaceService {
         mensaje: `Tu compra por $${orden.total} en el Marketplace ha sido confirmada.`,
         tipo: "success",
       });
+
+      const { data: itemsVendedor } = await supabaseAdmin
+        .from("marketplace_items_orden")
+        .select("vendedor_id")
+        .eq("orden_id", ordenId);
+
+      const vendedorIds = [
+        ...new Set((itemsVendedor || []).map((i) => i.vendedor_id)),
+      ];
+
+      for (const vendedorId of vendedorIds) {
+        const { data: vendedor } = await supabaseAdmin
+          .from("marketplace_vendedores")
+          .select("id, usuario_id, creado_por, entidad_tipo, entidad_id, nombre_tienda")
+          .eq("id", vendedorId)
+          .single();
+
+        if (!vendedor) continue;
+
+        const contactoId =
+          await MarketplaceEntityAuthService.resolverContactoVendedor(vendedor);
+
+        if (contactoId) {
+          await NotificacionService.crearNotificacion({
+            usuario_id: contactoId,
+            titulo: "Nueva venta en tu tienda",
+            mensaje: `Recibiste una nueva compra en ${vendedor.nombre_tienda}. Revisá el módulo Marketplace.`,
+            tipo: "info",
+          });
+        }
+      }
     } catch (err) {
       console.error("Error al notificar compra:", err);
     }
@@ -924,12 +1131,8 @@ export class MarketplaceService {
   static async listarVendedores(filtroEstado?: string) {
     let query = supabaseAdmin
       .from("marketplace_vendedores")
-      .select(
-        `
-        *,
-        usuario:perfiles!marketplace_vendedores_usuario_id_fkey(nombre, apellido, email, avatar_url)
-      `,
-      )
+      .select("*")
+      .not("entidad_id", "is", null)
       .order("created_at", { ascending: false });
 
     if (filtroEstado) {
@@ -938,8 +1141,279 @@ export class MarketplaceService {
 
     const { data, error } = await query;
     if (error)
-      throw new Error(`Error al listar vendedores: ${error.message}`);
-    return data || [];
+      throw new Error(`Error al listar tiendas: ${error.message}`);
+
+    const tiendas = data || [];
+    const enriquecidas = await Promise.all(
+      tiendas.map(async (tienda) => {
+        let entidad_nombre: string | null = null;
+        if (tienda.entidad_tipo && tienda.entidad_id) {
+          entidad_nombre = await MarketplaceEntityAuthService.obtenerNombreEntidad(
+            {
+              entidad_tipo: tienda.entidad_tipo as EntidadMarketplaceTipo,
+              entidad_id: tienda.entidad_id,
+            },
+          );
+        }
+        return { ...tienda, entidad_nombre };
+      }),
+    );
+
+    return enriquecidas;
+  }
+
+  static async listarEntidadesParaMarketplace(
+    usuarioId: string,
+    rol: string | undefined,
+  ) {
+    if (!MarketplaceEntityAuthService.puedeGestionarMarketplace(rol)) {
+      throw new Error("No tenés permisos para gestionar marketplace.");
+    }
+
+    if (rol === "admin_club") {
+      const { data: perfil } = await supabaseAdmin
+        .from("perfiles")
+        .select("club_id, clubes:clubes!perfiles_club_id_fkey(id, nombre, provincia)")
+        .eq("id", usuarioId)
+        .single();
+
+      if (!perfil?.club_id) return { clubes: [], asociaciones: [], federaciones: [] };
+
+      const clubRaw = perfil.clubes as
+        | { id: string; nombre: string; provincia?: string }
+        | { id: string; nombre: string; provincia?: string }[]
+        | null;
+      const club = Array.isArray(clubRaw) ? clubRaw[0] : clubRaw;
+      return {
+        clubes: club ? [club] : [],
+        asociaciones: [],
+        federaciones: [],
+      };
+    }
+
+    const [clubes, asociaciones, federaciones] = await Promise.all([
+      supabaseAdmin.from("clubes").select("id, nombre, provincia").order("nombre"),
+      supabaseAdmin.from("asociaciones").select("id, nombre, sigla, provincia").order("nombre"),
+      supabaseAdmin.from("federaciones").select("id, nombre, sigla").order("nombre"),
+    ]);
+
+    return {
+      clubes: clubes.data || [],
+      asociaciones: asociaciones.data || [],
+      federaciones: federaciones.data || [],
+    };
+  }
+
+  static async enviarPromocionEntidad(
+    usuarioId: string,
+    rol: string | undefined,
+    ref: EntidadMarketplaceRef,
+    payload: {
+      titulo: string;
+      mensaje: string;
+      audiencia: AudienciaPromocion;
+      producto_id?: string;
+      categoria_id?: string;
+    },
+  ) {
+    const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+
+    const destinatarios = await this.resolverDestinatariosPromocion(
+      tienda.id,
+      ref,
+      payload.audiencia,
+    );
+
+    if (destinatarios.length === 0) {
+      throw new Error("No hay destinatarios para la audiencia seleccionada.");
+    }
+
+    let categoriaNombre: string | null = null;
+    if (payload.categoria_id) {
+      const { data: categoria } = await supabaseAdmin
+        .from("marketplace_categorias")
+        .select("nombre")
+        .eq("id", payload.categoria_id)
+        .maybeSingle();
+      categoriaNombre = categoria?.nombre || null;
+    }
+
+    const actionUrl = this.buildPromoActionUrl(tienda.id, {
+      producto_id: payload.producto_id,
+      categoria_id: payload.categoria_id,
+    });
+
+    const metadata = {
+      origen: "marketplace_promo",
+      vendedor_id: tienda.id,
+      nombre_tienda: tienda.nombre_tienda,
+      categoria_id: payload.categoria_id || null,
+      categoria_nombre: categoriaNombre,
+      producto_id: payload.producto_id || null,
+      action_url: actionUrl,
+    };
+
+    await Promise.all(
+      destinatarios.map((uid) =>
+        NotificacionService.crearNotificacion({
+          usuario_id: uid,
+          titulo: payload.titulo,
+          mensaje: payload.mensaje,
+          tipo: "info",
+          metadata,
+        }),
+      ),
+    );
+
+    const { data, error } = await supabaseAdmin
+      .from("marketplace_promociones")
+      .insert({
+        vendedor_id: tienda.id,
+        titulo: payload.titulo,
+        mensaje: payload.mensaje,
+        audiencia: payload.audiencia,
+        producto_id: payload.producto_id || null,
+        enviado_por: usuarioId,
+        total_destinatarios: destinatarios.length,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(`Error al registrar promoción: ${error.message}`);
+    return { promocion: data, total_destinatarios: destinatarios.length };
+  }
+
+  private static buildPromoActionUrl(
+    vendedorId: string,
+    opts: { producto_id?: string; categoria_id?: string },
+  ): string {
+    if (opts.producto_id) {
+      return `/marketplace/producto/${opts.producto_id}`;
+    }
+
+    const params = new URLSearchParams();
+    if (opts.categoria_id) {
+      params.set("categoria_id", opts.categoria_id);
+    }
+    const query = params.toString();
+    return query
+      ? `/marketplace/tienda/${vendedorId}?${query}`
+      : `/marketplace/tienda/${vendedorId}`;
+  }
+
+  static async obtenerTiendaPublica(vendedorId: string) {
+    const { data: tienda, error } = await supabaseAdmin
+      .from("marketplace_vendedores")
+      .select(
+        "id, nombre_tienda, tipo, descripcion, logo_url, provincia, valoracion_promedio, total_ventas, entidad_tipo, entidad_id, estado, created_at",
+      )
+      .eq("id", vendedorId)
+      .maybeSingle();
+
+    if (error || !tienda) {
+      throw new Error("Tienda no encontrada.");
+    }
+    if (tienda.estado !== MARKETPLACE_ESTADOS_VENDEDOR.ACTIVO) {
+      throw new Error("Esta tienda no está disponible.");
+    }
+    if (!tienda.entidad_id) {
+      throw new Error("Tienda no disponible.");
+    }
+
+    let entidad_nombre: string | null = null;
+    if (tienda.entidad_tipo && tienda.entidad_id) {
+      entidad_nombre = await MarketplaceEntityAuthService.obtenerNombreEntidad({
+        entidad_tipo: tienda.entidad_tipo as EntidadMarketplaceTipo,
+        entidad_id: tienda.entidad_id,
+      });
+    }
+
+    const { count: productosActivos } = await supabaseAdmin
+      .from("marketplace_productos")
+      .select("id", { count: "exact", head: true })
+      .eq("vendedor_id", vendedorId)
+      .eq("activo", true);
+
+    const { data: categoriasTienda } = await supabaseAdmin
+      .from("marketplace_productos")
+      .select("categoria_id, categoria:marketplace_categorias(id, nombre, slug)")
+      .eq("vendedor_id", vendedorId)
+      .eq("activo", true);
+
+    const categoriasMap = new Map<string, { id: string; nombre: string; slug: string; total: number }>();
+    for (const row of categoriasTienda || []) {
+      const catRaw = row.categoria as
+        | { id: string; nombre: string; slug: string }
+        | { id: string; nombre: string; slug: string }[]
+        | null;
+      const cat = Array.isArray(catRaw) ? catRaw[0] : catRaw;
+      if (!cat?.id) continue;
+      const prev = categoriasMap.get(cat.id);
+      categoriasMap.set(cat.id, {
+        ...cat,
+        total: (prev?.total || 0) + 1,
+      });
+    }
+
+    return {
+      ...tienda,
+      entidad_nombre,
+      productos_activos: productosActivos || 0,
+      categorias: Array.from(categoriasMap.values()).sort((a, b) =>
+        a.nombre.localeCompare(b.nombre, "es"),
+      ),
+    };
+  }
+
+  private static async resolverDestinatariosPromocion(
+    vendedorId: string,
+    ref: EntidadMarketplaceRef,
+    audiencia: AudienciaPromocion,
+  ): Promise<string[]> {
+    if (audiencia === "plataforma") {
+      const { data } = await supabaseAdmin
+        .from("perfiles")
+        .select("id")
+        .eq("rol", "usuario");
+      return (data || []).map((p) => p.id);
+    }
+
+    if (audiencia === "compradores_previos") {
+      const { data: items } = await supabaseAdmin
+        .from("marketplace_items_orden")
+        .select("orden:marketplace_ordenes!inner(comprador_id, estado)")
+        .eq("vendedor_id", vendedorId);
+
+      const ids = new Set<string>();
+      for (const item of items || []) {
+        const orden = item.orden as { comprador_id?: string; estado?: string };
+        if (orden?.estado === MARKETPLACE_ESTADOS_ORDEN.PAGADA && orden.comprador_id) {
+          ids.add(orden.comprador_id);
+        }
+      }
+      return [...ids];
+    }
+
+    // afiliados de la entidad
+    let query = supabaseAdmin.from("afiliaciones").select("usuario_id").eq("estado", "habilitado");
+
+    if (ref.entidad_tipo === "club") {
+      query = query.eq("club_id", ref.entidad_id);
+    } else if (ref.entidad_tipo === "asociacion") {
+      query = query.eq("asociacion_id", ref.entidad_id);
+    } else {
+      const { data: asocs } = await supabaseAdmin
+        .from("asociaciones")
+        .select("id")
+        .eq("federacion_id", ref.entidad_id);
+
+      const asocIds = (asocs || []).map((a) => a.id);
+      if (asocIds.length === 0) return [];
+      query = query.in("asociacion_id", asocIds);
+    }
+
+    const { data } = await query;
+    return [...new Set((data || []).map((a) => a.usuario_id).filter(Boolean))];
   }
 
   static async suspenderVendedor(

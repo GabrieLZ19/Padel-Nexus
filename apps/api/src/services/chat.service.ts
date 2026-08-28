@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../config/supabase";
 import { ROLES_ADMINISTRATIVOS } from "../constants/roles";
+import { MarketplaceEntityAuthService } from "./marketplace-entity-auth.service";
 
 type ChatTipo = "directo" | "soporte" | "marketplace";
 
@@ -265,7 +266,7 @@ export class ChatService {
     const { data: producto, error } = await supabaseAdmin
       .from("marketplace_productos")
       .select(
-        "id, activo, vendedor:marketplace_vendedores!inner(usuario_id, estado)",
+        "id, activo, vendedor:marketplace_vendedores!inner(id, usuario_id, creado_por, entidad_tipo, entidad_id, estado)",
       )
       .eq("id", productoId)
       .single();
@@ -279,25 +280,32 @@ export class ChatService {
     }
 
     const vendedor = producto.vendedor as unknown as {
-      usuario_id: string;
+      id: string;
+      usuario_id: string | null;
+      creado_por: string | null;
+      entidad_tipo: string | null;
+      entidad_id: string | null;
       estado: string;
     };
-
-    if (!vendedor?.usuario_id) {
-      throw new Error("No se pudo resolver el vendedor del producto.");
-    }
 
     if (vendedor.estado !== "activo") {
       throw new Error("El vendedor no está activo.");
     }
 
-    if (vendedor.usuario_id === compradorId) {
+    const contactoId =
+      await MarketplaceEntityAuthService.resolverContactoVendedor(vendedor);
+
+    if (!contactoId) {
+      throw new Error("No se pudo resolver el contacto de la entidad vendedora.");
+    }
+
+    if (contactoId === compradorId) {
       throw new Error("No puede chatear consigo mismo sobre su propio producto.");
     }
 
     return this.iniciarConversacion(
       compradorId,
-      vendedor.usuario_id,
+      contactoId,
       "marketplace",
       productoId,
     );

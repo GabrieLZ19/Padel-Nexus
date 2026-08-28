@@ -1,6 +1,24 @@
 import { Request, Response } from "express";
 import { MarketplaceService } from "../services/marketplace.service";
+import { MarketplaceEntityAuthService } from "../services/marketplace-entity-auth.service";
+import type { EntidadMarketplaceTipo } from "../constants/marketplace";
 import { MercadoPagoConfig, Payment } from "mercadopago";
+
+function parseEntidadRef(req: Request): {
+  entidad_tipo: EntidadMarketplaceTipo;
+  entidad_id: string;
+} {
+  const entidad_tipo = (req.query.entidad_tipo ||
+    req.body.entidad_tipo) as EntidadMarketplaceTipo;
+  const entidad_id = (req.query.entidad_id ||
+    req.body.entidad_id) as string;
+
+  if (!entidad_tipo || !entidad_id) {
+    throw new Error("Se requiere entidad_tipo y entidad_id.");
+  }
+
+  return { entidad_tipo, entidad_id };
+}
 
 export class MarketplaceController {
   static async listarCategorias(req: Request, res: Response) {
@@ -16,6 +34,7 @@ export class MarketplaceController {
     try {
       const filtros = {
         categoria_id: req.query.categoria_id as string,
+        vendedor_id: req.query.vendedor_id as string,
         busqueda: req.query.busqueda as string,
         precio_min: req.query.precio_min
           ? Number(req.query.precio_min)
@@ -42,6 +61,15 @@ export class MarketplaceController {
         req.params.id,
       );
       res.json(producto);
+    } catch (err: any) {
+      res.status(404).json({ message: err.message });
+    }
+  }
+
+  static async obtenerTiendaPublica(req: Request, res: Response) {
+    try {
+      const tienda = await MarketplaceService.obtenerTiendaPublica(req.params.id);
+      res.json(tienda);
     } catch (err: any) {
       res.status(404).json({ message: err.message });
     }
@@ -223,89 +251,158 @@ export class MarketplaceController {
     }
   }
 
-  static async registrarVendedor(req: Request, res: Response) {
+  static async registrarVendedor(_req: Request, res: Response) {
+    return res.status(403).json({
+      message:
+        "El registro de vendedores individuales fue deshabilitado. Solo entidades pueden vender desde el CRM.",
+    });
+  }
+
+  static async obtenerPerfilVendedor(_req: Request, res: Response) {
+    return res.status(404).json({
+      message: "La gestión de tienda se realiza desde el módulo Marketplace del CRM.",
+    });
+  }
+
+  static async actualizarPerfilVendedor(_req: Request, res: Response) {
+    return res.status(403).json({
+      message: "La gestión de tienda se realiza desde el módulo Marketplace del CRM.",
+    });
+  }
+
+  static async listarMisProductos(_req: Request, res: Response) {
+    return res.status(403).json({
+      message: "Gestioná productos desde el módulo Marketplace del CRM.",
+    });
+  }
+
+  static async crearProducto(_req: Request, res: Response) {
+    return res.status(403).json({
+      message: "Gestioná productos desde el módulo Marketplace del CRM.",
+    });
+  }
+
+  static async editarProducto(_req: Request, res: Response) {
+    return res.status(403).json({
+      message: "Gestioná productos desde el módulo Marketplace del CRM.",
+    });
+  }
+
+  static async desactivarProducto(_req: Request, res: Response) {
+    return res.status(403).json({
+      message: "Gestioná productos desde el módulo Marketplace del CRM.",
+    });
+  }
+
+  static async listarMisVentas(_req: Request, res: Response) {
+    return res.status(403).json({
+      message: "Consultá ventas desde el módulo Marketplace del CRM.",
+    });
+  }
+
+  static async obtenerEstadisticas(_req: Request, res: Response) {
+    return res.status(403).json({
+      message: "Consultá estadísticas desde el módulo Marketplace del CRM.",
+    });
+  }
+
+  // ─── CRM: Marketplace por entidad ─────────────────────────────────────
+
+  static async listarEntidadesCrm(req: Request, res: Response) {
     try {
-      const { nombre_tienda, tipo, descripcion, provincia } = req.body;
-
-      if (!nombre_tienda || !tipo) {
-        return res
-          .status(400)
-          .json({ message: "Se requiere nombre_tienda y tipo." });
-      }
-
-      const vendedor = await MarketplaceService.registrarVendedor(
+      const entidades = await MarketplaceService.listarEntidadesParaMarketplace(
         req.user!.id,
-        { nombre_tienda, tipo, descripcion, provincia },
+        req.user!.rol,
       );
-      res.status(201).json(vendedor);
+      res.json(entidades);
+    } catch (err: any) {
+      res.status(403).json({ message: err.message });
+    }
+  }
+
+  static async obtenerTiendaEntidad(req: Request, res: Response) {
+    try {
+      const ref = parseEntidadRef(req);
+      await MarketplaceEntityAuthService.verificarAccesoEntidad(
+        req.user!.id,
+        req.user!.rol,
+        ref,
+      );
+      const tienda = await MarketplaceService.obtenerTiendaEntidad(ref);
+      res.json(tienda);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
   }
 
-  static async obtenerPerfilVendedor(req: Request, res: Response) {
+  static async registrarTiendaEntidad(req: Request, res: Response) {
     try {
-      const perfil = await MarketplaceService.obtenerMiPerfilVendedor(
+      const ref = parseEntidadRef(req);
+      const { nombre_tienda, descripcion, provincia, logo_base64 } = req.body;
+
+      const tienda = await MarketplaceService.registrarTiendaEntidad(
         req.user!.id,
+        req.user!.rol,
+        {
+          entidad_tipo: ref.entidad_tipo,
+          entidad_id: ref.entidad_id,
+          nombre_tienda: nombre_tienda || "",
+          tipo: ref.entidad_tipo,
+          descripcion,
+          provincia,
+          logo_base64,
+        },
       );
-      if (!perfil) {
-        return res
-          .status(404)
-          .json({ message: "No estás registrado como vendedor." });
-      }
-      res.json(perfil);
+      res.status(201).json(tienda);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(400).json({ message: err.message });
     }
   }
 
-  static async actualizarPerfilVendedor(req: Request, res: Response) {
+  static async actualizarTiendaEntidad(req: Request, res: Response) {
     try {
-      const perfil = await MarketplaceService.actualizarPerfilVendedor(
+      const ref = parseEntidadRef(req);
+      const tienda = await MarketplaceService.actualizarTiendaEntidad(
         req.user!.id,
+        req.user!.rol,
+        ref,
         req.body,
       );
-      res.json(perfil);
+      res.json(tienda);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(400).json({ message: err.message });
     }
   }
 
-  static async listarMisProductos(req: Request, res: Response) {
+  static async listarProductosEntidad(req: Request, res: Response) {
     try {
-      const vendedor = await MarketplaceService.obtenerMiPerfilVendedor(
+      const ref = parseEntidadRef(req);
+      const tienda = await MarketplaceService.assertGestionTiendaEntidad(
         req.user!.id,
+        req.user!.rol,
+        ref,
       );
-      if (!vendedor) {
-        return res
-          .status(404)
-          .json({ message: "No estás registrado como vendedor." });
-      }
-
       const pagina = req.query.pagina ? Number(req.query.pagina) : 1;
       const resultado = await MarketplaceService.listarMisProductos(
-        vendedor.id,
+        tienda.id,
         pagina,
       );
       res.json(resultado);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(400).json({ message: err.message });
     }
   }
 
-  static async crearProducto(req: Request, res: Response) {
+  static async crearProductoEntidad(req: Request, res: Response) {
     try {
-      const vendedor = await MarketplaceService.obtenerMiPerfilVendedor(
+      const ref = parseEntidadRef(req);
+      const tienda = await MarketplaceService.assertGestionTiendaEntidad(
         req.user!.id,
+        req.user!.rol,
+        ref,
       );
-      if (!vendedor) {
-        return res
-          .status(404)
-          .json({ message: "No estás registrado como vendedor." });
-      }
 
       const { imagenes_base64, ...datos } = req.body;
-
       if (!datos.nombre || !datos.precio || !datos.categoria_id) {
         return res.status(400).json({
           message: "Se requiere nombre, precio y categoria_id.",
@@ -313,7 +410,7 @@ export class MarketplaceController {
       }
 
       const producto = await MarketplaceService.crearProducto(
-        vendedor.id,
+        tienda.id,
         datos,
         imagenes_base64 || [],
       );
@@ -323,22 +420,20 @@ export class MarketplaceController {
     }
   }
 
-  static async editarProducto(req: Request, res: Response) {
+  static async editarProductoEntidad(req: Request, res: Response) {
     try {
-      const vendedor = await MarketplaceService.obtenerMiPerfilVendedor(
+      const ref = parseEntidadRef(req);
+      const tienda = await MarketplaceService.assertGestionTiendaEntidad(
         req.user!.id,
+        req.user!.rol,
+        ref,
       );
-      if (!vendedor) {
-        return res
-          .status(404)
-          .json({ message: "No estás registrado como vendedor." });
-      }
 
       const { imagenes_existentes, imagenes_nuevas_base64, ...datos } =
         req.body;
 
       const producto = await MarketplaceService.editarProducto(
-        vendedor.id,
+        tienda.id,
         req.params.id,
         datos,
         imagenes_existentes || [],
@@ -350,19 +445,17 @@ export class MarketplaceController {
     }
   }
 
-  static async desactivarProducto(req: Request, res: Response) {
+  static async desactivarProductoEntidad(req: Request, res: Response) {
     try {
-      const vendedor = await MarketplaceService.obtenerMiPerfilVendedor(
+      const ref = parseEntidadRef(req);
+      const tienda = await MarketplaceService.assertGestionTiendaEntidad(
         req.user!.id,
+        req.user!.rol,
+        ref,
       );
-      if (!vendedor) {
-        return res
-          .status(404)
-          .json({ message: "No estás registrado como vendedor." });
-      }
 
       const producto = await MarketplaceService.desactivarProducto(
-        vendedor.id,
+        tienda.id,
         req.params.id,
       );
       res.json(producto);
@@ -371,43 +464,79 @@ export class MarketplaceController {
     }
   }
 
-  static async listarMisVentas(req: Request, res: Response) {
+  static async activarProductoEntidad(req: Request, res: Response) {
     try {
-      const vendedor = await MarketplaceService.obtenerMiPerfilVendedor(
+      const ref = parseEntidadRef(req);
+      const tienda = await MarketplaceService.assertGestionTiendaEntidad(
         req.user!.id,
+        req.user!.rol,
+        ref,
       );
-      if (!vendedor) {
-        return res
-          .status(404)
-          .json({ message: "No estás registrado como vendedor." });
-      }
 
+      const producto = await MarketplaceService.activarProducto(
+        tienda.id,
+        req.params.id,
+      );
+      res.json(producto);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  }
+
+  static async listarVentasEntidad(req: Request, res: Response) {
+    try {
+      const ref = parseEntidadRef(req);
+      const tienda = await MarketplaceService.assertGestionTiendaEntidad(
+        req.user!.id,
+        req.user!.rol,
+        ref,
+      );
       const pagina = req.query.pagina ? Number(req.query.pagina) : 1;
       const resultado = await MarketplaceService.listarMisVentas(
-        vendedor.id,
+        tienda.id,
         pagina,
       );
       res.json(resultado);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(400).json({ message: err.message });
     }
   }
 
-  static async obtenerEstadisticas(req: Request, res: Response) {
+  static async obtenerEstadisticasEntidad(req: Request, res: Response) {
     try {
-      const vendedor = await MarketplaceService.obtenerMiPerfilVendedor(
+      const ref = parseEntidadRef(req);
+      const tienda = await MarketplaceService.assertGestionTiendaEntidad(
         req.user!.id,
+        req.user!.rol,
+        ref,
       );
-      if (!vendedor) {
-        return res
-          .status(404)
-          .json({ message: "No estás registrado como vendedor." });
-      }
-
-      const stats = await MarketplaceService.obtenerEstadisticas(vendedor.id);
+      const stats = await MarketplaceService.obtenerEstadisticas(tienda.id);
       res.json(stats);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(400).json({ message: err.message });
+    }
+  }
+
+  static async enviarPromocionEntidad(req: Request, res: Response) {
+    try {
+      const ref = parseEntidadRef(req);
+      const { titulo, mensaje, audiencia, producto_id, categoria_id } = req.body;
+
+      if (!titulo || !mensaje || !audiencia) {
+        return res.status(400).json({
+          message: "Se requiere titulo, mensaje y audiencia.",
+        });
+      }
+
+      const resultado = await MarketplaceService.enviarPromocionEntidad(
+        req.user!.id,
+        req.user!.rol,
+        ref,
+        { titulo, mensaje, audiencia, producto_id, categoria_id },
+      );
+      res.status(201).json(resultado);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
     }
   }
 

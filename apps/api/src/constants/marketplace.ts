@@ -15,12 +15,27 @@ export const MARKETPLACE_TIPOS_PRODUCTO = {
   SERVICIO: "servicio",
 } as const;
 
-export const MARKETPLACE_TIPOS_VENDEDOR = {
-  JUGADOR: "jugador",
+/** Tipos de entidad que pueden operar tienda en el marketplace. */
+export const MARKETPLACE_ENTIDAD_TIPOS = {
   CLUB: "club",
-  ENTRENADOR: "entrenador",
-  TIENDA: "tienda",
+  ASOCIACION: "asociacion",
+  FEDERACION: "federacion",
 } as const;
+
+export type EntidadMarketplaceTipo =
+  (typeof MARKETPLACE_ENTIDAD_TIPOS)[keyof typeof MARKETPLACE_ENTIDAD_TIPOS];
+
+/** Alias legacy: tipo de vendedor = tipo de entidad. */
+export const MARKETPLACE_TIPOS_VENDEDOR = MARKETPLACE_ENTIDAD_TIPOS;
+
+export const MARKETPLACE_AUDIENCIAS_PROMOCION = {
+  AFILIADOS: "afiliados",
+  PLATAFORMA: "plataforma",
+  COMPRADORES_PREVIOS: "compradores_previos",
+} as const;
+
+export type AudienciaPromocion =
+  (typeof MARKETPLACE_AUDIENCIAS_PROMOCION)[keyof typeof MARKETPLACE_AUDIENCIAS_PROMOCION];
 
 export const MARKETPLACE_STORAGE = {
   BUCKET: "marketplace",

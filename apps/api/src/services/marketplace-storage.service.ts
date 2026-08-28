@@ -185,4 +185,44 @@ export class MarketplaceStorageService {
 
     return { imagenes: todasLasImagenes, thumbnailUrl };
   }
+
+  /** Logo cuadrado de la tienda (400px WebP). */
+  static async subirLogoTienda(
+    vendedorId: string,
+    base64Data: string,
+  ): Promise<string> {
+    const matches = base64Data.match(/^data:image\/\w+;base64,(.+)$/);
+    const rawBuffer = matches
+      ? Buffer.from(matches[1], "base64")
+      : Buffer.from(base64Data, "base64");
+
+    if (rawBuffer.length > MARKETPLACE_STORAGE.MAX_FILE_SIZE_BYTES) {
+      throw new Error(
+        `La imagen excede el tamaño máximo de ${MARKETPLACE_STORAGE.MAX_FILE_SIZE_BYTES / 1024 / 1024}MB.`,
+      );
+    }
+
+    const logoBuffer = await sharp(rawBuffer)
+      .resize({ width: 400, height: 400, fit: "cover" })
+      .webp({ quality: MARKETPLACE_STORAGE.CALIDAD_WEBP })
+      .toBuffer();
+
+    const logoPath = `${vendedorId}/logo/logo.webp`;
+    const { error } = await supabaseAdmin.storage
+      .from(MARKETPLACE_STORAGE.BUCKET)
+      .upload(logoPath, logoBuffer, {
+        contentType: "image/webp",
+        upsert: true,
+      });
+
+    if (error) {
+      throw new Error(`Error al subir logo: ${error.message}`);
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabaseAdmin.storage.from(MARKETPLACE_STORAGE.BUCKET).getPublicUrl(logoPath);
+
+    return `${publicUrl}?v=${Date.now()}`;
+  }
 }
