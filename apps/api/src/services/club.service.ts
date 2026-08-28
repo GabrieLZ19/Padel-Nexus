@@ -44,14 +44,16 @@ function haversineKm(
   return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function formatearClubConCanchas(club: Record<string, unknown>) {
+function formatearClubConCanchas(
+  club: Record<string, unknown>,
+): Record<string, unknown> & { canchas: number } {
   const canchasRel = club.canchas as { count: number }[] | null | undefined;
   const canchasCount =
     canchasRel && canchasRel.length > 0 ? canchasRel[0].count : 0;
-  const { canchas, torneos, ...restoClub } = club;
+  const { canchas: _canchas, torneos: _torneos, ...restoClub } = club;
   return {
     ...restoClub,
-    canchas: canchasCount || Number(restoClub.canchas) || 0,
+    canchas: canchasCount || Number(club.canchas) || 0,
   };
 }
 

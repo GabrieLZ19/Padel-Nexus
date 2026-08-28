@@ -19,6 +19,19 @@ interface ChatPartidoParticipante {
   avatar_url: string | null;
 }
 
+function unwrapRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (value == null) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function asParticipante(
+  value: ChatPartidoParticipante | ChatPartidoParticipante[] | null | undefined,
+): ChatPartidoParticipante | null {
+  const perfil = unwrapRelation(value);
+  if (!perfil?.id) return null;
+  return perfil;
+}
+
 interface ChatPartidoResumen {
   id: string;
   nivel_requerido: string | null;
@@ -130,19 +143,47 @@ export class ChatService {
           .in("partido_id", partidoIds);
 
         for (const ins of inscripciones || []) {
-          const perfil = ins.perfiles as ChatPartidoParticipante | null;
-          if (!perfil?.id) continue;
+          const perfil = asParticipante(
+            ins.perfiles as
+              | ChatPartidoParticipante
+              | ChatPartidoParticipante[]
+              | null
+              | undefined,
+          );
+          if (!perfil) continue;
           const lista = inscripcionesPorPartido.get(ins.partido_id) || [];
           lista.push(perfil);
           inscripcionesPorPartido.set(ins.partido_id, lista);
         }
       }
 
+      type ClubResumen = {
+        nombre: string | null;
+        localidad: string | null;
+        provincia: string | null;
+      };
+      type CanchaResumen = {
+        nombre: string | null;
+        clubes: ClubResumen | ClubResumen[] | null;
+      };
+      type TurnoResumen = {
+        hora_inicio: string | null;
+        hora_fin: string | null;
+        canchas: CanchaResumen | CanchaResumen[] | null;
+      };
+      type ReservaPartidoRow = {
+        fecha_reserva: string | null;
+        turnos: TurnoResumen | TurnoResumen[] | null;
+      };
+
       for (const row of partidosRows || []) {
         if (!row.conversacion_id) continue;
-        const club = row.reservas?.turnos?.canchas?.clubes;
-        const turno = row.reservas?.turnos;
-        const cancha = row.reservas?.turnos?.canchas;
+        const reserva = unwrapRelation(
+          row.reservas as ReservaPartidoRow | ReservaPartidoRow[] | null,
+        );
+        const turno = unwrapRelation(reserva?.turnos ?? null);
+        const cancha = unwrapRelation(turno?.canchas ?? null);
+        const club = unwrapRelation(cancha?.clubes ?? null);
 
         partidosMap.set(row.conversacion_id, {
           id: row.id,
@@ -152,7 +193,7 @@ export class ChatService {
           cancha_nombre: cancha?.nombre ?? null,
           localidad: club?.localidad ?? null,
           provincia: club?.provincia ?? null,
-          fecha_reserva: row.reservas?.fecha_reserva ?? null,
+          fecha_reserva: reserva?.fecha_reserva ?? null,
           hora_inicio: turno?.hora_inicio ?? null,
           hora_fin: turno?.hora_fin ?? null,
           participantes: inscripcionesPorPartido.get(row.id) || [],
