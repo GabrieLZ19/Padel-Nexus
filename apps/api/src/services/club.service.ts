@@ -21,9 +21,38 @@ export interface ClubCercano {
   localidad: string;
   canchas: number;
   estado: string;
-  latitud: number;
-  longitud: number;
-  distancia_km: number;
+  latitud: number | null;
+  longitud: number | null;
+  distancia_km: number | null;
+}
+
+function haversineKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatearClubConCanchas(club: Record<string, unknown>) {
+  const canchasRel = club.canchas as { count: number }[] | null | undefined;
+  const canchasCount =
+    canchasRel && canchasRel.length > 0 ? canchasRel[0].count : 0;
+  const { canchas, torneos, ...restoClub } = club;
+  return {
+    ...restoClub,
+    canchas: canchasCount || Number(restoClub.canchas) || 0,
+  };
 }
 
 export class ClubService {
@@ -44,6 +73,72 @@ export class ClubService {
     if (error)
       throw new Error(`Error en búsqueda geográfica: ${error.message}`);
     return (data as ClubCercano[]) || [];
+  }
+
+  /**
+   * Lista todos los clubes y, si hay coordenadas del usuario, calcula distancia
+   * y ordena del más cercano al más lejano. Los clubes sin ubicación quedan al final.
+   */
+  static async listarTodosConDistancia(
+    lat?: number,
+    lng?: number,
+    search?: string,
+  ): Promise<ClubCercano[]> {
+    let query = supabaseAdmin.from("clubes").select("*, canchas(count)");
+
+    if (search?.trim()) {
+      query = query.ilike("nombre", `%${search.trim()}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error("Error interno al obtener los clubes.");
+
+    const clubes = ((data as Record<string, unknown>[]) || []).map(
+      formatearClubConCanchas,
+    );
+
+    const conDistancia: ClubCercano[] = clubes.map((club) => {
+      const latitud =
+        club.latitud == null ? null : Number(club.latitud as number);
+      const longitud =
+        club.longitud == null ? null : Number(club.longitud as number);
+
+      const distancia_km =
+        lat != null &&
+        lng != null &&
+        latitud != null &&
+        longitud != null &&
+        !Number.isNaN(latitud) &&
+        !Number.isNaN(longitud)
+          ? Number(
+              haversineKm(lat, lng, latitud, longitud).toFixed(2),
+            )
+          : null;
+
+      return {
+        id: String(club.id),
+        nombre: String(club.nombre ?? ""),
+        provincia: String(club.provincia ?? ""),
+        localidad: String(club.localidad ?? ""),
+        canchas: Number(club.canchas ?? 0),
+        estado: String(club.estado ?? "Activo"),
+        latitud,
+        longitud,
+        distancia_km,
+      };
+    });
+
+    return conDistancia.sort((a, b) => {
+      if (a.distancia_km == null && b.distancia_km == null) {
+        return a.nombre.localeCompare(b.nombre, "es");
+      }
+      if (a.distancia_km == null) return 1;
+      if (b.distancia_km == null) return -1;
+      if (a.distancia_km !== b.distancia_km) {
+        return a.distancia_km - b.distancia_km;
+      }
+      return a.nombre.localeCompare(b.nombre, "es");
+    });
   }
 
   static async obtenerClubesPaginados(

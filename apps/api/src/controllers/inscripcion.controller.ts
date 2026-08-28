@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { InscripcionService } from "../services/inscripcion.service";
-
+import type { FilaPlanillaInscripcion } from "../utils/inscripcionPlanilla";
 export const getAllInscripciones = async (
   req: Request,
   res: Response,
@@ -113,9 +113,11 @@ export const deleteInscripcion = async (
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";
-    return res
-      .status(500)
-      .json({ message: "Error al cancelar inscripción", error: message });
+    const status = message.includes("no encontrada") ? 404 : 500;
+    return res.status(status).json({
+      message: "Error al cancelar inscripción",
+      error: message,
+    });
   }
 };
 
@@ -168,6 +170,52 @@ export const createInscripcionManual = async (
       error instanceof Error ? error.message : "Error desconocido";
     return res.status(400).json({
       message: "No se pudo procesar la inscripción manual.",
+      error: message,
+    });
+  }
+};
+
+export const importarPlanillaInscripciones = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    const adminId = req.user?.id;
+    if (!adminId) {
+      return res.status(401).json({ message: "No autorizado." });
+    }
+
+    const { torneo_id, filas, modalidad, omitir_validaciones, motivo } =
+      req.body as {
+        torneo_id?: string;
+        filas?: FilaPlanillaInscripcion[];
+        modalidad?: string;
+        omitir_validaciones?: boolean;
+        motivo?: string;
+      };
+
+    if (!torneo_id || !Array.isArray(filas) || filas.length === 0) {
+      return res.status(400).json({
+        message: "torneo_id y filas de planilla son obligatorios.",
+      });
+    }
+
+    const resultado = await InscripcionService.importarDesdePlanilla({
+      torneoId: torneo_id,
+      adminId,
+      filas,
+      modalidad,
+      omitirValidaciones:
+        omitir_validaciones === undefined ? true : Boolean(omitir_validaciones),
+      motivo,
+    });
+
+    return res.status(200).json({ exito: true, ...resultado });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    return res.status(400).json({
+      message: "No se pudo importar la planilla.",
       error: message,
     });
   }

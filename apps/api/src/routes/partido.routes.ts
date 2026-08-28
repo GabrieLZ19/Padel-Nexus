@@ -11,11 +11,13 @@ router.get(
   authenticate,
   PartidosController.partidoPorReserva,
 );
+router.get("/:partido_id", PartidosController.getPartidoPorId);
 
 // Rutas Protegidas (Requieren cuenta para interactuar)
 router.use(authenticate);
 
 router.post("/publicar", PartidosController.publicarPartidoAbierto);
 router.post("/:partido_id/unirse", PartidosController.unirseAPartido);
+router.post("/:partido_id/salir", PartidosController.salirDePartido);
 
 export default router;

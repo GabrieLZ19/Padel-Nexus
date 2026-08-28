@@ -10,6 +10,7 @@ const router = Router();
 router.post("/login", PerfilController.login);
 router.post("/registro", PerfilController.registro);
 router.post("/recuperar-password", PerfilController.solicitarRecuperarPassword);
+router.get("/preinscripcion/:dni", PerfilController.buscarPreinscripcionPorDni);
 
 router.get("/google", PerfilController.iniciarGoogleAuth);
 router.get("/google/callback", PerfilController.googleCallback);

@@ -139,6 +139,28 @@ export const PerfilController = {
   },
 
   /**
+   * GET /api/perfil/preinscripcion/:dni
+   * Consulta si un DNI tiene datos precargados desde planilla.
+   */
+  async buscarPreinscripcionPorDni(req: Request, res: Response): Promise<Response> {
+    try {
+      const { dni } = req.params;
+      if (!dni) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "El DNI es obligatorio." });
+      }
+
+      const resultado = await PerfilService.buscarPreinscripcionPorDni(dni);
+      return res.status(200).json({ exito: true, ...resultado });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al consultar el DNI.";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
+  /**
    * POST /api/perfiles/login
    * Endpoint centralizado de autenticación (Unificado para Next.js)
    */

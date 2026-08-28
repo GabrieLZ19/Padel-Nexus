@@ -12,12 +12,19 @@ import {
   runSyncCheck,
   torneoExigeAfiliacionOrganizadora,
   torneoExigeCarnet,
+  torneoValidaCategoria,
   type CheckResult,
   type PerfilElegibilidad,
   type TorneoElegibilidad,
   esTorneoNacional,
 } from "../utils/inscripcionElegibilidad";
 import { AFILIACION_ESTADOS } from "../constants/afiliacion";
+import { PerfilService } from "./perfil.service";
+import {
+  agruparFilasEnParejas,
+  type FilaPlanillaInscripcion,
+} from "../utils/inscripcionPlanilla";
+import { esModalidadIndividual } from "../utils/modalidad";
 
 interface RegistroInscripcionDTO {
   torneoId: string;
@@ -127,7 +134,7 @@ export class InscripcionService {
     torneo: TorneoElegibilidad,
     etiqueta: string,
   ): Promise<void> {
-    assertCategoria(perfil, torneo.nivel, etiqueta);
+    assertCategoria(perfil, torneo, etiqueta);
     assertRama(perfil, torneo.rama, etiqueta);
     assertEdad(perfil, torneo, etiqueta);
     if (torneoExigeCarnet(torneo)) {
@@ -145,17 +152,46 @@ export class InscripcionService {
     torneo: TorneoElegibilidad,
     etiqueta: string,
   ): Promise<CheckResult[]> {
-    const checks: CheckResult[] = [
-      runSyncCheck("categoria", `${etiqueta} · categoría`, () =>
-        assertCategoria(perfil, torneo.nivel, etiqueta),
-      ),
+    const validarCategoria = torneoValidaCategoria(torneo);
+    const validarEdad = Boolean(torneo.validar_edad);
+
+    const checks: CheckResult[] = [];
+
+    if (validarCategoria || validarEdad) {
+      checks.push(
+        runSyncCheck("categoria", `${etiqueta} · categoría`, () =>
+          assertCategoria(perfil, torneo, etiqueta),
+        ),
+      );
+    } else {
+      checks.push({
+        code: "categoria",
+        label: `${etiqueta} · categoría`,
+        passed: true,
+        message: "No requerida para este torneo",
+      });
+    }
+
+    checks.push(
       runSyncCheck("rama", `${etiqueta} · rama`, () =>
         assertRama(perfil, torneo.rama, etiqueta),
       ),
-      runSyncCheck("edad", `${etiqueta} · edad`, () =>
-        assertEdad(perfil, torneo, etiqueta),
-      ),
-    ];
+    );
+
+    if (validarEdad) {
+      checks.push(
+        runSyncCheck("edad", `${etiqueta} · edad`, () =>
+          assertEdad(perfil, torneo, etiqueta),
+        ),
+      );
+    } else {
+      checks.push({
+        code: "edad",
+        label: `${etiqueta} · edad`,
+        passed: true,
+        message: "No requerida para este torneo",
+      });
+    }
 
     if (torneoExigeCarnet(torneo)) {
       try {
@@ -222,7 +258,7 @@ export class InscripcionService {
     const { data: perfilJ1, error: errJ1 } = await supabaseAdmin
       .from("perfiles")
       .select(
-        "id, nombre, apellido, email, categoria_padel, fecha_nacimiento, sexo",
+        "id, nombre, apellido, email, categoria_padel, fecha_nacimiento, sexo, dni",
       )
       .eq("id", params.usuarioId)
       .single();
@@ -256,7 +292,7 @@ export class InscripcionService {
       const { data: perfilJ2, error: errJ2 } = await supabaseAdmin
         .from("perfiles")
         .select(
-          "id, nombre, apellido, email, categoria_padel, fecha_nacimiento, sexo",
+          "id, nombre, apellido, email, categoria_padel, fecha_nacimiento, sexo, dni",
         )
         .eq("email", email2)
         .maybeSingle();
@@ -373,7 +409,7 @@ export class InscripcionService {
     if (jugador2Email) {
       const { data: user2, error: user2Error } = await supabaseAdmin
         .from("perfiles")
-        .select("id, categoria_padel, fecha_nacimiento, sexo, nombre")
+        .select("id, categoria_padel, fecha_nacimiento, sexo, nombre, dni")
         .eq("email", jugador2Email)
         .single();
 
@@ -538,12 +574,30 @@ export class InscripcionService {
     if (fetchError || !inscripcion)
       throw new Error("Inscripción no encontrada.");
 
+    // Desvincular de partidos: hay FKs restrictivas en equipo_a/equipo_b/ganador.
+    await supabaseAdmin
+      .from("partidos")
+      .update({ equipo_a_id: null })
+      .eq("equipo_a_id", id);
+    await supabaseAdmin
+      .from("partidos")
+      .update({ equipo_b_id: null })
+      .eq("equipo_b_id", id);
+    await supabaseAdmin
+      .from("partidos")
+      .update({ ganador: null })
+      .eq("ganador", id);
+
     const { error: delError } = await supabaseAdmin
       .from("inscripciones")
       .delete()
       .eq("id", id);
 
-    if (delError) throw new Error("Error interno al eliminar la inscripción.");
+    if (delError) {
+      throw new Error(
+        delError.message || "Error interno al eliminar la inscripción.",
+      );
+    }
 
     const { data: torneo } = await supabaseAdmin
       .from("torneos")
@@ -552,9 +606,10 @@ export class InscripcionService {
       .single();
 
     if (torneo) {
+      const actuales = Number(torneo.cupos_actuales ?? 0);
       await supabaseAdmin
         .from("torneos")
-        .update({ cupos_actuales: Math.max(0, torneo.cupos_actuales - 1) })
+        .update({ cupos_actuales: Math.max(0, actuales - 1) })
         .eq("id", inscripcion.torneo_id);
     }
   }
@@ -598,7 +653,7 @@ export class InscripcionService {
 
     const { data: j1, error: j1Error } = await supabaseAdmin
       .from("perfiles")
-      .select("id, nombre, apellido, categoria_padel, fecha_nacimiento, sexo")
+      .select("id, nombre, apellido, categoria_padel, fecha_nacimiento, sexo, dni")
       .or(
         `dni.eq."${jugador1Identificador}",email.eq."${jugador1Identificador}"`,
       )
@@ -626,7 +681,7 @@ export class InscripcionService {
     ) {
       const { data: resolvedJ2, error: j2Error } = await supabaseAdmin
         .from("perfiles")
-        .select("id, nombre, apellido, categoria_padel, fecha_nacimiento, sexo")
+        .select("id, nombre, apellido, categoria_padel, fecha_nacimiento, sexo, dni")
         .or(
           `dni.eq."${jugador2Identificador}",email.eq."${jugador2Identificador}"`,
         )
@@ -731,5 +786,101 @@ export class InscripcionService {
     });
 
     return inscripcionInsertada;
+  }
+
+  /**
+   * Importa inscripciones desde filas parseadas de la planilla oficial.
+   * Crea jugadores no registrados y los marca como pendientes de activación.
+   */
+  static async importarDesdePlanilla(datos: {
+    torneoId: string;
+    adminId: string;
+    filas: FilaPlanillaInscripcion[];
+    modalidad?: string | null;
+    omitirValidaciones?: boolean;
+    motivo?: string;
+  }) {
+    const {
+      torneoId,
+      adminId,
+      filas,
+      modalidad,
+      omitirValidaciones = true,
+      motivo,
+    } = datos;
+
+    if (!filas.length) {
+      throw new Error("La planilla no contiene jugadores para importar.");
+    }
+
+    const torneo = await InscripcionService.cargarTorneoElegibilidad(torneoId);
+    const { data: torneoCompleto } = await supabaseAdmin
+      .from("torneos")
+      .select("modalidad, precio_inscripcion")
+      .eq("id", torneoId)
+      .single();
+
+    const modalidadTorneo = modalidad || torneoCompleto?.modalidad;
+    const monto = Number(torneoCompleto?.precio_inscripcion || 0);
+    const individual = esModalidadIndividual(modalidadTorneo);
+
+    const grupos: Array<{
+      j1: FilaPlanillaInscripcion;
+      j2?: FilaPlanillaInscripcion;
+    }> = individual
+      ? filas.map((fila) => ({ j1: fila }))
+      : agruparFilasEnParejas(filas);
+
+    let inscripcionesOk = 0;
+    let jugadoresCreados = 0;
+    const errores: string[] = [];
+
+    for (const grupo of grupos) {
+      try {
+        const j1 = await PerfilService.resolverJugadorDesdePlanilla(grupo.j1);
+        if (j1.creado) jugadoresCreados++;
+
+        let j2: Awaited<
+          ReturnType<typeof PerfilService.resolverJugadorDesdePlanilla>
+        > | null = null;
+
+        if (!individual && grupo.j2) {
+          j2 = await PerfilService.resolverJugadorDesdePlanilla(grupo.j2);
+          if (j2.creado) jugadoresCreados++;
+        }
+
+        await InscripcionService.registrarInscripcionManual({
+          torneoId,
+          jugador1Identificador: grupo.j1.dni,
+          jugador2Identificador:
+            !individual && grupo.j2 ? grupo.j2.dni : undefined,
+          monto,
+          metodoPago: "Planilla",
+          adminId,
+          omitirValidaciones,
+          motivo:
+            motivo ||
+            "Importación masiva desde planilla oficial de inscripciones.",
+          letraPrioridad: grupo.j1.letraOrden,
+        });
+
+        inscripcionesOk++;
+      } catch (error: unknown) {
+        const filaRef = grupo.j2
+          ? `filas ${grupo.j1.fila}/${grupo.j2.fila}`
+          : `fila ${grupo.j1.fila}`;
+        const msg =
+          error instanceof Error ? error.message : "Error desconocido";
+        errores.push(`${filaRef}: ${msg}`);
+      }
+    }
+
+    return {
+      inscripcionesOk,
+      jugadoresCreados,
+      errores,
+      totalFilas: filas.length,
+      torneoId: torneo.id,
+    };
   }
 }

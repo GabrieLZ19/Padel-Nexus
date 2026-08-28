@@ -1,4 +1,10 @@
 import { supabaseAdmin } from "../config/supabase";
+import {
+  parseNombreCompleto,
+  normalizarDni,
+  type FilaPlanillaInscripcion,
+} from "../utils/inscripcionPlanilla";
+import { randomBytes } from "crypto";
 
 export interface ActualizarPerfilDTO {
   nombre?: string;
@@ -206,5 +212,173 @@ export class PerfilService {
     if (dbError) {
       throw new Error(`Error al remover el avatar de la base de datos: ${dbError.message}`);
     }
+  }
+
+  private static capitalizarTexto(texto?: string): string {
+    if (!texto) return "";
+    return texto
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }
+
+  private static emailPlaceholderDesdeDni(dni: string): string {
+    return `preinscripto+${dni}@padelnexus.local`;
+  }
+
+  /**
+   * Busca un perfil pre-cargado desde planilla por DNI (flujo de activación).
+   */
+  static async buscarPreinscripcionPorDni(dni: string) {
+    const dniLimpio = normalizarDni(dni);
+    if (!dniLimpio || dniLimpio.length < 7) {
+      throw new Error("Ingresá un DNI válido.");
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("perfiles")
+      .select(
+        "id, nombre, apellido, email, telefono, dni, lugar_residencia, categoria_padel, lado_preferido, fecha_nacimiento, sexo, pendiente_activacion",
+      )
+      .eq("dni", dniLimpio)
+      .maybeSingle();
+
+    if (error) throw new Error("Error al consultar el DNI.");
+    if (!data) {
+      return { encontrado: false as const };
+    }
+
+    if (!data.pendiente_activacion) {
+      return {
+        encontrado: true as const,
+        pendiente_activacion: false as const,
+        mensaje: "Este DNI ya tiene una cuenta activa. Iniciá sesión o recuperá tu contraseña.",
+      };
+    }
+
+    return {
+      encontrado: true as const,
+      pendiente_activacion: true as const,
+      perfil: {
+        nombre: data.nombre,
+        apellido: data.apellido,
+        email: data.email?.includes("@padelnexus.local")
+          ? ""
+          : data.email,
+        telefono: data.telefono,
+        dni: data.dni,
+        lugar_residencia: data.lugar_residencia,
+        categoria_padel: data.categoria_padel,
+        lado_preferido: data.lado_preferido || "indistinto",
+        fecha_nacimiento: data.fecha_nacimiento,
+        sexo: data.sexo || "masculino",
+      },
+    };
+  }
+
+  /**
+   * Crea o actualiza un jugador a partir de una fila de planilla.
+   */
+  static async resolverJugadorDesdePlanilla(fila: FilaPlanillaInscripcion) {
+    const dni = normalizarDni(fila.dni);
+    if (!dni || dni.length < 7) {
+      throw new Error(
+        `Fila ${fila.fila}: el DNI es obligatorio para importar inscripciones.`,
+      );
+    }
+
+    const { apellido, nombre } = parseNombreCompleto(fila.apellidoNombre);
+    if (!apellido && !nombre) {
+      throw new Error(
+        `Fila ${fila.fila}: el apellido y nombre son obligatorios.`,
+      );
+    }
+
+    const email =
+      fila.email && !fila.email.includes("@padelnexus.local")
+        ? fila.email.toLowerCase()
+        : PerfilService.emailPlaceholderDesdeDni(dni);
+
+    const { data: existente } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, nombre, apellido, email, pendiente_activacion")
+      .eq("dni", dni)
+      .maybeSingle();
+
+    if (existente) {
+      const patch: Record<string, unknown> = {};
+      if (!existente.nombre && nombre) patch.nombre = PerfilService.capitalizarTexto(nombre);
+      if (!existente.apellido && apellido)
+        patch.apellido = PerfilService.capitalizarTexto(apellido);
+      if (fila.telefono) patch.telefono = fila.telefono;
+      if (fila.direccion) patch.lugar_residencia = fila.direccion;
+      if (fila.categoria) patch.categoria_padel = fila.categoria;
+      if (fila.fechaNacimiento) patch.fecha_nacimiento = fila.fechaNacimiento;
+
+      if (Object.keys(patch).length > 0) {
+        await supabaseAdmin.from("perfiles").update(patch).eq("id", existente.id);
+      }
+
+      return {
+        id: existente.id,
+        nombre: existente.nombre,
+        apellido: existente.apellido,
+        creado: false,
+      };
+    }
+
+    const passwordTemporal = randomBytes(24).toString("hex");
+    const { data: authUser, error: authError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password: passwordTemporal,
+        email_confirm: true,
+        user_metadata: {
+          origen: "planilla_inscripcion",
+          pendiente_activacion: true,
+          dni,
+        },
+      });
+
+    if (authError || !authUser.user) {
+      throw new Error(
+        `Fila ${fila.fila}: no se pudo crear el jugador (${authError?.message || "error desconocido"}).`,
+      );
+    }
+
+    const userId = authUser.user.id;
+    const { data: perfil, error: perfilError } = await supabaseAdmin
+      .from("perfiles")
+      .upsert(
+        {
+          id: userId,
+          email,
+          dni,
+          nombre: PerfilService.capitalizarTexto(nombre),
+          apellido: PerfilService.capitalizarTexto(apellido),
+          telefono: fila.telefono || null,
+          lugar_residencia: fila.direccion || "A completar",
+          categoria_padel: fila.categoria || "5ª",
+          lado_preferido: "indistinto",
+          fecha_nacimiento: fila.fechaNacimiento || null,
+          sexo: "masculino",
+          rol: "usuario",
+          pendiente_activacion: true,
+        },
+        { onConflict: "id" },
+      )
+      .select("id, nombre, apellido")
+      .single();
+
+    if (perfilError || !perfil) {
+      await supabaseAdmin.auth.admin.deleteUser(userId);
+      throw new Error(
+        `Fila ${fila.fila}: no se pudo guardar el perfil del jugador.`,
+      );
+    }
+
+    return { ...perfil, creado: true };
   }
 }

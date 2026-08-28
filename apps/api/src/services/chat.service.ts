@@ -2,7 +2,7 @@ import { supabaseAdmin } from "../config/supabase";
 import { ROLES_ADMINISTRATIVOS } from "../constants/roles";
 import { MarketplaceEntityAuthService } from "./marketplace-entity-auth.service";
 
-type ChatTipo = "directo" | "soporte" | "marketplace";
+type ChatTipo = "directo" | "soporte" | "marketplace" | "partido";
 
 interface ChatProductoResumen {
   id: string;
@@ -10,6 +10,27 @@ interface ChatProductoResumen {
   precio: number;
   thumbnail_url: string | null;
   imagenes: string[] | null;
+}
+
+interface ChatPartidoParticipante {
+  id: string;
+  nombre: string | null;
+  apellido: string | null;
+  avatar_url: string | null;
+}
+
+interface ChatPartidoResumen {
+  id: string;
+  nivel_requerido: string | null;
+  estado: string;
+  club_nombre: string | null;
+  cancha_nombre: string | null;
+  localidad: string | null;
+  provincia: string | null;
+  fecha_reserva: string | null;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  participantes: ChatPartidoParticipante[];
 }
 
 export class ChatService {
@@ -55,6 +76,87 @@ export class ChatService {
 
       for (const p of productos || []) {
         productosMap.set(p.id, p);
+      }
+    }
+
+    const partidoConvIds = conversaciones
+      .filter((c) => c.tipo === "partido")
+      .map((c) => c.id);
+
+    const partidosMap = new Map<string, ChatPartidoResumen>();
+
+    if (partidoConvIds.length > 0) {
+      const { data: partidosRows } = await supabaseAdmin
+        .from("partidos_abiertos")
+        .select(
+          `
+          id,
+          conversacion_id,
+          nivel_requerido,
+          estado,
+          reservas (
+            fecha_reserva,
+            turnos (
+              hora_inicio,
+              hora_fin,
+              canchas (
+                nombre,
+                clubes ( nombre, localidad, provincia )
+              )
+            )
+          )
+        `,
+        )
+        .in("conversacion_id", partidoConvIds);
+
+      const partidoIds = (partidosRows || []).map((p) => p.id);
+      const inscripcionesPorPartido = new Map<string, ChatPartidoParticipante[]>();
+
+      if (partidoIds.length > 0) {
+        const { data: inscripciones } = await supabaseAdmin
+          .from("inscripciones_partidos")
+          .select(
+            `
+            partido_id,
+            jugador_id,
+            perfiles:perfiles!inscripciones_partidos_jugador_id_fkey (
+              id,
+              nombre,
+              apellido,
+              avatar_url
+            )
+          `,
+          )
+          .in("partido_id", partidoIds);
+
+        for (const ins of inscripciones || []) {
+          const perfil = ins.perfiles as ChatPartidoParticipante | null;
+          if (!perfil?.id) continue;
+          const lista = inscripcionesPorPartido.get(ins.partido_id) || [];
+          lista.push(perfil);
+          inscripcionesPorPartido.set(ins.partido_id, lista);
+        }
+      }
+
+      for (const row of partidosRows || []) {
+        if (!row.conversacion_id) continue;
+        const club = row.reservas?.turnos?.canchas?.clubes;
+        const turno = row.reservas?.turnos;
+        const cancha = row.reservas?.turnos?.canchas;
+
+        partidosMap.set(row.conversacion_id, {
+          id: row.id,
+          nivel_requerido: row.nivel_requerido,
+          estado: row.estado,
+          club_nombre: club?.nombre ?? null,
+          cancha_nombre: cancha?.nombre ?? null,
+          localidad: club?.localidad ?? null,
+          provincia: club?.provincia ?? null,
+          fecha_reserva: row.reservas?.fecha_reserva ?? null,
+          hora_inicio: turno?.hora_inicio ?? null,
+          hora_fin: turno?.hora_fin ?? null,
+          participantes: inscripcionesPorPartido.get(row.id) || [],
+        });
       }
     }
 
@@ -111,12 +213,16 @@ export class ChatService {
           ? productosMap.get(conv.producto_id) || null
           : null;
 
+        const partido =
+          conv.tipo === "partido" ? partidosMap.get(conv.id) || null : null;
+
         return {
           ...conv,
           otro_participante: otroParticipante,
           ultimo_mensaje: ultimoMensaje || null,
           no_leidos: noLeidos || 0,
           producto,
+          partido,
         };
       }),
     );

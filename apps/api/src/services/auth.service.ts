@@ -71,6 +71,87 @@ export class AuthService {
 
     const nombreCapitalizado = capitalizarTexto(datos.nombre);
     const apellidoCapitalizado = capitalizarTexto(datos.apellido);
+    const dniLimpio = String(datos.dni || "").replace(/[^\d]/g, "");
+
+    const { data: preinscripto } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, email, pendiente_activacion")
+      .eq("dni", dniLimpio)
+      .maybeSingle();
+
+    if (preinscripto?.pendiente_activacion) {
+      const emailFinal = datos.email?.trim() || preinscripto.email;
+      if (!emailFinal) {
+        throw new Error("El correo electrónico es obligatorio para activar la cuenta.");
+      }
+
+      const { error: updateAuthError } =
+        await supabaseAdmin.auth.admin.updateUserById(preinscripto.id, {
+          email: emailFinal,
+          password: datos.password,
+          email_confirm: true,
+          user_metadata: {
+            origen: "planilla_inscripcion",
+            pendiente_activacion: false,
+            dni: dniLimpio,
+          },
+        });
+
+      if (updateAuthError) {
+        throw new Error(
+          `Error al activar la cuenta: ${updateAuthError.message}`,
+        );
+      }
+
+      const { error: perfilError } = await supabaseAdmin
+        .from("perfiles")
+        .update({
+          email: emailFinal,
+          nombre: nombreCapitalizado,
+          apellido: apellidoCapitalizado,
+          telefono: datos.telefono,
+          lugar_residencia: datos.lugar_residencia,
+          categoria_padel: datos.categoria_padel,
+          lado_preferido: datos.lado_preferido,
+          sexo: datos.sexo || "masculino",
+          fecha_nacimiento: datos.fecha_nacimiento || null,
+          pendiente_activacion: false,
+        })
+        .eq("id", preinscripto.id);
+
+      if (perfilError) {
+        throw new Error(
+          `No se pudo completar el perfil: ${perfilError.message}`,
+        );
+      }
+
+      if (datos.avatar_base64) {
+        try {
+          const avatarUrl = await AuthService.subirAvatarBase64(
+            preinscripto.id,
+            datos.avatar_base64,
+          );
+          await supabaseAdmin
+            .from("perfiles")
+            .update({ avatar_url: avatarUrl })
+            .eq("id", preinscripto.id);
+        } catch (uploadError: unknown) {
+          console.error("Error al subir avatar en activación:", uploadError);
+        }
+      }
+
+      return {
+        exito: true,
+        mensaje:
+          "Cuenta activada correctamente. Ya podés iniciar sesión con tu email y contraseña.",
+      };
+    }
+
+    if (preinscripto && !preinscripto.pendiente_activacion) {
+      throw new Error(
+        "Ya existe una cuenta registrada con este DNI. Iniciá sesión o recuperá tu contraseña.",
+      );
+    }
 
     const { data, error } = await supabase.auth.signUp({
       email: datos.email,

@@ -4,10 +4,30 @@ export type PerfilElegibilidad = {
   id: string;
   categoria_padel?: string | null;
   fecha_nacimiento?: string | null;
+  dni?: string | null;
   sexo?: string | null;
   rol?: string | null;
   nombre?: string | null;
 };
+
+export type ContextoElegibilidadNivel = {
+  /** Fecha de nacimiento del perfil (p. ej. cargada por planilla al identificar al jugador por DNI). */
+  fechaNacimiento?: string | null;
+  fechaReferencia?: string | Date | null;
+};
+
+export type ResultadoElegibilidadNivel = {
+  permitido: boolean;
+  requiereCoincidenciaExacta: boolean;
+  motivo?: string;
+};
+
+type ClasificacionNivelEspecial =
+  | { tipo: "sub"; edadMaximaExclusiva: number }
+  | { tipo: "senior"; edadMinima: number }
+  | { tipo: "junior_mayor"; edadMinima: number }
+  | { tipo: "ladies" }
+  | { tipo: "inicial" };
 
 export type TorneoElegibilidad = {
   id: string;
@@ -65,6 +85,264 @@ export type CheckResult = {
   passed: boolean;
   message?: string;
 };
+
+/**
+ * Extrae el número de categorías libres oficiales (1ª–8ª).
+ * Retorna null para categorías especiales (Sub-, Ladies, Seniors, etc.).
+ */
+export function extraerNumeroCategoriaLibre(
+  categoria: string | null | undefined,
+): number | null {
+  const raw = (categoria || "").trim();
+  if (!raw) return null;
+
+  const ordinalMatch = raw.match(/^(\d+)\s*[ªa]/i);
+  if (ordinalMatch) return Number(ordinalMatch[1]);
+
+  return null;
+}
+
+/** Clasifica niveles especiales (Sub-, Seniors, Ladies, etc.) para validar edad. */
+export function clasificarNivelEspecial(
+  nivel: string | null | undefined,
+): ClasificacionNivelEspecial | "libre_numerico" | null {
+  const raw = (nivel || "").trim();
+  if (!raw) return null;
+
+  if (extraerNumeroCategoriaLibre(raw) != null) return "libre_numerico";
+
+  const subMatch = raw.match(/^Sub-(\d+)(?:\s+Promocional)?$/i);
+  if (subMatch) {
+    return { tipo: "sub", edadMaximaExclusiva: Number(subMatch[1]) };
+  }
+
+  const seniorMatch = raw.match(/^(Seniors|Women)\s*\+(\d+)$/i);
+  if (seniorMatch) {
+    return { tipo: "senior", edadMinima: Number(seniorMatch[2]) };
+  }
+
+  if (/^Juniors\s*\+18$/i.test(raw)) {
+    return { tipo: "junior_mayor", edadMinima: 18 };
+  }
+
+  if (/^Ladies(\s+[ABC])?$/i.test(raw)) {
+    return { tipo: "ladies" };
+  }
+
+  if (/^Inicial$/i.test(raw)) {
+    return { tipo: "inicial" };
+  }
+
+  return null;
+}
+
+export function torneoValidaCategoria(torneo: {
+  reglas_arbitraje?: unknown;
+}): boolean {
+  const reglas = parseReglasArbitraje(torneo.reglas_arbitraje);
+  if (typeof reglas.validar_categoria === "boolean") {
+    return reglas.validar_categoria;
+  }
+  return true;
+}
+
+export function nivelValidaEdadPorNivel(
+  nivel: string | null | undefined,
+): boolean {
+  const clasificacion = clasificarNivelEspecial(nivel);
+  if (!clasificacion || clasificacion === "libre_numerico") return false;
+  return (
+    clasificacion.tipo === "sub" ||
+    clasificacion.tipo === "senior" ||
+    clasificacion.tipo === "junior_mayor"
+  );
+}
+
+export type OpcionesElegibilidadNivel = {
+  validarCategoria?: boolean;
+  validarEdad?: boolean;
+};
+
+function resolverEdadParaElegibilidad(
+  contexto: ContextoElegibilidadNivel | undefined,
+  etiquetaPrefijo?: string,
+): { ok: true; edad: number } | { ok: false; motivo: string } {
+  const prefijo = etiquetaPrefijo ? `${etiquetaPrefijo}: ` : "";
+
+  if (!contexto?.fechaNacimiento?.trim()) {
+    return {
+      ok: false,
+      motivo: `${prefijo}completá la fecha de nacimiento en el perfil para validar el rango etario.`,
+    };
+  }
+
+  const fechaRef = resolverFechaReferencia(contexto.fechaReferencia);
+  try {
+    const edad = calcularEdadEnFecha(contexto.fechaNacimiento, fechaRef);
+    return { ok: true, edad };
+  } catch {
+    return {
+      ok: false,
+      motivo: `${prefijo}la fecha de nacimiento del perfil no es válida.`,
+    };
+  }
+}
+
+function resolverFechaReferencia(
+  fechaReferencia?: string | Date | null,
+): Date {
+  if (fechaReferencia instanceof Date) return fechaReferencia;
+  if (typeof fechaReferencia === "string" && fechaReferencia.trim()) {
+    const parsed = new Date(fechaReferencia);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  return new Date();
+}
+
+function evaluarCoincidenciaCategoria(
+  categoriaJugador: string | null | undefined,
+  nivelTorneo: string,
+): ResultadoElegibilidadNivel {
+  const coincide =
+    (categoriaJugador || "").trim() === nivelTorneo.trim();
+  if (!coincide) {
+    return {
+      permitido: false,
+      requiereCoincidenciaExacta: true,
+      motivo: `Tu categoría (${categoriaJugador || "sin definir"}) no coincide con la requerida (${nivelTorneo}).`,
+    };
+  }
+  return { permitido: true, requiereCoincidenciaExacta: true };
+}
+
+function evaluarElegibilidadNivelEspecial(
+  clasificacion: ClasificacionNivelEspecial,
+  categoriaJugador: string | null | undefined,
+  nivelTorneo: string,
+  contexto?: ContextoElegibilidadNivel,
+  opciones?: OpcionesElegibilidadNivel,
+): ResultadoElegibilidadNivel {
+  const validarCategoria = opciones?.validarCategoria !== false;
+  const validarEdad = opciones?.validarEdad !== false;
+
+  if (
+    clasificacion.tipo === "sub" ||
+    clasificacion.tipo === "senior" ||
+    clasificacion.tipo === "junior_mayor"
+  ) {
+    if (!validarCategoria && !validarEdad) {
+      return { permitido: true, requiereCoincidenciaExacta: false };
+    }
+
+    let edadOk = true;
+    let edadMotivo: string | undefined;
+
+    if (validarEdad) {
+      const edadRes = resolverEdadParaElegibilidad(contexto);
+      if (!edadRes.ok) {
+        return {
+          permitido: false,
+          requiereCoincidenciaExacta: false,
+          motivo: edadRes.motivo,
+        };
+      }
+
+      const edad = edadRes.edad;
+
+      if (clasificacion.tipo === "sub") {
+        const max = clasificacion.edadMaximaExclusiva;
+        if (edad >= max) {
+          edadOk = false;
+          edadMotivo = `Se requiere tener menos de ${max} años al día del torneo (edad calculada: ${edad}).`;
+        }
+      } else {
+        const min = clasificacion.edadMinima;
+        if (edad < min) {
+          edadOk = false;
+          edadMotivo = `Se requiere al menos ${min} años al día del torneo (edad calculada: ${edad}).`;
+        }
+      }
+    }
+
+    if (!edadOk) {
+      return {
+        permitido: false,
+        requiereCoincidenciaExacta: false,
+        motivo: edadMotivo,
+      };
+    }
+
+    if (validarCategoria) {
+      return evaluarCoincidenciaCategoria(categoriaJugador, nivelTorneo);
+    }
+
+    return { permitido: true, requiereCoincidenciaExacta: false };
+  }
+
+  if (clasificacion.tipo === "ladies" || clasificacion.tipo === "inicial") {
+    if (!validarCategoria) {
+      return { permitido: true, requiereCoincidenciaExacta: false };
+    }
+    return evaluarCoincidenciaCategoria(categoriaJugador, nivelTorneo);
+  }
+
+  return { permitido: true, requiereCoincidenciaExacta: false };
+}
+
+/**
+ * Regla FAP/APA libres: un jugador puede jugar en su categoría o en torneos
+ * más exigentes (número menor), nunca en categorías inferiores (número mayor).
+ * Ej.: 5ª → puede 1ª–5ª; no puede 6ª, 7ª, etc.
+ *
+ * Categorías especiales: calcula la edad desde la fecha de nacimiento del perfil
+ * (identificado por DNI en planilla/registro) y la compara con el rango del nivel.
+ * Sub-N exige edad < N; Seniors/Women +N exige edad >= N.
+ */
+export function puedeJugarEnNivelTorneo(
+  categoriaJugador: string | null | undefined,
+  nivelTorneo: string | null | undefined,
+  contexto?: ContextoElegibilidadNivel,
+  opciones?: OpcionesElegibilidadNivel,
+): ResultadoElegibilidadNivel {
+  const validarCategoria = opciones?.validarCategoria !== false;
+  const validarEdad = opciones?.validarEdad !== false;
+
+  if (!nivelTorneo) return { permitido: true, requiereCoincidenciaExacta: false };
+  if (!validarCategoria && !validarEdad) {
+    return { permitido: true, requiereCoincidenciaExacta: false };
+  }
+
+  const clasificacion = clasificarNivelEspecial(nivelTorneo);
+  if (clasificacion && clasificacion !== "libre_numerico") {
+    return evaluarElegibilidadNivelEspecial(
+      clasificacion,
+      categoriaJugador,
+      nivelTorneo,
+      contexto,
+      opciones,
+    );
+  }
+
+  if (!validarCategoria) {
+    return { permitido: true, requiereCoincidenciaExacta: false };
+  }
+
+  const numJugador = extraerNumeroCategoriaLibre(categoriaJugador);
+  const numTorneo = extraerNumeroCategoriaLibre(nivelTorneo);
+
+  if (numJugador == null || numTorneo == null) {
+    return {
+      permitido:
+        (categoriaJugador || "").trim() === (nivelTorneo || "").trim(),
+      requiereCoincidenciaExacta: true,
+    };
+  }
+
+  return {
+    permitido: numTorneo <= numJugador,
+    requiereCoincidenciaExacta: false,
+  };
+}
 
 /** Ejecuta un assert síncrono y lo convierte en check no-throw. */
 export function runSyncCheck(
@@ -167,15 +445,43 @@ export function assertInscripcionAbierta(torneo: TorneoElegibilidad): void {
 
 export function assertCategoria(
   perfil: PerfilElegibilidad,
-  nivelTorneo: string | null | undefined,
+  torneo: Pick<
+    TorneoElegibilidad,
+    "nivel" | "fecha" | "validar_edad" | "reglas_arbitraje"
+  >,
   etiqueta: string,
 ): void {
-  if (!nivelTorneo) return;
-  if (perfil.categoria_padel !== nivelTorneo) {
+  const validarCategoria = torneoValidaCategoria(torneo);
+  const validarEdad = Boolean(torneo.validar_edad);
+  if (!validarCategoria && !validarEdad) return;
+  if (!torneo.nivel) return;
+
+  const { permitido, requiereCoincidenciaExacta, motivo } =
+    puedeJugarEnNivelTorneo(
+      perfil.categoria_padel,
+      torneo.nivel,
+      {
+        fechaNacimiento: perfil.fecha_nacimiento,
+        fechaReferencia: torneo.fecha,
+      },
+      { validarCategoria, validarEdad },
+    );
+
+  if (permitido) return;
+
+  if (motivo) {
+    throw new Error(`${etiqueta}: ${motivo}`);
+  }
+
+  if (requiereCoincidenciaExacta) {
     throw new Error(
-      `${etiqueta}: su categoría (${perfil.categoria_padel || "sin definir"}) no coincide con la requerida (${nivelTorneo}).`,
+      `${etiqueta}: su categoría (${perfil.categoria_padel || "sin definir"}) no coincide con la requerida (${torneo.nivel}).`,
     );
   }
+
+  throw new Error(
+    `${etiqueta}: siendo categoría ${perfil.categoria_padel || "sin definir"}, no podés inscribirte a un torneo de ${torneo.nivel}. Solo podés jugar en tu categoría o en torneos más exigentes.`,
+  );
 }
 
 export function assertRama(
@@ -210,6 +516,9 @@ export function assertEdad(
   torneo: TorneoElegibilidad,
   etiqueta: string,
 ): void {
+  if (!torneo.validar_edad) return;
+  if (nivelValidaEdadPorNivel(torneo.nivel)) return;
+
   const { requiere, edadMinima } = resolverRequisitoEdad(
     torneo.categoria,
     torneo.validar_edad,

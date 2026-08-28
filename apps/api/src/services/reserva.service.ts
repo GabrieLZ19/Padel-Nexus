@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../config/supabase";
 import { MercadoPagoConfig, Preference } from "mercadopago";
+import { esHorarioReservaPasado } from "../utils/fechaArgentina";
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 
@@ -95,6 +96,7 @@ export class ReservaService {
       );
 
       const estaOcupado = turnosOcupados.has(turno.id) || tienePartidoTorneo;
+      const horarioPasado = esHorarioReservaPasado(fecha, turno.hora_inicio);
 
       return {
         turno_id: turno.id,
@@ -105,7 +107,7 @@ export class ReservaService {
         hora_inicio: turno.hora_inicio,
         hora_fin: turno.hora_fin,
         precio: turno.precio,
-        disponible: !estaOcupado,
+        disponible: !estaOcupado && !horarioPasado,
       };
     });
 
@@ -135,10 +137,8 @@ export class ReservaService {
 
     if (turnoError || !turno) throw new Error("Turno no encontrado.");
 
-    // Validar que la reserva no sea para una fecha y hora pasada
-    const now = new Date();
-    const reservaDateTime = new Date(`${fecha_reserva}T${turno.hora_inicio}`);
-    if (reservaDateTime < now) {
+    // Validar contra hora local Argentina (evita falsos positivos en servidores UTC)
+    if (esHorarioReservaPasado(fecha_reserva, turno.hora_inicio)) {
       throw new Error("FECHA_PASADA");
     }
 

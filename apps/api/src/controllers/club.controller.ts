@@ -13,14 +13,13 @@ export const getAllClubes = async (
       provincia,
       lat,
       lng,
-      radio,
+      ordenar,
     } = req.query;
 
-    // Si se proporcionan coordenadas, usar búsqueda geográfica
+    // Listado completo ordenado por cercanía (sin filtrar por radio)
     if (lat && lng) {
       const latNum = parseFloat(lat as string);
       const lngNum = parseFloat(lng as string);
-      const radioKm = radio ? parseFloat(radio as string) : 50;
 
       if (isNaN(latNum) || isNaN(lngNum)) {
         return res
@@ -28,7 +27,20 @@ export const getAllClubes = async (
           .json({ exito: false, error: "Coordenadas inválidas." });
       }
 
-      const data = await ClubService.buscarCercanos(latNum, lngNum, radioKm);
+      const data = await ClubService.listarTodosConDistancia(
+        latNum,
+        lngNum,
+        search as string | undefined,
+      );
+      return res.status(200).json({ exito: true, data, total: data.length });
+    }
+
+    if (ordenar === "distancia") {
+      const data = await ClubService.listarTodosConDistancia(
+        undefined,
+        undefined,
+        search as string | undefined,
+      );
       return res.status(200).json({ exito: true, data, total: data.length });
     }
 

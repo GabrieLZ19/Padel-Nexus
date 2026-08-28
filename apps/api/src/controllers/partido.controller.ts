@@ -46,6 +46,24 @@ export const PartidosController = {
     }
   },
 
+  async getPartidoPorId(req: Request, res: Response): Promise<Response> {
+    try {
+      const { partido_id } = req.params;
+      if (!partido_id) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "partido_id requerido." });
+      }
+
+      const data = await PartidoService.obtenerPartidoPorId(partido_id);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Partido no encontrado.";
+      return res.status(404).json({ exito: false, error: message });
+    }
+  },
+
   async getPartidosAbiertos(req: Request, res: Response): Promise<Response> {
     try {
       const { nivel_requerido, provincia, localidad, franja } = req.query;
@@ -97,6 +115,42 @@ export const PartidosController = {
         error instanceof Error
           ? error.message
           : "Error al intentar unirse al partido.";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
+  async salirDePartido(req: Request, res: Response): Promise<Response> {
+    try {
+      const { partido_id } = req.params;
+      const usuarioId = req.user?.id;
+
+      if (!partido_id || !usuarioId) {
+        return res.status(400).json({
+          exito: false,
+          error: "Parámetros de solicitud inválidos.",
+        });
+      }
+
+      const resultado = await PartidoService.salirDePartidoAbierto(
+        partido_id,
+        usuarioId,
+      );
+
+      const mensaje =
+        resultado.accion === "cancelado"
+          ? "Convocatoria cancelada correctamente."
+          : "Saliste de la convocatoria correctamente.";
+
+      return res.status(200).json({
+        exito: true,
+        mensaje,
+        ...resultado,
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al intentar salir del partido.";
       return res.status(400).json({ exito: false, error: message });
     }
   },

@@ -5,6 +5,7 @@ import {
   updateEstadoPago,
   deleteInscripcion,
   createInscripcionManual,
+  importarPlanillaInscripciones,
   getElegibilidadInscripcion,
 } from "../controllers/inscripcion.controller";
 import { authenticate, authorize } from "../middleware/auth";
@@ -28,6 +29,12 @@ router.post(
   "/manual",
   authorize(ROLES_ADMINISTRATIVOS),
   createInscripcionManual,
+);
+
+router.post(
+  "/importar-planilla",
+  authorize(ROLES_ADMINISTRATIVOS),
+  importarPlanillaInscripciones,
 );
 
 router.patch(

@@ -380,7 +380,7 @@ export class TorneoService {
           cupos_maximos: origen.cupos_maximos || 16,
           nivel: par.nivel,
           categoria: origen.categoria || "Libres",
-          modalidad: origen.modalidad || "Duplas",
+          modalidad: origen.modalidad || "Parejas",
           precio_inscripcion: Number(origen.precio_inscripcion || 0),
           formato: origen.formato || "Eliminatoria Directa",
           alcance: origen.alcance,
@@ -610,11 +610,13 @@ export class TorneoService {
         perfiles:perfiles!fk_inscripciones_usuario (
           lugar_residencia,
           avatar_url,
+          pendiente_activacion,
           clubes:clubes!perfiles_club_id_fkey (nombre)
         ),
         perfiles_jugador2:perfiles!fk_inscripciones_usuario2 (
           lugar_residencia,
           avatar_url,
+          pendiente_activacion,
           clubes:clubes!perfiles_club_id_fkey (nombre)
         )
       `,
