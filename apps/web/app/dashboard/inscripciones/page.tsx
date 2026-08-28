@@ -31,6 +31,12 @@ import Pagination from "../../../components/ui/Pagination";
 import { TorneosService, PagosService } from "@/utils/services";
 import { FAP_ESTADOS_PAGO } from "@/utils/constants/fap";
 import InscripcionManualModal from "@/components/inscripciones/InscripcionManualModal";
+import {
+  descargarPlantillaInscripcion,
+  etiquetaTipoPlanillaInscripcion,
+  leerPlanillaDesdeArchivo,
+} from "@/utils/inscripcionPlanilla";
+import { esModalidadIndividual } from "@/utils/formatFecha";
 
 const TABS = ["Todas", "Pendientes", "Confirmadas", "Rechazadas"];
 
@@ -72,132 +78,75 @@ export default function GestionInscripcionesPage() {
 
   const handleDescargarPlantilla = () => {
     if (!selectedTorneo) return;
-    const isIndiv = selectedTorneo.modalidad === "Individual";
-    const headers = isIndiv
-      ? ["Jugador (DNI o Email)", "Metodo de Pago (Efectivo / Transferencia / Dejar vacio)"]
-      : ["Jugador 1 (DNI o Email)", "Jugador 2 (DNI o Email)", "Metodo de Pago (Efectivo / Transferencia / Dejar vacio)"];
-      
-    const exampleRows = isIndiv
-      ? [
-          ["jugador@email.com", "Efectivo"],
-          ["40123456", "Transferencia"],
-          ["otro_jugador@email.com", ""],
-        ]
-      : [
-          ["jugador1@email.com", "jugador2@email.com", "Efectivo"],
-          ["40123456", "41765432", "Transferencia"],
-          ["otro_j1@email.com", "otro_j2@email.com", ""],
-        ];
-
-    // UTF-8 BOM so Excel opens accents correctly
-    const csvContent = "data:text/csv;charset=utf-8,\uFEFF"
-      + [headers.join(","), ...exampleRows.map(e => e.join(","))].join("\n");
-      
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `plantilla_inscripcion_${selectedTorneo.modalidad.toLowerCase()}_${selectedTorneo.nombre.toLowerCase().replace(/\s+/g, "_")}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    descargarPlantillaInscripcion({
+      alcance: selectedTorneo.alcance,
+      reglamento: (selectedTorneo as { reglamento?: string }).reglamento,
+      asociacion: (selectedTorneo as { asociacion?: string }).asociacion,
+    });
   };
 
-  const handleSubirCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSubirPlanilla = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedTorneo) return;
 
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      const text = evt.target?.result as string;
-      if (!text) return;
-
-      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-      if (lines.length <= 1) {
+    setImportingCSV(true);
+    try {
+      const { filas } = await leerPlanillaDesdeArchivo(file);
+      if (filas.length === 0) {
         setFeedbackModal({
           isOpen: true,
           type: "error",
-          title: "Archivo vacío",
-          description: "El archivo no contiene filas de datos (solo cabecera o vacío).",
-          onClose: () => setFeedbackModal(prev => ({ ...prev, isOpen: false })),
+          title: "Planilla vacía",
+          description:
+            "No se encontraron jugadores con DNI o nombre en la planilla.",
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
         });
         return;
       }
 
-      setImportingCSV(true);
-      let successCount = 0;
-      let errors: string[] = [];
+      const resultado = await InscripcionesService.importarPlanilla({
+        torneo_id: selectedTorneo.id,
+        filas,
+        modalidad: selectedTorneo.modalidad,
+      });
 
-      const dataRows = lines.slice(1);
-      const isIndiv = selectedTorneo.modalidad === "Individual";
-
-      for (let i = 0; i < dataRows.length; i++) {
-        const row = dataRows[i];
-        const delimiter = row.includes(";") ? ";" : ",";
-        const parts = row.split(delimiter).map(p => p.trim().replace(/^["']|["']$/g, ""));
-        
-        if (isIndiv) {
-          const identificador = parts[0];
-          const metodo = parts[1] || "";
-          if (!identificador) continue;
-
-          try {
-            await InscripcionesService.inscribirManual({
-              torneo_id: selectedTorneo.id,
-              jugador1_identificador: identificador,
-              monto: Number(selectedTorneo.precio_inscripcion || 0),
-              metodo_pago: metodo || undefined,
-            });
-            successCount++;
-          } catch (err: any) {
-            const errMsg = err.response?.data?.error || err.message || "Error desconocido";
-            errors.push(`Fila ${i + 2} (${identificador}): ${errMsg}`);
-          }
-        } else {
-          // Duplas
-          const j1 = parts[0];
-          const j2 = parts[1];
-          const metodo = parts[2] || "";
-          if (!j1) continue;
-
-          try {
-            await InscripcionesService.inscribirManual({
-              torneo_id: selectedTorneo.id,
-              jugador1_identificador: j1,
-              jugador2_identificador: j2 || undefined,
-              monto: Number(selectedTorneo.precio_inscripcion || 0),
-              metodo_pago: metodo || undefined,
-            });
-            successCount++;
-          } catch (err: any) {
-            const errMsg = err.response?.data?.error || err.message || "Error desconocido";
-            errors.push(`Fila ${i + 2} (${j1}/${j2 || 'N/A'}): ${errMsg}`);
-          }
-        }
-      }
-
-      setImportingCSV(false);
       setRefreshKey((prev) => prev + 1);
+      const isIndiv = esModalidadIndividual(selectedTorneo.modalidad);
 
-      if (errors.length === 0) {
+      if (resultado.errores.length === 0) {
         setFeedbackModal({
           isOpen: true,
           type: "success",
-          title: "Inscripción Masiva Completada",
-          description: `Se inscribieron exitosamente ${successCount} ${isIndiv ? 'jugadores' : 'parejas'}.`,
-          onClose: () => setFeedbackModal(prev => ({ ...prev, isOpen: false })),
+          title: "Importación completada",
+          description: `Se importaron ${resultado.inscripcionesOk} ${isIndiv ? "jugadores" : "parejas"}. ${resultado.jugadoresCreados > 0 ? `Se crearon ${resultado.jugadoresCreados} perfiles nuevos pendientes de activación.` : ""}`,
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
         });
       } else {
         setFeedbackModal({
           isOpen: true,
           type: "warning",
-          title: "Inscripción con Advertencias",
-          description: `Se inscribieron ${successCount} participantes. Fallaron ${errors.length}:\n\n${errors.slice(0, 5).join("\n")}${errors.length > 5 ? "\n... entre otros." : ""}`,
-          onClose: () => setFeedbackModal(prev => ({ ...prev, isOpen: false })),
+          title: "Importación con advertencias",
+          description: `Importadas: ${resultado.inscripcionesOk}. Perfiles nuevos: ${resultado.jugadoresCreados}. Errores: ${resultado.errores.length}\n\n${resultado.errores.slice(0, 5).join("\n")}${resultado.errores.length > 5 ? "\n..." : ""}`,
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
         });
       }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "No se pudo procesar la planilla.";
+      setFeedbackModal({
+        isOpen: true,
+        type: "error",
+        title: "Error al importar",
+        description: msg,
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
+    } finally {
+      setImportingCSV(false);
+      e.target.value = "";
+    }
   };
 
   useEffect(() => {
@@ -417,20 +366,21 @@ export default function GestionInscripcionesPage() {
         </div>
         <div className="flex gap-2">
           {selectedTorneo && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
               <button
                 onClick={handleDescargarPlantilla}
                 className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer animate-in fade-in"
-                title="Descargar plantilla CSV para carga masiva"
+                title="Descargar planilla oficial de inscripciones"
               >
-                <Download className="size-3.5" /> Descargar Plantilla
+                <Download className="size-3.5" /> Descargar Planilla
               </button>
               
               <div className="relative">
                 <input
                   type="file"
-                  accept=".csv"
-                  onChange={handleSubirCSV}
+                  accept=".xls,.xlsx"
+                  onChange={handleSubirPlanilla}
                   disabled={importingCSV}
                   className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
                 />
@@ -438,7 +388,7 @@ export default function GestionInscripcionesPage() {
                   disabled={importingCSV}
                   className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer disabled:opacity-50"
                 >
-                  <Upload className="size-3.5" /> {importingCSV ? "Importando..." : "Subir CSV"}
+                  <Upload className="size-3.5" /> {importingCSV ? "Importando..." : "Subir Planilla"}
                 </button>
               </div>
 
@@ -448,6 +398,14 @@ export default function GestionInscripcionesPage() {
               >
                 Inscribir {selectedTorneo.modalidad === "Individual" ? "Jugador" : "Pareja"}
               </button>
+              </div>
+              <p className="text-[11px] text-gray-500 text-right max-w-md">
+                Planilla {selectedTorneo ? etiquetaTipoPlanillaInscripcion({
+                  alcance: selectedTorneo.alcance,
+                  reglamento: (selectedTorneo as { reglamento?: string }).reglamento,
+                  asociacion: (selectedTorneo as { asociacion?: string }).asociacion,
+                }) : ""} según reglamento/alcance del torneo. En parejas, cada dos filas consecutivas forman una pareja.
+              </p>
             </div>
           )}
           <button
@@ -545,7 +503,7 @@ export default function GestionInscripcionesPage() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 size-4" />
           <input
             type="text"
-            placeholder="Buscar dupla o torneo..."
+            placeholder="Buscar pareja o torneo..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-11 pr-4 py-2.5 bg-[#111111] rounded-xl border border-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors"
@@ -626,7 +584,7 @@ export default function GestionInscripcionesPage() {
             <table className="w-full text-left border-collapse min-w-[900px]">
               <thead>
                 <tr className="border-b border-white/5 text-gray-400 text-xs font-bold uppercase tracking-wider bg-black/20">
-                  <th className="py-4 px-8">Jugador / Dupla</th>
+                  <th className="py-4 px-8">Jugador / Pareja</th>
                   <th className="py-4 px-6">Torneo / Cancha</th>
                   <th className="py-4 px-6">Fecha Req.</th>
                   <th className="py-4 px-6">Estado del Pago</th>
@@ -636,7 +594,7 @@ export default function GestionInscripcionesPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filteredInscripciones.map((ins) => {
-                  const esDupla =
+                  const esPareja =
                     ins.jugador2_nombre &&
                     ins.jugador2_nombre.trim() !== "" &&
                     ins.jugador2_nombre !== "-";
@@ -648,7 +606,7 @@ export default function GestionInscripcionesPage() {
                     >
                       <td className="py-4 px-8">
                         <div className="flex items-center gap-3 mb-1">
-                          {esDupla ? (
+                          {esPareja ? (
                             <Users className="size-4 text-brand-chartreuse" />
                           ) : (
                             <User className="size-4 text-brand-chartreuse" />
@@ -657,7 +615,7 @@ export default function GestionInscripcionesPage() {
                             <div className="font-bold text-white text-[14px]">
                               {/* Eliminamos ins.perfiles porque el backend ya inyectó el nombre dentro de jugador1_nombre */}
                               {cleanName(ins.jugador1_nombre)}
-                              {esDupla && ins.jugador2_nombre && (
+                              {esPareja && ins.jugador2_nombre && (
                                 <span className="text-gray-400 font-medium">
                                   {" "}
                                   / {cleanName(ins.jugador2_nombre)}

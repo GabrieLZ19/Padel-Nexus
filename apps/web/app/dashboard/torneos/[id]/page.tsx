@@ -23,6 +23,7 @@ import { TournamentWizardNav } from "@/components/torneos/TournamentWizardNav";
 import type { SaveStepHandler } from "@/components/torneos/wizard/types";
 import { useProfileStore } from "@/store/useProfileStore";
 import { esRolFiscal } from "@/utils/auth/roles";
+import { labelModalidad } from "@/utils/formatFecha";
 
 const WIZARD_STEPS = [
   { id: "edit", label: "1. Datos", desc: "Información" },
@@ -279,7 +280,7 @@ const HeaderNavegacion = ({ torneo, onBack }: HeaderProps) => (
         </h1>
         <p className="text-gray-400 mt-1 text-sm sm:text-base font-medium">
           {(torneo as any).rama ? `${(torneo as any).rama} · ` : ""}
-          {torneo.nivel} · {torneo.categoria} · {torneo.modalidad}
+          {torneo.nivel} · {torneo.categoria} · {labelModalidad(torneo.modalidad)}
         </p>
       </div>
     </div>

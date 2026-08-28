@@ -13,6 +13,7 @@ import {
   filtrarAsociacionesOrganizadorasFap,
   debeForzarOrganizadorFap,
   puedeUsarReglamentoAmateur,
+  reglamentoTorneo,
   type ReglamentoTorneo,
 } from "@/utils/constants/fapApaRules";
 import { esRolFederacionNacional } from "@/utils/auth/roles";
@@ -24,6 +25,21 @@ const ASO_PREFIX = "aso:";
 
 function organizadorValue(kind: "fed" | "aso", id: string) {
   return kind === "fed" ? `${FED_PREFIX}${id}` : `${ASO_PREFIX}${id}`;
+}
+
+function organizadorFromTorneo(torneo: Torneo): string {
+  const asoId = torneo.asociacion_id;
+  const fedId = torneo.federacion_id;
+  // La asociación provincial organizadora tiene prioridad sobre federación vinculada
+  if (asoId) return organizadorValue("aso", asoId);
+  if (fedId) return organizadorValue("fed", fedId);
+  return "";
+}
+
+function reglamentoFromTorneo(torneo: Torneo, userRole: RolUsuario): ReglamentoTorneo {
+  const raw = reglamentoTorneo(torneo);
+  if (raw === "Amateur" && !puedeUsarReglamentoAmateur(userRole)) return "FAP";
+  return raw;
 }
 
 function parseOrganizador(value: string): {
@@ -77,24 +93,15 @@ export const Paso1Datos = ({
     }
     return inicial;
   });
-  const [editAsociacion, setEditAsociacion] = useState<string>(() => {
-    const raw =
-      (torneo as { reglamento?: string; asociacion?: string }).reglamento ||
-      (torneo as { asociacion?: string }).asociacion ||
-      "FAP";
-    if (raw === "Amateur" && !puedeUsarReglamentoAmateur(userRole)) return "FAP";
-    return raw;
-  });
+  const [editAsociacion, setEditAsociacion] = useState<string>(() =>
+    reglamentoFromTorneo(torneo, userRole),
+  );
   const [asociacionesList, setAsociacionesList] = useState<Asociacion[]>([]);
   const [federacionesList, setFederacionesList] = useState<Federacion[]>([]);
   const [fapFederacionId, setFapFederacionId] = useState<string>("");
-  const [editOrganizador, setEditOrganizador] = useState<string>(() => {
-    const fedId = (torneo as { federacion_id?: string }).federacion_id;
-    const asoId = (torneo as { asociacion_id?: string }).asociacion_id;
-    if (fedId) return organizadorValue("fed", fedId);
-    if (asoId) return organizadorValue("aso", asoId);
-    return "";
-  });
+  const [editOrganizador, setEditOrganizador] = useState<string>(() =>
+    organizadorFromTorneo(torneo),
+  );
   const [editFormato, setEditFormato] = useState<string>(
     (torneo as { formato?: string }).formato || "Zonas + Llaves",
   );
@@ -185,6 +192,24 @@ export const Paso1Datos = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- carga inicial
   }, []);
+
+  // Sincronizar con datos persistidos tras guardar / refrescar torneo
+  useEffect(() => {
+    setEditAsociacion(reglamentoFromTorneo(torneo, userRole));
+    const org = organizadorFromTorneo(torneo);
+    if (org) setEditOrganizador(org);
+    else if (fapFederacionId) {
+      setEditOrganizador(organizadorValue("fed", fapFederacionId));
+    }
+  }, [
+    torneo.id,
+    torneo.reglamento,
+    torneo.asociacion,
+    torneo.asociacion_id,
+    torneo.federacion_id,
+    fapFederacionId,
+    userRole,
+  ]);
 
   // Alcance Nacional ⇒ organizadora FAP + reglamento FAP
   useEffect(() => {
@@ -288,10 +313,10 @@ export const Paso1Datos = ({
         ? "FAP"
         : (editAsociacion as ReglamentoTorneo);
 
-      // Si organiza una asociación del ecosistema FAP, igual vinculamos federacion_id FAP
-      const federacionIdFinal =
-        orgParsed.federacionId ||
-        (orgParsed.asociacionId ? fapFederacionId || null : null);
+      const federacionIdFinal = orgParsed.federacionId;
+      const asociacionIdFinal = orgParsed.federacionId
+        ? null
+        : orgParsed.asociacionId;
 
       await TorneosService.update(torneoId, {
         nombre: editNombre,
@@ -310,7 +335,7 @@ export const Paso1Datos = ({
         canchas_disponibles: selectedCanchas.length,
         alcance: editAlcance,
         reglamento: reglamentoFinal,
-        asociacion_id: orgParsed.asociacionId,
+        asociacion_id: asociacionIdFinal,
         federacion_id: federacionIdFinal,
         formato: editFormato,
       } as any);

@@ -1,3 +1,8 @@
+import {
+  NIVELES_PARTIDO_ABIERTO,
+  NIVEL_PARTIDO_DEFAULT,
+} from "@/utils/constants/padelConfig";
+
 export type FranjaPartido = "manana" | "tarde" | "noche";
 
 export type EstadoPartidoAbierto = "abierto" | "completo" | "cerrado" | "cancelado";
@@ -21,6 +26,7 @@ export interface PartidoAbierto {
   jugadores_faltantes: number;
   notas: string | null;
   estado: EstadoPartidoAbierto | string;
+  conversacion_id?: string | null;
   created_at: string;
   perfiles?: {
     nombre: string | null;
@@ -64,12 +70,7 @@ export interface PublicarPartidoAbiertoPayload {
   notas?: string;
 }
 
-export const NIVELES_PARTIDO = [
-  "5ta",
-  "6ta",
-  "7ma",
-  "8va",
-  "Principiante",
-  "Intermedio",
-  "Avanzado",
-] as const;
+/** Valores de nivel para filtros y formularios de partidos abiertos. */
+export const NIVELES_PARTIDO = NIVELES_PARTIDO_ABIERTO.map((n) => n.value);
+
+export { NIVEL_PARTIDO_DEFAULT };

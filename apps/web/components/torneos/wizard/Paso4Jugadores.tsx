@@ -7,6 +7,7 @@ import {
   Users,
   User,
   Trash2,
+  Info,
 } from "lucide-react";
 import { Torneo, Inscripcion } from "@/utils/types";
 import { InscripcionesService } from "@/utils/services/inscripciones";
@@ -20,6 +21,46 @@ import {
   PairDisplay,
   esAlcanceNacional,
 } from "@/components/torneos/PairDisplay";
+import {
+  descargarPlantillaInscripcion,
+  leerPlanillaDesdeArchivo,
+} from "@/utils/inscripcionPlanilla";
+import { esModalidadIndividual } from "@/utils/formatFecha";
+
+function jugadoresPendienteActivacion(ins: Inscripcion): string[] {
+  const pendientes: string[] = [];
+  if (ins.perfiles?.pendiente_activacion === true) {
+    pendientes.push(ins.jugador1_nombre || "Jugador 1");
+  }
+  if (ins.perfiles_jugador2?.pendiente_activacion === true) {
+    pendientes.push(ins.jugador2_nombre || "Jugador 2");
+  }
+  return pendientes;
+}
+
+function mensajePreinscripcionPendiente(ins: Inscripcion): string {
+  const pendientes = jugadoresPendienteActivacion(ins);
+  if (pendientes.length === 0) return "";
+
+  const lista = pendientes.join(" y ");
+  if (pendientes.length > 1) {
+    return `${lista} ya están preinscriptos. Deben registrarse en la App con su DNI para validar sus datos.`;
+  }
+  return `${lista} ya está preinscripto/a. Debe registrarse en la App con su DNI para validar sus datos.`;
+}
+
+function apiErrorMessage(error: unknown, fallback: string): string {
+  const e = error as {
+    response?: { data?: { error?: string; message?: string } };
+    message?: string;
+  };
+  return (
+    e.response?.data?.error ||
+    e.response?.data?.message ||
+    e.message ||
+    fallback
+  );
+}
 
 interface Paso4JugadoresProps {
   torneo: Torneo;
@@ -65,197 +106,79 @@ export const Paso4Jugadores = ({
     (i) => i.estado_pago === "Confirmado",
   ).length;
 
+  const preinscriptosCount = inscripciones.filter(
+    (i) =>
+      i.perfiles?.pendiente_activacion === true ||
+      i.perfiles_jugador2?.pendiente_activacion === true,
+  ).length;
+
   const handleDescargarPlantilla = () => {
-    const isIndiv = torneo.modalidad === "Individual";
-    const esNacional = /nacional/i.test(String(torneo.alcance || ""));
-    const headers = isIndiv
-      ? [
-          "Jugador (DNI o Email)",
-          ...(esNacional ? ["Letra (A-Z)"] : []),
-          "Metodo de Pago (Efectivo / Transferencia / Dejar vacio)",
-        ]
-      : [
-          "Jugador 1 (DNI o Email)",
-          "Jugador 2 (DNI o Email)",
-          ...(esNacional ? ["Letra (A-Z)"] : []),
-          "Metodo de Pago",
-        ];
-
-    const exampleRows = isIndiv
-      ? esNacional
-        ? [
-            ["jugador@email.com", "A", "Efectivo"],
-            ["40123456", "B", "Transferencia"],
-          ]
-        : [
-            ["jugador@email.com", "Efectivo"],
-            ["40123456", "Transferencia"],
-          ]
-      : esNacional
-        ? [
-            ["j1@email.com", "j2@email.com", "A", "Efectivo"],
-            ["40123456", "41765432", "B", "Transferencia"],
-          ]
-        : [
-            ["j1@email.com", "j2@email.com", "Efectivo"],
-            ["40123456", "41765432", "Transferencia"],
-          ];
-
-    const csvContent =
-      "data:text/csv;charset=utf-8,\uFEFF" +
-      [headers.join(","), ...exampleRows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `plantilla_inscripcion_${torneo.modalidad.toLowerCase()}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    descargarPlantillaInscripcion({
+      alcance: torneo.alcance,
+      reglamento: (torneo as { reglamento?: string }).reglamento,
+      asociacion: (torneo as { asociacion?: string }).asociacion,
+    });
   };
 
-  const handleSubirCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // La lógica de procesado del CSV se mantiene idéntica a tu código original
+  const handleSubirPlanilla = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      const text = evt.target?.result as string;
-      if (!text) return;
-
-      const lines = text
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter(Boolean);
-      if (lines.length <= 1) {
-        setFeedbackModal((prev: any) => ({
+    setImportingCSV(true);
+    try {
+      const { filas } = await leerPlanillaDesdeArchivo(file);
+      if (filas.length === 0) {
+        setFeedbackModal((prev: { isOpen?: boolean }) => ({
           ...prev,
           isOpen: true,
           type: "error",
-          title: "Archivo vacío",
-          description: "El archivo no contiene filas válidas.",
+          title: "Planilla vacía",
+          description:
+            "No se encontraron jugadores con DNI o nombre en la planilla.",
         }));
         return;
       }
 
-      setImportingCSV(true);
-      let successCount = 0;
-      let errors: string[] = [];
-      const dataRows = lines.slice(1);
-      const isIndiv = torneo.modalidad === "Individual";
-      const esNacional = /nacional/i.test(String(torneo.alcance || ""));
-      const metodosPago = [
-        "efectivo",
-        "transferencia",
-        "mercado_pago",
-        "mercadopago",
-        "confirmado",
-      ];
+      const resultado = await InscripcionesService.importarPlanilla({
+        torneo_id: torneo.id,
+        filas,
+        modalidad: torneo.modalidad,
+      });
 
-      for (let i = 0; i < dataRows.length; i++) {
-        const parts = dataRows[i]
-          .split(dataRows[i].includes(";") ? ";" : ",")
-          .map((p) => p.trim().replace(/^["']|["']$/g, ""));
-
-        try {
-          if (isIndiv) {
-            if (!parts[0]) continue;
-            let letra: string | undefined;
-            let metodo: string | undefined;
-            if (esNacional) {
-              letra = parts[1] || undefined;
-              metodo = parts[2] || undefined;
-            } else {
-              metodo = parts[1] || undefined;
-            }
-            await InscripcionesService.inscribirManual({
-              torneo_id: torneo.id,
-              jugador1_identificador: parts[0],
-              monto: Number(torneo.precio_inscripcion || 0),
-              metodo_pago: metodo || undefined,
-              letra_prioridad: letra,
-            });
-          } else {
-            if (!parts[0]) continue;
-            let j1 = parts[0];
-            let j2 = parts[1] || "";
-            let letra: string | undefined;
-            let metodo: string | undefined;
-
-            if (esNacional) {
-              // j1, j2, letra, metodo — o j1, j2, letra
-              if (
-                parts.length >= 3 &&
-                parts[2] &&
-                !metodosPago.includes(parts[2].toLowerCase())
-              ) {
-                letra = parts[2];
-                metodo = parts[3] || undefined;
-              } else if (
-                parts.length === 2 &&
-                j2 &&
-                metodosPago.includes(j2.toLowerCase())
-              ) {
-                metodo = j2;
-                j2 = "";
-              } else {
-                letra = parts[2] || undefined;
-                metodo = parts[3] || undefined;
-              }
-            } else if (
-              parts.length === 2 &&
-              j2 &&
-              metodosPago.includes(j2.toLowerCase())
-            ) {
-              metodo = j2;
-              j2 = "";
-            } else {
-              metodo = parts[2] || undefined;
-            }
-
-            await InscripcionesService.inscribirManual({
-              torneo_id: torneo.id,
-              jugador1_identificador: j1,
-              jugador2_identificador: j2 || undefined,
-              monto: Number(torneo.precio_inscripcion || 0),
-              metodo_pago: metodo || undefined,
-              letra_prioridad: letra,
-            });
-          }
-          successCount++;
-        } catch (err: any) {
-          errors.push(
-            `Fila ${i + 2}: ${err.response?.data?.error || err.message}`,
-          );
-        }
-      }
-
-      setImportingCSV(false);
       triggerRefresh();
+      const isIndiv = esModalidadIndividual(torneo.modalidad);
 
-      if (errors.length === 0) {
-        setFeedbackModal((prev: any) => ({
+      if (resultado.errores.length === 0) {
+        setFeedbackModal((prev: { isOpen?: boolean }) => ({
           ...prev,
           isOpen: true,
           type: "success",
-          title: "Completado",
-          description: `Se inscribieron ${successCount} correctamente.`,
+          title: "Importación completada",
+          description: `Se importaron ${resultado.inscripcionesOk} ${isIndiv ? "jugadores" : "parejas"}.${resultado.jugadoresCreados > 0 ? ` ${resultado.jugadoresCreados} jugador(es) quedaron preinscriptos: deberán registrarse en la App con su DNI para validar sus datos.` : ""}`,
         }));
       } else {
-        setFeedbackModal((prev: any) => ({
+        setFeedbackModal((prev: { isOpen?: boolean }) => ({
           ...prev,
           isOpen: true,
           type: "warning",
-          title: "Con Advertencias",
-          description: `Éxitos: ${successCount}. Fallos:\n${errors.slice(0, 5).join("\n")}`,
+          title: "Importación con advertencias",
+          description: `Éxitos: ${resultado.inscripcionesOk}. Perfiles nuevos: ${resultado.jugadoresCreados}. Errores:\n${resultado.errores.slice(0, 5).join("\n")}`,
         }));
       }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "No se pudo procesar la planilla.";
+      setFeedbackModal((prev: { isOpen?: boolean }) => ({
+        ...prev,
+        isOpen: true,
+        type: "error",
+        title: "Error al importar",
+        description: msg,
+      }));
+    } finally {
+      setImportingCSV(false);
+      e.target.value = "";
+    }
   };
 
   const handleEliminarInscripcion = (inscripcionId: string | number) => {
@@ -267,24 +190,40 @@ export const Paso4Jugadores = ({
       description: "Esta acción liberará los cupos del torneo. ¿Estás seguro?",
       confirmText: "Eliminar",
       cancelText: "Cancelar",
+      isLoading: false,
       onConfirm: async () => {
+        setFeedbackModal((prevModal: any) => ({
+          ...prevModal,
+          isLoading: true,
+        }));
         try {
           await InscripcionesService.eliminar(inscripcionId);
           triggerRefresh();
           setFeedbackModal((prevModal: any) => ({
             ...prevModal,
             isOpen: true,
+            isLoading: false,
             type: "success",
             title: "Eliminada",
             description: "Cupo liberado.",
+            onConfirm: undefined,
+            confirmText: undefined,
+            cancelText: undefined,
           }));
-        } catch (error: any) {
+        } catch (error: unknown) {
           setFeedbackModal((prevModal: any) => ({
             ...prevModal,
             isOpen: true,
+            isLoading: false,
             type: "error",
             title: "Error",
-            description: error.message,
+            description: apiErrorMessage(
+              error,
+              "No se pudo eliminar la inscripción.",
+            ),
+            onConfirm: undefined,
+            confirmText: undefined,
+            cancelText: undefined,
           }));
         }
       },
@@ -310,8 +249,8 @@ export const Paso4Jugadores = ({
           <div className="relative flex-1 lg:flex-none">
             <input
               type="file"
-              accept=".csv"
-              onChange={handleSubirCSV}
+              accept=".xls,.xlsx"
+              onChange={handleSubirPlanilla}
               disabled={importingCSV}
               className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
             />
@@ -320,7 +259,7 @@ export const Paso4Jugadores = ({
               className="w-full flex justify-center items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 disabled:opacity-50"
             >
               <Upload className="size-3.5" />{" "}
-              {importingCSV ? "Importando..." : "Subir CSV"}
+              {importingCSV ? "Importando..." : "Subir Planilla"}
             </button>
           </div>
           <button
@@ -331,6 +270,23 @@ export const Paso4Jugadores = ({
           </button>
         </div>
       </div>
+
+      {preinscriptosCount > 0 && (
+        <div className="mx-6 mt-4 flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-chartreuse/10">
+            <Info className="size-4 text-brand-chartreuse" />
+          </div>
+          <p className="text-xs leading-relaxed text-gray-400">
+            <span className="font-semibold text-gray-300">
+              {preinscriptosCount} jugador
+              {preinscriptosCount === 1 ? "" : "es"} preinscripto
+              {preinscriptosCount === 1 ? "" : "s"}
+            </span>{" "}
+            desde planilla. La inscripción ya está cargada; solo falta que se
+            registren en la App con su DNI para validar sus datos.
+          </p>
+        </div>
+      )}
 
       {/* Tabla de Inscritos */}
       {inscripciones.length === 0 ? (
@@ -354,16 +310,16 @@ export const Paso4Jugadores = ({
             <tbody className="divide-y divide-white/5">
               {inscripciones.map((ins) => {
                 const isConfirmed = ins.estado_pago === "Confirmado";
-                const isPendienteRegistro = ins.estado_pago === "Pendiente" || (ins as any).registrado === false;
+                const isPendienteRegistro =
+                  ins.perfiles?.pendiente_activacion === true ||
+                  ins.perfiles_jugador2?.pendiente_activacion === true;
+                const tooltipPreinscripcion =
+                  mensajePreinscripcionPendiente(ins);
                 return (
                   <tr
                     key={ins.id}
                     className={`hover:bg-white/5 transition-colors ${
-                      isPendienteRegistro
-                        ? "opacity-50 bg-black/40 grayscale"
-                        : isConfirmed
-                        ? "bg-green-500/5"
-                        : ""
+                      isConfirmed ? "bg-green-500/5" : ""
                     }`}
                   >
                     <td className="px-8 py-5 text-center">
@@ -390,17 +346,17 @@ export const Paso4Jugadores = ({
                       {String(ins.id).slice(0, 8).toUpperCase()}
                     </td>
                     <td className="px-6 py-5">
-                      <div className="font-bold text-white flex items-center gap-3">
+                      <div className="flex items-center gap-3">
                         <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                            isPendienteRegistro
-                              ? "bg-gray-800 text-gray-400"
-                              : "bg-brand-chartreuse/10 text-brand-chartreuse"
+                          className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
+                            isConfirmed
+                              ? "bg-brand-chartreuse/10 text-brand-chartreuse"
+                              : "bg-white/5 text-gray-500"
                           }`}
                         >
                           <User className="size-4" />
                         </div>
-                        <div>
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                           <PairDisplay
                             j1={ins.jugador1_nombre}
                             j2={ins.jugador2_nombre}
@@ -412,8 +368,12 @@ export const Paso4Jugadores = ({
                             variant="inline"
                           />
                           {isPendienteRegistro && (
-                            <span className="block text-[10px] text-amber-400/80 font-bold mt-0.5">
-                              ⚠️ Jugador no registrado en App (Pendiente)
+                            <span
+                              title={tooltipPreinscripcion}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-300/90"
+                            >
+                              <span className="size-1.5 shrink-0 rounded-full bg-sky-400" />
+                              Validar en App
                             </span>
                           )}
                         </div>
@@ -433,7 +393,7 @@ export const Paso4Jugadores = ({
                             : "Confirmado"
                           : modoFederacion
                             ? "No pagó"
-                            : "Pendiente en App"}
+                            : "Pendiente de pago"}
                       </span>
                     </td>
                     <td className="px-8 py-5 text-right font-semibold text-sm">
@@ -500,7 +460,13 @@ export const Paso4Jugadores = ({
               isOpen: true,
               type: "error",
               title: "Error",
-              description: error.message,
+              description: apiErrorMessage(
+                error,
+                "No se pudo confirmar el pago.",
+              ),
+              onConfirm: undefined,
+              confirmText: undefined,
+              cancelText: undefined,
             }));
           }
         }}

@@ -1,5 +1,5 @@
 import jsPDF from "jspdf";
-import { esModalidadIndividual } from "@/utils/formatFecha";
+import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
 import { Partido, Torneo } from "@/utils/types";
 
 type Rgb = readonly [number, number, number];
@@ -180,7 +180,7 @@ export function generarPdfGrillaPartidos(
   doc.setFont("helvetica", "normal");
   doc.setTextColor(200, 200, 200);
   doc.text(
-    `Categoría: ${torneo.categoria || "Libres"}  |  Modalidad: ${torneo.modalidad || "Parejas"}  |  Impreso: ${new Date().toLocaleDateString("es-AR")} ${new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} hs`,
+    `Categoría: ${torneo.categoria || "Libres"}  |  Modalidad: ${labelModalidad(torneo.modalidad)}  |  Impreso: ${new Date().toLocaleDateString("es-AR")} ${new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })} hs`,
     14,
     22,
   );
@@ -707,7 +707,7 @@ export function generarPdfHojaRuta(
 
   const detalleCompetencia = [
     (torneo.nombre || "TORNEO").toUpperCase(),
-    isIndividual ? "Individual" : "Duplas",
+    isIndividual ? "Individual" : labelModalidad(torneo.modalidad),
     torneo.categoria || null,
     torneo.rama || null,
     torneo.lugar || null,
@@ -1228,7 +1228,7 @@ export function generarPdfZonas(
   doc.setFont("helvetica", "normal");
   doc.setTextColor(186, 198, 214);
   doc.text(
-    `Categoría: ${torneo.categoria || "Libres"}  ·  ${isIndividual ? "Individual" : "Duplas"}  ·  ${zonas.length} zona${zonas.length === 1 ? "" : "s"}  ·  Impreso: ${new Date().toLocaleString("es-AR")}`,
+    `Categoría: ${torneo.categoria || "Libres"}  ·  ${isIndividual ? "Individual" : labelModalidad(torneo.modalidad)}  ·  ${zonas.length} zona${zonas.length === 1 ? "" : "s"}  ·  Impreso: ${new Date().toLocaleString("es-AR")}`,
     14,
     27,
   );
@@ -1525,7 +1525,7 @@ export function generarPdfZonas(
         doc.setFontSize(5.5);
         doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
         doc.text(
-          isIndividual ? "Jugadores" : "Parejas (cada fila = una dupla)",
+          isIndividual ? "Jugadores" : "Parejas (cada fila = una pareja)",
           marginX + leftW + 2,
           y + 3.4,
         );
@@ -1602,7 +1602,7 @@ export function generarPdfZonas(
 
       const cols = [
         { label: "#", w: 7 },
-        { label: isIndividual ? "Jugador" : "Dupla", w: 56 },
+        { label: isIndividual ? "Jugador" : "Pareja", w: 56 },
         { label: "PJ", w: 9 },
         { label: "PG", w: 9 },
         { label: "PP", w: 9 },

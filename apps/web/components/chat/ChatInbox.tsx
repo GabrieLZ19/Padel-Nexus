@@ -9,20 +9,34 @@ import {
   User,
   X,
   Headset,
-  Check,
-  CheckCheck,
   ShoppingBag,
   ExternalLink,
+  Users,
+  Calendar,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { isAxiosError } from "axios";
 import { ChatService } from "@/utils/services/chat";
 import { useChat } from "@/hooks/useChat";
 import { useProfileStore } from "@/store/useProfileStore";
+import { sileo } from "sileo";
 import type { ChatConversacion, ChatMensaje } from "@/utils/types";
+import ChatMessageBubble from "@/components/chat/ChatMessageBubble";
+import ChatParticipantesBar from "@/components/chat/ChatParticipantesBar";
+import {
+  buscarParticipante,
+  mapPartidoParticipantes,
+  type ChatParticipanteInfo,
+} from "@/components/chat/chatParticipants";
 
-export type ChatInboxTab = "todos" | "directos" | "soporte" | "marketplace";
+export type ChatInboxTab =
+  | "todos"
+  | "directos"
+  | "soporte"
+  | "marketplace"
+  | "partidos";
 
 interface ChatInboxProps {
   title?: string;
@@ -40,6 +54,27 @@ function formatPrecio(precio: number) {
   }).format(precio);
 }
 
+function tabForConv(conv: ChatConversacion): ChatInboxTab {
+  switch (conv.tipo) {
+    case "partido":
+      return "partidos";
+    case "marketplace":
+      return "marketplace";
+    case "soporte":
+      return "soporte";
+    default:
+      return "directos";
+  }
+}
+
+function buildMensajesUrl(convId?: string | null, tab?: ChatInboxTab) {
+  const params = new URLSearchParams();
+  if (tab) params.set("tab", tab);
+  if (convId) params.set("c", convId);
+  const query = params.toString();
+  return query ? `/mensajes?${query}` : "/mensajes";
+}
+
 export default function ChatInbox({
   title = "Mensajes",
   subtitle = "Conversaciones en tiempo real",
@@ -48,8 +83,10 @@ export default function ChatInbox({
   className = "",
 }: ChatInboxProps) {
   const { profile } = useProfileStore();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const deepLinkConvId = searchParams.get("c");
+  const tabParam = searchParams.get("tab");
 
   const {
     joinConversation,
@@ -73,12 +110,13 @@ export default function ChatInbox({
   const [activeTab, setActiveTab] = useState<ChatInboxTab>(defaultTab);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [showMobileChat, setShowMobileChat] = useState(false);
-  const deepLinkHandled = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeConvRef = useRef<ChatConversacion | null>(null);
+  const mensajesFetchGenRef = useRef(0);
 
   const fetchConversaciones = useCallback(async () => {
     try {
@@ -97,13 +135,28 @@ export default function ChatInbox({
     fetchConversaciones();
   }, [fetchConversaciones]);
 
+  useEffect(() => {
+    if (
+      tabParam === "todos" ||
+      tabParam === "directos" ||
+      tabParam === "soporte" ||
+      tabParam === "marketplace" ||
+      tabParam === "partidos"
+    ) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
   const fetchMensajes = useCallback(async (convId: string, cursor?: string) => {
+    const fetchGen = ++mensajesFetchGenRef.current;
     if (!cursor) setLoadingMensajes(true);
     try {
       const { mensajes: msgs, hay_mas } = await ChatService.getMensajes(
         convId,
         cursor,
       );
+
+      if (fetchGen !== mensajesFetchGenRef.current) return;
 
       if (cursor) {
         setMensajes((prev) => [...msgs, ...prev]);
@@ -112,40 +165,55 @@ export default function ChatInbox({
       }
       setHayMas(hay_mas);
     } catch (err) {
+      if (fetchGen !== mensajesFetchGenRef.current) return;
       console.error("Error al cargar mensajes:", err);
     } finally {
-      setLoadingMensajes(false);
+      if (fetchGen === mensajesFetchGenRef.current) {
+        setLoadingMensajes(false);
+      }
     }
   }, []);
 
-  const handleSelectConversacion = useCallback(
+  const selectConversacion = useCallback(
     (conv: ChatConversacion) => {
-      if (activeConv?.id) {
-        leaveConversation(activeConv.id);
+      const prev = activeConvRef.current;
+      if (prev?.id && prev.id !== conv.id) {
+        leaveConversation(prev.id);
       }
 
+      activeConvRef.current = conv;
       setActiveConv(conv);
       setMensajes([]);
+      setHayMas(false);
+      setTypingUsers(new Set());
       setShowMobileChat(true);
       joinConversation(conv.id);
       fetchMensajes(conv.id);
 
-      setConversaciones((prev) =>
-        prev.map((c) => (c.id === conv.id ? { ...c, no_leidos: 0 } : c)),
+      setConversaciones((prevConvs) =>
+        prevConvs.map((c) => (c.id === conv.id ? { ...c, no_leidos: 0 } : c)),
       );
     },
-    [activeConv, joinConversation, leaveConversation, fetchMensajes],
+    [joinConversation, leaveConversation, fetchMensajes],
   );
 
-  // Deep link ?c=conversacionId
+  const handleSelectConversacion = useCallback(
+    (conv: ChatConversacion) => {
+      const tab = tabForConv(conv);
+      setActiveTab(tab);
+      selectConversacion(conv);
+      router.replace(buildMensajesUrl(conv.id, tab), { scroll: false });
+    },
+    [selectConversacion, router],
+  );
+
+  // Deep link ?c=conversacionId — solo cuando cambia la URL, no al elegir en sidebar
   useEffect(() => {
-    if (deepLinkHandled.current || loading || !deepLinkConvId) return;
+    if (loading || !deepLinkConvId) return;
     const conv = conversaciones.find((c) => c.id === deepLinkConvId);
-    if (conv) {
-      deepLinkHandled.current = true;
-      handleSelectConversacion(conv);
-    }
-  }, [deepLinkConvId, conversaciones, loading, handleSelectConversacion]);
+    if (!conv || activeConvRef.current?.id === deepLinkConvId) return;
+    selectConversacion(conv);
+  }, [deepLinkConvId, conversaciones, loading, selectConversacion]);
 
   const handleContactarAdministracion = useCallback(async () => {
     setLoading(true);
@@ -332,17 +400,22 @@ export default function ChatInbox({
       activeTab === "todos" ||
       (activeTab === "directos" && conv.tipo === "directo") ||
       (activeTab === "soporte" && conv.tipo === "soporte") ||
-      (activeTab === "marketplace" && conv.tipo === "marketplace");
+      (activeTab === "marketplace" && conv.tipo === "marketplace") ||
+      (activeTab === "partidos" && conv.tipo === "partido");
 
     const nombreParticipante =
       `${conv.otro_participante.nombre || ""} ${conv.otro_participante.apellido || ""}`.toLowerCase();
     const nombreProducto = (conv.producto?.nombre || "").toLowerCase();
+    const nombreClub = (conv.partido?.club_nombre || "").toLowerCase();
+    const nombreCancha = (conv.partido?.cancha_nombre || "").toLowerCase();
     const q = searchQuery.toLowerCase();
 
     const matchSearch =
       !searchQuery ||
       nombreParticipante.includes(q) ||
-      nombreProducto.includes(q);
+      nombreProducto.includes(q) ||
+      nombreClub.includes(q) ||
+      nombreCancha.includes(q);
 
     return matchTab && matchSearch;
   });
@@ -388,8 +461,106 @@ export default function ChatInbox({
     return roles[rol] || rol;
   };
 
+  const formatPartidoFecha = (fecha?: string | null) => {
+    if (!fecha) return "";
+    return new Date(`${fecha}T12:00:00`).toLocaleDateString("es-AR", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+    });
+  };
+
+  const getConversationTitle = (conv: ChatConversacion) => {
+    if (conv.tipo === "partido" && conv.partido) {
+      return conv.partido.club_nombre || "Grupo de reserva";
+    }
+    return getDisplayName(conv.otro_participante);
+  };
+
+  const getConversationSubtitle = (conv: ChatConversacion) => {
+    if (conv.tipo !== "partido" || !conv.partido) return null;
+    const parts = [
+      conv.partido.cancha_nombre,
+      formatPartidoFecha(conv.partido.fecha_reserva),
+      conv.partido.nivel_requerido,
+    ].filter(Boolean);
+    return parts.join(" · ");
+  };
+
+  const participantesActivos: ChatParticipanteInfo[] =
+    activeConv?.tipo === "partido" && activeConv.partido
+      ? mapPartidoParticipantes(activeConv.partido.participantes)
+      : [];
+
+  const miParticipante: ChatParticipanteInfo | null = profile?.id
+    ? buscarParticipante(participantesActivos, profile.id) || {
+        id: profile.id,
+        nombre: profile.nombre ?? null,
+        apellido: profile.apellido ?? null,
+        avatar_url: profile.avatar_url ?? null,
+      }
+    : null;
+
+  const resolverParticipanteMensaje = (
+    remitenteId: string,
+  ): ChatParticipanteInfo | null => {
+    if (!activeConv) return null;
+    if (activeConv.tipo === "partido") {
+      return (
+        buscarParticipante(participantesActivos, remitenteId) ||
+        miParticipante
+      );
+    }
+    if (remitenteId === profile?.id) return miParticipante;
+    return {
+      id: activeConv.otro_participante.id,
+      nombre: activeConv.otro_participante.nombre,
+      apellido: activeConv.otro_participante.apellido,
+      avatar_url: activeConv.otro_participante.avatar_url,
+    };
+  };
+
+  const handleMensajePrivado = useCallback(
+    async (userId: string) => {
+      if (!profile?.id || userId === profile.id) return;
+
+      try {
+        const conv = await ChatService.iniciarChat(userId);
+        const actualizadas = await ChatService.getConversaciones();
+        setConversaciones(actualizadas);
+
+        const directConv = actualizadas.find((c) => c.id === conv.id);
+        if (!directConv) {
+          sileo.error({
+            title: "Error",
+            description: "No se pudo abrir el chat privado.",
+          });
+          return;
+        }
+
+        setActiveTab("directos");
+        handleSelectConversacion(directConv);
+      } catch (err: unknown) {
+        const message = isAxiosError(err)
+          ? err.response?.data?.error || "No se pudo abrir el chat privado."
+          : "No se pudo abrir el chat privado.";
+        sileo.error({ title: "Error", description: message });
+      }
+    },
+    [profile?.id, handleSelectConversacion],
+  );
+
+  const handleTabChange = useCallback(
+    (tab: ChatInboxTab) => {
+      setActiveTab(tab);
+      router.replace(buildMensajesUrl(deepLinkConvId, tab), { scroll: false });
+    },
+    [deepLinkConvId, router],
+  );
+
   const tabs: { key: ChatInboxTab; label: string }[] = [
     { key: "todos", label: "Todos" },
+    { key: "partidos", label: "Reservas" },
     { key: "marketplace", label: "Ventas" },
     { key: "directos", label: "Directos" },
     { key: "soporte", label: "Soporte" },
@@ -401,27 +572,33 @@ export default function ChatInbox({
     null;
 
   return (
-    <div className={`h-[calc(100vh-0px)] flex flex-col ${className}`}>
-      <div className="px-6 lg:px-10 py-6 border-b border-brand-white/5">
-        <h1 className="text-2xl md:text-3xl font-black text-brand-white">
+    <div
+      className={`flex flex-col min-h-0 h-[calc(100dvh-4.5rem)] md:h-[calc(100dvh-5.5rem)] ${className}`}
+    >
+      <div
+        className={`px-4 md:px-6 lg:px-10 py-4 md:py-6 border-b border-brand-white/5 shrink-0 ${
+          showMobileChat ? "hidden md:block" : ""
+        }`}
+      >
+        <h1 className="text-xl md:text-2xl lg:text-3xl font-black text-brand-white">
           {title}
         </h1>
-        <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+        <p className="text-xs md:text-sm text-gray-500 mt-1">{subtitle}</p>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         <div
-          className={`w-full md:w-96 lg:w-[420px] border-r border-brand-white/5 flex flex-col shrink-0 bg-brand-black ${
+          className={`w-full md:w-96 lg:w-[420px] border-r border-brand-white/5 flex flex-col shrink-0 bg-brand-black min-h-0 ${
             showMobileChat ? "hidden md:flex" : "flex"
           }`}
         >
           <div className="px-4 pt-4 pb-2">
-            <div className="flex bg-brand-card p-1 rounded-xl border border-brand-white/5">
+            <div className="flex bg-brand-card p-1 rounded-xl border border-brand-white/5 overflow-x-auto">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex-1 py-2 px-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                  onClick={() => handleTabChange(tab.key)}
+                  className={`shrink-0 flex-1 min-w-[72px] py-2 px-2 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
                     activeTab === tab.key
                       ? "bg-brand-chartreuse text-brand-black shadow-sm"
                       : "text-gray-400 hover:text-brand-white"
@@ -503,7 +680,9 @@ export default function ChatInbox({
                   }`}
                 >
                   <div className="relative size-12 rounded-full bg-brand-card border border-brand-white/10 flex items-center justify-center shrink-0 overflow-hidden">
-                    {conv.otro_participante.avatar_url ? (
+                    {conv.tipo === "partido" ? (
+                      <Users className="size-5 text-brand-chartreuse" />
+                    ) : conv.otro_participante.avatar_url ? (
                       <Image
                         src={conv.otro_participante.avatar_url}
                         alt="Avatar"
@@ -523,12 +702,17 @@ export default function ChatInbox({
                         <ShoppingBag className="size-2.5 text-brand-black" />
                       </div>
                     )}
+                    {conv.tipo === "partido" && (
+                      <div className="absolute -bottom-0.5 -right-0.5 bg-brand-chartreuse rounded-full p-0.5">
+                        <Calendar className="size-2.5 text-brand-black" />
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-bold text-brand-white truncate">
-                        {getDisplayName(conv.otro_participante)}
+                        {getConversationTitle(conv)}
                       </span>
                       {conv.ultimo_mensaje && (
                         <span className="text-[10px] text-gray-500 shrink-0">
@@ -539,6 +723,11 @@ export default function ChatInbox({
                     {conv.producto && (
                       <p className="text-[11px] text-brand-chartreuse/80 truncate mt-0.5">
                         {conv.producto.nombre}
+                      </p>
+                    )}
+                    {conv.tipo === "partido" && getConversationSubtitle(conv) && (
+                      <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                        {getConversationSubtitle(conv)}
                       </p>
                     )}
                     <div className="flex items-center justify-between gap-2 mt-0.5">
@@ -565,6 +754,14 @@ export default function ChatInbox({
                         Marketplace
                       </span>
                     )}
+                    {conv.tipo === "partido" && (
+                      <span className="inline-block mt-1 text-[9px] font-bold uppercase tracking-wider text-brand-chartreuse bg-brand-chartreuse/10 px-2 py-0.5 rounded-md border border-brand-chartreuse/20">
+                        Grupo de reserva
+                        {conv.partido?.participantes.length
+                          ? ` · ${conv.partido.participantes.length}`
+                          : ""}
+                      </span>
+                    )}
                   </div>
                 </button>
               ))
@@ -573,26 +770,33 @@ export default function ChatInbox({
         </div>
 
         <div
-          className={`flex-1 flex flex-col bg-brand-black ${
+          className={`flex-1 flex flex-col bg-brand-black min-h-0 ${
             !showMobileChat ? "hidden md:flex" : "flex"
           }`}
         >
           {activeConv ? (
             <>
-              <div className="px-4 lg:px-6 py-4 border-b border-brand-white/5 flex items-center gap-3 bg-brand-card/50">
+              <div className="shrink-0 px-3 md:px-4 lg:px-6 py-3 md:py-4 border-b border-brand-white/5 bg-brand-card/50">
+                <div className="flex items-start gap-2 md:gap-3">
                 <button
                   onClick={() => {
                     setShowMobileChat(false);
                     if (activeConv) leaveConversation(activeConv.id);
+                    activeConvRef.current = null;
                     setActiveConv(null);
+                    router.replace(buildMensajesUrl(null, activeTab), {
+                      scroll: false,
+                    });
                   }}
-                  className="md:hidden p-2 rounded-xl bg-brand-white/5 hover:bg-brand-white/10 transition-colors cursor-pointer"
+                  className="md:hidden p-1.5 rounded-xl bg-brand-white/5 hover:bg-brand-white/10 transition-colors cursor-pointer shrink-0 mt-0.5"
                 >
                   <ArrowLeft className="size-4 text-gray-400" />
                 </button>
 
-                <div className="relative size-10 rounded-full bg-brand-card border border-brand-white/10 flex items-center justify-center overflow-hidden">
-                  {activeConv.otro_participante.avatar_url ? (
+                <div className="relative size-9 md:size-10 rounded-full bg-brand-card border border-brand-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                  {activeConv.tipo === "partido" ? (
+                    <Users className="size-4 text-brand-chartreuse" />
+                  ) : activeConv.otro_participante.avatar_url ? (
                     <Image
                       src={activeConv.otro_participante.avatar_url}
                       alt="Avatar"
@@ -606,27 +810,75 @@ export default function ChatInbox({
 
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-bold text-brand-white truncate">
-                    {getDisplayName(activeConv.otro_participante)}
+                    {getConversationTitle(activeConv)}
                   </h3>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase text-gray-500 bg-brand-white/5 px-2 py-0.5 rounded">
-                      {getRolBadge(activeConv.otro_participante.rol)}
-                    </span>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                    {activeConv.tipo === "partido" ? (
+                      <span className="text-[9px] md:text-[10px] font-bold uppercase text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 md:px-2 py-0.5 rounded border border-brand-chartreuse/20">
+                        Grupo de reserva
+                      </span>
+                    ) : (
+                      <span className="text-[9px] md:text-[10px] font-bold uppercase text-gray-500 bg-brand-white/5 px-1.5 md:px-2 py-0.5 rounded">
+                        {getRolBadge(activeConv.otro_participante.rol)}
+                      </span>
+                    )}
+                    {activeConv.tipo === "partido" &&
+                      getConversationSubtitle(activeConv) && (
+                        <span className="hidden sm:inline text-[10px] text-gray-500 truncate">
+                          {getConversationSubtitle(activeConv)}
+                        </span>
+                      )}
                     {typingUsers.size > 0 && (
-                      <span className="text-[11px] text-brand-chartreuse font-medium animate-pulse">
+                      <span className="text-[10px] md:text-[11px] text-brand-chartreuse font-medium animate-pulse">
                         Escribiendo...
                       </span>
                     )}
                   </div>
+                  {activeConv.tipo === "partido" &&
+                    getConversationSubtitle(activeConv) && (
+                      <p className="sm:hidden text-[10px] text-gray-500 truncate mt-1">
+                        {getConversationSubtitle(activeConv)}
+                      </p>
+                    )}
                 </div>
+
+                {activeConv.tipo === "partido" &&
+                  participantesActivos.length > 0 && (
+                    <div className="hidden md:block shrink-0 max-w-[min(100%,280px)]">
+                      <ChatParticipantesBar
+                        participantes={participantesActivos}
+                        usuarioActualId={profile?.id}
+                        onMensajePrivado={(userId) => {
+                          void handleMensajePrivado(userId);
+                        }}
+                        compact
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {activeConv.tipo === "partido" &&
+                  participantesActivos.length > 0 && (
+                    <div className="md:hidden mt-2.5 pt-2.5 border-t border-brand-white/5 -mx-1 px-1">
+                      <ChatParticipantesBar
+                        participantes={participantesActivos}
+                        usuarioActualId={profile?.id}
+                        onMensajePrivado={(userId) => {
+                          void handleMensajePrivado(userId);
+                        }}
+                        compact
+                        mobile
+                      />
+                    </div>
+                  )}
               </div>
 
               {activeConv.tipo === "marketplace" && activeConv.producto && (
                 <Link
                   href={`/marketplace/producto/${activeConv.producto.id}`}
-                  className="mx-4 lg:mx-6 mt-3 flex items-center gap-3 rounded-2xl border border-brand-white/10 bg-brand-card/80 p-3 hover:border-brand-chartreuse/40 transition-colors"
+                  className="shrink-0 mx-3 md:mx-4 lg:mx-6 mt-2 md:mt-3 flex items-center gap-2.5 md:gap-3 rounded-xl md:rounded-2xl border border-brand-white/10 bg-brand-card/80 p-2.5 md:p-3 hover:border-brand-chartreuse/40 transition-colors"
                 >
-                  <div className="relative size-14 rounded-xl overflow-hidden bg-brand-black/40 border border-brand-white/10 shrink-0">
+                  <div className="relative size-11 md:size-14 rounded-lg md:rounded-xl overflow-hidden bg-brand-black/40 border border-brand-white/10 shrink-0">
                     {productoImagen ? (
                       <Image
                         src={productoImagen}
@@ -652,10 +904,43 @@ export default function ChatInbox({
                 </Link>
               )}
 
+              {activeConv.tipo === "partido" && activeConv.partido && (
+                <Link
+                  href={`/partidos/${activeConv.partido.id}`}
+                  className="shrink-0 mx-3 md:mx-4 lg:mx-6 mt-2 md:mt-3 flex items-center gap-2.5 md:gap-3 rounded-xl md:rounded-2xl border border-brand-white/10 bg-brand-card/80 p-2.5 md:p-3 hover:border-brand-chartreuse/40 transition-colors"
+                >
+                  <div className="size-11 md:size-14 rounded-lg md:rounded-xl bg-brand-chartreuse/10 border border-brand-chartreuse/20 flex items-center justify-center shrink-0">
+                    <Calendar className="size-5 md:size-6 text-brand-chartreuse" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs md:text-sm font-bold text-brand-white truncate">
+                      {activeConv.partido.club_nombre || "Convocatoria"}
+                    </p>
+                    <p className="text-[11px] md:text-xs text-gray-400 mt-0.5 truncate">
+                      {[
+                        activeConv.partido.cancha_nombre,
+                        formatPartidoFecha(activeConv.partido.fecha_reserva),
+                        activeConv.partido.hora_inicio?.slice(0, 5),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                    <p className="text-[10px] md:text-[11px] text-brand-chartreuse font-bold mt-0.5 md:mt-1">
+                      {activeConv.partido.participantes.length} jugador
+                      {activeConv.partido.participantes.length === 1
+                        ? ""
+                        : "es"}{" "}
+                      · Ver convocatoria
+                    </p>
+                  </div>
+                  <ExternalLink className="size-3.5 md:size-4 text-gray-500 shrink-0" />
+                </Link>
+              )}
+
               <div
                 ref={messagesContainerRef}
                 onScroll={handleScroll}
-                className="flex-1 overflow-y-auto px-4 lg:px-6 py-4 space-y-3"
+                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-contain px-3 md:px-4 lg:px-6 py-3 md:py-4 space-y-3"
               >
                 {loadingMensajes && (
                   <div className="flex justify-center py-4">
@@ -678,41 +963,20 @@ export default function ChatInbox({
 
                 {mensajes.map((msg) => {
                   const esMio = msg.remitente_id === profile?.id;
+                  const esGrupo = activeConv.tipo === "partido";
                   return (
-                    <div
+                    <ChatMessageBubble
                       key={msg.id}
-                      className={`flex ${esMio ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`max-w-[75%] lg:max-w-[60%] rounded-2xl px-4 py-2.5 ${
-                          esMio
-                            ? "bg-brand-chartreuse text-brand-black rounded-br-md"
-                            : "bg-brand-card border border-brand-white/5 text-brand-white rounded-bl-md"
-                        }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap wrap-break-word leading-relaxed">
-                          {msg.contenido}
-                        </p>
-                        <div
-                          className={`flex items-center gap-1 mt-1 ${esMio ? "justify-end" : "justify-start"}`}
-                        >
-                          <span
-                            className={`text-[10px] ${esMio ? "text-brand-black/50" : "text-gray-500"}`}
-                          >
-                            {formatMessageTime(msg.created_at)}
-                          </span>
-                          {esMio && (
-                            <span className="text-brand-black/50">
-                              {msg.leido ? (
-                                <CheckCheck className="size-3" />
-                              ) : (
-                                <Check className="size-3" />
-                              )}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                      mensaje={msg}
+                      esMio={esMio}
+                      participante={resolverParticipanteMensaje(msg.remitente_id)}
+                      esGrupo={esGrupo}
+                      onMensajePrivado={(userId) => {
+                        void handleMensajePrivado(userId);
+                      }}
+                      formatTime={formatMessageTime}
+                      showReadReceipt
+                    />
                   );
                 })}
 
@@ -731,8 +995,8 @@ export default function ChatInbox({
                 <div ref={messagesEndRef} />
               </div>
 
-              <div className="px-4 lg:px-6 py-4 border-t border-brand-white/5 bg-brand-card/30">
-                <div className="flex items-end gap-3">
+              <div className="shrink-0 px-3 md:px-4 lg:px-6 py-3 md:py-4 border-t border-brand-white/5 bg-brand-card/30 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                <div className="flex items-end gap-2 md:gap-3">
                   <textarea
                     ref={inputRef}
                     value={inputMsg}
@@ -740,18 +1004,18 @@ export default function ChatInbox({
                     onKeyDown={handleKeyDown}
                     placeholder="Escribe un mensaje..."
                     rows={1}
-                    className="flex-1 resize-none bg-brand-card border border-brand-white/5 rounded-2xl px-4 py-3 text-sm text-brand-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors max-h-32"
-                    style={{ minHeight: "44px" }}
+                    className="flex-1 min-w-0 resize-none bg-brand-card border border-brand-white/5 rounded-2xl px-3 md:px-4 py-2.5 md:py-3 text-sm text-brand-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors max-h-28 md:max-h-32"
+                    style={{ minHeight: "42px" }}
                   />
                   <button
                     onClick={handleSend}
                     disabled={!inputMsg.trim()}
-                    className="shrink-0 size-11 rounded-xl bg-brand-chartreuse text-brand-black flex items-center justify-center hover:opacity-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-[0_0_10px_rgba(203,254,1,0.2)]"
+                    className="shrink-0 size-10 md:size-11 rounded-xl bg-brand-chartreuse text-brand-black flex items-center justify-center hover:opacity-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-[0_0_10px_rgba(203,254,1,0.2)]"
                   >
-                    <Send className="size-5" />
+                    <Send className="size-4 md:size-5" />
                   </button>
                 </div>
-                <p className="text-[10px] text-gray-600 mt-2 pl-1">
+                <p className="hidden md:block text-[10px] text-gray-600 mt-2 pl-1">
                   Enter para enviar · Shift+Enter para nueva línea
                 </p>
               </div>

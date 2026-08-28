@@ -9,7 +9,7 @@ export default function PublicLayout({
   return (
     <div className="min-h-screen bg-brand-black text-brand-white font-sans selection:bg-brand-chartreuse selection:text-brand-black flex flex-col">
       <Navbar />
-      <div className="flex-1">{children}</div>
+      <div className="flex-1 min-h-0">{children}</div>
       <SoporteChat />
     </div>
   );

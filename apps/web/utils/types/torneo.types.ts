@@ -30,7 +30,10 @@ export interface Torneo {
   premio_3?: string | null;
   lugar?: string | null;
   alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | null;
+  reglamento?: 'FAP' | 'APA' | 'Amateur' | null;
   asociacion?: 'FAP' | 'APA' | 'Amateur' | null;
+  asociacion_id?: string | null;
+  federacion_id?: string | null;
   canchas_disponibles?: number | null;
   duracion_partido_minutos?: number | null;
   hora_inicio_jornada?: string | null;
@@ -63,6 +66,18 @@ export interface Inscripcion {
   torneo_nombre?: string;
   cancha_nombre?: string;
   categoria?: string;
+  perfiles?: {
+    lugar_residencia?: string | null;
+    avatar_url?: string | null;
+    pendiente_activacion?: boolean | null;
+    clubes?: { nombre?: string } | null;
+  } | null;
+  perfiles_jugador2?: {
+    lugar_residencia?: string | null;
+    avatar_url?: string | null;
+    pendiente_activacion?: boolean | null;
+    clubes?: { nombre?: string } | null;
+  } | null;
 }
 
 export interface Partido {

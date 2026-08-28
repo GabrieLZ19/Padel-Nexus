@@ -53,9 +53,8 @@ export const Paso6Fiscales = ({
   const [todosLosFiscales, setTodosLosFiscales] = useState<Fiscal[]>([]);
 
   const colegioEntidadId =
-    (torneo as { federacion_id?: string | null; asociacion_id?: string | null })
-      .federacion_id ||
     (torneo as { asociacion_id?: string | null }).asociacion_id ||
+    (torneo as { federacion_id?: string | null }).federacion_id ||
     null;
 
   useEffect(() => {

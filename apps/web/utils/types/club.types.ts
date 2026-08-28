@@ -15,7 +15,7 @@ export interface Club {
 }
 
 export interface ClubCercano extends Club {
-  distancia_km: number;
+  distancia_km?: number | null;
 }
 
 export interface Cancha {

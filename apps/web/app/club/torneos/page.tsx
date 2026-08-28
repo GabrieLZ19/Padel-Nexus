@@ -11,6 +11,7 @@ import {
   Building2,
   Calendar,
   Copy,
+  LayoutDashboard,
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { ClubPanelService } from "@/utils/services/club-panel";
@@ -47,7 +48,7 @@ export default function ClubTorneosPage() {
     categoria: "Libres",
     estado: "Borrador",
     cupos_maximos: 16,
-    modalidad: "Duplas",
+    modalidad: "Parejas",
     formato: "Eliminatoria Directa",
     precio_inscripcion: 0,
     alcance: "Provincial",
@@ -127,7 +128,7 @@ export default function ClubTorneosPage() {
       categoria: "Libres",
       estado: "Borrador",
       cupos_maximos: 16,
-      modalidad: "Duplas",
+      modalidad: "Parejas",
       formato: "Eliminatoria Directa",
       precio_inscripcion: 0,
       alcance: "Provincial",
@@ -153,7 +154,7 @@ export default function ClubTorneosPage() {
       categoria: t.categoria || "Libres",
       estado: t.estado || "Borrador",
       cupos_maximos: t.cupos_maximos || 16,
-      modalidad: t.modalidad || "Duplas",
+      modalidad: t.modalidad || "Parejas",
       formato: t.formato || "Eliminatoria Directa",
       precio_inscripcion: t.precio_inscripcion || 0,
       alcance: t.alcance || "Provincial",
@@ -385,6 +386,13 @@ export default function ClubTorneosPage() {
                     </td>
                     <td className="py-4 px-6 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => router.push(`/club/torneos/${t.id}`)}
+                          className="p-2 rounded-xl bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-transparent hover:border-brand-chartreuse/30 transition-colors cursor-pointer"
+                          title="Gestionar torneo"
+                        >
+                          <LayoutDashboard className="size-4" />
+                        </button>
                         <button
                           onClick={() => setReplicarTorneo(t)}
                           className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-brand-chartreuse transition-colors cursor-pointer"

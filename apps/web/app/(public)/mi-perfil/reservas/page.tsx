@@ -21,7 +21,9 @@ import {
 import { isAxiosError } from "axios";
 import { ReservasService } from "@/utils/services/reservas";
 import { PartidosService } from "@/utils/services/partidos";
-import { NIVELES_PARTIDO } from "@/utils/types";
+import { PARTIDOS_ABIERTOS } from "@/utils/constants/partidosAbiertos";
+import { NIVELES_PARTIDO_ABIERTO } from "@/utils/constants/padelConfig";
+import { NIVEL_PARTIDO_DEFAULT } from "@/utils/types";
 import { sileo } from "sileo";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 
@@ -70,7 +72,7 @@ export default function MisReservasPage() {
   >({});
 
   const [modalReserva, setModalReserva] = useState<ReservaUsuario | null>(null);
-  const [nivel, setNivel] = useState<string>(NIVELES_PARTIDO[1]);
+  const [nivel, setNivel] = useState<string>(NIVEL_PARTIDO_DEFAULT);
   const [cupos, setCupos] = useState(1);
   const [notas, setNotas] = useState("");
   const [publicando, setPublicando] = useState(false);
@@ -152,7 +154,7 @@ export default function MisReservasPage() {
 
   const openModal = (reserva: ReservaUsuario) => {
     setModalReserva(reserva);
-    setNivel(NIVELES_PARTIDO[1]);
+    setNivel(NIVEL_PARTIDO_DEFAULT);
     setCupos(1);
     setNotas("");
   };
@@ -176,7 +178,7 @@ export default function MisReservasPage() {
         ...prev,
         [modalReserva.id]: { id: partido.id, estado: partido.estado },
       }));
-      router.push("/partidos");
+      router.push(`/partidos/${partido.id}`);
     } catch (err: unknown) {
       const message = isAxiosError(err)
         ? err.response?.data?.error || "No se pudo publicar el partido."
@@ -200,8 +202,8 @@ export default function MisReservasPage() {
           Mis Reservas
         </h1>
         <p className="text-gray-400 mt-1.5 text-sm">
-          Consultá el estado de tus turnos reservados y publicá “Busco 4to”
-          desde una reserva confirmada.
+          Consultá el estado de tus turnos reservados y publicá &quot;
+          {PARTIDOS_ABIERTOS.titulo}&quot; desde una reserva confirmada.
         </p>
       </header>
 
@@ -404,17 +406,17 @@ export default function MisReservasPage() {
                       className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-brand-chartreuse/40 text-brand-chartreuse text-sm font-bold hover:bg-brand-chartreuse/10 transition-colors cursor-pointer"
                     >
                       <UserPlus className="w-4 h-4" />
-                      Busco 4to
+                      {PARTIDOS_ABIERTOS.titulo}
                     </button>
                   )}
 
                   {partidoExistente && (
                     <Link
-                      href="/partidos"
+                      href={`/partidos/${partidoExistente.id}`}
                       className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl bg-brand-white/5 border border-brand-white/10 text-gray-300 text-xs font-bold hover:text-brand-white transition-colors"
                     >
-                      Partido publicado ({partidoExistente.estado}) — Ver
-                      listado
+                      Convocatoria publicada ({partidoExistente.estado}) — Ver
+                      detalle
                     </Link>
                   )}
                 </div>
@@ -435,7 +437,9 @@ export default function MisReservasPage() {
           <div className="relative w-full max-w-md bg-brand-card border border-brand-white/10 rounded-3xl p-6 space-y-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-black text-white">Busco 4to</h2>
+                <h2 className="text-lg font-black text-white">
+                  {PARTIDOS_ABIERTOS.titulo}
+                </h2>
                 <p className="text-xs text-gray-400 mt-1">
                   Publicá tu reserva para completar el partido.
                 </p>
@@ -467,7 +471,10 @@ export default function MisReservasPage() {
                 value={nivel}
                 onChange={setNivel}
                 placeholder="Selecciona nivel"
-                options={NIVELES_PARTIDO.map((n) => ({ value: n, label: n }))}
+                options={NIVELES_PARTIDO_ABIERTO.map((n) => ({
+                  value: n.value,
+                  label: n.label,
+                }))}
               />
 
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">

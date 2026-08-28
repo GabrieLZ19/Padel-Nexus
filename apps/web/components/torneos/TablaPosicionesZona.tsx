@@ -254,7 +254,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="border-b border-white/10 text-[10px] font-black text-gray-500 uppercase tracking-wider">
-              <th className="py-2.5 px-3">Participantes / Dupla</th>
+              <th className="py-2.5 px-3">Participantes / Pareja</th>
               <th className="py-2.5 px-2 text-center text-brand-chartreuse font-black">
                 Pts
               </th>

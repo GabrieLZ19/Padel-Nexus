@@ -18,6 +18,12 @@ import {
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo } from "@/utils/types";
 import { useProfileStore } from "@/store/useProfileStore";
+import {
+  esModalidadIndividual,
+  esModalidadParejas,
+  labelModalidad,
+  MODALIDAD_PAREJAS,
+} from "@/utils/formatFecha";
 
 // ─── Componente de sección acordeón ───────────────────────────────────────────
 function FilterSection({
@@ -204,7 +210,10 @@ function TorneosContent() {
       !activeStatus ||
       (t.estado || "").toLowerCase() === activeStatus.toLowerCase();
     const matchesModalidad =
-      !activeModalidad || t.modalidad === activeModalidad;
+      !activeModalidad ||
+      (activeModalidad === MODALIDAD_PAREJAS
+        ? esModalidadParejas(t.modalidad)
+        : esModalidadIndividual(t.modalidad));
     const matchesGenero = !activeGenero || t.categoria === activeGenero;
     const matchesAlcance = !activeAlcance || t.alcance === activeAlcance;
     const matchesOrganizador =
@@ -396,7 +405,7 @@ function TorneosContent() {
               activeCount={activeModalidad ? 1 : 0}
             >
               <div className="flex flex-wrap gap-1.5 mt-1">
-                {["Duplas", "Individual"].map((mod) => (
+                {[MODALIDAD_PAREJAS, "Individual"].map((mod) => (
                   <button
                     key={mod}
                     onClick={() =>
@@ -667,7 +676,7 @@ function TorneosContent() {
                             {t.nivel || "5ª"} {t.categoria || "Caballeros"}
                           </div>
                           <div className="bg-brand-white/10 text-brand-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                            {t.modalidad || "Duplas"}
+                            {labelModalidad(t.modalidad)}
                           </div>
                         </div>
 

@@ -135,7 +135,7 @@ export default function DashboardProvincial() {
       iconColor: "text-emerald-400",
     },
     {
-      title: "Duplas Inscritas",
+      title: "Parejas Inscritas",
       value: inscripcionesConfirmadas.length.toString(),
       change: "Confirmadas",
       icon: Shield,
@@ -328,7 +328,7 @@ export default function DashboardProvincial() {
                   <tr className="border-b border-white/5 text-gray-500 text-[10px] font-bold uppercase tracking-widest">
                     <th className="py-3 px-4">Competencia</th>
                     <th className="py-3 px-4">Sede</th>
-                    <th className="py-3 px-4 text-center">Duplas</th>
+                    <th className="py-3 px-4 text-center">Parejas</th>
                     <th className="py-3 px-4">Estado</th>
                   </tr>
                 </thead>

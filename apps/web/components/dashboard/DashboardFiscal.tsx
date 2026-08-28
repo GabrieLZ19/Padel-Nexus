@@ -20,7 +20,7 @@ import {
   type FiscalTorneo,
 } from "@/utils/services/fiscal-panel";
 import { FAP_ESTADOS_TORNEO } from "@/utils/constants/fap";
-import { formatFechaCalendario } from "@/utils/formatFecha";
+import { formatFechaCalendario, labelModalidad } from "@/utils/formatFecha";
 
 export default function DashboardFiscal() {
   const router = useRouter();
@@ -160,7 +160,7 @@ export default function DashboardFiscal() {
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Users className="size-3.5" />
-                    {t.modalidad || "Duplas"}
+                    {labelModalidad(t.modalidad)}
                   </span>
                 </div>
               </motion.button>

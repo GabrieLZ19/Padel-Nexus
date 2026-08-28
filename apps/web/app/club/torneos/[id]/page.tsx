@@ -18,6 +18,7 @@ import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
 import { Paso7Sedes } from "@/components/torneos/wizard/Paso5Sedes";
 import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
 import { TournamentWizardNav } from "@/components/torneos/TournamentWizardNav";
+import { labelModalidad } from "@/utils/formatFecha";
 
 const WIZARD_STEPS = [
   { id: "edit", label: "1. Datos", desc: "Información" },
@@ -124,15 +125,15 @@ export default function ClubTorneoDetallePage() {
           </div>
           <p className="text-gray-400 mt-1 text-xs sm:text-sm font-medium">
             {(torneo as any).rama ? `${(torneo as any).rama} · ` : ""}
-            {torneo.nivel} · {torneo.categoria} · {torneo.modalidad}
+            {torneo.nivel} · {torneo.categoria} · {labelModalidad(torneo.modalidad)}
           </p>
         </div>
       </div>
 
-      {/* GRID DE LAYOUT NATIVO DE NAVEGACIÓN Y CONTENIDO */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-        {/* NAVEGADOR DE PASOS LATERAL / MOBILE */}
-        <div className="lg:col-span-1 lg:sticky lg:top-6 self-start z-30">
+      {/* GRID: contenido a la izquierda, navegación a la derecha */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6 items-start">
+        {/* Navegador de pasos — derecha en desktop */}
+        <div className="lg:col-span-1 order-1 lg:order-2 lg:sticky lg:top-6 self-start z-30 min-w-0">
           <TournamentWizardNav
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -140,11 +141,13 @@ export default function ClubTorneoDetallePage() {
           />
         </div>
 
-        {/* CONTENIDO DINÁMICO DEL PASO ACTIVO */}
-        <div className="lg:col-span-3">
+        {/* Contenido del paso activo — izquierda en desktop */}
+        <div className="lg:col-span-3 order-2 lg:order-1 min-w-0 overflow-x-hidden">
           {activeTab === "edit" && <Paso1Datos {...commonProps} />}
           {activeTab === "logos" && <Paso2Logos {...commonProps} />}
-          {activeTab === "categories" && <Paso3Categorias {...commonProps} />}
+          {activeTab === "categories" && (
+            <Paso3Categorias {...commonProps} modoClub />
+          )}
           {activeTab === "players" && (
             <Paso4Jugadores {...commonProps} inscripciones={inscripciones} />
           )}

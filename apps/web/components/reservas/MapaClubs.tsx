@@ -4,6 +4,10 @@ import { useEffect, useRef } from "react";
 import type { ClubCercano } from "@/utils/types/club.types";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import {
+  leafletTileUrl,
+  LEAFLET_TILE_ATTRIBUTION,
+} from "@/utils/leafletTiles";
 
 interface MapaClubsProps {
   clubes: ClubCercano[];
@@ -32,14 +36,10 @@ export default function MapaClubs({
       zoomControl: true,
     });
 
-    // Determinar si el tema es claro
     const isLightMode = document.documentElement.classList.contains("light");
-    const tileUrl = isLightMode
-      ? "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-      : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
-    L.tileLayer(tileUrl, {
-      attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ",
+    L.tileLayer(leafletTileUrl(isLightMode), {
+      attribution: LEAFLET_TILE_ATTRIBUTION,
       maxZoom: 16,
     }).addTo(map);
 
@@ -53,13 +53,9 @@ export default function MapaClubs({
           map.removeLayer(layer);
         }
       });
-      const newUrl = isLightNow
-        ? "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-        : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+      const newUrl = leafletTileUrl(isLightNow);
       L.tileLayer(newUrl, {
-        attribution: isLightNow
-          ? "Tiles &copy; Esri"
-          : "&copy; OpenStreetMap &copy; CARTO",
+        attribution: LEAFLET_TILE_ATTRIBUTION,
         maxZoom: 16,
       }).addTo(map);
     });

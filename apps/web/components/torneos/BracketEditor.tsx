@@ -90,7 +90,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     },
     {
       title: "5. Generar Cuadro Eliminatorio (Llaves)",
-      description: `Una vez disputados todos los partidos grupales y clasificadas las mejores duplas, ve a la pestaña "Llave campeonato" para dar de alta los Playoffs de eliminatoria directa.`,
+      description: `Una vez disputados todos los partidos grupales y clasificadas las mejores parejas, ve a la pestaña "Llave campeonato" para dar de alta los Playoffs de eliminatoria directa.`,
     },
   ];
 

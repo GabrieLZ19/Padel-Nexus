@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useProfileStore } from "@/store/useProfileStore";
+import { PARTIDOS_ABIERTOS } from "@/utils/constants/partidosAbiertos";
 import { useCartStore } from "@/store/useCartStore";
 import { ChatService } from "@/utils/services/chat";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
@@ -130,7 +131,7 @@ export default function Navbar() {
     { name: "Torneos", path: "/torneos" },
     { name: "Ranking", path: "/ranking" },
     { name: "Reservar", path: "/reservar" },
-    { name: "Partidos", path: "/partidos" },
+    { name: PARTIDOS_ABIERTOS.titulo, path: "/partidos" },
     { name: "Marketplace", path: "/marketplace" },
     { name: "Clubes", path: "/clubes" },
   ];

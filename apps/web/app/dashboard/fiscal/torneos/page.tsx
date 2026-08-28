@@ -15,7 +15,7 @@ import {
   nombreSedeFiscal,
   type FiscalTorneo,
 } from "@/utils/services/fiscal-panel";
-import { formatFechaCalendario } from "@/utils/formatFecha";
+import { formatFechaCalendario, labelModalidad } from "@/utils/formatFecha";
 
 const FILTROS_ALCANCE = ["Todos", "Nacional", "Provincial", "Regional", "Local"] as const;
 
@@ -152,7 +152,7 @@ export default function FiscalTorneosPage() {
                     <td className="px-5 py-4">
                       <span className="inline-flex items-center gap-1.5">
                         <Users className="size-3.5 text-gray-500" />
-                        {t.modalidad || "Duplas"}
+                        {labelModalidad(t.modalidad)}
                       </span>
                     </td>
                     <td className="px-5 py-4">{t.estado}</td>

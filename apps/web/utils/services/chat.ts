@@ -51,7 +51,7 @@ export class ChatService {
   }
 
   static async getNoLeidos(
-    tipo?: "directo" | "soporte" | "marketplace",
+    tipo?: "directo" | "soporte" | "marketplace" | "partido",
   ): Promise<number> {
     const { data } = await api.get("/mensajes/no-leidos", {
       params: tipo ? { tipo } : undefined,

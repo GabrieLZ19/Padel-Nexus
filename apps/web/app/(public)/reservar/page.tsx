@@ -38,7 +38,6 @@ export default function ReservarPage() {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [requiresAuth, setRequiresAuth] = useState(false);
   const [search, setSearch] = useState("");
-  const [radio, setRadio] = useState<number>(30); // Radio de búsqueda en Km
   const [userLocation, setUserLocation] = useState<{
     lat: number;
     lng: number;
@@ -106,12 +105,14 @@ export default function ReservarPage() {
 
     setLoading(true);
     try {
-      const params: Record<string, string | number> = {};
+      const params: Record<string, string | number> = {
+        page: 1,
+        limit: 200,
+      };
 
       if (userLocation) {
         params.lat = userLocation.lat;
         params.lng = userLocation.lng;
-        params.radio = radio;
       }
 
       if (search.trim()) {
@@ -129,7 +130,7 @@ export default function ReservarPage() {
     } finally {
       setLoading(false);
     }
-  }, [sessionChecked, profile?.id, userLocation, radio, search]);
+  }, [sessionChecked, profile?.id, userLocation, search]);
 
   useEffect(() => {
     fetchClubes();
@@ -236,36 +237,22 @@ export default function ReservarPage() {
           {/* ── Filtros expandibles ─────────────────────────── */}
           {showFilters && (
             <div className="mt-4 p-5 bg-brand-card border border-white/10 rounded-xl space-y-4 animate-in slide-in-from-top-2">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm text-gray-400">
-                    Radio de búsqueda
-                  </label>
-                  <span className="text-sm font-medium text-brand-chartreuse">
-                    {radio} km
-                  </span>
+              {userLocation ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-green-400">
+                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                    Ubicación activa: {userLocation.lat.toFixed(4)},{" "}
+                    {userLocation.lng.toFixed(4)}
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Mostramos todos los clubes ordenados del más cercano al más
+                    lejano según tu ubicación.
+                  </p>
                 </div>
-                <input
-                  type="range"
-                  min={5}
-                  max={200}
-                  step={5}
-                  value={radio}
-                  onChange={(e) => setRadio(Number(e.target.value))}
-                  className="w-full h-2 rounded-full appearance-none bg-white/10 accent-brand-chartreuse cursor-pointer"
-                />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>5 km</span>
-                  <span>200 km</span>
-                </div>
-              </div>
-
-              {userLocation && (
-                <div className="flex items-center gap-2 text-xs text-green-400">
-                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                  Ubicación activa: {userLocation.lat.toFixed(4)},{" "}
-                  {userLocation.lng.toFixed(4)}
-                </div>
+              ) : (
+                <p className="text-xs text-gray-400">
+                  Activá tu ubicación para ordenar los clubes por cercanía.
+                </p>
               )}
               {geoError && (
                 <p className="text-xs text-yellow-400">{geoError}</p>
@@ -275,7 +262,11 @@ export default function ReservarPage() {
         </div>
 
         {/* ── Mapa ───────────────────────────────────────────── */}
-        {!requiresAuth && userLocation && clubes.length > 0 && (
+        {!requiresAuth &&
+          userLocation &&
+          clubes.some(
+            (club) => club.latitud != null && club.longitud != null,
+          ) && (
           <div className="mb-10">
             <MapaClubs clubes={clubes} userLocation={userLocation} />
           </div>
@@ -317,13 +308,18 @@ export default function ReservarPage() {
           </div>
         ) : (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1">
             <h2 className="text-xl font-semibold">
-              {userLocation ? "Clubes cercanos" : "Todos los clubes"}
+              Todos los clubes
               <span className="ml-2 text-sm text-gray-500">
                 ({clubes.length})
               </span>
             </h2>
+            {userLocation && (
+              <p className="text-xs text-gray-500">
+                Ordenados por cercanía a tu ubicación
+              </p>
+            )}
           </div>
 
           {loading ? (
@@ -342,7 +338,8 @@ export default function ReservarPage() {
                 No se encontraron clubes
               </h3>
               <p className="text-gray-500">
-                Probá ampliar el radio de búsqueda o usar un término diferente.
+                Probá con otro término de búsqueda o activá tu ubicación para
+                ver el orden por cercanía.
               </p>
             </div>
           ) : (

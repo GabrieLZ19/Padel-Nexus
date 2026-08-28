@@ -19,6 +19,10 @@ import { ClubesService } from "@/utils/services/clubes";
 import { ReservasService } from "@/utils/services/reservas";
 import { useProfileStore } from "@/store/useProfileStore";
 import type { SlotDisponible } from "@/utils/types/club.types";
+import {
+  esHorarioReservaPasado,
+  fechaHoyArgentina,
+} from "@/utils/fechaArgentina";
 
 interface ClubDetalle {
   id: string;
@@ -105,12 +109,12 @@ export default function ClubHorariosPage() {
 
   // Navegar entre días
   const changeDate = (direction: number) => {
-    const date = new Date(selectedDate + "T12:00:00Z");
-    date.setUTCDate(date.getUTCDate() + direction);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (date >= today) {
-      setSelectedDate(date.toISOString().split("T")[0]);
+    const [year, month, day] = selectedDate.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+    date.setDate(date.getDate() + direction);
+    const next = getLocalIsoDate(date);
+    if (next >= fechaHoyArgentina()) {
+      setSelectedDate(next);
     }
   };
 
@@ -274,8 +278,7 @@ export default function ClubHorariosPage() {
             <div className="flex items-center gap-2 min-w-max">
               {getNextDays().map((dateStr) => {
                 const isActive = selectedDate === dateStr;
-                const isToday =
-                  new Date().toISOString().split("T")[0] === dateStr;
+                const isToday = fechaHoyArgentina() === dateStr;
                 return (
                   <button
                     key={dateStr}
@@ -302,7 +305,7 @@ export default function ClubHorariosPage() {
             <button
               onClick={() => changeDate(-1)}
               className="p-1.5 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors disabled:opacity-30 cursor-pointer"
-              disabled={selectedDate <= new Date().toISOString().split("T")[0]}
+              disabled={selectedDate <= fechaHoyArgentina()}
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -316,7 +319,7 @@ export default function ClubHorariosPage() {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                min={new Date().toISOString().split("T")[0]}
+                min={fechaHoyArgentina()}
                 className="absolute inset-0 opacity-0 pointer-events-none w-0 h-10"
               />
               <button className="flex items-center gap-2 text-sm text-gray-400 group-hover:text-white transition-colors py-1 px-3 bg-white/5 rounded-lg border border-white/5 cursor-pointer">
@@ -386,9 +389,10 @@ export default function ClubHorariosPage() {
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                   {cancha.slots.map((slot) => {
                     const isSelected = selectedSlot?.turno_id === slot.turno_id;
-                    const now = new Date();
-                    const slotDateTime = new Date(`${selectedDate}T${slot.hora_inicio}`);
-                    const isPast = slotDateTime < now;
+                    const isPast = esHorarioReservaPasado(
+                      selectedDate,
+                      slot.hora_inicio,
+                    );
                     const isDisponibleReal = slot.disponible && !isPast;
 
                     return (

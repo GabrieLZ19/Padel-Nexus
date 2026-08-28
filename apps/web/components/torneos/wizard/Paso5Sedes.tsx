@@ -15,7 +15,11 @@ export const Paso7Sedes = ({
 }: Paso7SedesProps) => {
   return (
     <div className="space-y-6">
-      <SedesFiscalesTab torneoId={torneoId} onRefresh={triggerRefresh} />
+      <SedesFiscalesTab
+        torneoId={torneoId}
+        onRefresh={triggerRefresh}
+        readOnly={readOnly}
+      />
 
       <div className="flex justify-between pt-4 border-t border-white/5">
         <button

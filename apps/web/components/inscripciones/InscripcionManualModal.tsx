@@ -9,6 +9,7 @@ import FeedbackModal, { FeedbackModalProps } from "../ui/FeedbackModal";
 import CustomDropdown from "../ui/CustomDropdown";
 import { useProfileStore } from "../../store/useProfileStore";
 import { esTorneoContextoFederacion } from "../../utils/constants/fapApaRules";
+import { esModalidadParejas } from "../../utils/formatFecha";
 import type { RolUsuario } from "../../utils/types/user.types";
 
 interface InscripcionManualModalProps {
@@ -194,7 +195,7 @@ export default function InscripcionManualModal({
                   </div>
                 </div>
 
-                {torneo.modalidad === "Duplas" && (
+                {esModalidadParejas(torneo.modalidad) && (
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
                       Jugador 2 (DNI o Email)

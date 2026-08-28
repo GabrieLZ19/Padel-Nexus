@@ -23,6 +23,25 @@ export const REGLAMENTOS_TORNEO: {
   { value: "Amateur", label: "Amateur / Independiente" },
 ];
 
+/** Reglamento persistido en torneos (columna `reglamento`, fallback legacy `asociacion`). */
+export function reglamentoTorneo(torneo: {
+  reglamento?: string | null;
+  asociacion?: string | null;
+}): ReglamentoTorneo {
+  const raw = String(torneo.reglamento || torneo.asociacion || "FAP").trim();
+  if (raw === "APA" || raw === "Amateur") return raw;
+  return "FAP";
+}
+
+export function labelReglamentoTorneo(
+  reglamento: ReglamentoTorneo | string,
+): string {
+  return (
+    REGLAMENTOS_TORNEO.find((r) => r.value === reglamento)?.value ||
+    String(reglamento || "FAP")
+  );
+}
+
 // ============================================================================
 // CUPOS OFICIALES FAP / APA (Sin BYEs impares)
 // ============================================================================
@@ -432,6 +451,22 @@ export function esTorneoContextoFederacion(
   if (rol === "admin_federacion" || rol === "superadmin") return true;
   if (/nacional/i.test(String(torneo.alcance || ""))) return true;
   const regl = String(torneo.reglamento || torneo.asociacion || "").toUpperCase();
+  return regl === "FAP";
+}
+
+/**
+ * Planilla de inscripción FAP (con columna LETRA) vs General (con ORDEN).
+ * Solo depende del torneo, no del rol del admin que descarga.
+ */
+export function usarPlanillaInscripcionFap(torneo: {
+  alcance?: string | null;
+  reglamento?: string | null;
+  asociacion?: string | null;
+}): boolean {
+  if (/nacional/i.test(String(torneo.alcance || ""))) return true;
+  const regl = String(torneo.reglamento || torneo.asociacion || "")
+    .trim()
+    .toUpperCase();
   return regl === "FAP";
 }
 

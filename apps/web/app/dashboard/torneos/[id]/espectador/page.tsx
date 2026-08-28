@@ -8,6 +8,7 @@ import { Torneo, Inscripcion, Partido } from "@/utils/types";
 
 // Importación exclusiva de componentes de lectura
 import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
+import { labelModalidad } from "@/utils/formatFecha";
 import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
 
 export default function TorneoEspectadorPage() {
@@ -87,7 +88,7 @@ export default function TorneoEspectadorPage() {
             </h1>
             <p className="text-gray-400 mt-1 text-sm font-medium">
               {(torneo as any).rama ? `${(torneo as any).rama} · ` : ""}
-              {torneo.nivel} · {torneo.categoria} · {torneo.modalidad}
+              {torneo.nivel} · {torneo.categoria} · {labelModalidad(torneo.modalidad)}
             </p>
           </div>
         </div>

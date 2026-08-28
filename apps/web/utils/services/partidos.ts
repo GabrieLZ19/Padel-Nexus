@@ -6,6 +6,11 @@ import type {
 } from "../types";
 
 export const PartidosService = {
+  async getById(partidoId: string): Promise<PartidoAbierto> {
+    const { data } = await api.get(`/partidos/${partidoId}`);
+    return data.data;
+  },
+
   async getAbiertos(
     params?: FiltrosPartidosAbiertos,
   ): Promise<PartidoAbierto[]> {
@@ -24,6 +29,16 @@ export const PartidosService = {
     partidoId: string,
   ): Promise<{ nuevosFaltantes: number; estado: string; mensaje?: string }> {
     const { data } = await api.post(`/partidos/${partidoId}/unirse`);
+    return data;
+  },
+
+  async salir(partidoId: string): Promise<{
+    accion: "abandonado" | "cancelado";
+    mensaje?: string;
+    nuevosFaltantes?: number;
+    estado?: string;
+  }> {
+    const { data } = await api.post(`/partidos/${partidoId}/salir`);
     return data;
   },
 

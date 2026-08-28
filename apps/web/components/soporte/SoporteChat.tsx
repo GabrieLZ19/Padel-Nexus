@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import {
   MessageSquare,
   X,
@@ -16,6 +17,7 @@ import { useProfileStore } from "@/store/useProfileStore";
 import type { ChatMensaje } from "@/utils/types";
 
 export default function SoporteChat() {
+  const pathname = usePathname();
   const { profile } = useProfileStore();
   const {
     joinConversation,
@@ -211,6 +213,7 @@ export default function SoporteChat() {
     });
 
   if (!profile) return null;
+  if (pathname?.startsWith("/mensajes")) return null;
 
   return (
     <>

@@ -3,7 +3,7 @@ import autoTable from "jspdf-autotable";
 import type { Partido } from "@/utils/types";
 import type { IncidenciaFiscal, ParejaFiscal, ReporteFiscal } from "@/utils/services/fiscal-panel";
 import { nombreSedeFiscal } from "@/utils/services/fiscal-panel";
-import { esModalidadIndividual, formatFechaCalendario, nombreJugadorVisible } from "@/utils/formatFecha";
+import { esModalidadIndividual, formatFechaCalendario, labelModalidad, nombreJugadorVisible } from "@/utils/formatFecha";
 import {
   agruparPartidosPorRonda,
   etiquetaCanchaAsignada,
@@ -102,7 +102,7 @@ export function generarActaFiscalPdf(reporte: ReporteFiscal) {
     formatFechaCalendario(reporte.torneo.fecha),
     sede,
     reporte.torneo.estado || "",
-    individual ? "Individual" : "Duplas",
+    individual ? "Individual" : labelModalidad(reporte.torneo.modalidad),
   ]
     .filter(Boolean)
     .join("  ·  ");

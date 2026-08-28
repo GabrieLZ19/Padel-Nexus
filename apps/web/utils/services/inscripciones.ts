@@ -108,6 +108,22 @@ export const InscripcionesService = {
     const response = await api.post("/inscripciones/manual", data);
     return response.data;
   },
+  async importarPlanilla(data: {
+    torneo_id: string;
+    filas: import("./inscripcionPlanilla").FilaPlanillaInscripcion[];
+    modalidad?: string;
+    omitir_validaciones?: boolean;
+    motivo?: string;
+  }) {
+    const response = await api.post<{
+      exito: boolean;
+      inscripcionesOk: number;
+      jugadoresCreados: number;
+      errores: string[];
+      totalFilas: number;
+    }>("/inscripciones/importar-planilla", data);
+    return response.data;
+  },
   async eliminar(id: string | number): Promise<void> {
     await api.delete(`/inscripciones/${id}`);
   },

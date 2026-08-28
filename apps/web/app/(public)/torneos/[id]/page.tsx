@@ -19,11 +19,7 @@ import { useProfileStore } from "@/store/useProfileStore";
 import { MatchCard } from "@/components/torneos/MatchCard";
 import { TablaPosicionesZona } from "@/components/torneos/TablaPosicionesZona";
 import PublicBracketView from "@/components/torneos/PublicBracketView";
-import {
-  allChecksPassed,
-  buildChecksElegibilidadJ1,
-  isInscripcionTemporalmenteAbierta,
-} from "@/utils/inscripcionElegibilidad";
+import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
 
 export default function TorneoDetallePage() {
   const params = useParams();
@@ -193,7 +189,7 @@ export default function TorneoDetallePage() {
   const isFinalizado = estadoBase === "finalizado";
   const isAbierto = estadoBase === "inscripción" || estadoBase === "borrador";
   const isCierreVencido = !isInscripcionTemporalmenteAbierta(torneo);
-  const isIndividual = torneo.modalidad === "Individual";
+  const isIndividual = esModalidadIndividual(torneo.modalidad);
   const hasPremios = torneo.premio_1 || torneo.premio_2 || torneo.premio_3;
   const cuposActuales = torneo.cupos_actuales || 0;
   const cuposMaximos = torneo.cupos_maximos || 16;
@@ -244,7 +240,7 @@ export default function TorneoDetallePage() {
     btnClass =
       "bg-white/10 text-white hover:bg-white/15 border border-white/15";
   } else {
-    btnText = isIndividual ? "Inscribirme" : "Inscribir mi dupla";
+    btnText = isIndividual ? "Inscribirme" : "Inscribir mi pareja";
     btnClass = "bg-brand-chartreuse text-brand-black hover:opacity-95";
   }
 
@@ -298,7 +294,7 @@ export default function TorneoDetallePage() {
                     <Users className="size-3.5 text-brand-chartreuse/80" />
                   )}
                   {cuposActuales}/{cuposMaximos}{" "}
-                  {isIndividual ? "jugadores" : "duplas"}
+                  {isIndividual ? "jugadores" : "parejas"}
                 </span>
               </div>
             </div>
@@ -325,7 +321,7 @@ export default function TorneoDetallePage() {
                   <div>
                     <h2 className="text-lg font-bold text-white">Cupos</h2>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {isIndividual ? "Jugadores" : "Duplas"} registradas
+                      {isIndividual ? "Jugadores" : "Parejas"} registradas
                     </p>
                   </div>
                   <span className="text-sm font-black text-brand-chartreuse tabular-nums">
@@ -344,7 +340,7 @@ export default function TorneoDetallePage() {
                       Formato
                     </p>
                     <p className="text-sm text-white font-medium">
-                      {torneo.modalidad} · {torneo.formato || "Eliminatoria"}
+                      {labelModalidad(torneo.modalidad)} · {torneo.formato || "Eliminatoria"}
                     </p>
                   </div>
                   <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3.5">
@@ -464,7 +460,7 @@ export default function TorneoDetallePage() {
                     ) : (
                       <Users className="size-3.5 text-brand-chartreuse shrink-0" />
                     )}
-                    {isIndividual ? "Individual" : "Por dupla"}
+                    {isIndividual ? "Individual" : "Por pareja"}
                   </li>
                   <li className="flex items-center gap-2">
                     <ShieldCheck className="size-3.5 text-brand-chartreuse shrink-0" />

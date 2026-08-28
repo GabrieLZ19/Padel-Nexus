@@ -56,6 +56,10 @@ export default function SignUpPage() {
   const [avatarError, setAvatarError] = useState<string>("");
 
   const [loading, setLoading] = useState(false);
+  const [buscandoDni, setBuscandoDni] = useState(false);
+  const [preinscripcionMsg, setPreinscripcionMsg] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<{
     nombre?: string;
@@ -216,7 +220,49 @@ export default function SignUpPage() {
   const handleDniChange = (val: string) => {
     const cleaned = val.replace(/[^0-9.]/g, "").slice(0, 10);
     setDni(cleaned);
+    setPreinscripcionMsg(null);
     if (errors.dni) setErrors((p) => ({ ...p, dni: undefined }));
+  };
+
+  const buscarPreinscripcionPorDni = async () => {
+    const dniLimpio = dni.trim().replace(/\./g, "");
+    if (!validateDni(dniLimpio)) return;
+
+    setBuscandoDni(true);
+    setPreinscripcionMsg(null);
+    try {
+      const resultado = await PerfilService.buscarPreinscripcionPorDni(dniLimpio);
+      if (!resultado.encontrado) return;
+
+      if (!resultado.pendiente_activacion) {
+        setPreinscripcionMsg(
+          resultado.mensaje ||
+            "Este DNI ya tiene cuenta. Iniciá sesión o recuperá tu contraseña.",
+        );
+        return;
+      }
+
+      const p = resultado.perfil;
+      if (!p) return;
+
+      if (p.nombre) setNombre(p.nombre);
+      if (p.apellido) setApellido(p.apellido);
+      if (p.email) setEmail(p.email);
+      if (p.telefono) setTelefono(p.telefono);
+      if (p.lugar_residencia) setResidencia(p.lugar_residencia);
+      if (p.fecha_nacimiento) setFechaNacimiento(p.fecha_nacimiento);
+      if (p.sexo) setSexo(p.sexo);
+      if (p.categoria_padel) setCategoria(p.categoria_padel);
+      if (p.lado_preferido) setLadoPreferido(p.lado_preferido);
+
+      setPreinscripcionMsg(
+        "Encontramos tus datos de una inscripción previa. Completá email y contraseña para activar tu cuenta.",
+      );
+    } catch {
+      // Sin preinscripción: flujo normal de registro
+    } finally {
+      setBuscandoDni(false);
+    }
   };
 
   const handleTelefonoChange = (val: string) => {
@@ -542,10 +588,21 @@ export default function SignUpPage() {
                       placeholder="Ej: 40.234.567"
                       value={dni}
                       onChange={(e) => handleDniChange(e.target.value)}
+                      onBlur={() => void buscarPreinscripcionPorDni()}
                       className={getInputStyles(!!errors.dni)}
                       required
                     />
                   </div>
+                  {buscandoDni && (
+                    <p className="text-gray-500 text-xs mt-1.5 ml-1">
+                      Buscando datos con tu DNI...
+                    </p>
+                  )}
+                  {preinscripcionMsg && (
+                    <p className="text-brand-chartreuse text-xs mt-1.5 ml-1">
+                      {preinscripcionMsg}
+                    </p>
+                  )}
                   {errors.dni && (
                     <p className="text-red-400 text-xs mt-1.5 ml-1">
                       {errors.dni}

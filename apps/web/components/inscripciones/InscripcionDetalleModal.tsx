@@ -27,9 +27,9 @@ export default function InscripcionDetalleModal({
 }: InscripcionDetalleModalProps) {
   if (!inscripcion) return null;
 
-  // Lógica para detectar si es una dupla o un jugador individual
+  // Lógica para detectar si es una pareja o un jugador individual
   // Asumimos que si jugador2 está vacío o tiene un guión, es individual.
-  const esDupla =
+  const esPareja =
     inscripcion.jugador2_nombre &&
     inscripcion.jugador2_nombre.trim() !== "" &&
     inscripcion.jugador2_nombre !== "-";
@@ -108,25 +108,25 @@ export default function InscripcionDetalleModal({
                 </div>
               </div>
 
-              {/* GRILLA DE DATOS (Dinámica para Jugador o Dupla) */}
+              {/* GRILLA DE DATOS (Dinámica para Jugador o Pareja) */}
               <div className="grid grid-cols-2 gap-4">
                 <div
-                  className={`bg-white/5 p-4 rounded-xl ${!esDupla ? "col-span-2" : ""}`}
+                  className={`bg-white/5 p-4 rounded-xl ${!esPareja ? "col-span-2" : ""}`}
                 >
                   <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5 mb-2">
-                    {esDupla ? (
+                    {esPareja ? (
                       <Users className="size-3" />
                     ) : (
                       <User className="size-3" />
                     )}
-                    {esDupla ? "Jugador 1" : "Jugador"}
+                    {esPareja ? "Jugador 1" : "Jugador"}
                   </div>
                   <div className="text-sm font-semibold text-white">
                     {inscripcion.jugador1_nombre}
                   </div>
                 </div>
 
-                {esDupla && (
+                {esPareja && (
                   <div className="bg-white/5 p-4 rounded-xl">
                     <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5 mb-2">
                       <Users className="size-3" /> Jugador 2

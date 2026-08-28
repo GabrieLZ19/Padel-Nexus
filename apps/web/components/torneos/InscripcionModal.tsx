@@ -28,6 +28,7 @@ import {
   buildChecksElegibilidadJ1,
   hydrateTorneoRestrictions,
 } from "@/utils/inscripcionElegibilidad";
+import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
 
 interface InscripcionModalProps {
   isOpen: boolean;
@@ -88,7 +89,7 @@ export default function InscripcionModal({
   const [showAllChecks, setShowAllChecks] = useState(false);
   const { profile } = useProfileStore();
 
-  const isIndividual = torneo.modalidad === "Individual";
+  const isIndividual = esModalidadIndividual(torneo.modalidad);
   const checks = useMemo(
     () => buildChecksElegibilidadJ1(torneo, profile),
     [torneo, profile],
@@ -265,7 +266,7 @@ export default function InscripcionModal({
                       </span>
                       <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/8 px-2 py-1 text-[11px] text-gray-300">
                         <Users className="size-3 text-brand-chartreuse/80" />
-                        {torneo.modalidad}
+                        {labelModalidad(torneo.modalidad)}
                       </span>
                       {(torneo.lugar || torneo.clubes?.nombre) && (
                         <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/8 px-2 py-1 text-[11px] text-gray-300 max-w-full">

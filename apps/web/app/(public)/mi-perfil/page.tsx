@@ -15,6 +15,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
+import { PARTIDOS_ABIERTOS } from "@/utils/constants/partidosAbiertos";
 import { useSocket } from "@/hooks/useSocket";
 import CredencialDigital from "@/components/perfil/CredencialDigital";
 import LicenciaModal from "@/components/perfil/LicenciaModal";
@@ -298,8 +299,12 @@ export default function PlayerDashboard() {
                     <Users className="text-brand-white group-hover:text-brand-chartreuse size-6 md:size-8 transition-colors" />
                   </div>
                   <div>
-                    <h2 className="text-base md:text-lg font-bold text-brand-white">Buscar 4to</h2>
-                    <p className="text-[10px] md:text-xs text-gray-400 mt-0.5">Partidos Abiertos</p>
+                    <h2 className="text-base md:text-lg font-bold text-brand-white">
+                      {PARTIDOS_ABIERTOS.titulo}
+                    </h2>
+                    <p className="text-[10px] md:text-xs text-gray-400 mt-0.5">
+                      Convocatorias abiertas
+                    </p>
                   </div>
                 </Link>
 

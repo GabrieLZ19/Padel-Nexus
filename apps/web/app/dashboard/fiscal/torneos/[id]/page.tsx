@@ -25,6 +25,7 @@ import type { Partido } from "@/utils/types";
 import {
   esModalidadIndividual,
   formatFechaCalendario,
+  labelModalidad,
   nombreJugadorVisible,
 } from "@/utils/formatFecha";
 import {
@@ -254,7 +255,7 @@ export default function FiscalTorneoOperativoPage() {
               {nombreSedeFiscal(torneo)}
             </span>
             <span>{torneo.estado}</span>
-            <span>{torneo.modalidad || "Duplas"}</span>
+            <span>{labelModalidad(torneo.modalidad)}</span>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-start gap-2">
@@ -486,8 +487,8 @@ function TablaJugadores({
   onAbrirJugador: (id: string) => void;
 }) {
   const modalidadIndividual = esModalidadIndividual(modalidad);
-  const hayDuplasArmadas = parejas.some((par) => esCompaneroReal(par.jugador2));
-  const individual = modalidadIndividual || !hayDuplasArmadas;
+  const hayParejasArmadas = parejas.some((par) => esCompaneroReal(par.jugador2));
+  const individual = modalidadIndividual || !hayParejasArmadas;
   const totalJugadores = parejas.reduce((acc, par) => {
     const j1 = par.jugador1 ? 1 : 0;
     const j2 = esCompaneroReal(par.jugador2) ? 1 : 0;
@@ -517,7 +518,7 @@ function TablaJugadores({
           )}
         </p>
         <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20">
-          {modalidadIndividual || individual ? "Individual" : "Duplas"}
+          {modalidadIndividual || individual ? "Individual" : "Parejas"}
         </span>
       </div>
 

@@ -176,4 +176,20 @@ export const PerfilService = {
   async eliminarAvatar(): Promise<void> {
     await api.delete<{ exito: boolean; mensaje: string }>("/perfil/avatar");
   },
+
+  async buscarPreinscripcionPorDni(dni: string): Promise<{
+    encontrado: boolean;
+    pendiente_activacion?: boolean;
+    mensaje?: string;
+    perfil?: Partial<RegistroPayload>;
+  }> {
+    const response = await api.get<{
+      exito: boolean;
+      encontrado: boolean;
+      pendiente_activacion?: boolean;
+      mensaje?: string;
+      perfil?: Partial<RegistroPayload>;
+    }>(`/perfil/preinscripcion/${encodeURIComponent(dni)}`);
+    return response.data;
+  },
 };

@@ -9,9 +9,15 @@ import {
   PlusCircle,
 } from "lucide-react";
 import {
+  labelModalidad,
+  MODALIDAD_PAREJAS,
+} from "@/utils/formatFecha";
+import {
   RAMAS_PADEL,
   getCategoriasParaAsociacion,
   getNivelesParaCategoria,
+  reglamentoTorneo,
+  labelReglamentoTorneo,
   CUSTOM_OPTION_VALUE,
 } from "@/utils/constants/fapApaRules";
 import type { RegisterSaveHandler } from "./types";
@@ -24,6 +30,8 @@ interface Paso3CategoriasProps {
   triggerRefresh: () => void;
   registerSaveHandler?: RegisterSaveHandler;
   readOnly?: boolean;
+  /** Torneos del panel de club: validaciones de inscripción opcionales */
+  modoClub?: boolean;
 }
 
 export const Paso3Categorias = ({
@@ -34,9 +42,10 @@ export const Paso3Categorias = ({
   triggerRefresh,
   registerSaveHandler,
   readOnly = false,
+  modoClub = false,
 }: Paso3CategoriasProps) => {
-  // Asociación viene del Paso 1
-  const asociacion = (torneo as any).asociacion || "FAP";
+  // Reglamento definido en el Paso 1 (columna `reglamento`)
+  const reglamento = reglamentoTorneo(torneo);
 
   // Rama
   const [editRama, setEditRama] = useState((torneo as any).rama || "Masculina");
@@ -55,12 +64,19 @@ export const Paso3Categorias = ({
 
   // Otros
   const [editModalidad, setEditModalidad] = useState(
-    torneo.modalidad || "Duplas",
+    labelModalidad(torneo.modalidad),
   );
   const [validarEdad, setValidarEdad] = useState(
     (torneo as any).validar_edad || false,
   );
   const reglasArbitrajeObj = (torneo as any).reglas_arbitraje || {};
+  const [validarCategoria, setValidarCategoria] = useState<boolean>(
+    Boolean(
+      modoClub
+        ? reglasArbitrajeObj.validar_categoria
+        : reglasArbitrajeObj.validar_categoria ?? true,
+    ),
+  );
   const [requiereCarnet, setRequiereCarnet] = useState<boolean>(
     Boolean(
       reglasArbitrajeObj.requiere_carnet_federativo ??
@@ -77,8 +93,8 @@ export const Paso3Categorias = ({
   // Opciones dinámicas de Categoría y Nivel
   // ====================================================================
   const categoriasOficiales = useMemo(
-    () => getCategoriasParaAsociacion(asociacion),
-    [asociacion],
+    () => getCategoriasParaAsociacion(reglamento),
+    [reglamento],
   );
 
   const categoriasConCustom = useMemo(() => {
@@ -95,8 +111,8 @@ export const Paso3Categorias = ({
     showCustomCategoria && customCategoria ? customCategoria : editCategoria;
 
   const nivelesOficiales = useMemo(
-    () => getNivelesParaCategoria(asociacion, categoriaEfectiva),
-    [asociacion, categoriaEfectiva],
+    () => getNivelesParaCategoria(reglamento, categoriaEfectiva),
+    [reglamento, categoriaEfectiva],
   );
 
   const nivelesConCustom = useMemo(() => {
@@ -108,15 +124,16 @@ export const Paso3Categorias = ({
     return items;
   }, [nivelesOficiales]);
 
-  // Auto-activar o desactivar validación de edad según categoría
+  // Auto-activar validación de edad según categoría (solo circuito federativo / admin)
   useEffect(() => {
+    if (modoClub) return;
     const esConEdad = /\+(30|40|50|60)|veteranos|ladies|menores/i.test(
       categoriaEfectiva,
     );
     if (esConEdad) {
       setValidarEdad(true);
     }
-  }, [categoriaEfectiva]);
+  }, [categoriaEfectiva, modoClub]);
 
   // Reset nivel cuando cambia la categoría (y hay opciones válidas)
   useEffect(() => {
@@ -128,9 +145,9 @@ export const Paso3Categorias = ({
         setCustomNivel("");
       }
     }
-  }, [categoriaEfectiva, asociacion]);
+  }, [categoriaEfectiva, reglamento]);
 
-  // Reset categoría y nivel cuando cambia la asociación
+  // Reset categoría y nivel cuando cambia el reglamento
   useEffect(() => {
     const valid = categoriasOficiales.some((c) => c.value === editCategoria);
     if (!valid && categoriasOficiales.length > 0) {
@@ -138,7 +155,7 @@ export const Paso3Categorias = ({
       setShowCustomCategoria(false);
       setCustomCategoria("");
     }
-  }, [asociacion]);
+  }, [reglamento]);
 
   // Genera el rango de días reales del torneo si existen las fechas
   const getPlayDaysRange = () => {
@@ -256,12 +273,16 @@ export const Paso3Categorias = ({
         categoria: finalCategoria,
         nivel: finalNivel,
         modalidad: editModalidad,
-        validar_edad: editCategoria === "Libres" ? false : validarEdad,
+        validar_edad: modoClub
+          ? validarEdad
+          : editCategoria === "Libres"
+            ? false
+            : validarEdad,
         dias_juego: selectedDias,
         reglas_arbitraje: {
           ...((torneo as any).reglas_arbitraje || {}),
+          validar_categoria: modoClub ? validarCategoria : true,
           requiere_carnet_federativo: requiereCarnet,
-          // Precio de carnet eliminado del flujo (solo validación de licencia FAP)
           monto_carnet: 0,
         },
       } as any);
@@ -316,7 +337,10 @@ export const Paso3Categorias = ({
         </h3>
         <p className="text-sm text-gray-400 mt-1">
           Configurá la rama, categoría y nivel según el reglamento{" "}
-          <span className="text-brand-chartreuse font-bold">{asociacion}</span>.
+          <span className="text-brand-chartreuse font-bold">
+            {labelReglamentoTorneo(reglamento)}
+          </span>
+          .
           Marcá los días de competencia (obligatorio).
         </p>
       </div>
@@ -436,7 +460,7 @@ export const Paso3Categorias = ({
             value={editModalidad}
             onChange={setEditModalidad}
             options={[
-              { value: "Duplas", label: "Duplas / Parejas" },
+              { value: MODALIDAD_PAREJAS, label: "Parejas" },
               { value: "Individual", label: "Individual / Singles" },
             ]}
             placeholder="Seleccionar Modalidad..."
@@ -444,75 +468,138 @@ export const Paso3Categorias = ({
         </div>
       </div>
 
-      {editCategoria !== "Libres" && (
-        <div className="border-t border-white/5 pt-6">
-          <label className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <ShieldCheck className="size-4 text-brand-chartreuse" /> Control
-            de Edad
-          </label>
-          <div
-            onClick={() => setValidarEdad(!validarEdad)}
-            className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-              validarEdad
-                ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white shadow-[0_0_15px_rgba(204,255,0,0.1)]"
-                : "bg-brand-input border-white/10 text-gray-400 hover:border-white/20"
-            }`}
-          >
-            <div>
-              <p className="font-extrabold text-xs text-white">
-                Validar Edad según Categoría
-              </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                Verifica que los participantes cumplan con la edad
-                reglamentaria.
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              checked={validarEdad}
-              onChange={() => {}}
-              className="size-5 rounded border-white/10 bg-black/50 text-brand-chartreuse focus:ring-brand-chartreuse accent-brand-chartreuse cursor-pointer transition-all"
-            />
+      {modoClub ? (
+        <div className="border-t border-white/5 pt-6 space-y-4">
+          <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+            <ShieldCheck className="size-4 text-brand-chartreuse" />
+            Validaciones de inscripción (opcionales)
+          </h4>
+          <p className="text-[11px] text-gray-500 -mt-2">
+            En torneos de club podés activar solo las reglas que necesites. Si
+            ninguna está marcada, cualquier jugador podrá inscribirse (salvo
+            rama y cupos).
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              {
+                checked: validarCategoria,
+                onToggle: () => setValidarCategoria((v) => !v),
+                title: "Validar categoría",
+                desc: "Verifica que la categoría del jugador alcance para el nivel del torneo.",
+              },
+              {
+                checked: validarEdad,
+                onToggle: () => setValidarEdad((v) => !v),
+                title: "Validar edad",
+                desc: "Usa la fecha de nacimiento del perfil para el rango etario del nivel.",
+              },
+              {
+                checked: requiereCarnet,
+                onToggle: () => setRequiereCarnet((v) => !v),
+                title: "Exigir carnet FAP",
+                desc: "Ambos jugadores deben tener licencia FAP activa para inscribirse.",
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                onClick={item.onToggle}
+                className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-3 ${
+                  item.checked
+                    ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white shadow-[0_0_15px_rgba(204,255,0,0.1)]"
+                    : "bg-brand-input border-white/10 text-gray-400 hover:border-white/20"
+                }`}
+              >
+                <div>
+                  <p className="font-extrabold text-xs text-white">
+                    {item.title}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">
+                    {item.desc}
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={item.checked}
+                  onChange={() => {}}
+                  className="mt-0.5 size-5 rounded border-white/10 bg-black/50 text-brand-chartreuse focus:ring-brand-chartreuse accent-brand-chartreuse cursor-pointer transition-all shrink-0"
+                />
+              </div>
+            ))}
           </div>
         </div>
+      ) : (
+        <>
+          {editCategoria !== "Libres" && (
+            <div className="border-t border-white/5 pt-6">
+              <label className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <ShieldCheck className="size-4 text-brand-chartreuse" /> Control
+                de Edad
+              </label>
+              <div
+                onClick={() => setValidarEdad(!validarEdad)}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                  validarEdad
+                    ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white shadow-[0_0_15px_rgba(204,255,0,0.1)]"
+                    : "bg-brand-input border-white/10 text-gray-400 hover:border-white/20"
+                }`}
+              >
+                <div>
+                  <p className="font-extrabold text-xs text-white">
+                    Validar Edad según Categoría
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    Verifica que los participantes cumplan con la edad
+                    reglamentaria.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={validarEdad}
+                  onChange={() => {}}
+                  className="size-5 rounded border-white/10 bg-black/50 text-brand-chartreuse focus:ring-brand-chartreuse accent-brand-chartreuse cursor-pointer transition-all"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="border-t border-white/10 pt-6 space-y-4">
+            <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+              <ShieldCheck className="size-4 text-brand-chartreuse" /> Carnet
+              Federativo Obligatorio
+            </h4>
+
+            <div className="bg-brand-input/40 p-5 rounded-2xl border border-white/10 space-y-4">
+              <div
+                onClick={() => setRequiereCarnet(!requiereCarnet)}
+                className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                  requiereCarnet
+                    ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white shadow-[0_0_15px_rgba(204,255,0,0.1)]"
+                    : "bg-brand-input border-white/10 text-gray-400 hover:border-white/20"
+                }`}
+              >
+                <div>
+                  <p className="font-extrabold text-xs text-white">
+                    Exige carnet federativo FAP vigente
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    Si está activo, ambos jugadores deben tener licencia FAP en
+                    estado Activa para inscribirse. Sin precio adicional.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={requiereCarnet}
+                  onChange={() => {}}
+                  className="size-5 rounded border-white/10 bg-black/50 text-brand-chartreuse focus:ring-brand-chartreuse accent-brand-chartreuse cursor-pointer transition-all"
+                />
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
-      {/* SECCIÓN CARNET FEDERATIVO */}
-      <div className="border-t border-white/10 pt-6 space-y-4">
-        <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-          <ShieldCheck className="size-4 text-brand-chartreuse" /> Carnet
-          Federativo Obligatorio
-        </h4>
-
-        <div className="bg-brand-input/40 p-5 rounded-2xl border border-white/10 space-y-4">
-          <div
-            onClick={() => setRequiereCarnet(!requiereCarnet)}
-            className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-              requiereCarnet
-                ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white shadow-[0_0_15px_rgba(204,255,0,0.1)]"
-                : "bg-brand-input border-white/10 text-gray-400 hover:border-white/20"
-            }`}
-          >
-            <div>
-              <p className="font-extrabold text-xs text-white">
-                Exige carnet federativo FAP vigente
-              </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                Si está activo, ambos jugadores deben tener licencia FAP en
-                estado Activa para inscribirse. Sin precio adicional.
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              checked={requiereCarnet}
-              onChange={() => {}}
-              className="size-5 rounded border-white/10 bg-black/50 text-brand-chartreuse focus:ring-brand-chartreuse accent-brand-chartreuse cursor-pointer transition-all"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* DÍAS DE PARTIDO */}
+      {/* DÍAS DE PARTIDO — sección carnet duplicada eliminada para modoClub */}
       <div className="border-t border-white/5 pt-6 space-y-4">
         <h4 className="text-xs text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
           <Calendar className="size-4 text-brand-chartreuse" /> Días de

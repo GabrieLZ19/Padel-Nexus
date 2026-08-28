@@ -85,6 +85,13 @@ export const NIVELES_PADEL = [
   { value: "Women +55", label: "Women +55", grupo: "Ladies & Veteranos" },
 ] as const;
 
+/** Niveles para convocatorias "Nos falta uno" (categorías Libres FAP/APA). */
+export const NIVELES_PARTIDO_ABIERTO = NIVELES_PADEL.filter(
+  (n) => n.grupo === "Libres",
+);
+
+export const NIVEL_PARTIDO_DEFAULT: NivelPadel = "5ª";
+
 export const LADOS_PADEL = [
   { value: "Drive", label: "Drive" },
   { value: "Revés", label: "Revés" },
@@ -132,7 +139,7 @@ export const ESTADOS_TORNEO = [
 ] as const;
 
 export const MODALIDADES_TORNEO = [
-  { value: "Duplas", label: "Duplas" },
+  { value: "Parejas", label: "Parejas" },
   { value: "Individual", label: "Individual" },
 ] as const;
 

@@ -7,6 +7,10 @@ import type { Club } from "@/utils/types";
 import { sileo } from "sileo";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import {
+  leafletTileUrl,
+  LEAFLET_TILE_ATTRIBUTION,
+} from "@/utils/leafletTiles";
 
 export default function ClubConfiguracionPage() {
   const [club, setClub] = useState<Club | null>(null);
@@ -65,12 +69,9 @@ export default function ClubConfiguracionPage() {
       });
 
       const isLightMode = document.documentElement.classList.contains("light");
-      const tileUrl = isLightMode
-        ? "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-        : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
-      L.tileLayer(tileUrl, {
-        attribution: "Tiles &copy; Esri &copy; CARTO",
+      L.tileLayer(leafletTileUrl(isLightMode), {
+        attribution: LEAFLET_TILE_ATTRIBUTION,
         maxZoom: 18,
       }).addTo(map);
 
