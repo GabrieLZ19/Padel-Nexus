@@ -19,12 +19,13 @@ import {
   X,
   Sun,
   Moon,
+  ShoppingBag,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 import { useSocket } from "@/hooks/useSocket";
 import { ChatService } from "@/utils/services/chat";
-import { sileo } from "sileo";
+import { mostrarToastNotificacion } from "@/utils/notificacionesToast";
 
 export default function ClubLayout({
   children,
@@ -130,13 +131,7 @@ export default function ClubLayout({
   }, []);
 
   useSocket((newNotif: any) => {
-    const payload = { title: newNotif.titulo, description: newNotif.mensaje };
-    switch (newNotif.tipo) {
-      case "success": sileo.success(payload); break;
-      case "error": sileo.error(payload); break;
-      case "warning": sileo.warning(payload); break;
-      default: sileo.info(payload); break;
-    }
+    mostrarToastNotificacion(newNotif);
   });
 
   const menuItems = [
@@ -144,6 +139,7 @@ export default function ClubLayout({
     { name: "Torneos", icon: Trophy, href: "/club/torneos" },
     { name: "Canchas", icon: Grid, href: "/club/canchas" },
     { name: "Reservas", icon: Calendar, href: "/club/reservas" },
+    { name: "Marketplace", icon: ShoppingBag, href: "/club/marketplace" },
     { name: "Chat interno", icon: MessageSquare, href: "/club/chat", badge: chatNoLeidos },
     { name: "Configuración", icon: Settings, href: "/club/configuracion" },
   ];

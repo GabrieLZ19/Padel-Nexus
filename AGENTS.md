@@ -46,6 +46,7 @@ Este workspace contiene el CRM web y la API para Padel Nexus. El foco actual es 
 - Usar el cliente admin de Supabase solo en el backend.
 - Preferir tipos explícitos sobre `any`.
 - Evitar introducir nuevas abstracciones a menos que eliminen duplicación o arreglen un problema real de consistencia.
+- **Nunca usar `alert()`, `confirm()` ni `prompt()` nativos en el frontend web.** Usar `sileo` para toasts y `FeedbackModal` (`components/ui/FeedbackModal.tsx`) para confirmaciones.
 
 ## Lista de Verificación
 - Ejecutar lint y build para cualquier slice tocado cuando sea posible.
@@ -64,3 +65,4 @@ Este workspace contiene el CRM web y la API para Padel Nexus. El foco actual es 
 - No usar `user_metadata` como fuente de autorización.
 - No hacer cambios destructivos en llaves sin confirmación y trail de auditoría.
 - No agregar trabajo de implementación mobile en esta fase a menos que sea solo preparación de contratos de datos.
+- No usar diálogos nativos del navegador (`alert`, `confirm`, `prompt`) en `apps/web`.

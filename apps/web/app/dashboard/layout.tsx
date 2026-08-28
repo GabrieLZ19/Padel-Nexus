@@ -34,7 +34,7 @@ import { useProfileStore } from "@/store/useProfileStore";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 import { useSocket } from "@/hooks/useSocket";
 import { ChatService } from "@/utils/services/chat";
-import { sileo } from "sileo";
+import { mostrarToastNotificacion } from "@/utils/notificacionesToast";
 import { getMenuItemsPorRol } from "@/utils/constants/menuPermissions";
 import SuperadminSidebarNav from "@/components/layout/SuperadminSidebarNav";
 
@@ -144,25 +144,7 @@ export default function DashboardLayout({
 
   // Suscribirse al WebSocket para recibir y disparar notificaciones con sileo
   useSocket((newNotif: any) => {
-    const payload = {
-      title: newNotif.titulo,
-      description: newNotif.mensaje,
-    };
-
-    switch (newNotif.tipo) {
-      case "success":
-        sileo.success(payload);
-        break;
-      case "error":
-        sileo.error(payload);
-        break;
-      case "warning":
-        sileo.warning(payload);
-        break;
-      default:
-        sileo.info(payload);
-        break;
-    }
+    mostrarToastNotificacion(newNotif);
   });
 
   // Cargar no leídos del chat y escuchar notificaciones

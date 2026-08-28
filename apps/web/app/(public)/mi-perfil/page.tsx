@@ -10,7 +10,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
-  Store,
+  ShoppingBag,
+  MessageSquare,
+  MapPin,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import { useSocket } from "@/hooks/useSocket";
@@ -58,7 +60,7 @@ export default function PlayerDashboard() {
   useSocket(handleSocketNotif);
 
   return (
-    <main className="max-w-6xl mx-auto p-5 md:p-10 space-y-8 md:space-y-10 relative isolate">
+    <main className="max-w-7xl mx-auto p-5 md:p-10 space-y-8 md:space-y-10 relative isolate">
       {/* EFECTO DE LUZ DE FONDO SUTIL */}
       <div className="absolute top-[-10%] left-[-5%] w-100 h-100 rounded-full bg-brand-chartreuse/5 blur-[100px] pointer-events-none z-0" />
 
@@ -83,19 +85,18 @@ export default function PlayerDashboard() {
         </Link>
       </header>
 
-      {/* BENTO GRID MAESTRO */}
-      <section className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 relative z-10">
+      {/* BENTO GRID — 12 columnas, sin espacio vacío */}
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 relative z-10">
         {!profile ? (
           <>
-            <Skeleton className="col-span-1 lg:row-span-2 min-h-80" />
-            <Skeleton className="col-span-2 min-h-35" />
-            <Skeleton className="col-span-2 min-h-40" />
-            <Skeleton className="col-span-1 lg:row-span-2 min-h-80" />
+            <Skeleton className="lg:col-span-4 lg:row-span-2 min-h-80" />
+            <Skeleton className="lg:col-span-8 min-h-35" />
+            <Skeleton className="lg:col-span-8 min-h-40" />
           </>
         ) : (
           <>
-            {/* 1. Licencia - Tarjeta Vertical Alta (Columna 1) */}
-            <div className="order-1 col-span-1 lg:row-span-2 bg-brand-card p-6 md:p-8 rounded-3xl border border-brand-white/5 flex flex-col items-center justify-center text-center gap-6 group hover:border-brand-white/10 transition-colors relative overflow-hidden">
+            {/* Licencia — columna izquierda */}
+            <div className="lg:col-span-4 lg:row-span-2 bg-brand-card p-6 md:p-8 rounded-3xl border border-brand-white/5 flex flex-col items-center justify-center text-center gap-6 group hover:border-brand-white/10 transition-colors relative overflow-hidden min-h-[480px]">
               <div className="absolute top-0 left-0 w-full h-32 bg-linear-to-b from-brand-chartreuse/5 to-transparent"></div>
 
               <div className="flex flex-col items-center w-full relative z-10">
@@ -246,10 +247,10 @@ export default function PlayerDashboard() {
               </div>
             </div>
 
-            {/* Columnas del Centro (Columna 2 y 3) */}
-            <div className="order-2 col-span-1 md:col-span-2 flex flex-col gap-4 md:gap-6 justify-between h-auto lg:h-full lg:min-h-[580px]">
-              {/* 2. Categoría - Banner Horizontal */}
-              <div className="w-full bg-brand-card p-6 md:p-8 rounded-3xl border border-brand-white/5 flex items-center justify-between group hover:border-brand-white/10 transition-colors overflow-hidden relative flex-1 lg:min-h-[270px] min-h-[160px] h-full">
+            {/* Panel central — categoría + accesos */}
+            <div className="lg:col-span-8 flex flex-col gap-4 md:gap-6">
+              {/* Categoría */}
+              <div className="w-full bg-brand-card p-6 md:p-8 rounded-3xl border border-brand-white/5 flex items-center justify-between group hover:border-brand-white/10 transition-colors overflow-hidden relative min-h-[160px] lg:min-h-[200px]">
                 <div className="flex items-center gap-4 md:gap-6 relative z-10">
                   <div className="p-4 bg-brand-chartreuse/10 rounded-2xl">
                     <Trophy className="text-brand-chartreuse size-7 md:size-10" />
@@ -274,92 +275,90 @@ export default function PlayerDashboard() {
                 </div>
               </div>
 
-              {/* Sub-grilla interna de 3 columnas para los botones de abajo */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 w-full flex-1 lg:min-h-[270px] h-auto">
-                {/* 3. Mis Torneos - Botón Bento */}
+              {/* Accesos rápidos — 4 columnas en desktop */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
                 <Link
                   href="/torneos"
-                  className="bg-brand-card p-5 md:p-8 rounded-3xl border border-brand-white/5 hover:border-brand-chartreuse/40 transition-all flex flex-col items-center justify-center text-center gap-4 group cursor-pointer h-full"
+                  className="bg-brand-card p-5 md:p-6 rounded-3xl border border-brand-white/5 hover:border-brand-chartreuse/40 transition-all flex flex-col items-center justify-center text-center gap-3 group cursor-pointer"
                 >
-                  <div className="p-4 bg-brand-white/5 rounded-2xl group-hover:bg-brand-chartreuse/10 transition-colors">
-                    <ClipboardList className="text-brand-white group-hover:text-brand-chartreuse size-7 md:size-10 transition-colors" />
+                  <div className="p-3 bg-brand-white/5 rounded-2xl group-hover:bg-brand-chartreuse/10 transition-colors">
+                    <ClipboardList className="text-brand-white group-hover:text-brand-chartreuse size-6 md:size-8 transition-colors" />
                   </div>
                   <div>
-                    <h2 className="text-lg md:text-2xl font-bold text-brand-white">
-                      Historial
-                    </h2>
-                    <p className="text-[11px] md:text-sm text-gray-400 mt-1">
-                      Mis Torneos
-                    </p>
+                    <h2 className="text-base md:text-lg font-bold text-brand-white">Historial</h2>
+                    <p className="text-[10px] md:text-xs text-gray-400 mt-0.5">Mis Torneos</p>
                   </div>
                 </Link>
 
-                {/* 4. Partidos - Botón Bento */}
                 <Link
                   href="/partidos"
-                  className="bg-brand-card p-5 md:p-8 rounded-3xl border border-brand-white/5 hover:border-brand-chartreuse/40 transition-all flex flex-col items-center justify-center text-center gap-4 group cursor-pointer h-full"
+                  className="bg-brand-card p-5 md:p-6 rounded-3xl border border-brand-white/5 hover:border-brand-chartreuse/40 transition-all flex flex-col items-center justify-center text-center gap-3 group cursor-pointer"
                 >
-                  <div className="p-4 bg-brand-white/5 rounded-2xl group-hover:bg-brand-chartreuse/10 transition-colors">
-                    <Users className="text-brand-white group-hover:text-brand-chartreuse size-7 md:size-10 transition-colors" />
+                  <div className="p-3 bg-brand-white/5 rounded-2xl group-hover:bg-brand-chartreuse/10 transition-colors">
+                    <Users className="text-brand-white group-hover:text-brand-chartreuse size-6 md:size-8 transition-colors" />
                   </div>
                   <div>
-                    <h2 className="text-lg md:text-2xl font-bold text-brand-white">
-                      Buscar 4to
-                    </h2>
-                    <p className="text-[11px] md:text-sm text-gray-400 mt-1">
-                      Partidos Abiertos
-                    </p>
+                    <h2 className="text-base md:text-lg font-bold text-brand-white">Buscar 4to</h2>
+                    <p className="text-[10px] md:text-xs text-gray-400 mt-0.5">Partidos Abiertos</p>
                   </div>
                 </Link>
 
-                {/* 5. Reservas - Botón Bento */}
                 <Link
                   href="/mi-perfil/reservas"
-                  className="bg-brand-card p-5 md:p-8 rounded-3xl border border-brand-white/5 hover:border-brand-chartreuse/40 transition-all flex flex-col items-center justify-center text-center gap-4 group cursor-pointer h-full"
+                  className="bg-brand-card p-5 md:p-6 rounded-3xl border border-brand-white/5 hover:border-brand-chartreuse/40 transition-all flex flex-col items-center justify-center text-center gap-3 group cursor-pointer"
                 >
-                  <div className="p-4 bg-brand-white/5 rounded-2xl group-hover:bg-brand-chartreuse/10 transition-colors">
-                    <Calendar className="text-brand-white group-hover:text-brand-chartreuse size-7 md:size-10 transition-colors" />
+                  <div className="p-3 bg-brand-white/5 rounded-2xl group-hover:bg-brand-chartreuse/10 transition-colors">
+                    <Calendar className="text-brand-white group-hover:text-brand-chartreuse size-6 md:size-8 transition-colors" />
                   </div>
                   <div>
-                    <h2 className="text-lg md:text-2xl font-bold text-brand-white">
-                      Reservas
-                    </h2>
-                    <p className="text-[11px] md:text-sm text-gray-400 mt-1">
-                      Mis Turnos
-                    </p>
+                    <h2 className="text-base md:text-lg font-bold text-brand-white">Reservas</h2>
+                    <p className="text-[10px] md:text-xs text-gray-400 mt-0.5">Mis Turnos</p>
+                  </div>
+                </Link>
+
+                <Link
+                  href="/marketplace"
+                  className="bg-brand-card p-5 md:p-6 rounded-3xl border border-brand-white/5 hover:border-brand-chartreuse/40 transition-all flex flex-col items-center justify-center text-center gap-3 group cursor-pointer"
+                >
+                  <div className="p-3 bg-brand-chartreuse/10 rounded-2xl group-hover:bg-brand-chartreuse/20 transition-colors">
+                    <ShoppingBag className="text-brand-chartreuse size-6 md:size-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-base md:text-lg font-bold text-brand-white">Marketplace</h2>
+                    <p className="text-[10px] md:text-xs text-gray-400 mt-0.5">Tiendas oficiales</p>
+                  </div>
+                </Link>
+              </div>
+
+              {/* Fila inferior — mensajes y reservar */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
+                <Link
+                  href="/mensajes"
+                  className="bg-brand-card p-5 md:p-6 rounded-3xl border border-brand-white/5 hover:border-brand-chartreuse/30 transition-all flex items-center gap-4 group cursor-pointer"
+                >
+                  <div className="p-3 bg-brand-white/5 rounded-2xl group-hover:bg-brand-chartreuse/10 transition-colors shrink-0">
+                    <MessageSquare className="size-6 text-gray-400 group-hover:text-brand-chartreuse transition-colors" />
+                  </div>
+                  <div className="text-left">
+                    <h2 className="font-bold text-brand-white">Mensajes</h2>
+                    <p className="text-xs text-gray-500">Chat con clubes y vendedores</p>
+                  </div>
+                </Link>
+
+                <Link
+                  href="/reservar"
+                  className="bg-gradient-to-r from-brand-chartreuse/15 to-transparent p-5 md:p-6 rounded-3xl border border-brand-chartreuse/20 hover:border-brand-chartreuse/40 transition-all flex items-center gap-4 group cursor-pointer"
+                >
+                  <div className="p-3 bg-brand-chartreuse/20 rounded-2xl shrink-0">
+                    <MapPin className="size-6 text-brand-chartreuse" />
+                  </div>
+                  <div className="text-left">
+                    <h2 className="font-bold text-brand-white">Reservar cancha</h2>
+                    <p className="text-xs text-gray-500">Encontrá clubes cerca tuyo</p>
                   </div>
                 </Link>
               </div>
             </div>
-
-            {/* 6. Vendedor - Tarjeta Vertical Alta (Columna 4) */}
-            <Link
-              href="/mi-perfil/vendedor"
-              className="order-3 col-span-1 lg:row-span-2 bg-brand-card p-6 md:p-8 rounded-3xl border border-brand-white/5 hover:border-brand-chartreuse/40 transition-all flex flex-col items-center justify-center text-center gap-6 group cursor-pointer relative overflow-hidden"
-            >
-              <div className="absolute top-0 left-0 w-full h-32 bg-linear-to-b from-brand-chartreuse/5 to-transparent"></div>
-
-              <div className="flex flex-col items-center w-full relative z-10">
-                <div className="p-3 bg-brand-chartreuse/10 rounded-2xl mb-3 group-hover:bg-brand-chartreuse/20 transition-colors">
-                  <Store className="text-brand-chartreuse size-6 md:size-8" />
-                </div>
-                <p className="text-sm font-medium text-gray-400">
-                  Portal Vendedor
-                </p>
-              </div>
-
-              <div className="w-full flex flex-col items-center relative z-10 space-y-4">
-                <h2 className="text-xl md:text-2xl font-black text-brand-white tracking-wider">
-                  Mi Tienda
-                </h2>
-                <p className="text-xs text-gray-500 max-w-[150px] mx-auto">
-                  Gestioná tus artículos a la venta, stock y clases.
-                </p>
-                <div className="w-full py-2 bg-brand-chartreuse text-brand-black rounded-xl text-xs font-bold shadow-md shadow-brand-chartreuse/10 group-hover:opacity-90 transition-opacity">
-                  Ingresar
-                </div>
-              </div>
-            </Link>
           </>
         )}
       </section>

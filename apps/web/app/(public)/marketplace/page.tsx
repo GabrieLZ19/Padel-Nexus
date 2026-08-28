@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   MarketplaceService,
   Producto,
@@ -22,9 +23,13 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { sileo } from "sileo";
+import DescuentoBadge from "@/components/marketplace/DescuentoBadge";
+import { tieneDescuento } from "@/utils/marketplaceDescuento";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 
-export default function MarketplacePage() {
+function MarketplaceContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [marcas, setMarcas] = useState<string[]>([]);
@@ -59,6 +64,22 @@ export default function MarketplacePage() {
       .then((favs) => setFavoritos(favs.map((f) => f.producto.id)))
       .catch(() => {}); // Ignorar si no está autenticado
   }, []);
+
+  useEffect(() => {
+    const vendedorParam = searchParams.get("vendedor_id");
+    if (vendedorParam) {
+      const categoriaParam = searchParams.get("categoria_id");
+      const qs = categoriaParam ? `?categoria_id=${categoriaParam}` : "";
+      router.replace(`/marketplace/tienda/${vendedorParam}${qs}`);
+    }
+  }, [searchParams, router]);
+
+  useEffect(() => {
+    const categoriaParam = searchParams.get("categoria_id");
+    if (categoriaParam && !searchParams.get("vendedor_id")) {
+      setCategoriaSeleccionada(categoriaParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     setLoading(true);
@@ -382,10 +403,21 @@ export default function MarketplacePage() {
                     >
                       {/* Badge destacado */}
                       {prod.destacado && (
-                        <span className="absolute top-4 left-4 bg-brand-chartreuse text-brand-black text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full z-10">
+                        <span
+                          className={`absolute left-4 bg-brand-chartreuse text-brand-black text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full z-10 ${
+                            tieneDescuento(prod.precio, prod.precio_anterior)
+                              ? "top-12"
+                              : "top-4"
+                          }`}
+                        >
                           Destacado
                         </span>
                       )}
+
+                      <DescuentoBadge
+                        precio={prod.precio}
+                        precioAnterior={prod.precio_anterior}
+                      />
 
                       {/* Botón Favorito */}
                       <button
@@ -408,7 +440,7 @@ export default function MarketplacePage() {
                             src={imageUrl}
                             alt={prod.nombre}
                             fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-500"
+                            className="object-contain group-hover:scale-105 transition-transform duration-500"
                             sizes="(max-width: 768px) 100vw, 33vw"
                           />
                         ) : (
@@ -449,9 +481,9 @@ export default function MarketplacePage() {
 
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-brand-white/5">
                           <div className="flex flex-col">
-                            {prod.precio_anterior && (
+                            {tieneDescuento(prod.precio, prod.precio_anterior) && (
                               <span className="text-[11px] text-gray-500 line-through">
-                                ${prod.precio_anterior.toLocaleString("es-AR")}
+                                ${prod.precio_anterior!.toLocaleString("es-AR")}
                               </span>
                             )}
                             <span className="text-lg font-black text-brand-chartreuse">
@@ -499,5 +531,19 @@ export default function MarketplacePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function MarketplacePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-brand-black flex items-center justify-center">
+          <div className="size-10 border-4 border-brand-chartreuse border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <MarketplaceContent />
+    </Suspense>
   );
 }

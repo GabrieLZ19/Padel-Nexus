@@ -26,6 +26,8 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { sileo } from "sileo";
+import DescuentoBadge from "@/components/marketplace/DescuentoBadge";
+import { tieneDescuento } from "@/utils/marketplaceDescuento";
 
 export default function ProductoDetallePage() {
   const { id } = useParams() as { id: string };
@@ -44,10 +46,7 @@ export default function ProductoDetallePage() {
   const { agregarItem } = useCartStore();
   const { profile } = useProfileStore();
 
-  const esDueno =
-    !!profile?.id &&
-    !!producto?.vendedor?.usuario_id &&
-    profile.id === producto.vendedor.usuario_id;
+  const esDueno = false;
 
   useEffect(() => {
     if (!id) return;
@@ -210,7 +209,7 @@ export default function ProductoDetallePage() {
                   src={imagenActiva}
                   alt={producto.nombre}
                   fill
-                  className="object-cover"
+                  className="object-contain"
                   sizes="(max-width: 1024px) 100vw, 40vw"
                   priority
                 />
@@ -238,7 +237,7 @@ export default function ProductoDetallePage() {
                       src={img}
                       alt={`Imagen ${i + 1}`}
                       fill
-                      className="object-cover"
+                      className="object-contain"
                     />
                   </button>
                 ))}
@@ -264,15 +263,22 @@ export default function ProductoDetallePage() {
                 <h1 className="text-3xl md:text-4xl font-black tracking-tight">
                   {producto.nombre}
                 </h1>
-                <div className="flex items-baseline gap-4">
-                  <span className="text-2xl md:text-3xl font-black text-brand-chartreuse">
-                    ${producto.precio.toLocaleString("es-AR")}
-                  </span>
-                  {producto.precio_anterior && (
-                    <span className="text-sm text-gray-500 line-through">
-                      ${producto.precio_anterior.toLocaleString("es-AR")}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-baseline gap-4">
+                    <span className="text-2xl md:text-3xl font-black text-brand-chartreuse">
+                      ${producto.precio.toLocaleString("es-AR")}
                     </span>
-                  )}
+                    {tieneDescuento(producto.precio, producto.precio_anterior) && (
+                      <span className="text-sm text-gray-500 line-through">
+                        ${producto.precio_anterior!.toLocaleString("es-AR")}
+                      </span>
+                    )}
+                  </div>
+                  <DescuentoBadge
+                    precio={producto.precio}
+                    precioAnterior={producto.precio_anterior}
+                    variant="large"
+                  />
                 </div>
               </div>
 
@@ -424,7 +430,7 @@ export default function ProductoDetallePage() {
                   src={producto.vendedor.logo_url}
                   alt={producto.vendedor.nombre_tienda}
                   fill
-                  className="object-cover"
+                  className="object-contain"
                 />
               </div>
             ) : (
@@ -478,14 +484,23 @@ export default function ProductoDetallePage() {
             </div>
 
             {!esDueno && (
-              <button
-                onClick={handlePreguntarVendedor}
-                disabled={contactando}
-                className="shrink-0 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/30 font-bold text-sm py-3 px-5 rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                <MessageSquare className="size-4" />
-                {contactando ? "Abriendo..." : "Contactar"}
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                <Link
+                  href={`/marketplace/tienda/${producto.vendedor.id}`}
+                  className="inline-flex items-center justify-center gap-2 bg-brand-white/5 hover:bg-brand-white/10 text-brand-white border border-brand-white/10 font-bold text-sm py-3 px-5 rounded-2xl transition-all"
+                >
+                  <Store className="size-4" />
+                  Ver tienda
+                </Link>
+                <button
+                  onClick={handlePreguntarVendedor}
+                  disabled={contactando}
+                  className="bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/30 font-bold text-sm py-3 px-5 rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <MessageSquare className="size-4" />
+                  {contactando ? "Abriendo..." : "Contactar"}
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -516,7 +531,7 @@ export default function ProductoDetallePage() {
                             src={val.comprador.avatar_url}
                             alt={val.comprador.nombre}
                             fill
-                            className="object-cover"
+                            className="object-contain"
                           />
                         </div>
                       ) : (
@@ -576,7 +591,7 @@ export default function ProductoDetallePage() {
                         src={rel.thumbnail_url}
                         alt={rel.nombre}
                         fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="object-contain group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">

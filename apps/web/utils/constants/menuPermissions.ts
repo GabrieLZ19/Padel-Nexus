@@ -33,6 +33,7 @@ const MENU_POR_ROL: Record<string, string[]> = {
     "/dashboard/jugadores",
     "/dashboard/fiscales",
     "/dashboard/rankings",
+    "/dashboard/marketplace",
     "/dashboard/estadisticas",
     "/dashboard/chat",
   ],
@@ -46,6 +47,7 @@ const MENU_POR_ROL: Record<string, string[]> = {
     "/dashboard/jugadores",
     "/dashboard/fiscales",
     "/dashboard/rankings",
+    "/dashboard/marketplace",
     "/dashboard/estadisticas",
     "/dashboard/chat",
   ],
@@ -58,6 +60,7 @@ const MENU_POR_ROL: Record<string, string[]> = {
     "/dashboard/afiliaciones",
     "/dashboard/clubes",
     "/dashboard/rankings",
+    "/dashboard/marketplace",
     "/dashboard/chat",
   ],
 

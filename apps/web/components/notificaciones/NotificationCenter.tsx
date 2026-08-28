@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   Trash2,
@@ -11,17 +12,23 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  Megaphone,
+  ExternalLink,
 } from "lucide-react";
-import { sileo } from "sileo";
 import { NotificacionesService } from "@/utils/services";
 import { Notificacion } from "@/utils/types";
 import { useSocket } from "@/hooks/useSocket";
 import { useProfileStore } from "@/store/useProfileStore";
+import { mostrarToastNotificacion } from "@/utils/notificacionesToast";
 
 export default function NotificationCenter() {
+  const router = useRouter();
   const { profile } = useProfileStore();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notificacion[]>([]);
+
+  const isMarketplacePromo = (notif: Notificacion) =>
+    notif.metadata?.origen === "marketplace_promo";
 
   // Cargar notificaciones históricas al montar
   useEffect(() => {
@@ -40,27 +47,7 @@ export default function NotificationCenter() {
   // Suscribirse al WebSocket y disparar sileo toast en tiempo real
   useSocket((newNotif: Notificacion) => {
     setNotifications((prev) => [newNotif, ...prev]);
-
-    // Disparar el toast Sileo según el tipo
-    const payload = {
-      title: newNotif.titulo,
-      description: newNotif.mensaje,
-    };
-
-    switch (newNotif.tipo) {
-      case "success":
-        sileo.success(payload);
-        break;
-      case "error":
-        sileo.error(payload);
-        break;
-      case "warning":
-        sileo.warning(payload);
-        break;
-      default:
-        sileo.info(payload);
-        break;
-    }
+    mostrarToastNotificacion(newNotif);
   });
 
   const handleMarkAsRead = async (id: string) => {
@@ -95,7 +82,30 @@ export default function NotificationCenter() {
 
   const unreadCount = notifications.filter((n) => !n.leido).length;
 
-  const getTypeStyles = (tipo: string) => {
+  const handleNotificationClick = async (notif: Notificacion) => {
+    if (!notif.leido) {
+      await handleMarkAsRead(notif.id);
+    }
+
+    const actionUrl = notif.metadata?.action_url as string | undefined;
+    if (actionUrl) {
+      setIsOpen(false);
+      router.push(actionUrl);
+    }
+  };
+
+  const getTypeStyles = (notif: Notificacion) => {
+    if (isMarketplacePromo(notif)) {
+      return {
+        icon: <Megaphone className="size-4 text-brand-chartreuse shrink-0" />,
+        bg: "bg-brand-chartreuse/5",
+        badge: "bg-brand-chartreuse/20 text-brand-chartreuse",
+        accent: "bg-brand-chartreuse",
+        label: "Promo",
+      };
+    }
+
+    const tipo = notif.tipo;
     switch (tipo) {
       case "success":
         return {
@@ -103,6 +113,7 @@ export default function NotificationCenter() {
           bg: "bg-emerald-500/5",
           badge: "bg-emerald-500/20 text-emerald-300",
           accent: "bg-emerald-400",
+          label: tipo,
         };
       case "error":
         return {
@@ -110,6 +121,7 @@ export default function NotificationCenter() {
           bg: "bg-rose-500/5",
           badge: "bg-rose-500/20 text-rose-300",
           accent: "bg-rose-400",
+          label: tipo,
         };
       case "warning":
         return {
@@ -117,6 +129,7 @@ export default function NotificationCenter() {
           bg: "bg-amber-500/5",
           badge: "bg-amber-500/20 text-amber-300",
           accent: "bg-amber-400",
+          label: tipo,
         };
       default:
         return {
@@ -124,6 +137,7 @@ export default function NotificationCenter() {
           bg: "bg-sky-500/5",
           badge: "bg-sky-500/20 text-sky-300",
           accent: "bg-sky-400",
+          label: tipo,
         };
     }
   };
@@ -216,12 +230,15 @@ export default function NotificationCenter() {
                 </div>
               ) : (
                 notifications.map((notif) => {
-                  const styles = getTypeStyles(notif.tipo);
+                  const styles = getTypeStyles(notif);
+                  const tieneLink = Boolean(notif.metadata?.action_url);
                   return (
                     <div
                       key={notif.id}
-                      onClick={() => !notif.leido && handleMarkAsRead(notif.id)}
-                      className={`relative flex gap-3 px-4 py-3.5 transition-all duration-150 group cursor-pointer ${
+                      onClick={() => handleNotificationClick(notif)}
+                      className={`relative flex gap-3 px-4 py-3.5 transition-all duration-150 group ${
+                        tieneLink ? "cursor-pointer" : "cursor-default"
+                      } ${
                         notif.leido
                           ? "opacity-60 hover:opacity-80 hover:bg-brand-white/2"
                           : `${styles.bg} hover:brightness-110`
@@ -253,16 +270,30 @@ export default function NotificationCenter() {
                             )}
                           </span>
                         </div>
-                        <p className="text-[12px] text-gray-400 leading-relaxed">
+                        <p className="text-[12px] text-gray-400 leading-relaxed whitespace-pre-line">
                           {notif.mensaje}
                         </p>
+                        {isMarketplacePromo(notif) && notif.metadata?.nombre_tienda && (
+                          <p className="text-[11px] text-gray-500 mt-1.5">
+                            Enviado desde ·{" "}
+                            <span className="text-brand-chartreuse/90 font-medium">
+                              {notif.metadata.nombre_tienda}
+                            </span>
+                          </p>
+                        )}
                         <div className="flex items-center justify-between mt-2">
                           <span
                             className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide ${styles.badge}`}
                           >
-                            {notif.tipo}
+                            {styles.label}
                           </span>
                           <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                            {tieneLink && (
+                              <span className="inline-flex items-center gap-0.5 text-[10px] text-brand-chartreuse">
+                                <ExternalLink className="size-3" />
+                                Abrir
+                              </span>
+                            )}
                             {!notif.leido && (
                               <button
                                 onClick={(e) => {
