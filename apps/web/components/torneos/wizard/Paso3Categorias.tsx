@@ -66,8 +66,8 @@ export const Paso3Categorias = ({
   const [editModalidad, setEditModalidad] = useState(
     labelModalidad(torneo.modalidad),
   );
-  const [validarEdad, setValidarEdad] = useState(
-    (torneo as any).validar_edad || false,
+  const [validarEdad, setValidarEdad] = useState<boolean>(
+    Boolean((torneo as { validar_edad?: boolean }).validar_edad),
   );
   const reglasArbitrajeObj = (torneo as any).reglas_arbitraje || {};
   const [validarCategoria, setValidarCategoria] = useState<boolean>(

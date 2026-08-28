@@ -20,6 +20,11 @@ import { MatchCard } from "@/components/torneos/MatchCard";
 import { TablaPosicionesZona } from "@/components/torneos/TablaPosicionesZona";
 import PublicBracketView from "@/components/torneos/PublicBracketView";
 import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
+import {
+  allChecksPassed,
+  buildChecksElegibilidadJ1,
+  isInscripcionTemporalmenteAbierta,
+} from "@/utils/inscripcionElegibilidad";
 
 export default function TorneoDetallePage() {
   const params = useParams();

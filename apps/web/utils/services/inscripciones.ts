@@ -1,4 +1,5 @@
 import { api } from "../api";
+import type { FilaPlanillaInscripcion } from "../inscripcionPlanilla";
 import { Inscripcion } from "../types";
 
 export interface PaginatedInscripciones {
@@ -110,7 +111,7 @@ export const InscripcionesService = {
   },
   async importarPlanilla(data: {
     torneo_id: string;
-    filas: import("./inscripcionPlanilla").FilaPlanillaInscripcion[];
+    filas: FilaPlanillaInscripcion[];
     modalidad?: string;
     omitir_validaciones?: boolean;
     motivo?: string;
