@@ -1,5 +1,9 @@
 import { supabase, supabaseAdmin } from "../config/supabase";
 import { env } from "../config/env.config";
+import {
+  buildPerfilUpdatePatch,
+  normalizeFechaNacimiento,
+} from "../utils/perfilPatch";
 import { FiscalSesionService } from "./fiscal-sesion.service";
 
 // DTO para el registro unificado FAP
@@ -105,18 +109,20 @@ export class AuthService {
 
       const { error: perfilError } = await supabaseAdmin
         .from("perfiles")
-        .update({
-          email: emailFinal,
-          nombre: nombreCapitalizado,
-          apellido: apellidoCapitalizado,
-          telefono: datos.telefono,
-          lugar_residencia: datos.lugar_residencia,
-          categoria_padel: datos.categoria_padel,
-          lado_preferido: datos.lado_preferido,
-          sexo: datos.sexo || "masculino",
-          fecha_nacimiento: datos.fecha_nacimiento || null,
-          pendiente_activacion: false,
-        })
+        .update(
+          buildPerfilUpdatePatch({
+            email: emailFinal,
+            nombre: nombreCapitalizado,
+            apellido: apellidoCapitalizado,
+            telefono: datos.telefono,
+            lugar_residencia: datos.lugar_residencia,
+            categoria_padel: datos.categoria_padel,
+            lado_preferido: datos.lado_preferido,
+            sexo: datos.sexo || "masculino",
+            fecha_nacimiento: normalizeFechaNacimiento(datos.fecha_nacimiento),
+            pendiente_activacion: false,
+          }),
+        )
         .eq("id", preinscripto.id);
 
       if (perfilError) {
@@ -167,7 +173,8 @@ export class AuthService {
           categoria_padel: datos.categoria_padel,
           lado_preferido: datos.lado_preferido,
           sexo: datos.sexo || "masculino",
-          fecha_nacimiento: datos.fecha_nacimiento || null,
+          fecha_nacimiento:
+            normalizeFechaNacimiento(datos.fecha_nacimiento) ?? null,
         },
       },
     });
@@ -176,6 +183,22 @@ export class AuthService {
       throw new Error(
         `Error en el registro de autenticación: ${error.message}`,
       );
+    }
+
+    if (data.user) {
+      await AuthService.aplicarPerfilRegistro(data.user.id, {
+        email: datos.email,
+        nombre: nombreCapitalizado,
+        apellido: apellidoCapitalizado,
+        telefono: datos.telefono || null,
+        dni: dniLimpio,
+        lugar_residencia: datos.lugar_residencia,
+        categoria_padel: datos.categoria_padel,
+        lado_preferido: datos.lado_preferido,
+        sexo: datos.sexo || "masculino",
+        fecha_nacimiento: normalizeFechaNacimiento(datos.fecha_nacimiento),
+        pendiente_activacion: false,
+      });
     }
 
     // Subir avatar si se proporcionó en base64
@@ -199,6 +222,33 @@ export class AuthService {
       mensaje:
         "Usuario registrado. Verifique su correo electrónico para confirmar la cuenta.",
     };
+  }
+
+  private static async aplicarPerfilRegistro(
+    userId: string,
+    datos: Record<string, unknown>,
+  ) {
+    const row = buildPerfilUpdatePatch({ id: userId, ...datos });
+    const delays = [0, 150, 300, 600, 1000];
+    let lastError: string | null = null;
+
+    for (const delay of delays) {
+      if (delay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+
+      const { error } = await supabaseAdmin
+        .from("perfiles")
+        .upsert(row, { onConflict: "id" });
+
+      if (!error) return;
+
+      lastError = error.message;
+    }
+
+    throw new Error(
+      `No se pudo sincronizar el perfil post-registro: ${lastError}`,
+    );
   }
 
   /**

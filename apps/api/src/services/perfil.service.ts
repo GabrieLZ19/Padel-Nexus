@@ -1,5 +1,9 @@
 import { supabaseAdmin } from "../config/supabase";
 import {
+  buildPerfilUpdatePatch,
+  normalizeFechaNacimiento,
+} from "../utils/perfilPatch";
+import {
   parseNombreCompleto,
   normalizarDni,
   type FilaPlanillaInscripcion,
@@ -35,15 +39,70 @@ export class PerfilService {
       throw new Error("Perfil de usuario no encontrado en la plataforma.");
     }
 
+    const perfilSincronizado = await PerfilService.sincronizarMetadataFaltante(
+      userId,
+      data,
+    );
+
     // Mapear fecha_vencimiento a vencimiento para cumplir con la documentación de Afiliaciones Múltiples (1:N)
-    if (data.afiliaciones && Array.isArray(data.afiliaciones)) {
-      data.afiliaciones = data.afiliaciones.map((af: any) => ({
+    if (perfilSincronizado.afiliaciones && Array.isArray(perfilSincronizado.afiliaciones)) {
+      perfilSincronizado.afiliaciones = perfilSincronizado.afiliaciones.map((af: any) => ({
         ...af,
         vencimiento: af.fecha_vencimiento,
       }));
     }
 
-    return data;
+    return perfilSincronizado;
+  }
+
+  /**
+   * Completa campos del perfil desde user_metadata cuando el trigger de auth no los copió.
+   */
+  static async sincronizarMetadataFaltante(
+    userId: string,
+    perfil: Record<string, unknown>,
+  ) {
+    const necesitaFecha = !perfil.fecha_nacimiento;
+    const necesitaSexo = !perfil.sexo;
+
+    if (!necesitaFecha && !necesitaSexo) {
+      return perfil;
+    }
+
+    const { data: authData, error: authError } =
+      await supabaseAdmin.auth.admin.getUserById(userId);
+
+    if (authError || !authData.user) {
+      return perfil;
+    }
+
+    const metadata = authData.user.user_metadata ?? {};
+    const patch: Record<string, string | null> = {};
+
+    if (necesitaFecha && metadata.fecha_nacimiento) {
+      patch.fecha_nacimiento = String(metadata.fecha_nacimiento);
+    }
+    if (necesitaSexo && metadata.sexo) {
+      patch.sexo = String(metadata.sexo);
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return perfil;
+    }
+
+    const { data: actualizado, error: updateError } = await supabaseAdmin
+      .from("perfiles")
+      .update(patch)
+      .eq("id", userId)
+      .select("*")
+      .single();
+
+    if (updateError || !actualizado) {
+      console.error("Error al sincronizar metadata de perfil:", updateError);
+      return { ...perfil, ...patch };
+    }
+
+    return { ...perfil, ...actualizado };
   }
 
   /**
@@ -87,18 +146,20 @@ export class PerfilService {
 
     const { data, error } = await supabaseAdmin
       .from("perfiles")
-      .update({
-        nombre: nombreCapitalizado !== undefined ? nombreCapitalizado : undefined,
-        apellido: apellidoCapitalizado !== undefined ? apellidoCapitalizado : undefined,
-        telefono: datos.telefono,
-        categoria_padel: datos.categoria_padel,
-        lado_preferido: datos.lado_preferido,
-        lugar_residencia: datos.lugar_residencia,
-        dni: datos.dni,
-        sexo: datos.sexo,
-        fecha_nacimiento: datos.fecha_nacimiento || null,
-        avatar_url: datos.avatar_url,
-      })
+      .update(
+        buildPerfilUpdatePatch({
+          nombre: nombreCapitalizado,
+          apellido: apellidoCapitalizado,
+          telefono: datos.telefono,
+          categoria_padel: datos.categoria_padel,
+          lado_preferido: datos.lado_preferido,
+          lugar_residencia: datos.lugar_residencia,
+          dni: datos.dni,
+          sexo: datos.sexo,
+          fecha_nacimiento: normalizeFechaNacimiento(datos.fecha_nacimiento),
+          avatar_url: datos.avatar_url,
+        }),
+      )
       .eq("id", userId)
       .select("*")
       .single();
