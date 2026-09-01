@@ -95,6 +95,8 @@ export default function ClubTorneosPage() {
         currentPage,
         PAGE_SIZE,
         search,
+        undefined,
+        { incluirBorradores: true },
       );
 
       // Filtrar exclusivamente torneos correspondientes a este club

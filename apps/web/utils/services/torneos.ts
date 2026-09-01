@@ -28,9 +28,16 @@ export const TorneosService = {
     limit: number,
     search?: string,
     estado?: string,
+    options?: { incluirBorradores?: boolean },
   ): Promise<PaginatedTorneos> {
     const response = await api.get<PaginatedTorneos | Torneo[]>("/torneos", {
-      params: { page, limit, search, estado },
+      params: {
+        page,
+        limit,
+        search,
+        estado,
+        incluir_borradores: options?.incluirBorradores ? "true" : undefined,
+      },
     });
 
     const payload = response.data as PaginatedTorneos | Torneo[];

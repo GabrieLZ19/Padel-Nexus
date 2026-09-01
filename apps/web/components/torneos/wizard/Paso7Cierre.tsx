@@ -31,7 +31,6 @@ export const Paso5Cierre = ({
   const isOpenState =
     estadoNorm === "inscripción" ||
     estadoNorm === "inscripcion" ||
-    estadoNorm === "borrador" ||
     estadoNorm === "habilitado";
 
   // Parsear puntos iniciales

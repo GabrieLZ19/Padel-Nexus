@@ -104,7 +104,9 @@ export default function TorneosPage() {
                 : undefined;
 
         const [torneosData, clubesResponse] = await Promise.all([
-          TorneosService.getByPage(page, PAGE_SIZE, search, estadoParam),
+          TorneosService.getByPage(page, PAGE_SIZE, search, estadoParam, {
+            incluirBorradores: activeTab === "Todos",
+          }),
           ClubesService.getAll().catch(() => ({ data: [], total: 0 })),
         ]);
 

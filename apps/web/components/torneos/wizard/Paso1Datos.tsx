@@ -338,6 +338,11 @@ export const Paso1Datos = ({
         asociacion_id: asociacionIdFinal,
         federacion_id: federacionIdFinal,
         formato: editFormato,
+        ...( ["borrador", "cerrado"].includes(
+          String(torneo.estado || "").toLowerCase(),
+        )
+          ? { estado: "Inscripción" }
+          : {}),
       } as any);
 
       triggerRefresh();
