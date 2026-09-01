@@ -9,13 +9,14 @@ export const getAllTorneos = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    const { page, limit, search, estado } = req.query;
+    const { page, limit, search, estado, incluir_borradores } = req.query;
     const pageNum = page ? Number(page) : undefined;
     const limitNum = Number(limit || "10");
 
     const resultado = await TorneoService.listarTorneos(pageNum, limitNum, {
       search: search as string | undefined,
       estado: estado as string | undefined,
+      incluirBorradores: incluir_borradores === "true",
     });
 
     return res

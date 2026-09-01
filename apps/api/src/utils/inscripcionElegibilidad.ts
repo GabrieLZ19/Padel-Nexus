@@ -397,6 +397,31 @@ export function calcularEdadEnFecha(
   return edad;
 }
 
+export function inscripcionAbiertaPorFechas(
+  torneo: Pick<TorneoElegibilidad, "fecha" | "fecha_cierre_inscripcion">,
+): boolean {
+  const ahora = new Date();
+
+  if (torneo.fecha_cierre_inscripcion) {
+    const cierre = new Date(torneo.fecha_cierre_inscripcion);
+    if (!Number.isNaN(cierre.getTime()) && ahora > cierre) return false;
+    return true;
+  }
+
+  if (!torneo.fecha) return false;
+
+  const fechaTorneo = new Date(torneo.fecha);
+  fechaTorneo.setHours(0, 0, 0, 0);
+  const fechaActual = new Date();
+  fechaActual.setHours(0, 0, 0, 0);
+
+  const diasRestantes = Math.ceil(
+    (fechaTorneo.getTime() - fechaActual.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  return diasRestantes >= FAP_REGLAS.DIAS_CIERRE_INSCRIPCION;
+}
+
 export function assertInscripcionAbierta(torneo: TorneoElegibilidad): void {
   const estado = (torneo.estado || "").trim();
   const estadoLower = estado.toLowerCase();
@@ -411,32 +436,12 @@ export function assertInscripcionAbierta(torneo: TorneoElegibilidad): void {
     throw new Error("Las inscripciones no están abiertas para este torneo.");
   }
 
-  const ahora = new Date();
-
-  if (torneo.fecha_cierre_inscripcion) {
-    const cierre = new Date(torneo.fecha_cierre_inscripcion);
-    if (!Number.isNaN(cierre.getTime()) && ahora > cierre) {
+  if (!inscripcionAbiertaPorFechas(torneo)) {
+    if (torneo.fecha_cierre_inscripcion) {
       throw new Error(
         "Las inscripciones están cerradas (se alcanzó la fecha límite de inscripción).",
       );
     }
-    return;
-  }
-
-  if (!torneo.fecha) {
-    throw new Error("El torneo no tiene una fecha definida.");
-  }
-
-  const fechaTorneo = new Date(torneo.fecha);
-  fechaTorneo.setHours(0, 0, 0, 0);
-  const fechaActual = new Date();
-  fechaActual.setHours(0, 0, 0, 0);
-
-  const diasRestantes = Math.ceil(
-    (fechaTorneo.getTime() - fechaActual.getTime()) / (1000 * 60 * 60 * 24),
-  );
-
-  if (diasRestantes < FAP_REGLAS.DIAS_CIERRE_INSCRIPCION) {
     throw new Error(
       `Las inscripciones cerraron automáticamente (${FAP_REGLAS.DIAS_CIERRE_INSCRIPCION} días antes del inicio).`,
     );

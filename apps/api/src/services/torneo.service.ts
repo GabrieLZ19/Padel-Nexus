@@ -6,6 +6,7 @@ import {
   FAP_REGLAS,
 } from "../constants/fap";
 import { enrichInscripcionDenominacion } from "../utils/denominacionNacional";
+import { inscripcionAbiertaPorFechas } from "../utils/inscripcionElegibilidad";
 
 function mapInscripcionPartido(ins: Record<string, unknown>) {
   const perfiles = ins.perfiles as
@@ -55,6 +56,7 @@ function mapInscripcionPartido(ins: Record<string, unknown>) {
 export interface FiltrosTorneo {
   search?: string;
   estado?: string;
+  incluirBorradores?: boolean;
 }
 
 export interface TorneoPayload {
@@ -80,24 +82,12 @@ export class TorneoService {
   // Helper para calcular estado dinámico (Cierre automático)
   private static evaluateDynamicState(torneo: any) {
     if (
-      (torneo.estado === FAP_ESTADOS_TORNEO.INSCRIPCION ||
-        torneo.estado === FAP_ESTADOS_TORNEO.CERRADO) &&
-      torneo.fecha
+      torneo.estado === FAP_ESTADOS_TORNEO.INSCRIPCION ||
+      torneo.estado === FAP_ESTADOS_TORNEO.CERRADO
     ) {
-      const fechaTorneo = new Date(torneo.fecha);
-      fechaTorneo.setHours(0, 0, 0, 0);
-      const fechaActual = new Date();
-      fechaActual.setHours(0, 0, 0, 0);
-
-      const diasFaltantes = Math.ceil(
-        (fechaTorneo.getTime() - fechaActual.getTime()) / (1000 * 60 * 60 * 24),
-      );
-
-      if (diasFaltantes < FAP_REGLAS.DIAS_CIERRE_INSCRIPCION) {
-        torneo.estado = FAP_ESTADOS_TORNEO.CERRADO;
-      } else {
-        torneo.estado = FAP_ESTADOS_TORNEO.INSCRIPCION;
-      }
+      torneo.estado = inscripcionAbiertaPorFechas(torneo)
+        ? FAP_ESTADOS_TORNEO.INSCRIPCION
+        : FAP_ESTADOS_TORNEO.CERRADO;
     }
 
     return torneo;
@@ -119,6 +109,10 @@ export class TorneoService {
       .order("created_at", { ascending: false });
 
     if (filtros?.search) query = query.ilike("nombre", `%${filtros.search}%`);
+
+    if (!filtros?.estado && !filtros?.incluirBorradores) {
+      query = query.neq("estado", FAP_ESTADOS_TORNEO.BORRADOR);
+    }
 
     if (filtros?.estado) {
       const estados = filtros.estado
@@ -534,7 +528,7 @@ export class TorneoService {
   static async actualizarTorneo(id: string, datos: any) {
     const { data: torneoActual } = await supabaseAdmin
       .from("torneos")
-      .select("estado, fecha")
+      .select("estado, fecha, fecha_cierre_inscripcion")
       .eq("id", id)
       .single();
 
