@@ -21,11 +21,14 @@ export interface Torneo {
   cupos_maximos: number;
   cupos_actuales: number;
   nivel?: string | null;
+  categoria?: string | null;
   modalidad: string;
   precio_inscripcion: number;
   formato: string;
   lugar?: string | null;
   alcance?: string | null;
+  hora_inicio_jornada?: string | null;
   banners?: string[];
   clubes?: TorneoClub | null;
+  inscripciones?: { usuario_id?: string; usuario2_id?: string }[];
 }

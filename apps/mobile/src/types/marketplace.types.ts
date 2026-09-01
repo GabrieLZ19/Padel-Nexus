@@ -11,6 +11,7 @@ export interface ProductoMarketplace {
   nombre: string;
   precio: number;
   precio_anterior?: number;
+  marca?: string;
   thumbnail_url?: string;
   imagenes: string[];
   destacado: boolean;

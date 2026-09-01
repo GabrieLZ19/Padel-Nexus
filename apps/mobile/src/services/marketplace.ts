@@ -7,6 +7,15 @@ import type {
   ProductoMarketplace,
 } from "@/src/types/marketplace.types";
 
+interface ApiProductosResponse {
+  productos?: ProductoMarketplace[];
+  data?: ProductoMarketplace[];
+  total: number;
+  pagina: number;
+  por_pagina: number;
+  total_paginas: number;
+}
+
 function getErrorMessage(error: unknown, fallback: string): string {
   if (isAxiosError(error)) {
     const data = error.response?.data as
@@ -16,6 +25,17 @@ function getErrorMessage(error: unknown, fallback: string): string {
   }
   if (error instanceof Error) return error.message;
   return fallback;
+}
+
+function parseProductosPage(payload: ApiProductosResponse): PaginatedProductos {
+  const items = payload.productos ?? payload.data ?? [];
+  return {
+    data: Array.isArray(items) ? items : [],
+    total: payload.total ?? items.length,
+    pagina: payload.pagina ?? 1,
+    por_pagina: payload.por_pagina ?? items.length,
+    total_paginas: payload.total_paginas ?? 1,
+  };
 }
 
 export const MarketplaceService = {
@@ -39,34 +59,23 @@ export const MarketplaceService = {
     por_pagina?: number;
   }): Promise<PaginatedProductos> {
     try {
-      const response = await api.get<PaginatedProductos>(
+      const response = await api.get<ApiProductosResponse>(
         "/marketplace/productos",
         {
           params: {
             orden: "destacados",
             pagina: params?.pagina ?? 1,
-            por_pagina: params?.por_pagina ?? 20,
+            por_pagina: params?.por_pagina ?? 24,
             busqueda: params?.busqueda,
             categoria_id: params?.categoria_id,
           },
         },
       );
-      return response.data;
+      return parseProductosPage(response.data);
     } catch (error: unknown) {
       throw new Error(
         getErrorMessage(error, "No se pudieron cargar los productos."),
       );
-    }
-  },
-
-  async getProducto(id: string): Promise<ProductoMarketplace> {
-    try {
-      const response = await api.get<ProductoMarketplace>(
-        `/marketplace/productos/${id}`,
-      );
-      return response.data;
-    } catch (error: unknown) {
-      throw new Error(getErrorMessage(error, "No se pudo cargar el producto."));
     }
   },
 };

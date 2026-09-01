@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -9,6 +10,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ProductCard } from "@/src/components/cards/ProductCard";
+import { MarketCategoryIcon } from "@/src/components/market/MarketCategoryIcon";
+import { SearchField } from "@/src/components/ui/SearchField";
 import { Skeleton } from "@/src/components/ui/Skeleton";
 import { MarketplaceService } from "@/src/services/marketplace";
 import type {
@@ -21,6 +24,7 @@ export default function MarketTab() {
   const [productos, setProductos] = useState<ProductoMarketplace[]>([]);
   const [categorias, setCategorias] = useState<CategoriaMarketplace[]>([]);
   const [categoriaActiva, setCategoriaActiva] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -29,19 +33,28 @@ export default function MarketTab() {
       MarketplaceService.getCategorias().catch(() => []),
       MarketplaceService.getProductos({
         categoria_id: categoriaActiva || undefined,
+        busqueda: busqueda.trim() || undefined,
         por_pagina: 24,
       }),
     ]);
     setCategorias(cats);
-    setProductos(productosPage.data || []);
-  }, [categoriaActiva]);
+    setProductos(productosPage.data);
+  }, [categoriaActiva, busqueda]);
 
   useEffect(() => {
     setLoading(true);
-    void loadData()
-      .catch(() => setProductos([]))
-      .finally(() => setLoading(false));
-  }, [loadData]);
+    const timer = setTimeout(() => {
+      void loadData()
+        .catch(() => setProductos([]))
+        .finally(() => setLoading(false));
+    }, busqueda ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [loadData, busqueda]);
+
+  const destacados = useMemo(
+    () => productos.filter((p) => p.destacado).slice(0, 4),
+    [productos],
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -68,47 +81,66 @@ export default function MarketTab() {
       }}
       ListHeaderComponent={
         <View className="mb-2 gap-4">
-          <View className="gap-1">
+          <View className="flex-row items-center justify-between">
             <Text className="font-sans-bold text-3xl text-white">Market</Text>
-            <Text className="font-sans text-base text-brand-muted">
-              Productos y servicios de la comunidad
-            </Text>
+            <Pressable className="relative h-11 w-11 items-center justify-center rounded-full border border-brand-border bg-brand-surface">
+              <FontAwesome name="shopping-cart" size={18} color="#FFFFFF" />
+              <View className="absolute -right-0.5 -top-0.5 h-4 w-4 items-center justify-center rounded-full bg-brand-chartreuse">
+                <Text className="font-sans-bold text-[10px] text-black">0</Text>
+              </View>
+            </Pressable>
           </View>
 
+          <SearchField
+            value={busqueda}
+            onChangeText={setBusqueda}
+            placeholder="Buscar palas, pelotas, indumentaria"
+          />
+
           {categorias.length > 0 ? (
-            <FlatList
-              horizontal
-              data={[{ id: "all", nombre: "Todos" }, ...categorias]}
-              keyExtractor={(item) => item.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8 }}
-              renderItem={({ item }) => {
-                const active =
-                  item.id === "all"
-                    ? categoriaActiva === null
-                    : categoriaActiva === item.id;
+            <View className="flex-row justify-between gap-2">
+              {categorias.slice(0, 4).map((cat) => {
+                const active = categoriaActiva === cat.id;
                 return (
                   <Pressable
+                    key={cat.id}
                     onPress={() =>
-                      setCategoriaActiva(item.id === "all" ? null : item.id)
+                      setCategoriaActiva(active ? null : cat.id)
                     }
-                    className={`rounded-full px-4 py-2 ${
+                    className={`flex-1 items-center gap-2 rounded-card border px-2 py-3 ${
                       active
-                        ? "bg-brand-chartreuse"
-                        : "border border-brand-border bg-brand-surface"
+                        ? "border-brand-chartreuse bg-brand-chartreuse"
+                        : "border-brand-border bg-brand-surface"
                     }`}
                   >
+                    <MarketCategoryIcon
+                      slug={cat.slug}
+                      nombre={cat.nombre}
+                      color={active ? "#000000" : "#CBFE01"}
+                    />
                     <Text
-                      className={`font-sans-semibold text-sm ${
+                      className={`text-center font-sans-medium text-xs ${
                         active ? "text-black" : "text-white"
                       }`}
+                      numberOfLines={1}
                     >
-                      {item.nombre}
+                      {cat.nombre}
                     </Text>
                   </Pressable>
                 );
-              }}
-            />
+              })}
+            </View>
+          ) : null}
+
+          {destacados.length > 0 ? (
+            <View className="gap-2">
+              <View className="flex-row items-center justify-between">
+                <Text className="font-sans-bold text-lg text-white">Destacados</Text>
+                <Text className="font-sans-semibold text-sm text-brand-chartreuse">
+                  Ver todo
+                </Text>
+              </View>
+            </View>
           ) : null}
         </View>
       }
@@ -116,15 +148,13 @@ export default function MarketTab() {
       ListEmptyComponent={
         loading ? (
           <View className="flex-row flex-wrap gap-3">
-            <Skeleton className="h-44 flex-1" />
-            <Skeleton className="h-44 flex-1" />
-            <Skeleton className="h-44 flex-1" />
-            <Skeleton className="h-44 flex-1" />
+            <Skeleton className="h-48 flex-1" />
+            <Skeleton className="h-48 flex-1" />
           </View>
         ) : (
           <View className="flex-1 items-center justify-center rounded-card border border-brand-border bg-brand-surface p-6">
             <Text className="text-center font-sans text-base text-brand-muted">
-              No hay productos publicados todavía.
+              No hay productos para mostrar.
             </Text>
           </View>
         )

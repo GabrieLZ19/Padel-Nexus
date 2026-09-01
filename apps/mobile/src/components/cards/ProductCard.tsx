@@ -17,31 +17,41 @@ export function ProductCard({ producto, onPress }: ProductCardProps) {
   return (
     <Pressable
       onPress={onPress}
-      className="flex-1 overflow-hidden rounded-card border border-brand-border bg-brand-surface active:opacity-90"
+      className="mb-3 flex-1 overflow-hidden rounded-card border border-brand-border bg-brand-surface active:opacity-90"
       style={{ maxWidth: "48%" }}
     >
-      {image ? (
-        <Image
-          source={{ uri: image }}
-          style={{ width: "100%", height: 120 }}
-          contentFit="cover"
-        />
-      ) : (
-        <View className="h-[120px] items-center justify-center bg-brand-elevated">
-          <FontAwesome name="shopping-bag" size={24} color="#CBFE01" />
-        </View>
-      )}
+      <View className="relative">
+        {image ? (
+          <Image
+            source={{ uri: image }}
+            style={{ width: "100%", height: 130 }}
+            contentFit="cover"
+          />
+        ) : (
+          <View className="h-[130px] items-center justify-center bg-brand-elevated">
+            <FontAwesome name="shopping-bag" size={24} color="#CBFE01" />
+          </View>
+        )}
+        <Pressable className="absolute right-2 top-2 h-8 w-8 items-center justify-center rounded-full bg-black/50">
+          <FontAwesome name="heart-o" size={14} color="#FFFFFF" />
+        </Pressable>
+      </View>
 
-      <View className="gap-1.5 p-3">
+      <View className="gap-1 p-3">
+        <Text className="font-sans text-[10px] uppercase tracking-wider text-brand-muted">
+          {producto.marca || producto.vendedor.nombre_tienda}
+        </Text>
         <Text className="font-sans-semibold text-sm text-white" numberOfLines={2}>
           {producto.nombre}
         </Text>
-        <Text className="font-sans text-[11px] text-brand-muted" numberOfLines={1}>
-          {producto.vendedor.nombre_tienda}
-        </Text>
-        <Text className="font-sans-bold text-sm text-brand-chartreuse">
-          {formatCurrencyArs(producto.precio)}
-        </Text>
+        <View className="mt-1 flex-row items-center justify-between">
+          <Text className="font-sans-bold text-base text-white">
+            {formatCurrencyArs(producto.precio)}
+          </Text>
+          <View className="h-8 w-8 items-center justify-center rounded-xl bg-brand-chartreuse">
+            <FontAwesome name="shopping-cart" size={14} color="#000000" />
+          </View>
+        </View>
       </View>
     </Pressable>
   );

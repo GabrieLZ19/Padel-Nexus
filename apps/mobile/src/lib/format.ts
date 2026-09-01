@@ -1,3 +1,4 @@
+import { normalizarTexto } from "@/src/lib/normalize";
 import { parseIsoDate } from "@/src/lib/dateUtils";
 
 const MESES_CORTOS = [
@@ -76,6 +77,91 @@ export function getProximaReserva<T extends { fecha_reserva: string }>(
     });
 
   return futuras[0] ?? null;
+}
+
+export function filtrarTorneosInscribibles<T extends { estado: string }>(
+  torneos: T[],
+): T[] {
+  return torneos.filter((t) => {
+    const e = normalizarTexto(t.estado || "");
+    return e === "inscripcion" || e === "en curso";
+  });
+}
+
+export function esTorneoInscripcionAbierta(estado: string): boolean {
+  const e = normalizarTexto(estado || "");
+  return e === "inscripcion";
+}
+
+export function esTorneoBorrador(estado: string): boolean {
+  return normalizarTexto(estado || "") === "borrador";
+}
+
+export function esTorneoPublico(estado: string): boolean {
+  return !esTorneoBorrador(estado);
+}
+
+export type FiltroEstadoTorneo =
+  | "todos"
+  | "inscripcion"
+  | "en-curso"
+  | "finalizado"
+  | "cerrado";
+
+export const OPCIONES_ESTADO_TORNEO: {
+  id: FiltroEstadoTorneo;
+  label: string;
+}[] = [
+  { id: "todos", label: "Todos" },
+  { id: "inscripcion", label: "Inscripción" },
+  { id: "en-curso", label: "En curso" },
+  { id: "finalizado", label: "Finalizado" },
+  { id: "cerrado", label: "Cerrado" },
+];
+
+export function coincideFiltroEstadoTorneo(
+  estado: string,
+  filtro: FiltroEstadoTorneo,
+): boolean {
+  if (filtro === "todos") return esTorneoPublico(estado);
+
+  const e = normalizarTexto(estado || "");
+  switch (filtro) {
+    case "inscripcion":
+      return e === "inscripcion";
+    case "en-curso":
+      return e === "en curso";
+    case "finalizado":
+      return e === "finalizado";
+    case "cerrado":
+      return e === "cerrado";
+    default:
+      return true;
+  }
+}
+
+export function etiquetaEstadoTorneoCard(estado: string): string {
+  const e = normalizarTexto(estado || "");
+  if (e === "inscripcion") return "Abierto";
+  if (e === "en curso") return "En curso";
+  if (e === "finalizado") return "Finalizado";
+  if (e === "cerrado") return "Cerrado";
+  return estadoTorneoLabel(estado);
+}
+
+export function colorEstadoTorneoCard(estado: string): string {
+  const e = normalizarTexto(estado || "");
+  if (e === "inscripcion") return "#10B981";
+  if (e === "en curso") return "#F59E0B";
+  if (e === "finalizado") return "#3B82F6";
+  if (e === "cerrado") return "#8A8A8A";
+  return estadoTorneoColor(estado);
+}
+
+export function filtrarTorneosPublicos<T extends { estado: string }>(
+  torneos: T[],
+): T[] {
+  return torneos.filter((t) => esTorneoPublico(t.estado));
 }
 
 export function filtrarTorneosCerca<T extends { clubes?: { provincia?: string } | null }>(

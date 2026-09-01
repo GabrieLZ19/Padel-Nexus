@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import "react-native-reanimated";
 import { StatusBar } from "expo-status-bar";
+import { useImmersiveNavigationBar } from "@/src/hooks/useImmersiveNavigationBar";
 
 export { ErrorBoundary } from "expo-router";
 
@@ -28,6 +29,8 @@ const navTheme = {
 };
 
 export default function RootLayout() {
+  useImmersiveNavigationBar();
+
   const [loaded, error] = useFonts({
     MuseoModerno: require("../assets/fonts/MuseoModerno-Regular.ttf"),
     "MuseoModerno-Medium": require("../assets/fonts/MuseoModerno-Medium.ttf"),
@@ -59,6 +62,10 @@ export default function RootLayout() {
             <Stack.Screen name="index" />
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen
+              name="notificaciones"
+              options={{ presentation: "modal", animation: "slide_from_bottom" }}
+            />
           </Stack>
         </ThemeProvider>
       </KeyboardProvider>

@@ -1,47 +1,85 @@
-import { useCallback, useEffect, useState } from "react";
-import { FlatList, RefreshControl, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ClubCard } from "@/src/components/cards/ClubCard";
+import { ReservaCard } from "@/src/components/cards/ReservaCard";
+import { SegmentTabs } from "@/src/components/ui/SegmentTabs";
 import { Skeleton } from "@/src/components/ui/Skeleton";
+import { Button } from "@/src/components/ui/Button";
+import { parseIsoDate } from "@/src/lib/dateUtils";
+import { ReservasService } from "@/src/services/reservas";
 import { ClubesService } from "@/src/services/clubes";
-import { useAuthStore } from "@/src/stores/authStore";
+import type { ReservaUsuario } from "@/src/types/reserva.types";
 import type { Club } from "@/src/types/club.types";
+
+type ReservasTab = "proximas" | "pasadas";
+
+function esPasada(reserva: ReservaUsuario): boolean {
+  const fecha = parseIsoDate(reserva.fecha_reserva);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  fecha.setHours(0, 0, 0, 0);
+  return fecha.getTime() < hoy.getTime();
+}
 
 export default function ReservarTab() {
   const insets = useSafeAreaInsets();
-  const usuario = useAuthStore((s) => s.usuario);
+  const [tab, setTab] = useState<ReservasTab>("proximas");
+  const [reservas, setReservas] = useState<ReservaUsuario[]>([]);
   const [clubes, setClubes] = useState<Club[]>([]);
+  const [showClubes, setShowClubes] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadClubes = useCallback(async () => {
-    const data = await ClubesService.getAll({
-      limit: 40,
-      provincia: usuario?.lugar_residencia || undefined,
-    });
-    setClubes(data);
-  }, [usuario?.lugar_residencia]);
+  const loadData = useCallback(async () => {
+    const [misReservas, clubesData] = await Promise.all([
+      ReservasService.getMisReservas().catch(() => []),
+      ClubesService.getAll({ limit: 30 }).catch(() => []),
+    ]);
+    setReservas(misReservas);
+    setClubes(clubesData);
+  }, []);
 
   useEffect(() => {
-    void loadClubes()
-      .catch(() => setClubes([]))
-      .finally(() => setLoading(false));
-  }, [loadClubes]);
+    void loadData().finally(() => setLoading(false));
+  }, [loadData]);
+
+  const filtered = useMemo(() => {
+    const sorted = [...reservas].sort((a, b) => {
+      const fa = parseIsoDate(a.fecha_reserva).getTime();
+      const fb = parseIsoDate(b.fecha_reserva).getTime();
+      return tab === "proximas" ? fa - fb : fb - fa;
+    });
+    return sorted.filter((r) =>
+      tab === "proximas" ? !esPasada(r) : esPasada(r),
+    );
+  }, [reservas, tab]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await loadClubes();
+      await loadData();
     } finally {
       setRefreshing(false);
     }
-  }, [loadClubes]);
+  }, [loadData]);
 
   return (
     <FlatList
       className="flex-1 bg-brand-black"
-      data={loading ? [] : clubes}
+      data={
+        loading
+          ? []
+          : showClubes
+            ? (clubes as Array<Club | ReservaUsuario>)
+            : filtered
+      }
       keyExtractor={(item) => item.id}
       contentContainerStyle={{
         paddingTop: insets.top + 16,
@@ -51,31 +89,70 @@ export default function ReservarTab() {
         flexGrow: 1,
       }}
       ListHeaderComponent={
-        <View className="mb-4 gap-2">
-          <Text className="font-sans-bold text-3xl text-white">Reservar</Text>
-          <Text className="font-sans text-base text-brand-muted">
-            Elegí un club para ver disponibilidad de canchas
-          </Text>
-          <View className="mt-2 rounded-card border border-brand-border bg-brand-surface/70 px-4 py-3">
-            <Text className="font-sans text-sm text-brand-muted">
-              La selección de turno y pago llega en el próximo bloque (Gate 3).
+        <View className="mb-4 gap-4">
+          <View className="flex-row items-center justify-between">
+            <Text className="font-sans-bold text-3xl text-white">
+              {showClubes ? "Elegir club" : "Mis reservas"}
             </Text>
+            {!showClubes ? (
+              <Pressable onPress={() => setShowClubes(true)}>
+                <Text className="font-sans-semibold text-sm text-brand-chartreuse">
+                  Nueva
+                </Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={() => setShowClubes(false)}>
+                <Text className="font-sans-semibold text-sm text-brand-chartreuse">
+                  Volver
+                </Text>
+              </Pressable>
+            )}
           </View>
+
+          {!showClubes ? (
+            <SegmentTabs
+              value={tab}
+              onChange={setTab}
+              options={[
+                { id: "proximas", label: "Próximas" },
+                { id: "pasadas", label: "Pasadas" },
+              ]}
+            />
+          ) : null}
         </View>
       }
-      renderItem={({ item }) => <ClubCard club={item} />}
+      renderItem={({ item }) =>
+        showClubes ? (
+          <View className="rounded-card border border-brand-border bg-brand-surface p-4">
+            <Text className="font-sans-bold text-base text-white">
+              {(item as Club).nombre}
+            </Text>
+            <Text className="mt-1 font-sans text-sm text-brand-muted">
+              {(item as Club).localidad}, {(item as Club).provincia}
+            </Text>
+          </View>
+        ) : (
+          <ReservaCard reserva={item as ReservaUsuario} />
+        )
+      }
       ListEmptyComponent={
         loading ? (
           <View className="gap-3">
-            <Skeleton className="h-20" />
-            <Skeleton className="h-20" />
-            <Skeleton className="h-20" />
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
           </View>
         ) : (
-          <View className="flex-1 items-center justify-center rounded-card border border-brand-border bg-brand-surface p-6">
+          <View className="flex-1 items-center justify-center gap-4 rounded-card border border-brand-border bg-brand-surface p-6">
             <Text className="text-center font-sans text-base text-brand-muted">
-              No encontramos clubes para mostrar.
+              {showClubes
+                ? "No hay clubes disponibles."
+                : tab === "proximas"
+                  ? "No tenés reservas próximas."
+                  : "No tenés reservas pasadas."}
             </Text>
+            {!showClubes ? (
+              <Button label="Reservar cancha" onPress={() => setShowClubes(true)} />
+            ) : null}
           </View>
         )
       }

@@ -20,12 +20,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export const TorneosService = {
-  async getAll(options?: { limit?: number; estado?: string }): Promise<Torneo[]> {
+  async getAll(options?: { limit?: number }): Promise<Torneo[]> {
     try {
       const response = await api.get<Torneo[] | PaginatedTorneos>("/torneos", {
         params: {
-          limit: options?.limit ?? 50,
-          estado: options?.estado,
+          limit: options?.limit ?? 100,
         },
       });
       const payload = response.data;

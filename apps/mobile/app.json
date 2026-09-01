@@ -39,6 +39,15 @@
           "photosPermission": "Padel Nexus necesita acceso a tus fotos para tu avatar de jugador.",
           "cameraPermission": "Padel Nexus necesita acceso a la cámara para tu foto de perfil."
         }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "position": "absolute",
+          "visibility": "hidden",
+          "behavior": "overlay-swipe",
+          "backgroundColor": "#000000"
+        }
       ]
     ],
     "experiments": {
