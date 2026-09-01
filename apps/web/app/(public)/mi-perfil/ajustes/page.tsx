@@ -18,6 +18,7 @@ import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { useProfileStore } from "@/store/useProfileStore";
 import { NIVELES_PADEL, LADOS_PADEL, PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
+import { toDateInputValue } from "@/utils/dateUtils";
 import { validateNombre, validateDni, validateTelefono } from "@/utils/validation";
 
 export const Skeleton = ({ className }: { className?: string }) => (
@@ -128,6 +129,10 @@ export default function ProfileSettings() {
         dni: (profile.dni || "").trim().replace(/\./g, ""),
         telefono: profile.telefono?.trim() || null,
       };
+      const fechaInput = toDateInputValue(profile.fecha_nacimiento);
+      if (fechaInput) {
+        Object.assign(cleanedProfile, { fecha_nacimiento: fechaInput });
+      }
 
       const updatedProfile = await PerfilService.updateMe(cleanedProfile);
       setProfile(updatedProfile);
@@ -319,7 +324,7 @@ export default function ProfileSettings() {
               <input
                 className="w-full bg-brand-input px-4 py-3.5 rounded-xl border border-white/10 text-white text-sm outline-none cursor-pointer focus:border-brand-chartreuse transition-colors"
                 type="date"
-                value={profile.fecha_nacimiento ? profile.fecha_nacimiento.split("T")[0] : ""}
+                value={toDateInputValue(profile.fecha_nacimiento)}
                 onChange={(e) => setProfile({ ...profile, fecha_nacimiento: e.target.value })}
               />
             </div>
