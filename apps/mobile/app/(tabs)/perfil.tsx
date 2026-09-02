@@ -1,39 +1,42 @@
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useCallback, useState } from "react";
-import { Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { Pressable, Text, View } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useFocusEffect } from "@react-navigation/native";
 
+import {
+  SettingsNavRow,
+  SettingsSection,
+  SettingsToggleRow,
+} from "@/src/components/perfil/SettingsList";
 import { AppScreen } from "@/src/components/layout/AppScreen";
-import { Button } from "@/src/components/ui/Button";
 import { Skeleton } from "@/src/components/ui/Skeleton";
-import { formatDateDisplay } from "@/src/lib/dateUtils";
 import { PerfilService } from "@/src/services/perfil";
 import { useAuthStore } from "@/src/stores/authStore";
+import type { PreferenciasNotificacion } from "@/src/types/user.types";
 
-function PerfilRow({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value?: string | null;
-  icon: React.ComponentProps<typeof FontAwesome>["name"];
-}) {
-  return (
-    <View className="flex-row items-center gap-3 rounded-card border border-brand-border bg-brand-surface px-4 py-3">
-      <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-chartreuse/10">
-        <FontAwesome name={icon} size={16} color="#CBFE01" />
-      </View>
-      <View className="flex-1">
-        <Text className="font-sans text-xs text-brand-muted">{label}</Text>
-        <Text className="font-sans-semibold text-base text-white">
-          {value || "—"}
-        </Text>
-      </View>
-    </View>
-  );
+const DEFAULT_PREFS: PreferenciasNotificacion = {
+  push: true,
+  email: true,
+  whatsapp: false,
+};
+
+function initialsFromName(nombre?: string | null, apellido?: string | null) {
+  const first = (nombre || "").trim().charAt(0);
+  const last = (apellido || "").trim().charAt(0);
+  const value = `${first}${last}`.toUpperCase();
+  return value || "J";
+}
+
+function normalizePrefs(
+  value?: PreferenciasNotificacion | null,
+): PreferenciasNotificacion {
+  return {
+    push: value?.push ?? DEFAULT_PREFS.push,
+    email: value?.email ?? DEFAULT_PREFS.email,
+    whatsapp: value?.whatsapp ?? DEFAULT_PREFS.whatsapp,
+  };
 }
 
 export default function PerfilTab() {
@@ -43,10 +46,17 @@ export default function PerfilTab() {
   const logout = useAuthStore((s) => s.logout);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [prefs, setPrefs] = useState<PreferenciasNotificacion>(DEFAULT_PREFS);
+  const [prefError, setPrefError] = useState<string | null>(null);
+  const [prefSaved, setPrefSaved] = useState(false);
+  const [prefSaving, setPrefSaving] = useState(false);
 
   const refreshPerfil = useCallback(async () => {
     const perfil = await PerfilService.getMe();
-    if (perfil) setUsuario(perfil);
+    if (perfil) {
+      setUsuario(perfil);
+      setPrefs(normalizePrefs(perfil.preferencias_notificacion));
+    }
   }, [setUsuario]);
 
   useFocusEffect(
@@ -67,87 +77,168 @@ export default function PerfilTab() {
     }
   }, [refreshPerfil]);
 
+  useEffect(() => {
+    if (!prefSaved) return;
+    const timer = setTimeout(() => setPrefSaved(false), 2500);
+    return () => clearTimeout(timer);
+  }, [prefSaved]);
+
+  const updatePref = useCallback(
+    async (key: keyof PreferenciasNotificacion, value: boolean) => {
+      const previous = prefs;
+      const next = { ...prefs, [key]: value };
+      setPrefs(next);
+      setPrefError(null);
+      setPrefSaved(false);
+      setPrefSaving(true);
+      try {
+        const updated = await PerfilService.updateMe({
+          preferencias_notificacion: next,
+        });
+        setUsuario(updated);
+        setPrefs(normalizePrefs(updated.preferencias_notificacion));
+        setPrefSaved(true);
+      } catch (err: unknown) {
+        setPrefs(previous);
+        setPrefError(
+          err instanceof Error
+            ? err.message
+            : "No se pudieron guardar las preferencias.",
+        );
+      } finally {
+        setPrefSaving(false);
+      }
+    },
+    [prefs, setUsuario],
+  );
+
   const nombreCompleto = [usuario?.nombre, usuario?.apellido]
     .filter(Boolean)
     .join(" ");
+  const initial = initialsFromName(usuario?.nombre, usuario?.apellido);
 
   return (
     <AppScreen
       title="Perfil"
-      subtitle="Tu ficha de jugador"
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}
     >
       {loading && !usuario ? (
-        <View className="gap-3">
-          <Skeleton className="mx-auto h-24 w-24 rounded-full" />
-          <Skeleton className="h-16" />
-          <Skeleton className="h-16" />
+        <View className="gap-4">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
         </View>
       ) : (
-        <View className="gap-5">
-          <View className="items-center gap-3">
+        <View className="gap-6">
+          <View className="flex-row items-center gap-3 rounded-card border border-brand-border bg-brand-surface p-4">
             {usuario?.avatar_url ? (
               <Image
                 source={{ uri: usuario.avatar_url }}
-                style={{ width: 96, height: 96, borderRadius: 48 }}
+                style={{ width: 56, height: 56, borderRadius: 28 }}
                 contentFit="cover"
               />
             ) : (
-              <View className="h-24 w-24 items-center justify-center rounded-full bg-brand-chartreuse/10">
-                <FontAwesome name="user" size={36} color="#CBFE01" />
+              <View className="h-14 w-14 items-center justify-center rounded-full bg-brand-chartreuse">
+                <Text className="font-sans-bold text-xl text-black">
+                  {initial}
+                </Text>
               </View>
             )}
-            <View className="items-center">
-              <Text className="font-sans-bold text-2xl text-white">
+
+            <View className="min-w-0 flex-1">
+              <Text
+                className="font-sans-bold text-lg text-white"
+                numberOfLines={1}
+              >
                 {nombreCompleto || "Jugador"}
               </Text>
-              <Text className="font-sans text-sm text-brand-muted">
-                {usuario?.email}
+              <Text
+                className="font-sans text-sm text-brand-muted"
+                numberOfLines={1}
+              >
+                {usuario?.email || "Sin email"}
               </Text>
             </View>
+
+            <Pressable
+              onPress={() => router.push("/perfil/datos-personales")}
+              className="rounded-full border border-brand-border bg-brand-elevated px-4 py-2 active:opacity-80"
+            >
+              <Text className="font-sans-semibold text-sm text-brand-chartreuse">
+                Editar
+              </Text>
+            </Pressable>
           </View>
 
-          <View className="gap-2">
-            <PerfilRow
-              label="Categoría"
-              value={usuario?.categoria_padel}
-              icon="trophy"
+          <SettingsSection title="CUENTA">
+            <SettingsNavRow
+              label="Datos personales"
+              icon={{ set: "fa", name: "user-o" }}
+              onPress={() => router.push("/perfil/datos-personales")}
             />
-            <PerfilRow
-              label="Lado preferido"
-              value={usuario?.lado_preferido}
-              icon="exchange"
+            <SettingsNavRow
+              label="Mi licencia"
+              icon={{ set: "mci", name: "shield-check-outline" }}
+              onPress={() => router.push("/perfil/licencia")}
             />
-            <PerfilRow
-              label="Provincia"
-              value={usuario?.lugar_residencia}
-              icon="map-marker"
+            <SettingsNavRow
+              label="Métodos de pago"
+              icon={{ set: "fa", name: "credit-card" }}
+              onPress={() => router.push("/perfil/metodos-pago")}
+              isLast
             />
-            <PerfilRow label="DNI" value={usuario?.dni} icon="id-card" />
-            <PerfilRow
-              label="Fecha de nacimiento"
-              value={
-                usuario?.fecha_nacimiento
-                  ? formatDateDisplay(usuario.fecha_nacimiento)
-                  : null
-              }
-              icon="birthday-cake"
-            />
-            <PerfilRow
-              label="Ranking nacional"
-              value={String(usuario?.ranking_nacional ?? 0)}
-              icon="line-chart"
-            />
-          </View>
+          </SettingsSection>
 
-          <Button
-            label="Cerrar sesión"
-            variant="ghost"
+          <SettingsSection title="NOTIFICACIONES">
+            <SettingsToggleRow
+              label="Notificaciones push"
+              icon={{ set: "fa", name: "bell-o" }}
+              value={prefs.push}
+              onValueChange={(value) => void updatePref("push", value)}
+            />
+            <SettingsToggleRow
+              label="Email"
+              icon={{ set: "fa", name: "envelope-o" }}
+              value={prefs.email}
+              onValueChange={(value) => void updatePref("email", value)}
+            />
+            <SettingsToggleRow
+              label="WhatsApp"
+              icon={{ set: "mci", name: "whatsapp" }}
+              value={prefs.whatsapp}
+              onValueChange={(value) => void updatePref("whatsapp", value)}
+              isLast
+            />
+          </SettingsSection>
+
+          {prefSaving ? (
+            <Text className="font-sans text-sm text-brand-muted">
+              Guardando preferencias...
+            </Text>
+          ) : null}
+          {prefSaved && !prefError && !prefSaving ? (
+            <View className="self-start rounded-full border border-brand-chartreuse/30 bg-brand-chartreuse/10 px-3 py-1.5">
+              <Text className="font-sans text-xs text-brand-chartreuse">
+                Preferencias guardadas
+              </Text>
+            </View>
+          ) : null}
+          {prefError ? (
+            <Text className="font-sans text-sm text-red-400">{prefError}</Text>
+          ) : null}
+
+          <Pressable
             onPress={() => {
               void logout().then(() => router.replace("/(auth)/login"));
             }}
-          />
+            className="mt-2 h-14 flex-row items-center justify-center gap-3 rounded-card border border-red-900/70 bg-red-950/40 active:opacity-80"
+          >
+            <FontAwesome name="sign-out" size={18} color="#F87171" />
+            <Text className="font-sans-semibold text-base text-red-400">
+              Cerrar sesión
+            </Text>
+          </Pressable>
         </View>
       )}
     </AppScreen>

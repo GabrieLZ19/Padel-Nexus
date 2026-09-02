@@ -4,6 +4,7 @@ import { api } from "@/src/services/api";
 import type {
   AuthResponse,
   Perfil,
+  PerfilPublico,
   RegistroPayload,
 } from "@/src/types/user.types";
 
@@ -67,6 +68,22 @@ export const PerfilService = {
     }
   },
 
+  async getPublico(userId: string): Promise<PerfilPublico | null> {
+    try {
+      const response = await api.get<ApiResponse<PerfilPublico>>(
+        `/perfil/publico/${userId}`,
+      );
+      return response.data.data ?? null;
+    } catch (error: unknown) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      throw new Error(
+        getErrorMessage(error, "No se pudo cargar el perfil del jugador."),
+      );
+    }
+  },
+
   async updateMe(perfilData: Partial<Perfil>): Promise<Perfil> {
     try {
       const response = await api.put<ApiResponse<Perfil>>(
@@ -76,6 +93,18 @@ export const PerfilService = {
       return response.data.data;
     } catch (error: unknown) {
       throw new Error(getErrorMessage(error, "No se pudo actualizar el perfil."));
+    }
+  },
+
+  async subirAvatar(avatarBase64: string): Promise<string> {
+    try {
+      const response = await api.post<ApiResponse<{ avatar_url: string }>>(
+        "/perfil/avatar",
+        { avatar_base64: avatarBase64 },
+      );
+      return response.data.data.avatar_url;
+    } catch (error: unknown) {
+      throw new Error(getErrorMessage(error, "No se pudo subir el avatar."));
     }
   },
 
@@ -127,6 +156,16 @@ export const PerfilService = {
     } catch (error: unknown) {
       throw new Error(
         getErrorMessage(error, "No se pudo iniciar sesión con Google."),
+      );
+    }
+  },
+
+  async registrarPushToken(expoPushToken: string): Promise<void> {
+    try {
+      await api.post("/perfil/push-token", { token: expoPushToken });
+    } catch (error: unknown) {
+      throw new Error(
+        getErrorMessage(error, "No se pudo registrar notificaciones push."),
       );
     }
   },

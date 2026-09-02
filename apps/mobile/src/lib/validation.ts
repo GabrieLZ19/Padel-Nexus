@@ -1,3 +1,8 @@
+export function validateNombre(val: string): boolean {
+  const trimmed = val.trim();
+  return trimmed.length >= 2 && !/\d/.test(trimmed);
+}
+
 export function validateDni(val: string): boolean {
   return /^(?:\d{1,2}\.?\d{3}\.?\d{3}|\d{7,8})$/.test(val.trim());
 }

@@ -62,6 +62,13 @@ export default function RootLayout() {
             <Stack.Screen name="index" />
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="perfil" />
+            <Stack.Screen name="torneo" />
+            <Stack.Screen name="jugador" />
+            <Stack.Screen name="ranking" />
+            <Stack.Screen name="reservar" />
+            <Stack.Screen name="market" />
+            <Stack.Screen name="pago" />
             <Stack.Screen
               name="notificaciones"
               options={{ presentation: "modal", animation: "slide_from_bottom" }}

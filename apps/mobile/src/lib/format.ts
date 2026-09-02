@@ -24,6 +24,12 @@ export function formatCurrencyArs(value: number): string {
   }).format(value);
 }
 
+/** Código corto legible para órdenes (ORD-183382AF). */
+export function formatOrdenSlug(id?: string | null): string {
+  if (!id) return "ORD-----";
+  return `ORD-${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+}
+
 export function formatDateShort(iso?: string | null): string {
   if (!iso) return "Sin fecha";
   const date = parseIsoDate(iso);

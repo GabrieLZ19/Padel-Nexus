@@ -3,6 +3,7 @@ import { Redirect, Tabs } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 
 import { useAuthStore } from "@/src/stores/authStore";
+import { usePushNotifications } from "@/src/hooks/usePushNotifications";
 
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof FontAwesome>["name"];
@@ -14,6 +15,8 @@ function TabBarIcon(props: {
 export default function TabLayout() {
   const isHydrated = useAuthStore((s) => s.isHydrated);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  usePushNotifications(isHydrated && isAuthenticated);
 
   if (!isHydrated) {
     return (

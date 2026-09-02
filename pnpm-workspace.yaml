@@ -3,3 +3,7 @@ allowBuilds:
   core-js: true
   sharp: true
   unrs-resolver: true
+overrides:
+  expo-location: "~19.0.8"
+  expo-device: "~8.0.10"
+  expo-notifications: "~0.32.17"

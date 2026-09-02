@@ -7,6 +7,12 @@ export type RolUsuario =
   | "admin_federacion"
   | "superadmin";
 
+export interface PreferenciasNotificacion {
+  push: boolean;
+  email: boolean;
+  whatsapp: boolean;
+}
+
 export interface Perfil {
   id: string;
   nombre: string | null;
@@ -24,7 +30,20 @@ export interface Perfil {
   fecha_nacimiento?: string | null;
   sexo?: "masculino" | "femenino" | "otro" | null;
   club_id: string | null;
+  preferencias_notificacion?: PreferenciasNotificacion | null;
   created_at?: string;
+}
+
+export interface PerfilPublico {
+  id: string;
+  nombre: string | null;
+  apellido: string | null;
+  avatar_url: string | null;
+  categoria_padel: string | null;
+  lado_preferido: string | null;
+  lugar_residencia: string | null;
+  sexo?: string | null;
+  clubes?: { id?: string; nombre?: string | null } | null;
 }
 
 export interface AuthResponse {

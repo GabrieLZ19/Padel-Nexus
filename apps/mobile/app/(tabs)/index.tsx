@@ -14,6 +14,10 @@ import {
   filtrarTorneosInscribibles,
   getProximaReserva,
 } from "@/src/lib/format";
+import {
+  hrefTorneoDetalle,
+  hrefTorneoInscripcion,
+} from "@/src/lib/navigation";
 import { NotificacionesService } from "@/src/services/notificaciones";
 import { ReservasService } from "@/src/services/reservas";
 import { TorneosService } from "@/src/services/torneos";
@@ -96,12 +100,12 @@ export default function HomeScreen() {
           <QuickAction
             label="Ranking"
             icon={{ set: "mci", name: "medal-outline" }}
-            onPress={() => router.push("/(tabs)/torneos")}
+            onPress={() => router.push("/ranking")}
           />
           <QuickAction
             label="Licencia"
             icon={{ set: "mci", name: "shield-check-outline" }}
-            onPress={() => router.push("/(tabs)/perfil")}
+            onPress={() => router.push("/perfil/licencia")}
           />
         </View>
 
@@ -130,8 +134,10 @@ export default function HomeScreen() {
                   key={torneo.id}
                   torneo={torneo}
                   variant="featured"
-                  onPress={() => router.push("/(tabs)/torneos")}
-                  onInscribirmePress={() => router.push("/(tabs)/torneos")}
+                  onPress={() => router.push(hrefTorneoDetalle(torneo.id))}
+                  onInscribirmePress={() =>
+                    router.push(hrefTorneoInscripcion(torneo.id))
+                  }
                 />
               ))}
             </View>

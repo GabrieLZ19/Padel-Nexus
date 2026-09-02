@@ -114,3 +114,74 @@ export function mergeDateParts(
   if (day > maxDay) day = maxDay;
   return { year, month, day };
 }
+
+export function proximosDias(cantidad = 14): { fecha: string; label: string }[] {
+  const hoy = createLocalDate(
+    new Date().getFullYear(),
+    new Date().getMonth() + 1,
+    new Date().getDate(),
+  );
+  const items: { fecha: string; label: string }[] = [];
+
+  for (let i = 0; i < cantidad; i++) {
+    const date = new Date(hoy);
+    date.setDate(hoy.getDate() + i);
+    const parts = toDateParts(date);
+    const weekday = WEEKDAY_LABELS[date.getDay()];
+    const label =
+      i === 0
+        ? "Hoy"
+        : i === 1
+          ? "Mañana"
+          : `${capitalize(weekday)} ${parts.day}/${parts.month}`;
+    items.push({ fecha: formatIsoDate(date), label });
+  }
+
+  return items;
+}
+
+/** Etiquetas cortas para selector de fecha (Hoy 14, Dom 15). */
+export function proximosDiasSelector(cantidad = 7): {
+  fecha: string;
+  diaCorto: string;
+  numero: string;
+  esHoy: boolean;
+}[] {
+  const hoy = createLocalDate(
+    new Date().getFullYear(),
+    new Date().getMonth() + 1,
+    new Date().getDate(),
+  );
+  const diasCortos = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const items: {
+    fecha: string;
+    diaCorto: string;
+    numero: string;
+    esHoy: boolean;
+  }[] = [];
+
+  for (let i = 0; i < cantidad; i++) {
+    const date = new Date(hoy);
+    date.setDate(hoy.getDate() + i);
+    const parts = toDateParts(date);
+    items.push({
+      fecha: formatIsoDate(date),
+      diaCorto: i === 0 ? "Hoy" : diasCortos[date.getDay()],
+      numero: String(parts.day),
+      esHoy: i === 0,
+    });
+  }
+
+  return items;
+}
+
+export function duracionMinutos(
+  horaInicio?: string | null,
+  horaFin?: string | null,
+): number | null {
+  if (!horaInicio || !horaFin) return null;
+  const [hi, mi] = horaInicio.split(":").map(Number);
+  const [hf, mf] = horaFin.split(":").map(Number);
+  if ([hi, mi, hf, mf].some((n) => Number.isNaN(n))) return null;
+  return hf * 60 + mf - (hi * 60 + mi);
+}

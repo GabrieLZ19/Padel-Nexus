@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
@@ -9,14 +10,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ReservaCard } from "@/src/components/cards/ReservaCard";
+import { Button } from "@/src/components/ui/Button";
 import { SegmentTabs } from "@/src/components/ui/SegmentTabs";
 import { Skeleton } from "@/src/components/ui/Skeleton";
-import { Button } from "@/src/components/ui/Button";
 import { parseIsoDate } from "@/src/lib/dateUtils";
+import { hrefReservaDetalle, hrefReservarNueva } from "@/src/lib/navigation";
 import { ReservasService } from "@/src/services/reservas";
-import { ClubesService } from "@/src/services/clubes";
 import type { ReservaUsuario } from "@/src/types/reserva.types";
-import type { Club } from "@/src/types/club.types";
 
 type ReservasTab = "proximas" | "pasadas";
 
@@ -29,21 +29,16 @@ function esPasada(reserva: ReservaUsuario): boolean {
 }
 
 export default function ReservarTab() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<ReservasTab>("proximas");
   const [reservas, setReservas] = useState<ReservaUsuario[]>([]);
-  const [clubes, setClubes] = useState<Club[]>([]);
-  const [showClubes, setShowClubes] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [misReservas, clubesData] = await Promise.all([
-      ReservasService.getMisReservas().catch(() => []),
-      ClubesService.getAll({ limit: 30 }).catch(() => []),
-    ]);
+    const misReservas = await ReservasService.getMisReservas().catch(() => []);
     setReservas(misReservas);
-    setClubes(clubesData);
   }, []);
 
   useEffect(() => {
@@ -73,13 +68,7 @@ export default function ReservarTab() {
   return (
     <FlatList
       className="flex-1 bg-brand-black"
-      data={
-        loading
-          ? []
-          : showClubes
-            ? (clubes as Array<Club | ReservaUsuario>)
-            : filtered
-      }
+      data={loading ? [] : filtered}
       keyExtractor={(item) => item.id}
       contentContainerStyle={{
         paddingTop: insets.top + 16,
@@ -91,67 +80,49 @@ export default function ReservarTab() {
       ListHeaderComponent={
         <View className="mb-4 gap-4">
           <View className="flex-row items-center justify-between">
-            <Text className="font-sans-bold text-3xl text-white">
-              {showClubes ? "Elegir club" : "Mis reservas"}
-            </Text>
-            {!showClubes ? (
-              <Pressable onPress={() => setShowClubes(true)}>
-                <Text className="font-sans-semibold text-sm text-brand-chartreuse">
-                  Nueva
-                </Text>
-              </Pressable>
-            ) : (
-              <Pressable onPress={() => setShowClubes(false)}>
-                <Text className="font-sans-semibold text-sm text-brand-chartreuse">
-                  Volver
-                </Text>
-              </Pressable>
-            )}
+            <Text className="font-sans-bold text-3xl text-white">Mis reservas</Text>
+            <Pressable onPress={() => router.push(hrefReservarNueva())}>
+              <Text className="font-sans-semibold text-sm text-brand-chartreuse">
+                Nueva
+              </Text>
+            </Pressable>
           </View>
 
-          {!showClubes ? (
-            <SegmentTabs
-              value={tab}
-              onChange={setTab}
-              options={[
-                { id: "proximas", label: "Próximas" },
-                { id: "pasadas", label: "Pasadas" },
-              ]}
-            />
-          ) : null}
+          <SegmentTabs
+            value={tab}
+            onChange={setTab}
+            options={[
+              { id: "proximas", label: "Próximas" },
+              { id: "pasadas", label: "Pasadas" },
+            ]}
+          />
         </View>
       }
-      renderItem={({ item }) =>
-        showClubes ? (
-          <View className="rounded-card border border-brand-border bg-brand-surface p-4">
-            <Text className="font-sans-bold text-base text-white">
-              {(item as Club).nombre}
-            </Text>
-            <Text className="mt-1 font-sans text-sm text-brand-muted">
-              {(item as Club).localidad}, {(item as Club).provincia}
-            </Text>
-          </View>
-        ) : (
-          <ReservaCard reserva={item as ReservaUsuario} />
-        )
-      }
+      renderItem={({ item }) => (
+        <ReservaCard
+          reserva={item}
+          onPress={() => router.push(hrefReservaDetalle(item.id))}
+          onDetalle={() => router.push(hrefReservaDetalle(item.id))}
+        />
+      )}
       ListEmptyComponent={
         loading ? (
           <View className="gap-3">
-            <Skeleton className="h-28" />
-            <Skeleton className="h-28" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-32" />
           </View>
         ) : (
           <View className="flex-1 items-center justify-center gap-4 rounded-card border border-brand-border bg-brand-surface p-6">
             <Text className="text-center font-sans text-base text-brand-muted">
-              {showClubes
-                ? "No hay clubes disponibles."
-                : tab === "proximas"
-                  ? "No tenés reservas próximas."
-                  : "No tenés reservas pasadas."}
+              {tab === "proximas"
+                ? "No tenés reservas próximas."
+                : "No tenés reservas pasadas."}
             </Text>
-            {!showClubes ? (
-              <Button label="Reservar cancha" onPress={() => setShowClubes(true)} />
+            {tab === "proximas" ? (
+              <Button
+                label="Reservar cancha"
+                onPress={() => router.push(hrefReservarNueva())}
+              />
             ) : null}
           </View>
         )

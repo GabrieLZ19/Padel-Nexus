@@ -7,4 +7,11 @@ export interface Club {
   canchas: number;
   estado: string;
   distancia_km?: number | null;
+  latitud?: number | null;
+  longitud?: number | null;
+}
+
+export interface ClubConDisponibilidad extends Club {
+  horarios_hoy?: string[];
+  precio_desde?: number | null;
 }

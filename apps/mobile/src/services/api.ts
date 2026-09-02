@@ -15,6 +15,7 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
+  config.headers["X-Padel-Client"] = "mobile";
   const token = await getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
@@ -19,6 +20,10 @@ import {
   filtrarTorneosPublicos,
   type FiltroEstadoTorneo,
 } from "@/src/lib/format";
+import {
+  hrefTorneoDetalle,
+  hrefTorneoInscripcion,
+} from "@/src/lib/navigation";
 import { TorneosService } from "@/src/services/torneos";
 import { useAuthStore } from "@/src/stores/authStore";
 import type { Torneo } from "@/src/types/torneo.types";
@@ -26,6 +31,7 @@ import type { Torneo } from "@/src/types/torneo.types";
 type TorneosTab = "disponibles" | "mis";
 
 export default function TorneosTabScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const usuario = useAuthStore((s) => s.usuario);
   const [torneos, setTorneos] = useState<Torneo[]>([]);
@@ -173,7 +179,14 @@ export default function TorneosTabScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <TorneoCard torneo={item} variant="featured" />
+          <TorneoCard
+            torneo={item}
+            variant="featured"
+            onPress={() => router.push(hrefTorneoDetalle(item.id))}
+            onInscribirmePress={() =>
+              router.push(hrefTorneoInscripcion(item.id))
+            }
+          />
         )}
         ListEmptyComponent={
           loading ? (

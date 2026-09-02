@@ -1,4 +1,5 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
@@ -14,13 +15,21 @@ import { MarketCategoryIcon } from "@/src/components/market/MarketCategoryIcon";
 import { SearchField } from "@/src/components/ui/SearchField";
 import { Skeleton } from "@/src/components/ui/Skeleton";
 import { MarketplaceService } from "@/src/services/marketplace";
+import {
+  hrefMarketCarrito,
+  hrefMarketOrdenes,
+  hrefMarketProducto,
+} from "@/src/lib/navigation";
+import { useCartStore } from "@/src/stores/cartStore";
 import type {
   CategoriaMarketplace,
   ProductoMarketplace,
 } from "@/src/types/marketplace.types";
 
 export default function MarketTab() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+  const cartCount = useCartStore((s) => s.totalItems());
   const [productos, setProductos] = useState<ProductoMarketplace[]>([]);
   const [categorias, setCategorias] = useState<CategoriaMarketplace[]>([]);
   const [categoriaActiva, setCategoriaActiva] = useState<string | null>(null);
@@ -83,12 +92,26 @@ export default function MarketTab() {
         <View className="mb-2 gap-4">
           <View className="flex-row items-center justify-between">
             <Text className="font-sans-bold text-3xl text-white">Market</Text>
-            <Pressable className="relative h-11 w-11 items-center justify-center rounded-full border border-brand-border bg-brand-surface">
-              <FontAwesome name="shopping-cart" size={18} color="#FFFFFF" />
-              <View className="absolute -right-0.5 -top-0.5 h-4 w-4 items-center justify-center rounded-full bg-brand-chartreuse">
-                <Text className="font-sans-bold text-[10px] text-black">0</Text>
-              </View>
+          <View className="flex-row items-center gap-2">
+            <Pressable onPress={() => router.push(hrefMarketOrdenes())}>
+              <Text className="font-sans-semibold text-sm text-brand-chartreuse">
+                Mis compras
+              </Text>
             </Pressable>
+            <Pressable
+              onPress={() => router.push(hrefMarketCarrito())}
+              className="relative h-11 w-11 items-center justify-center rounded-full border border-brand-border bg-brand-surface"
+            >
+              <FontAwesome name="shopping-cart" size={18} color="#FFFFFF" />
+              {cartCount > 0 ? (
+                <View className="absolute -right-0.5 -top-0.5 h-4 min-w-[16px] items-center justify-center rounded-full bg-brand-chartreuse px-1">
+                  <Text className="font-sans-bold text-[10px] text-black">
+                    {cartCount > 9 ? "9+" : cartCount}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+          </View>
           </View>
 
           <SearchField
@@ -144,7 +167,12 @@ export default function MarketTab() {
           ) : null}
         </View>
       }
-      renderItem={({ item }) => <ProductCard producto={item} />}
+      renderItem={({ item }) => (
+        <ProductCard
+          producto={item}
+          onPress={() => router.push(hrefMarketProducto(item.id))}
+        />
+      )}
       ListEmptyComponent={
         loading ? (
           <View className="flex-row flex-wrap gap-3">
