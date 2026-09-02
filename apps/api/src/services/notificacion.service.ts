@@ -56,7 +56,8 @@ export class NotificacionService {
       console.warn("⚠️ No se pudo emitir notificación por websocket:", socketErr);
     }
 
-    if (prefs.expo_push_token && prefs.push !== false) {
+    // prefs.push === false ya se filtró arriba; acá solo enviamos si hay token.
+    if (prefs.expo_push_token) {
       void PushNotificationService.enviarExpoPush({
         expoPushToken: prefs.expo_push_token,
         titulo,
