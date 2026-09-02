@@ -1,0 +1,34 @@
+# EAS upload: keep the archive lean for mobile builds
+.git/
+.cursor/
+.agents/
+.vscode/
+.turbo/
+**/.expo/
+**/dist/
+**/web-build/
+**/coverage/
+**/.next/
+**/android/
+**/ios/
+
+# Other apps / docs not needed for mobile native build
+apps/web/
+apps/api/
+*.pdf
+*.md
+!apps/mobile/**/*.md
+
+# Dependencies are installed on EAS workers
+node_modules/
+**/node_modules/
+
+# Local env / secrets
+.env
+.env.*
+!**/.env.example
+
+# Large / irrelevant
+**/*.log
+**/.DS_Store
+**/Thumbs.db
