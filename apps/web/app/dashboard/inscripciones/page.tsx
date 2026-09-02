@@ -119,7 +119,7 @@ export default function GestionInscripcionesPage() {
           isOpen: true,
           type: "success",
           title: "Importación completada",
-          description: `Se importaron ${resultado.inscripcionesOk} ${isIndiv ? "jugadores" : "parejas"}. ${resultado.jugadoresCreados > 0 ? `Se crearon ${resultado.jugadoresCreados} perfiles nuevos pendientes de activación.` : ""}`,
+          description: `Se importaron ${resultado.inscripcionesOk} ${isIndiv ? "jugadores" : "parejas"}.${resultado.jugadoresCreados > 0 ? ` Se crearon ${resultado.jugadoresCreados} ficha(s) de jugador nuevas con los datos de la planilla.` : ""}`,
           onClose: () =>
             setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
         });

@@ -360,7 +360,7 @@ export function puedeUsarReglamentoAmateur(rol: RolUsuario): boolean {
 
 /**
  * Armado de zonas según reglamento del Paso 1.
- * - FAP / APA: preferir 3; resto → zonas de 4 (reglamento oficial)
+ * - FAP / APA: preferir 3; sobrante 1 → zona de 4 en A; sobrante 2 → zonas de 4 en A y B
  * - Amateur: preferir 4 (formato club / independiente más flexible)
  */
 export function getCapacidadesZonasPorReglamento(
@@ -375,11 +375,12 @@ export function getCapacidadesZonasPorReglamento(
   return getCapacidadesZonasPreferidas(total, 3);
 }
 
-/** Capacidad de zonas FAP: preferir 3; si sobran 2 → dos zonas de 4. */
+/** Capacidad de zonas FAP: preferir 3; sobrante 1 → zona de 4 en A; sobrante 2 → zonas de 4 en A y B. */
 export function getCapacidadesZonasFap(total: number): number[] {
   return getCapacidadesZonasPreferidas(total, 3);
 }
 
+/** Capacidad de zonas FAP: preferir 3; sobrante 1 → zona de 4 en A; sobrante 2 → zonas de 4 en A y B. */
 function getCapacidadesZonasPreferidas(
   total: number,
   preferredSize: 3 | 4,
@@ -390,11 +391,11 @@ function getCapacidadesZonasPreferidas(
     if (mod === 0) return Array(total / 3).fill(3);
     if (mod === 1) {
       const count3 = Math.floor((total - 4) / 3);
-      if (count3 >= 0) return [...Array(count3).fill(3), 4];
+      if (count3 >= 0) return [4, ...Array(count3).fill(3)];
     }
     if (mod === 2) {
       const count3 = Math.floor((total - 8) / 3);
-      if (count3 >= 0) return [...Array(count3).fill(3), 4, 4];
+      if (count3 >= 0) return [4, 4, ...Array(count3).fill(3)];
     }
     if (total === 5) return [3, 2];
     if (total === 4) return [4];

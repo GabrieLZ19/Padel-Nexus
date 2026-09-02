@@ -7,7 +7,6 @@ import {
   Users,
   User,
   Trash2,
-  Info,
 } from "lucide-react";
 import { Torneo, Inscripcion } from "@/utils/types";
 import { InscripcionesService } from "@/utils/services/inscripciones";
@@ -26,28 +25,6 @@ import {
   leerPlanillaDesdeArchivo,
 } from "@/utils/inscripcionPlanilla";
 import { esModalidadIndividual } from "@/utils/formatFecha";
-
-function jugadoresPendienteActivacion(ins: Inscripcion): string[] {
-  const pendientes: string[] = [];
-  if (ins.perfiles?.pendiente_activacion === true) {
-    pendientes.push(ins.jugador1_nombre || "Jugador 1");
-  }
-  if (ins.perfiles_jugador2?.pendiente_activacion === true) {
-    pendientes.push(ins.jugador2_nombre || "Jugador 2");
-  }
-  return pendientes;
-}
-
-function mensajePreinscripcionPendiente(ins: Inscripcion): string {
-  const pendientes = jugadoresPendienteActivacion(ins);
-  if (pendientes.length === 0) return "";
-
-  const lista = pendientes.join(" y ");
-  if (pendientes.length > 1) {
-    return `${lista} ya están preinscriptos. Deben registrarse en la App con su DNI para validar sus datos.`;
-  }
-  return `${lista} ya está preinscripto/a. Debe registrarse en la App con su DNI para validar sus datos.`;
-}
 
 function apiErrorMessage(error: unknown, fallback: string): string {
   const e = error as {
@@ -106,12 +83,6 @@ export const Paso4Jugadores = ({
     (i) => i.estado_pago === "Confirmado",
   ).length;
 
-  const preinscriptosCount = inscripciones.filter(
-    (i) =>
-      i.perfiles?.pendiente_activacion === true ||
-      i.perfiles_jugador2?.pendiente_activacion === true,
-  ).length;
-
   const handleDescargarPlantilla = () => {
     descargarPlantillaInscripcion({
       alcance: torneo.alcance,
@@ -154,7 +125,7 @@ export const Paso4Jugadores = ({
           isOpen: true,
           type: "success",
           title: "Importación completada",
-          description: `Se importaron ${resultado.inscripcionesOk} ${isIndiv ? "jugadores" : "parejas"}.${resultado.jugadoresCreados > 0 ? ` ${resultado.jugadoresCreados} jugador(es) quedaron preinscriptos: deberán registrarse en la App con su DNI para validar sus datos.` : ""}`,
+          description: `Se importaron ${resultado.inscripcionesOk} ${isIndiv ? "jugadores" : "parejas"}.${resultado.jugadoresCreados > 0 ? ` Se crearon ${resultado.jugadoresCreados} ficha(s) de jugador nuevas con los datos de la planilla.` : ""}`,
         }));
       } else {
         setFeedbackModal((prev: { isOpen?: boolean }) => ({
@@ -271,23 +242,6 @@ export const Paso4Jugadores = ({
         </div>
       </div>
 
-      {preinscriptosCount > 0 && (
-        <div className="mx-6 mt-4 flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-chartreuse/10">
-            <Info className="size-4 text-brand-chartreuse" />
-          </div>
-          <p className="text-xs leading-relaxed text-gray-400">
-            <span className="font-semibold text-gray-300">
-              {preinscriptosCount} jugador
-              {preinscriptosCount === 1 ? "" : "es"} preinscripto
-              {preinscriptosCount === 1 ? "" : "s"}
-            </span>{" "}
-            desde planilla. La inscripción ya está cargada; solo falta que se
-            registren en la App con su DNI para validar sus datos.
-          </p>
-        </div>
-      )}
-
       {/* Tabla de Inscritos */}
       {inscripciones.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-12 text-center text-gray-500">
@@ -310,11 +264,6 @@ export const Paso4Jugadores = ({
             <tbody className="divide-y divide-white/5">
               {inscripciones.map((ins) => {
                 const isConfirmed = ins.estado_pago === "Confirmado";
-                const isPendienteRegistro =
-                  ins.perfiles?.pendiente_activacion === true ||
-                  ins.perfiles_jugador2?.pendiente_activacion === true;
-                const tooltipPreinscripcion =
-                  mensajePreinscripcionPendiente(ins);
                 return (
                   <tr
                     key={ins.id}
@@ -367,15 +316,6 @@ export const Paso4Jugadores = ({
                             showAvatars={false}
                             variant="inline"
                           />
-                          {isPendienteRegistro && (
-                            <span
-                              title={tooltipPreinscripcion}
-                              className="inline-flex items-center gap-1.5 rounded-md border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-300/90"
-                            >
-                              <span className="size-1.5 shrink-0 rounded-full bg-sky-400" />
-                              Validar en App
-                            </span>
-                          )}
                         </div>
                       </div>
                     </td>

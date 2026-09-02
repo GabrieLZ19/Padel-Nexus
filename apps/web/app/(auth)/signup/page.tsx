@@ -256,7 +256,7 @@ export default function SignUpPage() {
       if (p.lado_preferido) setLadoPreferido(p.lado_preferido);
 
       setPreinscripcionMsg(
-        "Encontramos tus datos de una inscripción previa. Completá email y contraseña para activar tu cuenta.",
+        "Encontramos tus datos cargados por tu asociación. Completá email y contraseña para activar tu cuenta en la App.",
       );
     } catch {
       // Sin preinscripción: flujo normal de registro

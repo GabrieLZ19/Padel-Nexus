@@ -27,6 +27,10 @@ import { GripVertical } from "lucide-react";
 import { MatchCard } from "./MatchCard";
 import { Partido } from "@/utils/types";
 import { PairDisplay } from "@/components/torneos/PairDisplay";
+import {
+  clasificadosPorZona,
+  textoClasificacionZonas,
+} from "@/utils/clasificacionZonas";
 
 const cleanName = (name?: string | null) => {
   if (!name) return "";
@@ -38,30 +42,11 @@ const cleanName = (name?: string | null) => {
   return cleaned;
 };
 
-const getClasificanTexto = (totalZonas: number) => {
-  if (totalZonas <= 0) return "Clasifican 2";
-  if (totalZonas === 1) return "Clasifican 2";
-  if (totalZonas === 2) return "Clasifican 2 por zona";
-  if (totalZonas === 3) return "Clasifica 1 por zona + 1 mejor 2º";
-  if (totalZonas === 4) return "Clasifican 2 por zona";
-  if (totalZonas === 5) return "Clasifica 1 por zona + 3 mejores 2º";
-  if (totalZonas === 6) return "Clasifica 1 por zona + 2 mejores 2º";
-  if (totalZonas === 7) return "Clasifica 1 por zona + 9 mejores 2º";
-  if (totalZonas === 8) return "Clasifican 2 por zona";
-  return "Clasifican 2 por zona";
-};
+const getClasificanTexto = (zonas: ZonaDrag[]) =>
+  textoClasificacionZonas(zonas.map((z) => ({ parejas: z.parejas })));
 
-const getLimiteClasificadosDirectos = (totalZonas: number) => {
-  if (
-    totalZonas === 3 ||
-    totalZonas === 5 ||
-    totalZonas === 6 ||
-    totalZonas === 7
-  ) {
-    return 1;
-  }
-  return 2;
-};
+const getLimiteClasificados = (parejasCount: number) =>
+  clasificadosPorZona(parejasCount);
 
 export interface ParejaDrag {
   id: string; // inscripcion_id
@@ -453,7 +438,7 @@ export const DroppableZona = ({
         </h4>
         {!isSiembra && (
           <span className="px-3 py-1 bg-black/40 rounded-full text-[10px] font-bold text-gray-400 uppercase tracking-wide">
-            {getClasificanTexto(totalZonas)}
+            {getClasificanTexto([zona])}
           </span>
         )}
       </div>
@@ -465,7 +450,7 @@ export const DroppableZona = ({
           {parejasConStats.map((pareja, index) => {
             const isClassified =
               !isEditing &&
-              index < getLimiteClasificadosDirectos(totalZonas) &&
+              index < getLimiteClasificados(zona.parejas.length) &&
               pareja.stats.played > 0;
             return (
               <SortablePareja

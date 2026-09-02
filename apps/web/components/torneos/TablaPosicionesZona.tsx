@@ -13,6 +13,7 @@ import {
   PairDisplay,
   esAlcanceNacional,
 } from "@/components/torneos/PairDisplay";
+import { clasificadosPorZona } from "@/utils/clasificacionZonas";
 
 export interface ParejaStats {
   inscripcionId: string;
@@ -53,6 +54,7 @@ interface TablaPosicionesZonaProps {
   }[];
   partidosZona: Partido[];
   alcance?: string | null;
+  capacidadZona?: number;
 }
 
 export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
@@ -60,9 +62,13 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
   parejasInscritas,
   partidosZona,
   alcance,
+  capacidadZona,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const nacional = esAlcanceNacional(alcance);
+  const cupoClasificacion = clasificadosPorZona(
+    capacidadZona ?? parejasInscritas.length,
+  );
 
   const cleanName = (name?: string | null) => {
     if (!name) return "";
@@ -280,7 +286,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
           </thead>
           <tbody className="divide-y divide-white/5 font-semibold text-gray-300">
             {stats.map((row, idx) => {
-              const isClasificado = idx < 2 && row.pj > 0;
+              const isClasificado = idx < cupoClasificacion && row.pj > 0;
               return (
                 <tr
                   key={row.inscripcionId}

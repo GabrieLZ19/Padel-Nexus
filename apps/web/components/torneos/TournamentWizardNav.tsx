@@ -156,7 +156,10 @@ export function TournamentWizardNav({
 
   const renderStepItem = (step: StepDefinition) => {
     const isActive = activeTab === step.id;
-    const isStepReadOnly = isReadOnlyMode && step.number <= 6;
+    const isStepReadOnly =
+      torneoEstado === "Finalizado"
+        ? step.number <= 6
+        : isReadOnlyMode && step.number <= 6 && step.id !== "times";
     const IconComponent = step.icon;
 
     return (

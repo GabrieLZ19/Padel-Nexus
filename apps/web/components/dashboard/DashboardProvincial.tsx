@@ -411,7 +411,7 @@ export default function DashboardProvincial() {
           </div>
           <div className="text-left">
             <p className="text-sm font-bold text-white">Red de Clubes</p>
-            <p className="text-[11px] text-gray-500">Contratar sedes y verificar afiliaciones</p>
+            <p className="text-[11px] text-gray-500">Gestionar sedes y clubes adheridos</p>
           </div>
         </button>
         <button

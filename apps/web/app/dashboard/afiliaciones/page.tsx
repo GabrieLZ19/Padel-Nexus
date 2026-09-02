@@ -101,7 +101,8 @@ export default function AfiliacionesAdminPage() {
           Afiliaciones
         </h1>
         <p className="text-sm text-gray-400 mt-1">
-          Aprobá o rechazá solicitudes de jugadores para asociarse a un club.
+          Operación interna: solicitudes de jugadores a clubes. En FAP, el vínculo
+          jugador–club se define al aprobar la licencia federativa.
         </p>
       </div>
 

@@ -8,6 +8,7 @@ import {
 } from "@/components/torneos/MatchTeamBox";
 import { api } from "@/utils/api";
 import { Trophy, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { zonaGrupoCompleta } from "@/utils/clasificacionZonas";
 
 interface PasoResultadosProps {
   torneo?: any;
@@ -95,21 +96,42 @@ export const PasoResultados = ({
     [partidos],
   );
 
+  const partidosZonaPorDefinir = useMemo(
+    () =>
+      sortPartidosEstable(
+        partidos.filter(
+          (p) =>
+            isZonaRonda(p.ronda) &&
+            (!p.equipo_a_id || !p.equipo_b_id) &&
+            p.ganador === null,
+        ),
+      ),
+    [partidos],
+  );
+
   const partidosFinalizados = useMemo(
     () => sortPartidosEstable(partidos.filter((p) => p.ganador !== null)),
     [partidos],
   );
 
   const {
+    gruposZonasPorDefinir,
     gruposZonas,
     partidosLlave,
     gruposZonasFinalizados,
     llaveFinalizados,
   } = useMemo(() => {
+    const zonasDefMap = new Map<string, Partido[]>();
     const zonasMap = new Map<string, Partido[]>();
     const zonasFinMap = new Map<string, Partido[]>();
     const llave: Partido[] = [];
     const llaveFin: Partido[] = [];
+
+    for (const p of partidosZonaPorDefinir) {
+      const key = String(p.ronda);
+      if (!zonasDefMap.has(key)) zonasDefMap.set(key, []);
+      zonasDefMap.get(key)!.push(p);
+    }
 
     for (const p of partidosJugables) {
       if (isZonaRonda(p.ronda)) {
@@ -145,34 +167,37 @@ export const PasoResultados = ({
         }));
 
     return {
+      gruposZonasPorDefinir: sortKeys(Array.from(zonasDefMap.entries())),
       gruposZonas: sortKeys(Array.from(zonasMap.entries())),
       partidosLlave: sortPartidosEstable(llave),
       gruposZonasFinalizados: sortKeys(Array.from(zonasFinMap.entries())),
       llaveFinalizados: sortPartidosEstable(llaveFin),
     };
-  }, [partidosJugables, partidosFinalizados]);
+  }, [partidosJugables, partidosFinalizados, partidosZonaPorDefinir]);
 
   const nombresZonas = useMemo(() => {
     const set = new Set<string>();
+    gruposZonasPorDefinir.forEach((g) => set.add(g.nombre));
     gruposZonas.forEach((g) => set.add(g.nombre));
     gruposZonasFinalizados.forEach((g) => set.add(g.nombre));
     return Array.from(set).sort((a, b) =>
       a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
     );
-  }, [gruposZonas, gruposZonasFinalizados]);
+  }, [gruposZonas, gruposZonasFinalizados, gruposZonasPorDefinir]);
 
   /** Zonas con partidos pendientes primero; las 100% finalizadas al fondo. */
   const { zonasActivas, zonasCompletas } = useMemo(() => {
     const activas: string[] = [];
     const completas: string[] = [];
     for (const nombre of nombresZonas) {
-      const pendientes =
-        gruposZonas.find((g) => g.nombre === nombre)?.partidos.length ?? 0;
-      if (pendientes > 0) activas.push(nombre);
-      else completas.push(nombre);
+      const todosZona = partidos.filter(
+        (p) => String(p.ronda) === nombre && isZonaRonda(p.ronda),
+      );
+      if (zonaGrupoCompleta(todosZona)) completas.push(nombre);
+      else activas.push(nombre);
     }
     return { zonasActivas: activas, zonasCompletas: completas };
-  }, [nombresZonas, gruposZonas]);
+  }, [nombresZonas, partidos]);
 
   const zonaEstaColapsada = (nombre: string) => {
     if (Object.prototype.hasOwnProperty.call(zonasColapsadas, nombre)) {
@@ -390,15 +415,23 @@ export const PasoResultados = ({
     ));
 
   const renderZonaCard = (nombre: string) => {
+    const porDefinir =
+      gruposZonasPorDefinir.find((g) => g.nombre === nombre)?.partidos || [];
     const pendientes =
       gruposZonas.find((g) => g.nombre === nombre)?.partidos || [];
     const finalizados =
       gruposZonasFinalizados.find((g) => g.nombre === nombre)?.partidos ||
       [];
     const colapsada = zonaEstaColapsada(nombre);
-    const total = pendientes.length + finalizados.length;
-    const resumenPartidos = [...pendientes, ...finalizados].slice(0, 6);
-    const zonaCerrada = pendientes.length === 0 && finalizados.length > 0;
+    const todosZona = partidos.filter(
+      (p) => String(p.ronda) === nombre && isZonaRonda(p.ronda),
+    );
+    const total = porDefinir.length + pendientes.length + finalizados.length;
+    const resumenPartidos = [...porDefinir, ...pendientes, ...finalizados].slice(
+      0,
+      6,
+    );
+    const zonaCerrada = zonaGrupoCompleta(todosZona);
 
     return (
       <div
@@ -429,6 +462,9 @@ export const PasoResultados = ({
             )}
           </div>
           <span className="shrink-0 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-gray-400">
+            {porDefinir.length > 0
+              ? `${porDefinir.length} por definir · `
+              : ""}
             {pendientes.length} en curso · {finalizados.length} finalizados
             {colapsada ? (
               <ChevronDown className="size-3.5" />
@@ -457,6 +493,30 @@ export const PasoResultados = ({
           </div>
         ) : (
           <div className="space-y-6">
+            {porDefinir.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2 border-l-2 border-sky-400/80 pl-3">
+                  <p className="text-[11px] font-black text-sky-300 uppercase tracking-wider">
+                    Pendientes de fase 1
+                  </p>
+                  <span className="text-[10px] font-bold text-sky-400/70">
+                    ({porDefinir.length})
+                  </span>
+                </div>
+                {porDefinir.map((p) => (
+                  <div
+                    key={p.id}
+                    className="rounded-xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 text-xs text-sky-200"
+                  >
+                    Partido #{String(p.orden || "").padStart(2, "0")} ·{" "}
+                    {p.estado_partido === "Pendiente Ganadores"
+                      ? "Ganador vs Ganador (se habilita al finalizar 1 y 2)"
+                      : "Perdedor vs Perdedor (se habilita al finalizar 1 y 2)"}
+                  </div>
+                ))}
+              </section>
+            )}
+
             {!isReadOnly && pendientes.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center gap-2 border-l-2 border-amber-400/80 pl-3">
@@ -485,7 +545,9 @@ export const PasoResultados = ({
               </section>
             )}
 
-            {pendientes.length === 0 && finalizados.length === 0 && (
+            {pendientes.length === 0 &&
+              finalizados.length === 0 &&
+              porDefinir.length === 0 && (
               <p className="text-xs text-gray-500 text-center py-4">
                 Sin partidos en esta zona.
               </p>

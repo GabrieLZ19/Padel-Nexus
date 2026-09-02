@@ -26,6 +26,7 @@ import {
   resumirCapacidadesZonas,
 } from "@/utils/constants/fapApaRules";
 import { generarPdfZonas } from "@/utils/grillaPdf";
+import { textoClasificacionZonas, zonaGrupoCompleta } from "@/utils/clasificacionZonas";
 
 interface BracketEditorProps {
   torneoId: string;
@@ -510,18 +511,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     return 32;
   };
 
-  const getClasificanTexto = (totalZonas: number) => {
-    if (totalZonas <= 0) return "Clasifican 2";
-    if (totalZonas === 1) return "Clasifican 2";
-    if (totalZonas === 2) return "Clasifican 2 por zona";
-    if (totalZonas === 3) return "Clasifica 1 por zona + 1 mejor 2º";
-    if (totalZonas === 4) return "Clasifican 2 por zona";
-    if (totalZonas === 5) return "Clasifica 1 por zona + 3 mejores 2º";
-    if (totalZonas === 6) return "Clasifica 1 por zona + 2 mejores 2º";
-    if (totalZonas === 7) return "Clasifica 1 por zona + 9 mejores 2º";
-    if (totalZonas === 8) return "Clasifican 2 por zona";
-    return "Clasifican 2 por zona";
-  };
+  const getClasificanTexto = (zonasActuales: ZonaDrag[]) =>
+    textoClasificacionZonas(
+      zonasActuales.map((z) => ({ parejas: z.parejas })),
+    );
 
   const totalZonas =
     zonas.length || Math.floor((torneo?.cupos_maximos || 8) / 3);
@@ -593,7 +586,13 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
   const partidosZona = partidos.filter((p) => isZonaRonda(p.ronda));
   const faseZonasCerrada =
-    partidosZona.length > 0 && partidosZona.every((p) => p.ganador != null);
+    zonas.length > 0 &&
+    zonas.every((z) => {
+      const matches = partidosZona.filter(
+        (p) => p.ronda?.toUpperCase() === z.nombre?.toUpperCase(),
+      );
+      return zonaGrupoCompleta(matches);
+    });
   const hayResultadoEnZonas = partidosZona.some((p) => p.ganador != null);
   const hayResultadoEnLlave = playoffPartidos.some((p) => p.ganador != null);
 
@@ -1134,7 +1133,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             <div className="text-gray-500 text-xs sm:text-sm font-medium">
               {zonas.length} zonas · {totalParejas}{" "}
               {isIndividual ? "jugadores" : "parejas"} ·{" "}
-              {getClasificanTexto(zonas.length)}
+              {getClasificanTexto(zonas)}
             </div>
           </div>
 
@@ -1167,6 +1166,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                         parejasInscritas={z.parejas}
                         partidosZona={partidosZona}
                         alcance={torneo?.alcance}
+                        capacidadZona={z.parejas.length}
                       />
                     );
                   })}

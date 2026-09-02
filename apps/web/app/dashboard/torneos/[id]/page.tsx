@@ -158,7 +158,10 @@ export default function TorneoDetallePage() {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-chartreuse"></span>
             </span>
             <span>
-              <strong className="text-white">Modo Lectura ({torneo.estado}):</strong> Los pasos 1 a 6 están bloqueados. Los cuadros (Paso 8) y la carga de resultados (Paso 9) permanecen habilitados.
+              <strong className="text-white">Modo Lectura ({torneo.estado}):</strong>{" "}
+              {torneo.estado === "Finalizado"
+                ? "Los pasos 1 a 6 están bloqueados. Los cuadros (Paso 8) y la carga de resultados (Paso 9) permanecen habilitados."
+                : "Los pasos 1 a 4 y 6 están bloqueados. Sedes y horarios (Paso 5) siguen editables para ampliar canchas y cronograma. Los cuadros (Paso 8) y resultados (Paso 9) permanecen habilitados."}
             </span>
           </div>
         </div>
@@ -213,9 +216,7 @@ export default function TorneoDetallePage() {
           {activeTab === "times" && (
             <Paso7Sedes
               {...commonProps}
-              readOnly={
-                torneo.estado === "En curso" || torneo.estado === "Finalizado"
-              }
+              readOnly={torneo.estado === "Finalizado"}
             />
           )}
           {activeTab === "fiscales" && (

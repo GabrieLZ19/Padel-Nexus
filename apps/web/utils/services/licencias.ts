@@ -1,5 +1,5 @@
 import { api } from "../api";
-import { Licencia } from "../types";
+import { Licencia, Perfil } from "../types";
 
 interface DatosSolicitud {
   nombre: string;
@@ -10,7 +10,7 @@ interface DatosSolicitud {
 }
 
 export interface PaginatedLicencias {
-  data: Licencia[];
+  data: Perfil[];
   total: number;
 }
 
@@ -25,15 +25,21 @@ export const LicenciasService = {
     page: number,
     limit: number,
     search?: string,
+    estado?: Licencia["estado"],
   ): Promise<PaginatedLicencias> {
-    const response = await api.get<PaginatedLicencias | Licencia[]>(
+    const response = await api.get<PaginatedLicencias | Perfil[]>(
       "/licencias",
       {
-        params: { page, limit, search },
+        params: {
+          page,
+          limit,
+          search,
+          ...(estado ? { estado } : {}),
+        },
       },
     );
 
-    const payload = response.data as PaginatedLicencias | Licencia[];
+    const payload = response.data as PaginatedLicencias | Perfil[];
     if (Array.isArray(payload)) {
       return { data: payload, total: payload.length };
     }

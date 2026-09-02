@@ -19,11 +19,13 @@ function PlayerNameLink({
   userId,
   className,
   won,
+  openInNewTab = true,
 }: {
   fullName?: string | null;
   userId?: string | null;
   className?: string;
   won?: boolean;
+  openInNewTab?: boolean;
 }) {
   const { apellido, nombre } = splitPlayerName(fullName);
   const label = nombre ? `${apellido}, ${nombre}` : apellido;
@@ -41,6 +43,9 @@ function PlayerNameLink({
       href={href}
       className={base}
       onClick={(e) => e.stopPropagation()}
+      {...(openInNewTab
+        ? { target: "_blank", rel: "noopener noreferrer" }
+        : {})}
     >
       {label}
     </Link>
@@ -88,7 +93,7 @@ export function PairDisplay({
   const [expanded, setExpanded] = useState(false);
   const empty = !j1 && !j2 && !denominacion;
   const hasJ2 = Boolean(j2 && j2 !== "-");
-  const useDenominacion = Boolean(alcanceNacional && denominacion);
+  const useDenominacion = Boolean(denominacion?.trim());
   const isRight = align === "right";
 
   if (empty) {
@@ -161,6 +166,38 @@ export function PairDisplay({
       );
     }
     return namesBlock;
+  }
+
+  if (variant === "inline") {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
+        <span
+          className={`font-black uppercase tracking-wide text-[11px] sm:text-xs shrink-0 ${
+            won ? "text-brand-chartreuse" : "text-brand-white"
+          }`}
+        >
+          {denominacion}
+        </span>
+        <span className="text-gray-600 font-medium">·</span>
+        <PlayerNameLink
+          fullName={j1}
+          userId={usuarioId}
+          won={won}
+          className="font-bold text-sm"
+        />
+        {hasJ2 ? (
+          <>
+            <span className="text-gray-500 font-medium">/</span>
+            <PlayerNameLink
+              fullName={j2}
+              userId={usuario2Id}
+              won={won}
+              className="font-bold text-sm text-gray-500"
+            />
+          </>
+        ) : null}
+      </span>
+    );
   }
 
   return (

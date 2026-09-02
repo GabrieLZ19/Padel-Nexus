@@ -13,6 +13,7 @@ import {
   FederacionesService,
   type Federacion,
 } from "@/utils/services/federaciones";
+import { ConfigLicenciasPanel } from "@/components/licencias/ConfigLicenciasPanel";
 
 export default function DetalleFederacionPage() {
   const params = useParams();
@@ -88,6 +89,12 @@ export default function DetalleFederacionPage() {
           <p className="text-sm text-gray-400 mt-6">{federacion.descripcion}</p>
         )}
       </div>
+
+      <ConfigLicenciasPanel
+        scope="federacion"
+        entidadId={federacion.id}
+        titulo="Configuración nacional de carnets (FAP)"
+      />
 
       <div>
         <h2 className="text-xl font-bold text-white mb-4">

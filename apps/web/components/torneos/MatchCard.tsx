@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from "react";
 import { Partido } from "@/utils/types";
 import { PairDisplay, esAlcanceNacional } from "@/components/torneos/PairDisplay";
 import { PlayerAvatar } from "@/components/torneos/MatchTeamBox";
@@ -164,15 +165,28 @@ export const MatchCard = ({
 
   const meta = formatMeta();
 
+  const handleCardClick = () => {
+    if (isInteractive && onEditSelect) onEditSelect(partido);
+  };
+
+  const handleCardKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!isInteractive || !onEditSelect) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onEditSelect(partido);
+    }
+  };
+
   return (
-    <button
-      type="button"
-      disabled={!isInteractive}
-      onClick={() => {
-        if (isInteractive && onEditSelect) onEditSelect(partido);
-      }}
+    <div
+      role={isInteractive ? "button" : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      onClick={isInteractive ? handleCardClick : undefined}
+      onKeyDown={isInteractive ? handleCardKeyDown : undefined}
       className={`w-full text-left rounded-2xl border overflow-hidden transition-all bg-brand-card ${
-        isInteractive ? "cursor-pointer hover:border-brand-chartreuse/40" : ""
+        isInteractive
+          ? "cursor-pointer hover:border-brand-chartreuse/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-chartreuse/50"
+          : ""
       } ${
         isActive
           ? "border-brand-chartreuse/50 shadow-sm"
@@ -243,6 +257,6 @@ export const MatchCard = ({
           </p>
         </div>
       )}
-    </button>
+    </div>
   );
 };

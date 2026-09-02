@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import { ConfigLicenciasPanel } from "@/components/licencias/ConfigLicenciasPanel";
 
 export default function DetalleAsociacionPage() {
   const params = useParams();
@@ -149,6 +150,12 @@ export default function DetalleAsociacionPage() {
           </div>
         </div>
       </div>
+
+      <ConfigLicenciasPanel
+        scope="asociacion"
+        entidadId={id}
+        titulo={`Licencias provinciales · ${asociacion?.provincia || asociacion?.nombre || ""}`}
+      />
 
       {/* Tabs */}
       <div className="flex border-b border-white/10 space-x-6 text-sm font-bold">
