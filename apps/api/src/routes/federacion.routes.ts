@@ -5,6 +5,8 @@ import {
   crearFederacion,
   actualizarFederacion,
   cambiarEstadoFederacion,
+  obtenerConfigLicenciaFederacion,
+  actualizarConfigLicenciaFederacion,
 } from "../controllers/federacion.controller";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -32,6 +34,20 @@ router.patch(
   authenticate,
   authorize(["superadmin"]),
   cambiarEstadoFederacion,
+);
+
+router.get(
+  "/:id/config-licencia",
+  authenticate,
+  authorize(["superadmin", "admin_federacion"]),
+  obtenerConfigLicenciaFederacion,
+);
+
+router.patch(
+  "/:id/config-licencia",
+  authenticate,
+  authorize(["superadmin", "admin_federacion"]),
+  actualizarConfigLicenciaFederacion,
 );
 
 export default router;

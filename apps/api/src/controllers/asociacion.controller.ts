@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { AsociacionService } from "../services/asociacion.service";
+import { LicenciaOrganizacionService } from "../services/licenciaOrganizacion.service";
 
 export const listarAsociaciones = async (req: Request, res: Response): Promise<Response> => {
   try {
@@ -84,5 +85,38 @@ export const cambiarEstadoAsociacion = async (req: Request, res: Response): Prom
     return res.status(200).json({ exito: true, data: actualizado });
   } catch (error: any) {
     return res.status(400).json({ exito: false, message: error.message });
+  }
+};
+
+export const obtenerConfigLicenciaAsociacion = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const data = await LicenciaOrganizacionService.obtenerConfigAsociacion(
+      req.params.id,
+    );
+    return res.json({ exito: true, data });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error al obtener configuración";
+    return res.status(500).json({ exito: false, message });
+  }
+};
+
+export const actualizarConfigLicenciaAsociacion = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const data = await LicenciaOrganizacionService.actualizarConfigAsociacion(
+      req.params.id,
+      req.body,
+    );
+    return res.json({ exito: true, data });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error al guardar configuración";
+    return res.status(400).json({ exito: false, message });
   }
 };

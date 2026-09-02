@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { FederacionService } from "../services/federacion.service";
+import { LicenciaOrganizacionService } from "../services/licenciaOrganizacion.service";
 
 export const listarFederaciones = async (_req: Request, res: Response) => {
   try {
@@ -62,6 +63,39 @@ export const cambiarEstadoFederacion = async (req: Request, res: Response) => {
     return res.status(200).json({ exito: true, data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error al cambiar estado";
+    return res.status(400).json({ exito: false, message });
+  }
+};
+
+export const obtenerConfigLicenciaFederacion = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const data = await LicenciaOrganizacionService.obtenerConfigFederacion(
+      req.params.id,
+    );
+    return res.json({ exito: true, data });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error al obtener configuración";
+    return res.status(500).json({ exito: false, message });
+  }
+};
+
+export const actualizarConfigLicenciaFederacion = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const data = await LicenciaOrganizacionService.actualizarConfigFederacion(
+      req.params.id,
+      req.body,
+    );
+    return res.json({ exito: true, data });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error al guardar configuración";
     return res.status(400).json({ exito: false, message });
   }
 };

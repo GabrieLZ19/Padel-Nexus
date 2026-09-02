@@ -8,6 +8,8 @@ import {
   crearAsociacion,
   actualizarAsociacion,
   cambiarEstadoAsociacion,
+  obtenerConfigLicenciaAsociacion,
+  actualizarConfigLicenciaAsociacion,
 } from "../controllers/asociacion.controller";
 import { authorize, authenticate } from "../middleware/auth";
 
@@ -38,6 +40,20 @@ router.patch(
   authenticate,
   authorize(["superadmin", "admin_federacion", "admin"]),
   cambiarEstadoAsociacion,
+);
+
+router.get(
+  "/:id/config-licencia",
+  authenticate,
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  obtenerConfigLicenciaAsociacion,
+);
+
+router.patch(
+  "/:id/config-licencia",
+  authenticate,
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  actualizarConfigLicenciaAsociacion,
 );
 
 export default router;

@@ -2,13 +2,20 @@
  * Etiqueta de representación en torneos nacionales: "NEUQUÉN A".
  * Provincia = lugar_residencia del jugador 1; letra = letra_prioridad de la inscripción.
  */
+function esProvinciaPlaceholder(provincia?: string | null): boolean {
+  const v = String(provincia || "")
+    .trim()
+    .toLowerCase();
+  return !v || v === "a completar" || v.startsWith("a completar ");
+}
+
 export function buildDenominacionNacional(
   provincia?: string | null,
   letra?: string | null,
 ): string | null {
   const prov = (provincia || "").trim();
   const letter = (letra || "").trim().toUpperCase();
-  if (!prov || !letter) return null;
+  if (!prov || !letter || esProvinciaPlaceholder(prov)) return null;
   return `${prov.toUpperCase()} ${letter}`;
 }
 

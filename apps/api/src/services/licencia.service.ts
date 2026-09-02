@@ -1,8 +1,14 @@
 import { supabaseAdmin } from "../config/supabase";
 import { NotificacionService } from "./notificacion.service";
+import { LicenciaOrganizacionService } from "./licenciaOrganizacion.service";
 
 export class LicenciaService {
-  static async obtenerLicencias(page: number, limit: number, search?: string) {
+  static async obtenerLicencias(
+    page: number,
+    limit: number,
+    search?: string,
+    estado?: string,
+  ) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
@@ -13,6 +19,10 @@ export class LicenciaService {
         { count: "exact" },
       )
       .order("created_at", { ascending: false });
+
+    if (estado) {
+      query = query.eq("licencias.estado", estado);
+    }
 
     if (search) {
       const term = `%${search.trim()}%`;
@@ -64,13 +74,25 @@ export class LicenciaService {
   }
 
   static async renovar(id: string) {
-    const vencimiento = new Date();
-    vencimiento.setFullYear(vencimiento.getFullYear() + 1);
+    const { data: licencia, error: readError } = await supabaseAdmin
+      .from("licencias")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (readError || !licencia) {
+      throw new Error("Licencia no encontrada para renovar.");
+    }
+
+    const fechaVencimiento =
+      await LicenciaOrganizacionService.calcularVencimientoParaLicencia(
+        licencia,
+      );
 
     const { data, error } = await supabaseAdmin
       .from("licencias")
       .update({
-        fecha_vencimiento: vencimiento.toISOString(),
+        fecha_vencimiento: fechaVencimiento,
         estado: "Activa",
       })
       .eq("id", id)
@@ -118,9 +140,12 @@ export class LicenciaService {
     const usuario_id = licenciaPrevia.usuario_id;
     let data = { ...licenciaPrevia, estado };
 
-    const vencimiento = new Date();
-    vencimiento.setFullYear(vencimiento.getFullYear() + 1);
-    const fechaVencimiento = fechaVencimientoOverride || vencimiento.toISOString().split("T")[0];
+    const fechaVencimientoCalculada =
+      await LicenciaOrganizacionService.calcularVencimientoParaLicencia(
+        licenciaPrevia,
+      );
+    const fechaVencimiento =
+      fechaVencimientoOverride || fechaVencimientoCalculada;
 
     // 2. Si es Rechazo (de Pendiente a Suspendida)
     if (estado === "Suspendida" && estadoPrevio === "Pendiente") {
@@ -152,7 +177,7 @@ export class LicenciaService {
     if (estado === "Activa" && estadoPrevio !== "Activa") {
       // Activación real: registrar la fecha de emisión y calcular vencimiento
       updateData.fecha_emision = new Date().toISOString().split("T")[0];
-      updateData.fecha_vencimiento = fechaVencimientoOverride || fechaVencimiento;
+      updateData.fecha_vencimiento = fechaVencimiento;
     } else if (fechaVencimientoOverride) {
       // Solo cambio de fecha (sin cambio de estado, o ya estaba Activa)
       updateData.fecha_vencimiento = fechaVencimientoOverride;

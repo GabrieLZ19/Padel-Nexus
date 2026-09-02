@@ -790,7 +790,7 @@ export class InscripcionService {
 
   /**
    * Importa inscripciones desde filas parseadas de la planilla oficial.
-   * Crea jugadores no registrados y los marca como pendientes de activación.
+   * Crea fichas de jugador completas para los DNI no registrados.
    */
   static async importarDesdePlanilla(datos: {
     torneoId: string;

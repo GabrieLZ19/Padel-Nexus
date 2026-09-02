@@ -32,6 +32,18 @@ router.patch(
   LicenciasController.cambiarEstadoLicencia,
 );
 
+router.get(
+  "/config-organizacion",
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  LicenciasController.obtenerConfigOrganizacion,
+);
+
+router.patch(
+  "/config-organizacion",
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  LicenciasController.actualizarConfigOrganizacion,
+);
+
 // --- Rutas de Gestión del Jugador (Autogestión y Verificaciones) ---
 router.post("/solicitar", LicenciasController.solicitar);
 router.get("/verificacion/:usuario_id", LicenciasController.verificar);

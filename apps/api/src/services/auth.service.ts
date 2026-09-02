@@ -4,6 +4,7 @@ import {
   buildPerfilUpdatePatch,
   normalizeFechaNacimiento,
 } from "../utils/perfilPatch";
+import { esEmailPlaceholderPlanilla } from "../utils/inscripcionPlanilla";
 import { FiscalSesionService } from "./fiscal-sesion.service";
 
 // DTO para el registro unificado FAP
@@ -83,7 +84,12 @@ export class AuthService {
       .eq("dni", dniLimpio)
       .maybeSingle();
 
-    if (preinscripto?.pendiente_activacion) {
+    const cuentaPlanillaPendienteApp =
+      preinscripto &&
+      (preinscripto.pendiente_activacion ||
+        esEmailPlaceholderPlanilla(preinscripto.email));
+
+    if (cuentaPlanillaPendienteApp) {
       const emailFinal = datos.email?.trim() || preinscripto.email;
       if (!emailFinal) {
         throw new Error("El correo electrónico es obligatorio para activar la cuenta.");
@@ -153,7 +159,7 @@ export class AuthService {
       };
     }
 
-    if (preinscripto && !preinscripto.pendiente_activacion) {
+    if (preinscripto && !cuentaPlanillaPendienteApp) {
       throw new Error(
         "Ya existe una cuenta registrada con este DNI. Iniciá sesión o recuperá tu contraseña.",
       );

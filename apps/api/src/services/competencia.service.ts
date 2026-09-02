@@ -1,6 +1,12 @@
 import { supabaseAdmin } from "../config/supabase";
 import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "../constants/fap";
 import { enrichInscripcionDenominacion } from "../utils/denominacionNacional";
+import { getCapacidadesZonasPreferidas } from "../utils/capacidadesZonas";
+import {
+  buildOcupadosDesdePartidos,
+  programarPartidosConDisponibilidad,
+  type PartidoProgramable,
+} from "../utils/programacionPartidos";
 
 interface ParejaRanking {
   inscripcionId: string;
@@ -134,46 +140,7 @@ export class CompetenciaService {
     const totalParejas = parejas.length;
     const S = preferredSize;
 
-    const getZonasFAP = (total: number, preferredSize: number): number[] => {
-      if (total < 3) return [total];
-      if (preferredSize === 3) {
-        const mod = total % 3;
-        if (mod === 0) return Array(total / 3).fill(3);
-        if (mod === 1) {
-          const count3 = Math.floor((total - 4) / 3);
-          if (count3 >= 0) return [...Array(count3).fill(3), 4];
-        }
-        if (mod === 2) {
-          const count3 = Math.floor((total - 8) / 3);
-          if (count3 >= 0) return [...Array(count3).fill(3), 4, 4];
-        }
-        if (total === 5) return [3, 2];
-        if (total === 4) return [4];
-      } else {
-        const mod = total % 4;
-        if (mod === 0) return Array(total / 4).fill(4);
-        if (mod === 1) {
-          const count4 = Math.floor((total - 9) / 4);
-          if (count4 >= 0) return [...Array(count4).fill(4), 3, 3, 3];
-        }
-        if (mod === 2) {
-          const count4 = Math.floor((total - 6) / 4);
-          if (count4 >= 0) return [...Array(count4).fill(4), 3, 3];
-        }
-        if (mod === 3) {
-          const count4 = Math.floor((total - 3) / 4);
-          if (count4 >= 0) return [...Array(count4).fill(4), 3];
-        }
-        if (total === 5) return [3, 2];
-        if (total === 3) return [3];
-      }
-      const count = Math.max(1, Math.floor(total / preferredSize));
-      const baseCap = Math.floor(total / count);
-      const remainder = total % count;
-      return Array.from({ length: count }).map((_, idx) => idx < remainder ? baseCap + 1 : baseCap);
-    };
-
-    const capacidadesZonas = getZonasFAP(totalParejas, S);
+    const capacidadesZonas = getCapacidadesZonasPreferidas(totalParejas, S);
     const cantidadZonas = capacidadesZonas.length;
 
     const zonas: Zona[] = capacidadesZonas.map((capacidad, index) => ({
@@ -219,6 +186,8 @@ export class CompetenciaService {
     }
 
     // 5. PERSISTENCIA EN BASE DE DATOS
+    const partidosZonaFase: PartidoProgramable[] = [];
+
     for (const zona of zonas) {
       // Crear el Grupo
       const { data: grupoInsertado } = await supabaseAdmin
@@ -242,7 +211,7 @@ export class CompetenciaService {
       }
 
       // Generar Partidos según la cantidad de parejas en la zona
-      const partidos = [];
+      const partidos: PartidoProgramable[] = [];
 
       if (zona.capacidad === 3 && p.length === 3) {
         // ZONA DE 3: Todos contra todos
@@ -252,6 +221,7 @@ export class CompetenciaService {
           orden: 1,
           equipo_a_id: p[0].inscripcionId,
           equipo_b_id: p[1].inscripcionId,
+          estado_partido: "Programado",
         }); // 1 vs 2
         partidos.push({
           torneo_id: torneoId,
@@ -259,6 +229,7 @@ export class CompetenciaService {
           orden: 2,
           equipo_a_id: p[1].inscripcionId,
           equipo_b_id: p[2].inscripcionId,
+          estado_partido: "Programado",
         }); // 2 vs 3
         partidos.push({
           torneo_id: torneoId,
@@ -266,6 +237,7 @@ export class CompetenciaService {
           orden: 3,
           equipo_a_id: p[0].inscripcionId,
           equipo_b_id: p[2].inscripcionId,
+          estado_partido: "Programado",
         }); // 1 vs 3
       } else if (zona.capacidad === 4 && p.length === 4) {
         // ZONA DE 4 (Regla FAP: Mayor vs Menor / Medio vs Medio)
@@ -275,6 +247,7 @@ export class CompetenciaService {
           orden: 1,
           equipo_a_id: p[0].inscripcionId,
           equipo_b_id: p[3].inscripcionId,
+          estado_partido: "Programado",
         }); // 1 vs 4
         partidos.push({
           torneo_id: torneoId,
@@ -282,6 +255,7 @@ export class CompetenciaService {
           orden: 2,
           equipo_a_id: p[1].inscripcionId,
           equipo_b_id: p[2].inscripcionId,
+          estado_partido: "Programado",
         }); // 2 vs 3
 
         // Los siguientes partidos de la zona de 4 dependen de los ganadores,
@@ -309,14 +283,20 @@ export class CompetenciaService {
               orden: orden++,
               equipo_a_id: p[i].inscripcionId,
               equipo_b_id: p[j].inscripcionId,
+              estado_partido: "Programado",
             });
           }
         }
       }
 
       if (partidos.length > 0) {
-        await supabaseAdmin.from("partidos").insert(partidos);
+        partidosZonaFase.push(...partidos);
       }
+    }
+
+    if (partidosZonaFase.length > 0) {
+      await programarPartidosConDisponibilidad(torneoId, partidosZonaFase);
+      await supabaseAdmin.from("partidos").insert(partidosZonaFase);
     }
 
     // 6. GENERAR PARTIDOS DE PLAYOFF EN BLANCO (LLAVES)
@@ -591,7 +571,7 @@ export class CompetenciaService {
     // 1. Conservar partidos con resultado; borrar solo los pendientes
     const { data: existentes } = await supabaseAdmin
       .from("partidos")
-      .select("id, equipo_a_id, equipo_b_id, ganador")
+      .select("id, equipo_a_id, equipo_b_id, ganador, orden")
       .eq("torneo_id", torneoId)
       .eq("ronda", nombreGrupo);
 
@@ -630,6 +610,7 @@ export class CompetenciaService {
         orden,
         equipo_a_id: aId,
         equipo_b_id: bId,
+        estado_partido: "Programado",
       });
     };
 
@@ -640,13 +621,30 @@ export class CompetenciaService {
     } else if (parejas.length === 4) {
       pushIfNew(1, parejas[0].inscripcion_id, parejas[3].inscripcion_id);
       pushIfNew(2, parejas[1].inscripcion_id, parejas[2].inscripcion_id);
-      if (jugados.length === 0) {
-        partidos.push({
-          torneo_id: torneoId,
-          ronda: nombreGrupo,
-          orden: 4,
-          estado_partido: "Pendiente Perdedores",
-        });
+
+      const ordenesExistentes = new Set(
+        (existentes || []).map((m) => m.orden).filter(Boolean),
+      );
+      const faltanSegundaFase =
+        !ordenesExistentes.has(3) || !ordenesExistentes.has(4);
+
+      if (jugados.length === 0 && faltanSegundaFase) {
+        if (!ordenesExistentes.has(3)) {
+          partidos.push({
+            torneo_id: torneoId,
+            ronda: nombreGrupo,
+            orden: 3,
+            estado_partido: "Pendiente Ganadores",
+          });
+        }
+        if (!ordenesExistentes.has(4)) {
+          partidos.push({
+            torneo_id: torneoId,
+            ronda: nombreGrupo,
+            orden: 4,
+            estado_partido: "Pendiente Perdedores",
+          });
+        }
       }
     } else {
       let orden = 1;
@@ -662,6 +660,15 @@ export class CompetenciaService {
     }
 
     if (partidos.length > 0) {
+      const { data: partidosProgramados } = await supabaseAdmin
+        .from("partidos")
+        .select("cancha_asignada, fecha_partido")
+        .eq("torneo_id", torneoId);
+
+      const ocupados = buildOcupadosDesdePartidos(partidosProgramados || []);
+      await programarPartidosConDisponibilidad(torneoId, partidos, {
+        ocupados,
+      });
       await supabaseAdmin.from("partidos").insert(partidos);
     }
   }

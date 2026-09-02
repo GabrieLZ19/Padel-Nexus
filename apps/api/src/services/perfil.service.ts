@@ -6,6 +6,9 @@ import {
 import {
   parseNombreCompleto,
   normalizarDni,
+  esEmailPlaceholderPlanilla,
+  esResidenciaPlaceholder,
+  resolverProvinciaDesdePlanilla,
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
 import { randomBytes } from "crypto";
@@ -311,7 +314,10 @@ export class PerfilService {
       return { encontrado: false as const };
     }
 
-    if (!data.pendiente_activacion) {
+    const cuentaPendienteApp =
+      data.pendiente_activacion || esEmailPlaceholderPlanilla(data.email);
+
+    if (!cuentaPendienteApp) {
       return {
         encontrado: true as const,
         pendiente_activacion: false as const,
@@ -325,9 +331,7 @@ export class PerfilService {
       perfil: {
         nombre: data.nombre,
         apellido: data.apellido,
-        email: data.email?.includes("@padelnexus.local")
-          ? ""
-          : data.email,
+        email: esEmailPlaceholderPlanilla(data.email) ? "" : data.email,
         telefono: data.telefono,
         dni: data.dni,
         lugar_residencia: data.lugar_residencia,
@@ -341,6 +345,7 @@ export class PerfilService {
 
   /**
    * Crea o actualiza un jugador a partir de una fila de planilla.
+   * La ficha queda completa para torneos; la activación en App ocurre al registrarse con su DNI.
    */
   static async resolverJugadorDesdePlanilla(fila: FilaPlanillaInscripcion) {
     const dni = normalizarDni(fila.dni);
@@ -364,9 +369,11 @@ export class PerfilService {
 
     const { data: existente } = await supabaseAdmin
       .from("perfiles")
-      .select("id, nombre, apellido, email, pendiente_activacion")
+      .select("id, nombre, apellido, email, pendiente_activacion, lugar_residencia")
       .eq("dni", dni)
       .maybeSingle();
+
+    const provinciaPlanilla = resolverProvinciaDesdePlanilla(fila);
 
     if (existente) {
       const patch: Record<string, unknown> = {};
@@ -374,9 +381,20 @@ export class PerfilService {
       if (!existente.apellido && apellido)
         patch.apellido = PerfilService.capitalizarTexto(apellido);
       if (fila.telefono) patch.telefono = fila.telefono;
-      if (fila.direccion) patch.lugar_residencia = fila.direccion;
+      if (
+        provinciaPlanilla &&
+        esResidenciaPlaceholder(existente.lugar_residencia)
+      ) {
+        patch.lugar_residencia = provinciaPlanilla;
+      } else if (
+        fila.direccion &&
+        esResidenciaPlaceholder(existente.lugar_residencia)
+      ) {
+        patch.lugar_residencia = fila.direccion;
+      }
       if (fila.categoria) patch.categoria_padel = fila.categoria;
       if (fila.fechaNacimiento) patch.fecha_nacimiento = fila.fechaNacimiento;
+      if (existente.pendiente_activacion) patch.pendiente_activacion = false;
 
       if (Object.keys(patch).length > 0) {
         await supabaseAdmin.from("perfiles").update(patch).eq("id", existente.id);
@@ -384,8 +402,8 @@ export class PerfilService {
 
       return {
         id: existente.id,
-        nombre: existente.nombre,
-        apellido: existente.apellido,
+        nombre: existente.nombre || PerfilService.capitalizarTexto(nombre),
+        apellido: existente.apellido || PerfilService.capitalizarTexto(apellido),
         creado: false,
       };
     }
@@ -398,7 +416,7 @@ export class PerfilService {
         email_confirm: true,
         user_metadata: {
           origen: "planilla_inscripcion",
-          pendiente_activacion: true,
+          pendiente_activacion: false,
           dni,
         },
       });
@@ -420,13 +438,13 @@ export class PerfilService {
           nombre: PerfilService.capitalizarTexto(nombre),
           apellido: PerfilService.capitalizarTexto(apellido),
           telefono: fila.telefono || null,
-          lugar_residencia: fila.direccion || "A completar",
+          lugar_residencia: provinciaPlanilla || fila.direccion || "A completar",
           categoria_padel: fila.categoria || "5ª",
           lado_preferido: "indistinto",
           fecha_nacimiento: fila.fechaNacimiento || null,
           sexo: "masculino",
           rol: "usuario",
-          pendiente_activacion: true,
+          pendiente_activacion: false,
         },
         { onConflict: "id" },
       )

@@ -174,6 +174,13 @@ export function parsearFilasPlanilla(
   return { tipo, filas };
 }
 
+/** Cuentas creadas desde planilla sin credenciales reales del jugador. */
+export function esEmailPlaceholderPlanilla(
+  email: string | null | undefined,
+): boolean {
+  return Boolean(email?.includes("@padelnexus.local"));
+}
+
 export function agruparFilasEnParejas(
   filas: FilaPlanillaInscripcion[],
 ): Array<{ j1: FilaPlanillaInscripcion; j2?: FilaPlanillaInscripcion }> {
@@ -192,4 +199,19 @@ export function agruparFilasEnParejas(
   return grupos;
 }
 
-export { parseNombreCompleto, normalizarDni };
+export { parseNombreCompleto, normalizarDni, resolverProvinciaDesdePlanilla, esResidenciaPlaceholder };
+
+function esResidenciaPlaceholder(valor?: string | null): boolean {
+  const v = String(valor || "")
+    .trim()
+    .toLowerCase();
+  return !v || v === "a completar" || v.startsWith("a completar ");
+}
+
+function resolverProvinciaDesdePlanilla(fila: FilaPlanillaInscripcion): string | null {
+  const asociacion = fila.asociacion?.trim();
+  if (asociacion) return asociacion;
+  const direccion = fila.direccion?.trim();
+  if (direccion && !esResidenciaPlaceholder(direccion)) return direccion;
+  return null;
+}

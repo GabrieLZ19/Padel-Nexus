@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { LicenciaService } from "../services/licencia.service";
+import { LicenciaOrganizacionService } from "../services/licenciaOrganizacion.service";
 
 export const LicenciasController = {
   /**
@@ -8,7 +9,7 @@ export const LicenciasController = {
    */
   async listar(req: Request, res: Response): Promise<Response> {
     try {
-      const { page = "1", limit = "10", search } = req.query;
+      const { page = "1", limit = "10", search, estado } = req.query;
       const pageNum = Number(page);
       const limitNum = Number(limit);
 
@@ -16,6 +17,7 @@ export const LicenciasController = {
         pageNum,
         limitNum,
         search as string | undefined,
+        estado as string | undefined,
       );
 
       return res.status(200).json({ exito: true, ...resultado });
@@ -214,6 +216,47 @@ export const LicenciasController = {
           ? error.message
           : "Error al procesar la solicitud de licencia.";
       return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
+  async obtenerConfigOrganizacion(req: Request, res: Response): Promise<Response> {
+    try {
+      const usuarioId = req.user?.id;
+      const rol = req.user?.rol;
+      if (!usuarioId || !rol) {
+        return res.status(401).json({ exito: false, error: "No autenticado." });
+      }
+
+      const data = await LicenciaOrganizacionService.resolverContextoAdmin(
+        usuarioId,
+        rol,
+      );
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al obtener configuración.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
+  async actualizarConfigOrganizacion(req: Request, res: Response): Promise<Response> {
+    try {
+      const usuarioId = req.user?.id;
+      const rol = req.user?.rol;
+      if (!usuarioId || !rol) {
+        return res.status(401).json({ exito: false, error: "No autenticado." });
+      }
+
+      const data = await LicenciaOrganizacionService.actualizarConfigDesdeContexto(
+        usuarioId,
+        rol,
+        req.body,
+      );
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al guardar configuración.";
+      return res.status(400).json({ exito: false, error: message });
     }
   },
 };

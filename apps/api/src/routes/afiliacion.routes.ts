@@ -12,23 +12,13 @@ router.patch("/:id/cancelar", AfiliacionController.cancelar);
 
 router.get(
   "/",
-  authorize([
-    "superadmin",
-    "admin",
-    "admin_federacion",
-    "admin_provincial",
-  ]),
+  authorize(["superadmin", "admin"]),
   AfiliacionController.listarAdmin,
 );
 
 router.patch(
   "/:id/estado",
-  authorize([
-    "superadmin",
-    "admin",
-    "admin_federacion",
-    "admin_provincial",
-  ]),
+  authorize(["superadmin", "admin"]),
   AfiliacionController.cambiarEstado,
 );
 
