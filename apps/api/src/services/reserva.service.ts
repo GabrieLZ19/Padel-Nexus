@@ -1,5 +1,11 @@
 import { supabaseAdmin } from "../config/supabase";
 import { MercadoPagoConfig, Preference } from "mercadopago";
+import {
+  buildMercadoPagoBackUrls,
+  getMercadoPagoAccessToken,
+  isMercadoPagoConfigured,
+  resolveMercadoPagoInitPoint,
+} from "../config/mercadopago";
 import { esHorarioReservaPasado } from "../utils/fechaArgentina";
 
 // ── Tipos ──────────────────────────────────────────────────────────────
@@ -186,7 +192,8 @@ export class ReservaService {
       .single();
 
     if (error) throw new Error(`Error al crear la reserva: ${error.message}`);
-    return data;
+    // Devolver detalle completo (turno/cancha/club) para el checkout.
+    return this.obtenerReservaPorId(data.id);
   }
 
   /**
@@ -385,7 +392,10 @@ export class ReservaService {
   /**
    * Crea una preferencia de pago en Mercado Pago para una reserva específica.
    */
-  static async crearPreferenciaPago(reservaId: string) {
+  static async crearPreferenciaPago(
+    reservaId: string,
+    options?: { mobile?: boolean },
+  ) {
     const reserva = await this.obtenerReservaPorId(reservaId);
 
     const { id, turnos } = reserva;
@@ -399,33 +409,31 @@ export class ReservaService {
     const club = cancha.clubes;
     if (!club) throw new Error("Club asociado no encontrado.");
 
-    // Fallback de simulación si no hay credencial real configurada
-    const token = process.env.MP_ACCESS_TOKEN;
-    if (
-      !token ||
-      token === "TEST-TOKEN-MOCK" ||
-      (!token.startsWith("APP_USR-") && !token.startsWith("TEST-"))
-    ) {
+    const token = getMercadoPagoAccessToken();
+    if (!isMercadoPagoConfigured()) {
       console.warn(
-        "Mercado Pago Access Token no configurado o inválido. Simulando checkout exitoso.",
+        "Mercado Pago Access Token no configurado. Simulando checkout exitoso.",
       );
-      const mockSuccessUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/reservar/checkout/${id}?payment=success`;
       return {
         preferenceId: "mock-pref-id-12345",
-        initPoint: mockSuccessUrl,
-        sandboxInitPoint: mockSuccessUrl,
+        initPoint: null,
+        sandboxInitPoint: null,
+        mockConfirmed: true,
+        paymentId: `mock-reserva-${Date.now()}`,
       };
     }
 
     const mpClient = new MercadoPagoConfig({
-      accessToken: token,
+      accessToken: token!,
     });
 
     const preference = new Preference(mpClient);
 
-    const successUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/reservar/checkout/${id}?payment=success`;
-    const failureUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/reservar/checkout/${id}?payment=failure`;
-    const pendingUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/reservar/checkout/${id}?payment=pending`;
+    const backUrls = buildMercadoPagoBackUrls({
+      mobile: options?.mobile,
+      webPath: `/reservar/checkout/${id}`,
+      mobileParams: { reserva_id: id },
+    });
 
     const response = await preference.create({
       body: {
@@ -438,12 +446,10 @@ export class ReservaService {
             currency_id: "ARS",
           },
         ],
-        back_urls: {
-          success: successUrl,
-          failure: failureUrl,
-          pending: pendingUrl,
-        },
-        auto_return: successUrl.startsWith("https://") ? "approved" : undefined,
+        back_urls: backUrls,
+        auto_return: backUrls.success.startsWith("https://")
+          ? "approved"
+          : undefined,
         external_reference: id,
         notification_url: `${process.env.BACKEND_URL || "http://localhost:4000"}/api/reservas/webhook/mercadopago`,
       },
@@ -451,10 +457,11 @@ export class ReservaService {
 
     return {
       preferenceId: response.id,
-      initPoint:
-        token && token.startsWith("TEST-")
-          ? response.sandbox_init_point
-          : response.init_point,
+      initPoint: resolveMercadoPagoInitPoint(
+        token!,
+        response.init_point,
+        response.sandbox_init_point,
+      ),
       sandboxInitPoint: response.sandbox_init_point,
     };
   }

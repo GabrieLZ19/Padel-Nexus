@@ -1,6 +1,14 @@
 import { supabaseAdmin } from "../config/supabase";
+import { MercadoPagoConfig, Preference } from "mercadopago";
+import {
+  buildMercadoPagoBackUrls,
+  getMercadoPagoAccessToken,
+  isMercadoPagoConfigured,
+  resolveMercadoPagoInitPoint,
+} from "../config/mercadopago";
 import { NotificacionService } from "./notificacion.service";
 import { LicenciaOrganizacionService } from "./licenciaOrganizacion.service";
+import { descripcionVigenciaLicencia } from "../utils/licenciaConfig";
 
 export class LicenciaService {
   static async obtenerLicencias(
@@ -48,7 +56,13 @@ export class LicenciaService {
 
     if (error || !data)
       throw new Error("Licencia no encontrada para este usuario.");
-    return data;
+
+    const datos = (data.datos_solicitud || {}) as Record<string, unknown>;
+    return {
+      ...data,
+      precio_anual: Number(datos.precio_anual ?? 0),
+      estado_pago: (datos.estado_pago as string) || "no_aplica",
+    };
   }
 
   static async crearLicencia(
@@ -261,6 +275,20 @@ export class LicenciaService {
   }
 
   static async solicitar(usuario_id: string, datos: Record<string, unknown>) {
+    const config =
+      await LicenciaOrganizacionService.resolverConfigParaLicencia({
+        datos_solicitud: datos,
+        club_id: typeof datos.club_id === "string" ? datos.club_id : null,
+      });
+
+    const precioAnual = Number(config.precioAnual || 0);
+    const datosConPago = {
+      ...datos,
+      precio_anual: precioAnual,
+      estado_pago: precioAnual > 0 ? "pendiente" : "no_aplica",
+      moneda: "ARS",
+    };
+
     const { data, error } = await supabaseAdmin
       .from("licencias")
       .insert([
@@ -268,7 +296,9 @@ export class LicenciaService {
           usuario_id,
           estado: "Pendiente",
           nro_licencia: `PAD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-          datos_solicitud: datos,
+          datos_solicitud: datosConPago,
+          club_id:
+            typeof datos.club_id === "string" ? datos.club_id : null,
         },
       ])
       .select()
@@ -276,7 +306,6 @@ export class LicenciaService {
 
     if (error) throw new Error(error.message);
 
-    // Notificar a los administradores
     NotificacionService.notificarAdmins({
       titulo: "Nueva Solicitud de Licencia",
       mensaje: `${datos.nombre} ${datos.apellido} ha solicitado una nueva licencia deportiva.`,
@@ -285,6 +314,222 @@ export class LicenciaService {
       console.error("Error al notificar admins de nueva licencia:", err),
     );
 
-    return data;
+    const mensajePago =
+      precioAnual > 0
+        ? `Completá el pago de $${precioAnual.toLocaleString("es-AR")} para continuar con la revisión.`
+        : "Un administrador revisará tu solicitud pronto.";
+
+    NotificacionService.crearNotificacion({
+      usuario_id,
+      titulo: "Solicitud de licencia recibida",
+      mensaje: `Tu carnet ${data.nro_licencia} quedó en estado pendiente. ${mensajePago}`,
+      tipo: "info",
+      metadata: {
+        tipo: "licencia",
+        licencia_id: data.id,
+        nro_licencia: data.nro_licencia,
+        precio_anual: precioAnual,
+      },
+    }).catch((err) =>
+      console.error("Error al notificar jugador de solicitud:", err),
+    );
+
+    return {
+      ...data,
+      precio_anual: precioAnual,
+      estado_pago: datosConPago.estado_pago,
+    };
+  }
+
+  static async cotizar(params: {
+    club_id?: string | null;
+    provincia?: string | null;
+  }) {
+    const config =
+      await LicenciaOrganizacionService.resolverConfigParaLicencia({
+        datos_solicitud: {
+          club_id: params.club_id || undefined,
+          provincia: params.provincia || undefined,
+        },
+        club_id: params.club_id || null,
+      });
+
+    return {
+      precio_anual: Number(config.precioAnual || 0),
+      moneda: "ARS",
+      vigencia_modo: config.vigenciaModo,
+      descripcion_vigencia: descripcionVigenciaLicencia(config),
+      origen: config.origen,
+    };
+  }
+
+  static async crearPreferenciaPago(
+    licenciaId: string,
+    usuarioId: string,
+    options?: { mobile?: boolean },
+  ) {
+    const { data: licencia, error } = await supabaseAdmin
+      .from("licencias")
+      .select("*")
+      .eq("id", licenciaId)
+      .eq("usuario_id", usuarioId)
+      .single();
+
+    if (error || !licencia) throw new Error("Licencia no encontrada.");
+
+    const datos = (licencia.datos_solicitud || {}) as Record<string, unknown>;
+    let precio = Number(datos.precio_anual ?? 0);
+
+    // Licencias creadas antes del cobro: resolver precio actual y persistirlo
+    if (precio <= 0) {
+      const config =
+        await LicenciaOrganizacionService.resolverConfigParaLicencia(licencia);
+      precio = Number(config.precioAnual || 0);
+      if (precio > 0) {
+        const datosActualizados = {
+          ...datos,
+          precio_anual: precio,
+          estado_pago:
+            datos.estado_pago === "pagado" ? "pagado" : "pendiente",
+          moneda: "ARS",
+        };
+        await supabaseAdmin
+          .from("licencias")
+          .update({ datos_solicitud: datosActualizados })
+          .eq("id", licenciaId);
+        Object.assign(datos, datosActualizados);
+      }
+    }
+
+    if (precio <= 0) {
+      throw new Error("Esta licencia no tiene un monto pendiente de pago.");
+    }
+    if (datos.estado_pago === "pagado") {
+      throw new Error("El pago de esta licencia ya fue registrado.");
+    }
+
+    const token = getMercadoPagoAccessToken();
+    if (!isMercadoPagoConfigured()) {
+      console.warn(
+        "⚠️ MP Access Token no configurado. Simulando pago de licencia.",
+      );
+      const mockPaymentId = `mock-licencia-${Date.now()}`;
+      const actualizada = await LicenciaService.confirmarPagoLicencia(
+        licenciaId,
+        usuarioId,
+        mockPaymentId,
+        precio,
+      );
+      return {
+        preferenceId: "mock-licencia-pref",
+        initPoint: null,
+        sandboxInitPoint: null,
+        mockConfirmed: true,
+        paymentId: mockPaymentId,
+        licencia: actualizada,
+      };
+    }
+
+    const mpClient = new MercadoPagoConfig({ accessToken: token! });
+    const preference = new Preference(mpClient);
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:4000";
+
+    const backUrls = buildMercadoPagoBackUrls({
+      mobile: options?.mobile,
+      webPath: "/mi-perfil",
+      mobileParams: { licencia_id: licenciaId },
+    });
+
+    const response = await preference.create({
+      body: {
+        items: [
+          {
+            id: licenciaId,
+            title: `Licencia FAP ${licencia.nro_licencia}`,
+            quantity: 1,
+            unit_price: precio,
+            currency_id: "ARS",
+          },
+        ],
+        back_urls: backUrls,
+        auto_return: backUrls.success.startsWith("https://")
+          ? "approved"
+          : undefined,
+        external_reference: `licencia:${licenciaId}`,
+        notification_url: `${backendUrl}/api/licencias/webhook/mercadopago`,
+      },
+    });
+
+    return {
+      preferenceId: response.id,
+      initPoint: resolveMercadoPagoInitPoint(
+        token!,
+        response.init_point,
+        response.sandbox_init_point,
+      ),
+      sandboxInitPoint: response.sandbox_init_point,
+      mockConfirmed: false,
+    };
+  }
+
+  static async confirmarPagoLicencia(
+    licenciaId: string,
+    usuarioId: string,
+    paymentId: string,
+    monto?: number,
+  ) {
+    const { data: licencia, error } = await supabaseAdmin
+      .from("licencias")
+      .select("*")
+      .eq("id", licenciaId)
+      .eq("usuario_id", usuarioId)
+      .single();
+
+    if (error || !licencia) throw new Error("Licencia no encontrada.");
+
+    const previos = (licencia.datos_solicitud || {}) as Record<string, unknown>;
+    const datos: Record<string, unknown> = {
+      ...previos,
+      estado_pago: "pagado",
+      mp_payment_id: paymentId,
+      fecha_pago: new Date().toISOString(),
+      ...(monto != null ? { monto_pagado: monto } : {}),
+    };
+
+    const { data, error: updError } = await supabaseAdmin
+      .from("licencias")
+      .update({ datos_solicitud: datos })
+      .eq("id", licenciaId)
+      .select()
+      .single();
+
+    if (updError || !data) {
+      throw new Error("No se pudo registrar el pago de la licencia.");
+    }
+
+    await NotificacionService.crearNotificacion({
+      usuario_id: usuarioId,
+      titulo: "Pago de licencia recibido",
+      mensaje: `Registramos el pago de tu licencia ${data.nro_licencia}. Queda pendiente la aprobación de la federación.`,
+      tipo: "success",
+      metadata: {
+        tipo: "licencia",
+        licencia_id: data.id,
+        nro_licencia: data.nro_licencia,
+      },
+    });
+
+    NotificacionService.notificarAdmins({
+      titulo: "Pago de licencia acreditado",
+      mensaje: `El jugador pagó la licencia ${data.nro_licencia}. Revisá y aprobá el alta.`,
+      tipo: "info",
+      metadata: { licencia_id: data.id },
+    }).catch(() => undefined);
+
+    return {
+      ...data,
+      precio_anual: Number(datos.precio_anual || 0),
+      estado_pago: "pagado",
+    };
   }
 }

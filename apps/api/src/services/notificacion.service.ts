@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../config/supabase";
 import { SocketService } from "./socket.service";
 import { ROLES_ADMINISTRATIVOS } from "../constants/roles";
+import { PushNotificationService } from "./push-notification.service";
 
 export class NotificacionService {
   static async crearNotificacion(params: {
@@ -11,6 +12,22 @@ export class NotificacionService {
     metadata?: Record<string, any>;
   }) {
     const { usuario_id, titulo, mensaje, tipo = "info", metadata = {} } = params;
+
+    const { data: perfilPrefs } = await supabaseAdmin
+      .from("perfiles")
+      .select("preferencias_notificacion")
+      .eq("id", usuario_id)
+      .maybeSingle();
+
+    const prefs = (perfilPrefs?.preferencias_notificacion || {}) as {
+      push?: boolean;
+      expo_push_token?: string;
+    };
+
+    // Si el jugador desactivó push/in-app, no creamos ni emitimos la notificación.
+    if (prefs.push === false) {
+      return null;
+    }
 
     const { data, error } = await supabaseAdmin
       .from("notificaciones")
@@ -37,6 +54,19 @@ export class NotificacionService {
       SocketService.emitirAPersona(usuario_id, "nueva_notificacion", data);
     } catch (socketErr) {
       console.warn("⚠️ No se pudo emitir notificación por websocket:", socketErr);
+    }
+
+    if (prefs.expo_push_token && prefs.push !== false) {
+      void PushNotificationService.enviarExpoPush({
+        expoPushToken: prefs.expo_push_token,
+        titulo,
+        mensaje,
+        data: {
+          notificacion_id: data.id,
+          tipo,
+          ...metadata,
+        },
+      });
     }
 
     return data;

@@ -29,6 +29,7 @@ router.use(authenticate);
 router.post("/actualizar-password", PerfilController.ActualizarPassword);
 router.get("/me", PerfilController.getMiPerfil);
 router.put("/me", PerfilController.updatePerfil);
+router.post("/push-token", PerfilController.registrarPushToken);
 router.post("/avatar", PerfilController.subirAvatar);
 router.delete("/avatar", PerfilController.eliminarAvatar);
 

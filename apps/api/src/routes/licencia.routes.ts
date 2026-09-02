@@ -46,6 +46,9 @@ router.patch(
 
 // --- Rutas de Gestión del Jugador (Autogestión y Verificaciones) ---
 router.post("/solicitar", LicenciasController.solicitar);
+router.get("/cotizacion", LicenciasController.cotizar);
+router.post("/:id/preferencia-mp", LicenciasController.crearPreferenciaPago);
+router.post("/:id/confirmar-retorno", LicenciasController.confirmarRetornoPago);
 router.get("/verificacion/:usuario_id", LicenciasController.verificar);
 router.get("/:usuario_id", LicenciasController.obtenerLicenciaPorUsuario);
 

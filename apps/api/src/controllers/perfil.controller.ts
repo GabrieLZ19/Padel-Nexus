@@ -112,6 +112,37 @@ export const PerfilController = {
   },
 
   /**
+   * POST /api/perfil/push-token
+   * Registra el token de Expo Push del dispositivo móvil.
+   */
+  async registrarPushToken(req: Request, res: Response): Promise<Response> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "Usuario no autorizado." });
+      }
+
+      const token = String(req.body?.token ?? "").trim();
+      if (!token) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "Token de push requerido." });
+      }
+
+      const perfil = await PerfilService.registrarPushToken(userId, token);
+      return res.status(200).json({ exito: true, data: perfil });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al registrar notificaciones push.";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
+  /**
    * POST /api/perfiles/actualizar-password
    * Finaliza el blanqueo guardando la nueva contraseña
    */

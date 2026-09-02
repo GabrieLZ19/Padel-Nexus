@@ -31,6 +31,10 @@ router.use(authenticate);
 
 router.post("/ordenes", MarketplaceController.crearOrden);
 router.post("/ordenes/:id/pagar", MarketplaceController.pagarOrden);
+router.post(
+  "/ordenes/:id/confirmar-retorno",
+  MarketplaceController.confirmarRetornoPago,
+);
 router.get("/mis-ordenes", MarketplaceController.listarMisOrdenes);
 router.get("/mis-ordenes/:id", MarketplaceController.obtenerOrden);
 router.post("/valoraciones", MarketplaceController.crearValoracion);

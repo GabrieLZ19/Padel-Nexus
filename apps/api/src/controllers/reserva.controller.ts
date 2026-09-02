@@ -194,7 +194,8 @@ export const ReservasController = {
   async crearPreferenciaPago(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const data = await ReservaService.crearPreferenciaPago(id);
+      const mobile = (req.get("x-padel-client") || "").toLowerCase() === "mobile";
+      const data = await ReservaService.crearPreferenciaPago(id, { mobile });
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Error desconocido";

@@ -530,7 +530,7 @@ export class InscripcionService {
       .update({ cupos_actuales: (torneo.cupos_actuales || 0) + 1 })
       .eq("id", torneoId);
 
-    // 12. NOTIFICAR ADMINS
+    // 12. NOTIFICAR ADMINS + JUGADORES
     const isPareja =
       Boolean(jugador2Nombre) &&
       jugador2Nombre!.trim() !== "" &&
@@ -540,13 +540,50 @@ export class InscripcionService {
       : `${jugador1Nombre || solicitante.nombre}`;
     const verbo = isPareja ? "se han inscripto" : "se ha inscripto";
 
+    const { data: torneoNombreRow } = await supabaseAdmin
+      .from("torneos")
+      .select("nombre")
+      .eq("id", torneoId)
+      .maybeSingle();
+    const nombreTorneo = torneoNombreRow?.nombre || "el torneo";
+
     NotificacionService.notificarAdmins({
       titulo: "Nueva Inscripción",
-      mensaje: `${jugadoresTexto} ${verbo} en el torneo.`,
+      mensaje: `${jugadoresTexto} ${verbo} en ${nombreTorneo}.`,
       tipo: "info",
     }).catch((err) =>
       console.error("Error al notificar admins de nueva inscripcion:", err),
     );
+
+    NotificacionService.crearNotificacion({
+      usuario_id: jugador1Id,
+      titulo: "Inscripción recibida",
+      mensaje: `Tu inscripción a ${nombreTorneo} quedó registrada. Estado de pago: pendiente.`,
+      tipo: "info",
+      metadata: {
+        tipo: "inscripcion",
+        inscripcion_id: inscripcionInsertada.id,
+        torneo_id: torneoId,
+      },
+    }).catch((err) =>
+      console.error("Error al notificar jugador de inscripción:", err),
+    );
+
+    if (jugador2Id) {
+      NotificacionService.crearNotificacion({
+        usuario_id: jugador2Id,
+        titulo: "Inscripción recibida",
+        mensaje: `Fuiste inscripto junto a ${jugador1Nombre || "tu pareja"} en ${nombreTorneo}. Estado de pago: pendiente.`,
+        tipo: "info",
+        metadata: {
+          tipo: "inscripcion",
+          inscripcion_id: inscripcionInsertada.id,
+          torneo_id: torneoId,
+        },
+      }).catch((err) =>
+        console.error("Error al notificar compañero de inscripción:", err),
+      );
+    }
 
     return inscripcionInsertada;
   }
@@ -556,11 +593,31 @@ export class InscripcionService {
       .from("inscripciones")
       .update({ estado_pago: estadoPago })
       .eq("id", id)
-      .select()
+      .select("*, torneos(nombre)")
       .single();
 
     if (error || !data)
       throw new Error("Error al actualizar el estado de pago.");
+
+    if (estadoPago === FAP_ESTADOS_PAGO.CONFIRMADO && data.usuario_id) {
+      const torneoNombre =
+        (data as { torneos?: { nombre?: string } | null }).torneos?.nombre ||
+        "el torneo";
+      NotificacionService.crearNotificacion({
+        usuario_id: data.usuario_id,
+        titulo: "Inscripción confirmada",
+        mensaje: `Tu pago fue verificado. Ya estás habilitado en ${torneoNombre}.`,
+        tipo: "success",
+        metadata: {
+          tipo: "inscripcion",
+          inscripcion_id: data.id,
+          torneo_id: data.torneo_id,
+        },
+      }).catch((err) =>
+        console.error("Error al notificar confirmación de inscripción:", err),
+      );
+    }
+
     return data;
   }
 

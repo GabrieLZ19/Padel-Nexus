@@ -1,6 +1,12 @@
 import { MercadoPagoConfig, Preference, Payment } from "mercadopago";
 import { supabaseAdmin } from "../config/supabase";
 import {
+  buildMercadoPagoBackUrls,
+  getMercadoPagoAccessToken,
+  isMercadoPagoConfigured,
+  resolveMercadoPagoInitPoint,
+} from "../config/mercadopago";
+import {
   MARKETPLACE_ESTADOS_ORDEN,
   MARKETPLACE_ESTADOS_VENDEDOR,
   type AudienciaPromocion,
@@ -728,7 +734,10 @@ export class MarketplaceService {
     return orden;
   }
 
-  static async crearPreferenciaMercadoPago(ordenId: string) {
+  static async crearPreferenciaMercadoPago(
+    ordenId: string,
+    options?: { mobile?: boolean },
+  ) {
     const { data: orden, error: errOrden } = await supabaseAdmin
       .from("marketplace_ordenes")
       .select(
@@ -751,25 +760,34 @@ export class MarketplaceService {
       throw new Error("Esta orden ya fue procesada.");
     }
 
-    const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
+    const token = getMercadoPagoAccessToken();
 
-    if (!token || token === "TEST") {
-      console.warn("⚠️ MP Access Token no configurado. Simulando checkout.");
-      const mockUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/marketplace/checkout?payment=success&orden_id=${ordenId}`;
+    if (!isMercadoPagoConfigured()) {
+      console.warn(
+        "⚠️ MP Access Token no configurado. Simulando checkout (confirmación inmediata).",
+      );
+      const mockPaymentId = `mock-mp-${Date.now()}`;
+      await MarketplaceService.confirmarPagoOrden(ordenId, mockPaymentId);
       return {
         preferenceId: "mock-marketplace-pref",
-        initPoint: mockUrl,
-        sandboxInitPoint: mockUrl,
+        initPoint: null,
+        sandboxInitPoint: null,
+        mockConfirmed: true,
+        paymentId: mockPaymentId,
       };
     }
 
-    const mpClient = new MercadoPagoConfig({ accessToken: token });
+    const mpClient = new MercadoPagoConfig({ accessToken: token! });
     const preference = new Preference(mpClient);
 
-    const baseUrl =
-      process.env.FRONTEND_URL || "http://localhost:3000";
     const backendUrl =
       process.env.BACKEND_URL || "http://localhost:4000";
+
+    const backUrls = buildMercadoPagoBackUrls({
+      mobile: options?.mobile,
+      webPath: "/marketplace/checkout",
+      mobileParams: { orden_id: ordenId },
+    });
 
     const mpItems = (orden as any).items.map((item: any) => ({
       id: item.producto?.id || "producto",
@@ -782,12 +800,10 @@ export class MarketplaceService {
     const response = await preference.create({
       body: {
         items: mpItems,
-        back_urls: {
-          success: `${baseUrl}/marketplace/checkout?payment=success&orden_id=${ordenId}`,
-          failure: `${baseUrl}/marketplace/checkout?payment=failure&orden_id=${ordenId}`,
-          pending: `${baseUrl}/marketplace/checkout?payment=pending&orden_id=${ordenId}`,
-        },
-        auto_return: baseUrl.startsWith("https://") ? "approved" : undefined,
+        back_urls: backUrls,
+        auto_return: backUrls.success.startsWith("https://")
+          ? "approved"
+          : undefined,
         external_reference: ordenId,
         notification_url: `${backendUrl}/api/marketplace/webhook/mercadopago`,
       },
@@ -800,10 +816,11 @@ export class MarketplaceService {
 
     return {
       preferenceId: response.id,
-      initPoint:
-        token.startsWith("TEST-")
-          ? response.sandbox_init_point
-          : response.init_point,
+      initPoint: resolveMercadoPagoInitPoint(
+        token!,
+        response.init_point,
+        response.sandbox_init_point,
+      ),
       sandboxInitPoint: response.sandbox_init_point,
     };
   }

@@ -14,31 +14,56 @@ export class RankingService {
    * Obtiene la billetera de ranking de un jugador específico junto con su historial deportivo
    */
   static async obtenerRankingPorUsuario(usuarioId: string) {
-    const { data, error } = await supabaseAdmin
-      .from("rankings")
-      .select(
-        `
-        *, 
-        perfiles (
-          nombre_completo, 
-          categoria_padel, 
-          avatar_url,
-          lugar_residencia
-        ),
-        historial_ranking (torneo_id, puntos_nuevos, created_at)
-      `,
-      )
-      .eq("usuario_id", usuarioId)
-      .order("created_at", {
-        referencedTable: "historial_ranking",
-        ascending: false,
-      });
+    const [rankingsResult, historialResult] = await Promise.all([
+      supabaseAdmin
+        .from("rankings")
+        .select(
+          `
+          *,
+          perfiles (
+            nombre,
+            apellido,
+            categoria_padel,
+            avatar_url,
+            lugar_residencia,
+            clubes:clubes!perfiles_club_id_fkey (
+              nombre,
+              provincia
+            )
+          )
+        `,
+        )
+        .eq("usuario_id", usuarioId),
+      supabaseAdmin
+        .from("historial_ranking")
+        .select("torneo_id, puntos_nuevos, puntos_anteriores, created_at")
+        .eq("usuario_id", usuarioId)
+        .order("created_at", { ascending: false }),
+    ]);
 
-    if (error || !data)
-      throw new Error(
-        "No se encontraron registros de ranking para este jugador.",
+    if (rankingsResult.error) {
+      console.error(
+        `Error al obtener ranking del usuario ${usuarioId}:`,
+        rankingsResult.error,
       );
-    return data;
+      throw new Error(
+        "No se pudieron cargar los registros de ranking del jugador.",
+      );
+    }
+
+    if (historialResult.error) {
+      console.error(
+        `Error al obtener historial de ranking del usuario ${usuarioId}:`,
+        historialResult.error,
+      );
+    }
+
+    const historial = historialResult.data ?? [];
+
+    return (rankingsResult.data ?? []).map((row) => ({
+      ...row,
+      historial_ranking: historial,
+    }));
   }
 
   /**

@@ -3,6 +3,7 @@ import { MarketplaceService } from "../services/marketplace.service";
 import { MarketplaceEntityAuthService } from "../services/marketplace-entity-auth.service";
 import type { EntidadMarketplaceTipo } from "../constants/marketplace";
 import { MercadoPagoConfig, Payment } from "mercadopago";
+import { getMercadoPagoAccessToken } from "../config/mercadopago";
 
 function parseEntidadRef(req: Request): {
   entidad_tipo: EntidadMarketplaceTipo;
@@ -122,11 +123,40 @@ export class MarketplaceController {
 
   static async pagarOrden(req: Request, res: Response) {
     try {
+      const mobile = (req.get("x-padel-client") || "").toLowerCase() === "mobile";
       const preferencia =
-        await MarketplaceService.crearPreferenciaMercadoPago(req.params.id);
+        await MarketplaceService.crearPreferenciaMercadoPago(req.params.id, {
+          mobile,
+        });
       res.json(preferencia);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
+    }
+  }
+
+  static async confirmarRetornoPago(req: Request, res: Response) {
+    try {
+      const { payment_id } = req.body;
+      const paymentId =
+        payment_id || `mobile-return-${Date.now()}`;
+
+      const orden = await MarketplaceService.confirmarPagoOrden(
+        req.params.id,
+        String(paymentId),
+      );
+
+      if (!orden) {
+        // Puede estar ya pagada: devolver estado actual
+        const actual = await MarketplaceService.obtenerOrden(
+          req.params.id,
+          req.user!.id,
+        );
+        return res.json(actual);
+      }
+
+      res.json(orden);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
     }
   }
 
@@ -229,8 +259,8 @@ export class MarketplaceController {
           return res.status(200).send("OK");
         }
 
-        const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
-        if (token && token !== "TEST") {
+        const token = getMercadoPagoAccessToken();
+        if (token) {
           const mpClient = new MercadoPagoConfig({ accessToken: token });
           const payment = new Payment(mpClient);
           const paymentInfo = await payment.get({ id: paymentId });

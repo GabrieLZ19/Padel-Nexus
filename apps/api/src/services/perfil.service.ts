@@ -13,6 +13,12 @@ import {
 } from "../utils/inscripcionPlanilla";
 import { randomBytes } from "crypto";
 
+export interface PreferenciasNotificacion {
+  push: boolean;
+  email: boolean;
+  whatsapp: boolean;
+}
+
 export interface ActualizarPerfilDTO {
   nombre?: string;
   apellido?: string;
@@ -24,6 +30,7 @@ export interface ActualizarPerfilDTO {
   sexo?: string;
   fecha_nacimiento?: string;
   avatar_url?: string;
+  preferencias_notificacion?: PreferenciasNotificacion;
 }
 
 export class PerfilService {
@@ -161,6 +168,13 @@ export class PerfilService {
           sexo: datos.sexo,
           fecha_nacimiento: normalizeFechaNacimiento(datos.fecha_nacimiento),
           avatar_url: datos.avatar_url,
+          preferencias_notificacion: datos.preferencias_notificacion
+            ? {
+                push: Boolean(datos.preferencias_notificacion.push),
+                email: Boolean(datos.preferencias_notificacion.email),
+                whatsapp: Boolean(datos.preferencias_notificacion.whatsapp),
+              }
+            : undefined,
         }),
       )
       .eq("id", userId)
@@ -459,5 +473,44 @@ export class PerfilService {
     }
 
     return { ...perfil, creado: true };
+  }
+
+  /**
+   * Guarda el token de Expo Push en preferencias_notificacion (jsonb).
+   */
+  static async registrarPushToken(userId: string, expoPushToken: string) {
+    const { data: perfil, error: readError } = await supabaseAdmin
+      .from("perfiles")
+      .select("preferencias_notificacion")
+      .eq("id", userId)
+      .single();
+
+    if (readError || !perfil) {
+      throw new Error("Perfil no encontrado.");
+    }
+
+    const current = (perfil.preferencias_notificacion || {}) as Record<
+      string,
+      unknown
+    >;
+
+    const { data, error } = await supabaseAdmin
+      .from("perfiles")
+      .update({
+        preferencias_notificacion: {
+          ...current,
+          push: current.push !== false,
+          expo_push_token: expoPushToken,
+        },
+      })
+      .eq("id", userId)
+      .select("*")
+      .single();
+
+    if (error || !data) {
+      throw new Error("No se pudo registrar el token de notificaciones push.");
+    }
+
+    return data;
   }
 }

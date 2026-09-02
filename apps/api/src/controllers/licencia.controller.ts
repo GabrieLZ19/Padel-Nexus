@@ -259,4 +259,63 @@ export const LicenciasController = {
       return res.status(400).json({ exito: false, error: message });
     }
   },
+
+  async cotizar(req: Request, res: Response): Promise<Response> {
+    try {
+      const data = await LicenciaService.cotizar({
+        club_id: (req.query.club_id as string) || null,
+        provincia: (req.query.provincia as string) || null,
+      });
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al cotizar la licencia.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
+  async crearPreferenciaPago(req: Request, res: Response): Promise<Response> {
+    try {
+      const usuarioId = req.user?.id;
+      if (!usuarioId) {
+        return res.status(401).json({ exito: false, error: "No autenticado." });
+      }
+      const mobile = (req.get("x-padel-client") || "").toLowerCase() === "mobile";
+      const data = await LicenciaService.crearPreferenciaPago(
+        req.params.id,
+        usuarioId,
+        { mobile },
+      );
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al iniciar el pago de la licencia.";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
+  async confirmarRetornoPago(req: Request, res: Response): Promise<Response> {
+    try {
+      const usuarioId = req.user?.id;
+      if (!usuarioId) {
+        return res.status(401).json({ exito: false, error: "No autenticado." });
+      }
+      const paymentId =
+        (req.body?.payment_id as string) || `mobile-licencia-${Date.now()}`;
+      const data = await LicenciaService.confirmarPagoLicencia(
+        req.params.id,
+        usuarioId,
+        String(paymentId),
+      );
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al confirmar el pago de la licencia.";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  },
 };
