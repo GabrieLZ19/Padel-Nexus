@@ -12,9 +12,10 @@ interface HomeHeaderProps {
 }
 
 function getInitials(usuario: Perfil | null): string {
-  const first = usuario?.nombre?.trim().charAt(0) || "";
-  const last = usuario?.apellido?.trim().charAt(0) || "";
-  return (first + last).toUpperCase() || "J";
+  const first = (usuario?.nombre || "").trim().charAt(0);
+  const last = (usuario?.apellido || "").trim().charAt(0);
+  const value = `${first}${last}`.toUpperCase();
+  return value || "J";
 }
 
 export function HomeHeader({
@@ -29,8 +30,8 @@ export function HomeHeader({
     .join(" · ");
 
   return (
-    <View className="flex-row items-start justify-between gap-4">
-      <View className="flex-1 gap-1">
+    <View className="flex-row items-center justify-between gap-4">
+      <View className="flex-1 gap-0.5 justify-center">
         <Text className="font-sans-bold text-[28px] leading-8 text-white">
           Hola,{" "}
           <Text className="text-brand-chartreuse">{nombre}</Text>
@@ -61,20 +62,23 @@ export function HomeHeader({
           onPress={onAvatarPress}
           accessibilityRole="button"
           accessibilityLabel="Ir al perfil"
-          className="h-11 w-11 overflow-hidden rounded-full bg-brand-surface active:opacity-80"
+          className="h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-brand-border bg-brand-surface active:opacity-80"
         >
           {usuario?.avatar_url ? (
             <Image
               source={{ uri: usuario.avatar_url }}
-              style={{ width: 44, height: 44 }}
+              style={{ width: 44, height: 44, borderRadius: 22 }}
               contentFit="cover"
               cachePolicy="memory-disk"
               priority="high"
               transition={120}
             />
           ) : (
-            <View className="h-11 w-11 items-center justify-center rounded-full bg-brand-chartreuse">
-              <Text className="font-sans-bold text-base text-black">
+            <View className="h-full w-full items-center justify-center rounded-full bg-brand-chartreuse">
+              <Text
+                className="font-sans-bold text-base text-black text-center"
+                style={{ includeFontPadding: false, textAlignVertical: "center" }}
+              >
                 {getInitials(usuario)}
               </Text>
             </View>

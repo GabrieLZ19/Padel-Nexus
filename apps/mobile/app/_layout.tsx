@@ -69,6 +69,7 @@ export default function RootLayout() {
             <Stack.Screen name="reservar" />
             <Stack.Screen name="market" />
             <Stack.Screen name="pago" />
+            <Stack.Screen name="callback" options={{ animation: "none", headerShown: false }} />
             <Stack.Screen
               name="notificaciones"
               options={{ presentation: "modal", animation: "slide_from_bottom" }}

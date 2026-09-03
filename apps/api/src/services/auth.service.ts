@@ -369,6 +369,19 @@ export class AuthService {
       .eq("id", data.user.id)
       .single();
 
+    if (perfil) {
+      const googleAvatar =
+        data.user.user_metadata?.avatar_url ||
+        data.user.user_metadata?.picture;
+      if (!perfil.avatar_url && googleAvatar) {
+        await supabaseAdmin
+          .from("perfiles")
+          .update({ avatar_url: googleAvatar })
+          .eq("id", data.user.id);
+        perfil.avatar_url = googleAvatar;
+      }
+    }
+
     // Fallback por si es un registro nuevo vía Google
     if (perfilError || !perfil) {
       const { data: nuevoPerfil, error: insertError } = await supabaseAdmin
@@ -424,6 +437,18 @@ export class AuthService {
       )
       .eq("id", user.id)
       .single();
+
+    if (perfil) {
+      const googleAvatar =
+        user.user_metadata?.avatar_url || user.user_metadata?.picture;
+      if (!perfil.avatar_url && googleAvatar) {
+        await supabaseAdmin
+          .from("perfiles")
+          .update({ avatar_url: googleAvatar })
+          .eq("id", user.id);
+        perfil.avatar_url = googleAvatar;
+      }
+    }
 
     // Si es un registro nuevo o el RLS bloquea la lectura inicial, usamos el canal de respaldo administrativo para asegurar la creación de la ficha
     if (perfilError || !perfil) {
