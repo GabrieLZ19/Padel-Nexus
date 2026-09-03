@@ -144,10 +144,11 @@ export const PerfilService = {
     }
   },
 
-  async obtenerUrlGoogle(): Promise<string> {
+  async obtenerUrlGoogle(redirectTo?: string): Promise<string> {
     try {
       const response = await api.get<{ exito: boolean; url: string }>(
         "/perfil/google",
+        { params: redirectTo ? { redirectTo } : undefined },
       );
       if (!response.data.url) {
         throw new Error("URL de Google vacía.");
@@ -156,6 +157,23 @@ export const PerfilService = {
     } catch (error: unknown) {
       throw new Error(
         getErrorMessage(error, "No se pudo iniciar sesión con Google."),
+      );
+    }
+  },
+
+  async verificarTokenGoogle(params: {
+    accessToken?: string;
+    code?: string;
+  }): Promise<AuthResponse> {
+    try {
+      const response = await api.post<AuthResponse>(
+        "/perfil/google/verificar",
+        params,
+      );
+      return parseLoginBody(response.data as unknown as LoginApiBody);
+    } catch (error: unknown) {
+      throw new Error(
+        getErrorMessage(error, "No se pudo validar la sesión con Google."),
       );
     }
   },

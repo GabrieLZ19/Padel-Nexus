@@ -32,10 +32,18 @@ export function useUserLocation() {
       const position = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      setCoords({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      });
+      if (
+        position?.coords &&
+        Number.isFinite(position.coords.latitude) &&
+        Number.isFinite(position.coords.longitude)
+      ) {
+        setCoords({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      } else {
+        setCoords(null);
+      }
     } catch (error) {
       if (__DEV__) {
         console.warn("[location] No se pudo obtener ubicación:", error);

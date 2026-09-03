@@ -17,6 +17,7 @@ export default function OAuthCallbackPage() {
   const [mensaje, setMensaje] = useState(
     "Estableciendo canal de conexión seguro...",
   );
+  const [deepLinkUrl, setDeepLinkUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const procesarHash = async () => {
@@ -62,7 +63,25 @@ export default function OAuthCallbackPage() {
           document.cookie = `padel_token=${data.token}; path=/; max-age=${60 * 60 * 24}`;
           document.cookie = `padel_user_role=${data.usuario.rol}; path=/; max-age=${60 * 60 * 24}`;
 
-          // Cambiamos el estado visual a éxito antes de redirigir
+          const isFromMobileApp =
+            searchParams.get("from") === "mobile" ||
+            searchParams.get("source") === "mobile" ||
+            window.location.hash.includes("from=mobile");
+
+          if (isFromMobileApp) {
+            const mobileDeepLink = `padelnexus://callback?token=${encodeURIComponent(data.token)}&access_token=${encodeURIComponent(accessToken)}`;
+            setDeepLinkUrl(mobileDeepLink);
+            setMensaje("¡Conexión exitosa! Volviendo a la app...");
+            try {
+              window.location.assign(mobileDeepLink);
+            } catch {
+              // noop
+            }
+            return;
+          }
+
+          // Flujo estándar en la web (PC / Desktop): nunca muestra el botón de la app
+          setDeepLinkUrl(null);
           setProfile(data.usuario);
           setStatus("success");
           setMensaje(
@@ -147,6 +166,17 @@ export default function OAuthCallbackPage() {
           >
             {mensaje}
           </p>
+
+          {deepLinkUrl && status === "success" && (
+            <div className="pt-2">
+              <a
+                href={deepLinkUrl}
+                className="inline-flex items-center justify-center rounded-xl bg-brand-chartreuse px-6 py-3 font-sans-bold text-sm font-semibold text-black shadow-lg hover:opacity-90 transition-all"
+              >
+                Abrir en la App Padel Nexus
+              </a>
+            </div>
+          )}
 
           {status === "loading" && (
             <span className="text-xs text-gray-500 uppercase tracking-widest font-bold animate-pulse">

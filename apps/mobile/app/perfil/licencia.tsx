@@ -377,6 +377,9 @@ export default function LicenciaScreen() {
                       source={{ uri: usuario.avatar_url }}
                       style={{ width: 56, height: 56, borderRadius: 14 }}
                       contentFit="cover"
+                      cachePolicy="memory-disk"
+                      priority="high"
+                      transition={120}
                     />
                   ) : (
                     <View className="h-14 w-14 items-center justify-center rounded-2xl bg-brand-chartreuse">

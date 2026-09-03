@@ -299,9 +299,10 @@ export const PerfilController = {
    */
   async iniciarGoogleAuth(req: Request, res: Response): Promise<Response> {
     try {
-      const urlDeRedireccion = await AuthService.obtenerUrlGoogle();
+      const redirectTo = req.query.redirectTo as string | undefined;
+      const urlDeRedireccion = await AuthService.obtenerUrlGoogle(redirectTo);
 
-      // Retornamos la URL en un JSON para que el frontend la maneje con window.location.href
+      // Retornamos la URL en un JSON para que el cliente la maneje
       return res.status(200).json({
         exito: true,
         url: urlDeRedireccion,
@@ -358,14 +359,19 @@ export const PerfilController = {
     res: Response,
   ): Promise<Response> {
     try {
-      const { accessToken } = req.body;
-      if (!accessToken) {
+      const { accessToken, code } = req.body;
+      if (!accessToken && !code) {
         return res
           .status(400)
-          .json({ exito: false, error: "El token de acceso es requerido." });
+          .json({ exito: false, error: "El token de acceso o código de sesión es requerido." });
       }
 
-      const resultado = await AuthService.verificarTokenGoogle(accessToken);
+      let resultado;
+      if (code) {
+        resultado = await AuthService.cambiarCodigoPorSesion(code);
+      } else {
+        resultado = await AuthService.verificarTokenGoogle(accessToken);
+      }
 
       return res.status(200).json({
         exito: true,

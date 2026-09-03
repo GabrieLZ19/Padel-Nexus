@@ -1,13 +1,14 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { Link, useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AuthFormScroll } from "@/src/components/ui/AuthFormScroll";
 import { BrandMark } from "@/src/components/ui/BrandMark";
 import { Button } from "@/src/components/ui/Button";
+import { GoogleLogo } from "@/src/components/ui/GoogleLogo";
 import { TextField } from "@/src/components/ui/TextField";
 import { useAuthStore } from "@/src/stores/authStore";
 
@@ -15,10 +16,12 @@ export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const login = useAuthStore((s) => s.login);
+  const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit() {
@@ -35,6 +38,23 @@ export default function LoginScreen() {
       setError(err instanceof Error ? err.message : "No se pudo iniciar sesión.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function onGoogleSignIn() {
+    setError(null);
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+      router.replace("/(tabs)");
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo iniciar sesión con Google.",
+      );
+    } finally {
+      setGoogleLoading(false);
     }
   }
 
@@ -101,18 +121,25 @@ export default function LoginScreen() {
             </Text>
             <View className="h-px flex-1 bg-brand-border" />
           </View>
-          <View className="flex-row justify-center gap-3">
-            {(["globe", "apple", "facebook"] as const).map((icon) => (
-              <Pressable
-                key={icon}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: true }}
-                className="h-14 w-14 items-center justify-center rounded-field border border-brand-border bg-brand-elevated opacity-50"
-              >
-                <FontAwesome name={icon} size={20} color="#FFFFFF" />
-              </Pressable>
-            ))}
-          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Continuar con Google"
+            disabled={loading || googleLoading}
+            onPress={() => void onGoogleSignIn()}
+            className="h-14 w-full flex-row items-center justify-center gap-3 rounded-field border border-brand-border bg-brand-surface active:opacity-80 disabled:opacity-50"
+          >
+            {googleLoading ? (
+              <ActivityIndicator size="small" color="#CBFE01" />
+            ) : (
+              <>
+                <GoogleLogo size={22} />
+                <Text className="font-sans-bold text-base text-white">
+                  Continuar con Google
+                </Text>
+              </>
+            )}
+          </Pressable>
         </Animated.View>
 
         <View className="mt-auto pt-10">

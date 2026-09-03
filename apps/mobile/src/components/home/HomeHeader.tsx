@@ -61,13 +61,16 @@ export function HomeHeader({
           onPress={onAvatarPress}
           accessibilityRole="button"
           accessibilityLabel="Ir al perfil"
-          className="h-11 w-11 overflow-hidden rounded-full active:opacity-80"
+          className="h-11 w-11 overflow-hidden rounded-full bg-brand-surface active:opacity-80"
         >
           {usuario?.avatar_url ? (
             <Image
               source={{ uri: usuario.avatar_url }}
               style={{ width: 44, height: 44 }}
               contentFit="cover"
+              cachePolicy="memory-disk"
+              priority="high"
+              transition={120}
             />
           ) : (
             <View className="h-11 w-11 items-center justify-center rounded-full bg-brand-chartreuse">

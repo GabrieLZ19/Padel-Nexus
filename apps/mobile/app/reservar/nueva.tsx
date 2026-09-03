@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClubNearCard } from "@/src/components/reservar/ClubNearCard";
 import { ClubsMapView } from "@/src/components/reservar/ClubsMapView";
+import { SafeErrorBoundary } from "@/src/components/ui/SafeErrorBoundary";
 import { ScreenHeader } from "@/src/components/ui/ScreenHeader";
 import { Skeleton } from "@/src/components/ui/Skeleton";
 import { useClubesCercanos } from "@/src/hooks/useClubesCercanos";
@@ -86,19 +87,21 @@ export default function ReservarNuevaScreen() {
           </Pressable>
         </View>
 
-        <ClubsMapView
-          clubs={clubes}
-          userCoords={coords}
-          selectedClubId={selectedClubId}
-          onSelectClub={(id) => {
-            if (selectedClubId === id) {
-              irAClub(id);
-              return;
-            }
-            setSelectedClubId(id);
-          }}
-          height={260}
-        />
+        <SafeErrorBoundary>
+          <ClubsMapView
+            clubs={clubes}
+            userCoords={coords}
+            selectedClubId={selectedClubId}
+            onSelectClub={(id) => {
+              if (selectedClubId === id) {
+                irAClub(id);
+                return;
+              }
+              setSelectedClubId(id);
+            }}
+            height={260}
+          />
+        </SafeErrorBoundary>
 
         <View className="flex-row items-center justify-between">
           <Text className="font-sans-bold text-lg text-white">
@@ -116,7 +119,7 @@ export default function ReservarNuevaScreen() {
 
       <FlatList
         data={loading ? [] : clubes}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.id)}
         style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: 24,

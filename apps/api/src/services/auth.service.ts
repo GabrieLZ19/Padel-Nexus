@@ -43,7 +43,9 @@ export class AuthService {
     // Al estar aislado, ignora el RLS de forma directa sin caer en bucles de Postgres
     const { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
-      .select("id, nombre, apellido, dni, lugar_residencia, rol, email, sexo, fecha_nacimiento, club_id")
+      .select(
+        "id, nombre, apellido, dni, lugar_residencia, rol, email, sexo, fecha_nacimiento, club_id, avatar_url, categoria_padel, lado_preferido, ranking_nacional, ranking_provincial",
+      )
       .eq("id", authData.user.id)
       .single();
 
@@ -321,12 +323,15 @@ export class AuthService {
   /**
    * Genera la URL de autorización oficial de Google usando signInWithOAuth
    */
-  static async obtenerUrlGoogle() {
+  static async obtenerUrlGoogle(redirectToCustom?: string) {
+    const finalRedirect =
+      redirectToCustom ||
+      `${env.FRONTEND_URL || "http://localhost:3000"}/callback`;
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        //  Forzamos a Supabase a redirigir a tu nueva pantalla procesadora del cliente
-        redirectTo: `${env.FRONTEND_URL || "http://localhost:3000"}/callback`,
+        redirectTo: finalRedirect,
         skipBrowserRedirect: true,
         queryParams: {
           prompt: "select_account",
@@ -358,7 +363,9 @@ export class AuthService {
     // Buscamos su perfil unificado en la base
     let { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
-      .select("id, nombre, apellido, dni, lugar_residencia, rol, email, ranking_nacional, ranking_provincial")
+      .select(
+        "id, nombre, apellido, dni, lugar_residencia, rol, email, ranking_nacional, ranking_provincial, avatar_url, categoria_padel, lado_preferido",
+      )
       .eq("id", data.user.id)
       .single();
 
@@ -371,11 +378,14 @@ export class AuthService {
           nombre: (data.user.user_metadata?.full_name || "Jugador Google").split(" ")[0],
           apellido: (data.user.user_metadata?.full_name || "").includes(" ") ? (data.user.user_metadata?.full_name || "").split(" ").slice(1).join(" ") : "",
           email: data.user.email,
+          avatar_url: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || null,
           rol: "usuario",
           lugar_residencia: "A completar",
           dni: "A completar",
         })
-        .select("id, nombre, apellido, dni, lugar_residencia, rol, email, ranking_nacional, ranking_provincial")
+        .select(
+          "id, nombre, apellido, dni, lugar_residencia, rol, email, ranking_nacional, ranking_provincial, avatar_url, categoria_padel, lado_preferido",
+        )
         .single();
 
       if (insertError || !nuevoPerfil) {
@@ -410,7 +420,7 @@ export class AuthService {
     let { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
       .select(
-        "id, nombre, apellido, dni, lugar_residencia, rol, email, categoria_padel, lado_preferido, ranking_nacional, ranking_provincial",
+        "id, nombre, apellido, dni, lugar_residencia, rol, email, categoria_padel, lado_preferido, ranking_nacional, ranking_provincial, avatar_url",
       )
       .eq("id", user.id)
       .single();
@@ -424,6 +434,7 @@ export class AuthService {
           nombre: (user.user_metadata?.full_name || "Jugador Google").split(" ")[0],
           apellido: (user.user_metadata?.full_name || "").includes(" ") ? (user.user_metadata?.full_name || "").split(" ").slice(1).join(" ") : "",
           email: user.email,
+          avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
           rol: "usuario",
           lugar_residencia: "La Rioja",
           dni: "A completar",
@@ -431,7 +442,7 @@ export class AuthService {
           lado_preferido: "S/C",
         })
         .select(
-          "id, nombre, apellido, dni, lugar_residencia, rol, email, categoria_padel, lado_preferido, ranking_nacional, ranking_provincial",
+          "id, nombre, apellido, dni, lugar_residencia, rol, email, categoria_padel, lado_preferido, ranking_nacional, ranking_provincial, avatar_url",
         )
         .single();
 
