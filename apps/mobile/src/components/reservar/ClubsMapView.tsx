@@ -1,11 +1,6 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
-import MapView, {
-  Marker,
-  PROVIDER_DEFAULT,
-  type Region,
-} from "react-native-maps";
 
 import type { UserCoords } from "@/src/hooks/useUserLocation";
 import type { Club } from "@/src/types/club.types";
@@ -16,6 +11,13 @@ interface ClubsMapViewProps {
   selectedClubId?: string | null;
   onSelectClub?: (clubId: string) => void;
   height?: number;
+}
+
+interface Region {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
 }
 
 const FALLBACK_REGION: Region = {
@@ -52,19 +54,41 @@ function buildRegion(
   const minLng = Math.min(...lngs);
   const maxLng = Math.max(...lngs);
 
-  const midLat = (minLat + maxLat) / 2;
-  const midLng = (minLng + maxLng) / 2;
-  const latDelta = Math.max((maxLat - minLat) * 1.6, 0.04);
-  const lngDelta = Math.max((maxLng - minLng) * 1.6, 0.04);
-
   return {
-    latitude: midLat,
-    longitude: midLng,
-    latitudeDelta: latDelta,
-    longitudeDelta: lngDelta,
+    latitude: (minLat + maxLat) / 2,
+    longitude: (minLng + maxLng) / 2,
+    latitudeDelta: Math.max((maxLat - minLat) * 1.6, 0.04),
+    longitudeDelta: Math.max((maxLng - minLng) * 1.6, 0.04),
   };
 }
 
+function MapFallback({
+  height,
+  message,
+}: {
+  height: number;
+  message: string;
+}) {
+  return (
+    <View
+      className="items-center justify-center overflow-hidden rounded-card border border-brand-border bg-brand-surface px-6"
+      style={{ height }}
+    >
+      <FontAwesome name="map-o" size={28} color="#CBFE01" />
+      <Text className="mt-3 text-center font-sans-semibold text-sm text-white">
+        {message}
+      </Text>
+      <Text className="mt-1 text-center font-sans text-xs text-brand-muted">
+        Podés elegir un club desde la lista.
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Mapa de clubes. Import dinámico de react-native-maps para evitar
+ * crash nativo al montar la pantalla si el módulo falla en el device.
+ */
 export function ClubsMapView({
   clubs,
   userCoords,
@@ -72,7 +96,36 @@ export function ClubsMapView({
   onSelectClub,
   height = 240,
 }: ClubsMapViewProps) {
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<{ animateToRegion: (r: Region, ms: number) => void } | null>(
+    null,
+  );
+  const [Maps, setMaps] = useState<{
+    MapView: ComponentType<Record<string, unknown>>;
+    Marker: ComponentType<Record<string, unknown>>;
+  } | null>(null);
+  const [mapFailed, setMapFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const mod = await import("react-native-maps");
+        if (cancelled) return;
+        setMaps({
+          MapView: mod.default as ComponentType<Record<string, unknown>>,
+          Marker: mod.Marker as ComponentType<Record<string, unknown>>,
+        });
+      } catch (error) {
+        if (__DEV__) {
+          console.warn("[maps] No se pudo cargar react-native-maps:", error);
+        }
+        if (!cancelled) setMapFailed(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const markers = useMemo(
     () =>
@@ -92,28 +145,52 @@ export function ClubsMapView({
   );
 
   useEffect(() => {
-    if (!mapRef.current) return;
-    mapRef.current.animateToRegion(region, 400);
-  }, [region]);
+    if (!mapRef.current || mapFailed) return;
+    try {
+      mapRef.current.animateToRegion(region, 400);
+    } catch {
+      // ignore animate errors
+    }
+  }, [region, mapFailed]);
 
+  if (mapFailed) {
+    return <MapFallback height={height} message="Mapa no disponible" />;
+  }
+
+  if (!Maps) {
+    return (
+      <View
+        className="items-center justify-center overflow-hidden rounded-card border border-brand-border bg-brand-surface"
+        style={{ height }}
+      >
+        <Text className="font-sans text-sm text-brand-muted">Cargando mapa…</Text>
+      </View>
+    );
+  }
+
+  const { MapView, Marker } = Maps;
   const selected = markers.find((c) => c.id === selectedClubId) ?? null;
 
   return (
     <View
       className="overflow-hidden rounded-card border border-brand-border"
       style={{ height }}
+      collapsable={false}
     >
       <MapView
         ref={mapRef}
         style={{ flex: 1 }}
-        provider={PROVIDER_DEFAULT}
         initialRegion={region}
         showsUserLocation={Boolean(userCoords)}
         showsMyLocationButton={false}
         showsCompass={false}
         toolbarEnabled={false}
+        liteMode={Platform.OS === "android"}
         mapType={Platform.OS === "ios" ? "mutedStandard" : "standard"}
         userInterfaceStyle="dark"
+        onMapReady={() => {
+          // no-op: confirma que el mapa montó sin crash
+        }}
       >
         {markers.map((club) => {
           const isSelected = club.id === selectedClubId;

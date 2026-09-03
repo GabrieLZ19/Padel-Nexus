@@ -28,7 +28,7 @@ interface LoginApiBody {
 function getErrorMessage(error: unknown, fallback: string): string {
   if (isAxiosError(error)) {
     if (!error.response) {
-      return "No se pudo conectar con el servidor. Verificá que la API esté corriendo en el puerto 4000 y que el celular esté en la misma red Wi‑Fi.";
+      return "El servidor no responde. Puede estar iniciando; esperá unos segundos e intentá de nuevo.";
     }
     const data = error.response.data as
       | { error?: string; message?: string; mensaje?: string }

@@ -60,65 +60,70 @@ export default function ReservarNuevaScreen() {
         <ScreenHeader title="Reservar cancha" />
       </View>
 
+      {/*
+        El mapa NO va dentro del FlatList: en Android MapView como
+        ListHeaderComponent suele crashear la app nativamente.
+      */}
+      <View className="gap-4 px-6 pb-2">
+        <View className="flex-row items-center gap-2">
+          <View className="flex-1 flex-row items-center gap-2 rounded-full border border-brand-border bg-brand-surface px-4 py-3">
+            <FontAwesome name="search" size={16} color="#8A8A8A" />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              onSubmitEditing={onSearchSubmit}
+              placeholder="Buscar canchas cerca tuyo"
+              placeholderTextColor="#8A8A8A"
+              returnKeyType="search"
+              className="flex-1 font-sans text-base text-white"
+            />
+          </View>
+          <Pressable
+            onPress={onSearchSubmit}
+            className="h-12 w-12 items-center justify-center rounded-full border border-brand-border bg-brand-surface active:opacity-80"
+          >
+            <FontAwesome name="sliders" size={18} color="#CBFE01" />
+          </Pressable>
+        </View>
+
+        <ClubsMapView
+          clubs={clubes}
+          userCoords={coords}
+          selectedClubId={selectedClubId}
+          onSelectClub={(id) => {
+            if (selectedClubId === id) {
+              irAClub(id);
+              return;
+            }
+            setSelectedClubId(id);
+          }}
+          height={260}
+        />
+
+        <View className="flex-row items-center justify-between">
+          <Text className="font-sans-bold text-lg text-white">
+            Canchas cercanas
+          </Text>
+          <Text className="font-sans text-sm text-brand-muted">
+            {disponiblesCount || clubes.length} disponibles
+          </Text>
+        </View>
+
+        {error ? (
+          <Text className="font-sans text-sm text-red-400">{error}</Text>
+        ) : null}
+      </View>
+
       <FlatList
         data={loading ? [] : clubes}
         keyExtractor={(item) => item.id}
+        style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: 24,
           paddingBottom: insets.bottom + 24,
           gap: 12,
         }}
-        ListHeaderComponent={
-          <View className="gap-4 pb-2">
-            <View className="flex-row items-center gap-2">
-              <View className="flex-1 flex-row items-center gap-2 rounded-full border border-brand-border bg-brand-surface px-4 py-3">
-                <FontAwesome name="search" size={16} color="#8A8A8A" />
-                <TextInput
-                  value={search}
-                  onChangeText={setSearch}
-                  onSubmitEditing={onSearchSubmit}
-                  placeholder="Buscar canchas cerca tuyo"
-                  placeholderTextColor="#8A8A8A"
-                  returnKeyType="search"
-                  className="flex-1 font-sans text-base text-white"
-                />
-              </View>
-              <Pressable
-                onPress={onSearchSubmit}
-                className="h-12 w-12 items-center justify-center rounded-full border border-brand-border bg-brand-surface active:opacity-80"
-              >
-                <FontAwesome name="sliders" size={18} color="#CBFE01" />
-              </Pressable>
-            </View>
-
-            <ClubsMapView
-              clubs={clubes}
-              userCoords={coords}
-              selectedClubId={selectedClubId}
-              onSelectClub={(id) => {
-                if (selectedClubId === id) {
-                  irAClub(id);
-                  return;
-                }
-                setSelectedClubId(id);
-              }}
-              height={260}
-            />
-
-            <View className="flex-row items-center justify-between">
-              <Text className="font-sans-bold text-lg text-white">
-                Canchas cercanas
-              </Text>
-              <Text className="font-sans text-sm text-brand-muted">
-                {disponiblesCount || clubes.length} disponibles
-              </Text>
-            </View>
-
-            {error ? (
-              <Text className="font-sans text-sm text-red-400">{error}</Text>
-            ) : null}
-          </View>
-        }
+        removeClippedSubviews={false}
         renderItem={({ item }) => (
           <ClubNearCard
             club={item}

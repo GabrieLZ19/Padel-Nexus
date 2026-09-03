@@ -23,7 +23,7 @@
       "package": "com.gabrielz20.padelnexus",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#CBFE01"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,

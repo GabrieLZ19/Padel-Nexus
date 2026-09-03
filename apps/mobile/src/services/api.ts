@@ -11,7 +11,8 @@ if (__DEV__) {
 
 export const api = axios.create({
   baseURL: API_URL,
-  timeout: 20000,
+  // Render free tier puede tardar ~50s en despertar del sleep.
+  timeout: 60000,
 });
 
 api.interceptors.request.use(async (config) => {
