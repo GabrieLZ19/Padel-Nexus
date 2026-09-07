@@ -135,6 +135,46 @@ export const TorneosService = {
     return response.data;
   },
 
+  async getLlaveMatriz(torneoId: string): Promise<{
+    pairCount: number;
+    matches: Array<{ matchNo: number; a: string; b: string; winnerTo: number | null }>;
+    supported: boolean;
+  }> {
+    const response = await api.get<{
+      pairCount: number;
+      matches: Array<{ matchNo: number; a: string; b: string; winnerTo: number | null }>;
+      supported: boolean;
+    }>(`/torneos/${torneoId}/llave-matriz`);
+    return response.data;
+  },
+
+  async getSedes(torneoId: string) {
+    const response = await api.get(`/torneos/${torneoId}/sedes`);
+    return response.data;
+  },
+
+  async guardarSedes(torneoId: string, clubIds: Array<string | number>) {
+    const response = await api.post(`/torneos/${torneoId}/sedes`, {
+      club_ids: clubIds,
+    });
+    return response.data;
+  },
+
+  async getCanchasDisponibilidad(torneoId: string) {
+    const response = await api.get(`/torneos/${torneoId}/canchas-disponibilidad`);
+    return response.data;
+  },
+
+  async guardarCanchasDisponibilidad(
+    torneoId: string,
+    disponibilidad: unknown[],
+  ) {
+    const response = await api.post(`/torneos/${torneoId}/canchas-disponibilidad`, {
+      disponibilidad,
+    });
+    return response.data;
+  },
+
   async generarZonas(torneoId: string, _size?: number, forzarDestructivo?: boolean) {
     // Tamaño de zona siempre auto FAP (preferredSize=3 en backend)
     const response = await api.post(

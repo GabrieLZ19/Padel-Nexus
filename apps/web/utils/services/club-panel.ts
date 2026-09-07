@@ -1,5 +1,12 @@
 import { api } from "../api";
-import { Club, Cancha, Reserva, Turno } from "../types";
+import {
+  Club,
+  Cancha,
+  Reserva,
+  Turno,
+  BloqueoDisponibilidad,
+  CrearBloqueoPayload,
+} from "../types";
 
 export class ClubPanelService {
   static async getMiClub(): Promise<Club> {
@@ -88,6 +95,37 @@ export class ClubPanelService {
   }): Promise<{ data: any[]; total: number }> {
     const { data } = await api.get("/club/mi-club/reservas", { params: filtros });
     return { data: data.data || [], total: data.total || 0 };
+  }
+
+  static async getBloqueos(params?: {
+    desde?: string;
+    hasta?: string;
+    todos?: boolean;
+  }): Promise<BloqueoDisponibilidad[]> {
+    const { data } = await api.get("/club/mi-club/bloqueos", {
+      params: {
+        desde: params?.desde,
+        hasta: params?.hasta,
+        todos: params?.todos ? "1" : undefined,
+      },
+    });
+    return data.data || [];
+  }
+
+  static async crearBloqueo(
+    payload: CrearBloqueoPayload,
+  ): Promise<BloqueoDisponibilidad> {
+    const { data } = await api.post("/club/mi-club/bloqueos", payload);
+    return data.data;
+  }
+
+  static async eliminarBloqueo(
+    bloqueoId: string,
+    hard = false,
+  ): Promise<void> {
+    await api.delete(`/club/mi-club/bloqueos/${bloqueoId}`, {
+      params: hard ? { hard: "1" } : undefined,
+    });
   }
 
   static async getEstadisticas(): Promise<{

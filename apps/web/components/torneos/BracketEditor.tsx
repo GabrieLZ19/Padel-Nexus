@@ -20,6 +20,7 @@ import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
 import { MatchCard } from "./MatchCard";
+import { FapBracketDiagram, type FapMatrixMatch } from "./FapBracketDiagram";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import {
   getCapacidadesZonasPorReglamento,
@@ -46,12 +47,26 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   isReadOnly = false,
 }) => {
   const formatoLower = torneo?.formato?.toLowerCase() || "";
+  // Solo eliminatoria pura. "Zonas + Eliminatoria" NO es directa.
   const isEliminatoriaDirecta =
-    formatoLower.includes("eliminatoria") || formatoLower.includes("directa");
+    formatoLower === "eliminatoria directa" ||
+    (formatoLower.includes("eliminatoria") &&
+      !formatoLower.includes("zona") &&
+      !formatoLower.includes("grupo"));
 
   const [activeView, setActiveView] = useState<
     "zonas" | "siembra" | "llaves" | "auditoria"
-  >(isEliminatoriaDirecta ? "llaves" : "zonas");
+  >(isEliminatoriaDirecta ? "siembra" : "zonas");
+  // Si el formato llega async, asegurar la vista correcta (zonas vs siembra)
+  useEffect(() => {
+    if (isEliminatoriaDirecta && activeView === "zonas") {
+      setActiveView("siembra");
+    } else if (!isEliminatoriaDirecta && activeView === "siembra") {
+      setActiveView("zonas");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo reaccionar a cambio de formato
+  }, [isEliminatoriaDirecta]);
+
   const autoSwitchedToLlave = React.useRef(false);
   const [zonas, setZonas] = useState<ZonaDrag[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,12 +149,13 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   };
 
   const handleRegenerarZonas = async () => {
-    if ((inscripciones || []).length % 2 !== 0) {
+    const totalInscritos = (inscripciones || []).length;
+    if (totalInscritos < 3) {
       setFeedbackModal({
         isOpen: true,
         type: "warning",
-        title: "Cantidad impar de parejas",
-        description: `Para generar las zonas de clasificación, la cantidad de participantes confirmados debe ser un número par. Actualmente hay ${(inscripciones || []).length} confirmados.`,
+        title: "Inscripciones insuficientes",
+        description: `Se necesitan al menos 3 parejas confirmadas para armar zonas. Actualmente hay ${totalInscritos}.`,
         onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
       });
       return;
@@ -663,26 +679,86 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       rondaEnCurso
     : null;
 
-  /** Origen de zona por inscripción (seed dentro de la zona = posición provisional). */
+  /** Origen FAP por inscripción: "1º A" (seed de zona = posición provisional). */
   const origenPorInscripcion = React.useMemo(() => {
     const map = new Map<string, string>();
     const sortedZonas = [...zonas].sort((a, b) =>
       a.nombre.localeCompare(b.nombre, "es"),
     );
     for (const zona of sortedZonas) {
-      const zonaNombre = /^zona\s+/i.test(zona.nombre)
-        ? zona.nombre.trim()
-        : `Zona ${zona.nombre.trim()}`;
+      const letter = zona.nombre.replace(/^zona\s+/i, "").trim().toUpperCase();
       const ordenadas = [...zona.parejas].sort(
         (a, b) => (a.seed || 999) - (b.seed || 999),
       );
       ordenadas.forEach((p, idx) => {
         const puesto = idx + 1;
-        map.set(String(p.id), `${zonaNombre} ${puesto}°`);
+        map.set(String(p.id), `${puesto}º ${letter}`);
       });
     }
     return map;
   }, [zonas]);
+
+  const [fapMatrixByOrden, setFapMatrixByOrden] = React.useState<
+    Map<number, { a: string; b: string }>
+  >(new Map());
+  const [fapMatrixMatches, setFapMatrixMatches] = React.useState<
+    FapMatrixMatch[]
+  >([]);
+  const [fapPairCount, setFapPairCount] = React.useState<number | null>(null);
+
+  const usaPlantillaFap = fapMatrixByOrden.size > 0;
+  const byesFap = React.useMemo(() => {
+    if (!usaPlantillaFap || !firstPlayoffRound) return 0;
+    const firstRoundMatchNos = new Set(
+      playoffPartidos
+        .filter((p) => (p.ronda || "").toUpperCase() === firstPlayoffRound)
+        .map((p) => Number(p.orden)),
+    );
+    const firstRoundRefs = new Set<string>();
+    for (const no of firstRoundMatchNos) {
+      const m = fapMatrixByOrden.get(no);
+      if (!m) continue;
+      if (!m.a.startsWith("W")) firstRoundRefs.add(m.a);
+      if (!m.b.startsWith("W")) firstRoundRefs.add(m.b);
+    }
+    const allLeafRefs = new Set<string>();
+    for (const [, m] of fapMatrixByOrden) {
+      if (!m.a.startsWith("W")) allLeafRefs.add(m.a);
+      if (!m.b.startsWith("W")) allLeafRefs.add(m.b);
+    }
+    return Math.max(0, allLeafRefs.size - firstRoundRefs.size);
+  }, [usaPlantillaFap, fapMatrixByOrden, playoffPartidos, firstPlayoffRound]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await TorneosService.getLlaveMatriz(torneoId);
+        const matches = data.matches || [];
+        if (cancelled) return;
+        const map = new Map<number, { a: string; b: string }>();
+        for (const m of matches) {
+          map.set(m.matchNo, { a: m.a, b: m.b });
+        }
+        setFapMatrixByOrden(map);
+        setFapMatrixMatches(matches);
+        setFapPairCount(data.pairCount ?? null);
+      } catch {
+        // Matriz opcional (torneos fuera de 6–36)
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [torneoId]);
+
+  const formatFapSide = (ref: string | null | undefined): string | null => {
+    if (!ref) return null;
+    if (ref.startsWith("W")) return `Gan. #${ref.slice(1)}`;
+    const m = /^([123])([A-L])$/i.exec(ref);
+    if (!m) return ref;
+    return `${m[1]}º ${m[2].toUpperCase()}`;
+  };
 
   const cabezasSerieIds = React.useMemo(() => {
     const ids = new Set<string>();
@@ -993,14 +1069,13 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
       {activeView === "zonas" && (
         <div className="space-y-6">
-          {(inscripciones || []).length % 2 !== 0 && (
+          {(inscripciones || []).length < 3 && (
             <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-extrabold px-4 py-3.5 rounded-xl">
-              ⚠️ Se requiere una cantidad par de participantes confirmados para
-              poder generar las zonas de la fase de grupos. Actualmente hay{" "}
-              {(inscripciones || []).length} confirmados.
+              Se necesitan al menos 3 parejas confirmadas para generar las zonas.
+              Actualmente hay {(inscripciones || []).length}.
             </div>
           )}
-          {(inscripciones || []).length % 2 === 0 &&
+          {(inscripciones || []).length >= 3 &&
             (inscripciones || []).some(
               (ins) => ins.estado_pago !== "Confirmado",
             ) && (
@@ -1016,14 +1091,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 id="btn-regenerar"
                 onClick={handleRegenerarZonas}
                 disabled={
-                  (inscripciones || []).length % 2 !== 0 ||
+                  (inscripciones || []).length < 3 ||
                   (inscripciones || []).some(
                     (ins) => ins.estado_pago !== "Confirmado",
                   )
                 }
                 className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-all relative disabled:opacity-40 disabled:cursor-not-allowed ${
                   tourStep === 0 &&
-                  (inscripciones || []).length % 2 === 0 &&
+                  (inscripciones || []).length >= 3 &&
                   !(inscripciones || []).some(
                     (ins) => ins.estado_pago !== "Confirmado",
                   )
@@ -1220,31 +1295,45 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     </>
                   )}
                 </span>
-                {puedeEditarLlave && libresPrimeraRonda > 0 && (
-                  <span className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-amber-400">
-                    Primera ronda {ocupadosPrimeraRonda}/{slotsPrimeraRonda} ·{" "}
-                    {libresPrimeraRonda} libre
-                    {libresPrimeraRonda === 1 ? "" : "s"}
+                {usaPlantillaFap ? (
+                  <span className="rounded-lg bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-3 py-2 text-brand-chartreuse">
+                    Plantilla FAP · {byesFap > 0 ? `${byesFap} bye(s) a semis` : "sin byes"}
                   </span>
+                ) : (
+                  puedeEditarLlave &&
+                  libresPrimeraRonda > 0 && (
+                    <span className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-amber-400">
+                      Primera ronda {ocupadosPrimeraRonda}/{slotsPrimeraRonda} ·{" "}
+                      {libresPrimeraRonda} libre
+                      {libresPrimeraRonda === 1 ? "" : "s"}
+                    </span>
+                  )
                 )}
               </div>
             )}
           </div>
 
           <div className="relative rounded-2xl border border-brand-input bg-brand-card overflow-hidden">
-            <div
-              className="pointer-events-none absolute inset-0 opacity-40 dark:opacity-[0.35]"
-              style={{
-                backgroundImage:
-                  "radial-gradient(ellipse 80% 50% at 20% 0%, rgba(110,137,1,0.08), transparent 55%), radial-gradient(ellipse 60% 40% at 90% 100%, rgba(56,189,248,0.06), transparent 50%)",
-              }}
-            />
             <div className="relative p-4 sm:p-6 overflow-x-auto">
               {playoffPartidos.length === 0 && partidos.length === 0 ? (
                 <div className="text-center p-12 text-gray-500 border border-dashed border-brand-input rounded-2xl">
                   Aún no se ha generado el cuadro de eliminatoria para este
                   torneo.
                 </div>
+              ) : usaPlantillaFap && fapMatrixMatches.length > 0 ? (
+                <FapBracketDiagram
+                  matches={fapMatrixMatches}
+                  partidos={playoffPartidos}
+                  pairCount={fapPairCount ?? undefined}
+                  alcance={torneo?.alcance}
+                  cabezasSerieIds={cabezasSerieIds}
+                  interactive={puedeEditarLlave}
+                  onMatchClick={(pToEdit) => {
+                    setSelectedMatchToEdit({ ...pToEdit });
+                    setMatchEditMotivo("");
+                    setShowMatchEditModal(true);
+                  }}
+                />
               ) : (
                 <div className="flex gap-0 min-w-max pb-4 pt-1">
                   {rondasToShow.map((ronda, rondaIndex) => (
@@ -1275,14 +1364,22 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                                     ? origenPorInscripcion.get(
                                         String(partido.equipo_a_id),
                                       ) || null
-                                    : null
+                                    : formatFapSide(
+                                        fapMatrixByOrden.get(
+                                          Number(partido.orden),
+                                        )?.a,
+                                      )
                                 }
                                 origenEquipoB={
                                   partido.equipo_b_id
                                     ? origenPorInscripcion.get(
                                         String(partido.equipo_b_id),
                                       ) || null
-                                    : null
+                                    : formatFapSide(
+                                        fapMatrixByOrden.get(
+                                          Number(partido.orden),
+                                        )?.b,
+                                      )
                                 }
                                 esCabezaSerieA={
                                   !!partido.equipo_a_id &&

@@ -103,7 +103,11 @@ export const MatchCard = ({
           <div className="flex items-center gap-2 min-h-[2.25rem]">
             <PlayerAvatar src={null} size="md" />
             <p className="text-[12px] font-medium text-gray-500 italic">
-              {esBye ? "Pase directo" : "Esperando rival…"}
+              {origen
+                ? "Por clasificar"
+                : esBye
+                  ? "Pase directo"
+                  : "Esperando rival…"}
             </p>
           </div>
         ) : (
@@ -147,7 +151,7 @@ export const MatchCard = ({
           return (
             <span
               key={idx}
-              className={`w-7 h-8 sm:w-8 sm:h-9 flex items-center justify-center rounded-md text-[11px] sm:text-xs font-black tabular-nums ${
+              className={`w-7 h-8 sm:w-8 sm:h-9 flex items-center justify-center rounded-md text-[11px] sm:text-xs font-black tabular-nums leading-none ${
                 !has
                   ? "text-gray-400 bg-transparent"
                   : setWon
@@ -195,6 +199,11 @@ export const MatchCard = ({
     >
       <div className="flex items-center justify-between gap-3 px-3.5 py-2 bg-brand-input/60 border-b border-brand-input min-h-[2rem]">
         <div className="flex items-center gap-2 min-w-0">
+          {partido.orden != null && (
+            <span className="text-[10px] font-black text-brand-chartreuse/90 tabular-nums">
+              #{partido.orden}
+            </span>
+          )}
           {partido.es_wo && (
             <span className="text-[9px] font-black text-amber-500 uppercase">
               W.O.

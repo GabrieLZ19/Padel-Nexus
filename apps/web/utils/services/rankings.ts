@@ -54,4 +54,14 @@ export const RankingsService = {
       return [];
     }
   },
+
+  getProvincialPorTorneo: async (
+    torneoId: string,
+  ): Promise<{
+    torneoId: string;
+    provincias: Array<{ provincia: string; puntos: number; parejas: number }>;
+  }> => {
+    const res = await api.get(`/rankings/provincial/${torneoId}`);
+    return res.data?.data || { torneoId, provincias: [] };
+  },
 };

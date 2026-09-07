@@ -82,4 +82,33 @@ export interface SlotDisponible {
   hora_fin: string;
   precio: number;
   disponible: boolean;
+  motivo_bloqueo?: string | null;
+}
+
+export type BloqueoTipo = "mantenimiento" | "torneo" | "abono" | "otro";
+
+export interface BloqueoDisponibilidad {
+  id: string;
+  club_id: string;
+  cancha_id: string | null;
+  fecha_inicio: string;
+  fecha_fin: string;
+  hora_inicio: string;
+  hora_fin: string;
+  motivo: string | null;
+  tipo: BloqueoTipo;
+  activo: boolean;
+  created_by?: string | null;
+  created_at?: string;
+  canchas?: { nombre: string } | null;
+}
+
+export interface CrearBloqueoPayload {
+  cancha_id?: string | null;
+  fecha_inicio: string;
+  fecha_fin: string;
+  hora_inicio: string;
+  hora_fin: string;
+  motivo?: string | null;
+  tipo?: BloqueoTipo;
 }

@@ -1,5 +1,10 @@
 import { api } from "../api";
-import { Club, FormClubState } from "../types";
+import {
+  Club,
+  FormClubState,
+  BloqueoDisponibilidad,
+  CrearBloqueoPayload,
+} from "../types";
 export interface ApiResponse {
   data: any[];
   total: number;
@@ -12,13 +17,19 @@ export const ClubesService = {
   },
 
   async create(clubData: FormClubState): Promise<Club> {
-    const response = await api.post<Club>("/clubes", clubData);
-    return response.data;
+    const response = await api.post<{ exito?: boolean; data?: Club } & Club>(
+      "/clubes",
+      clubData,
+    );
+    return (response.data?.data || response.data) as Club;
   },
 
   async update(id: string | number, clubData: FormClubState): Promise<Club> {
-    const response = await api.put<Club>(`/clubes/${id}`, clubData);
-    return response.data;
+    const response = await api.put<{ exito?: boolean; data?: Club } & Club>(
+      `/clubes/${id}`,
+      clubData,
+    );
+    return (response.data?.data || response.data) as Club;
   },
 
   async delete(id: string | number): Promise<void> {
@@ -56,5 +67,43 @@ export const ClubesService = {
 
   async deleteTurno(turnoId: string | number): Promise<void> {
     await api.delete(`/clubes/turnos/${turnoId}`);
+  },
+
+  async getBloqueos(
+    clubId: string | number,
+    params?: { desde?: string; hasta?: string; todos?: boolean },
+  ): Promise<BloqueoDisponibilidad[]> {
+    const response = await api.get<{ data?: BloqueoDisponibilidad[] }>(
+      `/clubes/${clubId}/bloqueos`,
+      {
+        params: {
+          desde: params?.desde,
+          hasta: params?.hasta,
+          todos: params?.todos ? "1" : undefined,
+        },
+      },
+    );
+    return response.data?.data || [];
+  },
+
+  async crearBloqueo(
+    clubId: string | number,
+    payload: CrearBloqueoPayload,
+  ): Promise<BloqueoDisponibilidad> {
+    const response = await api.post<{
+      exito?: boolean;
+      data?: BloqueoDisponibilidad;
+    }>(`/clubes/${clubId}/bloqueos`, payload);
+    return (response.data?.data || response.data) as BloqueoDisponibilidad;
+  },
+
+  async eliminarBloqueo(
+    clubId: string | number,
+    bloqueoId: string,
+    hard = false,
+  ): Promise<void> {
+    await api.delete(`/clubes/${clubId}/bloqueos/${bloqueoId}`, {
+      params: hard ? { hard: "1" } : undefined,
+    });
   },
 };

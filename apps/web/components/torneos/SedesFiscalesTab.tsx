@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Plus,
   Trash2,
@@ -11,13 +11,35 @@ import {
   Layers,
 } from "lucide-react";
 import { Club } from "@/utils/types";
-import { api } from "@/utils/api";
+import type { Torneo } from "@/utils/types";
 import CustomDropdown from "../ui/CustomDropdown";
 import { ClubesService } from "@/utils/services/clubes";
+import { TorneosService } from "@/utils/services/torneos";
 import { sileo } from "sileo";
 import { useProfileStore } from "@/store/useProfileStore";
 import type { RolUsuario } from "@/utils/types/user.types";
 import { labelModalidad } from "@/utils/formatFecha";
+import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
+
+type LocalidadSugerida = {
+  ciudad: string;
+  provincia: string;
+  detalle: string;
+  lat: number | null;
+  lon: number | null;
+};
+
+function normalizarProvinciaNominatim(raw: string): string {
+  const p = (raw || "").trim();
+  const lower = p.toLowerCase();
+  if (lower.includes("buenos aires") && !lower.includes("ciudad")) {
+    return "Buenos Aires";
+  }
+  if (lower.includes("ciudad autónoma") || lower.includes("caba")) {
+    return "CABA";
+  }
+  return p.replace(/^Provincia de(l)?\s+/i, "");
+}
 
 interface SedesFiscalesTabProps {
   torneoId: string;
@@ -128,6 +150,24 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   const [fechaFinTorneo, setFechaFinTorneo] = useState<string>("");
   const [diasJuego, setDiasJuego] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [duracionPartido, setDuracionPartido] = useState<number>(90);
+  const [showAltaClub, setShowAltaClub] = useState(false);
+  const [altaClubForm, setAltaClubForm] = useState({
+    nombre: "",
+    provincia: "La Rioja",
+    localidad: "",
+    canchas: 2,
+    latitud: null as number | null,
+    longitud: null as number | null,
+  });
+  const [localidadSearch, setLocalidadSearch] = useState("");
+  const [localidadesSugeridas, setLocalidadesSugeridas] = useState<
+    LocalidadSugerida[]
+  >([]);
+  const [loadingLocalidades, setLoadingLocalidades] = useState(false);
+  const [isLocalidadOpen, setIsLocalidadOpen] = useState(false);
+  const localidadDropdownRef = useRef<HTMLDivElement>(null);
+  const [creandoClub, setCreandoClub] = useState(false);
 
   const profile = useProfileStore((s) => s.profile);
   const userRole = (profile?.rol || "admin") as RolUsuario;
@@ -183,31 +223,38 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   useEffect(() => {
     const loadData = async () => {
       try {
-        const resClubsAll = await api.get<{ data?: Club[] }>("/clubes");
-        setClubs(resClubsAll.data?.data || []);
+        const resClubsAll = await ClubesService.getAll();
+        setClubs((resClubsAll.data as Club[]) || []);
 
-        const resSedes = await api.get<Club[]>(`/torneos/${torneoId}/sedes`);
-        setSelectedClubs(resSedes.data || []);
+        const sedes = await TorneosService.getSedes(torneoId);
+        setSelectedClubs((sedes as Club[]) || []);
 
-        const resDisp = await api.get(`/torneos/${torneoId}/canchas-disponibilidad`);
-        setDispList(resDisp.data || []);
+        const disp = await TorneosService.getCanchasDisponibilidad(torneoId);
+        setDispList((disp as typeof dispList) || []);
 
-        const resTorneo = await api.get(`/torneos/${torneoId}`);
-        if (resTorneo.data) {
+        const torneo = await TorneosService.getById(torneoId);
+        if (torneo) {
+          const meta = torneo as Torneo & {
+            fecha_fin?: string | null;
+            dias_juego?: string[];
+          };
           setTorneoMeta({
-            rama: resTorneo.data.rama || "",
-            categoria: resTorneo.data.categoria || "",
-            nivel: resTorneo.data.nivel || "",
-            modalidad: resTorneo.data.modalidad || "",
+            rama: meta.rama || "",
+            categoria: meta.categoria || "",
+            nivel: meta.nivel || "",
+            modalidad: meta.modalidad || "",
           });
-          if (resTorneo.data.fecha) {
-            setFechaInicioTorneo(resTorneo.data.fecha.split("T")[0]);
+          if (meta.fecha) {
+            setFechaInicioTorneo(String(meta.fecha).split("T")[0]);
           }
-          if (resTorneo.data.fecha_fin) {
-            setFechaFinTorneo(resTorneo.data.fecha_fin.split("T")[0]);
+          if (meta.fecha_fin) {
+            setFechaFinTorneo(String(meta.fecha_fin).split("T")[0]);
           }
-          if (Array.isArray(resTorneo.data.dias_juego)) {
-            setDiasJuego(resTorneo.data.dias_juego);
+          if (Array.isArray(meta.dias_juego)) {
+            setDiasJuego(meta.dias_juego);
+          }
+          if (meta.duracion_partido_minutos) {
+            setDuracionPartido(Number(meta.duracion_partido_minutos) || 90);
           }
         }
       } catch (e) {
@@ -264,13 +311,9 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   ) => {
     setSaving(true);
     try {
-      await api.post(`/torneos/${torneoId}/canchas-disponibilidad`, {
-        disponibilidad: newList,
-      });
-      const resDisp = await api.get(
-        `/torneos/${torneoId}/canchas-disponibilidad`,
-      );
-      setDispList(resDisp.data || []);
+      await TorneosService.guardarCanchasDisponibilidad(torneoId, newList);
+      const disp = await TorneosService.getCanchasDisponibilidad(torneoId);
+      setDispList((disp as typeof dispList) || []);
       if (successMessage) {
         sileo.success({ title: "Cronograma actualizado", description: successMessage });
       }
@@ -285,12 +328,202 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
     }
   };
 
+  const handleSaveDuracion = async (mins: number) => {
+    if (readOnly) return;
+    setDuracionPartido(mins);
+    try {
+      await TorneosService.update(torneoId, {
+        duracion_partido_minutos: mins,
+      } as Parameters<typeof TorneosService.update>[1]);
+      sileo.success({
+        title: "Duración actualizada",
+        description: `Partidos cada ${mins} minutos (zonas ≥75′ / llave ≥90′ según FAP).`,
+      });
+    } catch {
+      sileo.error({
+        title: "Error",
+        description: "No se pudo guardar la duración.",
+      });
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        localidadDropdownRef.current &&
+        !localidadDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsLocalidadOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Autocompletado geográfico (Nominatim / OpenStreetMap), mismo patrón que ClubModal y Asociaciones
+  useEffect(() => {
+    if (!localidadSearch.trim() || localidadSearch.length < 2) {
+      setLocalidadesSugeridas([]);
+      return;
+    }
+
+    let active = true;
+    const timer = setTimeout(async () => {
+      setLoadingLocalidades(true);
+      try {
+        const query = `${localidadSearch.trim()}, Argentina`;
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            query,
+          )}&countrycodes=ar&addressdetails=1&limit=8`,
+          { headers: { "Accept-Language": "es" } },
+        );
+        const data = await res.json();
+        if (!active || !Array.isArray(data)) return;
+
+        const sugerencias: LocalidadSugerida[] = data.map(
+          (item: {
+            name?: string;
+            display_name?: string;
+            lat?: string;
+            lon?: string;
+            address?: Record<string, string>;
+          }) => {
+            const addr = item.address || {};
+            const ciudad =
+              addr.city ||
+              addr.town ||
+              addr.village ||
+              addr.suburb ||
+              addr.municipality ||
+              item.name ||
+              String(item.display_name || "").split(",")[0];
+            const provincia = normalizarProvinciaNominatim(addr.state || "");
+            const road = addr.road || addr.pedestrian || "";
+            const house = addr.house_number || "";
+            const calle = road
+              ? house
+                ? `${road} ${house}`
+                : road
+              : "";
+            const detalle = [calle || ciudad, provincia || addr.state]
+              .filter(Boolean)
+              .join(" · ");
+            return {
+              ciudad: calle ? `${calle}, ${ciudad}` : ciudad,
+              provincia,
+              detalle,
+              lat: item.lat ? Number(item.lat) : null,
+              lon: item.lon ? Number(item.lon) : null,
+            };
+          },
+        );
+
+        const unicas = sugerencias.filter(
+          (v, i, self) =>
+            self.findIndex(
+              (t) => t.ciudad === v.ciudad && t.provincia === v.provincia,
+            ) === i,
+        );
+        setLocalidadesSugeridas(unicas);
+      } catch (err) {
+        console.error("Error en búsqueda predictiva de localidades:", err);
+      } finally {
+        if (active) setLoadingLocalidades(false);
+      }
+    }, 320);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [localidadSearch]);
+
+  const resetAltaClubForm = () => {
+    setAltaClubForm({
+      nombre: "",
+      provincia: "La Rioja",
+      localidad: "",
+      canchas: 2,
+      latitud: null,
+      longitud: null,
+    });
+    setLocalidadSearch("");
+    setLocalidadesSugeridas([]);
+    setIsLocalidadOpen(false);
+  };
+
+  const handleCrearClubRapido = async () => {
+    if (readOnly) return;
+    if (!altaClubForm.nombre.trim() || !altaClubForm.localidad.trim()) {
+      sileo.warning({
+        title: "Datos incompletos",
+        description: "Nombre y ciudad/dirección son obligatorios.",
+      });
+      return;
+    }
+    try {
+      setCreandoClub(true);
+      const cantidadCanchas = Math.max(1, Number(altaClubForm.canchas) || 1);
+      const club = await ClubesService.create({
+        nombre: altaClubForm.nombre.trim(),
+        provincia: altaClubForm.provincia,
+        localidad: altaClubForm.localidad.trim(),
+        canchas: cantidadCanchas,
+        estado: "Activo",
+        latitud: altaClubForm.latitud,
+        longitud: altaClubForm.longitud,
+      });
+
+      if (!club?.id) {
+        throw new Error("El club se creó sin ID válido.");
+      }
+
+      // El backend ya crea las filas en `canchas`; sincronizamos por si quedó algo pendiente
+      let canchasExistentes = await ClubesService.getCanchas(club.id);
+      if (canchasExistentes.length < cantidadCanchas) {
+        for (let i = canchasExistentes.length + 1; i <= cantidadCanchas; i++) {
+          try {
+            await ClubesService.createCancha(club.id, {
+              nombre: `Cancha ${i}`,
+              tipo_suelo: "Blindex",
+              techada: true,
+            });
+          } catch (err) {
+            console.error("Error creando cancha del club rápido:", err);
+          }
+        }
+        canchasExistentes = await ClubesService.getCanchas(club.id);
+      }
+
+      const canchasCreadas = canchasExistentes.length;
+      setClubs((prev) => [...prev, { ...club, canchas: canchasCreadas }]);
+      setNewClubId(String(club.id));
+      setShowAltaClub(false);
+      resetAltaClubForm();
+      sileo.success({
+        title: "Club creado",
+        description:
+          canchasCreadas >= cantidadCanchas
+            ? `${canchasCreadas} cancha(s) listas. Ya podés agregarlo como sede.`
+            : `Club listo (${canchasCreadas}/${cantidadCanchas} canchas). Revisá el detalle del club.`,
+      });
+    } catch {
+      sileo.error({
+        title: "Error",
+        description: "No se pudo crear el club.",
+      });
+    } finally {
+      setCreandoClub(false);
+    }
+  };
+
   const handleAddSede = async () => {
     if (!newClubId || readOnly) return;
     const clubIds = [...selectedClubs.map((c) => c.id), newClubId];
     try {
       setSaving(true);
-      await api.post(`/torneos/${torneoId}/sedes`, { club_ids: clubIds });
+      await TorneosService.guardarSedes(torneoId, clubIds);
       const clubAdded = clubs.find((c) => String(c.id) === newClubId);
       if (clubAdded) setSelectedClubs([...selectedClubs, clubAdded]);
       setNewClubId("");
@@ -308,7 +541,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       .filter((id) => String(id) !== String(clubId));
     try {
       setSaving(true);
-      await api.post(`/torneos/${torneoId}/sedes`, { club_ids: clubIds });
+      await TorneosService.guardarSedes(torneoId, clubIds);
       setSelectedClubs(
         selectedClubs.filter((c) => String(c.id) !== String(clubId)),
       );
@@ -477,6 +710,33 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
           </div>
         )}
 
+        <div className="space-y-3 p-4 rounded-2xl border border-white/10 bg-white/[0.02]">
+          <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+            <Clock className="size-4 text-brand-chartreuse" />
+            Duración de partidos
+          </h4>
+          <p className="text-[11px] text-gray-500">
+            FAP: zonas mínimo 75′ · llave mínimo 90′ · ventana 09:00–22:00
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {[60, 75, 90].map((mins) => (
+              <button
+                key={mins}
+                type="button"
+                disabled={readOnly}
+                onClick={() => void handleSaveDuracion(mins)}
+                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer ${
+                  duracionPartido === mins
+                    ? "bg-brand-chartreuse text-brand-black"
+                    : "bg-white/5 text-white border border-white/10"
+                }`}
+              >
+                {mins} min
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* ── 1. Sedes de juego ── */}
         <div className="space-y-4">
           <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
@@ -504,7 +764,155 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
             >
               Adicionar sede
             </button>
+            <button
+              type="button"
+              onClick={() => setShowAltaClub((v) => !v)}
+              disabled={readOnly}
+              className="bg-white/5 border border-white/10 text-white px-4 py-2.5 rounded-xl font-black text-xs cursor-pointer"
+            >
+              <Plus className="size-3.5 inline mr-1" />
+              Alta club
+            </button>
           </div>
+
+          {showAltaClub && !readOnly && (
+            <div className="space-y-3 p-4 rounded-2xl border border-dashed border-white/15 bg-black/20">
+              <p className="text-[11px] text-gray-500">
+                Alta rápida para sedes de prueba. La dirección usa OpenStreetMap
+                (Nominatim), igual que el alta de clubes.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">
+                    Nombre del club *
+                  </label>
+                  <input
+                    value={altaClubForm.nombre}
+                    onChange={(e) =>
+                      setAltaClubForm((f) => ({ ...f, nombre: e.target.value }))
+                    }
+                    placeholder="Ej: Club Pádel Centro"
+                    className="w-full bg-brand-card border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-brand-chartreuse/40"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">
+                    Provincia *
+                  </label>
+                  <CustomDropdown
+                    value={altaClubForm.provincia}
+                    onChange={(val) =>
+                      setAltaClubForm((f) => ({
+                        ...f,
+                        provincia: val,
+                        localidad: "",
+                        latitud: null,
+                        longitud: null,
+                      }))
+                    }
+                    options={PROVINCIAS_ARG.map((p) => ({
+                      value: p.value,
+                      label: p.label,
+                    }))}
+                    placeholder="Provincia..."
+                  />
+                </div>
+                <div className="relative md:col-span-2" ref={localidadDropdownRef}>
+                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">
+                    Ciudad / dirección *
+                  </label>
+                  <input
+                    value={localidadSearch}
+                    onFocus={() => setIsLocalidadOpen(true)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setLocalidadSearch(v);
+                      setAltaClubForm((f) => ({
+                        ...f,
+                        localidad: v,
+                        latitud: null,
+                        longitud: null,
+                      }));
+                      setIsLocalidadOpen(true);
+                    }}
+                    placeholder={
+                      loadingLocalidades
+                        ? "Buscando en el mapa..."
+                        : "Ej: Av. San Martín 1200, La Rioja"
+                    }
+                    className="w-full bg-brand-card border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-brand-chartreuse/40"
+                  />
+                  {isLocalidadOpen &&
+                    (loadingLocalidades || localidadesSugeridas.length > 0) && (
+                      <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#161616] border border-white/10 rounded-2xl shadow-2xl max-h-52 overflow-y-auto divide-y divide-white/5">
+                        {loadingLocalidades ? (
+                          <div className="p-3 text-center text-gray-500 text-xs flex items-center justify-center gap-2">
+                            <MapPin className="size-3.5 animate-bounce text-brand-chartreuse" />
+                            Buscando con OpenStreetMap...
+                          </div>
+                        ) : (
+                          localidadesSugeridas.map((loc, idx) => (
+                            <button
+                              key={`${loc.ciudad}-${idx}`}
+                              type="button"
+                              onClick={() => {
+                                setLocalidadSearch(loc.ciudad);
+                                setAltaClubForm((f) => ({
+                                  ...f,
+                                  localidad: loc.ciudad,
+                                  provincia: loc.provincia || f.provincia,
+                                  latitud: loc.lat,
+                                  longitud: loc.lon,
+                                }));
+                                setIsLocalidadOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-2.5 hover:bg-brand-chartreuse/10 text-gray-300 text-xs font-bold cursor-pointer transition-colors"
+                            >
+                              <div className="flex items-center gap-1.5 text-white">
+                                <MapPin className="size-3 text-brand-chartreuse shrink-0" />
+                                <span>{loc.ciudad}</span>
+                              </div>
+                              <span className="text-[10px] text-gray-500 pl-4 font-medium">
+                                {loc.detalle}
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">
+                    Cantidad de canchas *
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={altaClubForm.canchas}
+                    onChange={(e) =>
+                      setAltaClubForm((f) => ({
+                        ...f,
+                        canchas: Number(e.target.value) || 1,
+                      }))
+                    }
+                    className="w-full bg-brand-card border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-brand-chartreuse/40"
+                  />
+                  
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => void handleCrearClubRapido()}
+                    disabled={creandoClub}
+                    className="w-full bg-brand-chartreuse text-brand-black rounded-xl font-black text-xs uppercase py-2.5 cursor-pointer disabled:opacity-40"
+                  >
+                    {creandoClub ? "Creando…" : "Crear y listar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3">
             {selectedClubs.length === 0 ? (

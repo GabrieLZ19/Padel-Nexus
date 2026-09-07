@@ -1,13 +1,19 @@
-export function capacidadZona(parejasCount: number): 3 | 4 {
-  return parejasCount === 4 ? 4 : 3;
+export function capacidadZona(parejasCount: number): 2 | 3 | 4 {
+  if (parejasCount === 4) return 4;
+  if (parejasCount === 2) return 2;
+  return 3;
 }
 
 export function clasificadosPorZona(parejasCount: number): number {
-  return parejasCount === 4 ? 3 : 2;
+  if (parejasCount === 4) return 3;
+  if (parejasCount === 2) return 1;
+  return 2;
 }
 
 export function partidosEsperadosEnZona(parejasCount: number): number {
-  return parejasCount === 4 ? 4 : 3;
+  if (parejasCount === 4) return 4;
+  if (parejasCount === 2) return 1;
+  return 3;
 }
 
 export function partidoZonaPendiente(partido: {
@@ -24,6 +30,9 @@ export function textoClasificacionZonas(
 ): string {
   if (!zonas.length) return "Sin zonas";
 
+  const de2 = zonas.filter(
+    (z) => capacidadZona(z.capacidad ?? z.parejas?.length ?? 0) === 2,
+  ).length;
   const de3 = zonas.filter(
     (z) => capacidadZona(z.capacidad ?? z.parejas?.length ?? 0) === 3,
   ).length;
@@ -32,6 +41,11 @@ export function textoClasificacionZonas(
   ).length;
 
   const partes: string[] = [];
+  if (de2 > 0) {
+    partes.push(
+      `${de2} zona${de2 === 1 ? "" : "s"} de 2: clasifica 1º`,
+    );
+  }
   if (de3 > 0) {
     partes.push(
       `${de3} zona${de3 === 1 ? "" : "s"} de 3: clasifican 1º y 2º`,
@@ -42,7 +56,7 @@ export function textoClasificacionZonas(
       `${de4} zona${de4 === 1 ? "" : "s"} de 4: clasifican 1º, 2º y 3º`,
     );
   }
-  partes.push("se elimina 1 pareja por zona");
+  partes.push("se elimina 1 pareja por zona (salvo zona de 2)");
   return partes.join(" · ");
 }
 

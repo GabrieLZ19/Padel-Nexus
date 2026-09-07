@@ -14,11 +14,13 @@ import {
   X,
   Sun,
   CloudRain,
+  Ban,
 } from "lucide-react";
 import { ClubesService } from "@/utils/services/clubes";
 import type { Cancha, Turno } from "@/utils/types/club.types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal, { FeedbackModalProps } from "@/components/ui/FeedbackModal";
+import { BloquearHorariosModal } from "@/components/clubes/BloquearHorariosModal";
 
 interface ClubDetalle {
   id: string;
@@ -32,6 +34,7 @@ export default function CanchasAdminPage() {
   const [club, setClub] = useState<ClubDetalle | null>(null);
   const [canchas, setCanchas] = useState<(Cancha & { turnos?: Turno[] })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isBloqueoOpen, setIsBloqueoOpen] = useState(false);
 
   // Estado para agrupar turnos por día
   const [activeDayByCancha, setActiveDayByCancha] = useState<Record<string, number>>({});
@@ -266,13 +269,24 @@ export default function CanchasAdminPage() {
             Gestión de Canchas {club ? `— ${club.nombre}` : ""}
           </h1>
         </div>
-        <button
-          onClick={openNewCancha}
-          className="flex items-center gap-2 px-4 py-2.5 bg-brand-chartreuse text-black font-semibold rounded-xl hover:brightness-110 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Nueva cancha
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsBloqueoOpen(true)}
+            disabled={canchas.length === 0}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 text-white font-semibold rounded-xl hover:bg-white/10 transition-all disabled:opacity-40"
+          >
+            <Ban className="w-4 h-4" />
+            Bloquear horarios
+          </button>
+          <button
+            onClick={openNewCancha}
+            className="flex items-center gap-2 px-4 py-2.5 bg-brand-chartreuse text-black font-semibold rounded-xl hover:brightness-110 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Nueva cancha
+          </button>
+        </div>
       </div>
 
       {/* Listado de canchas */}
@@ -579,6 +593,14 @@ export default function CanchasAdminPage() {
           </div>
         </div>
       )}
+
+      <BloquearHorariosModal
+        isOpen={isBloqueoOpen}
+        onClose={() => setIsBloqueoOpen(false)}
+        canchas={canchas}
+        mode="admin"
+        clubId={clubId}
+      />
 
       {/* FEEDBACK MODAL (Éxito/Error) */}
       <FeedbackModal {...feedbackModal} />

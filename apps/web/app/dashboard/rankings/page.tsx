@@ -3,7 +3,107 @@
 import React, { useState, useEffect } from "react";
 import { Trophy, Search, Eye, Activity, X, Building2, MapPin } from "lucide-react";
 import { RankingsService, JugadorRanking } from "@/utils/services/rankings";
+import { TorneosService } from "@/utils/services/torneos";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+
+function RankingProvincialPanel() {
+  const [torneos, setTorneos] = useState<Array<{ id: string; nombre: string }>>(
+    [],
+  );
+  const [torneoId, setTorneoId] = useState("");
+  const [rows, setRows] = useState<
+    Array<{ provincia: string; puntos: number; parejas: number }>
+  >([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const list = await TorneosService.getByPage(1, 50, undefined, undefined, {
+          incluirBorradores: false,
+        });
+        setTorneos(
+          list.data
+            .filter((t) =>
+              String(t.alcance || "")
+                .toLowerCase()
+                .includes("nacional"),
+            )
+            .map((t) => ({ id: t.id, nombre: t.nombre })),
+        );
+      } catch {
+        setTorneos([]);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!torneoId) {
+      setRows([]);
+      return;
+    }
+    void (async () => {
+      try {
+        setLoading(true);
+        const data = await RankingsService.getProvincialPorTorneo(torneoId);
+        setRows(data.provincias || []);
+      } catch {
+        setRows([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [torneoId]);
+
+  return (
+    <div className="bg-brand-card border border-white/10 rounded-3xl p-6 space-y-4">
+      <div className="flex items-center gap-2 text-brand-chartreuse text-xs font-bold uppercase tracking-widest">
+        <MapPin className="size-4" /> Ranking por provincias (nacionales)
+      </div>
+      <CustomDropdown
+        value={torneoId}
+        onChange={setTorneoId}
+        options={[
+          { value: "", label: "Elegí un torneo nacional…" },
+          ...torneos.map((t) => ({ value: t.id, label: t.nombre })),
+        ]}
+        placeholder="Torneo nacional"
+      />
+      {loading ? (
+        <p className="text-sm text-gray-500">Calculando…</p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-gray-500">
+          Sin datos aún (hace falta llave con resultados).
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-400 border-b border-white/10">
+                <th className="py-2 pr-4">#</th>
+                <th className="py-2 pr-4">Provincia</th>
+                <th className="py-2 pr-4">Puntos</th>
+                <th className="py-2">Parejas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={r.provincia} className="border-b border-white/5 text-white">
+                  <td className="py-2 pr-4 text-brand-chartreuse font-bold">
+                    {i + 1}
+                  </td>
+                  <td className="py-2 pr-4 font-semibold">{r.provincia}</td>
+                  <td className="py-2 pr-4">{r.puntos}</td>
+                  <td className="py-2">{r.parejas}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function RankingsPage() {
   const [rankings, setRankings] = useState<JugadorRanking[]>([]);
@@ -70,8 +170,11 @@ export default function RankingsPage() {
         </h1>
         <p className="text-gray-400 text-sm mt-1">
           Posiciones oficiales, rendimiento y expedientes completos por categoría y rama.
+          En nacionales, el ranking por provincias usa 8/6/4/2/1 (campeón → octavos).
         </p>
       </div>
+
+      <RankingProvincialPanel />
 
       {/* Filtros */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

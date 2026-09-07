@@ -12,6 +12,7 @@ import {
   ChevronUp,
   Copy,
   DollarSign,
+  Ban,
 } from "lucide-react";
 import { ClubPanelService } from "@/utils/services/club-panel";
 import type { Cancha, Turno } from "@/utils/types";
@@ -21,6 +22,7 @@ import FeedbackModal, {
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { EdicionMasivaPrecios } from "@/components/clubes/EdicionMasivaPrecios";
 import { PlantillaTurnosMasiva } from "@/components/clubes/PlantillaTurnosMasiva";
+import { BloquearHorariosModal } from "@/components/clubes/BloquearHorariosModal";
 
 export default function ClubCanchasPage() {
   const [canchas, setCanchas] = useState<Cancha[]>([]);
@@ -31,6 +33,7 @@ export default function ClubCanchasPage() {
   const [isCanchaModalOpen, setIsCanchaModalOpen] = useState(false);
   const [isPreciosMasivosOpen, setIsPreciosMasivosOpen] = useState(false);
   const [isPlantillaOpen, setIsPlantillaOpen] = useState(false);
+  const [isBloqueoOpen, setIsBloqueoOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Form Cancha
@@ -195,6 +198,14 @@ export default function ClubCanchasPage() {
             className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 cursor-pointer w-fit disabled:opacity-40"
           >
             <Copy className="size-4" /> Plantilla de horarios
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsBloqueoOpen(true)}
+            disabled={canchas.length === 0}
+            className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 cursor-pointer w-fit disabled:opacity-40"
+          >
+            <Ban className="size-4" /> Bloquear horarios
           </button>
           <button
             type="button"
@@ -530,6 +541,13 @@ export default function ClubCanchasPage() {
         onSuccess={() => {
           void fetchCanchas();
         }}
+      />
+
+      <BloquearHorariosModal
+        canchas={canchas}
+        isOpen={isBloqueoOpen}
+        onClose={() => setIsBloqueoOpen(false)}
+        mode="club-panel"
       />
     </div>
   );
