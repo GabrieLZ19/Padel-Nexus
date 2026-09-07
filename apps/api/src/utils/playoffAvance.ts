@@ -1,7 +1,17 @@
 import { supabaseAdmin } from "../config/supabase";
 import { ClasificacionService } from "../services/clasificacion.service";
 import { clasificadosPorZona, partidoZonaPendiente } from "./clasificacionZonas";
+import {
+  getFapBracketForPairCount,
+  listLeafSeeds,
+} from "./fapBracketMatrices";
+import {
+  buildQualifiedMap,
+  fillLeafSidesFromQualified,
+} from "./fapBracketPlacement";
+import type { QualifiedPair } from "./fapBracketTypes";
 
+/** @deprecated Prefer matriz FAP por cantidad de parejas. */
 export function getPlayoffSize(zonasCount: number): number {
   if (zonasCount <= 1) return 2;
   if (zonasCount === 2 || zonasCount === 3) return 4;
@@ -14,8 +24,18 @@ export function getPrimeraRondaPlayoff(playoffSize: number): string {
   if (playoffSize === 4) return "SEMIS";
   if (playoffSize === 8) return "CUARTOS";
   if (playoffSize === 16) return "OCTAVOS";
+  if (playoffSize === 32) return "PRELIMINARES";
   return "FINAL";
 }
+
+const PLAYOFF_RONDAS = [
+  "PRELIMINARES",
+  "OCTAVOS",
+  "CUARTOS",
+  "SEMIS",
+  "FINAL",
+  "LLAVE",
+] as const;
 
 
 export async function avanzarPartidosInternosZonaCuatro(
@@ -118,14 +138,22 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
 
   if (!grupos || grupos.length === 0) return;
 
-  const clasificados: Array<{
-    id: string;
-    points: number;
-    diffSets: number;
-    diffGames: number;
-    gamesAFavor: number;
-    gamesEnContra: number;
-  }> = [];
+  const { count: pairCount } = await supabaseAdmin
+    .from("inscripciones")
+    .select("id", { count: "exact", head: true })
+    .eq("torneo_id", torneoId)
+    .eq("estado_pago", "Confirmado");
+
+  const nParejas = pairCount ?? 0;
+  const matrix = getFapBracketForPairCount(nParejas);
+  if (!matrix) {
+    console.error(
+      `[playoffAvance] Sin matriz FAP para ${nParejas} parejas (torneo ${torneoId})`,
+    );
+    return;
+  }
+
+  const qualifiedPairs: QualifiedPair[] = [];
 
   for (const g of grupos) {
     const parejasEnZona = g.grupo_parejas?.length || 0;
@@ -138,74 +166,76 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
       parejasEnZona,
     );
 
-    clasificados.push(
-      ...tabla.slice(0, cupo).map((t) => ({
-        id: t.inscripcionId,
-        points: t.puntosTotales,
-        diffSets: t.setsAFavor - t.setsEnContra,
-        diffGames: t.gamesAFavor - t.gamesEnContra,
-        gamesAFavor: t.gamesAFavor,
-        gamesEnContra: t.gamesEnContra,
-      })),
+    const zoneLetter = g.nombre_grupo.replace(/^Zona\s+/i, "").trim().toUpperCase();
+
+    for (let pos = 0; pos < cupo; pos++) {
+      const row = tabla[pos];
+      if (!row) continue;
+      qualifiedPairs.push({
+        pairId: row.inscripcionId,
+        zone: zoneLetter,
+        qualificationPosition: (pos + 1) as 1 | 2 | 3,
+        rankingScore: row.puntosTotales,
+      });
+    }
+  }
+
+  const qualifiedMap = buildQualifiedMap(qualifiedPairs);
+  const requiredSeeds = listLeafSeeds(matrix);
+  const missing = requiredSeeds.filter((s) => !qualifiedMap.has(s));
+  if (missing.length > 0) {
+    console.warn(
+      `[playoffAvance] Faltan clasificados para slots FAP ${missing.join(", ")} (torneo ${torneoId})`,
     );
   }
 
-  const n = grupos.length;
-  const playoffSize = getPlayoffSize(n);
-  const roundName = getPrimeraRondaPlayoff(playoffSize);
-
-  const compararEquipos = (
-    a: {
-      points: number;
-      diffSets: number;
-      diffGames: number;
-      gamesAFavor: number;
-      gamesEnContra: number;
-    },
-    b: {
-      points: number;
-      diffSets: number;
-      diffGames: number;
-      gamesAFavor: number;
-      gamesEnContra: number;
-    },
-  ) => {
-    if (a.points !== b.points) return b.points - a.points;
-    if (a.diffSets !== b.diffSets) return b.diffSets - a.diffSets;
-    if (a.diffGames !== b.diffGames) return b.diffGames - a.diffGames;
-    if (a.gamesAFavor !== b.gamesAFavor) return b.gamesAFavor - a.gamesAFavor;
-    return a.gamesEnContra - b.gamesEnContra;
-  };
-
-  clasificados.sort(compararEquipos);
-  const clasificadosPlayoff = clasificados.slice(0, playoffSize);
-
-  if (clasificadosPlayoff.length < 2) return;
-
   const { data: playoffMatches } = await supabaseAdmin
     .from("partidos")
-    .select("id, equipo_a_id, equipo_b_id")
+    .select("id, orden, equipo_a_id, equipo_b_id, ronda")
     .eq("torneo_id", torneoId)
-    .eq("ronda", roundName)
+    .in("ronda", [...PLAYOFF_RONDAS])
     .order("orden", { ascending: true });
 
-  if (!playoffMatches || playoffMatches.length < playoffSize / 2) return;
+  if (!playoffMatches || playoffMatches.length === 0) return;
 
-  for (let k = 0; k < playoffSize / 2; k++) {
-    const teamA = clasificadosPlayoff[k]?.id;
-    const teamB = clasificadosPlayoff[clasificadosPlayoff.length - 1 - k]?.id;
+  const byOrden = new Map(playoffMatches.map((p) => [p.orden, p]));
+  const fills = fillLeafSidesFromQualified(matrix, qualifiedMap);
 
-    if (!teamA || !teamB || teamA === teamB) continue;
+  for (const fill of fills) {
+    const partido = byOrden.get(fill.matchNo);
+    if (!partido) continue;
+
+    const matrixMatch = matrix.find((m) => m.matchNo === fill.matchNo);
+    if (!matrixMatch) continue;
+
+    const equipo_a_id = matrixMatch.a.startsWith("W")
+      ? partido.equipo_a_id
+      : fill.equipo_a_id;
+    const equipo_b_id = matrixMatch.b.startsWith("W")
+      ? partido.equipo_b_id
+      : fill.equipo_b_id;
+
+    if (
+      equipo_a_id === partido.equipo_a_id &&
+      equipo_b_id === partido.equipo_b_id
+    ) {
+      continue;
+    }
 
     await supabaseAdmin
       .from("partidos")
       .update({
-        equipo_a_id: teamA,
-        equipo_b_id: teamB,
+        equipo_a_id,
+        equipo_b_id,
         estado_partido: "Programado",
       })
-      .eq("id", playoffMatches[k].id);
+      .eq("id", partido.id);
   }
+
+  const { programarPartidosLlavePendientes } = await import(
+    "./programacionPartidos"
+  );
+  await programarPartidosLlavePendientes(torneoId);
 }
 
 export async function sincronizarClasificadosALlave(
@@ -216,30 +246,16 @@ export async function sincronizarClasificadosALlave(
   const zonasCompletas = await zonasGrupalesCompletas(torneoId);
   if (!zonasCompletas) return false;
 
-  const { data: grupos } = await supabaseAdmin
-    .from("grupos")
-    .select("id")
-    .eq("torneo_id", torneoId);
-
-  if (!grupos || grupos.length === 0) return false;
-
-  const playoffSize = getPlayoffSize(grupos.length);
-  const roundName = getPrimeraRondaPlayoff(playoffSize);
-
   const { data: playoffMatches } = await supabaseAdmin
     .from("partidos")
-    .select("id, equipo_a_id, equipo_b_id")
+    .select("id, equipo_a_id, equipo_b_id, orden, ronda")
     .eq("torneo_id", torneoId)
-    .eq("ronda", roundName)
+    .in("ronda", [...PLAYOFF_RONDAS])
     .order("orden", { ascending: true });
 
   if (!playoffMatches || playoffMatches.length === 0) return false;
 
-  const primeraRondaVacia = playoffMatches.every(
-    (m) => !m.equipo_a_id && !m.equipo_b_id,
-  );
-  if (!primeraRondaVacia) return false;
-
+  // Si ya hay alguna hoja rellena, igual re-sincronizamos con FAP (idempotente en lados W*).
   await avanzarJugadoresALlaves(torneoId);
   return true;
 }

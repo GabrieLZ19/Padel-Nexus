@@ -12,6 +12,7 @@ import {
   getInscripcionesByTorneo,
   generarCuadros,
   getZonasByTorneo,
+  getLlaveMatriz,
   moverParejaOverride,
   guardarZonasOverride,
   getAuditoriaByTorneo,
@@ -47,6 +48,7 @@ router.get("/:id", getTorneoById);
 router.get("/:id/partidos", getPartidosByTorneo);
 router.get("/:id/posiciones", obtenerPosicionesZona);
 router.get("/:id/zonas", getZonasByTorneo);
+router.get("/:id/llave-matriz", getLlaveMatriz);
 
 // Rutas Protegidas (Requieren autenticación)
 router.use(authenticate);

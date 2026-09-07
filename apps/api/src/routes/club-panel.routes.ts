@@ -33,6 +33,11 @@ router.post(
 // Reservas
 router.get("/mi-club/reservas", ClubPanelController.obtenerReservas);
 
+// Bloqueos de franjas (no disponibles para reserva online)
+router.get("/mi-club/bloqueos", ClubPanelController.listarBloqueos);
+router.post("/mi-club/bloqueos", ClubPanelController.crearBloqueo);
+router.delete("/mi-club/bloqueos/:bloqueoId", ClubPanelController.eliminarBloqueo);
+
 // Estadísticas
 router.get("/mi-club/estadisticas", ClubPanelController.obtenerEstadisticas);
 

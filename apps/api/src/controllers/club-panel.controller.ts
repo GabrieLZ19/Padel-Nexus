@@ -320,4 +320,79 @@ export class ClubPanelController {
       return res.status(400).json({ exito: false, error: message });
     }
   }
+
+  /**
+   * GET /api/club/mi-club/bloqueos
+   */
+  static async listarBloqueos(req: Request, res: Response) {
+    try {
+      const clubId = await ClubPanelController.getClubIdDelUsuario(req.user!.id);
+      const soloActivos = req.query.todos !== "1";
+      const data = await ClubService.listarBloqueos(clubId, {
+        soloActivos,
+        desde: typeof req.query.desde === "string" ? req.query.desde : undefined,
+        hasta: typeof req.query.hasta === "string" ? req.query.hasta : undefined,
+      });
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  }
+
+  /**
+   * POST /api/club/mi-club/bloqueos
+   */
+  static async crearBloqueo(req: Request, res: Response) {
+    try {
+      const clubId = await ClubPanelController.getClubIdDelUsuario(req.user!.id);
+      const {
+        cancha_id,
+        fecha_inicio,
+        fecha_fin,
+        hora_inicio,
+        hora_fin,
+        motivo,
+        tipo,
+      } = req.body as Record<string, unknown>;
+
+      const data = await ClubService.crearBloqueo(
+        clubId,
+        {
+          cancha_id: typeof cancha_id === "string" ? cancha_id : null,
+          fecha_inicio: String(fecha_inicio || ""),
+          fecha_fin: String(fecha_fin || ""),
+          hora_inicio: String(hora_inicio || ""),
+          hora_fin: String(hora_fin || ""),
+          motivo: typeof motivo === "string" ? motivo : null,
+          tipo: tipo as "mantenimiento" | "torneo" | "abono" | "otro" | undefined,
+        },
+        req.user!.id,
+      );
+      return res.status(201).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  }
+
+  /**
+   * DELETE /api/club/mi-club/bloqueos/:bloqueoId
+   * Soft-delete (activo=false) por defecto; ?hard=1 elimina.
+   */
+  static async eliminarBloqueo(req: Request, res: Response) {
+    try {
+      const clubId = await ClubPanelController.getClubIdDelUsuario(req.user!.id);
+      const bloqueoId = String(req.params.bloqueoId || "");
+      if (req.query.hard === "1") {
+        await ClubService.eliminarBloqueo(clubId, bloqueoId);
+      } else {
+        await ClubService.desactivarBloqueo(clubId, bloqueoId);
+      }
+      return res.status(200).json({ exito: true });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  }
 }

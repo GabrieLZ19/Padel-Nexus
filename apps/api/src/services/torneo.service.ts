@@ -1325,50 +1325,99 @@ export class TorneoService {
         console.warn("Error al emitir eventos de torneo finalizado:", e);
       }
     } else {
-      const rondasSiguientes: Record<string, string> = {
-        "16AVOS": "OCTAVOS",
-        OCTAVOS: "CUARTOS",
-        CUARTOS: "SEMIS",
-        SEMIS: "FINAL",
-      };
-      const rondaSiguiente =
-        rondasSiguientes[partido.ronda.toUpperCase().trim()];
+      // Avance FAP por matchNo (orden) si existe matriz; si no, índice legacy.
+      const { count: pairCount } = await supabaseAdmin
+        .from("inscripciones")
+        .select("id", { count: "exact", head: true })
+        .eq("torneo_id", partido.torneo_id)
+        .eq("estado_pago", "Confirmado");
 
-      if (rondaSiguiente) {
-        const { data: pact } = await supabaseAdmin
+      const { getFapBracketForPairCount } = await import(
+        "../utils/fapBracketMatrices"
+      );
+      const matrix = getFapBracketForPairCount(pairCount ?? 0);
+      const fapMatch = matrix?.find((m) => m.matchNo === partido.orden);
+
+      if (fapMatch?.winnerTo != null) {
+        const { data: destino } = await supabaseAdmin
           .from("partidos")
-          .select("id")
+          .select("id, equipo_a_id, equipo_b_id, orden")
           .eq("torneo_id", partido.torneo_id)
-          .eq("ronda", partido.ronda)
-          .order("orden", { ascending: true });
-        const { data: psig } = await supabaseAdmin
-          .from("partidos")
-          .select("id")
-          .eq("torneo_id", partido.torneo_id)
-          .eq("ronda", rondaSiguiente)
-          .order("orden", { ascending: true });
+          .eq("orden", fapMatch.winnerTo)
+          .maybeSingle();
 
-        if (pact && psig) {
-          const miIndice = pact.findIndex((p) => p.id === partido.id);
-          const idxHijo = Math.floor(miIndice / 2);
-          const partidoDestino = psig[idxHijo];
+        if (destino) {
+          const destSpec = matrix?.find((m) => m.matchNo === fapMatch.winnerTo);
+          const winnerRef = `W${fapMatch.matchNo}`;
+          let ranura: "equipo_a_id" | "equipo_b_id" = "equipo_a_id";
+          if (destSpec?.b === winnerRef) ranura = "equipo_b_id";
+          else if (destSpec?.a === winnerRef) ranura = "equipo_a_id";
+          else if (destino.equipo_a_id) ranura = "equipo_b_id";
 
-          if (partidoDestino) {
-            const ranura = miIndice % 2 === 0 ? "equipo_a_id" : "equipo_b_id";
-            await supabaseAdmin
-              .from("partidos")
-              .update({ [ranura]: ganadorId })
-              .eq("id", partidoDestino.id);
+          await supabaseAdmin
+            .from("partidos")
+            .update({ [ranura]: ganadorId })
+            .eq("id", destino.id);
 
-            // Emitir avance de cuadro para que el frontend refresque el grid
-            try {
-              SocketService.emitirATodos("bracket_actualizado", {
-                torneo_id: partido.torneo_id,
-                ronda_actual: partido.ronda,
-                ronda_siguiente: rondaSiguiente,
-              });
-            } catch (e) {
-              console.warn("Error al emitir bracket_actualizado:", e);
+          try {
+            SocketService.emitirATodos("bracket_actualizado", {
+              torneo_id: partido.torneo_id,
+              ronda_actual: partido.ronda,
+              ronda_siguiente: destino.orden,
+              matchNo: fapMatch.matchNo,
+              winnerTo: fapMatch.winnerTo,
+            });
+          } catch (e) {
+            console.warn("Error al emitir bracket_actualizado:", e);
+          }
+        }
+      } else {
+        const rondasSiguientes: Record<string, string> = {
+          PRELIMINARES: "OCTAVOS",
+          "32AVOS": "16AVOS",
+          "16AVOS": "OCTAVOS",
+          OCTAVOS: "CUARTOS",
+          CUARTOS: "SEMIS",
+          SEMIS: "FINAL",
+        };
+        const rondaSiguiente =
+          rondasSiguientes[partido.ronda.toUpperCase().trim()];
+
+        if (rondaSiguiente) {
+          const { data: pact } = await supabaseAdmin
+            .from("partidos")
+            .select("id")
+            .eq("torneo_id", partido.torneo_id)
+            .eq("ronda", partido.ronda)
+            .order("orden", { ascending: true });
+          const { data: psig } = await supabaseAdmin
+            .from("partidos")
+            .select("id")
+            .eq("torneo_id", partido.torneo_id)
+            .eq("ronda", rondaSiguiente)
+            .order("orden", { ascending: true });
+
+          if (pact && psig) {
+            const miIndice = pact.findIndex((p) => p.id === partido.id);
+            const idxHijo = Math.floor(miIndice / 2);
+            const partidoDestino = psig[idxHijo];
+
+            if (partidoDestino) {
+              const ranura = miIndice % 2 === 0 ? "equipo_a_id" : "equipo_b_id";
+              await supabaseAdmin
+                .from("partidos")
+                .update({ [ranura]: ganadorId })
+                .eq("id", partidoDestino.id);
+
+              try {
+                SocketService.emitirATodos("bracket_actualizado", {
+                  torneo_id: partido.torneo_id,
+                  ronda_actual: partido.ronda,
+                  ronda_siguiente: rondaSiguiente,
+                });
+              } catch (e) {
+                console.warn("Error al emitir bracket_actualizado:", e);
+              }
             }
           }
         }

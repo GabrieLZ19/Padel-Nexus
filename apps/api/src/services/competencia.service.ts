@@ -1,5 +1,7 @@
 import { supabaseAdmin } from "../config/supabase";
 import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "../constants/fap";
+import { getFapBracketForPairCount } from "../utils/fapBracketMatrices";
+import { roundNameForMatchNo } from "../utils/fapBracketTypes";
 import { enrichInscripcionDenominacion } from "../utils/denominacionNacional";
 import { getCapacidadesZonasPreferidas } from "../utils/capacidadesZonas";
 import {
@@ -99,11 +101,9 @@ export class CompetenciaService {
 
     const inscripciones = todasInscripciones;
 
-
-
-    if (inscripciones.length % 2 !== 0) {
+    if (inscripciones.length < 3) {
       throw new Error(
-        `La cantidad de participantes confirmados debe ser un número par. Actualmente hay ${inscripciones.length} inscritos confirmados.`
+        `Se necesitan al menos 3 parejas confirmadas para armar zonas. Actualmente hay ${inscripciones.length}.`,
       );
     }
 
@@ -185,6 +185,48 @@ export class CompetenciaService {
       }
     }
 
+    // 4.b Separación por institución/club (swap mínimo post-snake)
+    const shareClub = (a: ParejaRanking, b: ParejaRanking): boolean => {
+      if (!a.clubes.length || !b.clubes.length) return false;
+      return a.clubes.some((c) => b.clubes.includes(c));
+    };
+
+    for (let z = 0; z < zonas.length; z++) {
+      const zona = zonas[z];
+      for (let i = 0; i < zona.parejas.length; i++) {
+        for (let j = i + 1; j < zona.parejas.length; j++) {
+          if (!shareClub(zona.parejas[i], zona.parejas[j])) continue;
+          // Intentar intercambiar la de menor ranking (j) con otra zona
+          let swapped = false;
+          for (let z2 = 0; z2 < zonas.length && !swapped; z2++) {
+            if (z2 === z) continue;
+            const other = zonas[z2];
+            for (let k = other.parejas.length - 1; k >= 0; k--) {
+              const candidate = other.parejas[k];
+              // No meter otra cabeza top si rompe seed1: preferir no-cabezas
+              const conflictsInTarget = other.parejas.some(
+                (p, idx) => idx !== k && shareClub(zona.parejas[j], p),
+              );
+              const conflictsInSource = zona.parejas.some(
+                (p, idx) =>
+                  idx !== i && idx !== j && shareClub(candidate, p),
+              );
+              if (conflictsInTarget || conflictsInSource) continue;
+              if (shareClub(zona.parejas[i], candidate)) continue;
+
+              other.parejas[k] = zona.parejas[j];
+              zona.parejas[j] = candidate;
+              swapped = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // 4.c Caso 5 FAP: si Zona A tiene 2, asegurar enfrentamiento mismo club en 1er partido
+    // (se refleja al generar partidos: orden seed 1 vs 2)
+
     // 5. PERSISTENCIA EN BASE DE DATOS
     const partidosZonaFase: PartidoProgramable[] = [];
 
@@ -213,7 +255,16 @@ export class CompetenciaService {
       // Generar Partidos según la cantidad de parejas en la zona
       const partidos: PartidoProgramable[] = [];
 
-      if (zona.capacidad === 3 && p.length === 3) {
+      if (zona.capacidad === 2 && p.length === 2) {
+        partidos.push({
+          torneo_id: torneoId,
+          ronda: zona.nombre,
+          orden: 1,
+          equipo_a_id: p[0].inscripcionId,
+          equipo_b_id: p[1].inscripcionId,
+          estado_partido: "Programado",
+        });
+      } else if (zona.capacidad === 3 && p.length === 3) {
         // ZONA DE 3: Todos contra todos
         partidos.push({
           torneo_id: torneoId,
@@ -295,50 +346,71 @@ export class CompetenciaService {
     }
 
     if (partidosZonaFase.length > 0) {
-      await programarPartidosConDisponibilidad(torneoId, partidosZonaFase);
+      await programarPartidosConDisponibilidad(torneoId, partidosZonaFase, {
+        fase: "zonas",
+      });
       await supabaseAdmin.from("partidos").insert(partidosZonaFase);
     }
 
-    // 6. GENERAR PARTIDOS DE PLAYOFF EN BLANCO (LLAVES)
-    const roundsConfig = [
-      { name: "OCTAVOS", matches: 8 },
-      { name: "CUARTOS", matches: 4 },
-      { name: "SEMIS", matches: 2 },
-      { name: "FINAL", matches: 1 },
-    ];
-    
-    const getPlayoffSize = (zonasCount: number): number => {
-      if (zonasCount <= 1) return 2;
-      if (zonasCount === 2 || zonasCount === 3) return 4;
-      if (zonasCount >= 4 && zonasCount <= 6) return 8;
-      if (zonasCount >= 7 && zonasCount <= 12) return 16;
-      return 32;
-    };
-    
-    // El número de jugadores que avanzan es playoffSize
-    const advancingPlayers = getPlayoffSize(cantidadZonas);
-    const startIndex = roundsConfig.findIndex((r) => r.matches === advancingPlayers / 2);
-    
-    if (startIndex !== -1) {
-      const playoffPartidos = [];
-      let playoffOrden = 100; // Un orden alto para que queden después de los partidos de zona
-      
-      for (let i = startIndex; i < roundsConfig.length; i++) {
-        const round = roundsConfig[i];
-        for (let j = 0; j < round.matches; j++) {
-          playoffPartidos.push({
-            torneo_id: torneoId,
-            equipo_a_id: null,
-            equipo_b_id: null,
-            ronda: round.name,
-            orden: playoffOrden++,
-            estado_partido: "Programado",
-          });
-        }
-      }
-      
+    // 6. GENERAR PARTIDOS DE PLAYOFF EN BLANCO (LLAVES FAP)
+    const pairCount = inscripciones.length;
+    const fapMatrix = getFapBracketForPairCount(pairCount);
+
+    if (fapMatrix) {
+      const playoffPartidos = fapMatrix.map((m) => ({
+        torneo_id: torneoId,
+        equipo_a_id: null as string | null,
+        equipo_b_id: null as string | null,
+        ronda: roundNameForMatchNo(m.matchNo),
+        orden: m.matchNo,
+        estado_partido: "Programado",
+      }));
       if (playoffPartidos.length > 0) {
         await supabaseAdmin.from("partidos").insert(playoffPartidos);
+      }
+    } else {
+      // Fallback legacy si N queda fuera de 6–36
+      const roundsConfig = [
+        { name: "OCTAVOS", matches: 8 },
+        { name: "CUARTOS", matches: 4 },
+        { name: "SEMIS", matches: 2 },
+        { name: "FINAL", matches: 1 },
+      ];
+
+      const getPlayoffSizeLocal = (zonasCount: number): number => {
+        if (zonasCount <= 1) return 2;
+        if (zonasCount === 2 || zonasCount === 3) return 4;
+        if (zonasCount >= 4 && zonasCount <= 6) return 8;
+        if (zonasCount >= 7 && zonasCount <= 12) return 16;
+        return 32;
+      };
+
+      const advancingPlayers = getPlayoffSizeLocal(cantidadZonas);
+      const startIndex = roundsConfig.findIndex(
+        (r) => r.matches === advancingPlayers / 2,
+      );
+
+      if (startIndex !== -1) {
+        const playoffPartidos = [];
+        let playoffOrden = 100;
+
+        for (let i = startIndex; i < roundsConfig.length; i++) {
+          const round = roundsConfig[i];
+          for (let j = 0; j < round.matches; j++) {
+            playoffPartidos.push({
+              torneo_id: torneoId,
+              equipo_a_id: null,
+              equipo_b_id: null,
+              ronda: round.name,
+              orden: playoffOrden++,
+              estado_partido: "Programado",
+            });
+          }
+        }
+
+        if (playoffPartidos.length > 0) {
+          await supabaseAdmin.from("partidos").insert(playoffPartidos);
+        }
       }
     }
 

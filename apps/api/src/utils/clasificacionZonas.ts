@@ -1,13 +1,19 @@
-export function capacidadZona(parejasCount: number): 3 | 4 {
-  return parejasCount === 4 ? 4 : 3;
+export function capacidadZona(parejasCount: number): 2 | 3 | 4 {
+  if (parejasCount === 4) return 4;
+  if (parejasCount === 2) return 2;
+  return 3;
 }
 
 export function clasificadosPorZona(parejasCount: number): number {
-  return parejasCount === 4 ? 3 : 2;
+  if (parejasCount === 4) return 3;
+  if (parejasCount === 2) return 1;
+  return 2;
 }
 
 export function partidosEsperadosEnZona(parejasCount: number): number {
-  return parejasCount === 4 ? 4 : 3;
+  if (parejasCount === 4) return 4;
+  if (parejasCount === 2) return 1;
+  return 3;
 }
 
 export function partidoZonaPendiente(partido: {

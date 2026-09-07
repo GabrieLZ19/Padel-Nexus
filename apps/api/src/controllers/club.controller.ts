@@ -304,3 +304,72 @@ export const deleteTurno = async (req: Request, res: Response) => {
     return res.status(500).json({ exito: false, error: message });
   }
 };
+
+// ── Bloqueos de disponibilidad ─────────────────────────────────────────
+
+export const listarBloqueosClub = async (req: Request, res: Response) => {
+  try {
+    const clubId = String(req.params.id || "");
+    const data = await ClubService.listarBloqueos(clubId, {
+      soloActivos: req.query.todos !== "1",
+      desde: typeof req.query.desde === "string" ? req.query.desde : undefined,
+      hasta: typeof req.query.hasta === "string" ? req.query.hasta : undefined,
+    });
+    return res.status(200).json({ exito: true, data });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    return res.status(400).json({ exito: false, error: message });
+  }
+};
+
+export const crearBloqueoClub = async (req: Request, res: Response) => {
+  try {
+    const clubId = String(req.params.id || "");
+    const {
+      cancha_id,
+      fecha_inicio,
+      fecha_fin,
+      hora_inicio,
+      hora_fin,
+      motivo,
+      tipo,
+    } = req.body as Record<string, unknown>;
+
+    const data = await ClubService.crearBloqueo(
+      clubId,
+      {
+        cancha_id: typeof cancha_id === "string" ? cancha_id : null,
+        fecha_inicio: String(fecha_inicio || ""),
+        fecha_fin: String(fecha_fin || ""),
+        hora_inicio: String(hora_inicio || ""),
+        hora_fin: String(hora_fin || ""),
+        motivo: typeof motivo === "string" ? motivo : null,
+        tipo: tipo as "mantenimiento" | "torneo" | "abono" | "otro" | undefined,
+      },
+      req.user?.id,
+    );
+    return res.status(201).json({ exito: true, data });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    return res.status(400).json({ exito: false, error: message });
+  }
+};
+
+export const eliminarBloqueoClub = async (req: Request, res: Response) => {
+  try {
+    const clubId = String(req.params.id || "");
+    const bloqueoId = String(req.params.bloqueoId || "");
+    if (req.query.hard === "1") {
+      await ClubService.eliminarBloqueo(clubId, bloqueoId);
+    } else {
+      await ClubService.desactivarBloqueo(clubId, bloqueoId);
+    }
+    return res.status(200).json({ exito: true });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    return res.status(400).json({ exito: false, error: message });
+  }
+};

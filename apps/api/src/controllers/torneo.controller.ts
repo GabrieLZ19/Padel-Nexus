@@ -346,6 +346,38 @@ export const getZonasByTorneo = async (
   }
 };
 
+export const getLlaveMatriz = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { FAP_ESTADOS_PAGO } = await import("../constants/fap");
+    const { getFapBracketForPairCount } = await import(
+      "../utils/fapBracketMatrices"
+    );
+
+    const { count } = await supabaseAdmin
+      .from("inscripciones")
+      .select("id", { count: "exact", head: true })
+      .eq("torneo_id", req.params.id)
+      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
+
+    const pairCount = count || 0;
+    const matches = getFapBracketForPairCount(pairCount);
+
+    return res.status(200).json({
+      pairCount,
+      matches: matches || [],
+      supported: Boolean(matches),
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Error desconocido";
+    return res
+      .status(500)
+      .json({ message: "Error al obtener matriz de llave", error: msg });
+  }
+};
+
 export const moverParejaOverride = async (
   req: Request,
   res: Response,

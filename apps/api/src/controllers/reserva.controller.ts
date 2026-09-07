@@ -72,6 +72,14 @@ export const ReservasController = {
         });
       }
 
+      if (message === "TURNO_BLOQUEADO") {
+        return res.status(409).json({
+          exito: false,
+          error:
+            "Ese horario está bloqueado por el club (torneo, abono u otro compromiso).",
+        });
+      }
+
       if (message === "FECHA_PASADA") {
         return res.status(400).json({
           exito: false,

@@ -7,6 +7,7 @@ import {
   resolveMercadoPagoInitPoint,
 } from "../config/mercadopago";
 import { esHorarioReservaPasado } from "../utils/fechaArgentina";
+import { ClubService } from "./club.service";
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ export interface SlotDisponible {
   hora_fin: string;
   precio: number;
   disponible: boolean;
+  motivo_bloqueo?: string | null;
 }
 
 export interface CrearReservaDTO {
@@ -79,29 +81,64 @@ export class ReservaService {
     if (reservasError)
       throw new Error("Error al consultar las reservas existentes.");
 
-    // 3b. Obtener partidos de torneo programados en esa fecha para esas canchas
+    // 3b. Partidos de torneo en esas canchas/fecha (schema real)
     const { data: partidosTorneo } = await supabaseAdmin
       .from("partidos")
-      .select("cancha_id, hora_inicio")
-      .in("cancha_id", canchaIds)
-      .eq("fecha", fecha);
+      .select("cancha_asignada, franja_horaria, fecha_partido")
+      .in("cancha_asignada", canchaIds)
+      .eq("fecha_partido", fecha);
+
+    // 3c. Bloqueos de franja del club (abonos / torneo / mantenimiento)
+    const { data: bloqueos } = await supabaseAdmin
+      .from("bloqueos_disponibilidad")
+      .select("cancha_id, hora_inicio, hora_fin, motivo")
+      .eq("club_id", clubId)
+      .eq("activo", true)
+      .lte("fecha_inicio", fecha)
+      .gte("fecha_fin", fecha);
 
     const turnosOcupados = new Set(
       (reservas || []).map((r) => r.turno_id as string),
     );
+
+    const toMin = (t: string) => {
+      const [h, m] = String(t).slice(0, 5).split(":").map(Number);
+      return h * 60 + m;
+    };
+    const overlap = (aStart: string, aEnd: string, bStart: string, bEnd: string) =>
+      toMin(aStart) < toMin(bEnd) && toMin(aEnd) > toMin(bStart);
+
+    const franjaInicio = (franja: string | null | undefined) => {
+      if (!franja) return null;
+      const m = String(franja).match(/(\d{1,2}:\d{2})/);
+      return m ? m[1] : null;
+    };
 
     // 4. Construir la grilla de disponibilidad
     const canchasMap = new Map(canchas.map((c) => [c.id, c]));
 
     const slots: SlotDisponible[] = turnos.map((turno) => {
       const cancha = canchasMap.get(turno.cancha_id);
-      
-      // Verificar si hay un partido de torneo asignado en esta cancha y hora de inicio
-      const tienePartidoTorneo = (partidosTorneo || []).some(
-        (p: any) => p.cancha_id === turno.cancha_id && p.hora_inicio === turno.hora_inicio
-      );
 
-      const estaOcupado = turnosOcupados.has(turno.id) || tienePartidoTorneo;
+      const horaIni = String(turno.hora_inicio).slice(0, 5);
+      const tienePartidoTorneo = (partidosTorneo || []).some((p) => {
+        if (p.cancha_asignada !== turno.cancha_id) return false;
+        const hi = franjaInicio(p.franja_horaria as string | null);
+        return hi != null && hi === horaIni;
+      });
+
+      const bloqueo = (bloqueos || []).find((b) => {
+        if (b.cancha_id && b.cancha_id !== turno.cancha_id) return false;
+        return overlap(
+          String(turno.hora_inicio),
+          String(turno.hora_fin),
+          String(b.hora_inicio),
+          String(b.hora_fin),
+        );
+      });
+
+      const estaOcupado =
+        turnosOcupados.has(turno.id) || tienePartidoTorneo || !!bloqueo;
       const horarioPasado = esHorarioReservaPasado(fecha, turno.hora_inicio);
 
       return {
@@ -114,6 +151,7 @@ export class ReservaService {
         hora_fin: turno.hora_fin,
         precio: turno.precio,
         disponible: !estaOcupado && !horarioPasado,
+        motivo_bloqueo: bloqueo?.motivo ?? (bloqueo ? "Horario bloqueado" : null),
       };
     });
 
@@ -137,7 +175,7 @@ export class ReservaService {
     // Obtener los detalles del turno para validar la hora de inicio
     const { data: turno, error: turnoError } = await supabaseAdmin
       .from("turnos")
-      .select("hora_inicio")
+      .select("hora_inicio, hora_fin, cancha_id, canchas(club_id)")
       .eq("id", turno_id)
       .single();
 
@@ -146,6 +184,20 @@ export class ReservaService {
     // Validar contra hora local Argentina (evita falsos positivos en servidores UTC)
     if (esHorarioReservaPasado(fecha_reserva, turno.hora_inicio)) {
       throw new Error("FECHA_PASADA");
+    }
+
+    const clubId = (turno.canchas as { club_id?: string } | null)?.club_id;
+    if (clubId) {
+      const bloqueo = await ClubService.slotEstaBloqueado(
+        clubId,
+        turno.cancha_id,
+        fecha_reserva,
+        String(turno.hora_inicio),
+        String(turno.hora_fin),
+      );
+      if (bloqueo.bloqueado) {
+        throw new Error("TURNO_BLOQUEADO");
+      }
     }
 
     // 1. Verificar solapamiento

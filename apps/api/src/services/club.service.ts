@@ -215,12 +215,13 @@ export class ClubService {
   }
 
   static async crearClub(datos: CrearClubDTO) {
+    const cantidadCanchas = Math.max(0, Number(datos.canchas) || 0);
     const { data, error } = await supabaseAdmin
       .from("clubes")
       .insert([
         {
           ...datos,
-          canchas: Number(datos.canchas) || 0,
+          canchas: cantidadCanchas,
           estado: datos.estado || "Activo",
         },
       ])
@@ -228,6 +229,26 @@ export class ClubService {
       .single();
 
     if (error) throw new Error(`Error al crear el club: ${error.message}`);
+
+    // Crear filas reales en `canchas` (el contador de UI usa canchas(count), no solo la columna)
+    if (data?.id && cantidadCanchas > 0) {
+      const rows = Array.from({ length: cantidadCanchas }, (_, i) => ({
+        club_id: data.id,
+        nombre: `Cancha ${i + 1}`,
+        tipo_suelo: "Blindex",
+        techada: true,
+        activa: true,
+      }));
+      const { error: errCanchas } = await supabaseAdmin
+        .from("canchas")
+        .insert(rows);
+      if (errCanchas) {
+        throw new Error(
+          `Club creado, pero falló el alta de canchas: ${errCanchas.message}`,
+        );
+      }
+    }
+
     return data;
   }
 
@@ -748,5 +769,191 @@ export class ClubService {
 
     const totalPosibles = targetCanchaIds.length * dias.length * slots.length;
     return { creados, omitidos: totalPosibles - creados };
+  }
+
+  // ── Bloqueos de disponibilidad (reservas online) ─────────────────────
+
+  static async listarBloqueos(
+    clubId: string,
+    opts?: { soloActivos?: boolean; desde?: string; hasta?: string },
+  ) {
+    let q = supabaseAdmin
+      .from("bloqueos_disponibilidad")
+      .select(
+        "id, club_id, cancha_id, fecha_inicio, fecha_fin, hora_inicio, hora_fin, motivo, tipo, activo, created_by, created_at, canchas(nombre)",
+      )
+      .eq("club_id", clubId)
+      .order("fecha_inicio", { ascending: false })
+      .order("hora_inicio", { ascending: true });
+
+    if (opts?.soloActivos !== false) {
+      q = q.eq("activo", true);
+    }
+    if (opts?.desde) {
+      q = q.gte("fecha_fin", opts.desde);
+    }
+    if (opts?.hasta) {
+      q = q.lte("fecha_inicio", opts.hasta);
+    }
+
+    const { data, error } = await q;
+    if (error) throw new Error(`Error al listar bloqueos: ${error.message}`);
+    return data || [];
+  }
+
+  static async crearBloqueo(
+    clubId: string,
+    payload: {
+      cancha_id?: string | null;
+      fecha_inicio: string;
+      fecha_fin: string;
+      hora_inicio: string;
+      hora_fin: string;
+      motivo?: string | null;
+      tipo?: "mantenimiento" | "torneo" | "abono" | "otro";
+    },
+    createdBy?: string | null,
+  ) {
+    const normalizeTime = (raw: string) => {
+      const v = String(raw || "").trim();
+      const m = v.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+      if (!m) throw new Error(`Horario inválido: ${raw}`);
+      const hh = String(Number(m[1])).padStart(2, "0");
+      return `${hh}:${m[2]}:${m[3] || "00"}`;
+    };
+
+    const fecha_inicio = String(payload.fecha_inicio || "").slice(0, 10);
+    const fecha_fin = String(payload.fecha_fin || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha_inicio) || !/^\d{4}-\d{2}-\d{2}$/.test(fecha_fin)) {
+      throw new Error("Indicá fechas de inicio y fin válidas (AAAA-MM-DD).");
+    }
+    if (fecha_fin < fecha_inicio) {
+      throw new Error("La fecha de fin no puede ser anterior a la de inicio.");
+    }
+
+    const hora_inicio = normalizeTime(payload.hora_inicio);
+    const hora_fin = normalizeTime(payload.hora_fin);
+    const toMin = (t: string) => {
+      const [hh, mm] = t.split(":").map(Number);
+      return hh * 60 + mm;
+    };
+    if (toMin(hora_fin) <= toMin(hora_inicio)) {
+      throw new Error("La hora de fin debe ser posterior a la de inicio.");
+    }
+
+    let canchaId: string | null = payload.cancha_id || null;
+    if (canchaId) {
+      const { data: cancha } = await supabaseAdmin
+        .from("canchas")
+        .select("id, club_id")
+        .eq("id", canchaId)
+        .maybeSingle();
+      if (!cancha || cancha.club_id !== clubId) {
+        throw new Error("La cancha no pertenece a este club.");
+      }
+    }
+
+    const tiposOk = ["mantenimiento", "torneo", "abono", "otro"] as const;
+    const tipoRaw = String(payload.tipo || "otro");
+    const tipo = (tiposOk as readonly string[]).includes(tipoRaw)
+      ? (tipoRaw as (typeof tiposOk)[number])
+      : "otro";
+
+    const { data, error } = await supabaseAdmin
+      .from("bloqueos_disponibilidad")
+      .insert({
+        club_id: clubId,
+        cancha_id: canchaId,
+        fecha_inicio,
+        fecha_fin,
+        hora_inicio,
+        hora_fin,
+        motivo: payload.motivo?.trim() || null,
+        tipo,
+        activo: true,
+        created_by: createdBy || null,
+      })
+      .select(
+        "id, club_id, cancha_id, fecha_inicio, fecha_fin, hora_inicio, hora_fin, motivo, tipo, activo, created_by, created_at",
+      )
+      .single();
+
+    if (error) throw new Error(`Error al crear bloqueo: ${error.message}`);
+    return data;
+  }
+
+  static async desactivarBloqueo(clubId: string, bloqueoId: string) {
+    const { data: existing } = await supabaseAdmin
+      .from("bloqueos_disponibilidad")
+      .select("id, club_id")
+      .eq("id", bloqueoId)
+      .maybeSingle();
+    if (!existing || existing.club_id !== clubId) {
+      throw new Error("Bloqueo no encontrado.");
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("bloqueos_disponibilidad")
+      .update({ activo: false })
+      .eq("id", bloqueoId)
+      .select("id, activo")
+      .single();
+    if (error) throw new Error(`Error al desactivar bloqueo: ${error.message}`);
+    return data;
+  }
+
+  static async eliminarBloqueo(clubId: string, bloqueoId: string) {
+    const { data: existing } = await supabaseAdmin
+      .from("bloqueos_disponibilidad")
+      .select("id, club_id")
+      .eq("id", bloqueoId)
+      .maybeSingle();
+    if (!existing || existing.club_id !== clubId) {
+      throw new Error("Bloqueo no encontrado.");
+    }
+
+    const { error } = await supabaseAdmin
+      .from("bloqueos_disponibilidad")
+      .delete()
+      .eq("id", bloqueoId);
+    if (error) throw new Error(`Error al eliminar bloqueo: ${error.message}`);
+  }
+
+  /** True si un slot de una cancha/fecha/hora cae dentro de algún bloqueo activo. */
+  static async slotEstaBloqueado(
+    clubId: string,
+    canchaId: string,
+    fecha: string,
+    horaInicio: string,
+    horaFin: string,
+  ): Promise<{ bloqueado: boolean; motivo: string | null }> {
+    const hi = String(horaInicio).slice(0, 8);
+    const hf = String(horaFin).slice(0, 8);
+    const { data, error } = await supabaseAdmin
+      .from("bloqueos_disponibilidad")
+      .select("id, motivo, hora_inicio, hora_fin, cancha_id")
+      .eq("club_id", clubId)
+      .eq("activo", true)
+      .lte("fecha_inicio", fecha)
+      .gte("fecha_fin", fecha)
+      .or(`cancha_id.is.null,cancha_id.eq.${canchaId}`);
+
+    if (error) throw new Error(`Error al consultar bloqueos: ${error.message}`);
+
+    const overlaps = (aStart: string, aEnd: string, bStart: string, bEnd: string) => {
+      const toM = (t: string) => {
+        const [h, m] = t.slice(0, 5).split(":").map(Number);
+        return h * 60 + m;
+      };
+      return toM(aStart) < toM(bEnd) && toM(aEnd) > toM(bStart);
+    };
+
+    const hit = (data || []).find((b) =>
+      overlaps(hi, hf, String(b.hora_inicio), String(b.hora_fin)),
+    );
+    return {
+      bloqueado: !!hit,
+      motivo: hit?.motivo || null,
+    };
   }
 }

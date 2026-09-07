@@ -94,4 +94,27 @@ export const RankingsController = {
       return res.status(500).json({ exito: false, error: message });
     }
   },
+
+  async rankingProvincialTorneo(
+    req: Request,
+    res: Response,
+  ): Promise<Response> {
+    try {
+      const { torneo_id } = req.params;
+      if (!torneo_id) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "torneo_id requerido" });
+      }
+      const data =
+        await RankingService.rankingProvincialPorTorneo(torneo_id);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al calcular ranking provincial.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
 };

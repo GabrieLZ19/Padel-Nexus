@@ -253,4 +253,140 @@ export class RankingService {
 
     return nuevosPuntos;
   }
+
+  /**
+   * Ranking por provincias en torneos nacionales (FAP):
+   * 8 campeón · 6 finalista · 4 semis · 2 cuartos · 1 octavos.
+   */
+  static async rankingProvincialPorTorneo(torneoId: string) {
+    const PUNTOS_POR_RONDA: Record<string, { ganador: number; perdedor: number }> =
+      {
+        FINAL: { ganador: 8, perdedor: 6 },
+        SEMIS: { ganador: 0, perdedor: 4 },
+        SEMIFINAL: { ganador: 0, perdedor: 4 },
+        CUARTOS: { ganador: 0, perdedor: 2 },
+        OCTAVOS: { ganador: 0, perdedor: 1 },
+      };
+
+    const { data: partidos, error } = await supabaseAdmin
+      .from("partidos")
+      .select("ronda, ganador, equipo_a_id, equipo_b_id")
+      .eq("torneo_id", torneoId)
+      .not("ganador", "is", null)
+      .in("ronda", [
+        "FINAL",
+        "SEMIS",
+        "SEMIFINAL",
+        "CUARTOS",
+        "OCTAVOS",
+        "PRELIMINARES",
+      ]);
+
+    if (error) throw new Error(error.message);
+
+    const puntosPorInscripcion = new Map<string, number>();
+    const mejorRonda = new Map<string, number>();
+    const rankRonda = (r: string) => {
+      const u = r.toUpperCase();
+      if (u === "FINAL") return 5;
+      if (u.startsWith("SEMI")) return 4;
+      if (u === "CUARTOS") return 3;
+      if (u === "OCTAVOS") return 2;
+      return 1;
+    };
+
+    for (const p of partidos || []) {
+      const ronda = String(p.ronda || "").toUpperCase().trim();
+      const tabla = PUNTOS_POR_RONDA[ronda];
+      if (!tabla || !p.ganador) continue;
+
+      const perdedor =
+        p.ganador === p.equipo_a_id ? p.equipo_b_id : p.equipo_a_id;
+
+      const apply = (inscripcionId: string | null, pts: number) => {
+        if (!inscripcionId || pts <= 0) return;
+        const prevRank = mejorRonda.get(inscripcionId) || 0;
+        const thisRank = rankRonda(ronda);
+        // Solo sumar puntos de la mejor instancia (evitar doble conteo de avances)
+        if (thisRank < prevRank) return;
+        if (thisRank > prevRank) {
+          puntosPorInscripcion.set(inscripcionId, pts);
+          mejorRonda.set(inscripcionId, thisRank);
+        } else {
+          const cur = puntosPorInscripcion.get(inscripcionId) || 0;
+          if (pts > cur) puntosPorInscripcion.set(inscripcionId, pts);
+        }
+      };
+
+      apply(p.ganador, tabla.ganador);
+      apply(perdedor, tabla.perdedor);
+    }
+
+    // Campeón: ganador de FINAL = 8 (ya aplicado). Finalista = 6.
+    const inscIds = [...puntosPorInscripcion.keys()];
+    if (inscIds.length === 0) {
+      return { torneoId, provincias: [] as Array<{ provincia: string; puntos: number; parejas: number }> };
+    }
+
+    const { data: inscs } = await supabaseAdmin
+      .from("inscripciones")
+      .select(
+        `
+        id,
+        perfiles:perfiles!fk_inscripciones_usuario (
+          lugar_residencia,
+          clubes:clubes!perfiles_club_id_fkey (provincia)
+        ),
+        perfiles_j2:perfiles!fk_inscripciones_usuario2 (
+          lugar_residencia,
+          clubes:clubes!perfiles_club_id_fkey (provincia)
+        )
+      `,
+      )
+      .in("id", inscIds);
+
+    const provinciaDe = (raw: unknown): string => {
+      const p = raw as {
+        lugar_residencia?: string;
+        clubes?: { provincia?: string } | null;
+      } | null;
+      return (
+        p?.clubes?.provincia ||
+        p?.lugar_residencia ||
+        "Sin provincia"
+      );
+    };
+
+    const agg = new Map<string, { puntos: number; parejas: number }>();
+    for (const ins of inscs || []) {
+      const pts = puntosPorInscripcion.get(ins.id) || 0;
+      if (pts <= 0) continue;
+      const provA = provinciaDe(ins.perfiles);
+      const provB = provinciaDe(ins.perfiles_j2);
+      // Si misma provincia, suma una vez; si distintas, reparte mitad a cada una
+      if (provA === provB) {
+        const cur = agg.get(provA) || { puntos: 0, parejas: 0 };
+        cur.puntos += pts;
+        cur.parejas += 1;
+        agg.set(provA, cur);
+      } else {
+        for (const prov of [provA, provB]) {
+          const cur = agg.get(prov) || { puntos: 0, parejas: 0 };
+          cur.puntos += pts / 2;
+          cur.parejas += 0.5;
+          agg.set(prov, cur);
+        }
+      }
+    }
+
+    const provincias = [...agg.entries()]
+      .map(([provincia, v]) => ({
+        provincia,
+        puntos: Math.round(v.puntos * 10) / 10,
+        parejas: Math.round(v.parejas * 10) / 10,
+      }))
+      .sort((a, b) => b.puntos - a.puntos);
+
+    return { torneoId, provincias };
+  }
 }

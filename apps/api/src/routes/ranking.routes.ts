@@ -6,6 +6,10 @@ const router = Router();
 
 // --- Rutas Públicas (Cualquier jugador o visitante puede ver las estadísticas) ---
 router.get("/", RankingsController.obtenerRankingGlobal);
+router.get(
+  "/provincial/:torneo_id",
+  RankingsController.rankingProvincialTorneo,
+);
 router.get("/:usuario_id", RankingsController.obtenerPerfilRanking);
 
 // --- Rutas Administrativas Protegidas ---

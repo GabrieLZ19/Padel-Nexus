@@ -70,11 +70,18 @@ export function slotKey(
   return `${canchaLabel}|${normalizarFecha(fecha)}|${hora.slice(0, 8)}`;
 }
 
+/** Ventana FAP: no programar antes de 09:00 ni después de 22:00 (inicio). */
+export const FAP_HORA_INICIO_MIN = 9 * 60;
+export const FAP_HORA_INICIO_MAX = 22 * 60;
+
 export function expandirSlotsDisponibilidad(
   disponibilidad: DisponibilidadTorneo[],
   duracionMinutos: number,
+  opciones?: { horaMin?: number; horaMax?: number },
 ): SlotProgramacion[] {
   const duracion = Math.max(30, duracionMinutos || 90);
+  const horaMin = opciones?.horaMin ?? FAP_HORA_INICIO_MIN;
+  const horaMax = opciones?.horaMax ?? FAP_HORA_INICIO_MAX;
   const slots: SlotProgramacion[] = [];
 
   const bloques = [...disponibilidad].sort((a, b) => {
@@ -91,13 +98,17 @@ export function expandirSlotsDisponibilidad(
     if (!canchaLabel) continue;
 
     const fecha = normalizarFecha(bloque.fecha);
-    const inicio = parseHoraAMinutos(bloque.hora_inicio);
+    let inicio = parseHoraAMinutos(bloque.hora_inicio);
     const finConfigurado = bloque.hora_fin
       ? parseHoraAMinutos(bloque.hora_fin)
       : inicio + duracion;
-    const fin = finConfigurado > inicio ? finConfigurado : inicio + duracion;
+    let fin = finConfigurado > inicio ? finConfigurado : inicio + duracion;
+
+    inicio = Math.max(inicio, horaMin);
+    fin = Math.min(fin, horaMax + duracion);
 
     for (let minuto = inicio; minuto + duracion <= fin; minuto += duracion) {
+      if (minuto < horaMin || minuto > horaMax) continue;
       const hora = minutosAHoraStr(minuto);
       slots.push({
         canchaLabel,
@@ -123,6 +134,7 @@ function pesoRonda(ronda: string): number {
   if (zona) return zona[1].charCodeAt(0) - 65;
 
   const ordenPlayoff = [
+    "PRELIMINARES",
     "32AVOS",
     "16AVOS",
     "OCTAVOS",
@@ -229,15 +241,102 @@ export async function cargarContextoProgramacion(torneoId: string): Promise<{
   };
 }
 
+export type FaseProgramacion = "zonas" | "llave";
+
+/** FAP: zonas default/mín 75′ (permite 60); llave mín 90′. */
+export function duracionParaFase(
+  configurada: number,
+  fase: FaseProgramacion,
+): number {
+  const base = Number(configurada) || 0;
+  if (fase === "zonas") {
+    if (base === 60) return 60;
+    return Math.max(75, base || 75);
+  }
+  return Math.max(90, base || 90);
+}
+
 export async function programarPartidosConDisponibilidad(
   torneoId: string,
   partidos: PartidoProgramable[],
-  opciones?: { ocupados?: Set<string> },
+  opciones?: {
+    ocupados?: Set<string>;
+    fase?: FaseProgramacion;
+    duracionMinutos?: number;
+  },
 ): Promise<void> {
-  const { duracionMinutos, disponibilidad } =
+  const { duracionMinutos: configurada, disponibilidad } =
     await cargarContextoProgramacion(torneoId);
   if (!disponibilidad.length) return;
 
+  const fase = opciones?.fase || "zonas";
+  const duracionMinutos =
+    opciones?.duracionMinutos ?? duracionParaFase(configurada, fase);
+
   const slots = expandirSlotsDisponibilidad(disponibilidad, duracionMinutos);
   asignarHorariosAPartidos(partidos, slots, opciones?.ocupados);
+}
+
+/**
+ * Programa partidos de llave que ya tienen ambos equipos y aún no tienen cancha/hora.
+ */
+export async function programarPartidosLlavePendientes(
+  torneoId: string,
+): Promise<number> {
+  const PLAYOFF = [
+    "PRELIMINARES",
+    "OCTAVOS",
+    "CUARTOS",
+    "SEMIS",
+    "FINAL",
+    "LLAVE",
+    "16AVOS",
+    "32AVOS",
+  ];
+
+  const { data: partidos } = await supabaseAdmin
+    .from("partidos")
+    .select(
+      "id, ronda, orden, equipo_a_id, equipo_b_id, estado_partido, cancha_asignada, fecha_partido",
+    )
+    .eq("torneo_id", torneoId)
+    .in("ronda", PLAYOFF);
+
+  if (!partidos?.length) return 0;
+
+  const pendientes = partidos.filter(
+    (p) =>
+      p.equipo_a_id &&
+      p.equipo_b_id &&
+      !p.cancha_asignada &&
+      !String(p.estado_partido || "").toLowerCase().includes("pendiente"),
+  );
+  if (!pendientes.length) return 0;
+
+  const { data: todos } = await supabaseAdmin
+    .from("partidos")
+    .select("cancha_asignada, fecha_partido")
+    .eq("torneo_id", torneoId);
+
+  const ocupados = buildOcupadosDesdePartidos(todos || []);
+  const drafts: PartidoProgramable[] = pendientes.map((p) => ({ ...p }));
+  await programarPartidosConDisponibilidad(torneoId, drafts, {
+    ocupados,
+    fase: "llave",
+  });
+
+  let updated = 0;
+  for (let i = 0; i < pendientes.length; i++) {
+    const draft = drafts[i];
+    if (!draft.cancha_asignada || !draft.fecha_partido) continue;
+    await supabaseAdmin
+      .from("partidos")
+      .update({
+        cancha_asignada: draft.cancha_asignada,
+        fecha_partido: draft.fecha_partido,
+      })
+      .eq("id", pendientes[i].id);
+    updated++;
+  }
+  return updated;
 }

@@ -11,6 +11,9 @@ import {
   deleteCancha,
   createTurno,
   deleteTurno,
+  listarBloqueosClub,
+  crearBloqueoClub,
+  eliminarBloqueoClub,
 } from "../controllers/club.controller";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -107,6 +110,33 @@ router.delete(
     "admin_federacion",
   ]),
   deleteTurno,
+);
+
+const rolesBloqueo = [
+  "superadmin",
+  "admin",
+  "admin_club",
+  "admin_provincial",
+  "admin_federacion",
+] as const;
+
+router.get(
+  "/:id/bloqueos",
+  authenticate,
+  authorize([...rolesBloqueo]),
+  listarBloqueosClub,
+);
+router.post(
+  "/:id/bloqueos",
+  authenticate,
+  authorize([...rolesBloqueo]),
+  crearBloqueoClub,
+);
+router.delete(
+  "/:id/bloqueos/:bloqueoId",
+  authenticate,
+  authorize([...rolesBloqueo]),
+  eliminarBloqueoClub,
 );
 
 export default router;
