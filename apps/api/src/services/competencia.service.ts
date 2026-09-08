@@ -2,7 +2,10 @@ import { supabaseAdmin } from "../config/supabase";
 import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "../constants/fap";
 import { getFapBracketForPairCount } from "../utils/fapBracketMatrices";
 import { roundNameForMatchNo } from "../utils/fapBracketTypes";
-import { enrichInscripcionDenominacion } from "../utils/denominacionNacional";
+import {
+  enrichInscripcionDenominacion,
+  etiquetaInstitucion,
+} from "../utils/denominacionNacional";
 import { getCapacidadesZonasPreferidas } from "../utils/capacidadesZonas";
 import {
   buildOcupadosDesdePartidos,
@@ -537,27 +540,26 @@ export class CompetenciaService {
         const club1 = pClub1 || (gp.inscripciones?.usuario_id ? afiliacionesMap[gp.inscripciones.usuario_id] : null);
         const club2 = pClub2 || (gp.inscripciones?.usuario2_id ? afiliacionesMap[gp.inscripciones.usuario2_id] : null);
 
-        let clubName = "Sin club asignado";
-        if (club1 && club2) {
-          clubName = `${club1} / ${club2}`;
-        } else if (club1) {
-          clubName = club1;
-        } else if (club2) {
-          clubName = club2;
-        }
-
-        const cabezaDeSerie = gp.inscripcion_id ? cabezasDeSerieIds.has(gp.inscripcion_id) : false;
+        const cabezaDeSerie = gp.inscripcion_id
+          ? cabezasDeSerieIds.has(gp.inscripcion_id)
+          : false;
 
         const enriched = enrichInscripcionDenominacion(gp.inscripciones || {});
+
+        // Institución / Club en zonas FAP = provincia + letra (ej. "NEUQUÉN A").
+        const clubName = etiquetaInstitucion(enriched);
 
         return {
           ...gp,
           inscripciones: {
             ...(gp.inscripciones || {}),
             provincia: enriched.provincia,
+            letra_prioridad: enriched.letra_prioridad,
             denominacion_nacional: enriched.denominacion_nacional,
           },
           clubName,
+          club1: club1 || null,
+          club2: club2 || null,
           cabezaDeSerie,
         };
       }),

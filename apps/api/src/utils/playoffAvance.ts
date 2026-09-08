@@ -61,38 +61,45 @@ export async function avanzarPartidosInternosZonaCuatro(
 
   const p3NeedsTeams = !p3.equipo_a_id || !p3.equipo_b_id;
   const p4NeedsTeams = !p4.equipo_a_id || !p4.equipo_b_id;
-  if (!p3NeedsTeams && !p4NeedsTeams) return;
 
-  const g1 = p1.ganador;
-  const g2 = p2.ganador;
-  const perdedor1 =
-    p1.ganador === p1.equipo_a_id ? p1.equipo_b_id : p1.equipo_a_id;
-  const perdedor2 =
-    p2.ganador === p2.equipo_a_id ? p2.equipo_b_id : p2.equipo_a_id;
+  if (p3NeedsTeams || p4NeedsTeams) {
+    const g1 = p1.ganador;
+    const g2 = p2.ganador;
+    const perdedor1 =
+      p1.ganador === p1.equipo_a_id ? p1.equipo_b_id : p1.equipo_a_id;
+    const perdedor2 =
+      p2.ganador === p2.equipo_a_id ? p2.equipo_b_id : p2.equipo_a_id;
 
-  if (!g1 || !g2 || !perdedor1 || !perdedor2) return;
+    if (!g1 || !g2 || !perdedor1 || !perdedor2) return;
 
-  if (p3NeedsTeams) {
-    await supabaseAdmin
-      .from("partidos")
-      .update({
-        equipo_a_id: g1,
-        equipo_b_id: g2,
-        estado_partido: "Programado",
-      })
-      .eq("id", p3.id);
+    if (p3NeedsTeams) {
+      await supabaseAdmin
+        .from("partidos")
+        .update({
+          equipo_a_id: g1,
+          equipo_b_id: g2,
+          estado_partido: "Programado",
+        })
+        .eq("id", p3.id);
+    }
+
+    if (p4NeedsTeams) {
+      await supabaseAdmin
+        .from("partidos")
+        .update({
+          equipo_a_id: perdedor1,
+          equipo_b_id: perdedor2,
+          estado_partido: "Programado",
+        })
+        .eq("id", p4.id);
+    }
   }
 
-  if (p4NeedsTeams) {
-    await supabaseAdmin
-      .from("partidos")
-      .update({
-        equipo_a_id: perdedor1,
-        equipo_b_id: perdedor2,
-        estado_partido: "Programado",
-      })
-      .eq("id", p4.id);
-  }
+  // Completar cancha/hora si faltan (torneos previos o TBD sin slot).
+  const { programarPartidosZonaPendientes } = await import(
+    "./programacionPartidos"
+  );
+  await programarPartidosZonaPendientes(torneoId, nombreZona);
 }
 
 export async function avanzarPartidosInternosTodasLasZonasCuatro(

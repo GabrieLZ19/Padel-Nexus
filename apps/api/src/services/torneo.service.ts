@@ -5,7 +5,10 @@ import {
   FAP_ESTADOS_TORNEO,
   FAP_REGLAS,
 } from "../constants/fap";
-import { enrichInscripcionDenominacion } from "../utils/denominacionNacional";
+import {
+  enrichInscripcionDenominacion,
+  etiquetaInstitucion,
+} from "../utils/denominacionNacional";
 import { inscripcionAbiertaPorFechas } from "../utils/inscripcionElegibilidad";
 import {
   avanzarPartidosInternosZonaCuatro,
@@ -32,10 +35,6 @@ function mapInscripcionPartido(ins: Record<string, unknown>) {
 
   const club1 = perfiles?.clubes?.nombre;
   const club2 = perfilesJ2?.clubes?.nombre;
-  let clubName: string | null = null;
-  if (club1 && club2) clubName = `${club1} / ${club2}`;
-  else if (club1) clubName = club1;
-  else if (club2) clubName = club2;
 
   const enriched = enrichInscripcionDenominacion({
     letra_prioridad: ins.letra_prioridad as string | null | undefined,
@@ -48,7 +47,8 @@ function mapInscripcionPartido(ins: Record<string, unknown>) {
   return {
     jugador1_nombre: (ins.jugador1_nombre as string | null) ?? null,
     jugador2_nombre: (ins.jugador2_nombre as string | null) ?? null,
-    clubName: clubName || "Sin club asignado",
+    // Institución / Club = provincia + letra (denominación nacional).
+    clubName: etiquetaInstitucion(enriched),
     club1: club1 || null,
     club2: club2 || null,
     avatar_j1: perfiles?.avatar_url || null,
@@ -1421,6 +1421,15 @@ export class TorneoService {
             }
           }
         }
+      }
+
+      // Solo en partidos de llave: al completar ambos lados del siguiente cruce,
+      // asignar cancha/hora con el mismo descanso FAP que en zonas.
+      if (!partido.ronda.toUpperCase().startsWith("ZONA")) {
+        const { programarPartidosLlavePendientes } = await import(
+          "../utils/programacionPartidos"
+        );
+        await programarPartidosLlavePendientes(partido.torneo_id);
       }
     }
 
