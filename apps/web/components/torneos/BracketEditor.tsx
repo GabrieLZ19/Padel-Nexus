@@ -28,6 +28,7 @@ import {
 } from "@/utils/constants/fapApaRules";
 import { generarPdfZonas } from "@/utils/grillaPdf";
 import { textoClasificacionZonas, zonaGrupoCompleta } from "@/utils/clasificacionZonas";
+import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 
 interface BracketEditorProps {
   torneoId: string;
@@ -132,12 +133,18 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           seed: gp.seed,
           jugador1_nombre: gp.inscripciones.jugador1_nombre,
           jugador2_nombre: gp.inscripciones.jugador2_nombre,
-          club: gp.clubName || "Sin club asignado",
+          club: etiquetaInstitucion({
+            denominacion_nacional: gp.inscripciones?.denominacion_nacional,
+            provincia: gp.inscripciones?.provincia,
+            letra_prioridad: gp.inscripciones?.letra_prioridad,
+          }),
           cabezaDeSerie: gp.cabezaDeSerie,
           usuario_id: gp.inscripciones?.usuario_id ?? null,
           usuario2_id: gp.inscripciones?.usuario2_id ?? null,
           denominacion_nacional:
             gp.inscripciones?.denominacion_nacional ?? null,
+          provincia: gp.inscripciones?.provincia ?? null,
+          letra_prioridad: gp.inscripciones?.letra_prioridad ?? null,
         })),
       }));
       setZonas(formattedZonas);
@@ -280,7 +287,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           jugador1_nombre: p.equipo_a_j1 ?? "",
           jugador2_nombre: p.equipo_a_j2 ?? null,
           seed: idx * 2 + 1,
-          club: p.equipo_a_club || "Sin club asignado",
+          club: etiquetaInstitucion({
+            denominacion_nacional: p.equipo_a_denominacion,
+          }),
           usuario_id: p.equipo_a_usuario_id ?? null,
           usuario2_id: p.equipo_a_usuario2_id ?? null,
           denominacion_nacional: p.equipo_a_denominacion ?? null,
@@ -292,7 +301,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           jugador1_nombre: p.equipo_b_j1 ?? "",
           jugador2_nombre: p.equipo_b_j2 ?? null,
           seed: idx * 2 + 2,
-          club: p.equipo_b_club || "Sin club asignado",
+          club: etiquetaInstitucion({
+            denominacion_nacional: p.equipo_b_denominacion,
+          }),
           usuario_id: p.equipo_b_usuario_id ?? null,
           usuario2_id: p.equipo_b_usuario2_id ?? null,
           denominacion_nacional: p.equipo_b_denominacion ?? null,
@@ -323,6 +334,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           usuario_id: ins.usuario_id ?? null,
           usuario2_id: ins.usuario2_id ?? null,
           denominacion_nacional: ins.denominacion_nacional ?? null,
+          provincia: ins.provincia ?? null,
+          letra_prioridad: ins.letra_prioridad ?? null,
         })),
       });
     }

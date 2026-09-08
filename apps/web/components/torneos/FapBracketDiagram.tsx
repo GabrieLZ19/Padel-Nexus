@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useMemo, useState, useCallback } from "react";
-import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import React, { useMemo, useState, useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { ZoomIn, ZoomOut, Maximize2, Minimize2, X } from "lucide-react";
 import type { Partido } from "@/utils/types";
 import { MatchCard } from "./MatchCard";
 import { PairDisplay, esAlcanceNacional } from "@/components/torneos/PairDisplay";
@@ -22,6 +23,8 @@ type Props = {
   cabezasSerieIds?: Set<string>;
   interactive?: boolean;
   onMatchClick?: (partido: Partido) => void;
+  /** Vista pública / mobile: zoom inicial más bajo y tipografía compacta. */
+  compact?: boolean;
 };
 
 const SLOT = 220;
@@ -79,13 +82,66 @@ export function FapBracketDiagram({
   cabezasSerieIds,
   interactive = false,
   onMatchClick,
+  compact = false,
 }: Props) {
-  const [zoom, setZoom] = useState(1);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const layoutWidthRef = useRef(0);
+  const zoomTouchedRef = useRef(false);
+  const initialFitDoneRef = useRef(false);
+  const [zoom, setZoom] = useState(compact ? 0.48 : 1);
+  const [mobile, setMobile] = useState(compact);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const apply = () => setMobile(mq.matches || compact);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [compact]);
 
   const bumpZoom = useCallback((delta: number) => {
+    zoomTouchedRef.current = true;
     setZoom((z) =>
       Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((z + delta) * 100) / 100)),
     );
+  }, []);
+
+  const setZoomManual = useCallback((next: number) => {
+    zoomTouchedRef.current = true;
+    setZoom(
+      Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(next * 100) / 100)),
+    );
+  }, []);
+
+  const fitWidth = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || !layoutWidthRef.current) return;
+    const available = el.clientWidth - 8;
+    const next = Math.min(
+      1,
+      Math.max(ZOOM_MIN, available / layoutWidthRef.current),
+    );
+    setZoom(Math.round(next * 100) / 100);
+  }, []);
+
+  const fitWidthFromUser = useCallback(() => {
+    zoomTouchedRef.current = true;
+    fitWidth();
+  }, [fitWidth]);
+
+  const openFullscreen = useCallback(() => {
+    setFullscreen(true);
+  }, []);
+
+  const closeFullscreen = useCallback(() => {
+    setFullscreen(false);
   }, []);
 
   const layout = useMemo(() => {
@@ -190,6 +246,39 @@ export function FapBracketDiagram({
     };
   }, [matches, partidos]);
 
+  useEffect(() => {
+    if (layout) layoutWidthRef.current = layout.width;
+  }, [layout]);
+
+  // Solo un auto-ajuste inicial en mobile; no pisar el zoom del usuario
+  // cuando refrescan partidos / cambia el layout.
+  useEffect(() => {
+    if (!layout || !(compact || mobile) || fullscreen) return;
+    if (zoomTouchedRef.current || initialFitDoneRef.current) return;
+    const t = window.setTimeout(() => {
+      fitWidth();
+      initialFitDoneRef.current = true;
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, [layout, compact, mobile, fitWidth, fullscreen]);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeFullscreen();
+    };
+    window.addEventListener("keydown", onKey);
+    // Ajustar una sola vez al abrir fullscreen; después el usuario manda.
+    const t = window.setTimeout(() => fitWidth(), 80);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+      window.clearTimeout(t);
+    };
+  }, [fullscreen, closeFullscreen, fitWidth]);
+
   if (!layout || matches.length === 0) {
     return (
       <div className="text-center p-10 text-gray-500 text-sm border border-dashed border-white/10 rounded-2xl">
@@ -202,18 +291,36 @@ export function FapBracketDiagram({
   const inkHi = "rgba(203,254,1,0.55)";
   const nacional = esAlcanceNacional(alcance);
 
-  return (
-    <div className="rounded-2xl border border-brand-input bg-brand-card overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-brand-input bg-brand-input/40">
-        <div className="flex items-center gap-2">
+  const shell = (
+    <div
+      className={
+        fullscreen
+          ? "fixed inset-0 z-[220] flex flex-col bg-[#0a0a0a]"
+          : "rounded-2xl border border-brand-input bg-brand-card overflow-hidden"
+      }
+      role={fullscreen ? "dialog" : undefined}
+      aria-modal={fullscreen || undefined}
+      aria-label={fullscreen ? "Cuadro FAP a pantalla completa" : undefined}
+    >
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-brand-input bg-brand-input/40 ${
+          fullscreen ? "shrink-0" : ""
+        }`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
           <span className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-chartreuse">
             Plantilla FAP
           </span>
           {pairCount != null && (
-            <span className="text-xs font-bold text-gray-400">
+            <span className="text-xs font-bold text-gray-400 truncate">
               {pairCount} parejas · orden oficial
             </span>
           )}
+          {fullscreen ? (
+            <span className="hidden sm:inline text-[10px] text-gray-500">
+              Esc para cerrar
+            </span>
+          ) : null}
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-gray-500 hidden sm:inline mr-1">
@@ -231,7 +338,7 @@ export function FapBracketDiagram({
           </button>
           <button
             type="button"
-            onClick={() => setZoom(1)}
+            onClick={() => setZoomManual(1)}
             className="min-w-[3.25rem] h-8 rounded-lg border border-brand-input bg-brand-input/50 px-2 text-[11px] font-black tabular-nums text-brand-chartreuse hover:border-brand-chartreuse/40 transition-colors"
             aria-label="Restablecer zoom"
             title="Restablecer (100%)"
@@ -250,18 +357,46 @@ export function FapBracketDiagram({
           </button>
           <button
             type="button"
-            onClick={() => setZoom(0.5)}
+            onClick={fitWidthFromUser}
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-brand-input bg-brand-input/50 text-gray-300 hover:text-brand-chartreuse hover:border-brand-chartreuse/40 transition-colors"
-            aria-label="Ver cuadro completo"
-            title="Vista amplia (50%)"
+            aria-label="Ajustar al ancho"
+            title="Ajustar al ancho"
           >
-            <Maximize2 className="h-3.5 w-3.5" />
+            <Minimize2 className="h-3.5 w-3.5" />
           </button>
+          {fullscreen ? (
+            <button
+              type="button"
+              onClick={closeFullscreen}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-brand-chartreuse/40 bg-brand-chartreuse/15 text-brand-chartreuse hover:bg-brand-chartreuse/25 transition-colors"
+              aria-label="Cerrar pantalla completa"
+              title="Cerrar (Esc)"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={openFullscreen}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-brand-chartreuse/40 bg-brand-chartreuse/15 text-brand-chartreuse hover:bg-brand-chartreuse/25 transition-colors"
+              aria-label="Abrir en pantalla completa"
+              title="Pantalla completa"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
       <div
-        className="overflow-auto pb-2 max-h-[min(78vh,920px)]"
+        ref={scrollRef}
+        className={`overflow-auto overscroll-x-contain touch-pan-x touch-pan-y pb-2 ${
+          fullscreen
+            ? "flex-1 min-h-0"
+            : mobile
+              ? "max-h-[min(70vh,640px)]"
+              : "max-h-[min(78vh,920px)]"
+        }`}
         onWheel={(e) => {
           if (!(e.ctrlKey || e.metaKey)) return;
           e.preventDefault();
@@ -518,4 +653,22 @@ export function FapBracketDiagram({
       </div>
     </div>
   );
+
+  if (fullscreen && portalReady) {
+    return (
+      <>
+        <div
+          className={`rounded-2xl border border-dashed border-white/10 bg-black/20 ${
+            mobile ? "h-[min(70vh,640px)]" : "h-[min(78vh,420px)]"
+          } flex items-center justify-center text-xs text-gray-500`}
+          aria-hidden
+        >
+          Cuadro en pantalla completa…
+        </div>
+        {createPortal(shell, document.body)}
+      </>
+    );
+  }
+
+  return shell;
 }

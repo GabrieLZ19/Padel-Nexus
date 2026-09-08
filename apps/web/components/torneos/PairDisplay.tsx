@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { PlayerAvatar, splitPlayerName } from "@/components/torneos/MatchTeamBox";
+import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 
 export function esAlcanceNacional(alcance?: string | null): boolean {
   return /nacional/i.test(String(alcance || "").trim());
@@ -60,6 +61,8 @@ export type PairDisplayProps = {
   avatarJ1?: string | null;
   avatarJ2?: string | null;
   denominacion?: string | null;
+  provincia?: string | null;
+  letra_prioridad?: string | null;
   alcanceNacional?: boolean;
   won?: boolean;
   align?: "left" | "right";
@@ -82,6 +85,8 @@ export function PairDisplay({
   avatarJ1,
   avatarJ2,
   denominacion,
+  provincia,
+  letra_prioridad,
   alcanceNacional = false,
   won = false,
   align = "left",
@@ -91,9 +96,17 @@ export function PairDisplay({
   variant = "stacked",
 }: PairDisplayProps) {
   const [expanded, setExpanded] = useState(false);
-  const empty = !j1 && !j2 && !denominacion;
+  const denomRaw = etiquetaInstitucion({
+    denominacion_nacional: denominacion,
+    provincia,
+    letra_prioridad,
+  });
+  // Sin provincia/letra: no hay error; se muestran nombres (fallback seguro).
+  const denomLabel = denomRaw === "Sin denominación" ? "" : denomRaw;
+  const empty = !j1 && !j2 && !denomLabel;
   const hasJ2 = Boolean(j2 && j2 !== "-");
-  const useDenominacion = Boolean(denominacion?.trim());
+  // Nacional + denominación → chip colapsable; si faltan datos → solo nombres (sin error).
+  const useDenominacion = Boolean(denomLabel) && alcanceNacional;
   const isRight = align === "right";
 
   if (empty) {
@@ -172,11 +185,11 @@ export function PairDisplay({
     return (
       <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
         <span
-          className={`font-black uppercase tracking-wide text-[11px] sm:text-xs shrink-0 ${
+          className={`font-black tracking-wide text-[11px] sm:text-xs shrink-0 ${
             won ? "text-brand-chartreuse" : "text-brand-white"
           }`}
         >
-          {denominacion}
+          {denomLabel}
         </span>
         <span className="text-gray-600 font-medium">·</span>
         <PlayerNameLink
@@ -214,13 +227,14 @@ export function PairDisplay({
             : "bg-brand-input text-brand-white hover:bg-brand-input/80"
         } ${isRight ? "flex-row-reverse" : ""}`}
         aria-expanded={expanded}
+        title={expanded ? "Ocultar nombres" : "Ver nombres de la pareja"}
       >
         <span
-          className={`font-black uppercase tracking-wide truncate ${
+          className={`font-black tracking-wide truncate ${
             compact ? "text-[11px]" : "text-xs sm:text-sm"
           }`}
         >
-          {denominacion}
+          {denomLabel}
         </span>
         <ChevronDown
           className={`size-3.5 shrink-0 opacity-70 transition-transform ${
@@ -228,7 +242,9 @@ export function PairDisplay({
           }`}
         />
       </button>
-      {expanded ? <div className="mt-2">{namesBlock}</div> : null}
+      {expanded ? (
+        <div className={`mt-1.5 ${compact ? "pl-1" : "pl-2"}`}>{namesBlock}</div>
+      ) : null}
     </div>
   );
 }

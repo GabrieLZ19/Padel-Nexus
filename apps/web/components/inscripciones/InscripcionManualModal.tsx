@@ -229,7 +229,7 @@ export default function InscripcionManualModal({
                       className="py-2.5! text-sm!"
                     />
                     <p className="text-[10px] text-gray-500 mt-1.5">
-                      Se mostrará como provincia + letra (ej. NEUQUÉN A) según la
+                      Se mostrará como provincia + letra (ej. NEUQUÉN A, BUENOS AIRES C) según la
                       residencia del jugador 1.
                     </p>
                   </div>

@@ -10,3 +10,4 @@ node_modules
 
 .cursor/
 *.pdf
+.tmp_docs/

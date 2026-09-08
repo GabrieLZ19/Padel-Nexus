@@ -14,6 +14,7 @@ import {
   esAlcanceNacional,
 } from "@/components/torneos/PairDisplay";
 import { clasificadosPorZona } from "@/utils/clasificacionZonas";
+import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 
 export interface ParejaStats {
   inscripcionId: string;
@@ -37,6 +38,8 @@ export interface ParejaStats {
   usuario_id?: string | null;
   usuario2_id?: string | null;
   denominacion_nacional?: string | null;
+  provincia?: string | null;
+  letra_prioridad?: string | null;
 }
 
 interface TablaPosicionesZonaProps {
@@ -51,6 +54,8 @@ interface TablaPosicionesZonaProps {
     usuario_id?: string | null;
     usuario2_id?: string | null;
     denominacion_nacional?: string | null;
+    provincia?: string | null;
+    letra_prioridad?: string | null;
   }[];
   partidosZona: Partido[];
   alcance?: string | null;
@@ -93,7 +98,11 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
       map[p.id] = {
         inscripcionId: p.id,
         nombre,
-        club: p.club || "Sin club asignado",
+        club: etiquetaInstitucion({
+          denominacion_nacional: p.denominacion_nacional,
+          provincia: p.provincia,
+          letra_prioridad: p.letra_prioridad,
+        }),
         pts: 0,
         pj: 0,
         pg: 0,
@@ -112,6 +121,8 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
         usuario_id: p.usuario_id,
         usuario2_id: p.usuario2_id,
         denominacion_nacional: p.denominacion_nacional,
+        provincia: p.provincia,
+        letra_prioridad: p.letra_prioridad,
       };
     });
 
@@ -309,32 +320,29 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
                       >
                         {idx + 1}
                       </span>
-                      <div className="min-w-0">
-                        <div className="font-extrabold text-white text-xs flex flex-wrap items-center gap-1.5">
-                          <PairDisplay
-                            j1={row.jugador1_nombre}
-                            j2={row.jugador2_nombre}
-                            usuarioId={row.usuario_id}
-                            usuario2Id={row.usuario2_id}
-                            denominacion={row.denominacion_nacional}
-                            alcanceNacional={nacional}
-                            showAvatars={false}
-                            variant="inline"
-                            compact
-                          />
-                          {row.cabezaDeSerie && (
-                            <span className="inline-flex items-center gap-0.5 shrink-0 text-[8px] font-black text-amber-300 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                              <Star className="size-2.5 fill-amber-300" />
-                              Cab. Serie
-                            </span>
-                          )}
-                          {isClasificado && (
-                            <CheckCircle2 className="size-3.5 text-brand-chartreuse shrink-0" />
-                          )}
-                        </div>
-                        <p className="text-[10px] text-gray-500 font-bold truncate">
-                          {row.club}
-                        </p>
+                      <div className="min-w-0 flex items-start gap-1.5 flex-wrap">
+                        <PairDisplay
+                          j1={row.jugador1_nombre}
+                          j2={row.jugador2_nombre}
+                          usuarioId={row.usuario_id}
+                          usuario2Id={row.usuario2_id}
+                          denominacion={row.denominacion_nacional}
+                          provincia={row.provincia}
+                          letra_prioridad={row.letra_prioridad}
+                          alcanceNacional={nacional}
+                          showAvatars={false}
+                          variant="stacked"
+                          compact
+                        />
+                        {row.cabezaDeSerie && (
+                          <span className="inline-flex items-center gap-0.5 shrink-0 text-[8px] font-black text-amber-300 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
+                            <Star className="size-2.5 fill-amber-300" />
+                            Cab. Serie
+                          </span>
+                        )}
+                        {isClasificado && (
+                          <CheckCircle2 className="size-3.5 text-brand-chartreuse shrink-0 mt-1" />
+                        )}
                       </div>
                     </div>
                   </td>

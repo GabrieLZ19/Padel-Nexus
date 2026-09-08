@@ -2,6 +2,7 @@
 
 import React from "react";
 import { User, CheckCircle2 } from "lucide-react";
+import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 
 export function splitPlayerName(full?: string | null): {
   apellido: string;
@@ -123,6 +124,9 @@ export function TeamBox({
   compact?: boolean;
 }) {
   const isRight = align === "right";
+  const institucion = etiquetaInstitucion({
+    denominacion_nacional: club,
+  });
   return (
     <div
       className={`rounded-lg border px-2.5 py-2.5 min-w-0 h-full ${
@@ -139,8 +143,8 @@ export function TeamBox({
         {isWinner && (
           <CheckCircle2 className="size-3.5 text-brand-chartreuse shrink-0" />
         )}
-        <p className="text-[9px] font-black uppercase tracking-wider text-rose-500 truncate">
-          {club && club !== "Sin club asignado" ? club : "Sin club"}
+        <p className="text-[9px] font-black tracking-wider text-rose-500 truncate">
+          {institucion}
         </p>
       </div>
       <div className={`space-y-1.5 ${compact ? "space-y-1" : ""}`}>

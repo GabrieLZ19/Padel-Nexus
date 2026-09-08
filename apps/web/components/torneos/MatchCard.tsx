@@ -94,7 +94,7 @@ export const MatchCard = ({
           ) : null}
           {!origen && !esCabezaSerie && empty ? (
             <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">
-              {esBye ? "Bye" : "Libre"}
+              {esBye ? "BYE" : "Libre"}
             </span>
           ) : null}
         </div>
@@ -106,7 +106,7 @@ export const MatchCard = ({
               {origen
                 ? "Por clasificar"
                 : esBye
-                  ? "Pase directo"
+                  ? "BYE"
                   : "Esperando rival…"}
             </p>
           </div>

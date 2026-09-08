@@ -27,6 +27,7 @@ import { GripVertical } from "lucide-react";
 import { MatchCard } from "./MatchCard";
 import { Partido } from "@/utils/types";
 import { PairDisplay } from "@/components/torneos/PairDisplay";
+import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import {
   clasificadosPorZona,
   textoClasificacionZonas,
@@ -58,6 +59,8 @@ export interface ParejaDrag {
   usuario_id?: string | null;
   usuario2_id?: string | null;
   denominacion_nacional?: string | null;
+  provincia?: string | null;
+  letra_prioridad?: string | null;
 }
 
 export interface ZonaDrag {
@@ -117,7 +120,17 @@ export const SortablePareja = ({
 
   const j1 = cleanName(pareja.jugador1_nombre);
   const j2 = cleanName(pareja.jugador2_nombre);
-  const usaDenominacion = Boolean(pareja.denominacion_nacional);
+  const institucionLabel = (() => {
+    if (pareja.club === "Pase directo a Semis") return pareja.club;
+    return etiquetaInstitucion({
+      denominacion_nacional: pareja.denominacion_nacional,
+      provincia: pareja.provincia,
+      letra_prioridad: pareja.letra_prioridad,
+    });
+  })();
+  const usaDenominacion =
+    institucionLabel !== "Sin denominación" &&
+    institucionLabel !== "Pase directo a Semis";
 
   return (
     <div
@@ -150,33 +163,43 @@ export const SortablePareja = ({
       </div>
 
       <div className="flex-1 min-w-0 py-0.5">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <div className="text-[11.5px] font-black text-white uppercase leading-snug tracking-wide min-w-0">
+        <div className="flex flex-wrap items-start gap-1.5">
+          <div className="min-w-0">
             <PairDisplay
               j1={j1 || pareja.jugador1_nombre}
               j2={j2 || pareja.jugador2_nombre}
               usuarioId={pareja.usuario_id}
               usuario2Id={pareja.usuario2_id}
-              denominacion={pareja.denominacion_nacional}
+              denominacion={
+                institucionLabel !== "Sin denominación" &&
+                institucionLabel !== "Pase directo a Semis"
+                  ? institucionLabel
+                  : pareja.denominacion_nacional
+              }
+              provincia={pareja.provincia}
+              letra_prioridad={pareja.letra_prioridad}
               alcanceNacional={usaDenominacion}
               showAvatars={false}
-              variant="inline"
+              variant="stacked"
               compact
             />
+            {institucionLabel === "Pase directo a Semis" ||
+            institucionLabel === "Sin denominación" ? (
+              <div className="text-[10px] font-semibold text-gray-400 mt-1 truncate">
+                {institucionLabel}
+              </div>
+            ) : null}
           </div>
           {pareja.cabezaDeSerie && (
-            <span className="shrink-0 text-[8px] font-black text-[#ccff00] bg-[#ccff00]/10 border border-[#ccff00]/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+            <span className="shrink-0 text-[8px] font-black text-[#ccff00] bg-[#ccff00]/10 border border-[#ccff00]/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
               Cab. Serie
             </span>
           )}
           {isClassified && (
-            <span className="shrink-0 text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
+            <span className="shrink-0 text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider mt-0.5">
               Pasa
             </span>
           )}
-        </div>
-        <div className="text-[10px] font-semibold text-gray-400 mt-1 truncate">
-          {pareja.club || "Sin club asignado"}
         </div>
       </div>
 

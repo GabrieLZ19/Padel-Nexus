@@ -19,12 +19,28 @@ import { useProfileStore } from "@/store/useProfileStore";
 import { MatchCard } from "@/components/torneos/MatchCard";
 import { TablaPosicionesZona } from "@/components/torneos/TablaPosicionesZona";
 import PublicBracketView from "@/components/torneos/PublicBracketView";
+import {
+  FapBracketDiagram,
+  type FapMatrixMatch,
+} from "@/components/torneos/FapBracketDiagram";
 import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
 import {
   allChecksPassed,
   buildChecksElegibilidadJ1,
   isInscripcionTemporalmenteAbierta,
 } from "@/utils/inscripcionElegibilidad";
+import { etiquetaInstitucion } from "@/utils/denominacionNacional";
+
+const PLAYOFF_RONDAS = new Set([
+  "PRELIMINARES",
+  "32AVOS",
+  "16AVOS",
+  "OCTAVOS",
+  "CUARTOS",
+  "SEMIS",
+  "FINAL",
+  "LLAVE",
+]);
 
 export default function TorneoDetallePage() {
   const params = useParams();
@@ -37,6 +53,10 @@ export default function TorneoDetallePage() {
   const [activeTabPublica, setActiveTabPublica] = useState<"zonas" | "llaves">(
     "zonas",
   );
+  const [fapMatrixMatches, setFapMatrixMatches] = useState<FapMatrixMatch[]>(
+    [],
+  );
+  const [fapPairCount, setFapPairCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [isInscripcionOpen, setIsInscripcionModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -54,12 +74,20 @@ export default function TorneoDetallePage() {
       TorneosService.getById(torneoId),
       TorneosService.getPartidos(torneoId),
       TorneosService.getZonas(torneoId).catch(() => []),
+      TorneosService.getLlaveMatriz(torneoId).catch(() => null),
     ])
-      .then(([torneoData, partidosData, zonasData]) => {
+      .then(([torneoData, partidosData, zonasData, matrizData]) => {
         if (isMounted) {
           setTorneo(torneoData);
           setPartidos(partidosData || []);
           setZonas(zonasData || []);
+          if (matrizData?.supported && matrizData.matches?.length) {
+            setFapMatrixMatches(matrizData.matches);
+            setFapPairCount(matrizData.pairCount ?? null);
+          } else {
+            setFapMatrixMatches([]);
+            setFapPairCount(null);
+          }
           setLoading(false);
         }
       })
@@ -76,10 +104,10 @@ export default function TorneoDetallePage() {
         TorneosService.getPartidos(torneoId).then(
           (p) => isMounted && setPartidos(p || []),
         );
-        TorneosService.getZonas(torneoId).then(
-          (z) => isMounted && setZonas(z || []),
-        );
-      }, 500);
+        TorneosService.getZonas(torneoId)
+          .then((z) => isMounted && setZonas(z || []))
+          .catch(() => undefined);
+      }, 1200);
     };
 
     const handleWebsocketTorneo = (e: any) => {
@@ -98,10 +126,17 @@ export default function TorneoDetallePage() {
     const handleWebsocketBracket = (e: any) => {
       const data = e.detail;
       if (data?.torneo_id === torneoId) {
+        // Refrescar datos sin forzar el tab Cuadro: el jugador puede quedarse en Grupos.
         debouncedRefreshPartidos();
-        if (data?.fase === "llaves_principales_generadas" && isMounted) {
-          setActiveTabPublica("llaves");
-        }
+        TorneosService.getLlaveMatriz(torneoId)
+          .then((matrizData) => {
+            if (!isMounted) return;
+            if (matrizData?.supported && matrizData.matches?.length) {
+              setFapMatrixMatches(matrizData.matches);
+              setFapPairCount(matrizData.pairCount ?? null);
+            }
+          })
+          .catch(() => undefined);
       }
     };
 
@@ -402,12 +437,20 @@ export default function TorneoDetallePage() {
                           id: gp.inscripcion_id,
                           jugador1_nombre: gp.inscripciones?.jugador1_nombre,
                           jugador2_nombre: gp.inscripciones?.jugador2_nombre,
-                          club: gp.clubName || "Sin club asignado",
+                          club: etiquetaInstitucion({
+                            denominacion_nacional:
+                              gp.inscripciones?.denominacion_nacional,
+                            provincia: gp.inscripciones?.provincia,
+                            letra_prioridad: gp.inscripciones?.letra_prioridad,
+                          }),
                           cabezaDeSerie: gp.cabezaDeSerie,
                           usuario_id: gp.inscripciones?.usuario_id ?? null,
                           usuario2_id: gp.inscripciones?.usuario2_id ?? null,
                           denominacion_nacional:
                             gp.inscripciones?.denominacion_nacional ?? null,
+                          provincia: gp.inscripciones?.provincia ?? null,
+                          letra_prioridad:
+                            gp.inscripciones?.letra_prioridad ?? null,
                         }),
                       );
 
@@ -433,6 +476,37 @@ export default function TorneoDetallePage() {
                         </div>
                       );
                     })}
+                  </div>
+                ) : fapMatrixMatches.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-black text-white tracking-wide">
+                          Cuadro principal
+                        </h3>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          Plantilla FAP
+                          {fapPairCount ? ` · ${fapPairCount} parejas` : ""}
+                          {isFinalizado ? " · finalizado" : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="relative rounded-2xl border border-white/8 bg-[#0f0f0f] overflow-hidden">
+                      <div className="relative p-3 sm:p-5 overflow-x-auto">
+                        <FapBracketDiagram
+                          matches={fapMatrixMatches}
+                          partidos={partidos.filter((p) =>
+                            PLAYOFF_RONDAS.has(
+                              String(p.ronda || "").toUpperCase().trim(),
+                            ),
+                          )}
+                          pairCount={fapPairCount ?? undefined}
+                          alcance={torneo.alcance}
+                          interactive={false}
+                          compact
+                        />
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <PublicBracketView

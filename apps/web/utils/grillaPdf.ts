@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
 import { Partido, Torneo } from "@/utils/types";
 
@@ -10,6 +11,29 @@ const PDF_SLATE_100: Rgb = [241, 245, 249];
 const PDF_SLATE_300: Rgb = [203, 213, 225];
 const PDF_SLATE_500: Rgb = [100, 116, 139];
 const PDF_MUTED: Rgb = [186, 198, 214];
+
+/** PDF: Institución / Club = provincia + letra en mayúsculas (ej. NEUQUÉN A). */
+function textoInstitucionPdf(p: {
+  denominacion_nacional?: string | null;
+  club?: string | null;
+  provincia?: string | null;
+  letra_prioridad?: string | null;
+}): string {
+  const fromEtiqueta = etiquetaInstitucion({
+    denominacion_nacional: p.denominacion_nacional,
+    provincia: p.provincia,
+    letra_prioridad: p.letra_prioridad,
+  });
+  if (fromEtiqueta !== "Sin denominación") return fromEtiqueta;
+
+  // El editor a veces ya guarda la etiqueta FAP en `club` (ej. "BUENOS AIRES C").
+  const club = String(p.club || "").trim();
+  if (club && /\s[A-Za-z]$/.test(club) && !/^sin\s/i.test(club)) {
+    return etiquetaInstitucion({ denominacion_nacional: club });
+  }
+
+  return "Sin denominación";
+}
 
 function splitMatchSchedule(fechaIso?: string | null) {
   if (!fechaIso) {
@@ -967,6 +991,9 @@ export type ZonaPdfRow = {
     jugador1_nombre?: string | null;
     jugador2_nombre?: string | null;
     club?: string | null;
+    denominacion_nacional?: string | null;
+    provincia?: string | null;
+    letra_prioridad?: string | null;
     cabezaDeSerie?: boolean;
   }[];
 };
@@ -1095,7 +1122,7 @@ export function generarPdfZonas(
         seed: p.seed ?? null,
         j1: p.jugador1_nombre,
         j2: p.jugador2_nombre,
-        club: p.club,
+        club: textoInstitucionPdf(p),
         cs: Boolean(p.cabezaDeSerie),
         pj: 0,
         pg: 0,
@@ -1289,15 +1316,15 @@ export function generarPdfZonas(
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-    doc.text("COMPOSICION (orden de ranking / seed)", marginX + 2, y);
+    doc.text("COMPOSICION", marginX + 2, y);
     y += 4;
 
+    const parejaW = Math.floor((contentW - 8) * 0.55);
+    const institucionW = contentW - 8 - parejaW;
     const compCols = [
       { label: "#", w: 8 },
-      { label: isIndividual ? "Jugador" : "Pareja", w: 62 },
-      { label: "Institución / Club", w: 55 },
-      { label: "Seed", w: 14 },
-      { label: "Cabeza de serie", w: contentW - 8 - 62 - 55 - 14 },
+      { label: isIndividual ? "Jugador" : "Pareja", w: parejaW },
+      { label: "Institución / Club", w: institucionW },
     ];
     let cx = marginX;
     doc.setFillColor(SLATE_100[0], SLATE_100[1], SLATE_100[2]);
@@ -1338,12 +1365,12 @@ export function generarPdfZonas(
 
       const names = pairLabel(p.jugador1_nombre, p.jugador2_nombre);
       doc.setFontSize(7);
-      doc.text(names.line1.slice(0, 40), x + 2, y + (isIndividual ? 4.5 : 3.8));
+      doc.text(names.line1.slice(0, 48), x + 2, y + (isIndividual ? 4.5 : 3.8));
       if (!isIndividual && names.line2) {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(6.5);
         doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);
-        doc.text(names.line2.slice(0, 40), x + 2, y + 7.2);
+        doc.text(names.line2.slice(0, 48), x + 2, y + 7.2);
       }
       x += compCols[1].w;
 
@@ -1351,30 +1378,10 @@ export function generarPdfZonas(
       doc.setFontSize(7);
       doc.setTextColor(15, 23, 42);
       doc.text(
-        String(p.club || "—").slice(0, 36),
+        textoInstitucionPdf(p).slice(0, 42),
         x + 2,
         y + (isIndividual ? 4.5 : 5.5),
       );
-      x += compCols[2].w;
-
-      doc.setFont("helvetica", "bold");
-      doc.text(
-        p.seed != null ? String(p.seed) : "—",
-        x + compCols[3].w / 2,
-        y + (isIndividual ? 4.5 : 5.5),
-        { align: "center" },
-      );
-      x += compCols[3].w;
-
-      if (p.cabezaDeSerie) {
-        doc.setFillColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
-        doc.roundedRect(x + 1, y + (isIndividual ? 1.2 : 2), 26, 5, 1, 1, "F");
-        doc.setFontSize(5.5);
-        doc.setTextColor(15, 23, 42);
-        doc.text("Cabeza de serie", x + 14, y + (isIndividual ? 4.5 : 5.3), {
-          align: "center",
-        });
-      }
 
       y += rowH + 1;
     });
@@ -1679,7 +1686,11 @@ export function generarPdfZonas(
         });
         doc.setFont("helvetica", "normal");
         doc.setFontSize(6);
-        doc.text(String(s.club || "—").slice(0, 22), x + 2, y + rowH / 2 + 1.4);
+        doc.text(
+          String(s.club || "Sin denominación").slice(0, 22),
+          x + 2,
+          y + rowH / 2 + 1.4,
+        );
         y += rowH + 1;
       });
     }
