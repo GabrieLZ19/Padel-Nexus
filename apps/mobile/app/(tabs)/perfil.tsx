@@ -5,6 +5,7 @@ import { Pressable, Text, View } from "react-native";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useFocusEffect } from "@react-navigation/native";
 
+import { MinorModeBanner } from "@/src/components/legal/MinorModeBanner";
 import {
   SettingsNavRow,
   SettingsSection,
@@ -131,8 +132,9 @@ export default function PerfilTab() {
         </View>
       ) : (
         <View className="gap-6">
+          <MinorModeBanner />
           <View className="flex-row items-center gap-3 rounded-card border border-brand-border bg-brand-surface p-4">
-            {usuario?.avatar_url ? (
+            {usuario?.avatar_url && !usuario.es_menor ? (
               <Image
                 source={{ uri: usuario.avatar_url }}
                 style={{ width: 56, height: 56, borderRadius: 28 }}

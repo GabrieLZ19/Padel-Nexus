@@ -189,7 +189,9 @@ export function JugadorDetalleView({
     : perfil
       ? displayNameFromPerfil(perfil)
       : "Jugador";
-  const avatar = principal?.perfiles?.avatar_url || perfil?.avatar_url;
+  const avatar = perfil?.es_menor
+    ? null
+    : principal?.perfiles?.avatar_url || perfil?.avatar_url;
   const categoria =
     principal?.categoria ||
     principal?.perfiles?.categoria_padel ||

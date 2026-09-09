@@ -20,7 +20,9 @@ interface AuthState {
   hydrate: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
-  register: (payload: RegistroPayload) => Promise<void>;
+  register: (payload: RegistroPayload) => Promise<
+    import("@/src/types/user.types").RegistroResponse
+  >;
   logout: () => Promise<void>;
   setUsuario: (usuario: Perfil | null) => void;
 }
@@ -157,11 +159,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       void setCachedUser(session.usuario);
       set({ usuario: session.usuario, isAuthenticated: true });
     } catch {
-      throw new Error(
-        registro.mensaje ||
-          "Cuenta creada. Revisá tu email para confirmar y luego iniciá sesión.",
-      );
+      // Cuenta creada pero aún sin sesión (p.ej. email no confirmado)
     }
+    return registro;
   },
 
   logout: async () => {

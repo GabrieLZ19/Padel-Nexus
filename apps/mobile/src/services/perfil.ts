@@ -122,12 +122,11 @@ export const PerfilService = {
 
   async registrarUsuario(
     payload: RegistroPayload,
-  ): Promise<{ exito: boolean; mensaje: string }> {
+  ): Promise<import("@/src/types/user.types").RegistroResponse> {
     try {
-      const response = await api.post<{ exito: boolean; mensaje: string }>(
-        "/perfil/registro",
-        payload,
-      );
+      const response = await api.post<
+        import("@/src/types/user.types").RegistroResponse
+      >("/perfil/registro", payload);
       return response.data;
     } catch (error: unknown) {
       throw new Error(getErrorMessage(error, "No se pudo crear la cuenta."));
