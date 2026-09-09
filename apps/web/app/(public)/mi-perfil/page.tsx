@@ -20,6 +20,7 @@ import { useSocket } from "@/hooks/useSocket";
 import CredencialDigital from "@/components/perfil/CredencialDigital";
 import LicenciaModal from "@/components/perfil/LicenciaModal";
 import AfiliacionModal from "@/components/perfil/AfiliacionModal";
+import { MinorModeBanner } from "@/components/legal/MinorModeBanner";
 
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-white/5 rounded-3xl ${className}`} />
@@ -85,6 +86,8 @@ export default function PlayerDashboard() {
           Nueva Reserva
         </Link>
       </header>
+
+      <MinorModeBanner />
 
       {/* BENTO GRID — 12 columnas, sin espacio vacío */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 relative z-10">

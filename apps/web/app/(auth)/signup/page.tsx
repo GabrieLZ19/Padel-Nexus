@@ -73,6 +73,28 @@ export default function SignUpPage() {
     confirmPassword?: string;
   }>({});
   const [success, setSuccess] = useState(false);
+  const [parentalUrl, setParentalUrl] = useState<string | null>(null);
+  const [aceptaTyc, setAceptaTyc] = useState(false);
+  const [aceptaPrivacidad, setAceptaPrivacidad] = useState(false);
+  const [respNombre, setRespNombre] = useState("");
+  const [respApellido, setRespApellido] = useState("");
+  const [respDni, setRespDni] = useState("");
+  const [respEmail, setRespEmail] = useState("");
+  const [respTelefono, setRespTelefono] = useState("");
+  const [respVinculo, setRespVinculo] = useState("");
+
+  const calcularEsMenor = (fecha: string) => {
+    if (!fecha) return false;
+    const nacimiento = new Date(fecha);
+    if (Number.isNaN(nacimiento.getTime())) return false;
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - nacimiento.getFullYear();
+    const m = hoy.getMonth() - nacimiento.getMonth();
+    if (m < 0 || (m === 0 && hoy.getDate() < nacimiento.getDate())) edad -= 1;
+    return edad < 18;
+  };
+
+  const esMenorSignup = calcularEsMenor(fechaNacimiento);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -129,6 +151,38 @@ export default function SignUpPage() {
       newErrors.telefono = "Formato inválido (mín. 10 dígitos).";
     }
 
+    if (!fechaNacimiento) {
+      newErrors.residencia = newErrors.residencia; // keep shape
+      setError("La fecha de nacimiento es obligatoria.");
+      setLoading(false);
+      return;
+    }
+
+    if (!aceptaTyc || !aceptaPrivacidad) {
+      setError(
+        "Debés aceptar los Términos y Condiciones y la Política de Privacidad.",
+      );
+      setLoading(false);
+      return;
+    }
+
+    if (calcularEsMenor(fechaNacimiento)) {
+      if (
+        !respNombre.trim() ||
+        !respApellido.trim() ||
+        !respDni.trim() ||
+        !respEmail.trim() ||
+        !respTelefono.trim() ||
+        !respVinculo.trim()
+      ) {
+        setError(
+          "Para menores de 18 años completá todos los datos del responsable parental.",
+        );
+        setLoading(false);
+        return;
+      }
+    }
+
     if (!residencia) {
       newErrors.residencia = "La provincia es obligatoria.";
     }
@@ -176,14 +230,31 @@ export default function SignUpPage() {
         telefono: telefono.trim(),
         dni: dni.trim().replace(/\./g, ""),
         lugar_residencia: residencia,
-        fecha_nacimiento: fechaNacimiento || undefined,
+        fecha_nacimiento: fechaNacimiento,
         sexo: sexo || "masculino",
         categoria_padel: categoria,
         lado_preferido: ladoPreferido,
         avatar_base64: avatarBase64 || undefined,
+        acepta_tyc: aceptaTyc,
+        acepta_privacidad: aceptaPrivacidad,
+        responsable: calcularEsMenor(fechaNacimiento)
+          ? {
+              nombre: respNombre.trim(),
+              apellido: respApellido.trim(),
+              dni: respDni.trim().replace(/\./g, ""),
+              email: respEmail.trim(),
+              telefono: respTelefono.trim(),
+              vinculo: respVinculo.trim(),
+            }
+          : undefined,
       });
 
-      if (data.exito) setSuccess(true);
+      if (data.exito) {
+        setSuccess(true);
+        if (data.data?.parental?.consent_url) {
+          setParentalUrl(data.data.parental.consent_url);
+        }
+      }
     } catch (err: unknown) {
       if (isAxiosError(err)) {
         setError(
@@ -468,10 +539,36 @@ export default function SignUpPage() {
               <h3 className="text-2xl font-bold text-brand-white">
                 ¡Registro completado!
               </h3>
-              <p className="text-sm text-gray-300 max-w-md">
-                Enviamos un enlace de activación a tu correo electrónico. Por
-                favor, verificalo para activar tu ficha deportiva.
-              </p>
+              {parentalUrl ? (
+                <>
+                  <p className="text-sm text-gray-300 max-w-md">
+                    Detectamos que la cuenta es de un menor. Compartí este
+                    enlace con el responsable parental para completar el
+                    consentimiento (también podés copiarlo):
+                  </p>
+                  <div className="w-full rounded-xl border border-brand-white/10 bg-brand-black/40 p-3 text-left text-xs text-gray-200 break-all">
+                    {parentalUrl}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(parentalUrl);
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                    className="rounded-xl border border-brand-chartreuse/40 px-4 py-2 text-sm font-bold text-brand-chartreuse"
+                  >
+                    Copiar enlace
+                  </button>
+                </>
+              ) : (
+                <p className="text-sm text-gray-300 max-w-md">
+                  Enviamos un enlace de activación a tu correo electrónico. Por
+                  favor, verificalo para activar tu ficha deportiva.
+                </p>
+              )}
               <Link
                 href="/login"
                 className="mt-4 bg-brand-chartreuse text-brand-black font-bold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity"
@@ -637,12 +734,13 @@ export default function SignUpPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">
-                    Fecha de Nacimiento
+                    Fecha de Nacimiento *
                   </label>
                   <input
                     type="date"
                     value={fechaNacimiento}
                     onChange={(e) => setFechaNacimiento(e.target.value)}
+                    required
                     className="w-full bg-brand-input px-4 py-3.5 rounded-xl border border-white/10 text-white text-sm focus:border-brand-chartreuse outline-none cursor-pointer"
                   />
                 </div>
@@ -662,6 +760,61 @@ export default function SignUpPage() {
                   />
                 </div>
               </div>
+
+              {esMenorSignup ? (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-4">
+                  <div>
+                    <p className="text-sm font-bold text-amber-200">
+                      Cuenta de menor detectada
+                    </p>
+                    <p className="mt-1 text-xs text-amber-100/80">
+                      Por tu fecha de nacimiento, esta cuenta tendrá
+                      protecciones especiales. Completá los datos del
+                      responsable parental.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input
+                      placeholder="Nombre del responsable *"
+                      value={respNombre}
+                      onChange={(e) => setRespNombre(e.target.value)}
+                      className={getInputStyles()}
+                    />
+                    <input
+                      placeholder="Apellido del responsable *"
+                      value={respApellido}
+                      onChange={(e) => setRespApellido(e.target.value)}
+                      className={getInputStyles()}
+                    />
+                    <input
+                      placeholder="DNI del responsable *"
+                      value={respDni}
+                      onChange={(e) => setRespDni(e.target.value)}
+                      className={getInputStyles()}
+                    />
+                    <input
+                      placeholder="Vínculo (madre/padre/tutor) *"
+                      value={respVinculo}
+                      onChange={(e) => setRespVinculo(e.target.value)}
+                      className={getInputStyles()}
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email del responsable *"
+                      value={respEmail}
+                      onChange={(e) => setRespEmail(e.target.value)}
+                      className={getInputStyles()}
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Teléfono del responsable *"
+                      value={respTelefono}
+                      onChange={(e) => setRespTelefono(e.target.value)}
+                      className={getInputStyles()}
+                    />
+                  </div>
+                </div>
+              ) : null}
 
               {/* Fila 3: Provincia & Lado Preferido */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -836,6 +989,47 @@ export default function SignUpPage() {
                     </p>
                   )}
                 </div>
+              </div>
+
+              <div className="space-y-3 rounded-xl border border-brand-white/10 p-4">
+                <label className="flex items-start gap-3 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={aceptaTyc}
+                    onChange={(e) => setAceptaTyc(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span>
+                    Acepto los{" "}
+                    <Link
+                      href="/terminos"
+                      target="_blank"
+                      className="text-brand-chartreuse underline"
+                    >
+                      Términos y Condiciones
+                    </Link>
+                    .
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={aceptaPrivacidad}
+                    onChange={(e) => setAceptaPrivacidad(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span>
+                    Acepto la{" "}
+                    <Link
+                      href="/privacidad"
+                      target="_blank"
+                      className="text-brand-chartreuse underline"
+                    >
+                      Política de Privacidad
+                    </Link>
+                    .
+                  </span>
+                </label>
               </div>
 
               <motion.button

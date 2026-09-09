@@ -22,11 +22,35 @@ export interface RegistroPayload {
   telefono: string;
   dni: string;
   lugar_residencia: string;
-  fecha_nacimiento?: string;
+  fecha_nacimiento: string;
   sexo?: string;
   categoria_padel: string;
   lado_preferido: string;
   avatar_base64?: string;
+  acepta_tyc: boolean;
+  acepta_privacidad: boolean;
+  responsable?: {
+    nombre: string;
+    apellido: string;
+    dni: string;
+    email: string;
+    telefono: string;
+    vinculo: string;
+  };
+}
+
+export interface RegistroResponse {
+  exito: boolean;
+  mensaje: string;
+  data?: {
+    es_menor?: boolean;
+    cuenta_estado?: string;
+    parental?: {
+      token: string;
+      consent_url: string;
+      expires_at: string;
+    } | null;
+  };
 }
 
 export const PerfilService = {
@@ -97,10 +121,8 @@ export const PerfilService = {
   /**
    * Registra una nueva ficha de jugador federado con la estructura relacional FAP
    */
-  async registrarUsuario(
-    datos: RegistroPayload,
-  ): Promise<{ exito: boolean; mensaje: string }> {
-    const response = await api.post<{ exito: boolean; mensaje: string }>(
+  async registrarUsuario(datos: RegistroPayload): Promise<RegistroResponse> {
+    const response = await api.post<RegistroResponse>(
       "/perfil/registro",
       datos,
     );

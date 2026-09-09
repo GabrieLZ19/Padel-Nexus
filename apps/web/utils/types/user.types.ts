@@ -61,6 +61,10 @@ export interface Perfil {
   // Relaciones
   licencias?: Licencia[];
   afiliaciones?: Afiliacion[];
+  es_menor?: boolean;
+  cuenta_estado?: string | null;
+  perfil_publico_habilitado?: boolean;
+  marketing_opt_in?: boolean;
 }
 
 export interface LogAuditoria {
