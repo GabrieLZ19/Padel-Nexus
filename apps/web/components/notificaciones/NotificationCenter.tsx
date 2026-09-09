@@ -30,6 +30,12 @@ export default function NotificationCenter() {
   const isMarketplacePromo = (notif: Notificacion) =>
     notif.metadata?.origen === "marketplace_promo";
 
+  const isComunicacionesCampana = (notif: Notificacion) =>
+    notif.metadata?.origen === "comunicaciones_campana";
+
+  const isPromoLike = (notif: Notificacion) =>
+    isMarketplacePromo(notif) || isComunicacionesCampana(notif);
+
   // Cargar notificaciones históricas al montar
   useEffect(() => {
     if (!profile) return;
@@ -90,18 +96,22 @@ export default function NotificationCenter() {
     const actionUrl = notif.metadata?.action_url as string | undefined;
     if (actionUrl) {
       setIsOpen(false);
-      router.push(actionUrl);
+      if (/^https?:\/\//i.test(actionUrl)) {
+        window.location.assign(actionUrl);
+      } else {
+        router.push(actionUrl);
+      }
     }
   };
 
   const getTypeStyles = (notif: Notificacion) => {
-    if (isMarketplacePromo(notif)) {
+    if (isPromoLike(notif)) {
       return {
         icon: <Megaphone className="size-4 text-brand-chartreuse shrink-0" />,
         bg: "bg-brand-chartreuse/5",
         badge: "bg-brand-chartreuse/20 text-brand-chartreuse",
         accent: "bg-brand-chartreuse",
-        label: "Promo",
+        label: isComunicacionesCampana(notif) ? "Campaña" : "Promo",
       };
     }
 
@@ -279,6 +289,11 @@ export default function NotificationCenter() {
                             <span className="text-brand-chartreuse/90 font-medium">
                               {notif.metadata.nombre_tienda}
                             </span>
+                          </p>
+                        )}
+                        {isComunicacionesCampana(notif) && (
+                          <p className="text-[11px] text-gray-500 mt-1.5">
+                            Comunicación institucional
                           </p>
                         )}
                         <div className="flex items-center justify-between mt-2">

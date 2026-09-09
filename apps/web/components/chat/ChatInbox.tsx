@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Users,
   Calendar,
+  UserPlus,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -25,6 +26,7 @@ import { sileo } from "sileo";
 import type { ChatConversacion, ChatMensaje } from "@/utils/types";
 import ChatMessageBubble from "@/components/chat/ChatMessageBubble";
 import ChatParticipantesBar from "@/components/chat/ChatParticipantesBar";
+import NuevoGrupoModal from "@/components/chat/NuevoGrupoModal";
 import {
   buscarParticipante,
   mapPartidoParticipantes,
@@ -36,7 +38,8 @@ export type ChatInboxTab =
   | "directos"
   | "soporte"
   | "marketplace"
-  | "partidos";
+  | "partidos"
+  | "grupos";
 
 interface ChatInboxProps {
   title?: string;
@@ -58,13 +61,19 @@ function tabForConv(conv: ChatConversacion): ChatInboxTab {
   switch (conv.tipo) {
     case "partido":
       return "partidos";
+    case "grupo":
+      return "grupos";
     case "marketplace":
       return "marketplace";
     case "soporte":
-      return "soporte";
+    case "directo":
     default:
       return "directos";
   }
+}
+
+function esConversacionGrupo(tipo: ChatConversacion["tipo"]) {
+  return tipo === "partido" || tipo === "grupo";
 }
 
 function buildMensajesUrl(convId?: string | null, tab?: ChatInboxTab) {
@@ -110,6 +119,7 @@ export default function ChatInbox({
   const [activeTab, setActiveTab] = useState<ChatInboxTab>(defaultTab);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [showMobileChat, setShowMobileChat] = useState(false);
+  const [showNuevoGrupo, setShowNuevoGrupo] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -139,11 +149,14 @@ export default function ChatInbox({
     if (
       tabParam === "todos" ||
       tabParam === "directos" ||
-      tabParam === "soporte" ||
       tabParam === "marketplace" ||
-      tabParam === "partidos"
+      tabParam === "partidos" ||
+      tabParam === "grupos"
     ) {
       setActiveTab(tabParam);
+    } else if (tabParam === "soporte") {
+      // Soporte ya no tiene tab propio: vive dentro de Directos / Todos
+      setActiveTab("directos");
     }
   }, [tabParam]);
 
@@ -398,16 +411,18 @@ export default function ChatInbox({
   const filteredConversaciones = conversaciones.filter((conv) => {
     const matchTab =
       activeTab === "todos" ||
-      (activeTab === "directos" && conv.tipo === "directo") ||
-      (activeTab === "soporte" && conv.tipo === "soporte") ||
+      (activeTab === "directos" &&
+        (conv.tipo === "directo" || conv.tipo === "soporte")) ||
       (activeTab === "marketplace" && conv.tipo === "marketplace") ||
-      (activeTab === "partidos" && conv.tipo === "partido");
+      (activeTab === "partidos" && conv.tipo === "partido") ||
+      (activeTab === "grupos" && conv.tipo === "grupo");
 
     const nombreParticipante =
       `${conv.otro_participante.nombre || ""} ${conv.otro_participante.apellido || ""}`.toLowerCase();
     const nombreProducto = (conv.producto?.nombre || "").toLowerCase();
     const nombreClub = (conv.partido?.club_nombre || "").toLowerCase();
     const nombreCancha = (conv.partido?.cancha_nombre || "").toLowerCase();
+    const nombreGrupo = (conv.nombre || "").toLowerCase();
     const q = searchQuery.toLowerCase();
 
     const matchSearch =
@@ -415,7 +430,8 @@ export default function ChatInbox({
       nombreParticipante.includes(q) ||
       nombreProducto.includes(q) ||
       nombreClub.includes(q) ||
-      nombreCancha.includes(q);
+      nombreCancha.includes(q) ||
+      nombreGrupo.includes(q);
 
     return matchTab && matchSearch;
   });
@@ -471,6 +487,9 @@ export default function ChatInbox({
   };
 
   const getConversationTitle = (conv: ChatConversacion) => {
+    if (conv.tipo === "grupo") {
+      return conv.nombre?.trim() || "Grupo";
+    }
     if (conv.tipo === "partido" && conv.partido) {
       return conv.partido.club_nombre || "Grupo de reserva";
     }
@@ -490,7 +509,9 @@ export default function ChatInbox({
   const participantesActivos: ChatParticipanteInfo[] =
     activeConv?.tipo === "partido" && activeConv.partido
       ? mapPartidoParticipantes(activeConv.partido.participantes)
-      : [];
+      : activeConv?.tipo === "grupo"
+        ? mapPartidoParticipantes(activeConv.participantes)
+        : [];
 
   const miParticipante: ChatParticipanteInfo | null = profile?.id
     ? buscarParticipante(participantesActivos, profile.id) || {
@@ -505,7 +526,7 @@ export default function ChatInbox({
     remitenteId: string,
   ): ChatParticipanteInfo | null => {
     if (!activeConv) return null;
-    if (activeConv.tipo === "partido") {
+    if (esConversacionGrupo(activeConv.tipo)) {
       return (
         buscarParticipante(participantesActivos, remitenteId) ||
         miParticipante
@@ -519,6 +540,23 @@ export default function ChatInbox({
       avatar_url: activeConv.otro_participante.avatar_url,
     };
   };
+
+  const handleGrupoCreado = useCallback(
+    async (conversacionId: string) => {
+      const actualizadas = await fetchConversaciones();
+      const grupoConv = actualizadas.find((c) => c.id === conversacionId);
+      if (!grupoConv) {
+        sileo.error({
+          title: "Error",
+          description: "El grupo se creó pero no se pudo abrir.",
+        });
+        return;
+      }
+      setActiveTab("grupos");
+      handleSelectConversacion(grupoConv);
+    },
+    [fetchConversaciones, handleSelectConversacion],
+  );
 
   const handleMensajePrivado = useCallback(
     async (userId: string) => {
@@ -560,10 +598,10 @@ export default function ChatInbox({
 
   const tabs: { key: ChatInboxTab; label: string }[] = [
     { key: "todos", label: "Todos" },
+    { key: "grupos", label: "Grupos" },
     { key: "partidos", label: "Reservas" },
     { key: "marketplace", label: "Ventas" },
     { key: "directos", label: "Directos" },
-    { key: "soporte", label: "Soporte" },
   ];
 
   const productoImagen =
@@ -593,12 +631,12 @@ export default function ChatInbox({
           }`}
         >
           <div className="px-4 pt-4 pb-2">
-            <div className="flex bg-brand-card p-1 rounded-xl border border-brand-white/5 overflow-x-auto">
+            <div className="flex bg-brand-card p-1 rounded-xl border border-brand-white/5 gap-0.5">
               {tabs.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => handleTabChange(tab.key)}
-                  className={`shrink-0 flex-1 min-w-[72px] py-2 px-2 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+                  className={`flex-1 py-2 px-1.5 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                     activeTab === tab.key
                       ? "bg-brand-chartreuse text-brand-black shadow-sm"
                       : "text-gray-400 hover:text-brand-white"
@@ -643,6 +681,17 @@ export default function ChatInbox({
             </div>
           )}
 
+          <div className="px-4 pb-2">
+            <button
+              type="button"
+              onClick={() => setShowNuevoGrupo(true)}
+              className="w-full bg-brand-white/5 hover:bg-brand-white/10 text-brand-white border border-brand-white/10 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <UserPlus className="size-3.5 text-brand-chartreuse" /> Nuevo
+              grupo
+            </button>
+          </div>
+
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="p-4 space-y-3">
@@ -680,7 +729,7 @@ export default function ChatInbox({
                   }`}
                 >
                   <div className="relative size-12 rounded-full bg-brand-card border border-brand-white/10 flex items-center justify-center shrink-0 overflow-hidden">
-                    {conv.tipo === "partido" ? (
+                    {esConversacionGrupo(conv.tipo) ? (
                       <Users className="size-5 text-brand-chartreuse" />
                     ) : conv.otro_participante.avatar_url ? (
                       <Image
@@ -705,6 +754,11 @@ export default function ChatInbox({
                     {conv.tipo === "partido" && (
                       <div className="absolute -bottom-0.5 -right-0.5 bg-brand-chartreuse rounded-full p-0.5">
                         <Calendar className="size-2.5 text-brand-black" />
+                      </div>
+                    )}
+                    {conv.tipo === "grupo" && (
+                      <div className="absolute -bottom-0.5 -right-0.5 bg-brand-chartreuse rounded-full p-0.5">
+                        <Users className="size-2.5 text-brand-black" />
                       </div>
                     )}
                   </div>
@@ -762,6 +816,14 @@ export default function ChatInbox({
                           : ""}
                       </span>
                     )}
+                    {conv.tipo === "grupo" && (
+                      <span className="inline-block mt-1 text-[9px] font-bold uppercase tracking-wider text-brand-chartreuse bg-brand-chartreuse/10 px-2 py-0.5 rounded-md border border-brand-chartreuse/20">
+                        Grupo
+                        {conv.participantes?.length
+                          ? ` · ${conv.participantes.length}`
+                          : ""}
+                      </span>
+                    )}
                   </div>
                 </button>
               ))
@@ -794,7 +856,7 @@ export default function ChatInbox({
                 </button>
 
                 <div className="relative size-9 md:size-10 rounded-full bg-brand-card border border-brand-white/10 flex items-center justify-center overflow-hidden shrink-0">
-                  {activeConv.tipo === "partido" ? (
+                  {esConversacionGrupo(activeConv.tipo) ? (
                     <Users className="size-4 text-brand-chartreuse" />
                   ) : activeConv.otro_participante.avatar_url ? (
                     <Image
@@ -816,6 +878,13 @@ export default function ChatInbox({
                     {activeConv.tipo === "partido" ? (
                       <span className="text-[9px] md:text-[10px] font-bold uppercase text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 md:px-2 py-0.5 rounded border border-brand-chartreuse/20">
                         Grupo de reserva
+                      </span>
+                    ) : activeConv.tipo === "grupo" ? (
+                      <span className="text-[9px] md:text-[10px] font-bold uppercase text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 md:px-2 py-0.5 rounded border border-brand-chartreuse/20">
+                        Grupo
+                        {participantesActivos.length
+                          ? ` · ${participantesActivos.length}`
+                          : ""}
                       </span>
                     ) : (
                       <span className="text-[9px] md:text-[10px] font-bold uppercase text-gray-500 bg-brand-white/5 px-1.5 md:px-2 py-0.5 rounded">
@@ -842,7 +911,7 @@ export default function ChatInbox({
                     )}
                 </div>
 
-                {activeConv.tipo === "partido" &&
+                {esConversacionGrupo(activeConv.tipo) &&
                   participantesActivos.length > 0 && (
                     <div className="hidden md:block shrink-0 max-w-[min(100%,280px)]">
                       <ChatParticipantesBar
@@ -857,7 +926,7 @@ export default function ChatInbox({
                   )}
                 </div>
 
-                {activeConv.tipo === "partido" &&
+                {esConversacionGrupo(activeConv.tipo) &&
                   participantesActivos.length > 0 && (
                     <div className="md:hidden mt-2.5 pt-2.5 border-t border-brand-white/5 -mx-1 px-1">
                       <ChatParticipantesBar
@@ -963,7 +1032,7 @@ export default function ChatInbox({
 
                 {mensajes.map((msg) => {
                   const esMio = msg.remitente_id === profile?.id;
-                  const esGrupo = activeConv.tipo === "partido";
+                  const esGrupo = esConversacionGrupo(activeConv.tipo);
                   return (
                     <ChatMessageBubble
                       key={msg.id}
@@ -1036,6 +1105,15 @@ export default function ChatInbox({
           )}
         </div>
       </div>
+
+      <NuevoGrupoModal
+        isOpen={showNuevoGrupo}
+        onClose={() => setShowNuevoGrupo(false)}
+        excludeUserId={profile?.id}
+        onCreated={(id) => {
+          void handleGrupoCreado(id);
+        }}
+      />
     </div>
   );
 }

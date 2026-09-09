@@ -8,3 +8,4 @@ export * from "./licencias";
 export * from "./inscripciones";
 export * from "./notificaciones";
 export * from "./marketplace";
+export * from "./comunicaciones";

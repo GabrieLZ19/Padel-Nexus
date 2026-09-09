@@ -29,6 +29,7 @@ import {
   Award,
   Scale,
   ShieldAlert,
+  Megaphone,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
@@ -200,6 +201,11 @@ export default function DashboardLayout({
     },
     { name: "Rankings", icon: Award, href: "/dashboard/rankings" },
     { name: "Marketplace", icon: ShoppingBag, href: "/dashboard/marketplace" },
+    {
+      name: "Comunicaciones",
+      icon: Megaphone,
+      href: "/dashboard/comunicaciones",
+    },
     { name: "Moderación", icon: ShieldAlert, href: "/dashboard/moderacion" },
     { name: "Estadísticas", icon: Activity, href: "/dashboard/estadisticas" },
     { name: "Chat interno", icon: MessageSquare, href: "/dashboard/chat", badge: chatNoLeidos },

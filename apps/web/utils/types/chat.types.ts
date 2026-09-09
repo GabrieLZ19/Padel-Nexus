@@ -27,10 +27,18 @@ export interface ChatPartidoContexto {
   participantes: ChatPartidoParticipante[];
 }
 
+export type ChatConversacionTipo =
+  | "directo"
+  | "soporte"
+  | "marketplace"
+  | "partido"
+  | "grupo";
+
 export interface ChatConversacion {
   id: string;
   creado_por: string;
-  tipo: "directo" | "soporte" | "marketplace" | "partido";
+  tipo: ChatConversacionTipo;
+  nombre?: string | null;
   created_at: string;
   producto_id?: string | null;
   otro_participante: {
@@ -48,6 +56,8 @@ export interface ChatConversacion {
   no_leidos: number;
   producto?: ChatProductoContexto | null;
   partido?: ChatPartidoContexto | null;
+  /** Solo tipo grupo: todos los integrantes */
+  participantes?: ChatPartidoParticipante[];
 }
 
 export interface ChatMensaje {
@@ -57,4 +67,13 @@ export interface ChatMensaje {
   contenido: string;
   leido: boolean;
   created_at: string;
+}
+
+export interface ChatContactoBusqueda {
+  id: string;
+  nombre: string | null;
+  apellido: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  rol: string | null;
 }

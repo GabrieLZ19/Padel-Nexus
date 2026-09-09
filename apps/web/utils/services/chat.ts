@@ -1,5 +1,9 @@
 import { api } from "../api";
-import { ChatConversacion, ChatMensaje } from "../types";
+import {
+  ChatContactoBusqueda,
+  ChatConversacion,
+  ChatMensaje,
+} from "../types";
 
 export class ChatService {
   static async getConversaciones(): Promise<ChatConversacion[]> {
@@ -50,8 +54,26 @@ export class ChatService {
     return data.data;
   }
 
+  static async buscarContactos(q: string): Promise<ChatContactoBusqueda[]> {
+    const { data } = await api.get("/mensajes/contactos", {
+      params: { q },
+    });
+    return data.data || [];
+  }
+
+  static async crearGrupo(
+    nombre: string,
+    miembroIds: string[],
+  ): Promise<{ id: string; nombre: string; nueva: boolean }> {
+    const { data } = await api.post("/mensajes/grupos", {
+      nombre,
+      miembro_ids: miembroIds,
+    });
+    return data.data;
+  }
+
   static async getNoLeidos(
-    tipo?: "directo" | "soporte" | "marketplace" | "partido",
+    tipo?: "directo" | "soporte" | "marketplace" | "partido" | "grupo",
   ): Promise<number> {
     const { data } = await api.get("/mensajes/no-leidos", {
       params: tipo ? { tipo } : undefined,

@@ -6,13 +6,14 @@ import type { Notificacion } from "@/utils/types";
 
 export function mostrarToastNotificacion(notif: Notificacion) {
   const promo = notif.metadata?.origen === "marketplace_promo";
+  const campana = notif.metadata?.origen === "comunicaciones_campana";
   const nombreTienda = notif.metadata?.nombre_tienda as string | undefined;
   const description =
     promo && nombreTienda
       ? `${notif.mensaje} · ${nombreTienda}`
       : notif.mensaje;
 
-  if (promo) {
+  if (promo || campana) {
     sileo.show({
       type: "info",
       title: notif.titulo,
