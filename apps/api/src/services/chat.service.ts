@@ -363,12 +363,36 @@ export class ChatService {
     // Verificar que el destinatario existe
     const { data: destinatario } = await supabaseAdmin
       .from("perfiles")
-      .select("id")
+      .select("id, es_menor, cuenta_estado")
       .eq("id", destinatarioId)
       .single();
 
     if (!destinatario) {
       throw new Error("El usuario destinatario no existe.");
+    }
+
+    if (
+      destinatario.es_menor &&
+      destinatario.cuenta_estado === "PENDING_PARENTAL_CONSENT"
+    ) {
+      throw new Error(
+        "Esta cuenta de menor aún no completó el consentimiento parental.",
+      );
+    }
+
+    if (destinatario.es_menor) {
+      const { MenoresService } = await import("./menores.service");
+      const gate = await MenoresService.puedeIniciarChatConMenor(
+        creadorId,
+        destinatarioId,
+        tipo,
+      );
+      if (!gate.permitido) {
+        throw new Error(
+          gate.motivo ||
+            "No se puede iniciar chat con esta cuenta de menor.",
+        );
+      }
     }
 
     const productoIdNormalizado =

@@ -7,6 +7,10 @@ import {
 import { esEmailPlaceholderPlanilla } from "../utils/inscripcionPlanilla";
 import { FiscalSesionService } from "./fiscal-sesion.service";
 
+import { MenoresService } from "./menores.service";
+import { LegalService } from "./legal.service";
+import type { ResponsableInput } from "./menores.service";
+
 // DTO para el registro unificado FAP
 export interface RegistroDTO {
   email: string;
@@ -19,8 +23,11 @@ export interface RegistroDTO {
   categoria_padel: string;
   lado_preferido: string;
   sexo?: string;
-  fecha_nacimiento?: string;
+  fecha_nacimiento: string;
   avatar_base64?: string;
+  acepta_tyc?: boolean;
+  acepta_privacidad?: boolean;
+  responsable?: ResponsableInput;
 }
 
 export class AuthService {
@@ -44,7 +51,7 @@ export class AuthService {
     const { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
       .select(
-        "id, nombre, apellido, dni, lugar_residencia, rol, email, sexo, fecha_nacimiento, club_id, avatar_url, categoria_padel, lado_preferido, ranking_nacional, ranking_provincial",
+        "id, nombre, apellido, dni, lugar_residencia, rol, email, sexo, fecha_nacimiento, club_id, avatar_url, categoria_padel, lado_preferido, ranking_nacional, ranking_provincial, es_menor, cuenta_estado, perfil_publico_habilitado, marketing_opt_in",
       )
       .eq("id", authData.user.id)
       .single();
@@ -56,8 +63,18 @@ export class AuthService {
       );
     }
 
+    const perfilSync = await MenoresService.sincronizarTransicionEdad(
+      authData.user.id,
+    );
+
+    const usuarioBase = {
+      ...perfil,
+      es_menor: perfilSync?.es_menor ?? perfil.es_menor,
+      cuenta_estado: perfilSync?.cuenta_estado ?? perfil.cuenta_estado,
+    };
+
     return {
-      usuario: await FiscalSesionService.enriquecerPerfil(perfil),
+      usuario: await FiscalSesionService.enriquecerPerfil(usuarioBase),
       token: authData.session?.access_token,
     };
   }
@@ -66,6 +83,24 @@ export class AuthService {
    * Registra un nuevo usuario en Supabase Auth y crea su perfil relacional FAP
    */
   static async registrar(datos: RegistroDTO) {
+    if (!datos.fecha_nacimiento) {
+      throw new Error("La fecha de nacimiento es obligatoria.");
+    }
+    if (!datos.acepta_tyc || !datos.acepta_privacidad) {
+      throw new Error(
+        "Debés aceptar los Términos y Condiciones y la Política de Privacidad.",
+      );
+    }
+
+    const fechaNorm = normalizeFechaNacimiento(datos.fecha_nacimiento);
+    if (!fechaNorm) {
+      throw new Error("Fecha de nacimiento inválida.");
+    }
+
+    const versiones = await LegalService.obtenerVersionesActivas();
+    const tycVersion = versiones.tyc?.version;
+    const privVersion = versiones.privacidad?.version;
+
     const capitalizarTexto = (texto: string) => {
       if (!texto) return "";
       return texto
@@ -79,6 +114,37 @@ export class AuthService {
     const nombreCapitalizado = capitalizarTexto(datos.nombre);
     const apellidoCapitalizado = capitalizarTexto(datos.apellido);
     const dniLimpio = String(datos.dni || "").replace(/[^\d]/g, "");
+
+    const finalizarPostRegistro = async (userId: string) => {
+      const flags = await MenoresService.aplicarRegimenAlPerfil(
+        userId,
+        fechaNorm,
+        {
+          tyc_version: tycVersion,
+          privacidad_version: privVersion,
+        },
+      );
+
+      let parental: {
+        token: string;
+        consent_url: string;
+        expires_at: string;
+      } | null = null;
+
+      if (flags.es_menor) {
+        if (!datos.responsable) {
+          throw new Error(
+            "Para menores de 18 años debés indicar los datos del responsable parental.",
+          );
+        }
+        parental = await MenoresService.registrarResponsable(
+          userId,
+          datos.responsable,
+        );
+      }
+
+      return { flags, parental };
+    };
 
     const { data: preinscripto } = await supabaseAdmin
       .from("perfiles")
@@ -127,7 +193,7 @@ export class AuthService {
             categoria_padel: datos.categoria_padel,
             lado_preferido: datos.lado_preferido,
             sexo: datos.sexo || "masculino",
-            fecha_nacimiento: normalizeFechaNacimiento(datos.fecha_nacimiento),
+            fecha_nacimiento: fechaNorm,
             pendiente_activacion: false,
           }),
         )
@@ -154,10 +220,18 @@ export class AuthService {
         }
       }
 
+      const post = await finalizarPostRegistro(preinscripto.id);
+
       return {
         exito: true,
-        mensaje:
-          "Cuenta activada correctamente. Ya podés iniciar sesión con tu email y contraseña.",
+        mensaje: post.flags.es_menor
+          ? "Cuenta activada. Completá el consentimiento parental con el enlace generado."
+          : "Cuenta activada correctamente. Ya podés iniciar sesión con tu email y contraseña.",
+        data: {
+          es_menor: post.flags.es_menor,
+          cuenta_estado: post.flags.cuenta_estado,
+          parental: post.parental,
+        },
       };
     }
 
@@ -171,7 +245,6 @@ export class AuthService {
       email: datos.email,
       password: datos.password,
       options: {
-        // Guardamos la metadata obligatoria de la FAP
         data: {
           nombre: nombreCapitalizado,
           apellido: apellidoCapitalizado,
@@ -181,8 +254,7 @@ export class AuthService {
           categoria_padel: datos.categoria_padel,
           lado_preferido: datos.lado_preferido,
           sexo: datos.sexo || "masculino",
-          fecha_nacimiento:
-            normalizeFechaNacimiento(datos.fecha_nacimiento) ?? null,
+          fecha_nacimiento: fechaNorm,
         },
       },
     });
@@ -193,42 +265,54 @@ export class AuthService {
       );
     }
 
-    if (data.user) {
-      await AuthService.aplicarPerfilRegistro(data.user.id, {
-        email: datos.email,
-        nombre: nombreCapitalizado,
-        apellido: apellidoCapitalizado,
-        telefono: datos.telefono || null,
-        dni: dniLimpio,
-        lugar_residencia: datos.lugar_residencia,
-        categoria_padel: datos.categoria_padel,
-        lado_preferido: datos.lado_preferido,
-        sexo: datos.sexo || "masculino",
-        fecha_nacimiento: normalizeFechaNacimiento(datos.fecha_nacimiento),
-        pendiente_activacion: false,
-      });
+    if (!data.user) {
+      throw new Error("No se pudo crear el usuario.");
     }
 
-    // Subir avatar si se proporcionó en base64
-    if (datos.avatar_base64 && data.user) {
+    await AuthService.aplicarPerfilRegistro(data.user.id, {
+      email: datos.email,
+      nombre: nombreCapitalizado,
+      apellido: apellidoCapitalizado,
+      telefono: datos.telefono || null,
+      dni: dniLimpio,
+      lugar_residencia: datos.lugar_residencia,
+      categoria_padel: datos.categoria_padel,
+      lado_preferido: datos.lado_preferido,
+      sexo: datos.sexo || "masculino",
+      fecha_nacimiento: fechaNorm,
+      pendiente_activacion: false,
+    });
+
+    if (datos.avatar_base64) {
       try {
-        const userId = data.user.id;
-        const avatarUrl = await this.subirAvatarBase64(userId, datos.avatar_base64);
-        
-        // Actualizar el perfil recién creado en perfiles con la URL
+        const avatarUrl = await this.subirAvatarBase64(
+          data.user.id,
+          datos.avatar_base64,
+        );
         await supabaseAdmin
           .from("perfiles")
           .update({ avatar_url: avatarUrl })
-          .eq("id", userId);
+          .eq("id", data.user.id);
       } catch (uploadError: any) {
-        console.error("🔴 Error al subir avatar en registro:", uploadError.message || uploadError);
+        console.error(
+          "🔴 Error al subir avatar en registro:",
+          uploadError.message || uploadError,
+        );
       }
     }
 
+    const post = await finalizarPostRegistro(data.user.id);
+
     return {
       exito: true,
-      mensaje:
-        "Usuario registrado. Verifique su correo electrónico para confirmar la cuenta.",
+      mensaje: post.flags.es_menor
+        ? "Usuario registrado. Compartí el enlace de consentimiento parental con el responsable."
+        : "Usuario registrado. Verifique su correo electrónico para confirmar la cuenta.",
+      data: {
+        es_menor: post.flags.es_menor,
+        cuenta_estado: post.flags.cuenta_estado,
+        parental: post.parental,
+      },
     };
   }
 

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PerfilService, ActualizarPerfilDTO } from "../services/perfil.service";
 import { AuthService, RegistroDTO } from "../services/auth.service";
 import { FiscalSesionService } from "../services/fiscal-sesion.service";
+import { MenoresService } from "../services/menores.service";
 import { env } from "../config/env.config";
 
 export const PerfilController = {
@@ -18,6 +19,7 @@ export const PerfilController = {
           .json({ exito: false, error: "Usuario no autorizado." });
       }
 
+      await MenoresService.sincronizarTransicionEdad(userId);
       const perfil = await PerfilService.obtenerPerfilCompleto(userId);
       const perfilSesion = await FiscalSesionService.enriquecerPerfil(perfil);
       return res.status(200).json({ exito: true, data: perfilSesion });
@@ -244,12 +246,13 @@ export const PerfilController = {
         !datosRegistro.dni ||
         !datosRegistro.lugar_residencia ||
         !datosRegistro.nombre ||
-        !datosRegistro.apellido
+        !datosRegistro.apellido ||
+        !datosRegistro.fecha_nacimiento
       ) {
         return res.status(400).json({
           exito: false,
           error:
-            "Faltan datos obligatorios para el registro FAP (Email, Password, DNI, Residencia, Nombre, Apellido).",
+            "Faltan datos obligatorios para el registro FAP (Email, Password, DNI, Residencia, Nombre, Apellido, Fecha de nacimiento).",
         });
       }
 

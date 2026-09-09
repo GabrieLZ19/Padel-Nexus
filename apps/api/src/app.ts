@@ -20,6 +20,7 @@ import marketplaceRoutes from "./routes/marketplace.routes";
 import usuariosRoutes from "./routes/usuarios.routes";
 import fiscalPanelRoutes from "./routes/fiscal-panel.routes";
 import comunicacionesRoutes from "./routes/comunicaciones.routes";
+import menoresRoutes from "./routes/menores.routes";
 import { createServer } from "http";
 import { SocketService } from "./services/socket.service";
 
@@ -70,6 +71,7 @@ app.use("/api/marketplace", marketplaceRoutes);
 app.use("/api/admin/usuarios", usuariosRoutes);
 app.use("/api/fiscal-panel", fiscalPanelRoutes);
 app.use("/api/comunicaciones", comunicacionesRoutes);
+app.use("/api", menoresRoutes);
 
 // Manejador global de errores (Debe ir después de todas las rutas)
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

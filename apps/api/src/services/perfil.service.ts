@@ -117,12 +117,13 @@ export class PerfilService {
 
   /**
    * Ficha pública: sin datos sensibles de contacto ni documento.
+   * Menores: sin foto pública; sin perfil si no hay autorización.
    */
   static async obtenerPerfilPublico(userId: string) {
     const { data, error } = await supabaseAdmin
       .from("perfiles")
       .select(
-        "id, nombre, apellido, avatar_url, categoria_padel, lado_preferido, lugar_residencia, sexo, clubes:clubes!perfiles_club_id_fkey(id, nombre)",
+        "id, nombre, apellido, avatar_url, categoria_padel, lado_preferido, lugar_residencia, sexo, es_menor, cuenta_estado, perfil_publico_habilitado, clubes:clubes!perfiles_club_id_fkey(id, nombre)",
       )
       .eq("id", userId)
       .single();
@@ -131,7 +132,31 @@ export class PerfilService {
       throw new Error("Perfil de usuario no encontrado en la plataforma.");
     }
 
-    return data;
+    if (
+      data.es_menor &&
+      (data.cuenta_estado === "PENDING_PARENTAL_CONSENT" ||
+        data.cuenta_estado === "DRAFT_MINOR" ||
+        data.cuenta_estado === "SUSPENDED_MINOR" ||
+        !data.perfil_publico_habilitado)
+    ) {
+      throw new Error("Este perfil no está disponible públicamente.");
+    }
+
+    const avatarPublico = data.es_menor ? null : data.avatar_url;
+
+    return {
+      id: data.id,
+      nombre: data.nombre,
+      apellido: data.apellido,
+      avatar_url: avatarPublico,
+      categoria_padel: data.categoria_padel,
+      lado_preferido: data.lado_preferido,
+      // Residencia no pública para menores
+      lugar_residencia: data.es_menor ? null : data.lugar_residencia,
+      sexo: data.es_menor ? null : data.sexo,
+      es_menor: data.es_menor,
+      clubes: data.clubes,
+    };
   }
 
   /**

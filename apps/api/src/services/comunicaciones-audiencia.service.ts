@@ -49,7 +49,7 @@ export class ComunicacionesAudienciaService {
 
       const { data: lista, error } = await supabaseAdmin
         .from("comunicaciones_listas")
-        .select("id, owner_id, tipo, filtros")
+        .select("id, owner_id, tipo, filtros, etiquetas")
         .eq("id", ctx.listaId)
         .maybeSingle();
 
@@ -73,7 +73,11 @@ export class ComunicacionesAudienciaService {
         }
 
         const ids = uniqueIds((miembros || []).map((m) => m.perfil_id));
-        const idsScoped = await this.filtrarIdsPorAlcance(ctx, ids);
+        let idsScoped = await this.filtrarIdsPorAlcance(ctx, ids);
+        const etiquetasLista = (lista.etiquetas || []) as string[];
+        if (etiquetasLista.includes("marketing")) {
+          idsScoped = await this.excluirMenores(idsScoped);
+        }
         const sample = await this.obtenerSample(idsScoped.slice(0, 5));
 
         if (idsScoped.length > COMUNICACIONES_MAX_DESTINATARIOS) {
@@ -131,11 +135,35 @@ export class ComunicacionesAudienciaService {
 
     const sample = await this.obtenerSample(ids.slice(0, 5));
 
+    let idsFinal = ids;
+    if (ctx.listaId) {
+      const { data: listaMeta } = await supabaseAdmin
+        .from("comunicaciones_listas")
+        .select("etiquetas")
+        .eq("id", ctx.listaId)
+        .maybeSingle();
+      const etiquetas = (listaMeta?.etiquetas || []) as string[];
+      if (etiquetas.includes("marketing")) {
+        idsFinal = await this.excluirMenores(idsFinal);
+      }
+    }
+
     return {
-      total: ids.length,
-      ids,
-      sample,
+      total: idsFinal.length,
+      ids: idsFinal,
+      sample: await this.obtenerSample(idsFinal.slice(0, 5)),
     };
+  }
+
+  /** Menores no reciben campañas con etiqueta marketing. */
+  private static async excluirMenores(ids: string[]): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const { data } = await supabaseAdmin
+      .from("perfiles")
+      .select("id")
+      .in("id", ids)
+      .eq("es_menor", false);
+    return (data || []).map((p) => p.id);
   }
 
   private static inferirTipoDesdeFiltros(

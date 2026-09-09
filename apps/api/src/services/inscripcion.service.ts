@@ -402,7 +402,8 @@ export class InscripcionService {
       letraPrioridad,
     } = datos;
 
-    // 1. RESOLVER JUGADOR 2 (perfil completo para elegibilidad)
+    const { MenoresService } = await import("./menores.service");
+    await MenoresService.assertCuentaPuedeCompetir(jugador1Id);
     let jugador2Id: string | null = null;
     let perfilJugador2: PerfilElegibilidad | null = null;
 
@@ -420,6 +421,7 @@ export class InscripcionService {
       }
       jugador2Id = user2.id;
       perfilJugador2 = user2;
+      await MenoresService.assertCuentaPuedeCompetir(user2.id);
     }
 
     // 2. DATOS DEL TORNEO
