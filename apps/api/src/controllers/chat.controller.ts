@@ -108,7 +108,7 @@ export class ChatController {
   /**
    * GET /api/mensajes/no-leidos
    * Retorna el total de mensajes no leídos del usuario.
-   * Query opcional: ?tipo=directo|soporte|marketplace
+   * Query opcional: ?tipo=directo|soporte|marketplace|partido|grupo
    */
   static async contarNoLeidos(req: Request, res: Response) {
     try {
@@ -117,7 +117,9 @@ export class ChatController {
       const tipoValido =
         tipoRaw === "directo" ||
         tipoRaw === "soporte" ||
-        tipoRaw === "marketplace"
+        tipoRaw === "marketplace" ||
+        tipoRaw === "partido" ||
+        tipoRaw === "grupo"
           ? tipoRaw
           : undefined;
       const total = await ChatService.contarNoLeidos(usuarioId, tipoValido);
@@ -126,6 +128,71 @@ export class ChatController {
       const message =
         error instanceof Error ? error.message : "Error desconocido";
       return res.status(500).json({ exito: false, error: message });
+    }
+  }
+
+  /**
+   * GET /api/mensajes/contactos?q=
+   * Busca perfiles para armar grupos.
+   */
+  static async buscarContactos(req: Request, res: Response) {
+    try {
+      const q = typeof req.query.q === "string" ? req.query.q : "";
+      const data = await ChatService.buscarContactosGrupo(q);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al buscar contactos.";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  }
+
+  /**
+   * POST /api/mensajes/grupos
+   * Crea un grupo de chat con nombre e integrantes.
+   */
+  static async crearGrupo(req: Request, res: Response) {
+    try {
+      const creadorId = req.user!.id;
+      const { nombre, miembro_ids } = req.body as {
+        nombre?: string;
+        miembro_ids?: string[];
+      };
+
+      const data = await ChatService.crearGrupo(
+        creadorId,
+        nombre || "",
+        miembro_ids || [],
+      );
+      return res.status(201).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al crear grupo.";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  }
+
+  /**
+   * PATCH /api/mensajes/grupos/:id
+   * Actualiza nombre/miembros (solo creador).
+   */
+  static async actualizarGrupo(req: Request, res: Response) {
+    try {
+      const actorId = req.user!.id;
+      const data = await ChatService.actualizarGrupo(req.params.id, actorId, {
+        nombre: req.body?.nombre,
+        miembro_ids: req.body?.miembro_ids,
+      });
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al actualizar grupo.";
+      const status = message.includes("Solo el creador")
+        ? 403
+        : message.includes("no encontrado")
+          ? 404
+          : 400;
+      return res.status(status).json({ exito: false, error: message });
     }
   }
 }

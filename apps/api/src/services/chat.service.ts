@@ -2,7 +2,10 @@ import { supabaseAdmin } from "../config/supabase";
 import { ROLES_ADMINISTRATIVOS } from "../constants/roles";
 import { MarketplaceEntityAuthService } from "./marketplace-entity-auth.service";
 
-type ChatTipo = "directo" | "soporte" | "marketplace" | "partido";
+type ChatTipo = "directo" | "soporte" | "marketplace" | "partido" | "grupo";
+
+/** Tope de miembros en un grupo de chat interactivo (no broadcast). */
+const CHAT_GRUPO_MAX_MIEMBROS = 50;
 
 interface ChatProductoResumen {
   id: string;
@@ -65,7 +68,7 @@ export class ChatService {
     // 2. Obtener datos de cada conversación
     const { data: conversaciones, error: convError } = await supabaseAdmin
       .from("chat_conversaciones")
-      .select("id, creado_por, tipo, created_at, producto_id")
+      .select("id, creado_por, tipo, created_at, producto_id, nombre")
       .in("id", convIds)
       .order("created_at", { ascending: false });
 
@@ -204,14 +207,16 @@ export class ChatService {
     // 3. Para cada conversación, obtener el otro participante + último mensaje + no leídos
     const resultado = await Promise.all(
       conversaciones.map(async (conv) => {
-        // Otro participante
-        const { data: participantes } = await supabaseAdmin
+        const { data: participantesRows } = await supabaseAdmin
           .from("chat_participantes")
           .select("perfil_id")
-          .eq("conversacion_id", conv.id)
-          .neq("perfil_id", usuarioId);
+          .eq("conversacion_id", conv.id);
 
-        const otroPerfilId = participantes?.[0]?.perfil_id;
+        const otrosIds = (participantesRows || [])
+          .map((p) => p.perfil_id)
+          .filter((id) => id !== usuarioId);
+
+        const otroPerfilId = otrosIds[0];
 
         let otroParticipante = {
           id: "",
@@ -221,7 +226,7 @@ export class ChatService {
           rol: "usuario",
         };
 
-        if (otroPerfilId) {
+        if (otroPerfilId && conv.tipo !== "grupo") {
           const { data: perfil } = await supabaseAdmin
             .from("perfiles")
             .select("id, nombre, apellido, avatar_url, rol")
@@ -230,6 +235,23 @@ export class ChatService {
 
           if (perfil) {
             otroParticipante = perfil;
+          }
+        }
+
+        let participantesGrupo: ChatPartidoParticipante[] = [];
+        if (conv.tipo === "grupo") {
+          const todosIds = (participantesRows || []).map((p) => p.perfil_id);
+          if (todosIds.length > 0) {
+            const { data: perfiles } = await supabaseAdmin
+              .from("perfiles")
+              .select("id, nombre, apellido, avatar_url")
+              .in("id", todosIds);
+            participantesGrupo = (perfiles || []).map((p) => ({
+              id: p.id,
+              nombre: p.nombre,
+              apellido: p.apellido,
+              avatar_url: p.avatar_url,
+            }));
           }
         }
 
@@ -264,6 +286,8 @@ export class ChatService {
           no_leidos: noLeidos || 0,
           producto,
           partido,
+          participantes:
+            conv.tipo === "grupo" ? participantesGrupo : undefined,
         };
       }),
     );
@@ -589,6 +613,34 @@ export class ChatService {
   }
 
   /**
+   * Busca perfiles para agregar a un grupo de chat.
+   */
+  static async buscarContactosGrupo(queryRaw: string) {
+    const q = queryRaw.trim();
+    if (q.length < 2) {
+      throw new Error("Escribí al menos 2 caracteres para buscar.");
+    }
+
+    const term = `%${q.replace(/[%_,]/g, "\\$&")}%`;
+    const quoted = `"${term.replace(/"/g, '\\"')}"`;
+
+    const { data, error } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, nombre, apellido, email, avatar_url, rol")
+      .or(
+        `nombre.ilike.${quoted},apellido.ilike.${quoted},email.ilike.${quoted},dni.ilike.${quoted}`,
+      )
+      .order("apellido", { ascending: true })
+      .limit(25);
+
+    if (error) {
+      throw new Error(`Error al buscar contactos: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  /**
    * Obtiene los IDs de los otros participantes de una conversación (excluyendo al remitente).
    */
   static async obtenerDestinatarios(
@@ -602,5 +654,164 @@ export class ChatService {
       .neq("perfil_id", remitenteId);
 
     return (data || []).map((p) => p.perfil_id);
+  }
+
+  /**
+   * Crea un grupo de chat interactivo (pocos miembros). No es broadcast masivo.
+   */
+  static async crearGrupo(
+    creadorId: string,
+    nombre: string,
+    miembroIds: string[],
+  ) {
+    const nombreNormalizado = (nombre || "").trim();
+    if (!nombreNormalizado) {
+      throw new Error("El nombre del grupo es obligatorio.");
+    }
+
+    const unicos = [
+      ...new Set(
+        (miembroIds || []).filter((id) => id && id !== creadorId),
+      ),
+    ];
+
+    if (unicos.length < 1) {
+      throw new Error("Agregá al menos un integrante además de vos.");
+    }
+
+    if (unicos.length + 1 > CHAT_GRUPO_MAX_MIEMBROS) {
+      throw new Error(
+        `Un grupo puede tener como máximo ${CHAT_GRUPO_MAX_MIEMBROS} miembros. Para envíos masivos usá Comunicaciones.`,
+      );
+    }
+
+    const { data: perfiles, error: perfError } = await supabaseAdmin
+      .from("perfiles")
+      .select("id")
+      .in("id", unicos);
+
+    if (perfError) {
+      throw new Error(`Error al validar integrantes: ${perfError.message}`);
+    }
+    if ((perfiles || []).length !== unicos.length) {
+      throw new Error("Uno o más integrantes no existen.");
+    }
+
+    const { data: nuevaConv, error: convError } = await supabaseAdmin
+      .from("chat_conversaciones")
+      .insert({
+        creado_por: creadorId,
+        tipo: "grupo" as ChatTipo,
+        nombre: nombreNormalizado,
+      })
+      .select("id, nombre, tipo")
+      .single();
+
+    if (convError || !nuevaConv) {
+      throw new Error(
+        `Error al crear el grupo: ${convError?.message || "desconocido"}`,
+      );
+    }
+
+    const rows = [creadorId, ...unicos].map((perfil_id) => ({
+      conversacion_id: nuevaConv.id,
+      perfil_id,
+    }));
+
+    const { error: partError } = await supabaseAdmin
+      .from("chat_participantes")
+      .insert(rows);
+
+    if (partError) {
+      await supabaseAdmin
+        .from("chat_conversaciones")
+        .delete()
+        .eq("id", nuevaConv.id);
+      throw new Error("Error al agregar integrantes al grupo.");
+    }
+
+    return { id: nuevaConv.id, nombre: nuevaConv.nombre, nueva: true };
+  }
+
+  /**
+   * Actualiza nombre y/o miembros de un grupo. Solo el creador puede editar.
+   */
+  static async actualizarGrupo(
+    conversacionId: string,
+    actorId: string,
+    payload: { nombre?: string; miembro_ids?: string[] },
+  ) {
+    const { data: conv, error } = await supabaseAdmin
+      .from("chat_conversaciones")
+      .select("id, tipo, creado_por, nombre")
+      .eq("id", conversacionId)
+      .maybeSingle();
+
+    if (error || !conv) throw new Error("Grupo no encontrado.");
+    if (conv.tipo !== "grupo") {
+      throw new Error("La conversación no es un grupo.");
+    }
+    if (conv.creado_por !== actorId) {
+      throw new Error("Solo el creador del grupo puede editarlo.");
+    }
+
+    const patch: Record<string, unknown> = {};
+    if (payload.nombre !== undefined) {
+      const nombre = payload.nombre.trim();
+      if (!nombre) throw new Error("El nombre no puede estar vacío.");
+      patch.nombre = nombre;
+    }
+
+    if (Object.keys(patch).length > 0) {
+      const { error: updError } = await supabaseAdmin
+        .from("chat_conversaciones")
+        .update(patch)
+        .eq("id", conversacionId);
+      if (updError) {
+        throw new Error(`Error al actualizar grupo: ${updError.message}`);
+      }
+    }
+
+    if (payload.miembro_ids !== undefined) {
+      const unicos = [
+        ...new Set(
+          payload.miembro_ids.filter((id) => id && id !== actorId),
+        ),
+      ];
+      if (unicos.length + 1 > CHAT_GRUPO_MAX_MIEMBROS) {
+        throw new Error(
+          `Un grupo puede tener como máximo ${CHAT_GRUPO_MAX_MIEMBROS} miembros.`,
+        );
+      }
+
+      if (unicos.length > 0) {
+        const { data: perfiles } = await supabaseAdmin
+          .from("perfiles")
+          .select("id")
+          .in("id", unicos);
+        if ((perfiles || []).length !== unicos.length) {
+          throw new Error("Uno o más integrantes no existen.");
+        }
+      }
+
+      await supabaseAdmin
+        .from("chat_participantes")
+        .delete()
+        .eq("conversacion_id", conversacionId);
+
+      const rows = [actorId, ...unicos].map((perfil_id) => ({
+        conversacion_id: conversacionId,
+        perfil_id,
+      }));
+
+      const { error: insError } = await supabaseAdmin
+        .from("chat_participantes")
+        .insert(rows);
+      if (insError) {
+        throw new Error("Error al actualizar integrantes del grupo.");
+      }
+    }
+
+    return { id: conversacionId, ok: true };
   }
 }
