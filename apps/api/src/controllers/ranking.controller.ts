@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { RankingService } from "../services/ranking.service";
+import { TIPOS_RANKING, type TipoRanking } from "../constants/rankings";
 
 export const RankingsController = {
   async obtenerPerfilRanking(req: Request, res: Response): Promise<Response> {
@@ -24,15 +25,40 @@ export const RankingsController = {
 
   async obtenerRankingGlobal(req: Request, res: Response): Promise<Response> {
     try {
-      const { categoria, alcance, scope, provincia, pais } = req.query;
+      const {
+        categoria,
+        alcance,
+        scope,
+        provincia,
+        pais,
+        rama,
+        tipo_ranking,
+        limit,
+      } = req.query;
       const alcanceFinal = (alcance || scope) as string | undefined;
 
-      const data = await RankingService.obtenerRankingGlobal(
-        categoria as string | undefined,
-        alcanceFinal,
-        provincia as string | undefined,
-        (pais as string | undefined) || "Argentina",
-      );
+      // Validamos tipo_ranking contra el conjunto conocido para no filtrar por basura.
+      const tipoRankingParam = tipo_ranking as string | undefined;
+      const tipoRanking: TipoRanking | undefined =
+        tipoRankingParam &&
+        (TIPOS_RANKING as readonly string[]).includes(tipoRankingParam)
+          ? (tipoRankingParam as TipoRanking)
+          : undefined;
+
+      const limitNum = limit ? Number(limit) : undefined;
+
+      const data = await RankingService.obtenerRankingGlobal({
+        categoria: categoria as string | undefined,
+        alcance: alcanceFinal,
+        provincia: provincia as string | undefined,
+        pais: (pais as string | undefined) || "Argentina",
+        rama: rama as string | undefined,
+        tipoRanking,
+        limit:
+          limitNum && Number.isFinite(limitNum) && limitNum > 0
+            ? limitNum
+            : undefined,
+      });
 
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {

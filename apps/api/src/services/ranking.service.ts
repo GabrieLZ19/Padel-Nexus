@@ -1,4 +1,11 @@
 import { supabaseAdmin } from "../config/supabase";
+import {
+  categoriasPorTipoRanking,
+  normalizarProvincia,
+  normalizarRama,
+  type RamaRanking,
+  type TipoRanking,
+} from "../constants/rankings";
 
 export interface ActualizarPuntosDTO {
   usuarioId: string;
@@ -7,6 +14,29 @@ export interface ActualizarPuntosDTO {
   torneoId: string;
   alcance?: "Provincial" | "Nacional" | "Global";
   provinciaJurisdiccion?: string;
+}
+
+/**
+ * Filtros aceptados por `obtenerRankingGlobal`.
+ * Todos son opcionales; combinados en una sola query.
+ */
+export interface RankingGlobalFiltros {
+  categoria?: string;
+  alcance?: string;
+  provincia?: string;
+  pais?: string;
+  /**
+   * Tipo de ranking segun reglamento FAP.
+   * Si se envia, restringe la lista de categorias a ese grupo.
+   */
+  tipoRanking?: TipoRanking;
+  /**
+   * Rama del ranking (masculino / femenino).
+   * Se resuelve contra `perfiles.sexo` porque `rankings.rama` no distingue Damas/Caballeros.
+   */
+  rama?: string;
+  /** Cantidad maxima de resultados a devolver (defecto 100). */
+  limit?: number;
 }
 
 export class RankingService {
@@ -67,19 +97,27 @@ export class RankingService {
   }
 
   /**
-   * Obtiene el listado de clasificación general filtrado por nivel/categoría y alcance jurisdiccional
+   * Obtiene el listado de clasificacion general filtrado por nivel/categoria,
+   * alcance jurisdiccional, rama y tipo de ranking (menores/veteranos/libres).
+   *
+   * Reglas de ordenamiento (reglamento FAP):
+   * 1. Puntos DESC.
+   * 2. Ante igualdad, apellido y nombre ASC (orden alfabetico).
    */
-  static async obtenerRankingGlobal(
-    categoria?: string,
-    alcance: string = "Provincial",
-    provincia?: string,
-    pais?: string,
-  ) {
-    let query = supabaseAdmin
-      .from("rankings")
-      .select(
-        `
-        *, 
+  static async obtenerRankingGlobal(filtros: RankingGlobalFiltros = {}) {
+    const {
+      categoria,
+      alcance = "Provincial",
+      provincia,
+      pais,
+      tipoRanking,
+      rama,
+      limit = 100,
+    } = filtros;
+
+    let query = supabaseAdmin.from("rankings").select(
+      `
+        *,
         perfiles!inner (
           id,
           nombre,
@@ -99,7 +137,7 @@ export class RankingService {
           )
         )
       `,
-      );
+    );
 
     const alcanceBusqueda = alcance === "Nacional" ? "Provincial" : alcance;
 
@@ -107,18 +145,52 @@ export class RankingService {
       query = query.eq("alcance", alcanceBusqueda);
     }
 
-    query = query.order("puntos", { ascending: false }).limit(100);
+    // Orden principal + desempate alfabetico por apellido y nombre.
+    query = query
+      .order("puntos", { ascending: false })
+      .order("apellido", {
+        foreignTable: "perfiles",
+        ascending: true,
+        nullsFirst: false,
+      })
+      .order("nombre", {
+        foreignTable: "perfiles",
+        ascending: true,
+        nullsFirst: false,
+      })
+      .limit(limit);
 
     if (categoria && categoria !== "Todas") {
       query = query.eq("categoria", categoria);
+    } else if (tipoRanking) {
+      // Si no viene categoria puntual pero si tipo de ranking, filtramos por
+      // el conjunto de categorias definido para ese tipo.
+      const categorias = categoriasPorTipoRanking(tipoRanking);
+      if (categorias.length > 0) {
+        query = query.in("categoria", [...categorias]);
+      }
+    }
+
+    const ramaNormalizada: RamaRanking | null = normalizarRama(rama);
+    if (ramaNormalizada) {
+      query = query.eq("perfiles.sexo", ramaNormalizada);
     }
 
     if (alcance === "Nacional" && pais) {
       query = query.eq("perfiles.pais", pais);
     }
 
-    if (provincia && alcance !== "Global" && alcance !== "Nacional") {
-      query = query.eq("perfiles.lugar_residencia", provincia);
+    // NOTA: el filtro de provincia se aplica en memoria (mas abajo) porque
+    // `perfiles.lugar_residencia` mezcla acentos ("Cordoba" vs "Cordoba").
+    // Aplicar `.eq()` directo excluiria filas validas por diferencia de tilde.
+    //
+    // Se aplica SIEMPRE que venga `provincia`, sin importar el alcance:
+    // provincia es un filtro transversal (el usuario lo eligio explicitamente).
+    // Cuando hay filtro provincial, elevamos el limite para tener margen tras
+    // el filtrado en memoria.
+    const debeFiltrarProvincia = Boolean(provincia);
+    if (debeFiltrarProvincia) {
+      query = query.limit(Math.max(limit, 500));
     }
 
     const { data, error } = await query;
@@ -133,14 +205,35 @@ export class RankingService {
       pj?: number;
       pg?: number;
       tendencia?: number;
-      perfiles?: Record<string, unknown>;
+      perfiles?: Record<string, unknown> & {
+        lugar_residencia?: string | null;
+        clubes?: { provincia?: string | null } | null;
+      };
     };
 
-    // Deduplicar jugadores por usuario_id (tomando su categoría con mayor puntuación, que viene primero en el ordenamiento)
+    let filas = (data as RowRanking[]) || [];
+
+    // Filtro provincial insensible a acentos y mayusculas, aplicado en memoria.
+    // Se resuelve UNICAMENTE contra `perfiles.lugar_residencia` (la provincia
+    // que declara el jugador). Antes teniamos fallback al club, pero eso
+    // introducia jugadores fuera de la provincia elegida (ej. residente en
+    // Cordoba con club en Buenos Aires apareciendo bajo "Buenos Aires").
+    if (debeFiltrarProvincia) {
+      const provNorm = normalizarProvincia(provincia);
+      filas = filas.filter(
+        (jugador) =>
+          normalizarProvincia(jugador.perfiles?.lugar_residencia) === provNorm,
+      );
+      // Aplicamos el limite original una vez filtrado en memoria.
+      filas = filas.slice(0, limit);
+    }
+
+    // Deduplicar jugadores por usuario_id (tomando su categoria con mayor
+    // puntuacion, que viene primera en el ordenamiento).
     const seenUsers = new Set<string>();
     const uniqueData: RowRanking[] = [];
-    
-    for (const jugador of (data as RowRanking[] || [])) {
+
+    for (const jugador of filas) {
       if (!seenUsers.has(jugador.usuario_id)) {
         seenUsers.add(jugador.usuario_id);
         uniqueData.push(jugador);
