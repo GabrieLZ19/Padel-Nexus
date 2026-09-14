@@ -27,6 +27,8 @@ export class LicenciaService {
   /**
    * Lista licencias paginadas. Si el actor es admin_provincial, filtra
    * a su asociación / provincia (asociacion_id o lugar_residencia).
+   * Si no existe asociación para su provincia, igual lista por
+   * `lugar_residencia` (no rompe con 500).
    */
   static async obtenerLicencias(
     page: number,
@@ -39,18 +41,34 @@ export class LicenciaService {
     const to = from + limit - 1;
 
     let alcanceProvincial: {
-      asociacionId: string;
+      asociacionId: string | null;
       provincia: string;
     } | null = null;
 
     if (actor?.rol === "admin_provincial") {
-      const asoc =
-        await LicenciaOrganizacionService.resolverAsociacionProvincial(
-          actor.id,
+      const { data: perfil } = await supabaseAdmin
+        .from("perfiles")
+        .select("lugar_residencia")
+        .eq("id", actor.id)
+        .maybeSingle();
+
+      const provincia = (perfil?.lugar_residencia || "").trim();
+      if (!provincia) {
+        throw new Error(
+          "Tu perfil no tiene provincia asignada. Contactá a la federación.",
         );
+      }
+
+      const { data: asoc } = await supabaseAdmin
+        .from("asociaciones")
+        .select("id, provincia")
+        .ilike("provincia", provincia)
+        .limit(1)
+        .maybeSingle();
+
       alcanceProvincial = {
-        asociacionId: asoc.asociacionId,
-        provincia: asoc.provincia,
+        asociacionId: asoc?.id ?? null,
+        provincia: asoc?.provincia ?? provincia,
       };
     }
 
@@ -73,43 +91,74 @@ export class LicenciaService {
       );
     }
 
-    // Alcance provincial: preferimos asociacion_id; fallback a lugar_residencia.
+    // Filtro DB seguro: solo por lugar_residencia del perfil.
+    // El match por asociacion_id se refuerza en memoria (PostgREST no
+    // permite bien or() mezclando columna de padre + hija embebida).
     if (alcanceProvincial) {
-      query = query.or(
-        `licencias.asociacion_id.eq.${alcanceProvincial.asociacionId},lugar_residencia.ilike.${alcanceProvincial.provincia}`,
+      // Traemos un lote amplio y paginamos en memoria tras el refuerzo
+      // (acentos + asociacion_id). Volúmenes provinciales son chicos.
+      query = query.ilike(
+        "lugar_residencia",
+        `%${alcanceProvincial.provincia}%`,
       );
     }
 
-    const { data, error, count } = await query.range(from, to);
+    const rangeTo = alcanceProvincial ? 499 : to;
+    const rangeFrom = alcanceProvincial ? 0 : from;
+
+    const { data, error, count } = await query.range(rangeFrom, rangeTo);
     if (error) {
       console.error("🔴 Error al obtener licencias por perfil:", error);
-      throw new Error("Error al listar licencias");
+      throw new Error(error.message || "Error al listar licencias");
     }
 
     let rows = data || [];
 
-    // Refuerzo en memoria: normalizamos acentos porque lugar_residencia
-    // puede venir como "Cordoba" vs "Córdoba".
     if (alcanceProvincial) {
       const target = normalizarTexto(alcanceProvincial.provincia);
+      const asocId = alcanceProvincial.asociacionId;
+
+      if (asocId) {
+        const { data: extra } = await supabaseAdmin
+          .from("perfiles")
+          .select(
+            "*, licencias:licencias!fk_licencias_usuario!inner(*), afiliaciones:afiliaciones!fk_afiliaciones_usuario(id, entidad, estado, fecha_vencimiento)",
+          )
+          .eq("licencias.asociacion_id", asocId)
+          .order("created_at", { ascending: false })
+          .range(0, 499);
+
+        const byId = new Map<string, (typeof rows)[number]>();
+        for (const r of rows) byId.set(r.id, r);
+        for (const r of extra || []) byId.set(r.id, r);
+        rows = [...byId.values()];
+      }
+
       rows = rows.filter((perfil) => {
         const licencias = Array.isArray(perfil.licencias)
           ? perfil.licencias
           : perfil.licencias
             ? [perfil.licencias]
             : [];
-        const matchAsoc = licencias.some(
-          (l: { asociacion_id?: string | null }) =>
-            l.asociacion_id === alcanceProvincial!.asociacionId,
-        );
-        if (matchAsoc) return true;
+        if (
+          asocId &&
+          licencias.some(
+            (l: { asociacion_id?: string | null }) =>
+              l.asociacion_id === asocId,
+          )
+        ) {
+          return true;
+        }
         return normalizarTexto(perfil.lugar_residencia) === target;
       });
+
+      const total = rows.length;
+      return { data: rows.slice(from, to + 1), total };
     }
 
     return {
       data: rows,
-      total: alcanceProvincial ? rows.length : count || 0,
+      total: count || 0,
     };
   }
 
@@ -136,7 +185,9 @@ export class LicenciaService {
       throw new Error("Licencia no encontrada.");
     }
 
-    if (licencia.asociacion_id === asoc.asociacionId) return;
+    if (licencia.asociacion_id && asoc.asociacionId === licencia.asociacion_id) {
+      return;
+    }
 
     const datos = (licencia.datos_solicitud || {}) as Record<string, unknown>;
     const provinciaSolicitud =

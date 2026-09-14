@@ -243,10 +243,34 @@ export class LicenciaOrganizacionService {
         .limit(1)
         .maybeSingle();
 
+      // Si aún no hay asociación cargada para esa provincia, heredamos
+      // la config FAP (read-only de precio nacional) pero dejamos editar
+      // cuando exista la entidad. Evita 500 en el CRM provincial.
       if (!asoc) {
-        throw new Error(
-          `No se encontró una asociación para la provincia ${provincia}.`,
-        );
+        const { data: fap } = await supabaseAdmin
+          .from("federaciones")
+          .select("id, nombre, sigla")
+          .ilike("sigla", "FAP")
+          .limit(1)
+          .maybeSingle();
+
+        const configData = fap
+          ? await LicenciaOrganizacionService.obtenerConfigFederacion(fap.id)
+          : {
+              config: { ...LICENCIA_CONFIG_DEFAULT },
+              descripcion_vigencia: "Configuración por defecto del sistema",
+            };
+
+        return {
+          tipo: "asociacion" as const,
+          entidad_id: fap?.id || "",
+          entidad_nombre: `Provincia ${provincia} (sin asociación cargada)`,
+          subtitulo: `Alcance provincial · ${provincia} · falta crear la asociación en el sistema`,
+          provincia,
+          puede_editar: false,
+          hereda_de_federacion: true,
+          ...configData,
+        };
       }
 
       const configData =
@@ -318,11 +342,13 @@ export class LicenciaOrganizacionService {
   /**
    * Resuelve la asociación del admin provincial a partir de su
    * `lugar_residencia`. Usado para filtrar listados y autorizar PATCH.
+   * Si no hay asociación, igual devuelve la provincia del perfil
+   * (asociacionId = null) para no bloquear operaciones por provincia.
    */
   static async resolverAsociacionProvincial(usuarioId: string): Promise<{
-    asociacionId: string;
+    asociacionId: string | null;
     provincia: string;
-    nombre: string;
+    nombre: string | null;
   }> {
     const { data: perfil } = await supabaseAdmin
       .from("perfiles")
@@ -344,16 +370,10 @@ export class LicenciaOrganizacionService {
       .limit(1)
       .maybeSingle();
 
-    if (!asoc) {
-      throw new Error(
-        `No se encontró una asociación para la provincia ${provincia}.`,
-      );
-    }
-
     return {
-      asociacionId: asoc.id,
-      provincia: asoc.provincia,
-      nombre: asoc.nombre,
+      asociacionId: asoc?.id ?? null,
+      provincia: asoc?.provincia ?? provincia,
+      nombre: asoc?.nombre ?? null,
     };
   }
 }

@@ -32,7 +32,8 @@ export const LicenciasController = {
         error instanceof Error
           ? error.message
           : "Error desconocido al listar licencias.";
-      return res.status(500).json({ exito: false, error: message });
+      const status = message.includes("provincia asignada") ? 400 : 500;
+      return res.status(status).json({ exito: false, error: message });
     }
   },
 
