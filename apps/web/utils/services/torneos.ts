@@ -249,4 +249,60 @@ export const TorneosService = {
     const response = await api.post(`/torneos/${torneoId}/guardar-siembra`, payload);
     return response.data;
   },
+
+  /**
+   * Programacion de horarios (borrador -> programado -> publicado)
+   */
+  async previewProgramacion(torneoId: string): Promise<ProgramacionPreview> {
+    const response = await api.get<ProgramacionPreview>(
+      `/torneos/${torneoId}/programacion/preview`,
+    );
+    return response.data;
+  },
+
+  async reprogramarProgramacion(
+    torneoId: string,
+    payload: { motivo?: string } = {},
+  ): Promise<ProgramacionPreview> {
+    const response = await api.post<ProgramacionPreview>(
+      `/torneos/${torneoId}/programacion/reprogramar`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async publicarProgramacion(
+    torneoId: string,
+  ): Promise<{ ok: true; publicada_en: string }> {
+    const response = await api.post<{ ok: true; publicada_en: string }>(
+      `/torneos/${torneoId}/programacion/publicar`,
+      {},
+    );
+    return response.data;
+  },
 };
+
+/**
+ * Tipos publicos del endpoint de programacion. Se exportan para que las
+ * pantallas del CRM tipar sin duplicar contrato.
+ */
+export type ProgramacionEstado = "borrador" | "programado" | "publicado";
+
+export interface PartidoProgramado {
+  id: string;
+  ronda: string | null;
+  orden: number | null;
+  equipo_a_id: string | null;
+  equipo_b_id: string | null;
+  estado_partido: string | null;
+  cancha_asignada: string | null;
+  fecha_partido: string | null;
+  horario_bloqueado: boolean;
+}
+
+export interface ProgramacionPreview {
+  torneo_id: string;
+  programacion_estado: ProgramacionEstado;
+  partidos: PartidoProgramado[];
+  sin_horario: string[];
+}
