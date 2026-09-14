@@ -15,7 +15,9 @@ import {
   Move,
   X,
   Printer,
+  CalendarClock,
 } from "lucide-react";
+import { ProgramacionTab } from "./ProgramacionTab";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
@@ -56,7 +58,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       !formatoLower.includes("grupo"));
 
   const [activeView, setActiveView] = useState<
-    "zonas" | "siembra" | "llaves" | "auditoria"
+    "zonas" | "siembra" | "llaves" | "auditoria" | "programacion"
   >(isEliminatoriaDirecta ? "siembra" : "zonas");
   // Si el formato llega async, asegurar la vista correcta (zonas vs siembra)
   useEffect(() => {
@@ -999,6 +1001,16 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             <Trophy className="size-4" /> Llave campeonato
           </button>
           <button
+            onClick={() => setActiveView("programacion")}
+            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
+              activeView === "programacion"
+                ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
+                : "border border-transparent text-gray-500 hover:text-gray-300"
+            }`}
+          >
+            <CalendarClock className="size-4" /> Programación
+          </button>
+          <button
             onClick={() => setActiveView("auditoria")}
             className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
               activeView === "auditoria"
@@ -1010,6 +1022,15 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           </button>
         </div>
       </div>
+
+      {activeView === "programacion" && (
+        <ProgramacionTab
+          torneoId={torneoId}
+          partidos={partidos}
+          isReadOnly={isReadOnly}
+          onRefresh={onRefresh}
+        />
+      )}
 
       {/* PANEL SIEMBRA — Drag & Drop primera ronda de Eliminatoria Directa */}
       {activeView === "siembra" && (
