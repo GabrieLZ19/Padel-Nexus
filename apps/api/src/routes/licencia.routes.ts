@@ -28,8 +28,20 @@ router.put(
 
 router.patch(
   "/:id/estado",
-  authorize(["superadmin", "admin_federacion"]),
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
   LicenciasController.cambiarEstadoLicencia,
+);
+
+router.post(
+  "/:id/pagos",
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  LicenciasController.registrarPago,
+);
+
+router.get(
+  "/:id/pagos",
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  LicenciasController.listarPagos,
 );
 
 router.get(

@@ -6,8 +6,12 @@ import {
   descripcionVigenciaLicencia,
   mergeLicenciaConfig,
   mapRowToLicenciaConfig,
+  type LicenciaFrecuenciaPago,
   type LicenciaVigenciaModo,
 } from "../utils/licenciaConfig";
+
+const LICENCIA_CONFIG_COLUMNS =
+  "licencia_precio_anual, licencia_vigencia_modo, licencia_vencimiento_mes, licencia_vencimiento_dia, licencia_vigencia_meses, licencia_nombre_carne, licencia_frecuencia_pago, licencia_precio_mensual, licencia_dia_cobro";
 
 export interface LicenciaConfigPayload {
   precio_anual?: number;
@@ -15,6 +19,10 @@ export interface LicenciaConfigPayload {
   vencimiento_mes?: number | null;
   vencimiento_dia?: number | null;
   vigencia_meses?: number;
+  nombre_carne?: string | null;
+  frecuencia_pago?: LicenciaFrecuenciaPago;
+  precio_mensual?: number;
+  dia_cobro?: number | null;
 }
 
 function toDbPayload(payload: LicenciaConfigPayload): Record<string, unknown> {
@@ -34,6 +42,29 @@ function toDbPayload(payload: LicenciaConfigPayload): Record<string, unknown> {
   if (payload.vigencia_meses !== undefined) {
     out.licencia_vigencia_meses = payload.vigencia_meses;
   }
+  if (payload.nombre_carne !== undefined) {
+    const trimmed =
+      typeof payload.nombre_carne === "string"
+        ? payload.nombre_carne.trim()
+        : "";
+    out.licencia_nombre_carne = trimmed || null;
+  }
+  if (payload.frecuencia_pago !== undefined) {
+    out.licencia_frecuencia_pago = payload.frecuencia_pago;
+  }
+  if (payload.precio_mensual !== undefined) {
+    out.licencia_precio_mensual = Math.max(0, Number(payload.precio_mensual));
+  }
+  if (payload.dia_cobro !== undefined) {
+    if (payload.dia_cobro == null) {
+      out.licencia_dia_cobro = null;
+    } else {
+      out.licencia_dia_cobro = Math.min(
+        28,
+        Math.max(1, Number(payload.dia_cobro)),
+      );
+    }
+  }
   return out;
 }
 
@@ -41,9 +72,7 @@ export class LicenciaOrganizacionService {
   static async obtenerConfigFederacion(federacionId: string) {
     const { data, error } = await supabaseAdmin
       .from("federaciones")
-      .select(
-        "licencia_precio_anual, licencia_vigencia_modo, licencia_vencimiento_mes, licencia_vencimiento_dia, licencia_vigencia_meses",
-      )
+      .select(LICENCIA_CONFIG_COLUMNS)
       .eq("id", federacionId)
       .maybeSingle();
 
@@ -67,9 +96,7 @@ export class LicenciaOrganizacionService {
       .from("federaciones")
       .update(updates)
       .eq("id", federacionId)
-      .select(
-        "id, nombre, licencia_precio_anual, licencia_vigencia_modo, licencia_vencimiento_mes, licencia_vencimiento_dia, licencia_vigencia_meses",
-      )
+      .select(`id, nombre, ${LICENCIA_CONFIG_COLUMNS}`)
       .single();
 
     if (error) throw new Error(error.message);
@@ -85,7 +112,7 @@ export class LicenciaOrganizacionService {
     const { data: asoc, error } = await supabaseAdmin
       .from("asociaciones")
       .select(
-        "id, nombre, federacion_id, licencia_precio_anual, licencia_vigencia_modo, licencia_vencimiento_mes, licencia_vencimiento_dia, licencia_vigencia_meses",
+        `id, nombre, federacion_id, provincia, ${LICENCIA_CONFIG_COLUMNS}`,
       )
       .eq("id", asociacionId)
       .maybeSingle();
@@ -97,9 +124,7 @@ export class LicenciaOrganizacionService {
     if (asoc.federacion_id) {
       const { data } = await supabaseAdmin
         .from("federaciones")
-        .select(
-          "licencia_precio_anual, licencia_vigencia_modo, licencia_vencimiento_mes, licencia_vencimiento_dia, licencia_vigencia_meses",
-        )
+        .select(LICENCIA_CONFIG_COLUMNS)
         .eq("id", asoc.federacion_id)
         .maybeSingle();
       federacion = data;
@@ -173,9 +198,7 @@ export class LicenciaOrganizacionService {
 
     const { data: fap } = await supabaseAdmin
       .from("federaciones")
-      .select(
-        "licencia_precio_anual, licencia_vigencia_modo, licencia_vencimiento_mes, licencia_vencimiento_dia, licencia_vigencia_meses",
-      )
+      .select(LICENCIA_CONFIG_COLUMNS)
       .ilike("sigla", "FAP")
       .limit(1)
       .maybeSingle();
@@ -234,6 +257,7 @@ export class LicenciaOrganizacionService {
         entidad_id: asoc.id,
         entidad_nombre: asoc.nombre,
         subtitulo: `Asociación provincial · ${asoc.provincia}`,
+        provincia: asoc.provincia,
         puede_editar: true,
         ...configData,
       };
@@ -258,6 +282,7 @@ export class LicenciaOrganizacionService {
       entidad_id: fap.id,
       entidad_nombre: fap.nombre,
       subtitulo: "Federación nacional · aplica a todo el circuito FAP",
+      provincia: null as string | null,
       puede_editar: rol === "superadmin" || rol === "admin_federacion",
       ...configData,
     };
@@ -288,5 +313,47 @@ export class LicenciaOrganizacionService {
       contexto.entidad_id,
       payload,
     );
+  }
+
+  /**
+   * Resuelve la asociación del admin provincial a partir de su
+   * `lugar_residencia`. Usado para filtrar listados y autorizar PATCH.
+   */
+  static async resolverAsociacionProvincial(usuarioId: string): Promise<{
+    asociacionId: string;
+    provincia: string;
+    nombre: string;
+  }> {
+    const { data: perfil } = await supabaseAdmin
+      .from("perfiles")
+      .select("lugar_residencia")
+      .eq("id", usuarioId)
+      .maybeSingle();
+
+    const provincia = (perfil?.lugar_residencia || "").trim();
+    if (!provincia) {
+      throw new Error(
+        "Tu perfil no tiene provincia asignada. Contactá a la federación.",
+      );
+    }
+
+    const { data: asoc } = await supabaseAdmin
+      .from("asociaciones")
+      .select("id, nombre, provincia")
+      .ilike("provincia", provincia)
+      .limit(1)
+      .maybeSingle();
+
+    if (!asoc) {
+      throw new Error(
+        `No se encontró una asociación para la provincia ${provincia}.`,
+      );
+    }
+
+    return {
+      asociacionId: asoc.id,
+      provincia: asoc.provincia,
+      nombre: asoc.nombre,
+    };
   }
 }

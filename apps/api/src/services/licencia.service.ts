@@ -8,17 +8,51 @@ import {
 } from "../config/mercadopago";
 import { NotificacionService } from "./notificacion.service";
 import { LicenciaOrganizacionService } from "./licenciaOrganizacion.service";
-import { descripcionVigenciaLicencia } from "../utils/licenciaConfig";
+import {
+  calcularVencimientoTrasPagoMensual,
+  descripcionVigenciaLicencia,
+  periodoDesdeFecha,
+} from "../utils/licenciaConfig";
+
+function normalizarTexto(input?: string | null): string {
+  if (!input) return "";
+  return input
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
 
 export class LicenciaService {
+  /**
+   * Lista licencias paginadas. Si el actor es admin_provincial, filtra
+   * a su asociación / provincia (asociacion_id o lugar_residencia).
+   */
   static async obtenerLicencias(
     page: number,
     limit: number,
     search?: string,
     estado?: string,
+    actor?: { id: string; rol: string },
   ) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
+
+    let alcanceProvincial: {
+      asociacionId: string;
+      provincia: string;
+    } | null = null;
+
+    if (actor?.rol === "admin_provincial") {
+      const asoc =
+        await LicenciaOrganizacionService.resolverAsociacionProvincial(
+          actor.id,
+        );
+      alcanceProvincial = {
+        asociacionId: asoc.asociacionId,
+        provincia: asoc.provincia,
+      };
+    }
 
     let query = supabaseAdmin
       .from("perfiles")
@@ -39,12 +73,92 @@ export class LicenciaService {
       );
     }
 
+    // Alcance provincial: preferimos asociacion_id; fallback a lugar_residencia.
+    if (alcanceProvincial) {
+      query = query.or(
+        `licencias.asociacion_id.eq.${alcanceProvincial.asociacionId},lugar_residencia.ilike.${alcanceProvincial.provincia}`,
+      );
+    }
+
     const { data, error, count } = await query.range(from, to);
     if (error) {
       console.error("🔴 Error al obtener licencias por perfil:", error);
       throw new Error("Error al listar licencias");
     }
-    return { data: data || [], total: count || 0 };
+
+    let rows = data || [];
+
+    // Refuerzo en memoria: normalizamos acentos porque lugar_residencia
+    // puede venir como "Cordoba" vs "Córdoba".
+    if (alcanceProvincial) {
+      const target = normalizarTexto(alcanceProvincial.provincia);
+      rows = rows.filter((perfil) => {
+        const licencias = Array.isArray(perfil.licencias)
+          ? perfil.licencias
+          : perfil.licencias
+            ? [perfil.licencias]
+            : [];
+        const matchAsoc = licencias.some(
+          (l: { asociacion_id?: string | null }) =>
+            l.asociacion_id === alcanceProvincial!.asociacionId,
+        );
+        if (matchAsoc) return true;
+        return normalizarTexto(perfil.lugar_residencia) === target;
+      });
+    }
+
+    return {
+      data: rows,
+      total: alcanceProvincial ? rows.length : count || 0,
+    };
+  }
+
+  /**
+   * Valida que un admin_provincial solo pueda operar sobre licencias
+   * de su asociación / provincia.
+   */
+  static async assertPuedeGestionarLicencia(
+    licenciaId: string,
+    actor: { id: string; rol: string },
+  ): Promise<void> {
+    if (actor.rol !== "admin_provincial") return;
+
+    const asoc =
+      await LicenciaOrganizacionService.resolverAsociacionProvincial(actor.id);
+
+    const { data: licencia, error } = await supabaseAdmin
+      .from("licencias")
+      .select("id, asociacion_id, datos_solicitud, usuario_id")
+      .eq("id", licenciaId)
+      .maybeSingle();
+
+    if (error || !licencia) {
+      throw new Error("Licencia no encontrada.");
+    }
+
+    if (licencia.asociacion_id === asoc.asociacionId) return;
+
+    const datos = (licencia.datos_solicitud || {}) as Record<string, unknown>;
+    const provinciaSolicitud =
+      typeof datos.provincia === "string" ? datos.provincia : "";
+
+    const { data: perfil } = await supabaseAdmin
+      .from("perfiles")
+      .select("lugar_residencia")
+      .eq("id", licencia.usuario_id)
+      .maybeSingle();
+
+    const target = normalizarTexto(asoc.provincia);
+    if (
+      normalizarTexto(provinciaSolicitud) === target ||
+      normalizarTexto(perfil?.lugar_residencia) === target
+    ) {
+      return;
+    }
+
+    throw new Error(
+      "No podés gestionar licencias fuera de tu asociación provincial.",
+    );
   }
 
   static async obtenerPorUsuario(usuario_id: string) {
@@ -281,13 +395,40 @@ export class LicenciaService {
         club_id: typeof datos.club_id === "string" ? datos.club_id : null,
       });
 
-    const precioAnual = Number(config.precioAnual || 0);
+    const esMensual = config.frecuenciaPago === "mensual";
+    const precio = esMensual
+      ? Number(config.precioMensual || 0)
+      : Number(config.precioAnual || 0);
+
     const datosConPago = {
       ...datos,
-      precio_anual: precioAnual,
-      estado_pago: precioAnual > 0 ? "pendiente" : "no_aplica",
+      precio_anual: Number(config.precioAnual || 0),
+      precio_mensual: Number(config.precioMensual || 0),
+      frecuencia_pago: config.frecuenciaPago,
+      nombre_carne: config.nombreCarne,
+      estado_pago: precio > 0 ? "pendiente" : "no_aplica",
       moneda: "ARS",
     };
+
+    let asociacionId: string | null = null;
+    const clubId = typeof datos.club_id === "string" ? datos.club_id : null;
+    if (clubId) {
+      const { data: club } = await supabaseAdmin
+        .from("clubes")
+        .select("asociacion_id")
+        .eq("id", clubId)
+        .maybeSingle();
+      asociacionId = club?.asociacion_id ?? null;
+    }
+    if (!asociacionId && typeof datos.provincia === "string") {
+      const { data: asoc } = await supabaseAdmin
+        .from("asociaciones")
+        .select("id")
+        .ilike("provincia", datos.provincia.trim())
+        .limit(1)
+        .maybeSingle();
+      asociacionId = asoc?.id ?? null;
+    }
 
     const { data, error } = await supabaseAdmin
       .from("licencias")
@@ -297,8 +438,8 @@ export class LicenciaService {
           estado: "Pendiente",
           nro_licencia: `PAD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
           datos_solicitud: datosConPago,
-          club_id:
-            typeof datos.club_id === "string" ? datos.club_id : null,
+          club_id: clubId,
+          asociacion_id: asociacionId,
         },
       ])
       .select()
@@ -314,9 +455,10 @@ export class LicenciaService {
       console.error("Error al notificar admins de nueva licencia:", err),
     );
 
+    const etiqueta = esMensual ? "mensual" : "anual";
     const mensajePago =
-      precioAnual > 0
-        ? `Completá el pago de $${precioAnual.toLocaleString("es-AR")} para continuar con la revisión.`
+      precio > 0
+        ? `Completá el pago ${etiqueta} de $${precio.toLocaleString("es-AR")} para continuar con la revisión.`
         : "Un administrador revisará tu solicitud pronto.";
 
     NotificacionService.crearNotificacion({
@@ -328,7 +470,9 @@ export class LicenciaService {
         tipo: "licencia",
         licencia_id: data.id,
         nro_licencia: data.nro_licencia,
-        precio_anual: precioAnual,
+        precio_anual: Number(config.precioAnual || 0),
+        precio_mensual: Number(config.precioMensual || 0),
+        frecuencia_pago: config.frecuenciaPago,
       },
     }).catch((err) =>
       console.error("Error al notificar jugador de solicitud:", err),
@@ -336,7 +480,9 @@ export class LicenciaService {
 
     return {
       ...data,
-      precio_anual: precioAnual,
+      precio_anual: Number(config.precioAnual || 0),
+      precio_mensual: Number(config.precioMensual || 0),
+      frecuencia_pago: config.frecuenciaPago,
       estado_pago: datosConPago.estado_pago,
     };
   }
@@ -356,6 +502,10 @@ export class LicenciaService {
 
     return {
       precio_anual: Number(config.precioAnual || 0),
+      precio_mensual: Number(config.precioMensual || 0),
+      frecuencia_pago: config.frecuenciaPago,
+      nombre_carne: config.nombreCarne,
+      dia_cobro: config.diaCobro,
       moneda: "ARS",
       vigencia_modo: config.vigenciaModo,
       descripcion_vigencia: descripcionVigenciaLicencia(config),
@@ -531,5 +681,144 @@ export class LicenciaService {
       precio_anual: Number(datos.precio_anual || 0),
       estado_pago: "pagado",
     };
+  }
+
+  /**
+   * Registra un pago manual (anual o mensual) y actualiza la vigencia.
+   * Para frecuencia mensual: extiende fecha_vencimiento según dia_cobro.
+   */
+  static async registrarPago(
+    licenciaId: string,
+    payload: {
+      monto?: number;
+      periodo?: string;
+      metodo?: string;
+      notas?: string;
+      mp_payment_id?: string;
+    },
+    adminId?: string,
+  ) {
+    const { data: licencia, error } = await supabaseAdmin
+      .from("licencias")
+      .select("*")
+      .eq("id", licenciaId)
+      .single();
+
+    if (error || !licencia) throw new Error("Licencia no encontrada.");
+
+    const config =
+      await LicenciaOrganizacionService.resolverConfigParaLicencia(licencia);
+
+    const ahora = new Date();
+    const periodo =
+      payload.periodo && /^\d{4}-\d{2}$/.test(payload.periodo)
+        ? payload.periodo
+        : periodoDesdeFecha(ahora);
+
+    const montoDefault =
+      config.frecuenciaPago === "mensual"
+        ? Number(config.precioMensual || 0)
+        : Number(config.precioAnual || 0);
+    const monto =
+      payload.monto != null ? Math.max(0, Number(payload.monto)) : montoDefault;
+
+    const { data: pago, error: pagoError } = await supabaseAdmin
+      .from("licencia_pagos")
+      .insert({
+        licencia_id: licenciaId,
+        usuario_id: licencia.usuario_id,
+        periodo,
+        monto,
+        estado: "pagado",
+        metodo: payload.metodo || "manual",
+        mp_payment_id: payload.mp_payment_id || null,
+        registrado_por: adminId || null,
+        notas: payload.notas || null,
+        pagado_en: ahora.toISOString(),
+      })
+      .select()
+      .single();
+
+    if (pagoError) {
+      if (pagoError.code === "23505") {
+        throw new Error(
+          `Ya existe un pago registrado para el período ${periodo}.`,
+        );
+      }
+      throw new Error(pagoError.message);
+    }
+
+    // Extender vigencia según frecuencia.
+    let fechaVencimiento: string;
+    if (config.frecuenciaPago === "mensual") {
+      fechaVencimiento = calcularVencimientoTrasPagoMensual(
+        config.diaCobro,
+        ahora,
+      );
+    } else {
+      fechaVencimiento =
+        await LicenciaOrganizacionService.calcularVencimientoParaLicencia(
+          licencia,
+          ahora,
+        );
+    }
+
+    const datos = {
+      ...((licencia.datos_solicitud || {}) as Record<string, unknown>),
+      estado_pago: "pagado",
+      fecha_pago: ahora.toISOString(),
+      ultimo_periodo_pagado: periodo,
+    };
+
+    const updatePayload: Record<string, unknown> = {
+      fecha_vencimiento: fechaVencimiento,
+      datos_solicitud: datos,
+    };
+    // Si estaba vencida y pagó, reactivamos.
+    if (licencia.estado === "Vencida") {
+      updatePayload.estado = "Activa";
+    }
+
+    const { data: updated, error: updError } = await supabaseAdmin
+      .from("licencias")
+      .update(updatePayload)
+      .eq("id", licenciaId)
+      .select()
+      .single();
+
+    if (updError || !updated) {
+      throw new Error("Pago registrado pero no se pudo actualizar la vigencia.");
+    }
+
+    await NotificacionService.crearNotificacion({
+      usuario_id: licencia.usuario_id,
+      titulo: "Pago de licencia registrado",
+      mensaje: `Se registró el pago del período ${periodo} de tu licencia ${updated.nro_licencia}. Vigente hasta ${fechaVencimiento.split("-").reverse().join("/")}.`,
+      tipo: "success",
+      metadata: {
+        tipo: "licencia",
+        licencia_id: updated.id,
+        periodo,
+      },
+    }).catch(() => undefined);
+
+    return {
+      pago,
+      licencia: updated,
+      fecha_vencimiento: fechaVencimiento,
+    };
+  }
+
+  static async listarPagos(licenciaId: string) {
+    const { data, error } = await supabaseAdmin
+      .from("licencia_pagos")
+      .select(
+        "id, licencia_id, usuario_id, periodo, monto, estado, metodo, mp_payment_id, notas, pagado_en, created_at, registrado_por",
+      )
+      .eq("licencia_id", licenciaId)
+      .order("pagado_en", { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return data || [];
   }
 }

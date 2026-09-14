@@ -13,11 +13,17 @@ export const LicenciasController = {
       const pageNum = Number(page);
       const limitNum = Number(limit);
 
+      const actor =
+        req.user?.id && req.user?.rol
+          ? { id: req.user.id, rol: req.user.rol }
+          : undefined;
+
       const resultado = await LicenciaService.obtenerLicencias(
         pageNum,
         limitNum,
         search as string | undefined,
         estado as string | undefined,
+        actor,
       );
 
       return res.status(200).json({ exito: true, ...resultado });
@@ -165,6 +171,13 @@ export const LicenciasController = {
           });
       }
 
+      if (req.user?.id && req.user?.rol) {
+        await LicenciaService.assertPuedeGestionarLicencia(id, {
+          id: req.user.id,
+          rol: req.user.rol,
+        });
+      }
+
       const data = await LicenciaService.actualizarEstado(id, estado, fecha_vencimiento);
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {
@@ -172,7 +185,8 @@ export const LicenciasController = {
         error instanceof Error
           ? error.message
           : "Error al actualizar el estado de la licencia.";
-      return res.status(500).json({ exito: false, error: message });
+      const status = message.includes("No podés gestionar") ? 403 : 500;
+      return res.status(status).json({ exito: false, error: message });
     }
   },
 
@@ -316,6 +330,80 @@ export const LicenciasController = {
           ? error.message
           : "Error al confirmar el pago de la licencia.";
       return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * POST /api/licencias/:id/pagos
+   * Registro manual de pago (anual o mensual) por admin.
+   */
+  async registrarPago(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "ID de licencia requerido." });
+      }
+
+      if (req.user?.id && req.user?.rol) {
+        await LicenciaService.assertPuedeGestionarLicencia(id, {
+          id: req.user.id,
+          rol: req.user.rol,
+        });
+      }
+
+      const data = await LicenciaService.registrarPago(
+        id,
+        {
+          monto: req.body?.monto,
+          periodo: req.body?.periodo,
+          metodo: req.body?.metodo,
+          notas: req.body?.notas,
+          mp_payment_id: req.body?.mp_payment_id,
+        },
+        req.user?.id,
+      );
+      return res.status(201).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al registrar el pago.";
+      const status = message.includes("No podés gestionar") ? 403 : 400;
+      return res.status(status).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * GET /api/licencias/:id/pagos
+   * Historial de pagos de una licencia.
+   */
+  async listarPagos(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "ID de licencia requerido." });
+      }
+
+      if (req.user?.id && req.user?.rol) {
+        await LicenciaService.assertPuedeGestionarLicencia(id, {
+          id: req.user.id,
+          rol: req.user.rol,
+        });
+      }
+
+      const data = await LicenciaService.listarPagos(id);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al listar pagos.";
+      const status = message.includes("No podés gestionar") ? 403 : 500;
+      return res.status(status).json({ exito: false, error: message });
     }
   },
 };
