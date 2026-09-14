@@ -10,6 +10,10 @@ export interface Club {
   longitud?: number | null;
   cbu?: string | null;
   alias?: string | null;
+  /** Plan sin comisiones: desbloquea transferencia y pago en club */
+  suscripcion_sin_comisiones?: boolean;
+  pago_transferencia_habilitado?: boolean;
+  pago_efectivo_habilitado?: boolean;
   created_at?: string;
   torneos_count?: number; // Virtual
 }
@@ -70,6 +74,9 @@ export interface FormClubState {
   longitud?: number | null;
   cbu?: string | null;
   alias?: string | null;
+  suscripcion_sin_comisiones?: boolean;
+  pago_transferencia_habilitado?: boolean;
+  pago_efectivo_habilitado?: boolean;
 }
 
 export interface SlotDisponible {

@@ -598,6 +598,104 @@ export default function ClubModal({
                   </div>
                 </div>
 
+                {/* SECCIÓN: MÉTODOS DE PAGO / SUSCRIPCIÓN */}
+                <div className="space-y-4 pt-4 border-t border-brand-white/5">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="size-4 text-brand-chartreuse" />
+                    <span className="text-sm font-bold text-brand-white">
+                      Modalidades de pago en reservas
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    Mercado Pago es la opción recomendada (siempre activa). Transferencia y pago
+                    en club quedan deshabilitados por defecto y se habilitan con la suscripción
+                    sin comisiones.
+                  </p>
+
+                  <label className="flex items-start gap-3 p-3.5 rounded-xl border border-brand-white/10 bg-brand-black cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 size-4 accent-brand-chartreuse"
+                      checked={Boolean(formData.suscripcion_sin_comisiones)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setFormData((prev) => ({
+                          ...prev,
+                          suscripcion_sin_comisiones: checked,
+                          pago_transferencia_habilitado: checked
+                            ? prev.pago_transferencia_habilitado
+                            : false,
+                          pago_efectivo_habilitado: checked
+                            ? prev.pago_efectivo_habilitado
+                            : false,
+                        }));
+                      }}
+                    />
+                    <span className="space-y-0.5">
+                      <span className="block text-sm font-semibold text-brand-white">
+                        Suscripción sin comisiones
+                      </span>
+                      <span className="block text-xs text-gray-400">
+                        Permite al club ofrecer transferencia y pago en sede sin comisiones de
+                        plataforma.
+                      </span>
+                    </span>
+                  </label>
+
+                  <div
+                    className={`grid grid-cols-1 md:grid-cols-2 gap-3 ${
+                      formData.suscripcion_sin_comisiones
+                        ? ""
+                        : "opacity-50 pointer-events-none"
+                    }`}
+                  >
+                    <label className="flex items-start gap-3 p-3.5 rounded-xl border border-brand-white/10 bg-brand-black/60 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 size-4 accent-brand-chartreuse"
+                        checked={Boolean(formData.pago_transferencia_habilitado)}
+                        disabled={!formData.suscripcion_sin_comisiones}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            pago_transferencia_habilitado: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span className="space-y-0.5">
+                        <span className="block text-sm font-medium text-brand-white">
+                          Transferencia bancaria
+                        </span>
+                        <span className="block text-xs text-gray-400">
+                          Requiere CBU o alias cargados.
+                        </span>
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-3 p-3.5 rounded-xl border border-brand-white/10 bg-brand-black/60 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 size-4 accent-brand-chartreuse"
+                        checked={Boolean(formData.pago_efectivo_habilitado)}
+                        disabled={!formData.suscripcion_sin_comisiones}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            pago_efectivo_habilitado: e.target.checked,
+                          }))
+                        }
+                      />
+                      <span className="space-y-0.5">
+                        <span className="block text-sm font-medium text-brand-white">
+                          Pago en el club
+                        </span>
+                        <span className="block text-xs text-gray-400">
+                          El jugador abona al llegar.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
                 {/* SECCIÓN: GEOLOCALIZACIÓN Y MAPA */}
                 <div className="space-y-4 pt-4 border-t border-brand-white/5">
                   <div className="flex items-center gap-2">

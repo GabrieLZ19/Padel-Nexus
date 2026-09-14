@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { ReservasService } from "@/utils/services/reservas";
 import { getSupabaseBrowserClient } from "@/utils/supabase/client";
+import { metodosPagoReservaDisponibles } from "@/utils/metodosPagoReserva";
 import { sileo } from "sileo";
 
 interface ReservaDetalle {
@@ -50,6 +51,9 @@ interface ReservaDetalle {
         alias?: string | null;
         latitud?: number | null;
         longitud?: number | null;
+        suscripcion_sin_comisiones?: boolean;
+        pago_transferencia_habilitado?: boolean;
+        pago_efectivo_habilitado?: boolean;
       };
     };
   };
@@ -64,7 +68,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(true);
   const [procesando, setProcesando] = useState(false);
   const [completado, setCompletado] = useState(false);
-  const [metodoPago, setMetodoPago] = useState("transferencia");
+  const [metodoPago, setMetodoPago] = useState("mercadopago");
   const [referenciaTransferencia, setReferenciaTransferencia] = useState("");
   const [comprobanteArchivo, setComprobanteArchivo] = useState<File | null>(null);
   const [copiadoCbu, setCopiadoCbu] = useState(false);
@@ -101,10 +105,7 @@ export default function CheckoutPage() {
           }
 
           const turnData = await ReservasService.getTurnoInfo(tId);
-          const hasBankDetails = !!(turnData?.canchas?.clubes?.cbu?.trim() || turnData?.canchas?.clubes?.alias?.trim());
-          if (!hasBankDetails) {
-            setMetodoPago("efectivo");
-          }
+          setMetodoPago("mercadopago");
 
           setReserva({
             id: "new",
@@ -117,10 +118,7 @@ export default function CheckoutPage() {
           });
         } else {
           const resData = await ReservasService.getReservaById(reservaId);
-          const hasBankDetails = !!(resData?.turnos?.canchas?.clubes?.cbu?.trim() || resData?.turnos?.canchas?.clubes?.alias?.trim());
-          if (!hasBankDetails) {
-            setMetodoPago("efectivo");
-          }
+          setMetodoPago("mercadopago");
 
           setReserva(resData);
 
@@ -440,31 +438,33 @@ export default function CheckoutPage() {
               <div className="space-y-3.5">
                 {[
                   {
-                    id: "transferencia",
-                    label: "Transferencia bancaria",
-                    desc: "CBU / Alias inmediato",
-                    icon: CreditCard,
-                  },
-                  {
-                    id: "efectivo",
-                    label: "Efectivo en el club",
-                    desc: "Abonás al momento de jugar",
-                    icon: Coins,
-                  },
-                  {
                     id: "mercadopago",
                     label: "MercadoPago",
                     desc: "Tarjetas de crédito, débito o dinero en cuenta",
                     icon: Wallet,
                     badge: "Recomendado",
                   },
-                ].filter((metodo) => {
-                  if (metodo.id === "transferencia") {
-                    const club = reserva?.turnos?.canchas?.clubes;
-                    return !!(club?.cbu?.trim() || club?.alias?.trim());
-                  }
-                  return true;
-                }).map((metodo) => {
+                  {
+                    id: "transferencia",
+                    label: "Transferencia bancaria",
+                    desc: "CBU / Alias inmediato — plan sin comisiones",
+                    icon: CreditCard,
+                  },
+                  {
+                    id: "efectivo",
+                    label: "Pago en el club",
+                    desc: "Abonás al momento de jugar — plan sin comisiones",
+                    icon: Coins,
+                  },
+                ]
+                  .filter((metodo) =>
+                    metodosPagoReservaDisponibles(
+                      reserva?.turnos?.canchas?.clubes,
+                    ).includes(
+                      metodo.id as "mercadopago" | "transferencia" | "efectivo",
+                    ),
+                  )
+                  .map((metodo) => {
                   const IconComponent = metodo.icon;
                   const isSelected = metodoPago === metodo.id;
                   return (

@@ -22,6 +22,9 @@ const ESTADO_INICIAL: FormClubState = {
   longitud: null,
   cbu: "",
   alias: "",
+  suscripcion_sin_comisiones: false,
+  pago_transferencia_habilitado: false,
+  pago_efectivo_habilitado: false,
 };
 
 export default function GestionClubesPage() {
@@ -83,6 +86,9 @@ export default function GestionClubesPage() {
       longitud: club.longitud || null,
       cbu: club.cbu || "",
       alias: club.alias || "",
+      suscripcion_sin_comisiones: Boolean(club.suscripcion_sin_comisiones),
+      pago_transferencia_habilitado: Boolean(club.pago_transferencia_habilitado),
+      pago_efectivo_habilitado: Boolean(club.pago_efectivo_habilitado),
     });
     setEditingId(club.id);
     setIsModalOpen(true);

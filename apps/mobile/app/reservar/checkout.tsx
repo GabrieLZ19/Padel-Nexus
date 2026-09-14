@@ -20,6 +20,7 @@ import {
   toDateParts,
 } from "@/src/lib/dateUtils";
 import { formatCurrencyArs, formatTime } from "@/src/lib/format";
+import { metodosPagoReservaDisponibles } from "@/src/lib/metodosPagoReserva";
 import { hrefReservaDetalle } from "@/src/lib/navigation";
 import {
   abrirCheckoutMercadoPago,
@@ -477,10 +478,24 @@ export default function ReservaCheckoutScreen() {
               </Text>
               {(
                 [
-                  { id: "mercadopago" as const, label: "Mercado Pago" },
-                  { id: "efectivo" as const, label: "Efectivo en el club" },
+                  {
+                    id: "mercadopago" as const,
+                    label: "Mercado Pago",
+                    badge: "Recomendado",
+                  },
+                  {
+                    id: "efectivo" as const,
+                    label: "Pago en el club",
+                    badge: undefined as string | undefined,
+                  },
                 ] as const
-              ).map((opcion) => {
+              )
+                .filter((opcion) =>
+                  metodosPagoReservaDisponibles(
+                    reserva?.turnos?.canchas?.clubes,
+                  ).includes(opcion.id),
+                )
+                .map((opcion) => {
                 const active = metodoPago === opcion.id;
                 return (
                   <Pressable
@@ -492,13 +507,22 @@ export default function ReservaCheckoutScreen() {
                         : "border-brand-border bg-brand-surface"
                     }`}
                   >
-                    <Text
-                      className={`font-sans-semibold text-base ${
-                        active ? "text-white" : "text-brand-muted"
-                      }`}
-                    >
-                      {opcion.label}
-                    </Text>
+                    <View className="flex-1 gap-0.5 pr-3">
+                      <View className="flex-row flex-wrap items-center gap-2">
+                        <Text
+                          className={`font-sans-semibold text-base ${
+                            active ? "text-white" : "text-brand-muted"
+                          }`}
+                        >
+                          {opcion.label}
+                        </Text>
+                        {opcion.badge ? (
+                          <Text className="rounded bg-brand-chartreuse/15 px-1.5 py-0.5 font-sans-bold text-[10px] uppercase text-brand-chartreuse">
+                            {opcion.badge}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
                     {active ? (
                       <FontAwesome name="check-circle" size={18} color="#CBFE01" />
                     ) : null}

@@ -5,6 +5,9 @@ export interface ClubReservaEmbed {
   localidad?: string;
   cbu?: string | null;
   alias?: string | null;
+  suscripcion_sin_comisiones?: boolean;
+  pago_transferencia_habilitado?: boolean;
+  pago_efectivo_habilitado?: boolean;
 }
 
 export interface CanchaReservaEmbed {
