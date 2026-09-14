@@ -223,9 +223,19 @@ function esPendienteZona(p: PartidoProgramable): boolean {
 }
 
 /** Partidos de zona TBD (G/P) también deben recibir cancha/hora al generar. */
-function necesitaHorario(p: PartidoProgramable): boolean {
+function necesitaHorario(
+  p: PartidoProgramable,
+  opciones?: { permitirSinEquipos?: boolean },
+): boolean {
   if (p.cancha_asignada && p.fecha_partido) return false;
   if (esPendienteZona(p)) return true;
+  // Modo pre-programacion de llave: aceptamos partidos sin equipos aun (solo
+  // se agenda cancha/hora tentativa respetando feeders). Los descansos por
+  // pareja no aplican porque no hay pareja asignada.
+  if (opciones?.permitirSinEquipos) {
+    const estado = String(p.estado_partido || "").toLowerCase();
+    return !estado.includes("pendiente");
+  }
   if (!p.equipo_a_id || !p.equipo_b_id) return false;
   const estado = String(p.estado_partido || "").toLowerCase();
   return !estado.includes("pendiente");
@@ -474,7 +484,7 @@ function buscarSlotIndividual(
 }
 
 /** Cruces que alimentan un matchNo (winnerTo → destino). */
-function buildFeedersByMatchNo(
+export function buildFeedersByMatchNo(
   edges: ReadonlyArray<{ matchNo: number; winnerTo: number | null }>,
 ): Map<number, number[]> {
   const map = new Map<number, number[]>();
@@ -583,12 +593,18 @@ export function asignarHorariosAPartidos(
     duracionMinutos?: number;
     /** matchNo destino → matchNos que lo alimentan (llave FAP). */
     feedersByMatchNo?: Map<number, number[]>;
+    /**
+     * Modo pre-programacion de llave: permite asignar cancha/hora a partidos
+     * sin equipos definidos (usando solo feeders para el ordenamiento).
+     */
+    permitirSinEquipos?: boolean;
   },
 ): void {
   if (!slots.length || !partidos.length) return;
 
   const duracionMinutos = Math.max(30, opciones?.duracionMinutos || 75);
   const feedersByMatchNo = opciones?.feedersByMatchNo || new Map();
+  const permitirSinEquipos = opciones?.permitirSinEquipos === true;
   const ocupados = new Set(ocupadosIniciales || []);
   const historial = new Map<string, PartidoParejaHistorial[]>();
 
@@ -596,7 +612,9 @@ export function asignarHorariosAPartidos(
 
   const pendientes = partidos
     .map((partido, index) => ({ partido, index }))
-    .filter(({ partido }) => necesitaHorario(partido));
+    .filter(({ partido }) =>
+      necesitaHorario(partido, { permitirSinEquipos }),
+    );
 
   // Agrupar por zona para oleadas FAP; el resto secuencial
   const porZona = new Map<string, { partido: PartidoProgramable; index: number }[]>();
@@ -815,6 +833,7 @@ export async function programarPartidosConDisponibilidad(
     fase?: FaseProgramacion;
     duracionMinutos?: number;
     feedersByMatchNo?: Map<number, number[]>;
+    permitirSinEquipos?: boolean;
   },
 ): Promise<void> {
   const { duracionMinutos: configurada, disponibilidad } =
@@ -829,6 +848,7 @@ export async function programarPartidosConDisponibilidad(
   asignarHorariosAPartidos(partidos, slots, opciones?.ocupados, {
     duracionMinutos,
     feedersByMatchNo: opciones?.feedersByMatchNo,
+    permitirSinEquipos: opciones?.permitirSinEquipos,
   });
 }
 

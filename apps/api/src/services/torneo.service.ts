@@ -1914,9 +1914,60 @@ export class TorneoService {
     partidoId: string,
     payload: Record<string, any>,
   ) {
+    // Detectamos edicion de horario/cancha para aplicar reglas de auditoria
+    // cuando el torneo ya publico su programacion al publico.
+    const cambiaFecha = Object.prototype.hasOwnProperty.call(
+      payload,
+      "fecha_partido",
+    );
+    const cambiaCancha = Object.prototype.hasOwnProperty.call(
+      payload,
+      "cancha_asignada",
+    );
+    const cambiaHorario = cambiaFecha || cambiaCancha;
+
+    const motivo =
+      typeof payload.horario_motivo_cambio === "string"
+        ? payload.horario_motivo_cambio.trim()
+        : typeof payload.motivo === "string"
+          ? payload.motivo.trim()
+          : "";
+
+    // Limpiamos claves auxiliares que no son columnas reales.
+    const dbPayload: Record<string, any> = { ...payload };
+    delete dbPayload.motivo;
+
+    if (cambiaHorario) {
+      // Traemos el estado de programacion del torneo del partido
+      const { data: partido } = await supabaseAdmin
+        .from("partidos")
+        .select("torneo_id, torneos(programacion_estado)")
+        .eq("id", partidoId)
+        .maybeSingle();
+
+      const programacionEstado =
+        (partido?.torneos as { programacion_estado?: string } | null)
+          ?.programacion_estado || "borrador";
+
+      if (programacionEstado === "publicado" && !motivo) {
+        throw new Error(
+          "Debes indicar un motivo del cambio: la programacion del torneo ya fue publicada.",
+        );
+      }
+
+      if (motivo) {
+        dbPayload.horario_motivo_cambio = motivo;
+      }
+      // Marcamos el horario como bloqueado para que la reprogramacion
+      // automatica no lo pise.
+      if (!Object.prototype.hasOwnProperty.call(dbPayload, "horario_bloqueado")) {
+        dbPayload.horario_bloqueado = true;
+      }
+    }
+
     const { error } = await supabaseAdmin
       .from("partidos")
-      .update(payload)
+      .update(dbPayload)
       .eq("id", partidoId);
 
     if (error) throw new Error(error.message);

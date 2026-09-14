@@ -38,6 +38,11 @@ import {
 } from "../controllers/fiscal.controller";
 import { generarZonas } from "../controllers/competencia.controller";
 import { obtenerPosicionesZona } from "../controllers/clasificacion.controller";
+import {
+  previewProgramacion,
+  reprogramarProgramacion,
+  publicarProgramacion,
+} from "../controllers/programacion.controller";
 import { authenticate, authorize } from "../middleware/auth";
 
 const router = Router();
@@ -140,6 +145,23 @@ router.get(
   "/:id/auditoria",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   getAuditoriaByTorneo,
+);
+
+// --- Programacion de horarios (borrador -> programado -> publicado) ---
+router.get(
+  "/:id/programacion/preview",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  previewProgramacion,
+);
+router.post(
+  "/:id/programacion/reprogramar",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  reprogramarProgramacion,
+);
+router.post(
+  "/:id/programacion/publicar",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  publicarProgramacion,
 );
 
 // --- Rutas de Fiscales (CRUD y Asignaciones) ---

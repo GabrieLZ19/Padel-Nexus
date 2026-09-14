@@ -8,6 +8,7 @@ import {
 } from "../utils/denominacionNacional";
 import { getCapacidadesZonasPreferidas } from "../utils/capacidadesZonas";
 import {
+  buildFeedersByMatchNo,
   buildOcupadosDesdePartidos,
   programarPartidosConDisponibilidad,
   type PartidoProgramable,
@@ -356,11 +357,13 @@ export class CompetenciaService {
     }
 
     // 6. GENERAR PARTIDOS DE PLAYOFF EN BLANCO (LLAVES FAP)
+    // Pre-programamos horarios usando refs 1A/2B como placeholder (via feeders)
+    // para que el admin pueda revisar la programacion completa antes de publicar.
     const pairCount = inscripciones.length;
     const fapMatrix = getFapBracketForPairCount(pairCount);
 
     if (fapMatrix) {
-      const playoffPartidos = fapMatrix.map((m) => ({
+      const playoffPartidos: PartidoProgramable[] = fapMatrix.map((m) => ({
         torneo_id: torneoId,
         equipo_a_id: null as string | null,
         equipo_b_id: null as string | null,
@@ -369,6 +372,18 @@ export class CompetenciaService {
         estado_partido: "Programado",
       }));
       if (playoffPartidos.length > 0) {
+        // Pasamos los partidos de zona ya programados como "ocupados" para
+        // que el scheduler no pise los slots. Usamos `permitirSinEquipos`
+        // porque en este punto los equipos de la llave son null (dependen
+        // de los clasificados de las zonas).
+        const ocupadosZonas = buildOcupadosDesdePartidos(partidosZonaFase);
+        const feedersByMatchNo = buildFeedersByMatchNo(fapMatrix);
+        await programarPartidosConDisponibilidad(torneoId, playoffPartidos, {
+          fase: "llave",
+          ocupados: ocupadosZonas,
+          feedersByMatchNo,
+          permitirSinEquipos: true,
+        });
         await supabaseAdmin.from("partidos").insert(playoffPartidos);
       }
     } else {
@@ -417,10 +432,14 @@ export class CompetenciaService {
       }
     }
 
-    // Actualizamos el estado del torneo
+    // Actualizamos el estado del torneo y marcamos que hay programacion
+    // tentativa lista para revisar (borrador -> programado).
     await supabaseAdmin
       .from("torneos")
-      .update({ estado: FAP_ESTADOS_TORNEO.EN_CURSO })
+      .update({
+        estado: FAP_ESTADOS_TORNEO.EN_CURSO,
+        programacion_estado: "programado",
+      })
       .eq("id", torneoId);
 
     return {
