@@ -39,8 +39,19 @@ export class ClubPanelController {
   static async actualizarMiClub(req: Request, res: Response) {
     try {
       const clubId = await ClubPanelController.getClubIdDelUsuario(req.user!.id);
-      const { nombre, provincia, localidad, latitud, longitud, cbu, alias } = req.body;
+      const {
+        nombre,
+        provincia,
+        localidad,
+        latitud,
+        longitud,
+        cbu,
+        alias,
+        pago_transferencia_habilitado,
+        pago_efectivo_habilitado,
+      } = req.body;
 
+      // El club no puede autoasignarse la suscripción; solo métodos alternativos.
       const data = await ClubService.actualizarClub(clubId, {
         nombre,
         provincia,
@@ -49,6 +60,12 @@ export class ClubPanelController {
         longitud,
         cbu,
         alias,
+        ...(typeof pago_transferencia_habilitado === "boolean"
+          ? { pago_transferencia_habilitado }
+          : {}),
+        ...(typeof pago_efectivo_habilitado === "boolean"
+          ? { pago_efectivo_habilitado }
+          : {}),
       });
 
       return res.status(200).json({ exito: true, data });

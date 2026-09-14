@@ -10,6 +10,10 @@ export interface CrearClubDTO {
   longitud?: number | null;
   cbu?: string | null;
   alias?: string | null;
+  /** Plan sin comisiones: desbloquea transferencia y pago en club */
+  suscripcion_sin_comisiones?: boolean;
+  pago_transferencia_habilitado?: boolean;
+  pago_efectivo_habilitado?: boolean;
 }
 
 export type ActualizarClubDTO = Partial<CrearClubDTO>;
@@ -216,6 +220,7 @@ export class ClubService {
 
   static async crearClub(datos: CrearClubDTO) {
     const cantidadCanchas = Math.max(0, Number(datos.canchas) || 0);
+    const suscripcion = Boolean(datos.suscripcion_sin_comisiones);
     const { data, error } = await supabaseAdmin
       .from("clubes")
       .insert([
@@ -223,6 +228,13 @@ export class ClubService {
           ...datos,
           canchas: cantidadCanchas,
           estado: datos.estado || "Activo",
+          suscripcion_sin_comisiones: suscripcion,
+          pago_transferencia_habilitado: suscripcion
+            ? Boolean(datos.pago_transferencia_habilitado)
+            : false,
+          pago_efectivo_habilitado: suscripcion
+            ? Boolean(datos.pago_efectivo_habilitado)
+            : false,
         },
       ])
       .select()
@@ -253,9 +265,31 @@ export class ClubService {
   }
 
   static async actualizarClub(id: string, datos: ActualizarClubDTO) {
-    const payload = { ...datos };
+    const payload: ActualizarClubDTO = { ...datos };
     if (payload.canchas !== undefined) {
       payload.canchas = Number(payload.canchas) || 0;
+    }
+
+    // Sin suscripción sin comisiones, los métodos alternativos quedan off.
+    if (payload.suscripcion_sin_comisiones === false) {
+      payload.pago_transferencia_habilitado = false;
+      payload.pago_efectivo_habilitado = false;
+    } else if (
+      payload.pago_transferencia_habilitado === true ||
+      payload.pago_efectivo_habilitado === true
+    ) {
+      const actual = await ClubService.obtenerClubPorId(id);
+      const suscripcionActiva =
+        payload.suscripcion_sin_comisiones === true ||
+        Boolean(
+          (actual as { suscripcion_sin_comisiones?: boolean })
+            .suscripcion_sin_comisiones,
+        );
+      if (!suscripcionActiva) {
+        throw new Error(
+          "Transferencia y pago en club requieren la suscripción sin comisiones del club.",
+        );
+      }
     }
 
     const { data, error } = await supabaseAdmin

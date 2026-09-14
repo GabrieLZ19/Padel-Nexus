@@ -7,6 +7,10 @@ import {
   resolveMercadoPagoInitPoint,
 } from "../config/mercadopago";
 import { esHorarioReservaPasado } from "../utils/fechaArgentina";
+import {
+  assertMetodoPagoReservaPermitido,
+  type ClubMetodosPagoConfig,
+} from "../utils/metodos-pago-reserva";
 import { ClubService } from "./club.service";
 
 // ── Tipos ──────────────────────────────────────────────────────────────
@@ -259,7 +263,7 @@ export class ReservaService {
         id, hora_inicio, hora_fin, precio, dia_semana,
         canchas (
           id, nombre, tipo_suelo, techada,
-          clubes ( id, nombre, provincia, localidad, cbu, alias )
+          clubes ( id, nombre, provincia, localidad, cbu, alias, suscripcion_sin_comisiones, pago_transferencia_habilitado, pago_efectivo_habilitado )
         )
       `,
       )
@@ -283,7 +287,7 @@ export class ReservaService {
           id, hora_inicio, hora_fin, precio, dia_semana,
           canchas (
             id, nombre, tipo_suelo, techada,
-            clubes ( id, nombre, provincia, localidad, cbu, alias )
+            clubes ( id, nombre, provincia, localidad, cbu, alias, suscripcion_sin_comisiones, pago_transferencia_habilitado, pago_efectivo_habilitado )
           )
         ),
         pagos (
@@ -313,7 +317,16 @@ export class ReservaService {
     // 1. Verificar que la reserva existe y pertenece al usuario
     const { data: reserva, error: rError } = await supabaseAdmin
       .from("reservas")
-      .select("id, usuario_id, estado_pago")
+      .select(
+        `
+        id, usuario_id, estado_pago,
+        turnos (
+          canchas (
+            clubes ( id, nombre, provincia, localidad, cbu, alias, suscripcion_sin_comisiones, pago_transferencia_habilitado, pago_efectivo_habilitado )
+          )
+        )
+      `,
+      )
       .eq("id", reservaId)
       .single();
 
@@ -322,6 +335,15 @@ export class ReservaService {
       throw new Error("No tiene permiso sobre esta reserva.");
     if (reserva.estado_pago === "completado")
       throw new Error("Esta reserva ya fue pagada.");
+
+    const clubEmbed = (
+      reserva as {
+        turnos?: {
+          canchas?: { clubes?: ClubMetodosPagoConfig | null } | null;
+        } | null;
+      }
+    ).turnos?.canchas?.clubes;
+    assertMetodoPagoReservaPermitido(clubEmbed, metodoPago);
 
     const esTransferencia = metodoPago === "transferencia";
 

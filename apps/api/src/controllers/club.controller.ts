@@ -98,6 +98,9 @@ export const createClub = async (
       longitud,
       cbu,
       alias,
+      suscripcion_sin_comisiones,
+      pago_transferencia_habilitado,
+      pago_efectivo_habilitado,
     } = req.body;
 
     if (!nombre || !provincia) {
@@ -116,6 +119,9 @@ export const createClub = async (
       longitud: longitud ?? null,
       cbu: cbu || null,
       alias: alias || null,
+      suscripcion_sin_comisiones: Boolean(suscripcion_sin_comisiones),
+      pago_transferencia_habilitado: Boolean(pago_transferencia_habilitado),
+      pago_efectivo_habilitado: Boolean(pago_efectivo_habilitado),
     });
     return res.status(201).json({ exito: true, data });
   } catch (error: unknown) {
@@ -141,6 +147,9 @@ export const updateClub = async (
       longitud,
       cbu,
       alias,
+      suscripcion_sin_comisiones,
+      pago_transferencia_habilitado,
+      pago_efectivo_habilitado,
     } = req.body;
 
     if (!id)
@@ -158,6 +167,15 @@ export const updateClub = async (
       longitud,
       cbu,
       alias,
+      ...(typeof suscripcion_sin_comisiones === "boolean"
+        ? { suscripcion_sin_comisiones }
+        : {}),
+      ...(typeof pago_transferencia_habilitado === "boolean"
+        ? { pago_transferencia_habilitado }
+        : {}),
+      ...(typeof pago_efectivo_habilitado === "boolean"
+        ? { pago_efectivo_habilitado }
+        : {}),
     });
     return res.status(200).json({ exito: true, data });
   } catch (error: unknown) {
