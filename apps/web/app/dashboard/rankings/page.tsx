@@ -1,10 +1,87 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Trophy, Search, Eye, Activity, X, Building2, MapPin } from "lucide-react";
-import { RankingsService, JugadorRanking } from "@/utils/services/rankings";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Trophy,
+  Search,
+  Eye,
+  Activity,
+  X,
+  MapPin,
+  Info,
+} from "lucide-react";
+import {
+  RankingsService,
+  type JugadorRanking,
+  type RankingsQueryParams,
+  type TipoRankingFront,
+} from "@/utils/services/rankings";
 import { TorneosService } from "@/utils/services/torneos";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import { useProfileStore } from "@/store/useProfileStore";
+import { PROVINCIAS_ARG, NIVELES_PADEL } from "@/utils/constants/padelConfig";
+
+// -----------------------------------------------------------------------------
+// Config: tabs por tipo de ranking (menores / ladies-veteranos / libres)
+// -----------------------------------------------------------------------------
+
+interface TipoRankingConfig {
+  value: TipoRankingFront;
+  label: string;
+  descripcion: string;
+  grupoNivel: "Menores" | "Ladies & Veteranos" | "Libres";
+  /** Rama forzada por reglamento; null significa que el usuario elige. */
+  ramaForzada: "masculino" | "femenino" | null;
+  /** Si false, el selector de rama queda oculto. */
+  permiteRama: boolean;
+}
+
+const TIPOS_RANKING_CONFIG: TipoRankingConfig[] = [
+  {
+    value: "libres",
+    label: "Libres",
+    descripcion: "Damas y Caballeros por nivel (1ª a 8ª e Inicial).",
+    grupoNivel: "Libres",
+    ramaForzada: null,
+    permiteRama: true,
+  },
+  {
+    value: "veteranos",
+    label: "Ladies & Veteranos",
+    descripcion:
+      "Categorias por edad. Ladies (femenino) y Veteranos (masculino).",
+    grupoNivel: "Ladies & Veteranos",
+    ramaForzada: null,
+    permiteRama: true,
+  },
+  {
+    value: "menores",
+    label: "Menores",
+    descripcion: "Sub-10 a Sub-18 y promocionales.",
+    grupoNivel: "Menores",
+    ramaForzada: null,
+    permiteRama: true,
+  },
+];
+
+// Categorias disponibles por tipo, derivadas de NIVELES_PADEL.
+const CATEGORIAS_POR_TIPO: Record<TipoRankingFront, string[]> = {
+  menores: NIVELES_PADEL.filter((n) => n.grupo === "Menores").map((n) => n.value),
+  veteranos: NIVELES_PADEL.filter(
+    (n) => n.grupo === "Ladies & Veteranos",
+  ).map((n) => n.value),
+  libres: NIVELES_PADEL.filter((n) => n.grupo === "Libres").map((n) => n.value),
+};
+
+const RAMAS_OPCIONES = [
+  { value: "", label: "Todas las Ramas" },
+  { value: "masculino", label: "Caballeros / Masculino" },
+  { value: "femenino", label: "Damas / Femenino" },
+];
+
+// -----------------------------------------------------------------------------
+// Panel: ranking por provincias en torneos nacionales
+// -----------------------------------------------------------------------------
 
 function RankingProvincialPanel() {
   const [torneos, setTorneos] = useState<Array<{ id: string; nombre: string }>>(
@@ -17,11 +94,13 @@ function RankingProvincialPanel() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
       try {
         const list = await TorneosService.getByPage(1, 50, undefined, undefined, {
           incluirBorradores: false,
         });
+        if (cancelled) return;
         setTorneos(
           list.data
             .filter((t) =>
@@ -32,9 +111,12 @@ function RankingProvincialPanel() {
             .map((t) => ({ id: t.id, nombre: t.nombre })),
         );
       } catch {
-        setTorneos([]);
+        if (!cancelled) setTorneos([]);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -42,17 +124,22 @@ function RankingProvincialPanel() {
       setRows([]);
       return;
     }
+    let cancelled = false;
     void (async () => {
       try {
         setLoading(true);
         const data = await RankingsService.getProvincialPorTorneo(torneoId);
+        if (cancelled) return;
         setRows(data.provincias || []);
       } catch {
-        setRows([]);
+        if (!cancelled) setRows([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [torneoId]);
 
   return (
@@ -105,84 +192,184 @@ function RankingProvincialPanel() {
   );
 }
 
+// -----------------------------------------------------------------------------
+// Pagina principal
+// -----------------------------------------------------------------------------
+
 export default function RankingsPage() {
+  const profile = useProfileStore((s) => s.profile);
+  const rol = profile?.rol;
+
+  // El scope se define por rol: provincial y club fuerzan Provincial;
+  // federacion/superadmin van a Nacional/Global por defecto.
+  const scopePorRol = useMemo(() => {
+    if (rol === "admin_provincial" || rol === "admin_club") return "Provincial";
+    if (rol === "admin_federacion") return "Nacional";
+    return "Global";
+  }, [rol]);
+
+  // El provincial y el club ven forzada su provincia (residencia del perfil).
+  const provinciaForzada = useMemo(() => {
+    if (rol === "admin_provincial" || rol === "admin_club") {
+      return profile?.lugar_residencia || "";
+    }
+    return "";
+  }, [rol, profile?.lugar_residencia]);
+
+  // Estado de filtros
+  const [tipo, setTipo] = useState<TipoRankingFront>("libres");
+  const [rama, setRama] = useState<string>("");
+  const [categoria, setCategoria] = useState<string>("");
+  const [provincia, setProvincia] = useState<string>(provinciaForzada);
+  const [scope, setScope] = useState<string>(scopePorRol);
+  const [search, setSearch] = useState<string>("");
+
+  // Datos
   const [rankings, setRankings] = useState<JugadorRanking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [categoria, setCategoria] = useState("Todas");
-  const [rama, setRama] = useState("Todas");
 
-  // Modal Expediente del Jugador
-  const [selectedJugador, setSelectedJugador] = useState<any | null>(null);
-  const [showJugadorModal, setShowJugadorModal] = useState(false);
+  // Modal expediente
+  const [selectedJugador, setSelectedJugador] = useState<JugadorRanking | null>(
+    null,
+  );
 
+  // Reset de provincia/scope cuando cambia el rol resuelto (montaje o post-login).
   useEffect(() => {
-    fetchRankings();
-  }, []);
+    setScope(scopePorRol);
+    setProvincia(provinciaForzada);
+  }, [scopePorRol, provinciaForzada]);
 
-  const fetchRankings = async () => {
-    try {
+  // Fetch al cambiar filtros
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
       setLoading(true);
-      const data = await RankingsService.getAll();
-      setRankings(data);
-    } catch (err) {
-      console.error("Error al cargar rankings:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        const params: RankingsQueryParams = {
+          tipo_ranking: tipo,
+          scope,
+          rama: rama || undefined,
+          categoria: categoria || undefined,
+          provincia: provincia || undefined,
+          limit: 200,
+        };
+        const data = await RankingsService.getAll(params);
+        if (!cancelled) setRankings(data);
+      } catch (err) {
+        console.error("Error al cargar rankings:", err);
+        if (!cancelled) setRankings([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tipo, rama, categoria, provincia, scope]);
 
-  const handleOpenJugador = (j: any, posIndex: number) => {
-    const pj = j.pj || j.partidos_jugados || 0;
-    const pg = j.pg || j.partidos_ganados || 0;
-    const efectividad = pj > 0 ? Math.round((pg / pj) * 100) : 0;
+  // Reset de categoria al cambiar de tipo (evita valores invalidos entre grupos).
+  useEffect(() => {
+    setCategoria("");
+  }, [tipo]);
 
+  const tipoConfig = TIPOS_RANKING_CONFIG.find((t) => t.value === tipo)!;
+  const categoriasDelTipo = CATEGORIAS_POR_TIPO[tipo];
+
+  const filteredRankings = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return rankings;
+    return rankings.filter((j) => {
+      const nombreCompleto = `${j.nombre || ""} ${j.apellido || ""}`.toLowerCase();
+      return nombreCompleto.includes(q);
+    });
+  }, [rankings, search]);
+
+  const handleOpenJugador = (j: JugadorRanking, posIndex: number) => {
     setSelectedJugador({
       ...j,
-      posicionRanking: posIndex + 1,
-      pj,
-      pg,
-      efectividad,
+      posicion_actual: posIndex + 1,
     });
-    setShowJugadorModal(true);
   };
 
-  const filteredRankings = rankings.filter((j) => {
-    const nombreCompleto = `${j.nombre || ""} ${j.apellido || ""}`.toLowerCase();
-    const matchSearch = nombreCompleto.includes(search.toLowerCase().trim());
-    const matchCat =
-      categoria === "Todas" || (j.categoria_padel || j.categoria) === categoria;
-    const matchRama =
-      rama === "Todas" ||
-      (j.sexo && j.sexo.toLowerCase() === rama.toLowerCase());
-    return matchSearch && matchCat && matchRama;
-  });
+  const tituloContexto = useMemo(() => {
+    if (rol === "admin_provincial") return "Ranking Provincial / Regional";
+    if (rol === "admin_federacion" || rol === "superadmin")
+      return "Ranking Nacional FAP";
+    if (rol === "admin_club") return "Ranking del Circuito del Club";
+    return "Tabla General de Rankings";
+  }, [rol]);
+
+  const subtituloContexto = useMemo(() => {
+    if (rol === "admin_provincial") {
+      return `Jugadores de ${provinciaForzada || "tu provincia"} por categoria y rama. Usa "Ver Ranking Nacional" para consultar el ranking federativo.`;
+    }
+    if (rol === "admin_club") {
+      return "Ranking filtrado por circuito privado. Se muestran solo las categorias que administra el club.";
+    }
+    return "Posiciones oficiales, rendimiento y expedientes completos por categoria y rama.";
+  }, [rol, provinciaForzada]);
 
   return (
     <div className="p-6 md:p-8 max-w-full mx-auto space-y-8">
-      {/* Header */}
+      {/* Header contextual */}
       <div className="border-b border-white/10 pb-6">
         <div className="flex items-center gap-2 text-brand-chartreuse text-xs font-bold uppercase tracking-widest mb-1">
-          <Trophy className="size-4" /> Circuito Nacional FAP
+          <Trophy className="size-4" /> {tituloContexto}
         </div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight">
-          Tabla General de Rankings
+          {tipoConfig.label}
         </h1>
-        <p className="text-gray-400 text-sm mt-1">
-          Posiciones oficiales, rendimiento y expedientes completos por categoría y rama.
-          En nacionales, el ranking por provincias usa 8/6/4/2/1 (campeón → octavos).
-        </p>
+        <p className="text-gray-400 text-sm mt-1">{subtituloContexto}</p>
+        {rol === "admin_provincial" && (
+          <button
+            type="button"
+            onClick={() => setScope("Nacional")}
+            className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-brand-chartreuse/30 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+          >
+            <Trophy className="size-3.5" />
+            Ver Ranking Nacional
+          </button>
+        )}
       </div>
 
-      <RankingProvincialPanel />
+      {/* Nota de desempate */}
+      <div className="flex items-start gap-2 bg-white/5 border border-white/10 rounded-2xl p-3 text-xs text-gray-400">
+        <Info className="size-4 text-brand-chartreuse shrink-0 mt-0.5" />
+        <span>
+          Ante igualdad de puntos, el orden se resuelve alfabeticamente por
+          apellido y nombre segun reglamento.
+        </span>
+      </div>
 
-      {/* Filtros */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Ranking provincial por torneo nacional (solo fed / superadmin) */}
+      {(rol === "admin_federacion" || rol === "superadmin") && (
+        <RankingProvincialPanel />
+      )}
+
+      {/* Tabs por tipo de ranking */}
+      <div className="flex flex-wrap gap-2 border-b border-white/10 pb-2">
+        {TIPOS_RANKING_CONFIG.map((t) => (
+          <button
+            key={t.value}
+            onClick={() => setTipo(t.value)}
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all cursor-pointer ${
+              tipo === t.value
+                ? "bg-brand-chartreuse text-brand-black shadow-[0_0_15px_rgba(203,254,1,0.2)]"
+                : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Filtros contextuales */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="relative">
           <Search className="absolute left-4 top-3.5 size-4 text-gray-500" />
           <input
             type="text"
-            placeholder="Buscar por Nombre o Apellido..."
+            placeholder="Buscar por nombre o apellido..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-brand-card border border-white/10 text-white pl-11 pr-4 py-3 rounded-xl text-sm font-semibold focus:outline-none focus:border-brand-chartreuse/50"
@@ -190,63 +377,65 @@ export default function RankingsPage() {
         </div>
 
         <CustomDropdown
-          value={categoria}
-          onChange={setCategoria}
-          options={(() => {
-            const baseCats = [
-              "Todas",
-              "1ª",
-              "2ª",
-              "3ª",
-              "4ª",
-              "5ª",
-              "6ª",
-              "7ª",
-              "8ª",
-              "Sub-12",
-              "Sub-14",
-              "Sub-16",
-              "Sub-18",
-              "+30",
-              "+40",
-              "+50",
-            ];
-            const bdCats = Array.from(
-              new Set(
-                rankings
-                  .map((r) => r.categoria_padel || r.categoria)
-                  .filter(Boolean),
-              ),
-            );
-            const allCats = Array.from(new Set([...baseCats, ...bdCats]));
-            return allCats.map((c) => ({
-              value: c,
-              label: c === "Todas" ? "Todas las Categorías" : `Categoría ${c}`,
-            }));
-          })()}
-          placeholder="Categoría..."
+          value={rama}
+          onChange={setRama}
+          options={RAMAS_OPCIONES}
+          placeholder="Rama"
         />
 
         <CustomDropdown
-          value={rama}
-          onChange={setRama}
+          value={categoria}
+          onChange={setCategoria}
           options={[
-            { value: "Todas", label: "Todas las Ramas" },
-            { value: "masculino", label: "Masculino" },
-            { value: "femenino", label: "Femenino" },
+            { value: "", label: `Todas las categorias (${tipoConfig.label})` },
+            ...categoriasDelTipo.map((c) => ({ value: c, label: c })),
           ]}
-          placeholder="Rama..."
+          placeholder="Categoría"
         />
+
+        {/* Provincia solo para fed / superadmin. Provincial y club la tienen forzada. */}
+        {rol === "admin_federacion" || rol === "superadmin" ? (
+          <CustomDropdown
+            value={provincia}
+            onChange={setProvincia}
+            options={[
+              { value: "", label: "Todas las provincias" },
+              ...PROVINCIAS_ARG.map((p) => ({ value: p.value, label: p.label })),
+            ]}
+            placeholder="Provincia"
+          />
+        ) : (
+          <div className="flex items-center justify-center bg-white/5 border border-white/10 rounded-xl text-xs text-gray-400 px-4 py-3 font-semibold">
+            <MapPin className="size-3.5 mr-2 text-brand-chartreuse" />
+            {provincia || "Sin provincia asignada"}
+          </div>
+        )}
       </div>
 
-      {/* Tabla de Rankings */}
+      {/* Tabla */}
       {loading ? (
         <div className="p-12 text-center text-gray-500 font-semibold">
           Cargando tabla de posiciones...
         </div>
       ) : filteredRankings.length === 0 ? (
-        <div className="p-12 text-center border border-dashed border-white/10 rounded-3xl text-gray-500">
-          No hay jugadores registrados que coincidan con los filtros.
+        <div className="p-12 text-center border border-dashed border-white/10 rounded-3xl text-gray-500 space-y-2">
+          {rankings.length === 0 ? (
+            <>
+              <p className="font-semibold">
+                Aún no hay puntos cargados para{" "}
+                <span className="text-white">{tipoConfig.label}</span>
+                {provincia ? ` en ${provincia}` : ""}.
+              </p>
+              <p className="text-xs">
+                Los rankings se completan a medida que se disputan torneos que
+                otorgan puntos en esta clasificación.
+              </p>
+            </>
+          ) : (
+            <p className="font-semibold">
+              No hay jugadores que coincidan con la búsqueda actual.
+            </p>
+          )}
         </div>
       ) : (
         <div className="bg-[#161616] border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
@@ -266,10 +455,10 @@ export default function RankingsPage() {
               </thead>
               <tbody className="divide-y divide-white/5 text-sm font-semibold text-gray-300">
                 {filteredRankings.map((j, idx) => {
-                  const pj = j.pj || (j as any).partidos_jugados || 0;
-                  const pg = j.pg || (j as any).partidos_ganados || 0;
+                  const pj = j.pj || 0;
+                  const pg = j.pg || 0;
                   const efectividad = pj > 0 ? Math.round((pg / pj) * 100) : 0;
-                  const avatarUrl = (j as any).avatar_url || (j as any).perfiles?.avatar_url;
+                  const avatarUrl = j.avatar_url;
 
                   return (
                     <tr
@@ -295,6 +484,7 @@ export default function RankingsPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           {avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={avatarUrl}
                               alt={`${j.nombre} ${j.apellido}`}
@@ -310,14 +500,14 @@ export default function RankingsPage() {
                               {j.nombre} {j.apellido}
                             </span>
                             <span className="text-[11px] text-gray-500 font-normal">
-                              DNI: {(j as any).dni || (j as any).perfiles?.dni || "N/D"}
+                              DNI: {j.dni || "N/D"}
                             </span>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-gray-300 font-bold">
-                          {j.categoria_padel || j.categoria || "5ª"}
+                          {j.categoria_padel || j.categoria || "-"}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-gray-400">
@@ -343,7 +533,7 @@ export default function RankingsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right font-black text-brand-chartreuse text-base">
-                        {j.puntos || (j as any).ranking_nacional || 0} pts
+                        {j.puntos || 0} pts
                       </td>
                       <td className="px-6 py-4 text-right">
                         <button
@@ -351,7 +541,7 @@ export default function RankingsPage() {
                             e.stopPropagation();
                             handleOpenJugador(j, idx);
                           }}
-                          className="p-2 bg-white/5 hover:bg-brand-chartreuse/20 text-gray-400 hover:text-brand-chartreuse rounded-xl transition-all inline-flex items-center gap-1 text-xs font-bold"
+                          className="p-2 bg-white/5 hover:bg-brand-chartreuse/20 text-gray-400 hover:text-brand-chartreuse rounded-xl transition-all inline-flex items-center gap-1 text-xs font-bold cursor-pointer"
                           title="Ver Expediente Completo"
                         >
                           <Eye className="size-4" />
@@ -366,16 +556,17 @@ export default function RankingsPage() {
         </div>
       )}
 
-      {/* Modal Expediente del Jugador */}
-      {showJugadorModal && selectedJugador && (
+      {/* Modal expediente del jugador */}
+      {selectedJugador && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[#161616] border border-white/10 rounded-3xl max-w-md w-full p-6 space-y-6 shadow-2xl">
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-3">
-                {selectedJugador.avatar_url || selectedJugador.perfiles?.avatar_url ? (
+                {selectedJugador.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={selectedJugador.avatar_url || selectedJugador.perfiles?.avatar_url}
-                    alt={selectedJugador.nombre}
+                    src={selectedJugador.avatar_url}
+                    alt={`${selectedJugador.nombre} ${selectedJugador.apellido}`}
                     className="size-14 rounded-2xl object-cover border-2 border-brand-chartreuse/40"
                   />
                 ) : (
@@ -393,7 +584,7 @@ export default function RankingsPage() {
                 </div>
               </div>
               <button
-                onClick={() => setShowJugadorModal(false)}
+                onClick={() => setSelectedJugador(null)}
                 className="text-gray-400 hover:text-white p-1 cursor-pointer"
               >
                 <X className="size-5" />
@@ -402,74 +593,102 @@ export default function RankingsPage() {
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-black/30 p-3.5 rounded-2xl border border-white/5 space-y-1">
-                <span className="text-gray-500 font-bold uppercase text-[10px] block">Club de Pertenencia</span>
+                <span className="text-gray-500 font-bold uppercase text-[10px] block">
+                  Club de Pertenencia
+                </span>
                 <span className="text-white font-bold block">
-                  {selectedJugador.club || selectedJugador.perfiles?.clubes?.nombre || "Club Afiliado"}
+                  {selectedJugador.club || "Club Afiliado"}
                 </span>
               </div>
 
               <div className="bg-black/30 p-3.5 rounded-2xl border border-white/5 space-y-1">
-                <span className="text-gray-500 font-bold uppercase text-[10px] block">DNI</span>
+                <span className="text-gray-500 font-bold uppercase text-[10px] block">
+                  DNI
+                </span>
                 <span className="text-white font-mono font-bold block">
-                  {selectedJugador.dni || selectedJugador.perfiles?.dni || "N/D"}
+                  {selectedJugador.dni || "N/D"}
                 </span>
               </div>
 
               <div className="bg-black/30 p-3.5 rounded-2xl border border-white/5 space-y-1">
-                <span className="text-gray-500 font-bold uppercase text-[10px] block">Categoría</span>
+                <span className="text-gray-500 font-bold uppercase text-[10px] block">
+                  Categoría
+                </span>
                 <span className="text-brand-chartreuse font-extrabold block">
-                  {selectedJugador.categoria_padel || selectedJugador.categoria || "5ª Categoría"}
+                  {selectedJugador.categoria_padel || selectedJugador.categoria || "-"}
                 </span>
               </div>
 
               <div className="bg-black/30 p-3.5 rounded-2xl border border-white/5 space-y-1">
-                <span className="text-gray-500 font-bold uppercase text-[10px] block">Posición Ranking FAP</span>
+                <span className="text-gray-500 font-bold uppercase text-[10px] block">
+                  Posición Ranking
+                </span>
                 <span className="text-yellow-400 font-black text-xs block">
-                  #{selectedJugador.posicionRanking} en el Ranking
+                  #{selectedJugador.posicion_actual || "-"}
                 </span>
               </div>
 
               <div className="bg-black/30 p-3.5 rounded-2xl border border-white/5 space-y-1">
-                <span className="text-gray-500 font-bold uppercase text-[10px] block">Edad / Género</span>
-                <span className="text-white font-bold block">
-                  {selectedJugador.edad || (selectedJugador.perfiles?.fecha_nacimiento ? `${new Date().getFullYear() - new Date(selectedJugador.perfiles.fecha_nacimiento).getFullYear()} años` : "30 años")} • {selectedJugador.sexo === "femenino" || selectedJugador.perfiles?.sexo === "femenino" ? "Femenino" : "Masculino"}
+                <span className="text-gray-500 font-bold uppercase text-[10px] block">
+                  Rama
+                </span>
+                <span className="text-white font-bold block capitalize">
+                  {selectedJugador.sexo || "-"}
                 </span>
               </div>
 
               <div className="bg-black/30 p-3.5 rounded-2xl border border-white/5 space-y-1">
-                <span className="text-gray-500 font-bold uppercase text-[10px] block">Provincia</span>
+                <span className="text-gray-500 font-bold uppercase text-[10px] block">
+                  Provincia
+                </span>
                 <span className="text-gray-300 font-bold block">
-                  {selectedJugador.provincia || selectedJugador.perfiles?.lugar_residencia || "Argentina"}
+                  {selectedJugador.provincia || "Argentina"}
                 </span>
               </div>
             </div>
 
             <div className="bg-black/30 p-4 rounded-2xl border border-white/5 space-y-3">
               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Activity className="size-4 text-brand-chartreuse" /> Rendimiento & Estadísticas
+                <Activity className="size-4 text-brand-chartreuse" />
+                Rendimiento & Estadísticas
               </h4>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="bg-white/5 p-2.5 rounded-xl">
-                  <span className="text-[10px] text-gray-500 block">Puntos FAP</span>
+                  <span className="text-[10px] text-gray-500 block">
+                    Puntos FAP
+                  </span>
                   <span className="text-sm font-black text-brand-chartreuse">
                     {selectedJugador.puntos || 0} pts
                   </span>
                 </div>
                 <div className="bg-white/5 p-2.5 rounded-xl">
-                  <span className="text-[10px] text-gray-500 block">Partidos Jugados</span>
-                  <span className="text-sm font-black text-white">{selectedJugador.pj}</span>
+                  <span className="text-[10px] text-gray-500 block">
+                    Partidos Jugados
+                  </span>
+                  <span className="text-sm font-black text-white">
+                    {selectedJugador.pj || 0}
+                  </span>
                 </div>
                 <div className="bg-white/5 p-2.5 rounded-xl">
-                  <span className="text-[10px] text-gray-500 block">Efectividad</span>
+                  <span className="text-[10px] text-gray-500 block">
+                    Efectividad
+                  </span>
                   <span className="text-sm font-black text-emerald-400">
-                    {selectedJugador.efectividad}%
+                    {(selectedJugador.pj || 0) > 0
+                      ? Math.round(
+                          ((selectedJugador.pg || 0) /
+                            (selectedJugador.pj || 1)) *
+                            100,
+                        )
+                      : 0}
+                    %
                   </span>
                 </div>
               </div>
             </div>
 
             <button
-              onClick={() => setShowJugadorModal(false)}
+              onClick={() => setSelectedJugador(null)}
               className="w-full py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold text-xs transition-colors cursor-pointer"
             >
               Cerrar Ficha del Jugador
@@ -480,4 +699,3 @@ export default function RankingsPage() {
     </div>
   );
 }
-

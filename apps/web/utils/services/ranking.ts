@@ -1,18 +1,15 @@
-import { api } from "../api";
-import { RankingJugador } from "../types";
-import { ApiResponse } from "./perfil";
+/**
+ * @deprecated Este archivo existe solo por retro-compatibilidad con imports
+ * legacy (`@/utils/services/ranking`). Todo nuevo consumidor debe importar
+ * desde `@/utils/services/rankings` (plural), donde vive la implementacion
+ * consolidada.
+ */
 
-export const RankingsService = {
-  /**
-   * Obtiene el ranking de jugadores aplicando filtros opcionales
-   */
-  async getGlobal(params?: {
-    categoria?: string;
-    rama?: string;
-    provincia?: string;
-    scope?: string;
-  }): Promise<RankingJugador[]> {
-    const response = await api.get<ApiResponse<RankingJugador[]>>("/rankings", { params });
-    return response.data.data || [];
-  },
-};
+export {
+  RankingsService,
+  type RankingsQueryParams,
+  type JugadorRanking,
+  type TipoRankingFront,
+  type RamaRankingFront,
+  type AlcanceRanking,
+} from "./rankings";

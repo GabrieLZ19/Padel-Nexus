@@ -66,6 +66,16 @@ const MENU_POR_ROL: Record<string, string[]> = {
     "/dashboard/chat",
   ],
 
+  // Club: ve ranking limitado al circuito privado (rama + categorías gestionadas).
+  admin_club: [
+    "/dashboard",
+    "/dashboard/torneos",
+    "/dashboard/inscripciones",
+    "/dashboard/rankings",
+    "/dashboard/comunicaciones",
+    "/dashboard/chat",
+  ],
+
   fiscal: ["/dashboard", "/dashboard/fiscal/torneos"],
 };
 
