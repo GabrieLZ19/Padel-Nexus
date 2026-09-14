@@ -38,6 +38,7 @@ import type {
   ComunicacionesContactoBusqueda,
   ComunicacionesEtiqueta,
   ComunicacionesFiltros,
+  ComunicacionesLicenciaEstado,
   ComunicacionesLista,
   ComunicacionesListaTipo,
 } from "@/utils/types/comunicaciones.types";
@@ -46,8 +47,16 @@ const ETIQUETAS_OPTS: ComunicacionesEtiqueta[] = ["marketing", "institucional"];
 
 type TabId = "enviar" | "listas" | "historial";
 
+/**
+ * Categoria de destinatario (paso 1 del wizard). Segun el PDF de observaciones
+ * de septiembre 2026, el envio debe hacerse eligiendo primero el tipo de
+ * destinatario y luego mostrando solo los filtros aplicables a esa audiencia.
+ */
+type CategoriaDestinatario = "asociaciones" | "jugadores" | "clubes";
+
 const AUDIENCIA_LABELS: Record<ComunicacionesAudienciaTipo, string> = {
   admins_asociaciones: "Admins de asociaciones",
+  admins_clubes: "Admins de clubes",
   jugadores_provincia: "Jugadores por provincia",
   jugadores_asociacion: "Jugadores por asociación",
   jugadores_club: "Jugadores por club",
@@ -56,6 +65,31 @@ const AUDIENCIA_LABELS: Record<ComunicacionesAudienciaTipo, string> = {
   manual_ids: "Selección manual",
   plataforma: "Toda la plataforma (jugadores)",
 };
+
+/**
+ * Mapa de tipos de audiencia por categoria de destinatario.
+ * Se combina con los permisos por rol para decidir que mostrar en el wizard.
+ */
+const TIPOS_POR_CATEGORIA: Record<
+  CategoriaDestinatario,
+  ComunicacionesAudienciaTipo[]
+> = {
+  asociaciones: ["admins_asociaciones"],
+  jugadores: [
+    "jugadores_provincia",
+    "jugadores_asociacion",
+    "jugadores_club",
+    "inscritos_torneo",
+    "plataforma",
+  ],
+  clubes: ["admins_clubes"],
+};
+
+/**
+ * Umbral (en cantidad de destinatarios) a partir del cual el envio se considera
+ * "masivo" y requiere confirmacion reforzada aunque no sea la audiencia `plataforma`.
+ */
+const CONFIRMACION_REFORZADA_UMBRAL = 500;
 
 function errorMessage(err: unknown, fallback: string) {
   if (isAxiosError(err)) {
@@ -123,16 +157,20 @@ export default function ComunicacionesPanel() {
   const [loadingListas, setLoadingListas] = useState(true);
   const [loadingCampanas, setLoadingCampanas] = useState(false);
 
-  // Catalogos
+  // Catalogos: guardamos `provincia` como metadato para filtrar por rol.
   const [asociaciones, setAsociaciones] = useState<
-    { value: string; label: string }[]
+    { value: string; label: string; provincia?: string | null }[]
   >([]);
-  const [clubes, setClubes] = useState<{ value: string; label: string }[]>([]);
+  const [clubes, setClubes] = useState<
+    { value: string; label: string; provincia?: string | null }[]
+  >([]);
   const [torneos, setTorneos] = useState<{ value: string; label: string }[]>([]);
 
   // Composer
   const [titulo, setTitulo] = useState("");
   const [mensaje, setMensaje] = useState("");
+  const [categoriaDest, setCategoriaDest] =
+    useState<CategoriaDestinatario>("jugadores");
   const [audienciaTipo, setAudienciaTipo] =
     useState<ComunicacionesAudienciaTipo>("jugadores_provincia");
   const [provincia, setProvincia] = useState("");
@@ -141,6 +179,8 @@ export default function ComunicacionesPanel() {
   const [torneoId, setTorneoId] = useState("");
   const [listaId, setListaId] = useState("");
   const [categoriaPadel, setCategoriaPadel] = useState("");
+  const [licenciaEstado, setLicenciaEstado] =
+    useState<"" | ComunicacionesLicenciaEstado>("");
   const [actionUrl, setActionUrl] = useState("");
   const [preview, setPreview] = useState<AudienciaPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -180,28 +220,41 @@ export default function ComunicacionesPanel() {
   const puedePlataforma =
     rol === "superadmin" || rol === "admin_federacion";
 
-  const audienciasDisponibles = useMemo(() => {
-    const base: ComunicacionesAudienciaTipo[] = [
-      "admins_asociaciones",
-      "jugadores_provincia",
-      "jugadores_asociacion",
-      "jugadores_club",
-      "inscritos_torneo",
-      "lista",
-    ];
+  /**
+   * Categorias de destinatario habilitadas para el rol actual.
+   * Provincial ve solo Clubes y Jugadores (segun observaciones 13-9-2026).
+   * Club solo ve Jugadores (de su propio club).
+   */
+  const categoriasDisponibles = useMemo<CategoriaDestinatario[]>(() => {
+    if (rol === "admin_club") return ["jugadores"];
+    if (rol === "admin_provincial") return ["clubes", "jugadores"];
+    // Fed, superadmin, admin generico
+    return ["asociaciones", "jugadores", "clubes"];
+  }, [rol]);
+
+  /**
+   * Tipos de audiencia disponibles dentro de la categoria elegida, filtrados
+   * por permisos del rol (ej. `plataforma` solo para fed/superadmin).
+   */
+  const audienciasDisponibles = useMemo<ComunicacionesAudienciaTipo[]>(() => {
+    const base = TIPOS_POR_CATEGORIA[categoriaDest] || [];
+    let tipos = base.filter((t) => {
+      if (t === "plataforma") return puedePlataforma;
+      return true;
+    });
     if (rol === "admin_club") {
-      return ["jugadores_club", "inscritos_torneo", "lista"] as ComunicacionesAudienciaTipo[];
+      // Solo comunica a jugadores de su club.
+      tipos = tipos.filter((t) => t === "jugadores_club");
     }
-    if (puedePlataforma) {
-      return [...base, "plataforma"] as ComunicacionesAudienciaTipo[];
-    }
-    return base;
-  }, [rol, puedePlataforma]);
+    return tipos;
+  }, [categoriaDest, puedePlataforma, rol]);
 
   const esAudienciaJugadores =
     audienciaTipo === "jugadores_provincia" ||
     audienciaTipo === "jugadores_asociacion" ||
-    audienciaTipo === "jugadores_club";
+    audienciaTipo === "jugadores_club" ||
+    audienciaTipo === "inscritos_torneo" ||
+    audienciaTipo === "plataforma";
 
   const buildFiltros = useCallback((): ComunicacionesFiltros => {
     const filtros: ComunicacionesFiltros = {};
@@ -220,30 +273,27 @@ export default function ComunicacionesPanel() {
     if (audienciaTipo === "jugadores_provincia" || audienciaTipo === "plataforma") {
       filtros.solo_rol_usuario = true;
     }
+    // Filtro por estado de licencia: aplica a audiencias de jugadores.
+    if (
+      licenciaEstado &&
+      (audienciaTipo === "jugadores_provincia" ||
+        audienciaTipo === "jugadores_asociacion" ||
+        audienciaTipo === "jugadores_club" ||
+        audienciaTipo === "inscritos_torneo" ||
+        audienciaTipo === "plataforma")
+    ) {
+      filtros.licencia_estado = licenciaEstado;
+    }
     return filtros;
-  }, [provincia, asociacionId, clubId, torneoId, categoriaPadel, audienciaTipo]);
-
-  const presetsInstitucionales = useMemo(() => {
-    const items: {
-      label: string;
-      tipo: ComunicacionesAudienciaTipo;
-      clearProvincia?: boolean;
-    }[] = [];
-    if (audienciasDisponibles.includes("admins_asociaciones")) {
-      items.push({
-        label: "Todas las asociaciones",
-        tipo: "admins_asociaciones",
-        clearProvincia: true,
-      });
-    }
-    if (audienciasDisponibles.includes("jugadores_provincia")) {
-      items.push({
-        label: "Jugadores de mi alcance",
-        tipo: "jugadores_provincia",
-      });
-    }
-    return items;
-  }, [audienciasDisponibles]);
+  }, [
+    provincia,
+    asociacionId,
+    clubId,
+    torneoId,
+    categoriaPadel,
+    audienciaTipo,
+    licenciaEstado,
+  ]);
 
   const cargarListas = useCallback(async () => {
     setLoadingListas(true);
@@ -295,6 +345,7 @@ export default function ComunicacionesPanel() {
         asocs.map((a) => ({
           value: a.id,
           label: `${a.sigla ? `${a.sigla} · ` : ""}${a.nombre}${a.provincia ? ` (${a.provincia})` : ""}`,
+          provincia: a.provincia ?? null,
         })),
       );
 
@@ -303,6 +354,7 @@ export default function ComunicacionesPanel() {
         clubsData.map((c: { id: string; nombre: string; provincia?: string }) => ({
           value: c.id,
           label: `${c.nombre}${c.provincia ? ` · ${c.provincia}` : ""}`,
+          provincia: c.provincia ?? null,
         })),
       );
 
@@ -315,11 +367,173 @@ export default function ComunicacionesPanel() {
     })();
   }, []);
 
+  // Al cambiar de rol o categoria, aseguramos que la categoria activa sea valida.
+  useEffect(() => {
+    if (!categoriasDisponibles.includes(categoriaDest)) {
+      setCategoriaDest(categoriasDisponibles[0]);
+    }
+  }, [categoriasDisponibles, categoriaDest]);
+
+  // Admin de club: forzamos el filtro al club del perfil. No debe poder
+  // seleccionar otros clubes en el dropdown de audiencia.
+  useEffect(() => {
+    if (rol === "admin_club" && profile?.club_id) {
+      setClubId(profile.club_id);
+    }
+  }, [rol, profile?.club_id]);
+
+  // Etiqueta del club forzado para admin_club (mostrada en modo read-only).
+  const clubForzadoLabel = useMemo(() => {
+    if (rol !== "admin_club" || !profile?.club_id) return "";
+    const found = clubes.find((c) => c.value === profile.club_id);
+    return found?.label || "Tu club";
+  }, [rol, profile?.club_id, clubes]);
+
+  /**
+   * Provincia forzada por rol. El admin provincial NO debe poder cambiarla:
+   * el backend valida y descarta cualquier envio fuera de su provincia. Para
+   * evitar UX confusa, la mostramos read-only en el frontend tambien.
+   */
+  const provinciaForzada = useMemo(() => {
+    if (rol === "admin_provincial") {
+      return (profile?.lugar_residencia || "").trim();
+    }
+    return "";
+  }, [rol, profile?.lugar_residencia]);
+
+  // Sincronizamos el filtro `provincia` con la provincia forzada del rol.
+  useEffect(() => {
+    if (provinciaForzada) setProvincia(provinciaForzada);
+  }, [provinciaForzada]);
+
+  /** Normaliza texto (sin acentos, minusculas) para comparar provincias. */
+  const normalizarTexto = (v?: string | null) =>
+    (v || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
+
+  /**
+   * Dropdowns filtrados por alcance de rol. El provincial solo puede apuntar
+   * a asociaciones y clubes de su misma provincia (validacion espejada en backend).
+   */
+  const asociacionesDisponibles = useMemo(() => {
+    if (!provinciaForzada) return asociaciones;
+    const target = normalizarTexto(provinciaForzada);
+    return asociaciones.filter(
+      (a) => normalizarTexto(a.provincia) === target,
+    );
+  }, [asociaciones, provinciaForzada]);
+
+  const clubesDisponibles = useMemo(() => {
+    if (!provinciaForzada) return clubes;
+    const target = normalizarTexto(provinciaForzada);
+    return clubes.filter((c) => normalizarTexto(c.provincia) === target);
+  }, [clubes, provinciaForzada]);
+
+  /**
+   * Resumen textual de filtros aplicados. Se muestra en la preview antes de
+   * enviar (requerido por observaciones: "los usuarios deben poder ver los
+   * filtros aplicados y confirmar antes del envio").
+   */
+  const resumenFiltros = useMemo(() => {
+    const items: { label: string; value: string }[] = [];
+    const audienciaLabel = AUDIENCIA_LABELS[audienciaTipo] || audienciaTipo;
+    items.push({ label: "Audiencia", value: audienciaLabel });
+
+    if (audienciaTipo === "lista") {
+      const nombre = listas.find((l) => l.id === listaId)?.nombre;
+      if (nombre) items.push({ label: "Lista", value: nombre });
+    }
+
+    if (provincia) {
+      items.push({
+        label: "Provincia",
+        value: provinciaForzada
+          ? `${provincia} (forzada por rol)`
+          : provincia,
+      });
+    }
+
+    if (asociacionId) {
+      const nombre =
+        asociaciones.find((a) => a.value === asociacionId)?.label ||
+        asociacionId;
+      items.push({ label: "Asociación", value: nombre });
+    }
+
+    if (clubId) {
+      const nombre =
+        clubes.find((c) => c.value === clubId)?.label || clubId;
+      items.push({
+        label: "Club",
+        value:
+          rol === "admin_club" ? `${nombre} (forzado por rol)` : nombre,
+      });
+    }
+
+    if (torneoId && audienciaTipo === "inscritos_torneo") {
+      const nombre =
+        torneos.find((t) => t.value === torneoId)?.label || torneoId;
+      items.push({ label: "Torneo", value: nombre });
+    }
+
+    if (
+      categoriaPadel &&
+      (audienciaTipo === "jugadores_provincia" ||
+        audienciaTipo === "jugadores_asociacion" ||
+        audienciaTipo === "jugadores_club" ||
+        audienciaTipo === "plataforma")
+    ) {
+      items.push({ label: "Categoría", value: categoriaPadel });
+    }
+
+    if (
+      licenciaEstado !== "" &&
+      (audienciaTipo === "jugadores_provincia" ||
+        audienciaTipo === "jugadores_asociacion" ||
+        audienciaTipo === "jugadores_club" ||
+        audienciaTipo === "inscritos_torneo" ||
+        audienciaTipo === "plataforma")
+    ) {
+      items.push({
+        label: "Licencia",
+        value:
+          licenciaEstado === "vigente"
+            ? "Con licencia vigente"
+            : "Sin licencia vigente",
+      });
+    }
+
+    return items;
+  }, [
+    audienciaTipo,
+    provincia,
+    provinciaForzada,
+    asociacionId,
+    asociaciones,
+    clubId,
+    clubes,
+    torneoId,
+    torneos,
+    categoriaPadel,
+    licenciaEstado,
+    listaId,
+    listas,
+    rol,
+  ]);
+
+  // Al cambiar de categoria, elegimos el primer tipo disponible por defecto.
   useEffect(() => {
     if (!audienciasDisponibles.includes(audienciaTipo)) {
-      setAudienciaTipo(audienciasDisponibles[0]);
+      setAudienciaTipo(
+        audienciasDisponibles[0] || ("jugadores_provincia" as const),
+      );
+      setPreview(null);
     }
   }, [audienciasDisponibles, audienciaTipo]);
+
 
   useEffect(() => {
     const q = busquedaMiembro.trim();
@@ -394,7 +608,78 @@ export default function ComunicacionesPanel() {
       return;
     }
 
-    const total = preview?.total;
+    const total = preview?.total ?? 0;
+    // El PDF de observaciones 13-9-2026 exige confirmacion reforzada para
+    // envios masivos (audiencia "Toda la plataforma" o mas de ~500 personas).
+    const esMasivo =
+      audienciaTipo === "plataforma" ||
+      total > CONFIRMACION_REFORZADA_UMBRAL;
+
+    const doEnviar = async () => {
+      setEnviando(true);
+      try {
+        const result = await ComunicacionesService.enviarCampana({
+          titulo: titulo.trim(),
+          mensaje: mensaje.trim(),
+          audiencia_tipo: audienciaTipo,
+          filtros: buildFiltros(),
+          lista_id: audienciaTipo === "lista" ? listaId || null : null,
+          action_url: actionUrl.trim() || null,
+        });
+        sileo.success({
+          title: "Campaña enviada",
+          description: `${result.total_enviados} de ${result.total_destinatarios} notificaciones creadas.`,
+        });
+        setTitulo("");
+        setMensaje("");
+        setActionUrl("");
+        setPreview(null);
+        setFeedback((p) => ({ ...p, isOpen: false }));
+        setTab("historial");
+        void cargarCampanas();
+      } catch (err) {
+        sileo.error({
+          title: "No se pudo enviar",
+          description: errorMessage(err, "Error al enviar la campaña."),
+        });
+        setFeedback((p) => ({ ...p, isOpen: false }));
+      } finally {
+        setEnviando(false);
+      }
+    };
+
+    if (esMasivo) {
+      // Modal reforzado: pide tipear la palabra "CONFIRMAR".
+      setFeedback({
+        isOpen: true,
+        type: "danger",
+        title:
+          audienciaTipo === "plataforma"
+            ? "¿Enviar a TODA la plataforma?"
+            : `¿Enviar a ${total} destinatarios?`,
+        description:
+          "Este es un envio masivo. Verifica que el titulo, mensaje y audiencia sean correctos. Escribi CONFIRMAR abajo para habilitar el envio.",
+        confirmText: "Enviar ahora",
+        cancelText: "Cancelar",
+        showInput: true,
+        inputLabel: 'Escribi "CONFIRMAR" para habilitar el envio',
+        inputPlaceholder: "CONFIRMAR",
+        onClose: () => setFeedback((p) => ({ ...p, isOpen: false })),
+        onConfirm: async (inputValue) => {
+          if ((inputValue || "").trim().toUpperCase() !== "CONFIRMAR") {
+            sileo.warning({
+              title: "Escribi CONFIRMAR",
+              description:
+                "Necesitamos que tipees la palabra CONFIRMAR para autorizar un envio masivo.",
+            });
+            return;
+          }
+          await doEnviar();
+        },
+      });
+      return;
+    }
+
     setFeedback({
       isOpen: true,
       type: "warning",
@@ -405,38 +690,7 @@ export default function ComunicacionesPanel() {
       confirmText: "Enviar ahora",
       cancelText: "Cancelar",
       onClose: () => setFeedback((p) => ({ ...p, isOpen: false })),
-      onConfirm: async () => {
-        setEnviando(true);
-        try {
-          const result = await ComunicacionesService.enviarCampana({
-            titulo: titulo.trim(),
-            mensaje: mensaje.trim(),
-            audiencia_tipo: audienciaTipo,
-            filtros: buildFiltros(),
-            lista_id: audienciaTipo === "lista" ? listaId || null : null,
-            action_url: actionUrl.trim() || null,
-          });
-          sileo.success({
-            title: "Campaña enviada",
-            description: `${result.total_enviados} de ${result.total_destinatarios} notificaciones creadas.`,
-          });
-          setTitulo("");
-          setMensaje("");
-          setActionUrl("");
-          setPreview(null);
-          setFeedback((p) => ({ ...p, isOpen: false }));
-          setTab("historial");
-          void cargarCampanas();
-        } catch (err) {
-          sileo.error({
-            title: "No se pudo enviar",
-            description: errorMessage(err, "Error al enviar la campaña."),
-          });
-          setFeedback((p) => ({ ...p, isOpen: false }));
-        } finally {
-          setEnviando(false);
-        }
-      },
+      onConfirm: doEnviar,
     });
   };
 
@@ -522,7 +776,10 @@ export default function ComunicacionesPanel() {
     try {
       const filtros: ComunicacionesFiltros = {};
       if (listaTipo === "dinamica") {
-        if (listaProvincia) filtros.provincias = [listaProvincia];
+        // Si el rol fuerza provincia, la aplicamos aunque el usuario no la haya
+        // seleccionado (el dropdown esta oculto).
+        const provinciaLista = provinciaForzada || listaProvincia;
+        if (provinciaLista) filtros.provincias = [provinciaLista];
         if (listaAsociacionId) filtros.asociacion_ids = [listaAsociacionId];
         if (listaClubId) filtros.club_ids = [listaClubId];
         filtros.solo_rol_usuario = true;
@@ -658,38 +915,76 @@ export default function ComunicacionesPanel() {
       {tab === "enviar" && (
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           <div className="xl:col-span-8 space-y-5 rounded-3xl border border-brand-white/5 bg-gradient-to-br from-brand-card to-brand-black p-6 md:p-8">
-            {presetsInstitucionales.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase">
-                  Presets institucionales
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {presetsInstitucionales.map((p) => (
-                    <button
-                      key={p.label}
-                      type="button"
-                      onClick={() => {
-                        setAudienciaTipo(p.tipo);
-                        if (p.clearProvincia) setProvincia("");
-                        setPreview(null);
-                      }}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold border cursor-pointer transition-all ${
-                        audienciaTipo === p.tipo &&
-                        (p.clearProvincia ? !provincia : true)
-                          ? "bg-brand-chartreuse/15 border-brand-chartreuse/40 text-brand-chartreuse"
-                          : "border-brand-white/10 text-gray-400 hover:border-brand-white/20 hover:text-brand-white"
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
+            {/* Paso 1 del wizard: categoria de destinatario. */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-500 uppercase">
-                Audiencia
+                1 · Tipo de destinatario
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {(
+                  [
+                    {
+                      id: "asociaciones" as const,
+                      label: "Asociaciones",
+                      hint: "Comunicaciones institucionales a asociaciones y agrupaciones provinciales",
+                      Icon: Landmark,
+                    },
+                    {
+                      id: "jugadores" as const,
+                      label: "Jugadores",
+                      hint: "Jugadores federados y participantes de torneos",
+                      Icon: Users,
+                    },
+                    {
+                      id: "clubes" as const,
+                      label: "Clubes",
+                      hint: "Administradores de clubes registrados",
+                      Icon: Building2,
+                    },
+                  ] as const
+                )
+                  .filter((cat) => categoriasDisponibles.includes(cat.id))
+                  .map((cat) => {
+                    const active = categoriaDest === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setCategoriaDest(cat.id);
+                          setPreview(null);
+                          setProvincia("");
+                          setAsociacionId("");
+                          setClubId("");
+                          setTorneoId("");
+                          setLicenciaEstado("");
+                          setCategoriaPadel("");
+                        }}
+                        className={`text-left p-4 rounded-xl border transition-all cursor-pointer ${
+                          active
+                            ? "border-brand-chartreuse/50 bg-brand-chartreuse/10"
+                            : "border-brand-white/5 bg-brand-black/40 hover:border-brand-white/15"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <cat.Icon className="size-4 text-brand-chartreuse" />
+                          <span className="text-sm font-black text-brand-white">
+                            {cat.label}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 leading-relaxed">
+                          {cat.hint}
+                        </p>
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* Paso 2 del wizard: audiencia dentro de la categoria + lista guardada. */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase">
+                2 · Audiencia
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {audienciasDisponibles.map((a) => {
@@ -700,11 +995,13 @@ export default function ComunicacionesPanel() {
                         ? Trophy
                         : a === "admins_asociaciones"
                           ? Landmark
-                          : a === "jugadores_club"
+                          : a === "admins_clubes"
                             ? Building2
-                            : a === "jugadores_provincia"
-                              ? MapPin
-                              : Users;
+                            : a === "jugadores_club"
+                              ? Building2
+                              : a === "jugadores_provincia"
+                                ? MapPin
+                                : Users;
                   return (
                     <button
                       key={a}
@@ -728,26 +1025,75 @@ export default function ComunicacionesPanel() {
                     </button>
                   );
                 })}
+                {/* Lista guardada disponible en cualquier categoria. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAudienciaTipo("lista");
+                    setPreview(null);
+                  }}
+                  className={`text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                    audienciaTipo === "lista"
+                      ? "border-brand-chartreuse/50 bg-brand-chartreuse/10"
+                      : "border-brand-white/5 bg-brand-black/40 hover:border-brand-white/15"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <ListPlus className="size-3.5 text-brand-chartreuse" />
+                    <span className="text-xs font-bold text-brand-white">
+                      Lista guardada
+                    </span>
+                  </div>
+                </button>
               </div>
             </div>
 
             {(audienciaTipo === "jugadores_provincia" ||
-              audienciaTipo === "admins_asociaciones") && (
+              audienciaTipo === "admins_asociaciones" ||
+              audienciaTipo === "admins_clubes") && (
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-500 uppercase">
                   Provincia
                 </label>
+                {provinciaForzada ? (
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-brand-black/60 border border-brand-white/10 text-sm text-brand-white">
+                    <MapPin className="size-4 text-brand-chartreuse shrink-0" />
+                    <span className="font-semibold">{provinciaForzada}</span>
+                 
+                  </div>
+                ) : (
+                  <CustomDropdown
+                    value={provincia}
+                    onChange={(v) => {
+                      setProvincia(v);
+                      setPreview(null);
+                    }}
+                    options={[
+                      { value: "", label: "Todas (según tu alcance)" },
+                      ...provinciasOpts,
+                    ]}
+                    placeholder="Provincia"
+                  />
+                )}
+              </div>
+            )}
+
+            {audienciaTipo === "admins_clubes" && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase">
+                  Filtrar por club (opcional)
+                </label>
                 <CustomDropdown
-                  value={provincia}
+                  value={clubId}
                   onChange={(v) => {
-                    setProvincia(v);
+                    setClubId(v);
                     setPreview(null);
                   }}
                   options={[
-                    { value: "", label: "Todas (según tu alcance)" },
-                    ...provinciasOpts,
+                    { value: "", label: "Todos los clubes del alcance" },
+                    ...clubesDisponibles,
                   ]}
-                  placeholder="Provincia"
+                  placeholder="Club"
                 />
               </div>
             )}
@@ -765,10 +1111,15 @@ export default function ComunicacionesPanel() {
                   }}
                   options={[
                     { value: "", label: "Seleccioná asociación" },
-                    ...asociaciones,
+                    ...asociacionesDisponibles,
                   ]}
                   placeholder="Asociación"
                 />
+                {provinciaForzada && (
+                  <p className="text-[11px] text-gray-500">
+                    Solo podés apuntar a asociaciones de {provinciaForzada}.
+                  </p>
+                )}
               </div>
             )}
 
@@ -777,18 +1128,35 @@ export default function ComunicacionesPanel() {
                 <label className="text-xs font-bold text-gray-500 uppercase">
                   Club
                 </label>
-                <CustomDropdown
-                  value={clubId}
-                  onChange={(v) => {
-                    setClubId(v);
-                    setPreview(null);
-                  }}
-                  options={[
-                    { value: "", label: "Seleccioná club" },
-                    ...clubes,
-                  ]}
-                  placeholder="Club"
-                />
+                {rol === "admin_club" ? (
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-brand-black/60 border border-brand-white/10 text-sm text-brand-white">
+                    <Building2 className="size-4 text-brand-chartreuse shrink-0" />
+                    <span className="font-semibold">
+                      {clubForzadoLabel || "Tu club"}
+                    </span>
+                  
+                  </div>
+                ) : (
+                  <>
+                    <CustomDropdown
+                      value={clubId}
+                      onChange={(v) => {
+                        setClubId(v);
+                        setPreview(null);
+                      }}
+                      options={[
+                        { value: "", label: "Seleccioná club" },
+                        ...clubesDisponibles,
+                      ]}
+                      placeholder="Club"
+                    />
+                    {provinciaForzada && (
+                      <p className="text-[11px] text-gray-500">
+                        Solo podés apuntar a clubes de {provinciaForzada}.
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
@@ -836,25 +1204,51 @@ export default function ComunicacionesPanel() {
             )}
 
             {esAudienciaJugadores && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase">
-                  Categoría pádel
-                </label>
-                <CustomDropdown
-                  value={categoriaPadel}
-                  onChange={(v) => {
-                    setCategoriaPadel(v);
-                    setPreview(null);
-                  }}
-                  options={[
-                    { value: "", label: "Todas las categorías" },
-                    ...NIVELES_PADEL.map((n) => ({
-                      value: n.value,
-                      label: n.label,
-                    })),
-                  ]}
-                  placeholder="Categoría"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {(audienciaTipo === "jugadores_provincia" ||
+                  audienciaTipo === "jugadores_asociacion" ||
+                  audienciaTipo === "jugadores_club") && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase">
+                      Categoría pádel
+                    </label>
+                    <CustomDropdown
+                      value={categoriaPadel}
+                      onChange={(v) => {
+                        setCategoriaPadel(v);
+                        setPreview(null);
+                      }}
+                      options={[
+                        { value: "", label: "Todas las categorías" },
+                        ...NIVELES_PADEL.map((n) => ({
+                          value: n.value,
+                          label: n.label,
+                        })),
+                      ]}
+                      placeholder="Categoría"
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase">
+                    Licencia
+                  </label>
+                  <CustomDropdown
+                    value={licenciaEstado}
+                    onChange={(v) => {
+                      setLicenciaEstado(
+                        (v as ComunicacionesLicenciaEstado | "") || "",
+                      );
+                      setPreview(null);
+                    }}
+                    options={[
+                      { value: "", label: "Sin filtro por licencia" },
+                      { value: "vigente", label: "Con licencia vigente" },
+                      { value: "sin_licencia", label: "Sin licencia vigente" },
+                    ]}
+                    placeholder="Licencia"
+                  />
+                </div>
               </div>
             )}
 
@@ -938,6 +1332,28 @@ export default function ComunicacionesPanel() {
                     → {actionUrl}
                   </p>
                 )}
+              </div>
+
+              {/* Resumen de filtros: se ve siempre, con o sin preview */}
+              <div className="rounded-2xl border border-brand-white/10 bg-brand-black/40 p-4 space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                  Filtros aplicados
+                </p>
+                <ul className="space-y-1">
+                  {resumenFiltros.map((f) => (
+                    <li
+                      key={f.label}
+                      className="flex items-start gap-2 text-xs"
+                    >
+                      <span className="text-gray-500 shrink-0">
+                        {f.label}:
+                      </span>
+                      <span className="text-brand-white font-semibold break-words">
+                        {f.value}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </div>
 
               {preview ? (
@@ -1063,21 +1479,29 @@ export default function ComunicacionesPanel() {
 
             {listaTipo === "dinamica" ? (
               <div className="space-y-3">
-                <CustomDropdown
-                  value={listaProvincia}
-                  onChange={setListaProvincia}
-                  options={[
-                    { value: "", label: "Provincia (opcional)" },
-                    ...provinciasOpts,
-                  ]}
-                  placeholder="Provincia"
-                />
+                {provinciaForzada ? (
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-brand-black/60 border border-brand-white/10 text-sm text-brand-white">
+                    <MapPin className="size-4 text-brand-chartreuse shrink-0" />
+                    <span className="font-semibold">{provinciaForzada}</span>
+                  
+                  </div>
+                ) : (
+                  <CustomDropdown
+                    value={listaProvincia}
+                    onChange={setListaProvincia}
+                    options={[
+                      { value: "", label: "Provincia (opcional)" },
+                      ...provinciasOpts,
+                    ]}
+                    placeholder="Provincia"
+                  />
+                )}
                 <CustomDropdown
                   value={listaAsociacionId}
                   onChange={setListaAsociacionId}
                   options={[
                     { value: "", label: "Asociación (opcional)" },
-                    ...asociaciones,
+                    ...asociacionesDisponibles,
                   ]}
                   placeholder="Asociación"
                 />
@@ -1086,7 +1510,7 @@ export default function ComunicacionesPanel() {
                   onChange={setListaClubId}
                   options={[
                     { value: "", label: "Club (opcional)" },
-                    ...clubes,
+                    ...clubesDisponibles,
                   ]}
                   placeholder="Club"
                 />
@@ -1310,39 +1734,56 @@ export default function ComunicacionesPanel() {
             </p>
           ) : (
             <ul className="space-y-3">
-              {campanas.map((c) => (
-                <li
-                  key={c.id}
-                  className="p-4 rounded-xl border border-brand-white/5 bg-brand-black/40 space-y-2"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-brand-white truncate">
-                        {c.titulo}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1 line-clamp-2">
-                        {c.mensaje}
-                      </p>
-                    </div>
-                    <span className="text-[10px] text-gray-600 shrink-0">
-                      {new Date(c.created_at).toLocaleString("es-AR")}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">
-                    <span className="px-2 py-0.5 rounded-md bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20">
-                      {AUDIENCIA_LABELS[c.audiencia_tipo] || c.audiencia_tipo}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-400 border border-brand-white/10">
-                      {c.total_enviados}/{c.total_destinatarios} enviados
-                    </span>
-                    {c.action_url && (
-                      <span className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-500 border border-brand-white/10 font-mono normal-case tracking-normal">
-                        {c.action_url}
+              {campanas.map((c) => {
+                const remitenteNombre = c.creador
+                  ? nombrePersona({
+                      nombre: c.creador.nombre,
+                      apellido: c.creador.apellido,
+                      email: c.creador.email,
+                    })
+                  : "Usuario desconocido";
+                const remitenteRol = c.creador?.rol;
+                return (
+                  <li
+                    key={c.id}
+                    className="p-4 rounded-xl border border-brand-white/5 bg-brand-black/40 space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-brand-white truncate">
+                          {c.titulo}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1 line-clamp-2">
+                          {c.mensaje}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-gray-600 shrink-0">
+                        {new Date(c.created_at).toLocaleString("es-AR")}
                       </span>
-                    )}
-                  </div>
-                </li>
-              ))}
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">
+                      <span className="px-2 py-0.5 rounded-md bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20">
+                        {AUDIENCIA_LABELS[c.audiencia_tipo] || c.audiencia_tipo}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-400 border border-brand-white/10">
+                        {c.total_enviados}/{c.total_destinatarios} enviados
+                      </span>
+                      <span
+                        className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-400 border border-brand-white/10 normal-case tracking-normal"
+                        title={remitenteRol || undefined}
+                      >
+                        Enviado por: {remitenteNombre}
+                        {remitenteRol ? ` · ${remitenteRol}` : ""}
+                      </span>
+                      {c.action_url && (
+                        <span className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-500 border border-brand-white/10 font-mono normal-case tracking-normal">
+                          {c.action_url}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

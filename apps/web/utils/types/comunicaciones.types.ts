@@ -4,6 +4,7 @@ export type ComunicacionesEtiqueta = "marketing" | "institucional";
 
 export type ComunicacionesAudienciaTipo =
   | "admins_asociaciones"
+  | "admins_clubes"
   | "jugadores_provincia"
   | "jugadores_asociacion"
   | "jugadores_club"
@@ -11,6 +12,12 @@ export type ComunicacionesAudienciaTipo =
   | "lista"
   | "manual_ids"
   | "plataforma";
+
+/**
+ * Filtro por estado de licencia aplicable a audiencias de jugadores.
+ * Debe mantenerse alineado con `apps/api/src/constants/comunicaciones.ts`.
+ */
+export type ComunicacionesLicenciaEstado = "vigente" | "sin_licencia";
 
 export interface ComunicacionesFiltros {
   roles?: string[];
@@ -21,6 +28,7 @@ export interface ComunicacionesFiltros {
   torneo_id?: string;
   solo_rol_usuario?: boolean;
   perfil_ids?: string[];
+  licencia_estado?: ComunicacionesLicenciaEstado;
 }
 
 export interface ComunicacionesListaMiembro {
@@ -82,6 +90,17 @@ export interface ComunicacionesCampana {
   total_destinatarios: number;
   total_enviados: number;
   created_at: string;
+  /**
+   * Datos del remitente embebidos desde `perfiles` (join en backend).
+   * Puede venir `null` en filas viejas o si el creador fue eliminado.
+   */
+  creador?: {
+    id: string;
+    nombre: string | null;
+    apellido: string | null;
+    email: string | null;
+    rol: string | null;
+  } | null;
 }
 
 export interface EnviarCampanaPayload {
