@@ -12,14 +12,16 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  MapPin,
 } from "lucide-react";
-import { LicenciasService } from "@/utils/services/licencias";
+import { LicenciasService, type LicenciaConfigData } from "@/utils/services/licencias";
 import { ClubesService } from "@/utils/services/clubes";
 import { Licencia, Perfil } from "@/utils/types";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import Pagination from "@/components/ui/Pagination";
 import { ConfigLicenciasPanel } from "@/components/licencias/ConfigLicenciasPanel";
 import { LicenciaJugadorCard } from "@/components/licencias/LicenciaJugadorCard";
+import { useProfileStore } from "@/store/useProfileStore";
 
 const PAGE_SIZE = 8;
 
@@ -68,6 +70,7 @@ function contarPorEstado(items: Perfil[], estado: Licencia["estado"]) {
 }
 
 export default function JugadoresLicenciasPage() {
+  const { profile } = useProfileStore();
   const [licencias, setLicencias] = useState<Perfil[]>([]);
   const [clubes, setClubes] = useState<{ [id: string]: string }>({});
   const [total, setTotal] = useState<number>(0);
@@ -77,6 +80,8 @@ export default function JugadoresLicenciasPage() {
   const [filtroActivo, setFiltroActivo] = useState<FiltroLicencia>("Todas");
   const [mobileTab, setMobileTab] = useState<MobileTab>("licencias");
   const [configAbierta, setConfigAbierta] = useState(true);
+  const [contextoConfig, setContextoConfig] =
+    useState<LicenciaConfigData | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -94,7 +99,16 @@ export default function JugadoresLicenciasPage() {
         console.error("Error al cargar clubes para mapeo:", err);
       }
     };
+    const fetchContexto = async () => {
+      try {
+        const data = await LicenciasService.getConfigOrganizacion();
+        if (isMounted) setContextoConfig(data);
+      } catch {
+        // Config opcional: la página sigue funcionando sin el banner.
+      }
+    };
     fetchClubes();
+    fetchContexto();
     return () => {
       isMounted = false;
     };
@@ -269,16 +283,32 @@ export default function JugadoresLicenciasPage() {
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-brand-chartreuse mb-1">
-              Gestión federativa
+              {contextoConfig?.tipo === "asociacion"
+                ? "Gestión provincial"
+                : "Gestión federativa"}
             </p>
             <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">
               Jugadores y licencias
             </h1>
             <p className="text-gray-400 mt-1 text-sm max-w-xl">
-              Configurá el carnet del circuito y gestioná cada jugador. El
-              vencimiento individual se edita haciendo clic en la fecha de cada
-              tarjeta.
+              {contextoConfig?.tipo === "asociacion"
+                ? `Licencias de ${contextoConfig.entidad_nombre || "tu asociación"}. Podés aprobar, suspender y registrar pagos mensuales.`
+                : "Configurá el carnet del circuito y gestioná cada jugador. El vencimiento individual se edita haciendo clic en la fecha de cada tarjeta."}
             </p>
+            {contextoConfig?.tipo === "asociacion" && (
+              <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-chartreuse/25 bg-brand-chartreuse/5 text-[11px] font-bold text-brand-chartreuse">
+                <MapPin className="size-3.5" />
+                {contextoConfig.subtitulo ||
+                  contextoConfig.provincia ||
+                  profile?.lugar_residencia ||
+                  "Tu provincia"}
+                {contextoConfig.config?.frecuenciaPago === "mensual" && (
+                  <span className="text-gray-400 font-semibold">
+                    · pago mensual
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="relative w-full lg:w-96">

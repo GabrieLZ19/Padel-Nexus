@@ -1,28 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DollarSign, Calendar, Save, ShieldCheck, Info } from "lucide-react";
-import { api } from "@/utils/api";
+import {
+  DollarSign,
+  Calendar,
+  Save,
+  ShieldCheck,
+  Info,
+  IdCard,
+} from "lucide-react";
 import CustomDropdown from "@/components/ui/CustomDropdown";
-
-export type LicenciaVigenciaModo = "fecha_fija" | "meses_desde_emision";
-
-export interface LicenciaConfigData {
-  config: {
-    precioAnual: number;
-    vigenciaModo: LicenciaVigenciaModo;
-    vencimientoMes: number | null;
-    vencimientoDia: number | null;
-    vigenciaMeses: number;
-    origen?: string;
-  };
-  descripcion_vigencia: string;
-  hereda_de_federacion?: boolean;
-  entidad_nombre?: string;
-  subtitulo?: string;
-  puede_editar?: boolean;
-  tipo?: "federacion" | "asociacion";
-}
+import {
+  LicenciasService,
+  type LicenciaConfigData,
+  type LicenciaFrecuenciaPago,
+  type LicenciaVigenciaModo,
+} from "@/utils/services/licencias";
 
 interface ConfigLicenciasPanelProps {
   /** contexto = según rol del admin (recomendado en Jugadores y licencias) */
@@ -53,9 +46,19 @@ const VIGENCIA_OPCIONES = [
   { value: "meses_desde_emision", label: "Meses desde emisión" },
 ] as const;
 
+const FRECUENCIA_OPCIONES = [
+  { value: "anual", label: "Pago anual" },
+  { value: "mensual", label: "Pago mensual" },
+] as const;
+
 const DIAS_OPCIONES = Array.from({ length: 31 }, (_, i) => ({
   value: String(i + 1),
   label: String(i + 1),
+}));
+
+const DIAS_COBRO_OPCIONES = Array.from({ length: 28 }, (_, i) => ({
+  value: String(i + 1),
+  label: `Día ${i + 1}`,
 }));
 
 export function ConfigLicenciasPanel({
@@ -77,18 +80,16 @@ export function ConfigLicenciasPanel({
     puede_editar?: boolean;
   }>({});
 
-  const [precioInput, setPrecioInput] = useState("");
+  const [nombreCarne, setNombreCarne] = useState("");
+  const [frecuencia, setFrecuencia] =
+    useState<LicenciaFrecuenciaPago>("anual");
+  const [precioAnualInput, setPrecioAnualInput] = useState("");
+  const [precioMensualInput, setPrecioMensualInput] = useState("");
+  const [diaCobro, setDiaCobro] = useState(1);
   const [modo, setModo] = useState<LicenciaVigenciaModo>("fecha_fija");
   const [mes, setMes] = useState(12);
   const [dia, setDia] = useState(31);
   const [mesesInput, setMesesInput] = useState("12");
-
-  const basePath =
-    scope === "contexto"
-      ? "/licencias/config-organizacion"
-      : scope === "federacion"
-        ? `/federaciones/${entidadId}/config-licencia`
-        : `/asociaciones/${entidadId}/config-licencia`;
 
   const editarHabilitado =
     puedeEditar && (scope !== "contexto" || meta.puede_editar !== false);
@@ -100,12 +101,25 @@ export function ConfigLicenciasPanel({
     setLoading(true);
     setError(null);
 
-    const method = scope === "contexto" ? api.get : api.get;
-    method(basePath)
-      .then((res) => {
-        const data = (res.data?.data || res.data) as LicenciaConfigData;
+    void (async () => {
+      try {
+        let data: LicenciaConfigData;
+        if (scope === "contexto") {
+          data = await LicenciasService.getConfigOrganizacion();
+        } else if (scope === "federacion" && entidadId) {
+          data = await LicenciasService.getConfigFederacion(entidadId);
+        } else if (scope === "asociacion" && entidadId) {
+          data = await LicenciasService.getConfigAsociacion(entidadId);
+        } else {
+          return;
+        }
         if (!mounted || !data?.config) return;
-        setPrecioInput(String(data.config.precioAnual ?? ""));
+
+        setNombreCarne(data.config.nombreCarne || "");
+        setFrecuencia(data.config.frecuenciaPago || "anual");
+        setPrecioAnualInput(String(data.config.precioAnual ?? ""));
+        setPrecioMensualInput(String(data.config.precioMensual ?? ""));
+        setDiaCobro(data.config.diaCobro ?? 1);
         setModo(data.config.vigenciaModo || "fecha_fija");
         setMes(data.config.vencimientoMes ?? 12);
         setDia(data.config.vencimientoDia ?? 31);
@@ -117,53 +131,81 @@ export function ConfigLicenciasPanel({
           subtitulo: data.subtitulo,
           puede_editar: data.puede_editar,
         });
-      })
-      .catch((err) => {
-        if (mounted) {
-          setError(
-            err?.response?.data?.error ||
-              "No se pudo cargar la configuración de licencias.",
-          );
-        }
-      })
-      .finally(() => {
+      } catch (err: unknown) {
+        if (!mounted) return;
+        const e = err as { response?: { data?: { error?: string } } };
+        setError(
+          e?.response?.data?.error ||
+            "No se pudo cargar la configuración de licencias.",
+        );
+      } finally {
         if (mounted) setLoading(false);
-      });
+      }
+    })();
 
     return () => {
       mounted = false;
     };
-  }, [basePath, scope, entidadId]);
+  }, [scope, entidadId]);
 
   const guardar = async () => {
     setSaving(true);
     setMensaje(null);
     setError(null);
     try {
-      const precio = precioInput.trim() === "" ? 0 : Number(precioInput);
+      const precioAnual =
+        precioAnualInput.trim() === "" ? 0 : Number(precioAnualInput);
+      const precioMensual =
+        precioMensualInput.trim() === "" ? 0 : Number(precioMensualInput);
       const meses =
         mesesInput.trim() === "" ? 12 : Math.max(1, Number(mesesInput));
 
       const payload = {
-        precio_anual: precio,
+        nombre_carne: nombreCarne.trim() || null,
+        frecuencia_pago: frecuencia,
+        precio_anual: precioAnual,
+        precio_mensual: precioMensual,
+        dia_cobro: frecuencia === "mensual" ? diaCobro : null,
         vigencia_modo: modo,
         vencimiento_mes: modo === "fecha_fija" ? mes : null,
         vencimiento_dia: modo === "fecha_fija" ? dia : null,
         vigencia_meses: modo === "meses_desde_emision" ? meses : 12,
       };
-      const res = await api.patch(basePath, payload);
-      const data = (res.data?.data || res.data) as LicenciaConfigData;
+
+      let data: LicenciaConfigData;
+      if (scope === "contexto") {
+        data = await LicenciasService.updateConfigOrganizacion(payload);
+      } else if (scope === "federacion" && entidadId) {
+        data = await LicenciasService.updateConfigFederacion(
+          entidadId,
+          payload,
+        );
+      } else if (scope === "asociacion" && entidadId) {
+        data = await LicenciasService.updateConfigAsociacion(
+          entidadId,
+          payload,
+        );
+      } else {
+        throw new Error("Entidad no especificada.");
+      }
+
       if (data?.config) {
-        setPrecioInput(String(data.config.precioAnual ?? ""));
+        setNombreCarne(data.config.nombreCarne || "");
+        setFrecuencia(data.config.frecuenciaPago || "anual");
+        setPrecioAnualInput(String(data.config.precioAnual ?? ""));
+        setPrecioMensualInput(String(data.config.precioMensual ?? ""));
+        setDiaCobro(data.config.diaCobro ?? 1);
         setMesesInput(String(data.config.vigenciaMeses ?? 12));
       }
       setDescripcion(data.descripcion_vigencia || "");
       setHereda(Boolean(data.hereda_de_federacion));
       setMensaje("Guardado. Se aplica a nuevas activaciones y renovaciones.");
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
+      const e = err as { response?: { data?: { error?: string } }; message?: string };
       setError(
-        e?.response?.data?.error || "Error al guardar la configuración.",
+        e?.response?.data?.error ||
+          e?.message ||
+          "Error al guardar la configuración.",
       );
     } finally {
       setSaving(false);
@@ -171,9 +213,7 @@ export function ConfigLicenciasPanel({
   };
 
   const tituloFinal =
-    titulo ||
-    meta.entidad_nombre ||
-    "Configuración de carnets federativos";
+    titulo || meta.entidad_nombre || "Configuración de carnets federativos";
 
   if (loading) {
     return (
@@ -221,9 +261,8 @@ export function ConfigLicenciasPanel({
       <div className="rounded-xl bg-black/30 border border-white/5 px-3 py-2.5 flex gap-2 text-[11px] text-gray-400">
         <Info className="size-4 text-brand-chartreuse shrink-0 mt-0.5" />
         <p>
-          Estos valores se replican al aprobar o renovar licencias. Al vencer la
-          fecha, el carnet pasa a <span className="text-white font-semibold">no vigente</span> hasta
-          renovación.
+          Estos valores se replican al aprobar o renovar licencias. Con pago
+          mensual, la vigencia se extiende con cada pago registrado.
         </p>
       </div>
 
@@ -236,85 +275,155 @@ export function ConfigLicenciasPanel({
       <div className="space-y-3">
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1">
-            <DollarSign className="size-3" /> Costo anual (ARS)
+            <IdCard className="size-3" /> Nombre del carné
           </span>
           <input
             type="text"
-            inputMode="numeric"
             disabled={!editarHabilitado}
-            value={precioInput}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === "" || /^\d+$/.test(val)) {
-                setPrecioInput(val);
-              }
-            }}
-            placeholder="Ej: 45000"
+            value={nombreCarne}
+            onChange={(e) => setNombreCarne(e.target.value)}
+            placeholder="Ej: Licencia Federativa / Carné APA"
             className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white disabled:opacity-50 placeholder:text-gray-600"
           />
         </label>
 
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Vigencia
+            Frecuencia de pago
           </span>
           <CustomDropdown
-            value={modo}
-            onChange={(val) => setModo(val as LicenciaVigenciaModo)}
-            options={VIGENCIA_OPCIONES}
-            placeholder="Seleccionar vigencia"
+            value={frecuencia}
+            onChange={(val) =>
+              setFrecuencia(val as LicenciaFrecuenciaPago)
+            }
+            options={FRECUENCIA_OPCIONES}
+            placeholder="Frecuencia"
             disabled={!editarHabilitado}
           />
         </label>
 
-        {modo === "fecha_fija" ? (
+        {frecuencia === "mensual" ? (
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                Mes
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                <DollarSign className="size-3" /> Precio mensual (ARS)
               </span>
-              <CustomDropdown
-                value={String(mes)}
-                onChange={(val) => setMes(Number(val))}
-                options={MESES}
-                placeholder="Mes"
+              <input
+                type="text"
+                inputMode="numeric"
                 disabled={!editarHabilitado}
+                value={precioMensualInput}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "" || /^\d+$/.test(val)) {
+                    setPrecioMensualInput(val);
+                  }
+                }}
+                placeholder="Ej: 5000"
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white disabled:opacity-50 placeholder:text-gray-600"
               />
             </label>
             <label className="space-y-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                Día
+                Día de cobro
               </span>
               <CustomDropdown
-                value={String(dia)}
-                onChange={(val) => setDia(Number(val))}
-                options={DIAS_OPCIONES}
+                value={String(diaCobro)}
+                onChange={(val) => setDiaCobro(Number(val))}
+                options={DIAS_COBRO_OPCIONES}
                 placeholder="Día"
                 disabled={!editarHabilitado}
-                haciaArriba
               />
             </label>
           </div>
         ) : (
           <label className="block space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-              Meses de vigencia
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1">
+              <DollarSign className="size-3" /> Costo anual (ARS)
             </span>
             <input
               type="text"
               inputMode="numeric"
               disabled={!editarHabilitado}
-              value={mesesInput}
+              value={precioAnualInput}
               onChange={(e) => {
                 const val = e.target.value;
                 if (val === "" || /^\d+$/.test(val)) {
-                  setMesesInput(val);
+                  setPrecioAnualInput(val);
                 }
               }}
-              placeholder="12"
+              placeholder="Ej: 45000"
               className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white disabled:opacity-50 placeholder:text-gray-600"
             />
           </label>
+        )}
+
+        {/* Vigencia anual clásica: solo relevante si frecuencia = anual */}
+        {frecuencia === "anual" && (
+          <>
+            <label className="block space-y-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                Vigencia
+              </span>
+              <CustomDropdown
+                value={modo}
+                onChange={(val) => setModo(val as LicenciaVigenciaModo)}
+                options={VIGENCIA_OPCIONES}
+                placeholder="Seleccionar vigencia"
+                disabled={!editarHabilitado}
+              />
+            </label>
+
+            {modo === "fecha_fija" ? (
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    Mes
+                  </span>
+                  <CustomDropdown
+                    value={String(mes)}
+                    onChange={(val) => setMes(Number(val))}
+                    options={MESES}
+                    placeholder="Mes"
+                    disabled={!editarHabilitado}
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    Día
+                  </span>
+                  <CustomDropdown
+                    value={String(dia)}
+                    onChange={(val) => setDia(Number(val))}
+                    options={DIAS_OPCIONES}
+                    placeholder="Día"
+                    disabled={!editarHabilitado}
+                    haciaArriba
+                  />
+                </label>
+              </div>
+            ) : (
+              <label className="block space-y-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                  Meses de vigencia
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  disabled={!editarHabilitado}
+                  value={mesesInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "" || /^\d+$/.test(val)) {
+                      setMesesInput(val);
+                    }
+                  }}
+                  placeholder="12"
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white disabled:opacity-50 placeholder:text-gray-600"
+                />
+              </label>
+            )}
+          </>
         )}
       </div>
 
@@ -329,16 +438,14 @@ export function ConfigLicenciasPanel({
       {mensaje && (
         <p className="text-xs text-brand-chartreuse">{mensaje}</p>
       )}
-      {error && (
-        <p className="text-xs text-red-400">{error}</p>
-      )}
+      {error && <p className="text-xs text-red-400">{error}</p>}
 
       {editarHabilitado ? (
         <button
           type="button"
           onClick={guardar}
           disabled={saving}
-          className="w-full inline-flex items-center justify-center gap-2 bg-brand-chartreuse text-brand-black px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider disabled:opacity-60"
+          className="w-full inline-flex items-center justify-center gap-2 bg-brand-chartreuse text-brand-black px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider disabled:opacity-60 cursor-pointer"
         >
           <Save className="size-4" />
           {saving ? "Guardando..." : "Guardar configuración"}

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Licencia, Perfil } from "@/utils/types";
 import { LicenciaVencimientoEditor } from "./LicenciaVencimientoEditor";
+import { LicenciaPagosHistorial } from "./LicenciaPagosHistorial";
 
 interface LicenciaJugadorCardProps {
   jugador: Perfil;
@@ -189,6 +190,11 @@ export function LicenciaJugadorCard({
           </Link>
         </div>
       </div>
+
+      {/* Historial de pagos mensuales (colapsable) */}
+      {licencia.estado !== "Pendiente" && (
+        <LicenciaPagosHistorial licenciaId={licencia.id} />
+      )}
     </article>
   );
 }

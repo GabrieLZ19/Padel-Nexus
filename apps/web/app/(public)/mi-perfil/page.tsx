@@ -108,7 +108,19 @@ export default function PlayerDashboard() {
                   <CreditCard className="text-brand-chartreuse size-6 md:size-8" />
                 </div>
                 <p className="text-sm font-medium text-gray-400">
-                  Licencia Federativa
+                  {(() => {
+                    const lic =
+                      profile.licencias?.[
+                        Math.min(
+                          activeLicenciaIndex,
+                          Math.max(0, (profile.licencias?.length || 1) - 1),
+                        )
+                      ];
+                    return (
+                      lic?.datos_solicitud?.nombre_carne ||
+                      "Licencia Federativa"
+                    );
+                  })()}
                 </p>
               </div>
 
@@ -159,6 +171,10 @@ export default function PlayerDashboard() {
                               <CredencialDigital
                                 usuarioId={profile.id}
                                 licenciaId={currentLic.id}
+                                titulo={
+                                  currentLic.datos_solicitud?.nombre_carne ||
+                                  null
+                                }
                               />
                             </div>
                             <h2 className="text-xl md:text-2xl font-bold mt-5 text-brand-white tracking-wider">

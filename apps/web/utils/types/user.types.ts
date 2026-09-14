@@ -31,6 +31,10 @@ export interface Licencia {
     documento: string;
     provincia: string;
     club_id: string;
+    nombre_carne?: string;
+    frecuencia_pago?: "anual" | "mensual";
+    precio_anual?: number;
+    precio_mensual?: number;
   } | null;
   // Relación con Supabase
   perfiles?: Partial<Perfil> | null;

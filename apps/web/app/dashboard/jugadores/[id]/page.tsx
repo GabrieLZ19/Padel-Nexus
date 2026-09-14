@@ -174,6 +174,7 @@ export default function PerfilJugadorAdminPage() {
                 <CredencialDigital
                   usuarioId={perfil.id}
                   licenciaId={currentLicencia.id}
+                  titulo={currentLicencia.datos_solicitud?.nombre_carne}
                 />
               </div>
               <p className="text-[10px] text-gray-400 mt-2 text-center font-bold uppercase tracking-wider bg-black/40 px-2 py-0.5 rounded-full backdrop-blur-sm">
