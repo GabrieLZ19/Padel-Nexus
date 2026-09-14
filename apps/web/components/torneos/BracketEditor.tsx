@@ -18,6 +18,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { ProgramacionTab } from "./ProgramacionTab";
+import { ZonaCard } from "./ZonaCard";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
@@ -1262,20 +1263,21 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   partidos={partidos}
                 />
               ) : (
-                /* VISTA NORMAL: tablas de posiciones estilo FAP */
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {zonas.map((z) => {
+                /* VISTA NORMAL: zonas colapsables con partidos + caida en llave */
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {zonas.map((z, idx) => {
                     const partidosZona = partidos.filter(
                       (p) => p.ronda?.toUpperCase() === z.nombre?.toUpperCase(),
                     );
                     return (
-                      <TablaPosicionesZona
+                      <ZonaCard
                         key={z.id}
-                        nombreZona={z.nombre}
-                        parejasInscritas={z.parejas}
-                        partidosZona={partidosZona}
+                        zona={z}
+                        partidos={partidosZona}
                         alcance={torneo?.alcance}
-                        capacidadZona={z.parejas.length}
+                        fapMatrix={fapMatrixMatches}
+                        // Abrimos por defecto solo la primera para no saturar cuando hay muchas.
+                        defaultOpen={idx === 0 || zonas.length <= 3}
                       />
                     );
                   })}
