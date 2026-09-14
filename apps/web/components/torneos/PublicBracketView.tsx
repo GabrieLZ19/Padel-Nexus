@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CalendarDays, MapPin, Clock } from "lucide-react";
 import { Partido } from "@/utils/types";
 import {
   PairDisplay,
@@ -19,8 +20,34 @@ const RONDAS_CONFIG = [
 const MIN_COL_W = 300;
 const MIN_CARD_W = 240;
 const CONNECTOR_GAP = 56;
-const ROW_H = 128;
+// Aumentamos la altura de fila para acomodar la franja con fecha/cancha/hora.
+const ROW_H = 156;
 const HEADER_H = 36;
+
+/**
+ * Formatea la fecha/hora de un partido usando la zona horaria de Argentina.
+ * Devuelve strings vacíos si el dato no existe.
+ */
+function formatFechaHora(iso?: string | null): { fecha: string; hora: string } {
+  if (!iso) return { fecha: "", hora: "" };
+  try {
+    const d = new Date(iso);
+    const fecha = new Intl.DateTimeFormat("es-AR", {
+      day: "2-digit",
+      month: "short",
+      timeZone: "America/Argentina/Buenos_Aires",
+    }).format(d);
+    const hora = new Intl.DateTimeFormat("es-AR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "America/Argentina/Buenos_Aires",
+    }).format(d);
+    return { fecha, hora };
+  } catch {
+    return { fecha: "", hora: "" };
+  }
+}
 
 function BracketTeamRow({
   j1,
@@ -102,6 +129,11 @@ function BracketMatchCell({
   const hasB = Boolean(
     partido.equipo_b_j1 || partido.equipo_b_j2 || partido.equipo_b_denominacion,
   );
+  // BYE: uno de los dos lados existe y el otro no. El equipo que existe pasa
+  // directo. No hay score que mostrar; marcamos visualmente el ganador.
+  const esByeA = hasA && !hasB;
+  const esByeB = hasB && !hasA;
+  const esBye = esByeA || esByeB;
   const scoreA = [partido.set1_a, partido.set2_a, partido.set3_a]
     .filter((v) => v != null)
     .join("-");
@@ -109,13 +141,24 @@ function BracketMatchCell({
     .filter((v) => v != null)
     .join("-");
 
+  const { fecha, hora } = formatFechaHora(partido.fecha_partido);
+  const cancha = (partido.cancha_asignada || "").trim();
+  // Solo mostramos la franja si hay algo util. Un partido con BYE no necesita
+  // horario (no se juega), pero si el admin lo cargó, lo respetamos.
+  const mostrarFranja = !esBye && (fecha || hora || cancha);
+
   return (
     <div
       className={`rounded-xl border overflow-hidden bg-brand-card ${
-        finalizado ? "border-brand-input" : "border-brand-input"
+        finalizado
+          ? "border-brand-chartreuse/25"
+          : esBye
+            ? "border-brand-input/70 border-dashed"
+            : "border-brand-input"
       }`}
       style={{ width }}
     >
+      {/* Fila equipo A */}
       <div className="flex items-stretch border-b border-brand-input">
         <div className="min-w-0 flex-1">
           <BracketTeamRow
@@ -127,20 +170,21 @@ function BracketMatchCell({
             usuario2Id={partido.equipo_a_usuario2_id}
             denominacion={partido.equipo_a_denominacion}
             alcanceNacional={alcanceNacional}
-            won={isA}
-            emptyLabel={hasB && !hasA ? "BYE" : "TBD"}
+            won={isA || esByeA}
+            emptyLabel={esByeB ? "BYE" : "TBD"}
           />
         </div>
         <div
           className={`w-9 shrink-0 flex items-center justify-center border-l border-brand-input text-[11px] font-black tabular-nums ${
-            isA
+            isA || esByeA
               ? "text-brand-chartreuse bg-brand-chartreuse/10"
               : "text-gray-500"
           }`}
         >
-          {scoreA || "–"}
+          {esByeA ? "→" : scoreA || "–"}
         </div>
       </div>
+      {/* Fila equipo B */}
       <div className="flex items-stretch">
         <div className="min-w-0 flex-1">
           <BracketTeamRow
@@ -152,20 +196,46 @@ function BracketMatchCell({
             usuario2Id={partido.equipo_b_usuario2_id}
             denominacion={partido.equipo_b_denominacion}
             alcanceNacional={alcanceNacional}
-            won={isB}
-            emptyLabel={hasA && !hasB ? "BYE" : "TBD"}
+            won={isB || esByeB}
+            emptyLabel={esByeA ? "BYE" : "TBD"}
           />
         </div>
         <div
           className={`w-9 shrink-0 flex items-center justify-center border-l border-brand-input text-[11px] font-black tabular-nums ${
-            isB
+            isB || esByeB
               ? "text-brand-chartreuse bg-brand-chartreuse/10"
               : "text-gray-500"
           }`}
         >
-          {scoreB || "–"}
+          {esByeB ? "→" : scoreB || "–"}
         </div>
       </div>
+      {/* Franja inferior: fecha · cancha · hora (solo si hay dato y no es BYE) */}
+      {mostrarFranja && (
+        <div className="flex items-center gap-2 px-2.5 py-1.5 border-t border-brand-input bg-brand-black/40 text-[10px] font-semibold text-gray-400">
+          {fecha && (
+            <span className="inline-flex items-center gap-1 shrink-0">
+              <CalendarDays className="size-3 text-brand-chartreuse/70" />
+              <span className="capitalize">{fecha}</span>
+            </span>
+          )}
+          {hora && (
+            <span className="inline-flex items-center gap-1 shrink-0 tabular-nums">
+              <Clock className="size-3 text-brand-chartreuse/70" />
+              {hora}
+            </span>
+          )}
+          {cancha && (
+            <span
+              className="inline-flex items-center gap-1 min-w-0"
+              title={cancha}
+            >
+              <MapPin className="size-3 text-brand-chartreuse/70 shrink-0" />
+              <span className="truncate">{cancha}</span>
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
