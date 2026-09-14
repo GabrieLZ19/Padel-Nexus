@@ -130,7 +130,7 @@ export class ComunicacionesController {
 
   static async listarCampanas(req: Request, res: Response) {
     try {
-      const { id } = getActor(req);
+      const actor = getActor(req);
       const limit = req.query.limit
         ? Number.parseInt(String(req.query.limit), 10)
         : undefined;
@@ -138,10 +138,13 @@ export class ComunicacionesController {
         ? Number.parseInt(String(req.query.offset), 10)
         : undefined;
 
-      const data = await ComunicacionesService.listarCampanas(id, {
-        limit: Number.isFinite(limit) ? limit : undefined,
-        offset: Number.isFinite(offset) ? offset : undefined,
-      });
+      const data = await ComunicacionesService.listarCampanas(
+        { id: actor.id, rol: actor.rol },
+        {
+          limit: Number.isFinite(limit) ? limit : undefined,
+          offset: Number.isFinite(offset) ? offset : undefined,
+        },
+      );
       return res.status(200).json({ exito: true, ...data });
     } catch (error: unknown) {
       const message =

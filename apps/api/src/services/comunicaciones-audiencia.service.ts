@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "../config/supabase";
 import { AFILIACION_ESTADOS } from "../constants/afiliacion";
-import { FAP_ESTADOS_PAGO } from "../constants/fap";
+import { FAP_ESTADOS_PAGO, FAP_ESTADOS_LICENCIA } from "../constants/fap";
 import type { RolUsuario } from "../constants/roles";
 import {
   COMUNICACIONES_MAX_DESTINATARIOS,
@@ -170,11 +170,14 @@ export class ComunicacionesAudienciaService {
     filtros: ComunicacionesFiltros,
   ): ComunicacionesAudienciaTipo {
     if (filtros.torneo_id) return "inscritos_torneo";
-    if (filtros.asociacion_ids?.length) return "jugadores_asociacion";
-    if (filtros.club_ids?.length) return "jugadores_club";
     if (filtros.roles?.includes("admin_provincial")) {
       return "admins_asociaciones";
     }
+    if (filtros.roles?.includes("admin_club")) {
+      return "admins_clubes";
+    }
+    if (filtros.asociacion_ids?.length) return "jugadores_asociacion";
+    if (filtros.club_ids?.length) return "jugadores_club";
     if (filtros.provincias?.length) return "jugadores_provincia";
     return "jugadores_provincia";
   }
@@ -323,7 +326,8 @@ export class ComunicacionesAudienciaService {
         !next.torneo_id &&
         audienciaTipo !== "lista" &&
         audienciaTipo !== "manual_ids" &&
-        audienciaTipo !== "admins_asociaciones"
+        audienciaTipo !== "admins_asociaciones" &&
+        audienciaTipo !== "admins_clubes"
       ) {
         throw new Error(
           "Como admin genérico debés acotar por club, asociación, provincia, torneo o lista.",
@@ -339,38 +343,141 @@ export class ComunicacionesAudienciaService {
 
     switch (audienciaTipo) {
       case "plataforma":
-        return this.resolverJugadores(filtros);
+        return this.aplicarFiltroLicencia(
+          await this.resolverJugadores(filtros),
+          filtros,
+        );
 
       case "admins_asociaciones":
         return this.resolverAdminsAsociaciones(filtros);
 
+      case "admins_clubes":
+        return this.resolverAdminsClubes(filtros);
+
       case "jugadores_provincia":
-        return this.resolverJugadores({
-          ...filtros,
-          solo_rol_usuario: true,
-        });
+        return this.aplicarFiltroLicencia(
+          await this.resolverJugadores({
+            ...filtros,
+            solo_rol_usuario: true,
+          }),
+          filtros,
+        );
 
       case "jugadores_asociacion":
-        return this.resolverJugadoresAsociacion(filtros);
+        return this.aplicarFiltroLicencia(
+          await this.resolverJugadoresAsociacion(filtros),
+          filtros,
+        );
 
       case "jugadores_club":
-        return this.resolverJugadoresClub(filtros);
+        return this.aplicarFiltroLicencia(
+          await this.resolverJugadoresClub(filtros),
+          filtros,
+        );
 
       case "inscritos_torneo":
-        return this.resolverInscritosTorneo(filtros);
+        return this.aplicarFiltroLicencia(
+          await this.resolverInscritosTorneo(filtros),
+          filtros,
+        );
 
       case "lista":
-        // La resolución de listas se hace en resolver() antes de llegar acá.
+        // La resolucion de listas se hace en resolver() antes de llegar aca.
         throw new Error(
           "La audiencia de tipo lista debe resolverse en el flujo principal.",
         );
 
       case "manual_ids":
-        return this.resolverManualIds(filtros);
+        return this.aplicarFiltroLicencia(
+          await this.resolverManualIds(filtros),
+          filtros,
+        );
 
       default:
         throw new Error("Tipo de audiencia no soportado.");
     }
+  }
+
+  /**
+   * Aplica el filtro `licencia_estado` a un conjunto de perfiles.
+   * - `vigente`: al menos una licencia con estado Activa y no vencida.
+   * - `sin_licencia`: sin ninguna licencia activa a la fecha.
+   * Si no se pide filtro, devuelve los ids tal cual.
+   */
+  private static async aplicarFiltroLicencia(
+    ids: string[],
+    filtros: ComunicacionesFiltros,
+  ): Promise<string[]> {
+    if (!filtros.licencia_estado || ids.length === 0) return ids;
+
+    const hoy = new Date().toISOString().slice(0, 10);
+    const { data, error } = await supabaseAdmin
+      .from("licencias")
+      .select("usuario_id, fecha_vencimiento, estado")
+      .in("usuario_id", ids)
+      .eq("estado", FAP_ESTADOS_LICENCIA.ACTIVA);
+
+    if (error) {
+      throw new Error(`Error al aplicar filtro de licencia: ${error.message}`);
+    }
+
+    const usuariosConLicenciaVigente = new Set<string>();
+    for (const lic of data || []) {
+      if (!lic.usuario_id) continue;
+      const vence = lic.fecha_vencimiento;
+      if (!vence || vence >= hoy) {
+        usuariosConLicenciaVigente.add(lic.usuario_id);
+      }
+    }
+
+    if (filtros.licencia_estado === "vigente") {
+      return ids.filter((id) => usuariosConLicenciaVigente.has(id));
+    }
+    // sin_licencia
+    return ids.filter((id) => !usuariosConLicenciaVigente.has(id));
+  }
+
+  /**
+   * Resuelve admins de club (rol `admin_club`) segun provincia y clubes seleccionados.
+   */
+  private static async resolverAdminsClubes(
+    filtros: ComunicacionesFiltros,
+  ): Promise<string[]> {
+    let query = supabaseAdmin
+      .from("perfiles")
+      .select("id, club_id")
+      .eq("rol", "admin_club");
+
+    if (filtros.club_ids?.length) {
+      query = query.in("club_id", filtros.club_ids);
+    }
+
+    if (filtros.provincias?.length) {
+      // Restringimos a admins cuyo club pertenece a las provincias solicitadas.
+      const { data: clubes } = await supabaseAdmin
+        .from("clubes")
+        .select("id")
+        .in("provincia", filtros.provincias);
+      const clubIds = (clubes || []).map((c) => c.id);
+      if (clubIds.length === 0) return [];
+      query = query.in("club_id", clubIds);
+    }
+
+    if (filtros.asociacion_ids?.length) {
+      const { data: clubesAsoc } = await supabaseAdmin
+        .from("clubes")
+        .select("id")
+        .in("asociacion_id", filtros.asociacion_ids);
+      const clubIds = (clubesAsoc || []).map((c) => c.id);
+      if (clubIds.length === 0) return [];
+      query = query.in("club_id", clubIds);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Error al resolver admins de clubes: ${error.message}`);
+    }
+    return uniqueIds((data || []).map((p) => p.id));
   }
 
   private static async resolverAdminsAsociaciones(

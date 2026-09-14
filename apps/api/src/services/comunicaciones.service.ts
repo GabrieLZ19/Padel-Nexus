@@ -574,19 +574,62 @@ export class ComunicacionesService {
     };
   }
 
+  /**
+   * Lista campañas segun el alcance del actor:
+   * - `superadmin` / `admin_federacion`: ven todas las campañas.
+   * - `admin_provincial`: campañas propias y de admins de su provincia.
+   * - Resto de roles administrativos: solo campañas propias.
+   *
+   * Se hace join con `perfiles` para exponer nombre y rol del remitente.
+   */
   static async listarCampanas(
-    creadorId: string,
+    actor: { id: string; rol: string },
     opts?: { limit?: number; offset?: number },
   ) {
     const limit = Math.min(Math.max(opts?.limit || 20, 1), 100);
     const offset = Math.max(opts?.offset || 0, 0);
 
-    const { data, error, count } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("comunicaciones_campanas")
-      .select("*", { count: "exact" })
-      .eq("creador_id", creadorId)
+      .select(
+        `*, creador:perfiles!comunicaciones_campanas_creador_id_fkey (
+          id, nombre, apellido, email, rol
+        )`,
+        { count: "exact" },
+      )
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
+
+    const rol = actor.rol;
+    if (rol === "superadmin" || rol === "admin_federacion") {
+      // Ven todo, sin filtro por creador.
+    } else if (rol === "admin_provincial") {
+      // Ven las suyas + las de admins provinciales de su misma provincia.
+      const { data: perfilActor } = await supabaseAdmin
+        .from("perfiles")
+        .select("lugar_residencia")
+        .eq("id", actor.id)
+        .maybeSingle();
+      const provincia = (perfilActor?.lugar_residencia || "").trim();
+      if (provincia) {
+        const { data: pares } = await supabaseAdmin
+          .from("perfiles")
+          .select("id")
+          .eq("rol", "admin_provincial")
+          .eq("lugar_residencia", provincia);
+        const ids = new Set<string>([
+          actor.id,
+          ...((pares || []).map((p) => p.id)),
+        ]);
+        query = query.in("creador_id", [...ids]);
+      } else {
+        query = query.eq("creador_id", actor.id);
+      }
+    } else {
+      query = query.eq("creador_id", actor.id);
+    }
+
+    const { data, error, count } = await query;
 
     if (error) throw new Error(`Error al listar campañas: ${error.message}`);
 

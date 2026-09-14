@@ -10,6 +10,7 @@ export const COMUNICACIONES_ROLES_PERMITIDOS: RolUsuario[] = [
 
 export const COMUNICACIONES_AUDIENCIA_TIPOS = [
   "admins_asociaciones",
+  "admins_clubes",
   "jugadores_provincia",
   "jugadores_asociacion",
   "jugadores_club",
@@ -21,6 +22,19 @@ export const COMUNICACIONES_AUDIENCIA_TIPOS = [
 
 export type ComunicacionesAudienciaTipo =
   (typeof COMUNICACIONES_AUDIENCIA_TIPOS)[number];
+
+/**
+ * Filtro por estado de licencia aplicable a audiencias de jugadores.
+ * - `vigente`: al menos una licencia activa y no vencida (federativa o asociativa).
+ * - `sin_licencia`: sin ninguna licencia activa a la fecha.
+ */
+export const COMUNICACIONES_LICENCIA_ESTADOS = [
+  "vigente",
+  "sin_licencia",
+] as const;
+
+export type ComunicacionesLicenciaEstado =
+  (typeof COMUNICACIONES_LICENCIA_ESTADOS)[number];
 
 export const COMUNICACIONES_LISTA_TIPOS = ["manual", "dinamica"] as const;
 
@@ -55,6 +69,12 @@ export interface ComunicacionesFiltros {
   torneo_id?: string;
   solo_rol_usuario?: boolean;
   perfil_ids?: string[];
+  /**
+   * Restringe la audiencia por estado de licencia:
+   * - `vigente`: solo jugadores con licencia activa no vencida.
+   * - `sin_licencia`: solo jugadores sin licencia activa vigente.
+   */
+  licencia_estado?: ComunicacionesLicenciaEstado;
 }
 
 export function esAudienciaTipoValido(
