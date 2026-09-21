@@ -59,6 +59,11 @@ export default function DashboardFiscal() {
   const enCurso = torneos.filter(
     (t) => (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.EN_CURSO.toLowerCase(),
   );
+  const programados = torneos.filter(
+    (t) =>
+      (t.estado || "").toLowerCase() ===
+      FAP_ESTADOS_TORNEO.PROGRAMADO.toLowerCase(),
+  );
   const enInscripcion = torneos.filter(
     (t) => (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.INSCRIPCION.toLowerCase(),
   );
@@ -106,14 +111,19 @@ export default function DashboardFiscal() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Kpi icon={Trophy} label="Asignados" value={String(torneos.length)} />
-        <Kpi icon={Activity} label="En curso" value={String(enCurso.length)} />
         <Kpi
           icon={ClipboardList}
           label="En inscripción"
           value={String(enInscripcion.length)}
         />
+        <Kpi
+          icon={Activity}
+          label="Programados"
+          value={String(programados.length)}
+        />
+        <Kpi icon={Activity} label="En curso" value={String(enCurso.length)} />
       </div>
 
       <section className="space-y-4">

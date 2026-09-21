@@ -801,11 +801,15 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         row.jugador1_nombre ||
         row.jugador1?.nombre ||
         "Jugador 1";
-      const name2 =
+      const name2Raw =
         row.jugador_2_nombre ||
         row.jugador2_nombre ||
         row.jugador2?.nombre ||
         "";
+      const name2 =
+        !name2Raw || String(name2Raw).trim() === "-"
+          ? ""
+          : String(name2Raw).trim();
       const enLlave = firstRoundTeams.has(ins.id);
       return {
         value: ins.id,
@@ -1263,11 +1267,46 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   partidos={partidos}
                 />
               ) : (
-                /* VISTA NORMAL: zonas colapsables con partidos + caida en llave */
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {zonas.map((z, idx) => {
+                /* Vista: paneles apilados — todas las zonas visibles a la vez */
+                <div className="space-y-4">
+                  {zonas.length > 1 && (
+                    <div className="flex flex-wrap items-center gap-2 sticky top-2 z-10 py-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 mr-1">
+                        Ir a
+                      </span>
+                      {zonas.map((z) => {
+                        const letra =
+                          /^ZONA\s+([A-Z])/i.exec(z.nombre.trim())?.[1] ||
+                          z.nombre.slice(0, 1);
+                        const partidosZona = partidos.filter(
+                          (p) =>
+                            p.ronda?.toUpperCase() ===
+                            z.nombre?.toUpperCase(),
+                        );
+                        const jugados = partidosZona.filter(
+                          (p) => p.ganador != null,
+                        ).length;
+                        return (
+                          <a
+                            key={z.id}
+                            href={`#zona-${z.id}`}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-black/60 backdrop-blur-sm text-xs font-black text-white hover:border-brand-chartreuse/50 hover:text-brand-chartreuse transition-colors"
+                          >
+                            <span className="size-5 rounded-md bg-brand-chartreuse/15 text-brand-chartreuse inline-flex items-center justify-center text-[10px]">
+                              {letra}
+                            </span>
+                            <span className="tabular-nums text-gray-400 font-bold">
+                              {jugados}/{partidosZona.length || 0}
+                            </span>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {zonas.map((z) => {
                     const partidosZona = partidos.filter(
-                      (p) => p.ronda?.toUpperCase() === z.nombre?.toUpperCase(),
+                      (p) =>
+                        p.ronda?.toUpperCase() === z.nombre?.toUpperCase(),
                     );
                     return (
                       <ZonaCard
@@ -1275,9 +1314,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                         zona={z}
                         partidos={partidosZona}
                         alcance={torneo?.alcance}
-                        fapMatrix={fapMatrixMatches}
-                        // Abrimos por defecto solo la primera para no saturar cuando hay muchas.
-                        defaultOpen={idx === 0 || zonas.length <= 3}
+                        anchorId={`zona-${z.id}`}
+                        tercerSetCompleto={
+                          ((
+                            torneo?.reglas_arbitraje as
+                              | { definicion_tercer_set?: string }
+                              | undefined
+                          )?.definicion_tercer_set ?? "Completo") === "Completo"
+                        }
                       />
                     );
                   })}

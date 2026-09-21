@@ -298,9 +298,11 @@ export default function DetalleAsociacionPage() {
                         className={`text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-wider ${
                           t.estado === "Inscripción"
                             ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : t.estado === "En curso"
-                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                              : "bg-white/10 text-gray-300 border border-white/10"
+                            : t.estado === "Programado"
+                              ? "bg-violet-500/10 text-violet-400 border border-violet-500/20"
+                              : t.estado === "En curso"
+                                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                : "bg-white/10 text-gray-300 border border-white/10"
                         }`}
                       >
                         {t.estado || "Borrador"}

@@ -23,7 +23,62 @@ export interface Vendedor {
   estado: "activo" | "suspendido";
   valoracion_promedio: number;
   total_ventas: number;
+  cbu?: string | null;
+  alias?: string | null;
+  titular_cuenta?: string | null;
+  banco?: string | null;
+  mp_collector_id?: string | null;
+  mp_notas?: string | null;
 }
+
+export type EspacioSponsorCampana = "home" | "tienda" | "checkout" | "banner";
+export type EstadoSponsorCampana =
+  | "borrador"
+  | "activa"
+  | "finalizada"
+  | "pausada";
+
+export interface MarketplaceSponsor {
+  id: string;
+  vendedor_id: string;
+  nombre: string;
+  contacto_email?: string | null;
+  contacto_telefono?: string | null;
+  logo_url?: string | null;
+  notas?: string | null;
+  activo: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface MarketplaceSponsorCampana {
+  id: string;
+  sponsor_id: string;
+  vendedor_id: string;
+  titulo: string;
+  descripcion?: string | null;
+  espacio: EspacioSponsorCampana;
+  fecha_inicio: string;
+  fecha_fin: string;
+  provincia?: string | null;
+  torneo_id?: string | null;
+  categoria?: string | null;
+  imagen_url?: string | null;
+  link_url?: string | null;
+  estado: EstadoSponsorCampana;
+  created_at?: string;
+  updated_at?: string;
+  sponsor?: Pick<MarketplaceSponsor, "id" | "nombre" | "logo_url" | "activo">;
+}
+
+export type DatosCobroTienda = {
+  cbu?: string | null;
+  alias?: string | null;
+  titular_cuenta?: string | null;
+  banco?: string | null;
+  mp_collector_id?: string | null;
+  mp_notas?: string | null;
+};
 
 export interface Categoria {
   id: string;
@@ -261,7 +316,8 @@ export const MarketplaceService = {
 
   async crmActualizarTienda(
     ref: EntidadRef,
-    datos: Partial<Vendedor> & { logo_base64?: string; logo_url?: string | null },
+    datos: Partial<Vendedor> &
+      DatosCobroTienda & { logo_base64?: string; logo_url?: string | null },
   ): Promise<Vendedor> {
     const response = await api.put<Vendedor>("/marketplace/crm/tienda", {
       ...entidadParams(ref),
@@ -374,6 +430,140 @@ export const MarketplaceService = {
       ...payload,
     });
     return response.data;
+  },
+
+  async crmListarSponsors(ref: EntidadRef): Promise<MarketplaceSponsor[]> {
+    const response = await api.get<MarketplaceSponsor[]>("/marketplace/crm/sponsors", {
+      params: entidadParams(ref),
+    });
+    return response.data;
+  },
+
+  async crmCrearSponsor(
+    ref: EntidadRef,
+    datos: {
+      nombre: string;
+      contacto_email?: string | null;
+      contacto_telefono?: string | null;
+      logo_url?: string | null;
+      logo_base64?: string;
+      notas?: string | null;
+      activo?: boolean;
+    },
+  ): Promise<MarketplaceSponsor> {
+    const response = await api.post<MarketplaceSponsor>("/marketplace/crm/sponsors", {
+      ...entidadParams(ref),
+      ...datos,
+    });
+    return response.data;
+  },
+
+  async crmActualizarSponsor(
+    ref: EntidadRef,
+    id: string,
+    datos: Partial<{
+      nombre: string;
+      contacto_email: string | null;
+      contacto_telefono: string | null;
+      logo_url: string | null;
+      logo_base64: string;
+      notas: string | null;
+      activo: boolean;
+    }>,
+  ): Promise<MarketplaceSponsor> {
+    const response = await api.put<MarketplaceSponsor>(
+      `/marketplace/crm/sponsors/${id}`,
+      {
+        ...entidadParams(ref),
+        ...datos,
+      },
+    );
+    return response.data;
+  },
+
+  async crmEliminarSponsor(ref: EntidadRef, id: string): Promise<void> {
+    await api.delete(`/marketplace/crm/sponsors/${id}`, {
+      params: entidadParams(ref),
+    });
+  },
+
+  async crmListarSponsorCampanas(
+    ref: EntidadRef,
+    sponsorId?: string,
+  ): Promise<MarketplaceSponsorCampana[]> {
+    const response = await api.get<MarketplaceSponsorCampana[]>(
+      "/marketplace/crm/sponsor-campanas",
+      {
+        params: {
+          ...entidadParams(ref),
+          sponsor_id: sponsorId || undefined,
+        },
+      },
+    );
+    return response.data;
+  },
+
+  async crmCrearSponsorCampana(
+    ref: EntidadRef,
+    datos: {
+      sponsor_id: string;
+      titulo: string;
+      descripcion?: string | null;
+      espacio?: EspacioSponsorCampana;
+      fecha_inicio: string;
+      fecha_fin: string;
+      provincia?: string | null;
+      torneo_id?: string | null;
+      categoria?: string | null;
+      imagen_url?: string | null;
+      imagen_base64?: string;
+      link_url?: string | null;
+      estado?: EstadoSponsorCampana;
+    },
+  ): Promise<MarketplaceSponsorCampana> {
+    const response = await api.post<MarketplaceSponsorCampana>(
+      "/marketplace/crm/sponsor-campanas",
+      {
+        ...entidadParams(ref),
+        ...datos,
+      },
+    );
+    return response.data;
+  },
+
+  async crmActualizarSponsorCampana(
+    ref: EntidadRef,
+    id: string,
+    datos: Partial<{
+      sponsor_id: string;
+      titulo: string;
+      descripcion: string | null;
+      espacio: EspacioSponsorCampana;
+      fecha_inicio: string;
+      fecha_fin: string;
+      provincia: string | null;
+      torneo_id: string | null;
+      categoria: string | null;
+      imagen_url: string | null;
+      imagen_base64: string;
+      link_url: string | null;
+      estado: EstadoSponsorCampana;
+    }>,
+  ): Promise<MarketplaceSponsorCampana> {
+    const response = await api.put<MarketplaceSponsorCampana>(
+      `/marketplace/crm/sponsor-campanas/${id}`,
+      {
+        ...entidadParams(ref),
+        ...datos,
+      },
+    );
+    return response.data;
+  },
+
+  async crmEliminarSponsorCampana(ref: EntidadRef, id: string): Promise<void> {
+    await api.delete(`/marketplace/crm/sponsor-campanas/${id}`, {
+      params: entidadParams(ref),
+    });
   },
 
   // Admin moderación

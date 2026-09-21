@@ -1,6 +1,6 @@
 import { Partido } from "@/utils/types";
 import { Loader2, Trophy, AlertCircle, CalendarClock } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { TorneosService } from "@/utils/services/torneos";
 import { TeamBox } from "@/components/torneos/MatchTeamBox";
@@ -249,23 +249,34 @@ export const LiveArbitrajeRow = ({
     }
   };
 
-  // Determinar si los sets previos están completos
   const set1Completado = s1A !== "" && s1B !== "";
   const set2Completado = s2A !== "" && s2B !== "";
 
-  // Calcular si los primeros 2 sets quedaron empatados 1-1 (lo que HABILITA y REQUIERE el 3er set)
+  // Sets ganados en los dos primeros (habilita Set 3 solo si hay 1-1)
   const gA1 = set1Completado && Number(s1A) > Number(s1B) ? 1 : 0;
   const gB1 = set1Completado && Number(s1B) > Number(s1A) ? 1 : 0;
   const gA2 = set2Completado && Number(s2A) > Number(s2B) ? 1 : 0;
   const gB2 = set2Completado && Number(s2B) > Number(s2A) ? 1 : 0;
 
+  const setsTrasDos = { a: gA1 + gA2, b: gB1 + gB2 };
   const requiereTercerSet =
-    set1Completado && set2Completado && gA1 + gA2 === 1 && gB1 + gB2 === 1;
+    set1Completado && set2Completado && setsTrasDos.a === 1 && setsTrasDos.b === 1;
+  /** Set tradicional (completo): siempre se muestra la columna Set 3. STB: solo si hay 1-1. */
+  const mostrarTercerSet = esTercerSetCompleto || requiereTercerSet;
+  const tercerSetEditable = requiereTercerSet;
+
+  useEffect(() => {
+    // En STB, si el partido queda 2-0, limpiar el 3er set. En tradicional se deja la columna visible.
+    if (!esTercerSetCompleto && !requiereTercerSet && (s3A !== "" || s3B !== "")) {
+      setS3A("");
+      setS3B("");
+    }
+  }, [esTercerSetCompleto, requiereTercerSet, s3A, s3B]);
 
   // Determinar total de sets ganados incluyendo el 3er set (para definir el ganador)
   const getSetsGanados = () => {
-    let setsA = gA1 + gA2;
-    let setsB = gB1 + gB2;
+    let setsA = setsTrasDos.a;
+    let setsB = setsTrasDos.b;
 
     if (requiereTercerSet && s3A !== "" && s3B !== "") {
       if (Number(s3A) > Number(s3B)) setsA++;
@@ -443,10 +454,10 @@ export const LiveArbitrajeRow = ({
   };
 
   return (
-    <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-md">
-      <div className="flex flex-col gap-2 px-3 py-2.5 bg-white/[0.03] border-b border-white/8">
-        <div className="flex flex-wrap items-center gap-2 min-w-0">
-          <span className="text-[10px] font-black text-sky-400 bg-sky-400/10 border border-sky-400/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+    <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-md min-w-0">
+      <div className="flex flex-col gap-2 px-2.5 sm:px-3 py-2 sm:py-2.5 bg-white/[0.03] border-b border-white/8">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
+          <span className="text-[10px] font-black text-sky-400 bg-sky-400/10 border border-sky-400/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0 tabular-nums">
             #
             {(partido.orden != null
               ? String(partido.orden).padStart(2, "0")
@@ -457,24 +468,27 @@ export const LiveArbitrajeRow = ({
             {partido.ronda}
           </span>
           {programacionLabel ? (
-            <span className="text-[10px] font-bold text-emerald-400/90 truncate min-w-0">
+            <span className="text-[10px] font-bold text-emerald-400/90 truncate min-w-0 max-w-full sm:max-w-[min(100%,28rem)] basis-full sm:basis-auto">
               {programacionLabel}
             </span>
           ) : (
-            <span className="text-[10px] font-semibold text-gray-500">
-              Sede y horario del cuadro
+            <span className="text-[10px] font-semibold text-gray-500 basis-full sm:basis-auto">
+              Sin sede/horario
             </span>
           )}
-          <button
-            type="button"
-            onClick={() => setShowProgramacion((v) => !v)}
-            className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-white border border-white/10 hover:border-white/20 bg-white/5 px-2 py-1 rounded-lg cursor-pointer shrink-0"
-          >
-            <CalendarClock className="size-3" />
-            {showProgramacion ? "Ocultar" : "Ajustar sede"}
-          </button>
-          <div className="flex items-center gap-3 text-[10px] shrink-0 sm:ml-auto">
-            <label className="flex items-center gap-1.5 font-bold text-gray-400 cursor-pointer">
+          <div className="flex items-center gap-2 ml-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowProgramacion((v) => !v)}
+              className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-white border border-white/10 hover:border-white/20 bg-white/5 px-2 py-1 rounded-lg cursor-pointer"
+            >
+              <CalendarClock className="size-3" />
+              <span className="hidden sm:inline">
+                {showProgramacion ? "Ocultar" : "Ajustar sede"}
+              </span>
+              <span className="sm:hidden">{showProgramacion ? "OK" : "Sede"}</span>
+            </button>
+            <label className="flex items-center gap-1 font-bold text-gray-400 cursor-pointer text-[10px]">
               <input
                 type="checkbox"
                 checked={esWo}
@@ -484,20 +498,20 @@ export const LiveArbitrajeRow = ({
               W.O.
             </label>
             {esWo && (
-              <label className="flex items-center gap-1.5 text-red-400 font-bold cursor-pointer">
+              <label className="flex items-center gap-1 text-red-400 font-bold cursor-pointer text-[10px]">
                 <input
                   type="checkbox"
                   checked={esInjustificadoWo}
                   onChange={(e) => setEsInjustificadoWo(e.target.checked)}
                   className="accent-red-500 rounded"
                 />
-                Injustificado
+                Inj.
               </label>
             )}
           </div>
         </div>
         {showProgramacion && (
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
             <CustomDropdown
               value={canchaEdit}
               onChange={(val) => {
@@ -532,7 +546,7 @@ export const LiveArbitrajeRow = ({
       </div>
 
       {esWo ? (
-        <div className="p-3 space-y-3">
+        <div className="p-2.5 sm:p-3 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
               type="button"
@@ -575,7 +589,7 @@ export const LiveArbitrajeRow = ({
           </div>
         </div>
       ) : (
-        <div className="p-3 space-y-3">
+        <div className="p-2.5 sm:p-3 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 md:gap-3 items-stretch">
             <TeamBox
               j1={partido.equipo_a_j1}
@@ -587,19 +601,21 @@ export const LiveArbitrajeRow = ({
               isWinner={setsA >= 2}
             />
 
-            <div className="flex flex-col items-center justify-center gap-1 px-1 py-1 order-first md:order-none self-center">
+            <div className="flex flex-col items-center justify-center gap-1 px-1 py-1 self-center">
               <div className="flex gap-1.5">
                 {(
                   [
                     "Set 1",
                     "Set 2",
-                    requiereTercerSet && !esTercerSetCompleto ? "STB" : "Set 3",
-                  ] as const
-                ).map((label, i) => (
+                    ...(mostrarTercerSet
+                      ? [esTercerSetCompleto ? "Set 3" : "STB"]
+                      : []),
+                  ] as string[]
+                ).map((label) => (
                   <span
                     key={label}
                     className={`text-[8px] font-black uppercase w-10 text-center ${
-                      i === 2 && requiereTercerSet
+                      (label === "Set 3" || label === "STB") && tercerSetEditable
                         ? "text-brand-chartreuse"
                         : "text-gray-500"
                     }`}
@@ -629,20 +645,23 @@ export const LiveArbitrajeRow = ({
                   }
                   className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
                 />
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  aria-label="Set 3 equipo A"
-                  value={s3A}
-                  onChange={(e) =>
-                    setS3A(e.target.value.replace(/[^0-9]/g, ""))
-                  }
-                  className={`w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border ${
-                    requiereTercerSet
-                      ? "border-brand-chartreuse"
-                      : "border-white/15 focus:border-brand-chartreuse opacity-60"
-                  }`}
-                />
+                {mostrarTercerSet && (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    aria-label="Set 3 equipo A"
+                    value={s3A}
+                    disabled={!tercerSetEditable}
+                    onChange={(e) =>
+                      setS3A(e.target.value.replace(/[^0-9]/g, ""))
+                    }
+                    className={`w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border ${
+                      tercerSetEditable
+                        ? "border-brand-chartreuse"
+                        : "border-white/10 opacity-40 cursor-not-allowed"
+                    }`}
+                  />
+                )}
               </div>
               <div className="h-px w-full max-w-[8.5rem] bg-white/10 my-0.5" />
               <div className="flex gap-1.5">
@@ -666,20 +685,23 @@ export const LiveArbitrajeRow = ({
                   }
                   className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
                 />
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  aria-label="Set 3 equipo B"
-                  value={s3B}
-                  onChange={(e) =>
-                    setS3B(e.target.value.replace(/[^0-9]/g, ""))
-                  }
-                  className={`w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border ${
-                    requiereTercerSet
-                      ? "border-brand-chartreuse"
-                      : "border-white/15 focus:border-brand-chartreuse opacity-60"
-                  }`}
-                />
+                {mostrarTercerSet && (
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    aria-label="Set 3 equipo B"
+                    value={s3B}
+                    disabled={!tercerSetEditable}
+                    onChange={(e) =>
+                      setS3B(e.target.value.replace(/[^0-9]/g, ""))
+                    }
+                    className={`w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border ${
+                      tercerSetEditable
+                        ? "border-brand-chartreuse"
+                        : "border-white/10 opacity-40 cursor-not-allowed"
+                    }`}
+                  />
+                )}
               </div>
             </div>
 
@@ -693,23 +715,15 @@ export const LiveArbitrajeRow = ({
               isWinner={setsB >= 2}
             />
           </div>
-
-          {(requiereTercerSet || s3A !== "" || s3B !== "") && (
-            <p className="text-[10px] text-center text-brand-chartreuse/90 font-bold">
-              {esTercerSetCompleto
-                ? "3er set: completo convencional."
-                : `3er set: Super Tie-break a ${stbPuntosTarget} pts${stbDiferenciaRequerida ? " (diff. 2)" : ""}.`}
-            </p>
-          )}
         </div>
       )}
 
-      <div className="flex justify-end px-3 pb-3">
+      <div className="flex justify-stretch sm:justify-end px-2.5 sm:px-3 pb-2.5 sm:pb-3">
         <button
           type="button"
           onClick={handleFinalizar}
           disabled={isSaving}
-          className="bg-brand-chartreuse text-brand-black hover:opacity-90 px-4 py-2 rounded-xl text-[11px] font-black transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+          className="w-full sm:w-auto bg-brand-chartreuse text-brand-black hover:opacity-90 px-4 py-2.5 sm:py-2 rounded-xl text-[11px] font-black transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
         >
           {isSaving ? (
             <Loader2 className="size-3.5 animate-spin" />

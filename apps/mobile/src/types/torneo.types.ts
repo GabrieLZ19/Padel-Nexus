@@ -2,6 +2,7 @@ export type EstadoTorneo =
   | "Borrador"
   | "Inscripción"
   | "Cerrado"
+  | "Programado"
   | "En curso"
   | "Finalizado";
 

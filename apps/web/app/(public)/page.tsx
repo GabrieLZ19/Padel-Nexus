@@ -7,6 +7,7 @@ import { Search, Trophy, TrendingUp, Play, Calendar } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { RankingsService } from "@/utils/services/ranking";
 import { Torneo, RankingJugador } from "@/utils/types";
+import { formatFechaCalendario } from "@/utils/formatFecha";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -172,7 +173,7 @@ export default function LandingPage() {
                       <h3 className="font-bold text-brand-white">{t.nombre}</h3>
                       <p className="text-xs text-brand-chartreuse font-bold mt-2">
                         {t.fecha
-                          ? new Date(t.fecha).toLocaleDateString()
+                          ? formatFechaCalendario(t.fecha)
                           : "Fecha a confirmar"}
                       </p>
                     </div>

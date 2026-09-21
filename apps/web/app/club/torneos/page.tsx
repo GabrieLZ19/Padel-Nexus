@@ -20,8 +20,14 @@ import { Torneo, Club, FormTorneoState } from "@/utils/types";
 import TorneoModal from "@/components/torneos/TorneoModal";
 import ReplicarTorneoModal from "@/components/torneos/ReplicarTorneoModal";
 import FeedbackModal, { FeedbackModalProps } from "@/components/ui/FeedbackModal";
+import { formatFechaCalendario } from "@/utils/formatFecha";
+import { FAP_ESTADOS_TORNEO } from "@/utils/constants/fap";
+import {
+  TORNEO_LIST_TABS,
+  estadoParamDesdeTabTorneo,
+  tabTorneoIncluyeBorradores,
+} from "@/utils/constants/padelConfig";
 
-const TABS = ["Todos", "Activos", "Borradores", "Finalizados"];
 const PAGE_SIZE = 6;
 
 export default function ClubTorneosPage() {
@@ -88,26 +94,40 @@ export default function ClubTorneosPage() {
   }, []);
 
   const loadData = async () => {
-    if (!club) return;
+    if (!club?.id) {
+      setTournaments([]);
+      setTotal(0);
+      return;
+    }
     try {
       setLoading(true);
+      const estadoParam = estadoParamDesdeTabTorneo(activeTab);
+
       const res = await TorneosService.getByPage(
         currentPage,
         PAGE_SIZE,
         search,
-        undefined,
-        { incluirBorradores: true },
+        estadoParam,
+        {
+          incluirBorradores: tabTorneoIncluyeBorradores(activeTab),
+          clubId: String(club.id),
+        },
       );
 
-      // Filtrar exclusivamente torneos correspondientes a este club
-      const clubTorneos = (res.data || []).filter(
+      // Defensa extra: nunca mostrar torneos de otro club
+      const propios = (res.data || []).filter(
         (t) => String(t.club_id) === String(club.id),
       );
-
-      setTournaments(clubTorneos);
-      setTotal(clubTorneos.length);
+      setTournaments(propios);
+      setTotal(
+        propios.length === (res.data || []).length
+          ? res.total || propios.length
+          : propios.length,
+      );
     } catch (err) {
       console.error("Error al cargar torneos del club:", err);
+      setTournaments([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -115,9 +135,15 @@ export default function ClubTorneosPage() {
 
   useEffect(() => {
     if (club) {
-      loadData();
+      void loadData();
     }
-  }, [currentPage, search, club]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData usa club/tab/page/search
+  }, [currentPage, search, club, activeTab]);
+
+  const handleChangeTab = (tab: string) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
+  };
 
   const handleOpenCreateModal = () => {
     setEditingId(null);
@@ -197,7 +223,12 @@ export default function ClubTorneosPage() {
       }
 
       setIsModalOpen(false);
-      loadData();
+      if (!editingId) {
+        setActiveTab(FAP_ESTADOS_TORNEO.BORRADOR);
+        setCurrentPage(1);
+      } else {
+        void loadData();
+      }
       setFeedbackModal({
         isOpen: true,
         type: "success",
@@ -240,7 +271,10 @@ export default function ClubTorneosPage() {
             isOpen: true,
             type: "danger",
             title: "Error al eliminar",
-            description: err.message || "No se pudo eliminar el torneo.",
+            description:
+              err?.response?.data?.message ||
+              err.message ||
+              "No se pudo eliminar el torneo.",
             onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
           });
         }
@@ -248,12 +282,7 @@ export default function ClubTorneosPage() {
     });
   };
 
-  const filteredTournaments = tournaments.filter((t) => {
-    if (activeTab === "Activos") return t.estado === "Inscripción" || t.estado === "En curso";
-    if (activeTab === "Borradores") return t.estado === "Borrador";
-    if (activeTab === "Finalizados") return t.estado === "Finalizado";
-    return true;
-  });
+  const filteredTournaments = tournaments;
 
   return (
     <div className="space-y-8">
@@ -286,10 +315,10 @@ export default function ClubTorneosPage() {
       {/* FILTROS Y BÚSQUEDA */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between border-b border-brand-white/5 pb-4">
         <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0">
-          {TABS.map((tab) => (
+          {TORNEO_LIST_TABS.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => handleChangeTab(tab)}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === tab
                   ? "bg-brand-chartreuse text-brand-black shadow-lg"
@@ -306,7 +335,10 @@ export default function ClubTorneosPage() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="Buscar por nombre..."
             className="w-full bg-brand-card border border-brand-white/5 text-white pl-10 pr-4 py-2 rounded-xl text-xs focus:border-brand-white/10 outline-none"
           />
@@ -354,13 +386,11 @@ export default function ClubTorneosPage() {
                       </p>
                     </td>
                     <td className="py-4 px-6 text-gray-300 font-medium">
-                      {t.fecha
-                        ? new Date(t.fecha).toLocaleDateString("es-AR", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "Sin fecha"}
+                      {formatFechaCalendario(t.fecha, {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </td>
                     <td className="py-4 px-6">
                       <span className="bg-brand-white/5 text-gray-300 border border-brand-white/10 px-3 py-1 rounded-full text-xs font-bold uppercase">
@@ -376,11 +406,13 @@ export default function ClubTorneosPage() {
                         className={`px-3 py-1 rounded-full text-xs font-black uppercase ${
                           t.estado === "Inscripción"
                             ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                            : t.estado === "En curso"
-                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                              : t.estado === "Finalizado"
-                                ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                                : "bg-white/5 text-gray-400 border border-white/10"
+                            : t.estado === "Programado"
+                              ? "bg-violet-500/10 text-violet-400 border border-violet-500/20"
+                              : t.estado === "En curso"
+                                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                : t.estado === "Finalizado"
+                                  ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                  : "bg-white/5 text-gray-400 border border-white/10"
                         }`}
                       >
                         {t.estado || "Borrador"}

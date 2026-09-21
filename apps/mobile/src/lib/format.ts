@@ -54,10 +54,14 @@ export function estadoTorneoColor(estado: string): string {
   switch (estado) {
     case "Inscripción":
       return "#10B981";
+    case "Programado":
+      return "#8B5CF6";
     case "En curso":
       return "#F59E0B";
     case "Finalizado":
       return "#3B82F6";
+    case "Cerrado":
+      return "#8A8A8A";
     default:
       return "#8A8A8A";
   }
@@ -110,6 +114,7 @@ export function esTorneoPublico(estado: string): boolean {
 export type FiltroEstadoTorneo =
   | "todos"
   | "inscripcion"
+  | "programado"
   | "en-curso"
   | "finalizado"
   | "cerrado";
@@ -120,6 +125,7 @@ export const OPCIONES_ESTADO_TORNEO: {
 }[] = [
   { id: "todos", label: "Todos" },
   { id: "inscripcion", label: "Inscripción" },
+  { id: "programado", label: "Programado" },
   { id: "en-curso", label: "En curso" },
   { id: "finalizado", label: "Finalizado" },
   { id: "cerrado", label: "Cerrado" },
@@ -135,6 +141,8 @@ export function coincideFiltroEstadoTorneo(
   switch (filtro) {
     case "inscripcion":
       return e === "inscripcion";
+    case "programado":
+      return e === "programado";
     case "en-curso":
       return e === "en curso";
     case "finalizado":
@@ -149,6 +157,7 @@ export function coincideFiltroEstadoTorneo(
 export function etiquetaEstadoTorneoCard(estado: string): string {
   const e = normalizarTexto(estado || "");
   if (e === "inscripcion") return "Abierto";
+  if (e === "programado") return "Programado";
   if (e === "en curso") return "En curso";
   if (e === "finalizado") return "Finalizado";
   if (e === "cerrado") return "Cerrado";
@@ -158,6 +167,7 @@ export function etiquetaEstadoTorneoCard(estado: string): string {
 export function colorEstadoTorneoCard(estado: string): string {
   const e = normalizarTexto(estado || "");
   if (e === "inscripcion") return "#10B981";
+  if (e === "programado") return "#8B5CF6";
   if (e === "en curso") return "#F59E0B";
   if (e === "finalizado") return "#3B82F6";
   if (e === "cerrado") return "#8A8A8A";

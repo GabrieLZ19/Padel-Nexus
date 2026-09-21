@@ -15,6 +15,7 @@ import {
 } from "@/components/torneos/PairDisplay";
 import { clasificadosPorZona } from "@/utils/clasificacionZonas";
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
+import { formatNombrePareja } from "@/utils/nombrePareja";
 
 export interface ParejaStats {
   inscripcionId: string;
@@ -60,6 +61,8 @@ interface TablaPosicionesZonaProps {
   partidosZona: Partido[];
   alcance?: string | null;
   capacidadZona?: number;
+  /** Sin card externa (cuando vive dentro de ZonaCard). */
+  embedded?: boolean;
 }
 
 export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
@@ -68,6 +71,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
   partidosZona,
   alcance,
   capacidadZona,
+  embedded = false,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const nacional = esAlcanceNacional(alcance);
@@ -75,25 +79,12 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
     capacidadZona ?? parejasInscritas.length,
   );
 
-  const cleanName = (name?: string | null) => {
-    if (!name) return "";
-    const cleaned = name
-      .trim()
-      .replace(/^[\s,.\-]+/, "")
-      .replace(/[\s,.\-]+$/, "");
-    if (cleaned === "," || cleaned === "." || cleaned === "") return "";
-    return cleaned;
-  };
-
   const stats = useMemo(() => {
     const map: Record<string, ParejaStats> = {};
 
     parejasInscritas.forEach((p) => {
-      const j1 = cleanName(p.jugador1_nombre);
-      const j2 = cleanName(p.jugador2_nombre);
-      const nombre = j1
-        ? `${j1} ${j2 && j2 !== "-" ? `/ ${j2}` : ""}`
-        : "Pareja";
+      const nombre =
+        formatNombrePareja(p.jugador1_nombre, p.jugador2_nombre) || "Pareja";
 
       map[p.id] = {
         inscripcionId: p.id,
@@ -242,12 +233,23 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
   }, [parejasInscritas, partidosZona]);
 
   return (
-    <div className="bg-[#161616] border border-white/5 rounded-3xl p-5 space-y-4 shadow-xl">
-      <div className="flex items-center justify-between gap-3 border-b border-white/5 pb-3">
+    <div
+      className={
+        embedded
+          ? "space-y-3"
+          : "bg-[#161616] border border-white/5 rounded-3xl p-5 space-y-4 shadow-xl"
+      }
+    >
+      <div
+        className={`flex items-center justify-between gap-3 ${
+          embedded ? "" : "border-b border-white/5 pb-3"
+        }`}
+      >
         <div className="flex items-center gap-2 min-w-0">
           <Trophy className="size-4 text-brand-chartreuse shrink-0" />
           <h4 className="font-extrabold text-white text-sm uppercase tracking-wider truncate">
-            Posiciones · {nombreZona}
+            Posiciones
+            {!embedded && <> · {nombreZona}</>}
           </h4>
         </div>
         <button
@@ -381,12 +383,6 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
           </tbody>
         </table>
       </div>
-
-      {!expanded && (
-        <p className="text-[10px] text-gray-500 font-medium">
-          Vista compacta · Tocá &quot;Ver detalle&quot; para sets, games y STB.
-        </p>
-      )}
     </div>
   );
 };

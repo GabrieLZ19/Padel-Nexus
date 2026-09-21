@@ -78,6 +78,8 @@ export default function DashboardFederacion() {
   const torneosActivos = torneos.filter(
     (t) =>
       (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.INSCRIPCION.toLowerCase() ||
+      (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.CERRADO.toLowerCase() ||
+      (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.PROGRAMADO.toLowerCase() ||
       (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.EN_CURSO.toLowerCase(),
   );
 
@@ -211,6 +213,7 @@ export default function DashboardFederacion() {
     { label: "Provinciales", count: torneos.filter((t) => t.alcance === "Provincial").length },
     { label: "Regionales", count: torneos.filter((t) => t.alcance === "Regional").length },
     { label: "Locales", count: torneos.filter((t) => t.alcance === "Local").length },
+    { label: "Privados", count: torneos.filter((t) => t.alcance === "Privado").length },
   ];
   const maxTorneos = Math.max(...torneosPorAlcance.map((t) => t.count), 1);
 
@@ -417,20 +420,24 @@ export default function DashboardFederacion() {
                         <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${
                           t.estado === "Inscripción"
                             ? "text-[#00ff88]"
-                            : t.estado === "En curso"
-                              ? "text-[#ffb800]"
-                              : t.estado === "Finalizado"
-                                ? "text-blue-400"
-                                : "text-gray-400"
+                            : t.estado === "Programado"
+                              ? "text-violet-400"
+                              : t.estado === "En curso"
+                                ? "text-[#ffb800]"
+                                : t.estado === "Finalizado"
+                                  ? "text-blue-400"
+                                  : "text-gray-400"
                         }`}>
                           <span className={`size-1.5 rounded-full ${
                             t.estado === "Inscripción"
                               ? "bg-[#00ff88]"
-                              : t.estado === "En curso"
-                                ? "bg-[#ffb800]"
-                                : t.estado === "Finalizado"
-                                  ? "bg-blue-400"
-                                  : "bg-gray-500"
+                              : t.estado === "Programado"
+                                ? "bg-violet-500"
+                                : t.estado === "En curso"
+                                  ? "bg-[#ffb800]"
+                                  : t.estado === "Finalizado"
+                                    ? "bg-blue-400"
+                                    : "bg-gray-500"
                           }`} />
                           {t.estado || "Borrador"}
                         </span>

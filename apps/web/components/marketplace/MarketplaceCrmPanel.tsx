@@ -10,15 +10,18 @@ import {
   Store,
   Package,
   LayoutGrid,
+  Landmark,
+  Handshake,
 } from "lucide-react";
 import { sileo } from "sileo";
-import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import MarketplaceTiendaTab from "./MarketplaceTiendaTab";
 import MarketplaceProductoForm from "./MarketplaceProductoForm";
 import MarketplaceVentasTab from "./MarketplaceVentasTab";
 import MarketplacePublicacionesTab from "./MarketplacePublicacionesTab";
 import MarketplacePromocionesTab from "./MarketplacePromocionesTab";
+import MarketplaceCobrosTab from "./MarketplaceCobrosTab";
+import MarketplaceSponsorsTab from "./MarketplaceSponsorsTab";
 import {
   MarketplaceService,
   type AudienciaPromocion,
@@ -27,8 +30,9 @@ import {
   type Producto,
   type Vendedor,
 } from "@/utils/services/marketplace";
+import { useProfileStore } from "@/store/useProfileStore";
 
-type TabId = "tienda" | "productos" | "ventas" | "promociones";
+type TabId = "tienda" | "productos" | "ventas" | "promociones" | "cobros" | "sponsors";
 
 type FeedbackState = {
   isOpen: boolean;
@@ -50,13 +54,54 @@ const TAB_CONFIG: { id: TabId; label: string; icon: typeof Store }[] = [
   { id: "tienda", label: "Mi tienda", icon: Store },
   { id: "productos", label: "Publicaciones", icon: LayoutGrid },
   { id: "ventas", label: "Ventas", icon: TrendingUp },
+  { id: "cobros", label: "Cobros", icon: Landmark },
+  { id: "sponsors", label: "Sponsors", icon: Handshake },
   { id: "promociones", label: "Promociones", icon: Megaphone },
 ];
+
+/** El tipo de tienda sigue el rol del admin; no es seleccionable en UI. */
+function tipoTiendaDesdeRol(
+  rol: string | undefined,
+  modoClub: boolean,
+): EntidadMarketplaceTipo {
+  if (modoClub || rol === "admin_club") return "club";
+  if (rol === "admin_provincial") return "asociacion";
+  if (
+    rol === "admin_federacion" ||
+    rol === "admin" ||
+    rol === "superadmin"
+  ) {
+    return "federacion";
+  }
+  return "club";
+}
+
+function primeraEntidadId(
+  tipo: EntidadMarketplaceTipo,
+  data: {
+    clubes: { id: string }[];
+    asociaciones: { id: string }[];
+    federaciones: { id: string }[];
+  },
+  preferido?: string,
+): string {
+  const lista =
+    tipo === "club"
+      ? data.clubes
+      : tipo === "asociacion"
+        ? data.asociaciones
+        : data.federaciones;
+  if (preferido && lista.some((e) => e.id === preferido)) return preferido;
+  return lista[0]?.id || "";
+}
 
 export default function MarketplaceCrmPanel({
   modoClub = false,
   mostrarModeracion = false,
 }: MarketplaceCrmPanelProps) {
+  const { profile } = useProfileStore();
+  const tipoFijo = tipoTiendaDesdeRol(profile?.rol, modoClub);
+
   const [tab, setTab] = useState<TabId>("tienda");
   const [loading, setLoading] = useState(true);
   const [entidades, setEntidades] = useState<{
@@ -65,7 +110,7 @@ export default function MarketplaceCrmPanel({
     federaciones: { id: string; nombre: string; sigla?: string }[];
   }>({ clubes: [], asociaciones: [], federaciones: [] });
 
-  const [entidadTipo, setEntidadTipo] = useState<EntidadMarketplaceTipo>("club");
+  const [entidadTipo, setEntidadTipo] = useState<EntidadMarketplaceTipo>(tipoFijo);
   const [entidadId, setEntidadId] = useState("");
   const [tienda, setTienda] = useState<Vendedor | null>(null);
   const [stats, setStats] = useState<any>(null);
@@ -102,6 +147,11 @@ export default function MarketplaceCrmPanel({
   const cerrarFeedback = () =>
     setFeedbackModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
 
+  // Mantener tipo alineado al rol (p. ej. al hidratar el perfil).
+  useEffect(() => {
+    setEntidadTipo(tipoFijo);
+  }, [tipoFijo]);
+
   const entidadRef: EntidadRef | null = useMemo(() => {
     if (!entidadId) return null;
     return { entidad_tipo: entidadTipo, entidad_id: entidadId };
@@ -117,33 +167,13 @@ export default function MarketplaceCrmPanel({
     return entidades.federaciones.find((f) => f.id === entidadId)?.nombre;
   }, [entidadTipo, entidadId, entidades]);
 
-  const opcionesEntidad = useMemo(() => {
-    if (entidadTipo === "club") {
-      return entidades.clubes.map((c) => ({ value: c.id, label: c.nombre }));
-    }
-    if (entidadTipo === "asociacion") {
-      return entidades.asociaciones.map((a) => ({
-        value: a.id,
-        label: a.sigla ? `${a.nombre} (${a.sigla})` : a.nombre,
-      }));
-    }
-    return entidades.federaciones.map((f) => ({
-      value: f.id,
-      label: f.sigla ? `${f.nombre} (${f.sigla})` : f.nombre,
-    }));
-  }, [entidadTipo, entidades]);
-
   const cargarEntidades = useCallback(async () => {
     const data = await MarketplaceService.crmGetEntidades();
     setEntidades(data);
-    if (modoClub && data.clubes.length === 1) {
-      setEntidadTipo("club");
-      setEntidadId(data.clubes[0].id);
-    } else if (!entidadId && data.clubes.length > 0) {
-      setEntidadTipo("club");
-      setEntidadId(data.clubes[0].id);
-    }
-  }, [modoClub, entidadId]);
+    const tipo = tipoTiendaDesdeRol(profile?.rol, modoClub);
+    setEntidadTipo(tipo);
+    setEntidadId((prev) => primeraEntidadId(tipo, data, prev));
+  }, [modoClub, profile?.rol]);
 
   const cargarTienda = useCallback(async (ref: EntidadRef) => {
     const tiendaData = await MarketplaceService.crmGetTienda(ref);
@@ -412,37 +442,13 @@ export default function MarketplaceCrmPanel({
         />
       ) : (
         <>
-          {!modoClub && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-brand-card border border-brand-white/5 rounded-2xl p-5">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase">Tipo</label>
-                <CustomDropdown
-                  value={entidadTipo}
-                  onChange={(v) => {
-                    setEntidadTipo(v as EntidadMarketplaceTipo);
-                    setEntidadId("");
-                  }}
-                  placeholder="Tipo de entidad"
-                  options={[
-                    { value: "club", label: "Club" },
-                    { value: "asociacion", label: "Asociación" },
-                    { value: "federacion", label: "Federación" },
-                  ]}
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold text-gray-500 uppercase">Entidad</label>
-                <CustomDropdown
-                  value={entidadId}
-                  onChange={setEntidadId}
-                  placeholder="Seleccioná la entidad"
-                  options={opcionesEntidad}
-                />
-              </div>
+          {!entidadRef ? (
+            <div className="rounded-2xl border border-dashed border-brand-white/10 p-10 text-center">
+              <p className="text-gray-500 text-sm">
+                No hay una entidad asociada a tu rol para configurar el marketplace.
+              </p>
             </div>
-          )}
-
-          {entidadRef && (
+          ) : (
             <>
               {/* Tabs */}
               <div className="flex flex-wrap gap-2 p-1.5 bg-brand-black/40 border border-brand-white/5 rounded-2xl w-full sm:w-fit">
@@ -542,6 +548,50 @@ export default function MarketplaceCrmPanel({
                   <p className="text-gray-500 text-sm">Publicá tu tienda para registrar ventas.</p>
                 ) : (
                   <MarketplaceVentasTab ventas={ventas} stats={stats} />
+                )
+              )}
+
+              {tab === "cobros" && (
+                !tienda || !entidadRef ? (
+                  <div className="rounded-2xl border border-dashed border-brand-white/10 p-10 text-center">
+                    <p className="text-gray-500 text-sm">
+                      Primero publicá tu tienda en la pestaña{" "}
+                      <button
+                        type="button"
+                        onClick={() => setTab("tienda")}
+                        className="text-brand-chartreuse font-bold cursor-pointer"
+                      >
+                        Mi tienda
+                      </button>{" "}
+                      para configurar el destino de acreditación.
+                    </p>
+                  </div>
+                ) : (
+                  <MarketplaceCobrosTab
+                    tienda={tienda}
+                    entidadRef={entidadRef}
+                    onSaved={(t) => setTienda(t)}
+                  />
+                )
+              )}
+
+              {tab === "sponsors" && (
+                !tienda || !entidadRef ? (
+                  <div className="rounded-2xl border border-dashed border-brand-white/10 p-10 text-center">
+                    <p className="text-gray-500 text-sm">
+                      Primero publicá tu tienda en la pestaña{" "}
+                      <button
+                        type="button"
+                        onClick={() => setTab("tienda")}
+                        className="text-brand-chartreuse font-bold cursor-pointer"
+                      >
+                        Mi tienda
+                      </button>{" "}
+                      para gestionar sponsors.
+                    </p>
+                  </div>
+                ) : (
+                  <MarketplaceSponsorsTab entidadRef={entidadRef} />
                 )
               )}
 

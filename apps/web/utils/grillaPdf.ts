@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
+import { cleanJugadorNombre } from "@/utils/nombrePareja";
 import { Partido, Torneo } from "@/utils/types";
 
 type Rgb = readonly [number, number, number];
@@ -679,8 +680,8 @@ export function generarPdfHojaRuta(
   const isIndividual = esModalidadIndividual(torneo.modalidad);
 
   const shortName = (full?: string | null) => {
-    if (!full || full === "-" || full === "Libre") return "—";
-    const cleaned = full.trim();
+    const cleaned = cleanJugadorNombre(full);
+    if (!cleaned) return "—";
     const idx = cleaned.indexOf(",");
     if (idx === -1) {
       const parts = cleaned.split(/\s+/);
@@ -1043,15 +1044,13 @@ export function generarPdfZonas(
 
   const pairLabel = (j1?: string | null, j2?: string | null) => {
     const a = splitName(j1);
-    if (isIndividual) {
-      return {
-        line1: `${a.apellido.toUpperCase()}${a.nombre ? `, ${a.nombre}` : ""}`,
-        line2: "",
-      };
+    const line1 = `${a.apellido.toUpperCase()}${a.nombre ? `, ${a.nombre}` : ""}`;
+    if (isIndividual || !cleanJugadorNombre(j2)) {
+      return { line1, line2: "" };
     }
     const b = splitName(j2);
     return {
-      line1: `${a.apellido.toUpperCase()}${a.nombre ? `, ${a.nombre}` : ""}`,
+      line1,
       line2: `${b.apellido.toUpperCase()}${b.nombre ? `, ${b.nombre}` : ""}`,
     };
   };

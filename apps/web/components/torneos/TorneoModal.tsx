@@ -172,7 +172,7 @@ export default function TorneoModal({
                 {(userRole === "admin_federacion" ||
                   userRole === "superadmin") && (
                   <p className="text-[10px] text-gray-500 mt-1.5">
-                    La federación nacional no organiza torneos Locales /
+                    La federación nacional no organiza torneos Locales ni
                     Privados.
                   </p>
                 )}

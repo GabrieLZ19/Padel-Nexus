@@ -25,8 +25,12 @@ import FeedbackModal, {
 } from "../../../components/ui/FeedbackModal";
 import { useProfileStore } from "@/store/useProfileStore";
 import { esRolFiscal } from "@/utils/auth/roles";
-
-const TABS = ["Todos", "Activos", "Borradores", "Finalizados"];
+import { formatFechaCalendario } from "@/utils/formatFecha";
+import {
+  TORNEO_LIST_TABS,
+  estadoParamDesdeTabTorneo,
+  tabTorneoIncluyeBorradores,
+} from "@/utils/constants/padelConfig";
 
 const ESTADO_INICIAL: FormTorneoState = {
   nombre: "",
@@ -64,6 +68,7 @@ export default function TorneosPage() {
     }
   }, [profile?.rol, router]);
 
+  // Aterriza en Todos para ver el listado completo.
   const [activeTab, setActiveTab] = useState<string>("Todos");
   const [search, setSearch] = useState<string>("");
   const [tournaments, setTournaments] = useState<Torneo[]>([]);
@@ -94,18 +99,11 @@ export default function TorneosPage() {
 
     const fetchData = async () => {
       try {
-        const estadoParam =
-          activeTab === "Activos"
-            ? "Inscripción,En curso"
-            : activeTab === "Borradores"
-              ? "Borrador"
-              : activeTab === "Finalizados"
-                ? "Finalizado"
-                : undefined;
+        const estadoParam = estadoParamDesdeTabTorneo(activeTab);
 
         const [torneosData, clubesResponse] = await Promise.all([
           TorneosService.getByPage(page, PAGE_SIZE, search, estadoParam, {
-            incluirBorradores: activeTab === "Todos",
+            incluirBorradores: tabTorneoIncluyeBorradores(activeTab),
           }),
           ClubesService.getAll().catch(() => ({ data: [], total: 0 })),
         ]);
@@ -270,14 +268,14 @@ export default function TorneosPage() {
       {/* FILTROS Y TABS */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
         <div className="inline-flex bg-[#111111] p-1.5 rounded-xl border border-white/5 overflow-x-auto w-full sm:w-auto">
-          {TABS.map((tab) => (
+          {TORNEO_LIST_TABS.map((tab) => (
             <button
               key={tab}
               onClick={() => {
                 setActiveTab(tab);
                 setPage(1);
               }}
-              className={`whitespace-nowrap rounded-lg px-5 py-2 text-sm font-bold transition-all ${
+              className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition-all ${
                 activeTab === tab
                   ? "bg-brand-chartreuse text-brand-card shadow-[0_0_10px_rgba(204,255,0,0.15)]"
                   : "text-gray-400 hover:text-white"
@@ -404,9 +402,7 @@ export default function TorneosPage() {
                         </div>
                         <div className="text-[13px] text-gray-500 mt-0.5">
                           {t.fecha
-                            ? new Date(
-                                `${t.fecha.split("T")[0]}T12:00:00`,
-                              ).toLocaleDateString("es-AR", {
+                            ? formatFechaCalendario(t.fecha, {
                                 day: "2-digit",
                                 month: "short",
                                 year: "numeric",
@@ -434,22 +430,30 @@ export default function TorneosPage() {
                             className={`w-2 h-2 rounded-full ${
                               t.estado === "Inscripción"
                                 ? "bg-[#00ff88]"
-                                : t.estado === "En curso"
-                                  ? "bg-[#ffb800]"
-                                  : t.estado === "Finalizado"
-                                    ? "bg-blue-500"
-                                    : "bg-gray-500"
+                                : t.estado === "Programado"
+                                  ? "bg-violet-500"
+                                  : t.estado === "En curso"
+                                    ? "bg-[#ffb800]"
+                                    : t.estado === "Cerrado"
+                                      ? "bg-gray-400"
+                                      : t.estado === "Finalizado"
+                                        ? "bg-blue-500"
+                                        : "bg-gray-500"
                             }`}
                           ></span>
                           <span
                             className={`text-[13px] font-bold ${
                               t.estado === "Inscripción"
                                 ? "text-[#00ff88]"
-                                : t.estado === "En curso"
-                                  ? "text-[#ffb800]"
-                                  : t.estado === "Finalizado"
-                                    ? "text-blue-500"
-                                    : "text-gray-400"
+                                : t.estado === "Programado"
+                                  ? "text-violet-400"
+                                  : t.estado === "En curso"
+                                    ? "text-[#ffb800]"
+                                    : t.estado === "Cerrado"
+                                      ? "text-gray-400"
+                                      : t.estado === "Finalizado"
+                                        ? "text-blue-500"
+                                        : "text-gray-400"
                             }`}
                           >
                             {t.estado || "Borrador"}

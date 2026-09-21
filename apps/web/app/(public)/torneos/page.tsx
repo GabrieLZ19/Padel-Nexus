@@ -21,6 +21,7 @@ import { useProfileStore } from "@/store/useProfileStore";
 import {
   esModalidadIndividual,
   esModalidadParejas,
+  formatFechaCalendario,
   labelModalidad,
   MODALIDAD_PAREJAS,
 } from "@/utils/formatFecha";
@@ -170,7 +171,7 @@ function TorneosContent() {
   ).sort() as string[];
 
   const GENEROS_FIJOS = ["Masculino", "Femenino", "Mixto"];
-  const ALCANCES_FIJOS = ["Nacional", "Provincial", "Local"];
+  const ALCANCES_FIJOS = ["Nacional", "Provincial", "Regional", "Local", "Privado"];
 
   const ORGANIZADORES_DINAMICOS = Array.from(
     new Set(tournaments.map((t) => t.clubes?.nombre).filter(Boolean)),
@@ -182,6 +183,12 @@ function TorneosContent() {
       label: "Inscripciones Abiertas",
       color: "bg-emerald-500",
       shadow: "shadow-[0_0_10px_rgba(16,185,129,0.4)]",
+    },
+    {
+      id: "Programado",
+      label: "Programado",
+      color: "bg-violet-500",
+      shadow: "shadow-[0_0_10px_rgba(139,92,246,0.4)]",
     },
     {
       id: "En curso",
@@ -251,8 +258,7 @@ function TorneosContent() {
 
   const formatFecha = (fechaVal?: string | number | null) => {
     if (!fechaVal) return "Fecha a confirmar";
-    const fechaLimpia = String(fechaVal).split("T")[0];
-    return new Date(`${fechaLimpia}T12:00:00`).toLocaleDateString("es-AR", {
+    return formatFechaCalendario(String(fechaVal), {
       weekday: "short",
       day: "2-digit",
       month: "short",
@@ -608,6 +614,7 @@ function TorneosContent() {
                 const estadoStr = (t.estado || "").toLowerCase().trim();
                 const isAbierto =
                   estadoStr === "inscripción" || estadoStr === "borrador";
+                const isProgramado = estadoStr === "programado";
                 const isEnCurso = estadoStr === "en curso";
                 const isFinalizado = estadoStr === "finalizado";
                 const isCerrado = estadoStr === "cerrado";
@@ -629,6 +636,10 @@ function TorneosContent() {
                   btnText = "Ver en vivo";
                   btnClass =
                     "bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20";
+                } else if (isProgramado) {
+                  btnText = "Ver cuadro";
+                  btnClass =
+                    "bg-violet-500/10 text-violet-300 border border-violet-500/20 hover:bg-violet-500/20";
                 } else if (isFinalizado) {
                   btnText = "Ver resultados";
                   btnClass =
@@ -655,13 +666,15 @@ function TorneosContent() {
 
                 const labelEstado = isAbierto
                   ? "Abierto"
-                  : isCerrado
-                    ? "Cerrado"
-                    : isEnCurso
-                      ? "En curso"
-                      : isFinalizado
-                        ? "Finalizado"
-                        : t.estado;
+                  : isProgramado
+                    ? "Programado"
+                    : isCerrado
+                      ? "Cerrado"
+                      : isEnCurso
+                        ? "En curso"
+                        : isFinalizado
+                          ? "Finalizado"
+                          : t.estado;
 
                 return (
                   <div

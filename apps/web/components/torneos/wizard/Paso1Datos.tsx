@@ -12,13 +12,14 @@ import {
   getReglamentosPermitidos,
   filtrarAsociacionesOrganizadorasFap,
   debeForzarOrganizadorFap,
+  esAlcanceSinEntidadOrganizadora,
   puedeUsarReglamentoAmateur,
   reglamentoTorneo,
   type ReglamentoTorneo,
 } from "@/utils/constants/fapApaRules";
 import { esRolFederacionNacional } from "@/utils/auth/roles";
 import type { RolUsuario } from "@/utils/types/user.types";
-import type { RegisterSaveHandler } from "./types";
+import type { OnTorneoUpdated, RegisterSaveHandler } from "./types";
 
 const FED_PREFIX = "fed:";
 const ASO_PREFIX = "aso:";
@@ -38,7 +39,10 @@ function organizadorFromTorneo(torneo: Torneo): string {
 
 function reglamentoFromTorneo(torneo: Torneo, userRole: RolUsuario): ReglamentoTorneo {
   const raw = reglamentoTorneo(torneo);
-  if (raw === "Amateur" && !puedeUsarReglamentoAmateur(userRole)) return "FAP";
+  if (raw === "Amateur") {
+    if (!puedeUsarReglamentoAmateur(userRole)) return "FAP";
+    if (!esAlcanceSinEntidadOrganizadora(torneo.alcance)) return "FAP";
+  }
   return raw;
 }
 
@@ -64,6 +68,7 @@ interface Paso1DatosProps {
   triggerRefresh: () => void;
   setActiveTab: (tab: string) => void | Promise<void>;
   registerSaveHandler?: RegisterSaveHandler;
+  onTorneoUpdated?: OnTorneoUpdated;
   readOnly?: boolean;
 }
 
@@ -74,6 +79,7 @@ export const Paso1Datos = ({
   triggerRefresh,
   setActiveTab,
   registerSaveHandler,
+  onTorneoUpdated,
   readOnly = false,
 }: Paso1DatosProps) => {
   const profile = useProfileStore((s) => s.profile);
@@ -107,7 +113,12 @@ export const Paso1Datos = ({
   );
 
   const forzarFap = debeForzarOrganizadorFap(editAlcance);
-  const reglamentosDisponibles = getReglamentosPermitidos(userRole);
+  const sinEntidadOrganizadora = esAlcanceSinEntidadOrganizadora(editAlcance);
+  const organizadorDeshabilitado = forzarFap || sinEntidadOrganizadora;
+  const reglamentosDisponibles = getReglamentosPermitidos(
+    userRole,
+    editAlcance,
+  );
   const asociacionesOrganizadoras = filtrarAsociacionesOrganizadorasFap(
     asociacionesList,
   );
@@ -222,12 +233,15 @@ export const Paso1Datos = ({
     }
   }, [forzarFap, fapFederacionId, editAsociacion]);
 
-  // Si el rol no puede Amateur y quedó seleccionado, corregir
+  // Amateur solo en Local/Privado (y roles permitidos)
   useEffect(() => {
-    if (editAsociacion === "Amateur" && !puedeUsarReglamentoAmateur(userRole)) {
+    if (editAsociacion !== "Amateur") return;
+    const amateurOk =
+      puedeUsarReglamentoAmateur(userRole) && sinEntidadOrganizadora;
+    if (!amateurOk) {
       setEditAsociacion("FAP");
     }
-  }, [editAsociacion, userRole]);
+  }, [editAsociacion, userRole, sinEntidadOrganizadora]);
 
   useEffect(() => {
     if (!editSede) {
@@ -305,20 +319,28 @@ export const Paso1Datos = ({
       setGuardandoDatos(true);
       const precioFinal = esGratis ? 0 : Math.max(0, Number(editPrecio) || 0);
       const orgParsed = parseOrganizador(
-        forzarFap && fapFederacionId
-          ? organizadorValue("fed", fapFederacionId)
-          : editOrganizador,
+        sinEntidadOrganizadora
+          ? ""
+          : forzarFap && fapFederacionId
+            ? organizadorValue("fed", fapFederacionId)
+            : editOrganizador,
       );
       const reglamentoFinal = forzarFap
         ? "FAP"
-        : (editAsociacion as ReglamentoTorneo);
+        : editAsociacion === "Amateur" && !sinEntidadOrganizadora
+          ? "FAP"
+          : (editAsociacion as ReglamentoTorneo);
 
-      const federacionIdFinal = orgParsed.federacionId;
-      const asociacionIdFinal = orgParsed.federacionId
+      const federacionIdFinal = sinEntidadOrganizadora
         ? null
-        : orgParsed.asociacionId;
+        : orgParsed.federacionId;
+      const asociacionIdFinal = sinEntidadOrganizadora
+        ? null
+        : orgParsed.federacionId
+          ? null
+          : orgParsed.asociacionId;
 
-      await TorneosService.update(torneoId, {
+      const updated = await TorneosService.update(torneoId, {
         nombre: editNombre,
         fecha: editFecha ? editFecha : null,
         fecha_cierre_inscripcion: editFechaCierre
@@ -345,9 +367,11 @@ export const Paso1Datos = ({
           : {}),
       } as any);
 
-      triggerRefresh();
-
+      // Actualizar padre de inmediato (evita estado stale al volver al paso).
+      // En silent no hacemos refresh completo: evita carrera con el remount.
+      onTorneoUpdated?.(updated);
       if (!options?.silent) {
+        triggerRefresh();
         setFeedbackModal((prev: any) => ({
           ...prev,
           isOpen: true,
@@ -442,7 +466,8 @@ export const Paso1Datos = ({
           />
           {(userRole === "admin" || userRole === "admin_club") && (
             <p className="text-[10px] text-yellow-500/80 mt-1.5 font-semibold">
-              Tu perfil de Club solo permite organizar torneos Locales, Regionales o Provinciales.
+              Tu perfil de Club solo permite organizar torneos Locales, Privados,
+              Regionales o Provinciales.
             </p>
           )}
           {userRole === "admin_provincial" && (
@@ -452,7 +477,7 @@ export const Paso1Datos = ({
           )}
           {esRolFederacionNacional(userRole) && (
             <p className="text-[10px] text-gray-500 mt-1.5">
-              La federación nacional no organiza torneos Locales / Privados.
+              La federación nacional no organiza torneos Locales ni Privados.
             </p>
           )}
         </div>
@@ -470,7 +495,9 @@ export const Paso1Datos = ({
           <p className="text-[10px] text-gray-500 mt-1.5">
             {forzarFap
               ? "Alcance Nacional: se aplica el reglamento FAP."
-              : "El reglamento determina los cortes de edad, categorías y siembras del Paso 3."}
+              : sinEntidadOrganizadora
+                ? "En Local o Privado podés usar FAP, APA o Amateur / Independiente."
+                : "En Regional, Provincial o Nacional solo aplica reglamento FAP o APA."}
           </p>
         </div>
 
@@ -480,19 +507,27 @@ export const Paso1Datos = ({
           </label>
           <CustomDropdown
             value={
-              forzarFap && fapFederacionId
-                ? organizadorValue("fed", fapFederacionId)
-                : editOrganizador
+              sinEntidadOrganizadora
+                ? ""
+                : forzarFap && fapFederacionId
+                  ? organizadorValue("fed", fapFederacionId)
+                  : editOrganizador
             }
             onChange={setEditOrganizador}
             options={organizadorOptions}
-            placeholder="-- FAP o asociación del ecosistema --"
-            disabled={forzarFap}
+            placeholder={
+              sinEntidadOrganizadora
+                ? "Club sede / organizador del torneo"
+                : "-- FAP o asociación del ecosistema --"
+            }
+            disabled={organizadorDeshabilitado}
           />
           <p className="text-[10px] text-gray-500 mt-1.5">
-            {forzarFap
-              ? "Alcance Nacional: organiza la Federación Argentina de Pádel (FAP)."
-              : "Por defecto FAP. Podés elegir una asociación provincial del ecosistema."}
+            {sinEntidadOrganizadora
+              ? "Alcance Local o Privado: organiza el club sede (u otra entidad no federativa). No aplica FAP ni asociación provincial."
+              : forzarFap
+                ? "Alcance Nacional: organiza la Federación Argentina de Pádel (FAP)."
+                : "Por defecto FAP. Podés elegir una asociación provincial del ecosistema."}
           </p>
         </div>
         <div>
@@ -700,7 +735,7 @@ export const Paso1Datos = ({
           disabled={readOnly || guardandoDatos || !editNombre || !editFecha || !editSede}
           className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
         >
-          {readOnly ? "Modo Lectura (En curso)" : guardandoDatos ? "Guardando..." : "Guardar Cambios"}
+          {readOnly ? "Modo Lectura" : guardandoDatos ? "Guardando..." : "Guardar Cambios"}
         </button>
         <button
           onClick={() => void setActiveTab("logos")}

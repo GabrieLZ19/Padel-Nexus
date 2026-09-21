@@ -3,7 +3,7 @@ import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Inscripcion } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { Trophy, Settings, Award, CheckCircle, Scale } from "lucide-react";
-import type { RegisterSaveHandler } from "./types";
+import type { OnTorneoUpdated, RegisterSaveHandler } from "./types";
 
 interface Paso5CierreProps {
   torneo: Torneo;
@@ -13,6 +13,8 @@ interface Paso5CierreProps {
   setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
   registerSaveHandler?: RegisterSaveHandler;
+  onTorneoUpdated?: OnTorneoUpdated;
+  readOnly?: boolean;
 }
 
 export const Paso5Cierre = ({
@@ -23,6 +25,8 @@ export const Paso5Cierre = ({
   setActiveTab,
   triggerRefresh,
   registerSaveHandler,
+  onTorneoUpdated,
+  readOnly = false,
 }: Paso5CierreProps) => {
   const confirmadasCount = inscripciones.filter(
     (i) => i.estado_pago === "Confirmado",
@@ -89,9 +93,10 @@ export const Paso5Cierre = ({
   const handleSaveConfig = async (options?: {
     silent?: boolean;
   }): Promise<boolean> => {
+    if (readOnly) return true;
     try {
       setGuardandoConfig(true);
-      await TorneosService.update(torneoId, {
+      const updated = await TorneosService.update(torneoId, {
         configuracion_puntos: {
           puntos_activados: puntosActivados,
           puntos_campeon: Number(puntosCampeon),
@@ -114,8 +119,9 @@ export const Paso5Cierre = ({
           instancia_limite_stb: instanciaLimiteStb,
         },
       } as any);
-      triggerRefresh();
+      onTorneoUpdated?.(updated);
       if (!options?.silent) {
+        triggerRefresh();
         setFeedbackModal((prev: any) => ({
           ...prev,
           isOpen: true,
@@ -150,7 +156,11 @@ export const Paso5Cierre = ({
   }, [registerSaveHandler]);
 
   return (
-    <div className="bg-brand-card border border-white/10 rounded-3xl p-6 space-y-6 shadow-xl">
+    <div
+      className={`bg-brand-card border border-white/10 rounded-3xl p-6 space-y-6 shadow-xl ${
+        readOnly ? "pointer-events-none opacity-60 select-none" : ""
+      }`}
+    >
       <h3 className="text-lg font-bold text-white uppercase tracking-wider">
         Paso 6: Cierre de Inscripción y Puntuación
       </h3>
@@ -533,15 +543,23 @@ export const Paso5Cierre = ({
           <button
             type="button"
             onClick={() => void handleSaveConfig()}
-            disabled={guardandoConfig}
+            disabled={readOnly || guardandoConfig}
             className="bg-brand-chartreuse text-brand-black px-6 py-2.5 rounded-xl font-black text-xs hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
           >
-            {guardandoConfig ? "Guardando..." : "Guardar Configuración General"}
+            {readOnly
+              ? "Modo Lectura"
+              : guardandoConfig
+                ? "Guardando..."
+                : "Guardar Configuración General"}
           </button>
         </div>
       </div>
 
-      <div className="flex justify-between items-center pt-4 border-t border-white/5">
+      <div
+        className={`flex justify-between items-center pt-4 border-t border-white/5 ${
+          readOnly ? "pointer-events-auto opacity-100" : ""
+        }`}
+      >
         <button
           onClick={() => void setActiveTab("fiscales")}
           disabled={guardandoConfig}

@@ -200,17 +200,20 @@ function nombreEquipoCorto(
   if (!id) return fallbackPlaceholder;
   const j1 =
     lado === "a" ? partido.equipo_a_j1 || "" : partido.equipo_b_j1 || "";
-  const j2 =
+  const j2Raw =
     lado === "a" ? partido.equipo_a_j2 || "" : partido.equipo_b_j2 || "";
+  const j2 = j2Raw.trim() === "-" ? "" : j2Raw;
   const soloApellido = (nombre: string) => {
     const trimmed = nombre.trim();
-    if (!trimmed) return "";
+    if (!trimmed || trimmed === "-") return "";
     // Si viene "Juan Perez" preferimos el apellido; si viene un solo token, lo devolvemos tal cual.
     const parts = trimmed.split(/\s+/);
     return parts.length > 1 ? parts[parts.length - 1] : trimmed;
   };
-  if (j1 && j2) return `${soloApellido(j1)} / ${soloApellido(j2)}`;
-  if (j1) return soloApellido(j1);
+  const a = soloApellido(j1);
+  const b = soloApellido(j2);
+  if (a && b) return `${a} / ${b}`;
+  if (a) return a;
   return fallbackPlaceholder;
 }
 

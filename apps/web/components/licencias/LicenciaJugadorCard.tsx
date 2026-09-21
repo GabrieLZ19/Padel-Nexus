@@ -81,16 +81,29 @@ export function LicenciaJugadorCard({
   const isEditing = editingLicenciaId === licencia.id;
 
   return (
-    <article className="bg-[#111111] border border-white/5 rounded-2xl p-4 lg:p-5 hover:border-white/10 transition-colors">
-      <div className="flex flex-col xl:flex-row xl:items-center gap-4 xl:gap-6">
-        {/* Jugador */}
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+    <article className="bg-[#111111] border border-white/5 rounded-2xl p-4 lg:p-5 hover:border-white/10 transition-colors overflow-hidden">
+      {/*
+        Flex + wrap: si hay espacio (monitor amplio @100%) queda en una fila;
+        si el zoom/columna aprieta, vencimiento y acciones bajan sin truncar el nombre.
+      */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3.5 min-w-0">
+        <div className="flex items-center gap-3.5 min-w-0 flex-1 basis-[min(100%,280px)]">
           <div className="size-11 rounded-full bg-brand-card border border-white/10 flex items-center justify-center text-gray-500 shrink-0">
             <User className="size-5" />
           </div>
-          <div className="min-w-0">
-            <h3 className="font-bold text-white truncate">{nombreCompleto}</h3>
-            <p className="text-xs text-gray-500 truncate">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-bold text-white break-words [overflow-wrap:anywhere]">
+                {nombreCompleto}
+              </h3>
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${estado.bg} ${estado.border} ${estado.text}`}
+              >
+                <span className={`size-1.5 rounded-full ${estado.dot}`} />
+                {estado.label}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 break-all mt-0.5">
               {jugador.email || "Sin email"}
             </p>
             <div className="flex flex-wrap items-center gap-2 mt-1.5">
@@ -101,34 +114,20 @@ export function LicenciaJugadorCard({
               <span className="inline-flex items-center gap-1 text-[11px] text-gray-400 bg-black/30 px-2 py-0.5 rounded-md">
                 Cat. {jugador.categoria_padel || "—"}
               </span>
+              <span className="inline-flex items-center gap-1 text-[11px] text-gray-400 font-mono bg-black/30 px-2 py-0.5 rounded-md">
+                <Hash className="size-3" />
+                {licencia.nro_licencia}
+                {jugador.licencias && jugador.licencias.length > 1 && (
+                  <span className="text-[10px] text-brand-chartreuse font-bold">
+                    ×{jugador.licencias.length}
+                  </span>
+                )}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Licencia + estado */}
-        <div className="flex flex-wrap items-center gap-3 xl:w-auto">
-          <div className="flex items-center gap-2 bg-black/30 border border-white/5 rounded-xl px-3 py-2">
-            <Hash className="size-3.5 text-gray-500" />
-            <span className="text-sm font-mono font-semibold text-gray-300">
-              {licencia.nro_licencia}
-            </span>
-            {jugador.licencias && jugador.licencias.length > 1 && (
-              <span className="text-[10px] bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/25 px-1.5 py-0.5 rounded font-bold">
-                ×{jugador.licencias.length}
-              </span>
-            )}
-          </div>
-
-          <span
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border ${estado.bg} ${estado.border} ${estado.text}`}
-          >
-            <span className={`size-2 rounded-full ${estado.dot}`} />
-            {estado.label}
-          </span>
-        </div>
-
-        {/* Vencimiento editable */}
-        <div className="xl:w-56 shrink-0">
+        <div className="w-full sm:w-auto sm:min-w-[200px] sm:max-w-[260px] sm:flex-1 min-[1600px]:flex-none min-[1600px]:w-60">
           <LicenciaVencimientoEditor
             fechaVencimiento={licencia.fecha_vencimiento}
             editable={licencia.estado !== "Pendiente"}
@@ -149,13 +148,12 @@ export function LicenciaJugadorCard({
           />
         </div>
 
-        {/* Acciones */}
-        <div className="flex items-center gap-2 xl:shrink-0">
+        <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto shrink-0">
           {licencia.estado === "Pendiente" ? (
             <button
               type="button"
               onClick={onValidar}
-              className="flex-1 xl:flex-none inline-flex items-center justify-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-colors shadow-[0_0_15px_rgba(204,255,0,0.12)]"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-colors shadow-[0_0_15px_rgba(204,255,0,0.12)]"
             >
               <ShieldCheck className="size-4" />
               Validar solicitud
@@ -164,7 +162,7 @@ export function LicenciaJugadorCard({
             <button
               type="button"
               onClick={() => onCambiarEstado(licencia.id, "Suspendida")}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-colors"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-colors"
             >
               <Ban className="size-4" />
               Revocar
@@ -173,7 +171,7 @@ export function LicenciaJugadorCard({
             <button
               type="button"
               onClick={() => onCambiarEstado(licencia.id, "Activa")}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border border-brand-chartreuse/30 bg-brand-chartreuse/10 text-brand-chartreuse hover:bg-brand-chartreuse hover:text-brand-black transition-colors"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border border-brand-chartreuse/30 bg-brand-chartreuse/10 text-brand-chartreuse hover:bg-brand-chartreuse hover:text-brand-black transition-colors"
             >
               <ShieldCheck className="size-4" />
               Reactivar
@@ -191,7 +189,6 @@ export function LicenciaJugadorCard({
         </div>
       </div>
 
-      {/* Historial de pagos mensuales (colapsable) */}
       {licencia.estado !== "Pendiente" && (
         <LicenciaPagosHistorial licenciaId={licencia.id} />
       )}

@@ -24,12 +24,16 @@ import { PARTIDOS_ABIERTOS } from "@/utils/constants/partidosAbiertos";
 import PartidoChatPanel from "@/components/partidos/PartidoChatPanel";
 import FeedbackModal, { type FeedbackModalProps } from "@/components/ui/FeedbackModal";
 import { sileo } from "sileo";
+import { formatFechaCalendario, parseFechaCalendarioLocal } from "@/utils/formatFecha";
 
 function formatFecha(fecha: string) {
-  const d = new Date(`${fecha}T12:00:00`);
+  const d = parseFechaCalendarioLocal(fecha);
+  if (!d) {
+    return { diaSemana: "", fechaCompleta: "Sin fecha" };
+  }
   return {
     diaSemana: d.toLocaleDateString("es-AR", { weekday: "long" }),
-    fechaCompleta: d.toLocaleDateString("es-AR", {
+    fechaCompleta: formatFechaCalendario(fecha, {
       day: "numeric",
       month: "long",
       year: "numeric",

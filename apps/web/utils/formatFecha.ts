@@ -2,6 +2,34 @@
  * Fechas de calendario (YYYY-MM-DD o ISO a medianoche UTC)
  * se muestran en zona local sin correr un día.
  */
+
+/** Extrae YYYY-MM-DD del string (calendario civil, sin TZ). */
+export function fechaCalendarioIsoDay(fecha?: string | null): string | null {
+  if (!fecha) return null;
+  const day = fecha.includes("T") ? fecha.split("T")[0] : fecha.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+}
+
+/**
+ * Date local a mediodía del día de calendario indicado.
+ * Evita el desfase -1 día de `new Date("YYYY-MM-DD")` (UTC midnight).
+ */
+export function parseFechaCalendarioLocal(
+  fecha?: string | Date | null,
+): Date | null {
+  if (!fecha) return null;
+  if (fecha instanceof Date) {
+    return Number.isNaN(fecha.getTime()) ? null : fecha;
+  }
+  const day = fechaCalendarioIsoDay(String(fecha).trim());
+  if (day) {
+    const local = new Date(`${day}T12:00:00`);
+    return Number.isNaN(local.getTime()) ? null : local;
+  }
+  const parsed = new Date(String(fecha));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export function formatFechaCalendario(
   fecha?: string | null,
   options: Intl.DateTimeFormatOptions = {
@@ -11,13 +39,9 @@ export function formatFechaCalendario(
   },
 ): string {
   if (!fecha) return "Sin fecha";
-  const day = fecha.includes("T") ? fecha.split("T")[0] : fecha.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
-    const parsed = new Date(fecha);
-    if (Number.isNaN(parsed.getTime())) return "Sin fecha";
-    return parsed.toLocaleDateString("es-AR", options);
-  }
-  return new Date(`${day}T12:00:00`).toLocaleDateString("es-AR", options);
+  const parsed = parseFechaCalendarioLocal(fecha);
+  if (!parsed) return "Sin fecha";
+  return parsed.toLocaleDateString("es-AR", options);
 }
 
 export const MODALIDAD_PAREJAS = "Parejas";

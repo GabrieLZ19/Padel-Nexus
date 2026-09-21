@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Trophy, Check } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Inscripcion, Partido } from "@/utils/types";
 import FeedbackModal, {
@@ -18,18 +18,13 @@ import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
 import { Paso7Sedes } from "@/components/torneos/wizard/Paso5Sedes";
 import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
 import { TournamentWizardNav } from "@/components/torneos/TournamentWizardNav";
+import type { SaveStepHandler } from "@/components/torneos/wizard/types";
+import {
+  esEstadoTorneoModoLectura,
+  isWizardPasoReadOnly,
+  textoBannerModoLectura,
+} from "@/components/torneos/wizard/stepLocks";
 import { labelModalidad } from "@/utils/formatFecha";
-
-const WIZARD_STEPS = [
-  { id: "edit", label: "1. Datos", desc: "Información" },
-  { id: "logos", label: "2. Logos", desc: "Patrocinadores" },
-  { id: "categories", label: "3. Categorías", desc: "Clases" },
-  { id: "players", label: "4. Jugadores", desc: "Inscripciones" },
-  { id: "times", label: "5. Sedes", desc: "Canchas & Horas" },
-  { id: "cierre", label: "6. Cierre", desc: "Puntuación" },
-  { id: "draws", label: "7. Cuadros", desc: "Fixture" },
-  { id: "matches", label: "8. Resultados", desc: "Marcadores" },
-];
 
 export default function ClubTorneoDetallePage() {
   const params = useParams();
@@ -42,6 +37,10 @@ export default function ClubTorneoDetallePage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>("edit");
   const [refreshKey, setRefreshKey] = useState(0);
+  const saveHandlerRef = useRef<SaveStepHandler | null>(null);
+  const activeTabRef = useRef(activeTab);
+  const navigatingRef = useRef(false);
+  activeTabRef.current = activeTab;
 
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
     isOpen: false,
@@ -52,6 +51,30 @@ export default function ClubTorneoDetallePage() {
   });
 
   const triggerRefresh = () => setRefreshKey((p) => p + 1);
+
+  const onTorneoUpdated = useCallback((updated: Torneo) => {
+    setTorneo((prev) => (prev ? { ...prev, ...updated } : updated));
+  }, []);
+
+  const registerSaveHandler = useCallback((handler: SaveStepHandler | null) => {
+    saveHandlerRef.current = handler;
+  }, []);
+
+  /** Guarda el paso actual (si tiene handler) y luego cambia de tab. */
+  const navigateToTab = useCallback(async (nextTab: string) => {
+    if (nextTab === activeTabRef.current || navigatingRef.current) return;
+    const save = saveHandlerRef.current;
+    if (save) {
+      navigatingRef.current = true;
+      try {
+        const ok = await save();
+        if (!ok) return;
+      } finally {
+        navigatingRef.current = false;
+      }
+    }
+    setActiveTab(nextTab);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -101,7 +124,9 @@ export default function ClubTorneoDetallePage() {
     torneoId: id,
     setFeedbackModal,
     triggerRefresh,
-    setActiveTab,
+    setActiveTab: navigateToTab,
+    registerSaveHandler,
+    onTorneoUpdated,
   };
 
   return (
@@ -124,11 +149,27 @@ export default function ClubTorneoDetallePage() {
             </span>
           </div>
           <p className="text-gray-400 mt-1 text-xs sm:text-sm font-medium">
-            {(torneo as any).rama ? `${(torneo as any).rama} · ` : ""}
-            {torneo.nivel} · {torneo.categoria} · {labelModalidad(torneo.modalidad)}
+            {(torneo as { rama?: string }).rama
+              ? `${(torneo as { rama?: string }).rama} · `
+              : ""}
+            {torneo.nivel} · {torneo.categoria} ·{" "}
+            {labelModalidad(torneo.modalidad)}
           </p>
         </div>
       </div>
+
+      {esEstadoTorneoModoLectura(torneo.estado) && (
+        <div className="bg-black/20 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center gap-2.5 text-xs text-gray-400 shadow-sm">
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-chartreuse opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-chartreuse"></span>
+          </span>
+          <span>
+            <strong className="text-white">Modo Lectura ({torneo.estado}):</strong>{" "}
+            {textoBannerModoLectura(String(torneo.estado))}
+          </span>
+        </div>
+      )}
 
       {/* GRID: contenido a la izquierda, navegación a la derecha */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6 items-start">
@@ -136,34 +177,67 @@ export default function ClubTorneoDetallePage() {
         <div className="lg:col-span-1 order-1 lg:order-2 lg:sticky lg:top-6 self-start z-30 min-w-0">
           <TournamentWizardNav
             activeTab={activeTab}
-            setActiveTab={setActiveTab}
+            setActiveTab={navigateToTab}
             torneoEstado={torneo.estado}
+            hiddenStepIds={["fiscales"]}
           />
         </div>
 
         {/* Contenido del paso activo — izquierda en desktop */}
         <div className="lg:col-span-3 order-2 lg:order-1 min-w-0 overflow-x-hidden">
-          {activeTab === "edit" && <Paso1Datos {...commonProps} />}
-          {activeTab === "logos" && <Paso2Logos {...commonProps} />}
+          {activeTab === "edit" && (
+            <Paso1Datos
+              {...commonProps}
+              readOnly={isWizardPasoReadOnly(torneo.estado, "edit")}
+            />
+          )}
+          {activeTab === "logos" && (
+            <Paso2Logos
+              {...commonProps}
+              readOnly={isWizardPasoReadOnly(torneo.estado, "logos")}
+            />
+          )}
           {activeTab === "categories" && (
-            <Paso3Categorias {...commonProps} modoClub />
+            <Paso3Categorias
+              {...commonProps}
+              modoClub
+              readOnly={isWizardPasoReadOnly(torneo.estado, "categories")}
+            />
           )}
           {activeTab === "players" && (
-            <Paso4Jugadores {...commonProps} inscripciones={inscripciones} />
+            <Paso4Jugadores
+              {...commonProps}
+              inscripciones={inscripciones}
+              readOnly={isWizardPasoReadOnly(torneo.estado, "players")}
+            />
           )}
-          {activeTab === "times" && <Paso7Sedes {...commonProps} />}
+          {activeTab === "times" && (
+            <Paso7Sedes
+              {...commonProps}
+              readOnly={isWizardPasoReadOnly(torneo.estado, "times")}
+            />
+          )}
           {activeTab === "cierre" && (
-            <Paso5Cierre {...commonProps} inscripciones={inscripciones} />
+            <Paso5Cierre
+              {...commonProps}
+              inscripciones={inscripciones}
+              readOnly={isWizardPasoReadOnly(torneo.estado, "cierre")}
+            />
           )}
           {activeTab === "draws" && (
             <Paso6Cuadros
               {...commonProps}
               inscripciones={inscripciones}
               partidos={partidos}
+              isReadOnly={isWizardPasoReadOnly(torneo.estado, "draws")}
             />
           )}
           {activeTab === "matches" && (
-            <Paso8Arbitraje {...commonProps} partidos={partidos} />
+            <Paso8Arbitraje
+              {...commonProps}
+              partidos={partidos}
+              isReadOnly={isWizardPasoReadOnly(torneo.estado, "matches")}
+            />
           )}
         </div>
       </div>

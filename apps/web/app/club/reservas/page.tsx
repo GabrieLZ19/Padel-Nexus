@@ -7,6 +7,7 @@ import { ClubPanelService } from "@/utils/services/club-panel";
 import type { Cancha } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import Pagination from "@/components/ui/Pagination";
+import { formatFechaCalendario } from "@/utils/formatFecha";
 
 export default function ClubReservasPage() {
   const [reservas, setReservas] = useState<any[]>([]);
@@ -211,9 +212,7 @@ export default function ClubReservasPage() {
                     className="hover:bg-brand-white/1 transition-colors"
                   >
                     <td className="py-5 px-6 font-bold text-brand-white">
-                      {new Date(
-                        res.fecha_reserva + "T00:00:00",
-                      ).toLocaleDateString("es-AR", {
+                      {formatFechaCalendario(res.fecha_reserva, {
                         day: "2-digit",
                         month: "short",
                         year: "numeric",

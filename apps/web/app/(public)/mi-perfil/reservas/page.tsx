@@ -26,6 +26,7 @@ import { NIVELES_PARTIDO_ABIERTO } from "@/utils/constants/padelConfig";
 import { NIVEL_PARTIDO_DEFAULT } from "@/utils/types";
 import { sileo } from "sileo";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import { formatFechaCalendario, parseFechaCalendarioLocal } from "@/utils/formatFecha";
 
 interface ReservaUsuario {
   id: string;
@@ -118,37 +119,19 @@ export default function MisReservasPage() {
 
   const formatFecha = (dateStr?: string) => {
     if (!dateStr) return "";
-    const date = new Date(dateStr + "T12:00:00Z");
-    const dias = [
-      "Domingo",
-      "Lunes",
-      "Martes",
-      "Miércoles",
-      "Jueves",
-      "Viernes",
-      "Sábado",
-    ];
-    const meses = [
-      "Ene",
-      "Feb",
-      "Mar",
-      "Abr",
-      "May",
-      "Jun",
-      "Jul",
-      "Ago",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dic",
-    ];
-    return `${dias[date.getUTCDay()]} ${date.getUTCDate()} de ${meses[date.getUTCMonth()]}`;
+    return formatFechaCalendario(dateStr, {
+      weekday: "long",
+      day: "numeric",
+      month: "short",
+    });
   };
 
   const esReservaFutura = (fecha: string) => {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-    const f = new Date(`${fecha}T12:00:00`);
+    const f = parseFechaCalendarioLocal(fecha);
+    if (!f) return false;
+    f.setHours(0, 0, 0, 0);
     return f >= hoy;
   };
 

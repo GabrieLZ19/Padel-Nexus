@@ -32,16 +32,9 @@ import {
   clasificadosPorZona,
   textoClasificacionZonas,
 } from "@/utils/clasificacionZonas";
+import { cleanJugadorNombre } from "@/utils/nombrePareja";
 
-const cleanName = (name?: string | null) => {
-  if (!name) return "";
-  let cleaned = name
-    .trim()
-    .replace(/^[\s,.\-]+/, "") // remove leading spaces, commas, dots, dashes
-    .replace(/[\s,.\-]+$/, ""); // remove trailing spaces, commas, dots, dashes
-  if (cleaned === "," || cleaned === "." || cleaned === "") return "";
-  return cleaned;
-};
+const cleanName = (name?: string | null) => cleanJugadorNombre(name);
 
 const getClasificanTexto = (zonas: ZonaDrag[]) =>
   textoClasificacionZonas(zonas.map((z) => ({ parejas: z.parejas })));

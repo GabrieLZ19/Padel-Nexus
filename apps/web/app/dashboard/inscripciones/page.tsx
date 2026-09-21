@@ -38,9 +38,18 @@ import {
 } from "@/utils/inscripcionPlanilla";
 import { esModalidadIndividual } from "@/utils/formatFecha";
 
-const TABS = ["Todas", "Pendientes", "Confirmadas", "Rechazadas"];
+const TABS = ["Todas", "Pendientes", "Confirmadas", "Rechazadas"] as const;
+type TabInscripcion = (typeof TABS)[number];
+
+const TAB_A_ESTADO: Record<TabInscripcion, string | undefined> = {
+  Todas: undefined,
+  Pendientes: FAP_ESTADOS_PAGO.PENDIENTE,
+  Confirmadas: FAP_ESTADOS_PAGO.CONFIRMADO,
+  Rechazadas: FAP_ESTADOS_PAGO.RECHAZADO,
+};
 
 const PAGE_SIZE = 5;
+const SEARCH_DEBOUNCE_MS = 300;
 
 const cleanName = (name?: string | null) => {
   if (!name) return "Desconocido";
@@ -57,9 +66,14 @@ export default function GestionInscripcionesPage() {
 
   const [page, setPage] = useState<number>(1);
   const [filterTorneo, setFilterTorneo] = useState<string>("");
+  const [searchInput, setSearchInput] = useState<string>("");
   const [search, setSearch] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<string>("Todas");
+  const [activeTab, setActiveTab] = useState<TabInscripcion>("Todas");
   const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [kpiPendientes, setKpiPendientes] = useState(0);
+  const [kpiConfirmadas, setKpiConfirmadas] = useState(0);
+  const [kpiRechazadas, setKpiRechazadas] = useState(0);
+  const [recaudacionTotal, setRecaudacionTotal] = useState(0);
 
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
     isOpen: false,
@@ -154,6 +168,17 @@ export default function GestionInscripcionesPage() {
   }, []);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
@@ -161,9 +186,19 @@ export default function GestionInscripcionesPage() {
           filterTorneo,
           page,
           PAGE_SIZE,
+          {
+            search: search || undefined,
+            estadoPago: TAB_A_ESTADO[activeTab],
+          },
         );
         setInscripciones(Array.isArray(res.data) ? res.data : []);
         setTotal(res.total || 0);
+        if (res.resumen) {
+          setKpiPendientes(res.resumen.pendientes);
+          setKpiConfirmadas(res.resumen.confirmadas);
+          setKpiRechazadas(res.resumen.rechazadas);
+          setRecaudacionTotal(res.resumen.recaudacion);
+        }
       } catch (err) {
         console.error("Error al cargar:", err);
         setInscripciones([]);
@@ -173,7 +208,7 @@ export default function GestionInscripcionesPage() {
     };
 
     void loadData();
-  }, [filterTorneo, page, refreshKey]);
+  }, [filterTorneo, page, refreshKey, search, activeTab]);
 
   const [pagoModal, setPagoModal] = useState<{
     isOpen: boolean;
@@ -257,46 +292,8 @@ export default function GestionInscripcionesPage() {
     setDetalleModalOpen(true);
   };
 
-  const filteredInscripciones = inscripciones.filter((i) => {
-    const term = search.toLowerCase();
-    const nombreJ1 = (i.jugador1_nombre || "").toLowerCase();
-    const nombreJ2 = (i.jugador2_nombre || "").toLowerCase();
-    const nombreTorneo = (
-      i.torneo_nombre ||
-      i.cancha_nombre ||
-      ""
-    ).toLowerCase();
-
-    const matchSearch =
-      nombreJ1.includes(term) ||
-      nombreJ2.includes(term) ||
-      nombreTorneo.includes(term);
-
-    const matchTab =
-      activeTab === "Todas" ||
-      (activeTab === "Pendientes" &&
-        i.estado_pago === FAP_ESTADOS_PAGO.PENDIENTE) ||
-      (activeTab === "Confirmadas" &&
-        i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO) ||
-      (activeTab === "Rechazadas" &&
-        i.estado_pago === FAP_ESTADOS_PAGO.RECHAZADO);
-
-    return matchSearch && matchTab;
-  });
-
   // --- CÁLCULO DE MÉTRICAS REALES ---
-  const kpiPendientes = inscripciones.filter(
-    (i) => i.estado_pago === FAP_ESTADOS_PAGO.PENDIENTE,
-  ).length;
-  const kpiConfirmadas = inscripciones.filter(
-    (i) => i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO,
-  ).length;
-  const kpiRechazadas = inscripciones.filter(
-    (i) => i.estado_pago === FAP_ESTADOS_PAGO.RECHAZADO,
-  ).length;
-  const recaudacionTotal = inscripciones
-    .filter((i) => i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO)
-    .reduce((acc, curr) => acc + Number(curr.monto || 0), 0);
+  // KPIs vienen del resumen del backend (independientes de página/búsqueda/tab).
 
   const formatMoney = (amount: number) => {
     if (amount >= 1000000)
@@ -322,7 +319,7 @@ export default function GestionInscripcionesPage() {
     const escapeCSV = (str: string | number | undefined | null) =>
       `"${String(str || "").replace(/"/g, '""')}"`;
 
-    const csvData = filteredInscripciones.map((ins) => [
+    const csvData = inscripciones.map((ins) => [
       escapeCSV(ins.id),
       escapeCSV(ins.jugador1_nombre),
       escapeCSV(ins.jugador2_nombre || "-"),
@@ -357,25 +354,36 @@ export default function GestionInscripcionesPage() {
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 space-y-8 md:px-10 md:py-10">
       {/* HEADER PRINCIPAL */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">
-            Inscripciones y reservas
-          </h1>
-          <p className="text-gray-400 mt-1">Control de pagos y validaciones</p>
+      <div className="flex flex-col gap-4 sm:gap-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              Inscripciones y reservas
+            </h1>
+            <p className="text-gray-400 mt-1 text-sm sm:text-base">
+              Control de pagos y validaciones
+            </p>
+          </div>
+          <button
+            onClick={handleExportarExcel}
+            disabled={loading || inscripciones.length === 0}
+            className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all disabled:opacity-50 cursor-pointer w-full sm:w-auto shrink-0"
+          >
+            <Download className="size-4" /> Exportar CSV
+          </button>
         </div>
-        <div className="flex gap-2">
-          {selectedTorneo && (
-            <div className="flex flex-col items-end gap-1">
-              <div className="flex items-center gap-2 flex-wrap justify-end">
+
+        {selectedTorneo && (
+          <div className="flex flex-col gap-2 rounded-2xl border border-white/5 bg-[#111111]/60 p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
               <button
                 onClick={handleDescargarPlantilla}
-                className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer animate-in fade-in"
+                className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-3 sm:px-4 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer"
                 title="Descargar planilla oficial de inscripciones"
               >
                 <Download className="size-3.5" /> Descargar Planilla
               </button>
-              
+
               <div className="relative">
                 <input
                   type="file"
@@ -386,36 +394,37 @@ export default function GestionInscripcionesPage() {
                 />
                 <button
                   disabled={importingCSV}
-                  className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-3 sm:px-4 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 cursor-pointer disabled:opacity-50"
                 >
-                  <Upload className="size-3.5" /> {importingCSV ? "Importando..." : "Subir Planilla"}
+                  <Upload className="size-3.5" />{" "}
+                  {importingCSV ? "Importando..." : "Subir Planilla"}
                 </button>
               </div>
 
               <button
                 onClick={() => setIsManualModalOpen(true)}
-                className="flex items-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md cursor-pointer"
+                className="flex items-center justify-center gap-2 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-md cursor-pointer sm:ml-auto"
               >
-                Inscribir {selectedTorneo.modalidad === "Individual" ? "Jugador" : "Pareja"}
+                Inscribir{" "}
+                {selectedTorneo.modalidad === "Individual"
+                  ? "Jugador"
+                  : "Pareja"}
               </button>
-              </div>
-              <p className="text-[11px] text-gray-500 text-right max-w-md">
-                Planilla {selectedTorneo ? etiquetaTipoPlanillaInscripcion({
-                  alcance: selectedTorneo.alcance,
-                  reglamento: (selectedTorneo as { reglamento?: string }).reglamento,
-                  asociacion: (selectedTorneo as { asociacion?: string }).asociacion,
-                }) : ""} según reglamento/alcance del torneo. En parejas, cada dos filas consecutivas forman una pareja.
-              </p>
             </div>
-          )}
-          <button
-            onClick={handleExportarExcel}
-            disabled={loading || filteredInscripciones.length === 0}
-            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 px-5 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50 cursor-pointer"
-          >
-            <Download className="size-4" /> Exportar CSV
-          </button>
-        </div>
+            <p className="text-[11px] text-gray-500 sm:text-right">
+              Planilla{" "}
+              {etiquetaTipoPlanillaInscripcion({
+                alcance: selectedTorneo.alcance,
+                reglamento: (selectedTorneo as { reglamento?: string })
+                  .reglamento,
+                asociacion: (selectedTorneo as { asociacion?: string })
+                  .asociacion,
+              })}{" "}
+              según reglamento/alcance del torneo. En parejas, cada dos filas
+              consecutivas forman una pareja.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* TARJETAS DE MÉTRICAS */}
@@ -465,32 +474,20 @@ export default function GestionInscripcionesPage() {
         </div>
       </div>
 
-      {/* BARRA DE FILTROS Y BÚSQUEDA */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 pt-4">
-        <div className="w-full xl:w-[320px]">
-          <CustomDropdown
-            value={filterTorneo}
-            onChange={(value) => {
-              setFilterTorneo(value);
-              setPage(1);
-            }}
-            placeholder="Todos los torneos"
-            options={[
-              { value: "", label: "Todos los torneos" },
-              ...torneos.map((t) => ({ value: t.id, label: t.nombre })),
-            ]}
-            disabled={loading}
-          />
-        </div>
-
-        <div className="inline-flex bg-[#111111] p-1.5 rounded-xl border border-white/5 overflow-x-auto w-full sm:w-auto">
+      {/* BARRA DE FILTROS Y BÚSQUEDA — mismo lenguaje visual que Torneos */}
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 pt-2">
+        <div className="inline-flex w-full sm:w-auto bg-[#111111] p-1.5 rounded-xl border border-white/5">
           {TABS.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`whitespace-nowrap rounded-lg px-5 py-2 text-sm font-bold transition-all ${
+              type="button"
+              onClick={() => {
+                setActiveTab(tab);
+                setPage(1);
+              }}
+              className={`flex-1 sm:flex-none whitespace-nowrap rounded-lg px-3 sm:px-5 py-2 text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeTab === tab
-                  ? "bg-brand-chartreuse text-[#111] shadow-[0_0_10px_rgba(204,255,0,0.15)]"
+                  ? "bg-brand-chartreuse text-brand-card shadow-[0_0_10px_rgba(204,255,0,0.15)]"
                   : "text-gray-400 hover:text-white"
               }`}
             >
@@ -499,15 +496,34 @@ export default function GestionInscripcionesPage() {
           ))}
         </div>
 
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 size-4" />
-          <input
-            type="text"
-            placeholder="Buscar pareja o torneo..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 bg-[#111111] rounded-xl border border-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors"
-          />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full xl:w-auto">
+          <div className="w-full sm:w-[200px] shrink-0">
+            <CustomDropdown
+              value={filterTorneo}
+              onChange={(value) => {
+                setFilterTorneo(value);
+                setPage(1);
+              }}
+              placeholder="Todos los torneos"
+              options={[
+                { value: "", label: "Todos los torneos" },
+                ...torneos.map((t) => ({ value: t.id, label: t.nombre })),
+              ]}
+              disabled={loading}
+              className="!py-2.5 !text-sm"
+            />
+          </div>
+
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 size-4" />
+            <input
+              type="text"
+              placeholder="Buscar pareja o torneo..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-[#111111] rounded-xl border border-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors"
+            />
+          </div>
         </div>
       </div>
 
@@ -566,7 +582,7 @@ export default function GestionInscripcionesPage() {
               </tbody>
             </table>
           </div>
-        ) : filteredInscripciones.length === 0 ? (
+        ) : inscripciones.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center text-center">
             <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 text-gray-500">
               <Search className="size-8" />
@@ -593,7 +609,7 @@ export default function GestionInscripcionesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {filteredInscripciones.map((ins) => {
+                {inscripciones.map((ins) => {
                   const esPareja =
                     ins.jugador2_nombre &&
                     ins.jugador2_nombre.trim() !== "" &&
@@ -730,7 +746,7 @@ export default function GestionInscripcionesPage() {
         page={page}
         total={total}
         pageSize={PAGE_SIZE}
-        currentCount={filteredInscripciones.length}
+        currentCount={inscripciones.length}
         onPageChange={setPage}
       />
       <div className="relative z-50">

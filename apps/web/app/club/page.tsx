@@ -14,6 +14,7 @@ import {
 import Link from "next/link";
 import { ClubPanelService } from "@/utils/services/club-panel";
 import type { Club } from "@/utils/types";
+import { formatFechaCalendario } from "@/utils/formatFecha";
 
 interface Estadisticas {
   canchas_totales: number;
@@ -233,9 +234,7 @@ export default function ClubDashboardPage() {
                     className="hover:bg-brand-white/2 transition-colors"
                   >
                     <td className="py-4 px-4 font-bold text-brand-white">
-                      {new Date(
-                        res.fecha_reserva + "T00:00:00",
-                      ).toLocaleDateString("es-AR", {
+                      {formatFechaCalendario(res.fecha_reserva, {
                         day: "2-digit",
                         month: "short",
                         year: "numeric",

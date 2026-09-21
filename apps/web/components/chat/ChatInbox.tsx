@@ -32,6 +32,7 @@ import {
   mapPartidoParticipantes,
   type ChatParticipanteInfo,
 } from "@/components/chat/chatParticipants";
+import { formatFechaCalendario } from "@/utils/formatFecha";
 
 export type ChatInboxTab =
   | "todos"
@@ -479,7 +480,7 @@ export default function ChatInbox({
 
   const formatPartidoFecha = (fecha?: string | null) => {
     if (!fecha) return "";
-    return new Date(`${fecha}T12:00:00`).toLocaleDateString("es-AR", {
+    return formatFechaCalendario(fecha, {
       weekday: "short",
       day: "2-digit",
       month: "short",

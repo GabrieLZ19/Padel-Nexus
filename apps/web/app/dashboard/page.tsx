@@ -95,6 +95,10 @@ function DashboardGenerico() {
       (t.estado || "").toLowerCase() ===
         FAP_ESTADOS_TORNEO.INSCRIPCION.toLowerCase() ||
       (t.estado || "").toLowerCase() ===
+        FAP_ESTADOS_TORNEO.CERRADO.toLowerCase() ||
+      (t.estado || "").toLowerCase() ===
+        FAP_ESTADOS_TORNEO.PROGRAMADO.toLowerCase() ||
+      (t.estado || "").toLowerCase() ===
         FAP_ESTADOS_TORNEO.EN_CURSO.toLowerCase(),
   ).length;
   const inscripcionesTorneo = inscripciones.filter(

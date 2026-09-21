@@ -5,6 +5,12 @@ import { Inscripcion } from "../types";
 export interface PaginatedInscripciones {
   data: Inscripcion[];
   total: number;
+  resumen?: {
+    pendientes: number;
+    confirmadas: number;
+    rechazadas: number;
+    recaudacion: number;
+  };
 }
 
 export type CheckElegibilidadApi = {
@@ -55,9 +61,16 @@ export const InscripcionesService = {
     torneoId: string,
     page: number,
     limit: number,
+    filtros?: { search?: string; estadoPago?: string },
   ): Promise<PaginatedInscripciones> {
     const response = await api.get<PaginatedInscripciones>(`/inscripciones`, {
-      params: { torneo_id: torneoId, page, limit },
+      params: {
+        torneo_id: torneoId || undefined,
+        page,
+        limit,
+        search: filtros?.search?.trim() || undefined,
+        estado_pago: filtros?.estadoPago || undefined,
+      },
     });
     return response.data;
   },

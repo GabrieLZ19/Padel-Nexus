@@ -285,6 +285,7 @@ export const Paso6Fiscales = ({
 
                   const RANGOS: Record<string, number> = {
                     Local: 1,
+                    Privado: 1,
                     Regional: 2,
                     Provincial: 3,
                     Nacional: 4,

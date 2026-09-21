@@ -134,9 +134,36 @@ export const CATEGORIAS_TORNEO = [
 export const ESTADOS_TORNEO = [
   { value: FAP_ESTADOS_TORNEO.BORRADOR, label: "Borrador (Oculto)" },
   { value: FAP_ESTADOS_TORNEO.INSCRIPCION, label: "Inscripción Abierta" },
+  { value: FAP_ESTADOS_TORNEO.CERRADO, label: "Cerrado" },
+  { value: FAP_ESTADOS_TORNEO.PROGRAMADO, label: "Programado" },
   { value: FAP_ESTADOS_TORNEO.EN_CURSO, label: "En Curso" },
   { value: FAP_ESTADOS_TORNEO.FINALIZADO, label: "Finalizado" },
 ] as const;
+
+/** Tabs de filtro en listas CRM/club — un tab por estado FAP. */
+export const TORNEO_LIST_TABS = [
+  "Todos",
+  FAP_ESTADOS_TORNEO.INSCRIPCION,
+  FAP_ESTADOS_TORNEO.CERRADO,
+  FAP_ESTADOS_TORNEO.PROGRAMADO,
+  FAP_ESTADOS_TORNEO.EN_CURSO,
+  FAP_ESTADOS_TORNEO.BORRADOR,
+  FAP_ESTADOS_TORNEO.FINALIZADO,
+] as const;
+
+export type TorneoListTab = (typeof TORNEO_LIST_TABS)[number];
+
+/** Resuelve el query `estado` para TorneosService.getByPage según el tab activo. */
+export function estadoParamDesdeTabTorneo(
+  tab: string,
+): string | undefined {
+  if (tab === "Todos") return undefined;
+  return tab;
+}
+
+export function tabTorneoIncluyeBorradores(tab: string): boolean {
+  return tab === "Todos" || tab === FAP_ESTADOS_TORNEO.BORRADOR;
+}
 
 export const MODALIDADES_TORNEO = [
   { value: "Parejas", label: "Parejas" },
@@ -149,7 +176,8 @@ export const FORMATOS_TORNEO = [
 ] as const;
 
 export const ALCANCES_TORNEO = [
-  { value: "Local", label: "Local / Privado" },
+  { value: "Local", label: "Local" },
+  { value: "Privado", label: "Privado" },
   { value: "Regional", label: "Regional" },
   { value: "Provincial", label: "Provincial" },
   { value: "Nacional", label: "Nacional" },

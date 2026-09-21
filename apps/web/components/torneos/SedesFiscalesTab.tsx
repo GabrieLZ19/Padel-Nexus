@@ -8,7 +8,6 @@ import {
   Calendar,
   Clock,
   MapPin,
-  Layers,
 } from "lucide-react";
 import { Club } from "@/utils/types";
 import type { Torneo } from "@/utils/types";
@@ -80,7 +79,7 @@ function buildFechasTorneo(
   let limit = 0;
 
   while (current <= endDate && limit < 31) {
-    const iso = current.toISOString().split("T")[0];
+    const iso = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
     const dayName = current.toLocaleDateString("es-AR", { weekday: "short" });
     const capDay =
       dayName.charAt(0).toUpperCase() + dayName.slice(1).replace(".", "");
@@ -965,14 +964,6 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
             <Calendar className="size-4 text-brand-chartreuse" />
             Cronograma de canchas
           </h4>
-
-          <div className="flex flex-wrap items-center gap-2 p-4 bg-black/30 border border-white/10 rounded-2xl">
-            <Layers className="size-4 text-brand-chartreuse shrink-0" />
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-              Categoría del torneo (Paso 3)
-            </span>
-            <span className="text-sm font-bold text-white">{categoriaLabel}</span>
-          </div>
 
           {selectedClubs.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-8 border border-dashed border-white/10 rounded-2xl">

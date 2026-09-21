@@ -277,11 +277,11 @@ export default function JugadoresLicenciasPage() {
   const vencidas = contarPorEstado(licencias, "Vencida");
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto p-6 lg:p-10 space-y-6">
+    <div className="w-full max-w-[1600px] mx-auto p-6 lg:p-8 xl:p-10 space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-widest text-brand-chartreuse mb-1">
               {contextoConfig?.tipo === "asociacion"
                 ? "Gestión provincial"
@@ -311,7 +311,7 @@ export default function JugadoresLicenciasPage() {
             )}
           </div>
 
-          <div className="relative w-full lg:w-96">
+          <div className="relative w-full lg:w-80 xl:w-96 shrink-0">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 size-4" />
             <input
               type="text"
@@ -321,7 +321,7 @@ export default function JugadoresLicenciasPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="w-full pl-11 pr-4 py-3.5 bg-brand-input border border-white/5 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors"
+              className="w-full pl-11 pr-4 py-3 bg-brand-input border border-white/5 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors"
             />
           </div>
         </div>
@@ -368,7 +368,7 @@ export default function JugadoresLicenciasPage() {
               }`}
             >
               <stat.icon className={`size-5 ${stat.color} shrink-0`} />
-              <div>
+              <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
                   {stat.label}
                 </p>
@@ -380,8 +380,8 @@ export default function JugadoresLicenciasPage() {
           ))}
         </div>
 
-        {/* Filtros por estado */}
-        <div className="flex flex-wrap gap-2">
+        {/* Filtros por estado — el marco abraza el contenido */}
+        <div className="inline-flex flex-wrap items-center bg-[#111111] p-1 rounded-xl border border-white/5 w-fit max-w-full">
           {FILTROS.map((filtro) => (
             <button
               key={filtro}
@@ -390,10 +390,10 @@ export default function JugadoresLicenciasPage() {
                 setFiltroActivo(filtro);
                 setPage(1);
               }}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors ${
+              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
                 filtroActivo === filtro
                   ? "bg-brand-chartreuse text-brand-black shadow-[0_0_10px_rgba(204,255,0,0.15)]"
-                  : "bg-[#111111] text-gray-400 border border-white/5 hover:text-white hover:border-white/15"
+                  : "text-gray-400 hover:text-white"
               }`}
             >
               {filtro}
@@ -402,7 +402,7 @@ export default function JugadoresLicenciasPage() {
         </div>
       </div>
 
-      {/* Tabs mobile */}
+      {/* Tabs solo en mobile / tablet angosto */}
       <div className="flex lg:hidden gap-2 p-1 bg-[#111111] border border-white/5 rounded-xl">
         <button
           type="button"
@@ -430,10 +430,10 @@ export default function JugadoresLicenciasPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,380px)_1fr] gap-6 items-start">
-        {/* Config colapsable en desktop */}
+      {/* Sidebar: compacta en notebooks/zoom; más ancha solo en monitores grandes */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(240px,280px)_minmax(0,1fr)] min-[1700px]:grid-cols-[minmax(300px,360px)_minmax(0,1fr)] gap-6 items-start">
         <aside
-          className={`lg:sticky lg:top-6 ${
+          className={`lg:sticky lg:top-6 min-w-0 ${
             mobileTab === "config" ? "block" : "hidden lg:block"
           }`}
         >
@@ -449,10 +449,14 @@ export default function JugadoresLicenciasPage() {
               <ChevronDown className="size-4" />
             )}
           </button>
-          {configAbierta && <ConfigLicenciasPanel scope="contexto" />}
+          <div className={configAbierta ? undefined : "lg:hidden"}>
+            <ConfigLicenciasPanel
+              scope="contexto"
+              compact
+            />
+          </div>
         </aside>
 
-        {/* Lista de jugadores */}
         <section
           className={`space-y-4 min-w-0 ${
             mobileTab === "licencias" ? "block" : "hidden lg:block"
@@ -468,7 +472,6 @@ export default function JugadoresLicenciasPage() {
                 {filtroActivo !== "Todas" ? ` · filtro: ${filtroActivo}` : ""}
               </p>
             </div>
-            
           </div>
 
           {loading ? (

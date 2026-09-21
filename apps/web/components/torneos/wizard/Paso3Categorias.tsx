@@ -20,7 +20,21 @@ import {
   labelReglamentoTorneo,
   CUSTOM_OPTION_VALUE,
 } from "@/utils/constants/fapApaRules";
-import type { RegisterSaveHandler } from "./types";
+import type { OnTorneoUpdated, RegisterSaveHandler } from "./types";
+
+/** Categorías con cortes etarios (no aplica validar categoría padel 1ª–8ª). */
+function esCategoriaConControlEdad(
+  categoria: string,
+  nivel?: string,
+): boolean {
+  const blob = `${categoria} ${nivel || ""}`;
+  return /ladies|veteranos|menores|seniors|women|juniors|\+\d{2}/i.test(blob);
+}
+
+/** Libres: niveles de categoría padel (1ª–8ª / Inicial). */
+function esCategoriaLibres(categoria: string): boolean {
+  return /^libres$/i.test(String(categoria || "").trim());
+}
 
 interface Paso3CategoriasProps {
   torneo: Torneo;
@@ -29,6 +43,7 @@ interface Paso3CategoriasProps {
   setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
   registerSaveHandler?: RegisterSaveHandler;
+  onTorneoUpdated?: OnTorneoUpdated;
   readOnly?: boolean;
   /** Torneos del panel de club: validaciones de inscripción opcionales */
   modoClub?: boolean;
@@ -41,6 +56,7 @@ export const Paso3Categorias = ({
   setActiveTab,
   triggerRefresh,
   registerSaveHandler,
+  onTorneoUpdated,
   readOnly = false,
   modoClub = false,
 }: Paso3CategoriasProps) => {
@@ -110,6 +126,15 @@ export const Paso3Categorias = ({
   const categoriaEfectiva =
     showCustomCategoria && customCategoria ? customCategoria : editCategoria;
 
+  const nivelEfectivo =
+    showCustomNivel && customNivel ? customNivel : editNivel;
+
+  const mostrarValidarEdad = esCategoriaConControlEdad(
+    categoriaEfectiva,
+    nivelEfectivo,
+  );
+  const mostrarValidarCategoria = esCategoriaLibres(categoriaEfectiva);
+
   const nivelesOficiales = useMemo(
     () => getNivelesParaCategoria(reglamento, categoriaEfectiva),
     [reglamento, categoriaEfectiva],
@@ -124,16 +149,17 @@ export const Paso3Categorias = ({
     return items;
   }, [nivelesOficiales]);
 
-  // Auto-activar validación de edad según categoría (solo circuito federativo / admin)
+  // Auto activar / apagar según categoría
   useEffect(() => {
-    if (modoClub) return;
-    const esConEdad = /\+(30|40|50|60)|veteranos|ladies|menores/i.test(
-      categoriaEfectiva,
-    );
-    if (esConEdad) {
-      setValidarEdad(true);
+    if (mostrarValidarEdad) {
+      if (!modoClub) setValidarEdad(true);
+    } else {
+      setValidarEdad(false);
     }
-  }, [categoriaEfectiva, modoClub]);
+    if (!mostrarValidarCategoria) {
+      setValidarCategoria(false);
+    }
+  }, [mostrarValidarEdad, mostrarValidarCategoria, modoClub]);
 
   // Reset nivel cuando cambia la categoría (y hay opciones válidas)
   useEffect(() => {
@@ -268,27 +294,28 @@ export const Paso3Categorias = ({
 
     try {
       setGuardandoCategorias(true);
-      await TorneosService.update(torneoId, {
+      const updated = await TorneosService.update(torneoId, {
         rama: editRama,
         categoria: finalCategoria,
         nivel: finalNivel,
         modalidad: editModalidad,
-        validar_edad: modoClub
-          ? validarEdad
-          : editCategoria === "Libres"
-            ? false
-            : validarEdad,
+        validar_edad: mostrarValidarEdad ? validarEdad : false,
         dias_juego: selectedDias,
         reglas_arbitraje: {
           ...((torneo as any).reglas_arbitraje || {}),
-          validar_categoria: modoClub ? validarCategoria : true,
+          validar_categoria: mostrarValidarCategoria
+            ? modoClub
+              ? validarCategoria
+              : true
+            : false,
           requiere_carnet_federativo: requiereCarnet,
           monto_carnet: 0,
         },
       } as any);
 
-      triggerRefresh();
+      onTorneoUpdated?.(updated);
       if (!options?.silent) {
+        triggerRefresh();
         setFeedbackModal((prev: any) => ({
           ...prev,
           isOpen: true,
@@ -475,62 +502,80 @@ export const Paso3Categorias = ({
             Validaciones de inscripción (opcionales)
           </h4>
           <p className="text-[11px] text-gray-500 -mt-2">
-            En torneos de club podés activar solo las reglas que necesites. Si
-            ninguna está marcada, cualquier jugador podrá inscribirse (salvo
-            rama y cupos).
+            Se muestran según la categoría elegida. En Libres podés validar
+            categoría padel; en Ladies, Veteranos o Menores, la edad.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              {
-                checked: validarCategoria,
-                onToggle: () => setValidarCategoria((v) => !v),
-                title: "Validar categoría",
-                desc: "Verifica que la categoría del jugador alcance para el nivel del torneo.",
-              },
-              {
-                checked: validarEdad,
-                onToggle: () => setValidarEdad((v) => !v),
-                title: "Validar edad",
-                desc: "Usa la fecha de nacimiento del perfil para el rango etario del nivel.",
-              },
-              {
-                checked: requiereCarnet,
-                onToggle: () => setRequiereCarnet((v) => !v),
-                title: "Exigir carnet FAP",
-                desc: "Ambos jugadores deben tener licencia FAP activa para inscribirse.",
-              },
-            ].map((item) => (
-              <div
-                key={item.title}
-                onClick={item.onToggle}
-                className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-3 ${
-                  item.checked
-                    ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white shadow-[0_0_15px_rgba(204,255,0,0.1)]"
-                    : "bg-brand-input border-white/10 text-gray-400 hover:border-white/20"
-                }`}
-              >
-                <div>
-                  <p className="font-extrabold text-xs text-white">
-                    {item.title}
-                  </p>
-                  <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">
-                    {item.desc}
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={item.checked}
-                  onChange={() => {}}
-                  className="mt-0.5 size-5 rounded border-white/10 bg-black/50 text-brand-chartreuse focus:ring-brand-chartreuse accent-brand-chartreuse cursor-pointer transition-all shrink-0"
-                />
-              </div>
-            ))}
+              {[
+                mostrarValidarCategoria
+                  ? {
+                      key: "categoria",
+                      checked: validarCategoria,
+                      onToggle: () => setValidarCategoria((v) => !v),
+                      title: "Validar categoría",
+                      desc: "Verifica que la categoría del jugador alcance para el nivel del torneo (1ª–8ª / Inicial).",
+                    }
+                  : null,
+                mostrarValidarEdad
+                  ? {
+                      key: "edad",
+                      checked: validarEdad,
+                      onToggle: () => setValidarEdad((v) => !v),
+                      title: "Validar edad",
+                      desc: "Usa la fecha de nacimiento del perfil para el rango etario del nivel.",
+                    }
+                  : null,
+                {
+                  key: "carnet",
+                  checked: requiereCarnet,
+                  onToggle: () => setRequiereCarnet((v) => !v),
+                  title: "Exigir carnet FAP",
+                  desc: "Ambos jugadores deben tener licencia FAP activa para inscribirse.",
+                },
+              ]
+                .filter(
+                  (
+                    item,
+                  ): item is {
+                    key: string;
+                    checked: boolean;
+                    onToggle: () => void;
+                    title: string;
+                    desc: string;
+                  } => item != null,
+                )
+                .map((item) => (
+                  <div
+                    key={item.key}
+                    onClick={item.onToggle}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-3 ${
+                      item.checked
+                        ? "bg-brand-chartreuse/10 border-brand-chartreuse/40 text-white shadow-[0_0_15px_rgba(204,255,0,0.1)]"
+                        : "bg-brand-input border-white/10 text-gray-400 hover:border-white/20"
+                    }`}
+                  >
+                    <div>
+                      <p className="font-extrabold text-xs text-white">
+                        {item.title}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">
+                        {item.desc}
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={item.checked}
+                      onChange={() => {}}
+                      className="mt-0.5 size-5 rounded border-white/10 bg-black/50 text-brand-chartreuse focus:ring-brand-chartreuse accent-brand-chartreuse cursor-pointer transition-all shrink-0"
+                    />
+                  </div>
+                ))}
           </div>
         </div>
       ) : (
         <>
-          {editCategoria !== "Libres" && (
+          {mostrarValidarEdad && (
             <div className="border-t border-white/5 pt-6">
               <label className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <ShieldCheck className="size-4 text-brand-chartreuse" /> Control
@@ -636,7 +681,7 @@ export const Paso3Categorias = ({
             className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
           >
             {readOnly
-              ? "Modo Lectura (En curso)"
+              ? "Modo Lectura"
               : guardandoCategorias
                 ? "Guardando..."
                 : "Guardar Cambios"}

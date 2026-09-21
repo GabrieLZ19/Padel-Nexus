@@ -17,7 +17,7 @@ import {
 } from "@/utils/services/fiscal-panel";
 import { formatFechaCalendario, labelModalidad } from "@/utils/formatFecha";
 
-const FILTROS_ALCANCE = ["Todos", "Nacional", "Provincial", "Regional", "Local"] as const;
+const FILTROS_ALCANCE = ["Todos", "Nacional", "Provincial", "Regional", "Local", "Privado"] as const;
 
 export default function FiscalTorneosPage() {
   const router = useRouter();

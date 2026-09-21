@@ -14,10 +14,13 @@ import {
   GitBranch,
   Trophy,
   Lock,
-  Check,
   ChevronDown,
   LayoutGrid,
 } from "lucide-react";
+import {
+  isWizardPasoReadOnly,
+  type WizardPasoId,
+} from "@/components/torneos/wizard/stepLocks";
 
 export interface StepDefinition {
   id: string;
@@ -123,21 +126,25 @@ interface TournamentWizardNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void | Promise<void>;
   torneoEstado?: string;
+  /** Pasos a ocultar (p. ej. fiscales en panel club). */
+  hiddenStepIds?: string[];
 }
 
 export function TournamentWizardNav({
   activeTab,
   setActiveTab,
   torneoEstado,
+  hiddenStepIds = [],
 }: TournamentWizardNavProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const isReadOnlyMode =
-    torneoEstado === "En curso" || torneoEstado === "Finalizado";
+  const visibleSteps = ALL_STEPS.filter(
+    (step) => !hiddenStepIds.includes(step.id),
+  );
 
   // Filtrado por buscador
-  const filteredSteps = ALL_STEPS.filter((step) => {
+  const filteredSteps = visibleSteps.filter((step) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
     return (
@@ -147,7 +154,8 @@ export function TournamentWizardNav({
     );
   });
 
-  const activeStepObj = ALL_STEPS.find((s) => s.id === activeTab) || ALL_STEPS[0];
+  const activeStepObj =
+    visibleSteps.find((s) => s.id === activeTab) || visibleSteps[0];
 
   const handleSelectStep = (stepId: string) => {
     void setActiveTab(stepId);
@@ -156,10 +164,10 @@ export function TournamentWizardNav({
 
   const renderStepItem = (step: StepDefinition) => {
     const isActive = activeTab === step.id;
-    const isStepReadOnly =
-      torneoEstado === "Finalizado"
-        ? step.number <= 6
-        : isReadOnlyMode && step.number <= 6 && step.id !== "times";
+    const isStepReadOnly = isWizardPasoReadOnly(
+      torneoEstado,
+      step.id as WizardPasoId,
+    );
     const IconComponent = step.icon;
 
     return (
@@ -331,7 +339,7 @@ export function TournamentWizardNav({
           ) : (
             /* Vista Agrupada normal */
             (["config", "logistics", "competition"] as const).map((groupKey) => {
-              const groupSteps = ALL_STEPS.filter((s) => s.group === groupKey);
+              const groupSteps = visibleSteps.filter((s) => s.group === groupKey);
               return (
                 <div key={groupKey} className="space-y-2">
                   <p className="text-[10px] text-brand-chartreuse font-black uppercase tracking-widest pl-1">

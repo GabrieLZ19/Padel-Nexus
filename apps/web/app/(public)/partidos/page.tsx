@@ -30,9 +30,10 @@ import {
 import { PARTIDOS_ABIERTOS } from "@/utils/constants/partidosAbiertos";
 import { sileo } from "sileo";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import { formatFechaCalendario } from "@/utils/formatFecha";
 
 function formatFecha(fecha: string) {
-  return new Date(`${fecha}T12:00:00`).toLocaleDateString("es-AR", {
+  return formatFechaCalendario(fecha, {
     weekday: "short",
     day: "2-digit",
     month: "short",

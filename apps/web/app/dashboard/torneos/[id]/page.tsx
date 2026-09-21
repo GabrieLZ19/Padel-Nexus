@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Trophy, Check } from "lucide-react";
+import { ArrowLeft, Trophy, Check, Printer } from "lucide-react";
 import { TorneosService } from "../../../../utils/services/torneos";
 import { Torneo, Inscripcion, Partido } from "../../../../utils/types";
 import FeedbackModal, {
@@ -21,6 +21,11 @@ import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
 import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
 import { TournamentWizardNav } from "@/components/torneos/TournamentWizardNav";
 import type { SaveStepHandler } from "@/components/torneos/wizard/types";
+import {
+  esEstadoTorneoModoLectura,
+  isWizardPasoReadOnly,
+  textoBannerModoLectura,
+} from "@/components/torneos/wizard/stepLocks";
 import { useProfileStore } from "@/store/useProfileStore";
 import { esRolFiscal } from "@/utils/auth/roles";
 import { labelModalidad } from "@/utils/formatFecha";
@@ -72,6 +77,10 @@ export default function TorneoDetallePage() {
   });
 
   const triggerRefresh = () => setRefreshKey((p) => p + 1);
+
+  const onTorneoUpdated = useCallback((updated: Torneo) => {
+    setTorneo((prev) => (prev ? { ...prev, ...updated } : updated));
+  }, []);
 
   const registerSaveHandler = useCallback((handler: SaveStepHandler | null) => {
     saveHandlerRef.current = handler;
@@ -139,6 +148,7 @@ export default function TorneoDetallePage() {
     triggerRefresh,
     setActiveTab: navigateToTab,
     registerSaveHandler,
+    onTorneoUpdated,
   };
 
   return (
@@ -146,11 +156,12 @@ export default function TorneoDetallePage() {
       {/* HEADER */}
       <HeaderNavegacion
         torneo={torneo}
+        partidos={partidos}
         onBack={() => router.push("/dashboard/torneos")}
       />
 
-      {/* BANNER AVISO MODO SOLO LECTURA SI EL TORNEO ESTÁ EN CURSO O FINALIZADO */}
-      {(torneo.estado === "En curso" || torneo.estado === "Finalizado") && (
+      {/* BANNER AVISO MODO SOLO LECTURA SI EL TORNEO ESTÁ PROGRAMADO, EN CURSO O FINALIZADO */}
+      {esEstadoTorneoModoLectura(torneo.estado) && (
         <div className="bg-black/20 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs my-1 shadow-sm">
           <div className="flex items-center gap-2.5 text-gray-400">
             <span className="relative flex h-2 w-2 shrink-0">
@@ -159,9 +170,7 @@ export default function TorneoDetallePage() {
             </span>
             <span>
               <strong className="text-white">Modo Lectura ({torneo.estado}):</strong>{" "}
-              {torneo.estado === "Finalizado"
-                ? "Los pasos 1 a 6 están bloqueados. Los cuadros (Paso 8) y la carga de resultados (Paso 9) permanecen habilitados."
-                : "Los pasos 1 a 4 y 6 están bloqueados. Sedes y horarios (Paso 5) siguen editables para ampliar canchas y cronograma. Los cuadros (Paso 8) y resultados (Paso 9) permanecen habilitados."}
+              {textoBannerModoLectura(String(torneo.estado))}
             </span>
           </div>
         </div>
@@ -183,59 +192,53 @@ export default function TorneoDetallePage() {
           {activeTab === "edit" && (
             <Paso1Datos
               {...commonProps}
-              readOnly={
-                torneo.estado === "En curso" || torneo.estado === "Finalizado"
-              }
+              readOnly={isWizardPasoReadOnly(torneo.estado, "edit")}
             />
           )}
           {activeTab === "logos" && (
             <Paso2Logos
               {...commonProps}
-              readOnly={
-                torneo.estado === "En curso" || torneo.estado === "Finalizado"
-              }
+              readOnly={isWizardPasoReadOnly(torneo.estado, "logos")}
             />
           )}
           {activeTab === "categories" && (
             <Paso3Categorias
               {...commonProps}
-              readOnly={
-                torneo.estado === "En curso" || torneo.estado === "Finalizado"
-              }
+              readOnly={isWizardPasoReadOnly(torneo.estado, "categories")}
             />
           )}
           {activeTab === "players" && (
             <Paso4Jugadores
               {...commonProps}
               inscripciones={inscripciones}
-              readOnly={
-                torneo.estado === "En curso" || torneo.estado === "Finalizado"
-              }
+              readOnly={isWizardPasoReadOnly(torneo.estado, "players")}
             />
           )}
           {activeTab === "times" && (
             <Paso7Sedes
               {...commonProps}
-              readOnly={torneo.estado === "Finalizado"}
+              readOnly={isWizardPasoReadOnly(torneo.estado, "times")}
             />
           )}
           {activeTab === "fiscales" && (
             <Paso6Fiscales
               {...commonProps}
-              readOnly={
-                torneo.estado === "En curso" || torneo.estado === "Finalizado"
-              }
+              readOnly={isWizardPasoReadOnly(torneo.estado, "fiscales")}
             />
           )}
           {activeTab === "cierre" && (
-            <Paso5Cierre {...commonProps} inscripciones={inscripciones} />
+            <Paso5Cierre
+              {...commonProps}
+              inscripciones={inscripciones}
+              readOnly={isWizardPasoReadOnly(torneo.estado, "cierre")}
+            />
           )}
           {activeTab === "draws" && (
             <Paso6Cuadros
               {...commonProps}
               inscripciones={inscripciones}
               partidos={partidos}
-              isReadOnly={torneo.estado === "Finalizado"}
+              isReadOnly={isWizardPasoReadOnly(torneo.estado, "draws")}
             />
           )}
           {activeTab === "matches" && (
@@ -243,7 +246,7 @@ export default function TorneoDetallePage() {
               {...commonProps}
               torneoId={id}
               partidos={partidos}
-              isReadOnly={torneo.estado === "Finalizado"}
+              isReadOnly={isWizardPasoReadOnly(torneo.estado, "matches")}
             />
           )}
         </div>
@@ -260,19 +263,20 @@ export default function TorneoDetallePage() {
 
 interface HeaderProps {
   torneo: Torneo;
+  partidos: Partido[];
   onBack: () => void;
 }
 
-const HeaderNavegacion = ({ torneo, onBack }: HeaderProps) => (
-  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-    <div className="flex items-start sm:items-center gap-4">
+const HeaderNavegacion = ({ torneo, partidos, onBack }: HeaderProps) => (
+  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
+    <div className="flex items-start sm:items-center gap-4 min-w-0">
       <button
         onClick={onBack}
         className="w-10 h-10 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl flex items-center justify-center transition-colors shrink-0 cursor-pointer"
       >
         <ArrowLeft className="size-5" />
       </button>
-      <div>
+      <div className="min-w-0">
         <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex flex-wrap items-center gap-3">
           {torneo.nombre}
           <span className="text-xs font-black bg-brand-chartreuse/20 text-brand-chartreuse px-3 py-1 rounded-full uppercase tracking-wider">
@@ -285,6 +289,21 @@ const HeaderNavegacion = ({ torneo, onBack }: HeaderProps) => (
         </p>
       </div>
     </div>
+
+    {torneo.estado === "Finalizado" && (
+      <button
+        type="button"
+        onClick={async () => {
+          const { generarPdfGrillaPartidos } = await import("@/utils/grillaPdf");
+          generarPdfGrillaPartidos(torneo, partidos || []);
+        }}
+        className="inline-flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white px-4 py-2.5 rounded-xl font-bold text-xs border border-white/10 cursor-pointer shrink-0 self-start lg:self-center"
+        title="Descargar informe de resultados (PDF)"
+      >
+        <Printer className="size-4" />
+        Informe de resultados
+      </button>
+    )}
   </div>
 );
 

@@ -1,5 +1,6 @@
 import { FAP_ESTADOS_LICENCIA, FAP_REGLAS } from "./constants/fap";
 import type { Perfil, Torneo } from "./types";
+import { parseFechaCalendarioLocal } from "./formatFecha";
 
 export type CheckElegibilidad = {
   code: "cierre" | "categoria" | "carnet" | "rama" | "edad" | "perfil";
@@ -55,11 +56,10 @@ function resolverFechaReferencia(
   fechaReferencia?: string | Date | null,
 ): Date {
   if (fechaReferencia instanceof Date) return fechaReferencia;
-  if (typeof fechaReferencia === "string" && fechaReferencia.trim()) {
-    const parsed = new Date(fechaReferencia);
-    if (!Number.isNaN(parsed.getTime())) return parsed;
-  }
-  return new Date();
+  const parsed = parseFechaCalendarioLocal(
+    typeof fechaReferencia === "string" ? fechaReferencia : null,
+  );
+  return parsed ?? new Date();
 }
 
 export function hydrateTorneoRestrictions(torneo: Torneo): Torneo {
@@ -102,8 +102,8 @@ export function calcularEdadEnFecha(
   fechaNacimiento: string,
   fechaReferencia: Date,
 ): number {
-  const nacimiento = new Date(fechaNacimiento);
-  if (Number.isNaN(nacimiento.getTime())) return NaN;
+  const nacimiento = parseFechaCalendarioLocal(fechaNacimiento);
+  if (!nacimiento) return NaN;
   const ref = new Date(fechaReferencia);
   let edad = ref.getFullYear() - nacimiento.getFullYear();
   const mes = ref.getMonth() - nacimiento.getMonth();
@@ -117,14 +117,17 @@ export function isInscripcionTemporalmenteAbierta(torneo: Torneo): boolean {
   const ahora = new Date();
 
   if (torneo.fecha_cierre_inscripcion) {
-    const cierre = new Date(torneo.fecha_cierre_inscripcion);
+    const cierre =
+      parseFechaCalendarioLocal(torneo.fecha_cierre_inscripcion) ??
+      new Date(torneo.fecha_cierre_inscripcion);
     if (!Number.isNaN(cierre.getTime()) && ahora > cierre) return false;
     return true;
   }
 
   if (!torneo.fecha) return false;
 
-  const fechaTorneo = new Date(torneo.fecha);
+  const fechaTorneo = parseFechaCalendarioLocal(torneo.fecha);
+  if (!fechaTorneo) return false;
   fechaTorneo.setHours(0, 0, 0, 0);
   const fechaActual = new Date();
   fechaActual.setHours(0, 0, 0, 0);
@@ -490,9 +493,10 @@ export function buildChecksElegibilidadJ1(
         edadMsg =
           "Completá tu fecha de nacimiento en el perfil para esta categoría.";
       } else if (edadMinima != null && t.fecha && perfil?.fecha_nacimiento) {
+        const refTorneo = parseFechaCalendarioLocal(t.fecha);
         const edad = calcularEdadEnFecha(
           perfil.fecha_nacimiento,
-          new Date(t.fecha),
+          refTorneo ?? new Date(),
         );
         if (Number.isNaN(edad) || edad < edadMinima) {
           edadOk = false;

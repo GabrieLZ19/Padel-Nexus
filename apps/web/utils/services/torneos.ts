@@ -28,7 +28,7 @@ export const TorneosService = {
     limit: number,
     search?: string,
     estado?: string,
-    options?: { incluirBorradores?: boolean },
+    options?: { incluirBorradores?: boolean; clubId?: string },
   ): Promise<PaginatedTorneos> {
     const response = await api.get<PaginatedTorneos | Torneo[]>("/torneos", {
       params: {
@@ -37,6 +37,7 @@ export const TorneosService = {
         search,
         estado,
         incluir_borradores: options?.incluirBorradores ? "true" : undefined,
+        club_id: options?.clubId || undefined,
       },
     });
 

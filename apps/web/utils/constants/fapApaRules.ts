@@ -224,17 +224,26 @@ type AlcanceOption = {
 };
 
 const TODOS_LOS_ALCANCES: AlcanceOption[] = [
-  { value: "Local", label: "Local / Privado" },
+  { value: "Local", label: "Local" },
+  { value: "Privado", label: "Privado" },
   { value: "Provincial", label: "Provincial" },
   { value: "Regional", label: "Regional" },
   { value: "Nacional", label: "Nacional" },
 ];
 
+/** Local / Privado: organiza el club sede; no aplica FAP ni asociación provincial. */
+export function esAlcanceSinEntidadOrganizadora(
+  alcance: string | null | undefined,
+): boolean {
+  const val = String(alcance || "").trim().toLowerCase();
+  return val === "local" || val === "privado";
+}
+
 export function getAlcancesPermitidos(rol: RolUsuario): AlcanceOption[] {
   switch (rol) {
     case "admin":
     case "admin_club":
-      // Club: Local, Regional, Provincial — sin Nacional
+      // Club: Local, Privado, Regional, Provincial — sin Nacional
       return TODOS_LOS_ALCANCES.map((a) => {
         if (a.value === "Nacional") {
           return {
@@ -248,7 +257,7 @@ export function getAlcancesPermitidos(rol: RolUsuario): AlcanceOption[] {
       });
 
     case "admin_provincial":
-      // Asociación Provincial: Provincial, Regional, Local — sin Nacional
+      // Asociación Provincial: Provincial, Regional, Local, Privado — sin Nacional
       return TODOS_LOS_ALCANCES.map((a) => {
         if (a.value === "Nacional") {
           return {
@@ -263,22 +272,30 @@ export function getAlcancesPermitidos(rol: RolUsuario): AlcanceOption[] {
 
     case "admin_federacion":
     case "superadmin":
-      // Federación nacional: sin Local/Privado (solo Provincial / Regional / Nacional)
-      return TODOS_LOS_ALCANCES.filter((a) => a.value !== "Local");
+      // Federación nacional: sin Local ni Privado (solo Provincial / Regional / Nacional)
+      return TODOS_LOS_ALCANCES.filter(
+        (a) => a.value !== "Local" && a.value !== "Privado",
+      );
 
     default:
       return TODOS_LOS_ALCANCES;
   }
 }
 
-/** Reglamentos visibles según rol: Amateur oculto solo para federación nacional. */
+/** Reglamentos visibles según rol y alcance.
+ * Amateur / Independiente solo en Local o Privado (y nunca para federación nacional).
+ * Alcances superiores (Regional, Provincial, Nacional): solo FAP o APA.
+ */
 export function getReglamentosPermitidos(
   rol: RolUsuario,
+  alcance?: string | null,
 ): { value: ReglamentoTorneo; label: string }[] {
-  if (esRolFederacionNacional(rol)) {
-    return REGLAMENTOS_TORNEO.filter((r) => r.value !== "Amateur");
-  }
-  return [...REGLAMENTOS_TORNEO];
+  const amateurPermitido =
+    puedeUsarReglamentoAmateur(rol) &&
+    esAlcanceSinEntidadOrganizadora(alcance);
+
+  if (amateurPermitido) return [...REGLAMENTOS_TORNEO];
+  return REGLAMENTOS_TORNEO.filter((r) => r.value !== "Amateur");
 }
 
 export function esAsociacionActiva(a: {

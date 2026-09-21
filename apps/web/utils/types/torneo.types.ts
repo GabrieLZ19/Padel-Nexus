@@ -5,6 +5,7 @@ export type EstadoTorneo =
   | "Borrador"
   | "Inscripción"
   | "Cerrado"
+  | "Programado"
   | "En curso"
   | "Finalizado";
 export type FormatoTorneo = "Eliminatoria Directa" | "Fase de Grupos" | "Mixto";
@@ -29,7 +30,7 @@ export interface Torneo {
   premio_2?: string | null;
   premio_3?: string | null;
   lugar?: string | null;
-  alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | null;
+  alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | 'Privado' | null;
   reglamento?: 'FAP' | 'APA' | 'Amateur' | null;
   asociacion?: 'FAP' | 'APA' | 'Amateur' | null;
   asociacion_id?: string | null;
@@ -147,7 +148,7 @@ export interface FormTorneoState {
   modalidad: string;
   precio_inscripcion?: number;
   formato: string;
-  alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | null;
+  alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | 'Privado' | null;
   asociacion?: 'FAP' | 'APA' | 'Amateur' | null;
   asociacion_id?: string | null;
   premio_1?: string;

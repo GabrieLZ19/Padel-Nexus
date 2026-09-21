@@ -136,7 +136,7 @@ export const Paso6Cuadros = ({
         type: "info",
         title: "Generar Fixture",
         description:
-          "Se crearán los cruces aleatorios basados en las inscripciones confirmadas. El torneo pasará a estado 'En curso'.",
+          "Se crearán los cruces aleatorios basados en las inscripciones confirmadas. El torneo pasará a estado 'Programado' (fixture listo; aún no en juego).",
         confirmText: "Generar Cuadro",
         cancelText: "Cancelar",
         onConfirm: executeGeneration,

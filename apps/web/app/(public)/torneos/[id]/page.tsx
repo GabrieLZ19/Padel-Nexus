@@ -23,7 +23,7 @@ import {
   FapBracketDiagram,
   type FapMatrixMatch,
 } from "@/components/torneos/FapBracketDiagram";
-import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
+import { esModalidadIndividual, formatFechaCalendario, labelModalidad } from "@/utils/formatFecha";
 import {
   allChecksPassed,
   buildChecksElegibilidadJ1,
@@ -165,9 +165,7 @@ export default function TorneoDetallePage() {
 
   const formatFecha = (fechaVal?: string | number | null) => {
     if (!fechaVal) return "Fecha a confirmar";
-    const date = new Date(String(fechaVal));
-    date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
-    return date.toLocaleDateString("es-AR", {
+    return formatFechaCalendario(String(fechaVal), {
       weekday: "short",
       day: "2-digit",
       month: "short",
@@ -226,6 +224,7 @@ export default function TorneoDetallePage() {
 
   const estadoBase = (torneo.estado || "").toLowerCase().trim();
   const isEnCurso = estadoBase === "en curso";
+  const isProgramado = estadoBase === "programado";
   const isFinalizado = estadoBase === "finalizado";
   const isAbierto = estadoBase === "inscripción" || estadoBase === "borrador";
   const isCierreVencido = !isInscripcionTemporalmenteAbierta(torneo);
@@ -487,7 +486,13 @@ export default function TorneoDetallePage() {
                         <p className="text-[11px] text-gray-500 mt-0.5">
                           Plantilla FAP
                           {fapPairCount ? ` · ${fapPairCount} parejas` : ""}
-                          {isFinalizado ? " · finalizado" : ""}
+                          {isFinalizado
+                            ? " · finalizado"
+                            : isProgramado
+                              ? " · programado"
+                              : isEnCurso
+                                ? " · en curso"
+                                : ""}
                         </p>
                       </div>
                     </div>
