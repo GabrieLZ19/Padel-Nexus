@@ -1916,13 +1916,19 @@ export class TorneoService {
       .select("club_id, clubes(*, canchas(count))")
       .eq("torneo_id", torneoId);
     if (error) throw new Error(error.message);
+
+    type ClubConCanchas = Record<string, unknown> & {
+      canchas?: { count: number }[] | number | null;
+    };
+
     return (data || [])
-      .map((ts: {
-        clubes?: Record<string, unknown> & {
-          canchas?: { count: number }[] | number | null;
-        } | null;
-      }) => {
-        const club = ts.clubes;
+      .map((ts) => {
+        const clubesRel = ts.clubes as
+          | ClubConCanchas
+          | ClubConCanchas[]
+          | null
+          | undefined;
+        const club = Array.isArray(clubesRel) ? clubesRel[0] : clubesRel;
         if (!club) return null;
         const canchasRel = club.canchas;
         const canchasCount =

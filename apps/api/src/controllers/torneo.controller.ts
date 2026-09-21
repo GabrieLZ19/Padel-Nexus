@@ -312,10 +312,17 @@ export const actualizarResultado = async (
         .select("fiscal_id, fiscales(usuario_id)")
         .eq("torneo_id", partidoData.torneo_id);
 
-      const isFiscalAsignado = (fiscalesAsignados || []).some(
-        (row: { fiscales?: { usuario_id?: string } | null }) =>
-          row.fiscales?.usuario_id === user_id,
-      );
+      const isFiscalAsignado = (fiscalesAsignados || []).some((row) => {
+        const fiscalesRel = row.fiscales as
+          | { usuario_id?: string }
+          | { usuario_id?: string }[]
+          | null
+          | undefined;
+        const fiscal = Array.isArray(fiscalesRel)
+          ? fiscalesRel[0]
+          : fiscalesRel;
+        return fiscal?.usuario_id === user_id;
+      });
 
       if (!isFiscalAsignado) {
         return res.status(403).json({
