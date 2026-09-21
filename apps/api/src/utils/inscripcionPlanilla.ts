@@ -130,6 +130,9 @@ export function parsearFilasPlanilla(
   const idxDireccion = indiceColumna(headerRow, /DIRECC/);
 
   const filas: FilaPlanillaInscripcion[] = [];
+  /** En planillas FAP, LETRA/ASOCIACIÓN suelen venir solo en la 1ª fila de la pareja. */
+  let ultimaLetra: string | undefined;
+  let ultimaAsociacion: string | undefined;
 
   for (let r = headerIndex + 1; r < matrix.length; r++) {
     const row = matrix[r] || [];
@@ -140,16 +143,22 @@ export function parsearFilasPlanilla(
 
     if (!apellidoNombre && !dni) continue;
 
+    const letraRaw =
+      idxLetraOrden >= 0
+        ? normalizarLetraOrden(row[idxLetraOrden])
+        : undefined;
+    if (letraRaw) ultimaLetra = letraRaw;
+
+    const asociacionRaw =
+      idxAsociacion >= 0
+        ? normalizarTexto(row[idxAsociacion]) || undefined
+        : undefined;
+    if (asociacionRaw) ultimaAsociacion = asociacionRaw;
+
     filas.push({
       fila: r + 1,
-      letraOrden:
-        idxLetraOrden >= 0
-          ? normalizarLetraOrden(row[idxLetraOrden])
-          : undefined,
-      asociacion:
-        idxAsociacion >= 0
-          ? normalizarTexto(row[idxAsociacion]) || undefined
-          : undefined,
+      letraOrden: letraRaw || ultimaLetra,
+      asociacion: asociacionRaw || ultimaAsociacion,
       apellidoNombre,
       dni,
       fechaNacimiento:
@@ -208,10 +217,16 @@ function esResidenciaPlaceholder(valor?: string | null): boolean {
   return !v || v === "a completar" || v.startsWith("a completar ");
 }
 
-function resolverProvinciaDesdePlanilla(fila: FilaPlanillaInscripcion): string | null {
-  const asociacion = fila.asociacion?.trim();
-  if (asociacion) return asociacion;
-  const direccion = fila.direccion?.trim();
-  if (direccion && !esResidenciaPlaceholder(direccion)) return direccion;
-  return null;
+/**
+ * Provincia para denominación nacional: SOLO columna ASOCIACIÓN de la planilla.
+ * No inventar ni usar DIRECCIÓN. Si viene vacía, el caller usa lugar_residencia existente.
+ */
+function resolverProvinciaDesdePlanilla(
+  fila: FilaPlanillaInscripcion,
+): string | null {
+  const asociacion = String(fila.asociacion || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!asociacion || esResidenciaPlaceholder(asociacion)) return null;
+  return asociacion;
 }

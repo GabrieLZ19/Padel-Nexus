@@ -42,6 +42,12 @@ import {
   previewProgramacion,
   reprogramarProgramacion,
   publicarProgramacion,
+  getProgramacionBoard,
+  asignarProgramacion,
+  desasignarProgramacion,
+  limpiarProgramacion,
+  autoAsignarProgramacion,
+  nuevaEdicionProgramacion,
 } from "../controllers/programacion.controller";
 import { authenticate, authorize, optionalAuthenticate } from "../middleware/auth";
 
@@ -168,6 +174,36 @@ router.post(
   "/:id/programacion/publicar",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   publicarProgramacion,
+);
+router.get(
+  "/:id/programacion/board",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  getProgramacionBoard,
+);
+router.put(
+  "/:id/programacion/asignar",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  asignarProgramacion,
+);
+router.put(
+  "/:id/programacion/desasignar",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  desasignarProgramacion,
+);
+router.post(
+  "/:id/programacion/limpiar",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  limpiarProgramacion,
+);
+router.post(
+  "/:id/programacion/auto",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  autoAsignarProgramacion,
+);
+router.post(
+  "/:id/programacion/nueva-edicion",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  nuevaEdicionProgramacion,
 );
 
 // --- Rutas de Fiscales (CRUD y Asignaciones) ---

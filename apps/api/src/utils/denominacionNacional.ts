@@ -1,6 +1,8 @@
 /**
  * Etiqueta de representación en torneos nacionales: "NEUQUÉN A", "BUENOS AIRES C".
- * Provincia = lugar_residencia del jugador 1; letra = letra_prioridad de la inscripción.
+ * Provincia = ASOCIACIÓN de la planilla (persistida en lugar_residencia al importar);
+ *   si la planilla no trae ASOCIACIÓN, se usa el lugar_residencia ya cargado en el perfil.
+ * Letra = LETRA de la planilla (letra_prioridad de la inscripción).
  * Provincia completa en mayúsculas + letra (sin abreviaturas).
  */
 

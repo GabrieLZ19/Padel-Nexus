@@ -32,6 +32,14 @@ export interface SlotProgramacion {
 export const FAP_HORA_INICIO_MIN = 9 * 60;
 export const FAP_HORA_INICIO_MAX = 22 * 60;
 
+/** Grilla del programador visual: inicios de partido 08:00–21:00. */
+export const PROGRAMADOR_HORA_INICIO_MIN = 8 * 60;
+export const PROGRAMADOR_HORA_INICIO_MAX = 21 * 60;
+
+/** Hora fin de bloque al seedear disponibilidad (cubre último inicio 21:00 + 90′). */
+export const PROGRAMADOR_HORA_FIN_BLOQUE = "22:30:00";
+export const PROGRAMADOR_HORA_INICIO_BLOQUE = "08:00:00";
+
 /**
  * FAP: mínimo 1 h entre la finalización estimada de un partido y el comienzo del siguiente
  * (regla de alteración; también usamos como descanso base entre partidos de la misma pareja).
@@ -51,7 +59,47 @@ interface PartidoParejaHistorial {
 }
 
 function normalizarFecha(fecha: string): string {
-  return String(fecha || "").split("T")[0];
+  const raw = String(fecha || "").trim();
+  const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  // Timestamps con espacio: "2026-10-07 15:00:00+00"
+  const space = raw.match(/^(\d{4}-\d{2}-\d{2})\s/);
+  if (space) return space[1];
+  return raw.split("T")[0];
+}
+
+function esFechaIso(valor: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalizarFecha(valor));
+}
+
+/** Etiqueta Paso 3: "Mié 30", "Jue 1" (día corto + número del mes). */
+function etiquetaDiaJuegoDesdeIso(iso: string): string {
+  const [yyyy, mm, dd] = iso.split("-").map(Number);
+  const dateObj = new Date(yyyy, mm - 1, dd, 12, 0, 0);
+  if (Number.isNaN(dateObj.getTime())) return "";
+  const dayName = dateObj.toLocaleDateString("es-AR", { weekday: "short" });
+  const capDay =
+    dayName.charAt(0).toUpperCase() + dayName.slice(1).replace(".", "");
+  return `${capDay} ${dateObj.getDate()}`;
+}
+
+function buildFechaIso(fecha: string, minutosDesdeMedianoche: number): string {
+  const norm = normalizarFecha(fecha);
+  if (!esFechaIso(norm)) {
+    throw new Error(`Fecha de programación inválida: ${fecha}`);
+  }
+  const [y, mo, d] = norm.split("-").map(Number);
+  // Argentina sin DST: UTC−3. Wall-clock local → Instant UTC.
+  const utcTotal = minutosDesdeMedianoche + 3 * 60;
+  const dayOffset = Math.floor(utcTotal / (24 * 60));
+  const minsInDay = ((utcTotal % (24 * 60)) + 24 * 60) % (24 * 60);
+  const uh = Math.floor(minsInDay / 60);
+  const um = minsInDay % 60;
+  const instant = new Date(Date.UTC(y, mo - 1, d + dayOffset, uh, um, 0));
+  if (Number.isNaN(instant.getTime())) {
+    throw new Error(`No se pudo armar datetime para ${norm}`);
+  }
+  return instant.toISOString();
 }
 
 function parseHoraAMinutos(hora: string): number {
@@ -98,17 +146,6 @@ function wallClockParts(
     fecha: `${yyyy}-${mm}-${dd}`,
     startMin: hour * 60 + minute,
   };
-}
-
-function buildFechaIso(fecha: string, minutosDesdeMedianoche: number): string {
-  const [y, mo, d] = normalizarFecha(fecha).split("-").map(Number);
-  // Argentina sin DST: UTC−3. Wall-clock local → Instant UTC.
-  const utcTotal = minutosDesdeMedianoche + 3 * 60;
-  const dayOffset = Math.floor(utcTotal / (24 * 60));
-  const minsInDay = ((utcTotal % (24 * 60)) + 24 * 60) % (24 * 60);
-  const uh = Math.floor(minsInDay / 60);
-  const um = minsInDay % 60;
-  return new Date(Date.UTC(y, mo - 1, d + dayOffset, uh, um, 0)).toISOString();
 }
 
 function parseFechaPartidoIso(
@@ -180,6 +217,136 @@ export function expandirSlotsDisponibilidad(
         hora,
         fechaIso: buildFechaIso(fecha, minuto),
       });
+    }
+  }
+
+  return slots.sort((a, b) => {
+    if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
+    if (a.hora !== b.hora) return a.hora.localeCompare(b.hora);
+    return a.canchaLabel.localeCompare(b.canchaLabel);
+  });
+}
+
+/** Canchas únicas presentes en disponibilidad (ignora franjas horarias legacy). */
+export function extraerCanchasUnicas(
+  disponibilidad: DisponibilidadTorneo[],
+): DisponibilidadTorneo[] {
+  const map = new Map<string, DisponibilidadTorneo>();
+  for (const d of disponibilidad) {
+    const key = `${d.club_id}|${d.cancha_id}`;
+    if (!key || map.has(key)) continue;
+    map.set(key, d);
+  }
+  return [...map.values()];
+}
+
+/**
+ * Días de juego del torneo.
+ * - `dias_juego` puede ser ISO (`2026-09-30`) o etiquetas del Paso 3 (`Mié 30`).
+ * - Si son etiquetas, se filtra el rango fecha→fecha_fin.
+ * - Si no hay fechas válidas, se usan las de disponibilidad.
+ */
+export function resolverDiasProgramacion(opts: {
+  fecha?: string | null;
+  fecha_fin?: string | null;
+  dias_juego?: string[] | null;
+  disponibilidad?: DisponibilidadTorneo[];
+}): string[] {
+  const diasJuegoRaw = (opts.dias_juego || [])
+    .map((d) => String(d || "").trim())
+    .filter(Boolean);
+
+  const diasIsoExplicitos = diasJuegoRaw
+    .filter((d) => esFechaIso(d))
+    .map((d) => normalizarFecha(d));
+  if (diasIsoExplicitos.length > 0) {
+    return [...new Set(diasIsoExplicitos)].sort();
+  }
+
+  const etiquetas = new Set(
+    diasJuegoRaw.filter((d) => !esFechaIso(d)).map((d) => d.replace(/\.$/, "")),
+  );
+
+  const rangoDesdeHasta = (): string[] => {
+    const inicio = opts.fecha ? normalizarFecha(opts.fecha) : "";
+    const finRaw = opts.fecha_fin ? normalizarFecha(opts.fecha_fin) : inicio;
+    if (!inicio || !esFechaIso(inicio)) return [];
+    const fin = finRaw && esFechaIso(finRaw) ? finRaw : inicio;
+    const [y0, m0, d0] = inicio.split("-").map(Number);
+    const [y1, m1, d1] = fin.split("-").map(Number);
+    const cur = new Date(y0, m0 - 1, d0, 12, 0, 0);
+    const end = new Date(y1, m1 - 1, d1, 12, 0, 0);
+    if (Number.isNaN(cur.getTime()) || Number.isNaN(end.getTime())) return [];
+    const dias: string[] = [];
+    let guard = 0;
+    while (cur <= end && guard < 62) {
+      const y = cur.getFullYear();
+      const m = String(cur.getMonth() + 1).padStart(2, "0");
+      const d = String(cur.getDate()).padStart(2, "0");
+      dias.push(`${y}-${m}-${d}`);
+      cur.setDate(cur.getDate() + 1);
+      guard += 1;
+    }
+    return dias;
+  };
+
+  const rango = rangoDesdeHasta();
+  if (rango.length > 0) {
+    if (etiquetas.size === 0) return rango;
+    const filtrados = rango.filter((iso) =>
+      etiquetas.has(etiquetaDiaJuegoDesdeIso(iso)),
+    );
+    return filtrados.length > 0 ? filtrados : rango;
+  }
+
+  const fromDisp = [
+    ...new Set(
+      (opts.disponibilidad || [])
+        .map((d) => normalizarFecha(d.fecha))
+        .filter((f) => esFechaIso(f)),
+    ),
+  ];
+  return fromDisp.sort();
+}
+
+/**
+ * Grilla del programador: canchas × días × inicios 08:00–21:00 cada `duracion`.
+ * No depende de franjas cortas legacy en disponibilidad.
+ */
+export function generarSlotsDesdeSedesYVentana(params: {
+  canchas: DisponibilidadTorneo[];
+  dias: string[];
+  duracionMinutos: number;
+}): SlotProgramacion[] {
+  const duracion = Math.max(30, params.duracionMinutos || 90);
+  const slots: SlotProgramacion[] = [];
+  const canchas = extraerCanchasUnicas(params.canchas);
+  const dias = [
+    ...new Set(
+      params.dias.map(normalizarFecha).filter((f) => esFechaIso(f)),
+    ),
+  ].sort();
+
+  for (const fecha of dias) {
+    for (const cancha of canchas) {
+      const canchaLabel = buildCanchaLabel(cancha);
+      if (!canchaLabel) continue;
+      for (
+        let minuto = PROGRAMADOR_HORA_INICIO_MIN;
+        minuto <= PROGRAMADOR_HORA_INICIO_MAX;
+        minuto += duracion
+      ) {
+        try {
+          slots.push({
+            canchaLabel,
+            fecha,
+            hora: minutosAHoraStr(minuto),
+            fechaIso: buildFechaIso(fecha, minuto),
+          });
+        } catch {
+          // Fecha inválida: se omite el slot
+        }
+      }
     }
   }
 
@@ -787,11 +954,14 @@ export function asignarHorariosAPartidos(
 export async function cargarContextoProgramacion(torneoId: string): Promise<{
   duracionMinutos: number;
   disponibilidad: DisponibilidadTorneo[];
+  fecha: string | null;
+  fecha_fin: string | null;
+  dias_juego: string[] | null;
 }> {
   const [{ data: torneo }, { data: disponibilidad }] = await Promise.all([
     supabaseAdmin
       .from("torneos")
-      .select("duracion_partido_minutos")
+      .select("duracion_partido_minutos, fecha, fecha_fin, dias_juego")
       .eq("id", torneoId)
       .maybeSingle(),
     supabaseAdmin
@@ -804,9 +974,17 @@ export async function cargarContextoProgramacion(torneoId: string): Promise<{
       .order("hora_inicio", { ascending: true }),
   ]);
 
+  const diasJuegoRaw = torneo?.dias_juego;
+  const dias_juego = Array.isArray(diasJuegoRaw)
+    ? (diasJuegoRaw as string[])
+    : null;
+
   return {
     duracionMinutos: Number(torneo?.duracion_partido_minutos || 90),
     disponibilidad: (disponibilidad || []) as DisponibilidadTorneo[],
+    fecha: torneo?.fecha ? String(torneo.fecha) : null,
+    fecha_fin: torneo?.fecha_fin ? String(torneo.fecha_fin) : null,
+    dias_juego,
   };
 }
 
@@ -836,7 +1014,7 @@ export async function programarPartidosConDisponibilidad(
     permitirSinEquipos?: boolean;
   },
 ): Promise<void> {
-  const { duracionMinutos: configurada, disponibilidad } =
+  const { duracionMinutos: configurada, disponibilidad, fecha, fecha_fin, dias_juego } =
     await cargarContextoProgramacion(torneoId);
   if (!disponibilidad.length) return;
 
@@ -844,7 +1022,17 @@ export async function programarPartidosConDisponibilidad(
   const duracionMinutos =
     opciones?.duracionMinutos ?? duracionParaFase(configurada, fase);
 
-  const slots = expandirSlotsDisponibilidad(disponibilidad, duracionMinutos);
+  const dias = resolverDiasProgramacion({
+    fecha,
+    fecha_fin,
+    dias_juego,
+    disponibilidad,
+  });
+  const slots = generarSlotsDesdeSedesYVentana({
+    canchas: disponibilidad,
+    dias,
+    duracionMinutos,
+  });
   asignarHorariosAPartidos(partidos, slots, opciones?.ocupados, {
     duracionMinutos,
     feedersByMatchNo: opciones?.feedersByMatchNo,
@@ -1075,4 +1263,150 @@ export async function programarPartidosZonaPendientes(
     updated++;
   }
   return updated;
+}
+
+export function parseFechaPartidoIsoPublic(
+  iso: string,
+): { fecha: string; startMin: number } | null {
+  return parseFechaPartidoIso(iso);
+}
+
+export function minutosAHoraStrPublic(totalMin: number): string {
+  return minutosAHoraStr(totalMin);
+}
+
+export type IssueSeverity = "ok" | "wait" | "bad";
+
+export interface ProgramacionIssue {
+  partido_id: string;
+  severity: IssueSeverity;
+  message: string;
+}
+
+/**
+ * Evalúa conflictos no bloqueantes para partidos ya asignados.
+ * descansoMinutos: minutos mínimos tras fin estimado (default FAP 60).
+ */
+export function evaluateProgramacionIssues(
+  partidos: PartidoProgramable[],
+  opciones: {
+    duracionMinutos: number;
+    descansoMinutos?: number;
+    feedersByMatchNo?: Map<number, number[]>;
+  },
+): ProgramacionIssue[] {
+  const duracion = Math.max(30, opciones.duracionMinutos || 90);
+  const descanso =
+    opciones.descansoMinutos ?? FAP_DESCANSO_MINUTOS_TRAS_FIN;
+  const feeders = opciones.feedersByMatchNo || new Map<number, number[]>();
+  const issues: ProgramacionIssue[] = [];
+
+  const assigned = partidos.filter(
+    (p) => p.cancha_asignada && p.fecha_partido,
+  );
+
+  for (const p of assigned) {
+    const id = String((p as { id?: string }).id || "");
+    if (!id) continue;
+    const parsed = parseFechaPartidoIso(String(p.fecha_partido));
+    if (!parsed) {
+      issues.push({
+        partido_id: id,
+        severity: "bad",
+        message: "Fecha/hora inválida",
+      });
+      continue;
+    }
+
+    const equipos = equiposDePartido(p);
+
+    const orden = Number(p.orden);
+    if (Number.isFinite(orden) && orden > 0) {
+      const deps = feeders.get(orden) || [];
+      for (const depOrden of deps) {
+        const feeder = partidos.find((x) => Number(x.orden) === depOrden);
+        if (!feeder) continue;
+        if (!feeder.fecha_partido) {
+          issues.push({
+            partido_id: id,
+            severity: "wait",
+            message: "Depende de un partido anterior sin horario",
+          });
+          continue;
+        }
+        const fp = parseFechaPartidoIso(String(feeder.fecha_partido));
+        if (!fp) continue;
+        if (
+          fp.fecha > parsed.fecha ||
+          (fp.fecha === parsed.fecha && fp.startMin >= parsed.startMin)
+        ) {
+          issues.push({
+            partido_id: id,
+            severity: "wait",
+            message: "Debe jugarse después de su partido de origen",
+          });
+        } else if (
+          fp.fecha === parsed.fecha &&
+          parsed.startMin - (fp.startMin + duracion) < descanso
+        ) {
+          issues.push({
+            partido_id: id,
+            severity: "bad",
+            message: "Descanso insuficiente desde el partido de origen",
+          });
+        }
+      }
+    }
+
+    for (const other of assigned) {
+      if (other === p || String((other as { id?: string }).id) === id) continue;
+      const op = parseFechaPartidoIso(String(other.fecha_partido));
+      if (!op) continue;
+
+      if (
+        String(other.cancha_asignada) === String(p.cancha_asignada) &&
+        op.fecha === parsed.fecha &&
+        op.startMin === parsed.startMin
+      ) {
+        issues.push({
+          partido_id: id,
+          severity: "bad",
+          message: "Cancha ocupada en ese horario",
+        });
+      }
+
+      if (op.fecha !== parsed.fecha) continue;
+      const otherEquipos = equiposDePartido(other);
+      const common = equipos.some((e) => otherEquipos.includes(e));
+      if (!common) continue;
+
+      if (op.startMin === parsed.startMin) {
+        issues.push({
+          partido_id: id,
+          severity: "bad",
+          message: "Pareja programada simultáneamente",
+        });
+      } else {
+        const gap = Math.abs(op.startMin - parsed.startMin) - duracion;
+        if (gap < descanso) {
+          issues.push({
+            partido_id: id,
+            severity: "bad",
+            message: `Descanso insuficiente: ${Math.max(0, gap)} min`,
+          });
+        }
+      }
+    }
+  }
+
+  const byId = new Map<string, ProgramacionIssue>();
+  const rank = (s: IssueSeverity) =>
+    s === "bad" ? 2 : s === "wait" ? 1 : 0;
+  for (const issue of issues) {
+    const prev = byId.get(issue.partido_id);
+    if (!prev || rank(issue.severity) > rank(prev.severity)) {
+      byId.set(issue.partido_id, issue);
+    }
+  }
+  return [...byId.values()];
 }
