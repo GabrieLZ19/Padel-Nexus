@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase";
+import { FAP_ESTADOS_TORNEO } from "../constants/fap";
 import { getFapBracketForPairCount } from "../utils/fapBracketMatrices";
 import {
   asignarHorariosAPartidos,
@@ -256,12 +257,25 @@ export class ProgramacionService {
     }
 
     const publicadaEn = new Date().toISOString();
+    const { data: torneoActual } = await supabaseAdmin
+      .from("torneos")
+      .select("estado")
+      .eq("id", torneoId)
+      .single();
+
+    const updatePayload: Record<string, string> = {
+      programacion_estado: "publicado",
+      programacion_publicada_en: publicadaEn,
+    };
+
+    // Publicar horarios implica que la competencia arranca / está lista para jugar.
+    if (torneoActual?.estado === FAP_ESTADOS_TORNEO.PROGRAMADO) {
+      updatePayload.estado = FAP_ESTADOS_TORNEO.EN_CURSO;
+    }
+
     const { error } = await supabaseAdmin
       .from("torneos")
-      .update({
-        programacion_estado: "publicado",
-        programacion_publicada_en: publicadaEn,
-      })
+      .update(updatePayload)
       .eq("id", torneoId);
     if (error) throw new Error(error.message);
 

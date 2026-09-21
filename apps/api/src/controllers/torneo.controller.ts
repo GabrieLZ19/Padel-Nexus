@@ -3,20 +3,44 @@ import { TorneoService } from "../services/torneo.service";
 import { CompetenciaService } from "../services/competencia.service";
 import { supabaseAdmin } from "../config/supabase";
 import sharp from "sharp";
+import { esRolAdministrativo } from "../constants/roles";
 
 export const getAllTorneos = async (
   req: Request,
   res: Response,
 ): Promise<Response> => {
   try {
-    const { page, limit, search, estado, incluir_borradores } = req.query;
+    const { page, limit, search, estado, incluir_borradores, club_id } =
+      req.query;
     const pageNum = page ? Number(page) : undefined;
     const limitNum = Number(limit || "10");
+
+    let clubIdFiltro =
+      typeof club_id === "string" && club_id.trim()
+        ? club_id.trim()
+        : undefined;
+
+    // admin_club: siempre acotar al club del perfil (no confiar solo en el query)
+    if (req.user?.rol === "admin_club" && req.user.id) {
+      const { data: perfil } = await supabaseAdmin
+        .from("perfiles")
+        .select("club_id")
+        .eq("id", req.user.id)
+        .maybeSingle();
+      if (perfil?.club_id) {
+        clubIdFiltro = perfil.club_id;
+      } else {
+        return res.status(200).json(
+          pageNum !== undefined ? { data: [], total: 0 } : [],
+        );
+      }
+    }
 
     const resultado = await TorneoService.listarTorneos(pageNum, limitNum, {
       search: search as string | undefined,
       estado: estado as string | undefined,
       incluirBorradores: incluir_borradores === "true",
+      clubId: clubIdFiltro,
     });
 
     return res
@@ -116,10 +140,29 @@ export const deleteTorneo = async (
   res: Response,
 ): Promise<Response> => {
   try {
+    const rol = req.user?.rol;
+    const userId = req.user?.id;
+
+    if (rol === "admin_club" && userId) {
+      const { data: perfil } = await supabaseAdmin
+        .from("perfiles")
+        .select("club_id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const torneo = await TorneoService.obtenerPorId(req.params.id);
+      if (!perfil?.club_id || torneo.club_id !== perfil.club_id) {
+        return res.status(403).json({
+          message: "Solo podés eliminar torneos de tu propio club.",
+        });
+      }
+    }
+
     await TorneoService.eliminarTorneo(req.params.id);
     return res.status(200).json({ message: "Torneo eliminado correctamente" });
   } catch (error: unknown) {
-    return res.status(500).json({ message: "Error al eliminar torneo" });
+    const msg = error instanceof Error ? error.message : "Error al eliminar torneo";
+    return res.status(500).json({ message: msg });
   }
 };
 
@@ -214,49 +257,73 @@ export const actualizarResultado = async (
 ): Promise<Response> => {
   try {
     const { partido_id } = req.params;
-    const { 
-      ganador_id, 
-      set1_a, 
-      set1_b, 
-      set2_a, 
-      set2_b, 
-      set3_a, 
-      set3_b, 
-      es_supertiebreak, 
-      es_wo, 
-      es_injustificado_wo 
+    const {
+      ganador_id,
+      set1_a,
+      set1_b,
+      set2_a,
+      set2_b,
+      set3_a,
+      set3_b,
+      es_supertiebreak,
+      es_wo,
+      es_injustificado_wo,
     } = req.body;
 
     const user_id = req.user?.id;
     const user_rol = req.user?.rol;
 
-    const isAdmin = ["superadmin", "admin_federacion", "admin_provincial", "admin"].includes(user_rol || "");
+    const { data: partidoData, error: errPartido } = await supabaseAdmin
+      .from("partidos")
+      .select("id, torneo_id")
+      .eq("id", partido_id)
+      .maybeSingle();
 
-    if (!isAdmin) {
-      // Si es un jugador regular, verificar si está asignado como fiscal en este torneo
-      const { data: partidoData, error: errPartido } = await supabaseAdmin
-        .from("partidos")
-        .select("torneo_id")
-        .eq("id", partido_id)
-        .single();
-        
-      if (errPartido || !partidoData) {
-        return res.status(404).json({ message: "Partido no encontrado o no pertenece a ningún torneo" });
+    if (errPartido || !partidoData?.torneo_id) {
+      return res.status(404).json({
+        message: "Partido no encontrado o no pertenece a ningún torneo",
+      });
+    }
+
+    if (esRolAdministrativo(user_rol)) {
+      if (user_rol === "admin_club" && user_id) {
+        const [{ data: perfil }, { data: torneo }] = await Promise.all([
+          supabaseAdmin
+            .from("perfiles")
+            .select("club_id")
+            .eq("id", user_id)
+            .maybeSingle(),
+          supabaseAdmin
+            .from("torneos")
+            .select("club_id")
+            .eq("id", partidoData.torneo_id)
+            .maybeSingle(),
+        ]);
+
+        if (!perfil?.club_id || !torneo?.club_id || perfil.club_id !== torneo.club_id) {
+          return res.status(403).json({
+            message: "Solo podés cargar resultados de torneos de tu propio club.",
+          });
+        }
       }
-
-      const { data: fiscalAsociado } = await supabaseAdmin
+    } else {
+      const { data: fiscalesAsignados } = await supabaseAdmin
         .from("torneo_fiscales")
         .select("fiscal_id, fiscales(usuario_id)")
-        .eq("torneo_id", partidoData.torneo_id)
-        .maybeSingle();
+        .eq("torneo_id", partidoData.torneo_id);
 
-      const isFiscalAsignado = (fiscalAsociado as any)?.fiscales?.usuario_id === user_id;
+      const isFiscalAsignado = (fiscalesAsignados || []).some(
+        (row: { fiscales?: { usuario_id?: string } | null }) =>
+          row.fiscales?.usuario_id === user_id,
+      );
 
       if (!isFiscalAsignado) {
-        return res.status(403).json({ message: "No tienes permisos de fiscal en este torneo" });
+        return res.status(403).json({
+          message: "No tienes permisos de fiscal en este torneo",
+        });
       }
     }
-    
+
     await TorneoService.procesarResultadoYAvance(
       partido_id,
       ganador_id,
@@ -270,11 +337,9 @@ export const actualizarResultado = async (
       Boolean(es_wo),
       Boolean(es_injustificado_wo),
     );
-    return res
-      .status(200)
-      .json({
-        message: "Resultado cargado y estadísticas distribuidas con éxito",
-      });
+    return res.status(200).json({
+      message: "Resultado cargado y estadísticas distribuidas con éxito",
+    });
   } catch (error: any) {
     return res
       .status(500)
@@ -483,6 +548,24 @@ export const obtenerCanchasDisponibilidadTorneo = async (req: Request, res: Resp
 
 export const guardarCanchasDisponibilidadTorneo = async (req: Request, res: Response): Promise<Response> => {
   try {
+    const rol = req.user?.rol;
+    const userId = req.user?.id;
+
+    if (rol === "admin_club" && userId) {
+      const { data: perfil } = await supabaseAdmin
+        .from("perfiles")
+        .select("club_id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const torneo = await TorneoService.obtenerPorId(req.params.id);
+      if (!perfil?.club_id || torneo.club_id !== perfil.club_id) {
+        return res.status(403).json({
+          message: "Solo podés editar el cronograma de torneos de tu propio club.",
+        });
+      }
+    }
+
     const { disponibilidad } = req.body;
     await TorneoService.guardarCanchasDisponibilidad(req.params.id, disponibilidad);
     return res.status(200).json({ message: "Disponibilidad de canchas guardada correctamente" });

@@ -43,12 +43,12 @@ import {
   reprogramarProgramacion,
   publicarProgramacion,
 } from "../controllers/programacion.controller";
-import { authenticate, authorize } from "../middleware/auth";
+import { authenticate, authorize, optionalAuthenticate } from "../middleware/auth";
 
 const router = Router();
 
-// Rutas Públicas (Lectura)
-router.get("/", getAllTorneos);
+// Lectura pública; si hay sesión de club, el listado se acota a su club_id
+router.get("/", optionalAuthenticate, getAllTorneos);
 router.get("/:id", getTorneoById);
 router.get("/:id/partidos", getPartidosByTorneo);
 router.get("/:id/posiciones", obtenerPosicionesZona);
@@ -85,7 +85,13 @@ router.delete(
 );
 router.delete(
   "/:id",
-  authorize(["superadmin", "admin_federacion", "admin"]),
+  authorize([
+    "superadmin",
+    "admin_federacion",
+    "admin_provincial",
+    "admin_club",
+    "admin",
+  ]),
   deleteTorneo,
 );
 
@@ -221,7 +227,7 @@ router.get(
 );
 router.post(
   "/:id/canchas-disponibilidad",
-  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   guardarCanchasDisponibilidadTorneo,
 );
 

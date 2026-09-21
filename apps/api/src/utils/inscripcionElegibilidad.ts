@@ -428,6 +428,7 @@ export function assertInscripcionAbierta(torneo: TorneoElegibilidad): void {
 
   const cerrados = [
     FAP_ESTADOS_TORNEO.CERRADO.toLowerCase(),
+    FAP_ESTADOS_TORNEO.PROGRAMADO.toLowerCase(),
     FAP_ESTADOS_TORNEO.EN_CURSO.toLowerCase(),
     FAP_ESTADOS_TORNEO.FINALIZADO.toLowerCase(),
   ];

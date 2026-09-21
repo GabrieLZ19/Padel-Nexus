@@ -6,7 +6,13 @@ export const getAllInscripciones = async (
   res: Response,
 ): Promise<Response | void> => {
   try {
-    const { torneo_id, page = "1", limit = "10" } = req.query;
+    const {
+      torneo_id,
+      page = "1",
+      limit = "10",
+      search,
+      estado_pago,
+    } = req.query;
 
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
@@ -15,9 +21,17 @@ export const getAllInscripciones = async (
       torneo_id as string | undefined,
       pageNum,
       limitNum,
+      {
+        search: typeof search === "string" ? search : undefined,
+        estadoPago: typeof estado_pago === "string" ? estado_pago : undefined,
+      },
     );
 
-    return res.status(200).json(resultado);
+    const resumen = await InscripcionService.obtenerResumenInscripciones(
+      torneo_id as string | undefined,
+    );
+
+    return res.status(200).json({ ...resultado, resumen });
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";

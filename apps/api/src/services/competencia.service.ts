@@ -432,12 +432,12 @@ export class CompetenciaService {
       }
     }
 
-    // Actualizamos el estado del torneo y marcamos que hay programacion
-    // tentativa lista para revisar (borrador -> programado).
+    // Actualizamos el estado del torneo a Programado (fixture listo, aún no en juego)
+    // y marcamos que hay programacion tentativa lista para revisar.
     await supabaseAdmin
       .from("torneos")
       .update({
-        estado: FAP_ESTADOS_TORNEO.EN_CURSO,
+        estado: FAP_ESTADOS_TORNEO.PROGRAMADO,
         programacion_estado: "programado",
       })
       .eq("id", torneoId);

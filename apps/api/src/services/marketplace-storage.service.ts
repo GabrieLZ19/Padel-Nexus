@@ -225,4 +225,45 @@ export class MarketplaceStorageService {
 
     return `${publicUrl}?v=${Date.now()}`;
   }
+
+  /** Logo/imagen de sponsor o campaña (800px WebP). */
+  static async subirImagenSponsor(
+    vendedorId: string,
+    folder: string,
+    base64Data: string,
+  ): Promise<string> {
+    const matches = base64Data.match(/^data:image\/\w+;base64,(.+)$/);
+    const rawBuffer = matches
+      ? Buffer.from(matches[1], "base64")
+      : Buffer.from(base64Data, "base64");
+
+    if (rawBuffer.length > MARKETPLACE_STORAGE.MAX_FILE_SIZE_BYTES) {
+      throw new Error(
+        `La imagen excede el tamaño máximo de ${MARKETPLACE_STORAGE.MAX_FILE_SIZE_BYTES / 1024 / 1024}MB.`,
+      );
+    }
+
+    const buffer = await sharp(rawBuffer)
+      .resize({ width: 800, height: 800, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: MARKETPLACE_STORAGE.CALIDAD_WEBP })
+      .toBuffer();
+
+    const path = `${vendedorId}/sponsors/${folder}-${Date.now()}.webp`;
+    const { error } = await supabaseAdmin.storage
+      .from(MARKETPLACE_STORAGE.BUCKET)
+      .upload(path, buffer, {
+        contentType: "image/webp",
+        upsert: true,
+      });
+
+    if (error) {
+      throw new Error(`Error al subir imagen de sponsor: ${error.message}`);
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabaseAdmin.storage.from(MARKETPLACE_STORAGE.BUCKET).getPublicUrl(path);
+
+    return `${publicUrl}?v=${Date.now()}`;
+  }
 }

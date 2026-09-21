@@ -347,6 +347,7 @@ export class InscripcionService {
     torneoId?: string,
     page: number = 1,
     limit: number = 10,
+    filtros?: { search?: string; estadoPago?: string },
   ) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
@@ -362,6 +363,40 @@ export class InscripcionService {
 
     if (torneoId) {
       query = query.eq("torneo_id", torneoId);
+    }
+
+    if (filtros?.estadoPago) {
+      query = query.eq("estado_pago", filtros.estadoPago);
+    }
+
+    const term = filtros?.search?.trim();
+    if (term) {
+      // Escapar caracteres que rompen el filtro `or` de PostgREST.
+      const safe = term.replace(/[%_,.()]/g, " ").replace(/\s+/g, " ").trim();
+      if (safe) {
+        const pattern = `%${safe}%`;
+        const orParts = [
+          `jugador1_nombre.ilike.${pattern}`,
+          `jugador2_nombre.ilike.${pattern}`,
+        ];
+
+        // Si no hay torneo fijo, incluir coincidencias por nombre de torneo.
+        if (!torneoId) {
+          const { data: torneosMatch } = await supabaseAdmin
+            .from("torneos")
+            .select("id")
+            .ilike("nombre", pattern)
+            .limit(80);
+          const torneoIds = (torneosMatch || [])
+            .map((t) => t.id as string)
+            .filter(Boolean);
+          if (torneoIds.length > 0) {
+            orParts.push(`torneo_id.in.(${torneoIds.join(",")})`);
+          }
+        }
+
+        query = query.or(orParts.join(","));
+      }
     }
 
     const { data, error, count } = await query;
@@ -388,6 +423,38 @@ export class InscripcionService {
     );
 
     return { data: formattedData, total: count };
+  }
+
+  static async obtenerResumenInscripciones(torneoId?: string) {
+    let query = supabaseAdmin
+      .from("inscripciones")
+      .select("estado_pago, monto");
+
+    if (torneoId) {
+      query = query.eq("torneo_id", torneoId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error("Error al obtener resumen de inscripciones.");
+    }
+
+    const rows = data || [];
+    let pendientes = 0;
+    let confirmadas = 0;
+    let rechazadas = 0;
+    let recaudacion = 0;
+
+    for (const row of rows) {
+      const estado = row.estado_pago as string;
+      if (estado === FAP_ESTADOS_PAGO.PENDIENTE) pendientes += 1;
+      else if (estado === FAP_ESTADOS_PAGO.CONFIRMADO) {
+        confirmadas += 1;
+        recaudacion += Number(row.monto || 0);
+      } else if (estado === FAP_ESTADOS_PAGO.RECHAZADO) rechazadas += 1;
+    }
+
+    return { pendientes, confirmadas, rechazadas, recaudacion };
   }
 
   static async registrarInscripcion(datos: RegistroInscripcionDTO) {

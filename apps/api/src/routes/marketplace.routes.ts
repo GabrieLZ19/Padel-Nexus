@@ -126,6 +126,53 @@ router.post(
 );
 
 router.get(
+  "/crm/sponsors",
+  authorize(ROLES_CRM_MARKETPLACE),
+  MarketplaceController.listarSponsors,
+);
+router.post(
+  "/crm/sponsors",
+  authorize(ROLES_CRM_MARKETPLACE),
+  MarketplaceController.crearSponsor,
+);
+router.put(
+  "/crm/sponsors/:id",
+  authorize(ROLES_CRM_MARKETPLACE),
+  MarketplaceController.actualizarSponsor,
+);
+router.delete(
+  "/crm/sponsors/:id",
+  authorize(ROLES_CRM_MARKETPLACE),
+  MarketplaceController.eliminarSponsor,
+);
+
+router.get(
+  "/crm/sponsor-campanas",
+  authorize(ROLES_CRM_MARKETPLACE),
+  MarketplaceController.listarSponsorCampanas,
+);
+router.post(
+  "/crm/sponsor-campanas",
+  authorize(ROLES_CRM_MARKETPLACE),
+  MarketplaceController.crearSponsorCampana,
+);
+router.put(
+  "/crm/sponsor-campanas/:id",
+  authorize(ROLES_CRM_MARKETPLACE),
+  MarketplaceController.actualizarSponsorCampana,
+);
+router.patch(
+  "/crm/sponsor-campanas/:id",
+  authorize(ROLES_CRM_MARKETPLACE),
+  MarketplaceController.actualizarSponsorCampana,
+);
+router.delete(
+  "/crm/sponsor-campanas/:id",
+  authorize(ROLES_CRM_MARKETPLACE),
+  MarketplaceController.eliminarSponsorCampana,
+);
+
+router.get(
   "/admin/vendedores",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
   MarketplaceController.listarVendedoresAdmin,

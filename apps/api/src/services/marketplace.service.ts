@@ -51,6 +51,88 @@ interface DatosVendedor {
   provincia?: string;
 }
 
+interface DatosCobroTienda {
+  cbu?: string | null;
+  alias?: string | null;
+  titular_cuenta?: string | null;
+  banco?: string | null;
+  mp_collector_id?: string | null;
+  mp_notas?: string | null;
+}
+
+type EspacioSponsorCampana = "home" | "tienda" | "checkout" | "banner";
+type EstadoSponsorCampana = "borrador" | "activa" | "finalizada" | "pausada";
+
+interface DatosSponsor {
+  nombre: string;
+  contacto_email?: string | null;
+  contacto_telefono?: string | null;
+  logo_url?: string | null;
+  logo_base64?: string;
+  notas?: string | null;
+  activo?: boolean;
+}
+
+interface DatosSponsorCampana {
+  sponsor_id: string;
+  titulo: string;
+  descripcion?: string | null;
+  espacio?: EspacioSponsorCampana;
+  fecha_inicio: string;
+  fecha_fin: string;
+  provincia?: string | null;
+  torneo_id?: string | null;
+  categoria?: string | null;
+  imagen_url?: string | null;
+  imagen_base64?: string;
+  link_url?: string | null;
+  estado?: EstadoSponsorCampana;
+}
+
+function normalizarCbu(cbu: string | null | undefined): string | null {
+  if (cbu == null || String(cbu).trim() === "") return null;
+  const digits = String(cbu).replace(/\D/g, "");
+  if (digits.length > 0 && digits.length !== 22) {
+    throw new Error("El CBU debe tener exactamente 22 dígitos.");
+  }
+  return digits || null;
+}
+
+function pickDatosCobro(
+  datos: Partial<DatosCobroTienda> & Record<string, unknown>,
+): DatosCobroTienda {
+  const payload: DatosCobroTienda = {};
+  if (datos.cbu !== undefined) payload.cbu = normalizarCbu(datos.cbu as string | null);
+  if (datos.alias !== undefined) {
+    const alias = datos.alias == null ? null : String(datos.alias).trim();
+    payload.alias = alias || null;
+  }
+  if (datos.titular_cuenta !== undefined) {
+    const titular =
+      datos.titular_cuenta == null
+        ? null
+        : String(datos.titular_cuenta).trim();
+    payload.titular_cuenta = titular || null;
+  }
+  if (datos.banco !== undefined) {
+    const banco = datos.banco == null ? null : String(datos.banco).trim();
+    payload.banco = banco || null;
+  }
+  if (datos.mp_collector_id !== undefined) {
+    const mp =
+      datos.mp_collector_id == null
+        ? null
+        : String(datos.mp_collector_id).trim();
+    payload.mp_collector_id = mp || null;
+  }
+  if (datos.mp_notas !== undefined) {
+    const notas =
+      datos.mp_notas == null ? null : String(datos.mp_notas).trim();
+    payload.mp_notas = notas || null;
+  }
+  return payload;
+}
+
 interface DatosTiendaEntidad extends DatosVendedor {
   entidad_tipo: EntidadMarketplaceTipo;
   entidad_id: string;
@@ -389,12 +471,21 @@ export class MarketplaceService {
     usuarioId: string,
     rol: string | undefined,
     ref: EntidadMarketplaceRef,
-    datos: Partial<DatosVendedor> & { logo_url?: string; logo_base64?: string },
+    datos: Partial<DatosVendedor> &
+      Partial<DatosCobroTienda> & { logo_url?: string | null; logo_base64?: string },
   ) {
     const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
 
-    const { logo_base64, ...rest } = datos;
-    const updatePayload: Record<string, unknown> = { ...rest };
+    const { logo_base64, logo_url, nombre_tienda, descripcion, provincia, ...rest } =
+      datos;
+    const updatePayload: Record<string, unknown> = {
+      ...pickDatosCobro(rest),
+    };
+
+    if (nombre_tienda !== undefined) updatePayload.nombre_tienda = nombre_tienda;
+    if (descripcion !== undefined) updatePayload.descripcion = descripcion;
+    if (provincia !== undefined) updatePayload.provincia = provincia;
+    if (logo_url !== undefined) updatePayload.logo_url = logo_url;
 
     if (logo_base64) {
       updatePayload.logo_url = await MarketplaceStorageService.subirLogoTienda(
@@ -1208,16 +1299,42 @@ export class MarketplaceService {
       };
     }
 
-    const [clubes, asociaciones, federaciones] = await Promise.all([
-      supabaseAdmin.from("clubes").select("id, nombre, provincia").order("nombre"),
-      supabaseAdmin.from("asociaciones").select("id, nombre, sigla, provincia").order("nombre"),
-      supabaseAdmin.from("federaciones").select("id, nombre, sigla").order("nombre"),
-    ]);
+    if (rol === "admin_provincial") {
+      const { data: perfil } = await supabaseAdmin
+        .from("perfiles")
+        .select("lugar_residencia")
+        .eq("id", usuarioId)
+        .maybeSingle();
+
+      const provincia = (perfil?.lugar_residencia || "").trim();
+      if (!provincia) {
+        return { clubes: [], asociaciones: [], federaciones: [] };
+      }
+
+      const { data: asocs } = await supabaseAdmin
+        .from("asociaciones")
+        .select("id, nombre, sigla, provincia")
+        .ilike("provincia", provincia)
+        .order("nombre")
+        .limit(5);
+
+      return {
+        clubes: [],
+        asociaciones: asocs || [],
+        federaciones: [],
+      };
+    }
+
+    // admin / admin_federacion / superadmin → tienda de federación
+    const { data: federaciones } = await supabaseAdmin
+      .from("federaciones")
+      .select("id, nombre, sigla")
+      .order("nombre");
 
     return {
-      clubes: clubes.data || [],
-      asociaciones: asociaciones.data || [],
-      federaciones: federaciones.data || [],
+      clubes: [],
+      asociaciones: [],
+      federaciones: federaciones || [],
     };
   }
 
@@ -1477,5 +1594,325 @@ export class MarketplaceService {
     });
 
     return data;
+  }
+
+  // --- Sponsors y campañas ---
+
+  static async listarSponsors(
+    usuarioId: string,
+    rol: string | undefined,
+    ref: EntidadMarketplaceRef,
+  ) {
+    const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+    const { data, error } = await supabaseAdmin
+      .from("marketplace_sponsors")
+      .select("*")
+      .eq("vendedor_id", tienda.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error(`Error al listar sponsors: ${error.message}`);
+    return data || [];
+  }
+
+  static async crearSponsor(
+    usuarioId: string,
+    rol: string | undefined,
+    ref: EntidadMarketplaceRef,
+    datos: DatosSponsor,
+  ) {
+    const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+    const nombre = (datos.nombre || "").trim();
+    if (!nombre) throw new Error("El nombre del sponsor es obligatorio.");
+
+    let logoUrl = datos.logo_url ?? null;
+    if (datos.logo_base64) {
+      logoUrl = await MarketplaceStorageService.subirImagenSponsor(
+        tienda.id,
+        "logo",
+        datos.logo_base64,
+      );
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("marketplace_sponsors")
+      .insert({
+        vendedor_id: tienda.id,
+        nombre,
+        contacto_email: datos.contacto_email?.trim() || null,
+        contacto_telefono: datos.contacto_telefono?.trim() || null,
+        logo_url: logoUrl,
+        notas: datos.notas?.trim() || null,
+        activo: datos.activo !== false,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(`Error al crear sponsor: ${error.message}`);
+    return data;
+  }
+
+  static async actualizarSponsor(
+    usuarioId: string,
+    rol: string | undefined,
+    ref: EntidadMarketplaceRef,
+    sponsorId: string,
+    datos: Partial<DatosSponsor>,
+  ) {
+    const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+
+    const { data: existente, error: errExist } = await supabaseAdmin
+      .from("marketplace_sponsors")
+      .select("id")
+      .eq("id", sponsorId)
+      .eq("vendedor_id", tienda.id)
+      .maybeSingle();
+
+    if (errExist || !existente) {
+      throw new Error("Sponsor no encontrado en esta tienda.");
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (datos.nombre !== undefined) {
+      const nombre = String(datos.nombre).trim();
+      if (!nombre) throw new Error("El nombre del sponsor es obligatorio.");
+      updatePayload.nombre = nombre;
+    }
+    if (datos.contacto_email !== undefined) {
+      updatePayload.contacto_email =
+        datos.contacto_email?.trim() || null;
+    }
+    if (datos.contacto_telefono !== undefined) {
+      updatePayload.contacto_telefono =
+        datos.contacto_telefono?.trim() || null;
+    }
+    if (datos.notas !== undefined) {
+      updatePayload.notas = datos.notas?.trim() || null;
+    }
+    if (datos.activo !== undefined) updatePayload.activo = datos.activo;
+    if (datos.logo_url !== undefined) updatePayload.logo_url = datos.logo_url;
+    if (datos.logo_base64) {
+      updatePayload.logo_url = await MarketplaceStorageService.subirImagenSponsor(
+        tienda.id,
+        "logo",
+        datos.logo_base64,
+      );
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("marketplace_sponsors")
+      .update(updatePayload)
+      .eq("id", sponsorId)
+      .select()
+      .single();
+
+    if (error) throw new Error(`Error al actualizar sponsor: ${error.message}`);
+    return data;
+  }
+
+  static async eliminarSponsor(
+    usuarioId: string,
+    rol: string | undefined,
+    ref: EntidadMarketplaceRef,
+    sponsorId: string,
+  ) {
+    const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+    const { error } = await supabaseAdmin
+      .from("marketplace_sponsors")
+      .delete()
+      .eq("id", sponsorId)
+      .eq("vendedor_id", tienda.id);
+
+    if (error) throw new Error(`Error al eliminar sponsor: ${error.message}`);
+  }
+
+  static async listarSponsorCampanas(
+    usuarioId: string,
+    rol: string | undefined,
+    ref: EntidadMarketplaceRef,
+    sponsorId?: string,
+  ) {
+    const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+    let query = supabaseAdmin
+      .from("marketplace_sponsor_campanas")
+      .select(
+        "*, sponsor:marketplace_sponsors(id, nombre, logo_url, activo)",
+      )
+      .eq("vendedor_id", tienda.id)
+      .order("fecha_inicio", { ascending: false });
+
+    if (sponsorId) query = query.eq("sponsor_id", sponsorId);
+
+    const { data, error } = await query;
+    if (error) throw new Error(`Error al listar campañas: ${error.message}`);
+    return data || [];
+  }
+
+  static async crearSponsorCampana(
+    usuarioId: string,
+    rol: string | undefined,
+    ref: EntidadMarketplaceRef,
+    datos: DatosSponsorCampana,
+  ) {
+    const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+
+    const { data: sponsor } = await supabaseAdmin
+      .from("marketplace_sponsors")
+      .select("id")
+      .eq("id", datos.sponsor_id)
+      .eq("vendedor_id", tienda.id)
+      .maybeSingle();
+
+    if (!sponsor) throw new Error("Sponsor no encontrado en esta tienda.");
+
+    const titulo = (datos.titulo || "").trim();
+    if (!titulo) throw new Error("El título de la campaña es obligatorio.");
+    if (!datos.fecha_inicio || !datos.fecha_fin) {
+      throw new Error("Se requieren fecha_inicio y fecha_fin.");
+    }
+    if (datos.fecha_fin < datos.fecha_inicio) {
+      throw new Error("La fecha de fin no puede ser anterior al inicio.");
+    }
+
+    let imagenUrl = datos.imagen_url ?? null;
+    if (datos.imagen_base64) {
+      imagenUrl = await MarketplaceStorageService.subirImagenSponsor(
+        tienda.id,
+        "campana",
+        datos.imagen_base64,
+      );
+    }
+
+    const espacio: EspacioSponsorCampana = datos.espacio || "banner";
+    const estado: EstadoSponsorCampana = datos.estado || "borrador";
+
+    const { data, error } = await supabaseAdmin
+      .from("marketplace_sponsor_campanas")
+      .insert({
+        sponsor_id: datos.sponsor_id,
+        vendedor_id: tienda.id,
+        titulo,
+        descripcion: datos.descripcion?.trim() || null,
+        espacio,
+        fecha_inicio: datos.fecha_inicio,
+        fecha_fin: datos.fecha_fin,
+        provincia: datos.provincia?.trim() || null,
+        torneo_id: datos.torneo_id || null,
+        categoria: datos.categoria?.trim() || null,
+        imagen_url: imagenUrl,
+        link_url: datos.link_url?.trim() || null,
+        estado,
+      })
+      .select("*, sponsor:marketplace_sponsors(id, nombre, logo_url, activo)")
+      .single();
+
+    if (error) throw new Error(`Error al crear campaña: ${error.message}`);
+    return data;
+  }
+
+  static async actualizarSponsorCampana(
+    usuarioId: string,
+    rol: string | undefined,
+    ref: EntidadMarketplaceRef,
+    campanaId: string,
+    datos: Partial<DatosSponsorCampana>,
+  ) {
+    const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+
+    const { data: existente } = await supabaseAdmin
+      .from("marketplace_sponsor_campanas")
+      .select("id, fecha_inicio, fecha_fin")
+      .eq("id", campanaId)
+      .eq("vendedor_id", tienda.id)
+      .maybeSingle();
+
+    if (!existente) throw new Error("Campaña no encontrada en esta tienda.");
+
+    const updatePayload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (datos.titulo !== undefined) {
+      const titulo = String(datos.titulo).trim();
+      if (!titulo) throw new Error("El título de la campaña es obligatorio.");
+      updatePayload.titulo = titulo;
+    }
+    if (datos.descripcion !== undefined) {
+      updatePayload.descripcion = datos.descripcion?.trim() || null;
+    }
+    if (datos.espacio !== undefined) updatePayload.espacio = datos.espacio;
+    if (datos.fecha_inicio !== undefined) {
+      updatePayload.fecha_inicio = datos.fecha_inicio;
+    }
+    if (datos.fecha_fin !== undefined) updatePayload.fecha_fin = datos.fecha_fin;
+    if (datos.provincia !== undefined) {
+      updatePayload.provincia = datos.provincia?.trim() || null;
+    }
+    if (datos.torneo_id !== undefined) {
+      updatePayload.torneo_id = datos.torneo_id || null;
+    }
+    if (datos.categoria !== undefined) {
+      updatePayload.categoria = datos.categoria?.trim() || null;
+    }
+    if (datos.link_url !== undefined) {
+      updatePayload.link_url = datos.link_url?.trim() || null;
+    }
+    if (datos.estado !== undefined) updatePayload.estado = datos.estado;
+    if (datos.imagen_url !== undefined) {
+      updatePayload.imagen_url = datos.imagen_url;
+    }
+    if (datos.imagen_base64) {
+      updatePayload.imagen_url =
+        await MarketplaceStorageService.subirImagenSponsor(
+          tienda.id,
+          "campana",
+          datos.imagen_base64,
+        );
+    }
+    if (datos.sponsor_id !== undefined) {
+      const { data: sponsor } = await supabaseAdmin
+        .from("marketplace_sponsors")
+        .select("id")
+        .eq("id", datos.sponsor_id)
+        .eq("vendedor_id", tienda.id)
+        .maybeSingle();
+      if (!sponsor) throw new Error("Sponsor no encontrado en esta tienda.");
+      updatePayload.sponsor_id = datos.sponsor_id;
+    }
+
+    const fechaInicio = String(
+      updatePayload.fecha_inicio ?? existente.fecha_inicio,
+    );
+    const fechaFin = String(updatePayload.fecha_fin ?? existente.fecha_fin);
+    if (fechaFin < fechaInicio) {
+      throw new Error("La fecha de fin no puede ser anterior al inicio.");
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("marketplace_sponsor_campanas")
+      .update(updatePayload)
+      .eq("id", campanaId)
+      .select("*, sponsor:marketplace_sponsors(id, nombre, logo_url, activo)")
+      .single();
+
+    if (error) throw new Error(`Error al actualizar campaña: ${error.message}`);
+    return data;
+  }
+
+  static async eliminarSponsorCampana(
+    usuarioId: string,
+    rol: string | undefined,
+    ref: EntidadMarketplaceRef,
+    campanaId: string,
+  ) {
+    const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+    const { error } = await supabaseAdmin
+      .from("marketplace_sponsor_campanas")
+      .delete()
+      .eq("id", campanaId)
+      .eq("vendedor_id", tienda.id);
+
+    if (error) throw new Error(`Error al eliminar campaña: ${error.message}`);
   }
 }

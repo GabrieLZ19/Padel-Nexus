@@ -611,4 +611,129 @@ export class MarketplaceController {
       res.status(400).json({ message: err.message });
     }
   }
+
+  static async listarSponsors(req: Request, res: Response) {
+    try {
+      const ref = parseEntidadRef(req);
+      const sponsors = await MarketplaceService.listarSponsors(
+        req.user!.id,
+        req.user!.rol,
+        ref,
+      );
+      res.json(sponsors);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  }
+
+  static async crearSponsor(req: Request, res: Response) {
+    try {
+      const ref = parseEntidadRef(req);
+      const sponsor = await MarketplaceService.crearSponsor(
+        req.user!.id,
+        req.user!.rol,
+        ref,
+        req.body,
+      );
+      res.status(201).json(sponsor);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  }
+
+  static async actualizarSponsor(req: Request, res: Response) {
+    try {
+      const ref = parseEntidadRef(req);
+      const sponsor = await MarketplaceService.actualizarSponsor(
+        req.user!.id,
+        req.user!.rol,
+        ref,
+        req.params.id,
+        req.body,
+      );
+      res.json(sponsor);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  }
+
+  static async eliminarSponsor(req: Request, res: Response) {
+    try {
+      const ref = parseEntidadRef(req);
+      await MarketplaceService.eliminarSponsor(
+        req.user!.id,
+        req.user!.rol,
+        ref,
+        req.params.id,
+      );
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  }
+
+  static async listarSponsorCampanas(req: Request, res: Response) {
+    try {
+      const ref = parseEntidadRef(req);
+      const sponsorId =
+        typeof req.query.sponsor_id === "string"
+          ? req.query.sponsor_id
+          : undefined;
+      const campanas = await MarketplaceService.listarSponsorCampanas(
+        req.user!.id,
+        req.user!.rol,
+        ref,
+        sponsorId,
+      );
+      res.json(campanas);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  }
+
+  static async crearSponsorCampana(req: Request, res: Response) {
+    try {
+      const ref = parseEntidadRef(req);
+      const campana = await MarketplaceService.crearSponsorCampana(
+        req.user!.id,
+        req.user!.rol,
+        ref,
+        req.body,
+      );
+      res.status(201).json(campana);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  }
+
+  static async actualizarSponsorCampana(req: Request, res: Response) {
+    try {
+      const ref = parseEntidadRef(req);
+      const campana = await MarketplaceService.actualizarSponsorCampana(
+        req.user!.id,
+        req.user!.rol,
+        ref,
+        req.params.id,
+        req.body,
+      );
+      res.json(campana);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  }
+
+  static async eliminarSponsorCampana(req: Request, res: Response) {
+    try {
+      const ref = parseEntidadRef(req);
+      await MarketplaceService.eliminarSponsorCampana(
+        req.user!.id,
+        req.user!.rol,
+        ref,
+        req.params.id,
+      );
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  }
 }

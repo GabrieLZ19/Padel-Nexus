@@ -61,6 +61,7 @@ export interface FiltrosTorneo {
   search?: string;
   estado?: string;
   incluirBorradores?: boolean;
+  clubId?: string;
 }
 
 export interface TorneoPayload {
@@ -75,7 +76,7 @@ export interface TorneoPayload {
   modalidad: string;
   precio_inscripcion: number;
   formato: string;
-  alcance?: "Nacional" | "Provincial" | "Regional" | "Local" | null;
+  alcance?: "Nacional" | "Provincial" | "Regional" | "Local" | "Privado" | null;
   premios?: { uno?: string; dos?: string; tres?: string };
   canchas_disponibles?: number;
   duracion_partido_minutos?: number;
@@ -97,6 +98,36 @@ export class TorneoService {
     return torneo;
   }
 
+  /** Prioridad de visualización: en curso → programado → activos → borradores → finalizados. */
+  private static prioridadEstadoListado(estado: string | null | undefined): number {
+    switch (estado) {
+      case FAP_ESTADOS_TORNEO.EN_CURSO:
+        return 0;
+      case FAP_ESTADOS_TORNEO.PROGRAMADO:
+        return 1;
+      case FAP_ESTADOS_TORNEO.INSCRIPCION:
+        return 2;
+      case FAP_ESTADOS_TORNEO.CERRADO:
+        return 3;
+      case FAP_ESTADOS_TORNEO.BORRADOR:
+        return 4;
+      case FAP_ESTADOS_TORNEO.FINALIZADO:
+        return 5;
+      default:
+        return 6;
+    }
+  }
+
+  private static fechaOrdenListado(torneo: {
+    fecha?: string | null;
+    created_at?: string | null;
+  }): number {
+    const raw = torneo.fecha || torneo.created_at;
+    if (!raw) return 0;
+    const ts = Date.parse(raw);
+    return Number.isNaN(ts) ? 0 : ts;
+  }
+
   static async listarTorneos(
     page?: number,
     limit: number = 10,
@@ -106,11 +137,12 @@ export class TorneoService {
       .from("torneos")
       .select(
         `*, clubes!club_id(nombre, provincia), inscripciones(usuario_id)`,
-        {
-          count: "exact",
-        },
       )
       .order("created_at", { ascending: false });
+
+    if (filtros?.clubId) {
+      query = query.eq("club_id", filtros.clubId);
+    }
 
     if (filtros?.search) query = query.ilike("nombre", `%${filtros.search}%`);
 
@@ -138,25 +170,17 @@ export class TorneoService {
     type DbTorneo = Record<string, any> & {
       cupos_actuales?: number;
       cupos_maximos?: number;
+      fecha?: string | null;
+      created_at?: string | null;
     };
 
-    let data;
-    let count = 0;
+    // Traemos el set filtrado completo para ordenar por estado (prioridad) y
+    // paginar en memoria: así "En curso" siempre aparece primero aunque la
+    // página 1 no coincida con created_at DESC.
+    const result = await query.limit(5000);
+    if (result.error) throw new Error(result.error.message);
 
-    if (page !== undefined) {
-      const from = (page - 1) * limit;
-      const to = from + limit - 1;
-      const result = await query.range(from, to);
-      data = result.data;
-      count = result.count || 0;
-      if (result.error) throw new Error(result.error.message);
-    } else {
-      const result = await query.limit(limit);
-      data = result.data;
-      if (result.error) throw new Error(result.error.message);
-    }
-
-    let formatted = ((data as DbTorneo[]) || []).map((t) => {
+    let formatted = ((result.data as DbTorneo[]) || []).map((t) => {
       const realInscriptos = Array.isArray(t.inscripciones)
         ? t.inscripciones.length
         : t.cupos_actuales || 0;
@@ -173,7 +197,26 @@ export class TorneoService {
       formatted = formatted.filter((t) => requestedStates.includes(t.estado));
     }
 
-    return { data: formatted, total: count, paginated: page !== undefined };
+    formatted.sort((a, b) => {
+      const byEstado =
+        TorneoService.prioridadEstadoListado(a.estado) -
+        TorneoService.prioridadEstadoListado(b.estado);
+      if (byEstado !== 0) return byEstado;
+      return (
+        TorneoService.fechaOrdenListado(b) - TorneoService.fechaOrdenListado(a)
+      );
+    });
+
+    const total = formatted.length;
+
+    if (page !== undefined) {
+      const from = (page - 1) * limit;
+      formatted = formatted.slice(from, from + limit);
+    } else {
+      formatted = formatted.slice(0, limit);
+    }
+
+    return { data: formatted, total, paginated: page !== undefined };
   }
 
   static async obtenerPorId(id: string) {
@@ -498,12 +541,13 @@ export class TorneoService {
 
   public static normalizarAlcance(
     alcance?: string | null,
-  ): "Nacional" | "Provincial" | "Regional" | "Local" {
+  ): "Nacional" | "Provincial" | "Regional" | "Local" | "Privado" {
     if (!alcance) return "Provincial";
     const val = String(alcance).trim();
     if (/nacional/i.test(val)) return "Nacional";
     if (/regional/i.test(val)) return "Regional";
-    if (/local|privado/i.test(val)) return "Local";
+    if (/^privado$/i.test(val)) return "Privado";
+    if (/local/i.test(val)) return "Local";
     if (/provincial/i.test(val)) return "Provincial";
     return "Provincial";
   }
@@ -813,7 +857,7 @@ export class TorneoService {
     const horaInicio = torneo.hora_inicio_jornada || "08:00";
     const [hours, minutes] = horaInicio.split(":").map(Number);
 
-    let currentRoundStartTime = new Date(baseDateStr + "T00:00:00");
+    let currentRoundStartTime = new Date(`${baseDateStr}T12:00:00`);
     currentRoundStartTime.setHours(hours, minutes, 0, 0);
 
     if (torneo.formato === "Eliminatoria Directa") {
@@ -1052,15 +1096,15 @@ export class TorneoService {
 
     await supabaseAdmin
       .from("torneos")
-      .update({ estado: FAP_ESTADOS_TORNEO.EN_CURSO })
+      .update({ estado: FAP_ESTADOS_TORNEO.PROGRAMADO })
       .eq("id", id);
 
     // Emitir por WebSocket cambio de estado de torneo en tiempo real
     try {
       SocketService.emitirATodos("torneo_actualizado", {
         torneo_id: id,
-        estado: FAP_ESTADOS_TORNEO.EN_CURSO,
-        mensaje: "El torneo ha pasado a estado EN CURSO",
+        estado: FAP_ESTADOS_TORNEO.PROGRAMADO,
+        mensaje: "El torneo ha pasado a estado PROGRAMADO (fixture generado)",
       });
     } catch (e) {
       console.warn("Error al emitir evento websocket de torneo:", e);
@@ -1136,9 +1180,28 @@ export class TorneoService {
 
     const { data: torneoInfo } = await supabaseAdmin
       .from("torneos")
-      .select("nivel, categoria, modalidad, configuracion_puntos")
+      .select("nivel, categoria, modalidad, configuracion_puntos, estado")
       .eq("id", partido.torneo_id)
       .single();
+
+    // Fallback: primer resultado carga el torneo de Programado → En curso
+    // (cubre torneos que no publican programación de horarios).
+    if (torneoInfo?.estado === FAP_ESTADOS_TORNEO.PROGRAMADO) {
+      await supabaseAdmin
+        .from("torneos")
+        .update({ estado: FAP_ESTADOS_TORNEO.EN_CURSO })
+        .eq("id", partido.torneo_id);
+
+      try {
+        SocketService.emitirATodos("torneo_actualizado", {
+          torneo_id: partido.torneo_id,
+          estado: FAP_ESTADOS_TORNEO.EN_CURSO,
+          mensaje: "El torneo ha pasado a estado EN CURSO",
+        });
+      } catch (e) {
+        console.warn("Error al emitir evento websocket de torneo:", e);
+      }
+    }
 
     if (torneoInfo) {
       let TABLA_PUNTOS: Record<string, { ganador: number; perdedor: number }> =
@@ -1850,10 +1913,26 @@ export class TorneoService {
   static async obtenerSedes(torneoId: string) {
     const { data, error } = await supabaseAdmin
       .from("torneo_sedes")
-      .select("club_id, clubes(*)")
+      .select("club_id, clubes(*, canchas(count))")
       .eq("torneo_id", torneoId);
     if (error) throw new Error(error.message);
-    return (data || []).map((ts: any) => ts.clubes).filter(Boolean);
+    return (data || [])
+      .map((ts: {
+        clubes?: Record<string, unknown> & {
+          canchas?: { count: number }[] | number | null;
+        } | null;
+      }) => {
+        const club = ts.clubes;
+        if (!club) return null;
+        const canchasRel = club.canchas;
+        const canchasCount =
+          Array.isArray(canchasRel) && canchasRel.length > 0
+            ? Number(canchasRel[0].count) || 0
+            : Number(canchasRel) || 0;
+        const { canchas: _canchas, ...resto } = club;
+        return { ...resto, canchas: canchasCount };
+      })
+      .filter(Boolean);
   }
 
   static async guardarSedes(torneoId: string, clubIds: string[]) {

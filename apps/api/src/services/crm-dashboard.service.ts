@@ -62,9 +62,12 @@ export class CrmDashboardService {
     ]);
 
     const torneosActivos = countByEstado(torneosRes.data, (estado) =>
-      [FAP_ESTADOS_TORNEO.INSCRIPCION.toLowerCase(), FAP_ESTADOS_TORNEO.EN_CURSO.toLowerCase()].includes(
-        estado,
-      ),
+      [
+        FAP_ESTADOS_TORNEO.INSCRIPCION.toLowerCase(),
+        FAP_ESTADOS_TORNEO.CERRADO.toLowerCase(),
+        FAP_ESTADOS_TORNEO.PROGRAMADO.toLowerCase(),
+        FAP_ESTADOS_TORNEO.EN_CURSO.toLowerCase(),
+      ].includes(estado),
     );
     const torneosFinalizados = countByEstado(
       torneosRes.data,

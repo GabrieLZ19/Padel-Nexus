@@ -44,6 +44,34 @@ export const authenticate = async (
   next();
 };
 
+/** Autenticación opcional: si hay Bearer válido, setea req.user; si no, continúa anónimo. */
+export const optionalAuthenticate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return next();
+  }
+
+  const token = authHeader.split(" ")[1];
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
+
+  if (!error && user) {
+    req.user = {
+      id: user.id,
+      email: user.email,
+      rol: (user.app_metadata?.rol || "usuario") as RolUsuario,
+    };
+  }
+
+  return next();
+};
+
 export const authorize = (rolesPermitidos: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user || !req.user.rol) {
