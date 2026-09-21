@@ -52,20 +52,6 @@ type FechaTorneo = {
   diaJuegoValue: string;
 };
 
-function formatDateLabel(fStr: string) {
-  try {
-    const cleanDate = fStr.split("T")[0];
-    const [yyyy, mm, dd] = cleanDate.split("-");
-    const dateObj = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
-    const dayName = dateObj.toLocaleDateString("es-AR", { weekday: "short" });
-    const capDay =
-      dayName.charAt(0).toUpperCase() + dayName.slice(1).replace(".", "");
-    return `${capDay} ${dd}/${mm}/${yyyy}`;
-  } catch {
-    return fStr;
-  }
-}
-
 function buildFechasTorneo(
   fechaInicio: string,
   fechaFin: string,
@@ -129,15 +115,9 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   const [dispList, setDispList] = useState<
     Array<Record<string, unknown> & { club_id?: string; cancha_id?: string }>
   >([]);
-  const [selectedDateFilter, setSelectedDateFilter] = useState<string>("all");
 
   const [newClubId, setNewClubId] = useState<string>("");
   const [activeSedeId, setActiveSedeId] = useState<string>("");
-  const [cronogramaForm, setCronogramaForm] = useState({
-    fecha: "",
-    hora_inicio: "",
-    hora_fin: "",
-  });
 
   const [torneoMeta, setTorneoMeta] = useState({
     rama: "",
@@ -149,7 +129,6 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   const [fechaFinTorneo, setFechaFinTorneo] = useState<string>("");
   const [diasJuego, setDiasJuego] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const [duracionPartido, setDuracionPartido] = useState<number>(90);
   const [showAltaClub, setShowAltaClub] = useState(false);
   const [altaClubForm, setAltaClubForm] = useState({
     nombre: "",
@@ -199,25 +178,41 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
     [selectedClubs],
   );
 
-  const groupedByDate = useMemo(() => {
+  /** Canchas contratadas (únicas por club+cancha), sin franjas horarias. */
+  const canchasContratadas = useMemo(() => {
     const map = new Map<
       string,
-      { rawFecha: string; items: { item: (typeof dispList)[0]; originalIndex: number }[] }
-    >();
-
-    dispList.forEach((item, index) => {
-      const f = String(item.fecha || "").split("T")[0];
-      if (!f) return;
-      if (!map.has(f)) {
-        map.set(f, { rawFecha: f, items: [] });
+      {
+        club_id: string;
+        cancha_id: string;
+        clubNombre: string;
+        canchaNombre: string;
       }
-      map.get(f)!.items.push({ item, originalIndex: index });
-    });
-
-    return Array.from(map.values()).sort((a, b) =>
-      a.rawFecha.localeCompare(b.rawFecha),
+    >();
+    for (const item of dispList) {
+      const clubId = String(item.club_id || "");
+      const canchaId = String(item.cancha_id || "");
+      if (!clubId || !canchaId) continue;
+      const key = `${clubId}|${canchaId}`;
+      if (map.has(key)) continue;
+      const club = item.clubes as { nombre?: string } | undefined;
+      const cancha = item.canchas as { nombre?: string } | undefined;
+      map.set(key, {
+        club_id: clubId,
+        cancha_id: canchaId,
+        clubNombre:
+          club?.nombre ||
+          selectedClubs.find((c) => String(c.id) === clubId)?.nombre ||
+          "Club",
+        canchaNombre: cancha?.nombre || `Cancha ${canchaId.slice(0, 4)}`,
+      });
+    }
+    return [...map.values()].sort((a, b) =>
+      `${a.clubNombre}${a.canchaNombre}`.localeCompare(
+        `${b.clubNombre}${b.canchaNombre}`,
+      ),
     );
-  }, [dispList]);
+  }, [dispList, selectedClubs]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -251,9 +246,6 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
           }
           if (Array.isArray(meta.dias_juego)) {
             setDiasJuego(meta.dias_juego);
-          }
-          if (meta.duracion_partido_minutos) {
-            setDuracionPartido(Number(meta.duracion_partido_minutos) || 90);
           }
         }
       } catch (e) {
@@ -290,19 +282,25 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       .then((data) => {
         const list = data || [];
         setCanchasDisponibles(list);
-        setSelectedCanchaIds(list.map((c) => String(c.id)));
+        const enrolled = new Set(
+          dispList
+            .filter((d) => String(d.club_id) === String(activeSedeId))
+            .map((d) => String(d.cancha_id)),
+        );
+        if (enrolled.size > 0) {
+          setSelectedCanchaIds(
+            list
+              .map((c) => String(c.id))
+              .filter((id) => enrolled.has(id)),
+          );
+        } else {
+          setSelectedCanchaIds(list.map((c) => String(c.id)));
+        }
       })
       .catch((e) => console.error(e));
+    // Solo al cambiar sede; dispList se usa como snapshot inicial
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSedeId]);
-
-  useEffect(() => {
-    if (!cronogramaForm.fecha && fechasCompetencia.length > 0) {
-      setCronogramaForm((prev) => ({
-        ...prev,
-        fecha: fechasCompetencia[0].iso,
-      }));
-    }
-  }, [fechasCompetencia, cronogramaForm.fecha]);
 
   const persistDisponibilidad = async (
     newList: typeof dispList,
@@ -314,36 +312,47 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       const disp = await TorneosService.getCanchasDisponibilidad(torneoId);
       setDispList((disp as typeof dispList) || []);
       if (successMessage) {
-        sileo.success({ title: "Cronograma actualizado", description: successMessage });
+        sileo.success({
+          title: "Canchas actualizadas",
+          description: successMessage,
+        });
       }
     } catch (e) {
       console.error(e);
       sileo.error({
         title: "Error",
-        description: "No se pudo guardar el cronograma.",
+        description: "No se pudieron guardar las canchas del torneo.",
       });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSaveDuracion = async (mins: number) => {
-    if (readOnly) return;
-    setDuracionPartido(mins);
-    try {
-      await TorneosService.update(torneoId, {
-        duracion_partido_minutos: mins,
-      } as Parameters<typeof TorneosService.update>[1]);
-      sileo.success({
-        title: "Duración actualizada",
-        description: `Partidos cada ${mins} minutos (zonas ≥75′ / llave ≥90′ según FAP).`,
-      });
-    } catch {
-      sileo.error({
-        title: "Error",
-        description: "No se pudo guardar la duración.",
-      });
+  /** Semilla 08:00–22:30 por día × cancha para el programador. */
+  const buildSeedRows = (
+    clubId: string,
+    canchaIds: string[],
+  ): typeof dispList => {
+    const dias =
+      fechasCompetencia.length > 0
+        ? fechasCompetencia.map((f) => f.iso)
+        : fechaInicioTorneo
+          ? [fechaInicioTorneo]
+          : [];
+    const rows: typeof dispList = [];
+    for (const fecha of dias) {
+      for (const canchaId of canchaIds) {
+        rows.push({
+          club_id: clubId,
+          cancha_id: canchaId,
+          fecha,
+          hora_inicio: "08:00:00",
+          hora_fin: "22:30:00",
+          categoria: categoriaLabel,
+        });
+      }
     }
+    return rows;
   };
 
   useEffect(() => {
@@ -547,6 +556,14 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       if (String(activeSedeId) === String(clubId)) {
         setActiveSedeId("");
       }
+      const remaining = dispList.filter(
+        (d) => String(d.club_id) !== String(clubId),
+      );
+      if (remaining.length !== dispList.length) {
+        await TorneosService.guardarCanchasDisponibilidad(torneoId, remaining);
+        const disp = await TorneosService.getCanchasDisponibilidad(torneoId);
+        setDispList((disp as typeof dispList) || []);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -562,121 +579,70 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
     );
   };
 
-  const handleAddDiaCronograma = async () => {
+  const handleGuardarCanchasSede = async () => {
     if (readOnly) return;
-
-    const { fecha, hora_inicio, hora_fin } = cronogramaForm;
-
-    if (!activeSedeId || !fecha || !hora_inicio) {
+    if (!activeSedeId) {
       sileo.warning({
-        title: "Datos incompletos",
-        description: "Elegí sede, día y hora de inicio.",
+        title: "Sin sede",
+        description: "Elegí una sede para asociar canchas.",
       });
       return;
     }
-
     if (selectedCanchaIds.length === 0) {
       sileo.warning({
         title: "Sin canchas",
-        description: "Seleccioná al menos una cancha para este día.",
+        description: "Seleccioná al menos una cancha.",
       });
       return;
     }
-
-    if (fechaInicioTorneo && fecha < fechaInicioTorneo) {
+    if (fechasCompetencia.length === 0 && !fechaInicioTorneo) {
       sileo.error({
-        title: "Fecha inválida",
-        description: `La fecha no puede ser anterior al inicio del torneo (${fechaInicioTorneo}).`,
+        title: "Sin fechas",
+        description:
+          "Definí la fecha del torneo (Paso 1) o los días de juego (Paso 3).",
       });
       return;
     }
 
-    if (fechaFinTorneo && fecha > fechaFinTorneo) {
-      sileo.error({
-        title: "Fecha inválida",
-        description: `La fecha no puede superar la finalización del torneo (${fechaFinTorneo}).`,
-      });
-      return;
-    }
-
-    if (diasJuego.length > 0) {
-      const fechaObj = fechasTorneo.find((f) => f.iso === fecha);
-      if (fechaObj && !diasJuego.includes(fechaObj.diaJuegoValue)) {
-        sileo.error({
-          title: "Día no habilitado",
-          description: `Este día no está entre los días de competencia del Paso 3.`,
+    const otrasSedes = dispList.filter(
+      (d) => String(d.club_id) !== String(activeSedeId),
+    );
+    // Reconstruir semillas de otras sedes por cancha única (días actuales)
+    const otrasCanchas = new Map<string, { club_id: string; cancha_id: string }>();
+    for (const d of otrasSedes) {
+      const key = `${d.club_id}|${d.cancha_id}`;
+      if (!otrasCanchas.has(key)) {
+        otrasCanchas.set(key, {
+          club_id: String(d.club_id),
+          cancha_id: String(d.cancha_id),
         });
-        return;
       }
     }
-
-    const normFormHora = hora_inicio.slice(0, 5);
-    if (hora_fin && hora_fin.slice(0, 5) <= normFormHora) {
-      sileo.error({
-        title: "Horario inválido",
-        description: "La hora de fin debe ser posterior a la hora de inicio.",
-      });
-      return;
+    const otrasRows: typeof dispList = [];
+    for (const c of otrasCanchas.values()) {
+      otrasRows.push(...buildSeedRows(c.club_id, [c.cancha_id]));
     }
 
-    const nuevosItems = selectedCanchaIds
-      .map((canchaId) => {
-        const conflicto = dispList.some((item) => {
-          const itemFecha = String(item.fecha || "").split("T")[0];
-          const itemHora = String(item.hora_inicio || "").slice(0, 5);
-          return (
-            String(item.club_id) === String(activeSedeId) &&
-            String(item.cancha_id) === String(canchaId) &&
-            itemFecha === fecha &&
-            itemHora === normFormHora
-          );
-        });
-        if (conflicto) return null;
-
-        return {
-          club_id: activeSedeId,
-          cancha_id: canchaId,
-          fecha,
-          hora_inicio: hora_inicio,
-          hora_fin: hora_fin || null,
-          categoria: categoriaLabel,
-        };
-      })
-      .filter(Boolean) as typeof dispList;
-
-    if (nuevosItems.length === 0) {
-      sileo.error({
-        title: "Sin cambios",
-        description:
-          "Todas las canchas seleccionadas ya tienen ese horario cargado.",
-      });
-      return;
-    }
-
-    const omitidas = selectedCanchaIds.length - nuevosItems.length;
-    const msg =
-      omitidas > 0
-        ? `Se agregaron ${nuevosItems.length} cancha(s). ${omitidas} ya existían.`
-        : `Se agregaron ${nuevosItems.length} cancha(s) al cronograma.`;
-
-    await persistDisponibilidad([...dispList, ...nuevosItems], msg);
+    const nuevas = buildSeedRows(activeSedeId, selectedCanchaIds);
+    await persistDisponibilidad(
+      [...otrasRows, ...nuevas],
+      `${selectedCanchaIds.length} cancha(s) listas para el programador (08:00–21:00).`,
+    );
   };
 
-  const handleRemoveCanchaDisp = async (idx: number) => {
-    if (readOnly) return;
-    const newList = dispList.filter((_, i) => i !== idx);
-    await persistDisponibilidad(newList);
-  };
-
-  const handleRemoveDiaCompleto = async (rawFecha: string) => {
+  const handleQuitarCanchaTorneo = async (
+    clubId: string,
+    canchaId: string,
+  ) => {
     if (readOnly) return;
     const newList = dispList.filter(
-      (item) => String(item.fecha || "").split("T")[0] !== rawFecha,
+      (d) =>
+        !(
+          String(d.club_id) === String(clubId) &&
+          String(d.cancha_id) === String(canchaId)
+        ),
     );
-    await persistDisponibilidad(
-      newList,
-      `Se eliminó el cronograma del ${formatDateLabel(rawFecha)}.`,
-    );
+    await persistDisponibilidad(newList, "Cancha quitada del torneo.");
   };
 
   return (
@@ -712,28 +678,16 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
         <div className="space-y-3 p-4 rounded-2xl border border-white/10 bg-white/[0.02]">
           <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
             <Clock className="size-4 text-brand-chartreuse" />
-            Duración de partidos
+            Horarios
           </h4>
-          <p className="text-[11px] text-gray-500">
-            FAP: zonas mínimo 75′ · llave mínimo 90′ · ventana 09:00–22:00
+          <p className="text-[11px] text-gray-500 leading-relaxed">
+            En este paso solo elegís sedes y canchas. La grilla de horarios
+            (08:00–21:00), la duración del partido y la asignación se arman en el{" "}
+            <span className="text-brand-chartreuse font-semibold">
+              programador visual
+            </span>
+            .
           </p>
-          <div className="flex flex-wrap gap-2">
-            {[60, 75, 90].map((mins) => (
-              <button
-                key={mins}
-                type="button"
-                disabled={readOnly}
-                onClick={() => void handleSaveDuracion(mins)}
-                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer ${
-                  duracionPartido === mins
-                    ? "bg-brand-chartreuse text-brand-black"
-                    : "bg-white/5 text-white border border-white/10"
-                }`}
-              >
-                {mins} min
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* ── 1. Sedes de juego ── */}
@@ -778,7 +732,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
             <div className="space-y-3 p-4 rounded-2xl border border-dashed border-white/15 bg-black/20">
               <p className="text-[11px] text-gray-500">
                 Alta rápida para sedes de prueba. La dirección usa OpenStreetMap
-                (Nominatim), igual que el alta de clubes.
+                (Nominatim).
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
@@ -916,7 +870,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
           <div className="space-y-3">
             {selectedClubs.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-4 border border-dashed border-white/10 rounded-2xl">
-                Agregá al menos una sede para configurar el cronograma.
+                Agregá al menos una sede y después marcá sus canchas.
               </p>
             ) : (
               selectedClubs.map((club) => {
@@ -940,7 +894,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                       <p className="text-xs text-gray-400 mt-0.5 font-medium">
                         {club.provincia} · {club.canchas} cancha
                         {Number(club.canchas) === 1 ? "" : "s"}
-                        {isActive ? " · Seleccionada para cronograma" : ""}
+                        {isActive ? " · Editando canchas" : ""}
                       </p>
                     </button>
                     <button
@@ -958,113 +912,38 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
           </div>
         </div>
 
-        {/* ── 2. Cronograma ── */}
+        {/* ── 2. Canchas del torneo ── */}
         <div className="border-t border-white/10 pt-6 space-y-5">
           <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
             <Calendar className="size-4 text-brand-chartreuse" />
-            Cronograma de canchas
+            Canchas del torneo
           </h4>
+          <p className="text-[11px] text-gray-500">
+            Marcá qué canchas de la sede entran al torneo. El programador arma la
+            grilla 08:00–21:00 en los días de competencia
+            {fechasCompetencia.length > 0
+              ? ` (${fechasCompetencia.length} jornada${fechasCompetencia.length === 1 ? "" : "s"})`
+              : ""}
+            .
+          </p>
 
           {selectedClubs.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-8 border border-dashed border-white/10 rounded-2xl">
-              Primero agregá una sede de juego para cargar el cronograma.
+              Primero agregá una sede de juego.
             </p>
           ) : (
             <div className="space-y-5 p-4 bg-brand-input/40 rounded-2xl border border-white/10">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
-                    Sede activa
-                  </span>
-                  <CustomDropdown
-                    value={activeSedeId}
-                    onChange={setActiveSedeId}
-                    options={sedesOptions}
-                    placeholder="Elegí sede..."
-                    disabled={readOnly}
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
-                    Día de competencia
-                  </span>
-                  {fechasCompetencia.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {fechasCompetencia.map((f) => (
-                        <button
-                          key={f.iso}
-                          type="button"
-                          disabled={readOnly}
-                          onClick={() =>
-                            setCronogramaForm((prev) => ({
-                              ...prev,
-                              fecha: f.iso,
-                            }))
-                          }
-                          className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer disabled:opacity-50 ${
-                            cronogramaForm.fecha === f.iso
-                              ? "bg-brand-chartreuse text-brand-black border-brand-chartreuse"
-                              : "bg-brand-input border-white/10 text-gray-300 hover:border-white/20"
-                          }`}
-                        >
-                          {f.label}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <input
-                      type="date"
-                      value={cronogramaForm.fecha}
-                      min={fechaInicioTorneo}
-                      max={fechaFinTorneo}
-                      disabled={readOnly}
-                      onChange={(e) =>
-                        setCronogramaForm((prev) => ({
-                          ...prev,
-                          fecha: e.target.value,
-                        }))
-                      }
-                      className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold text-sm outline-none focus:border-brand-chartreuse/50 h-12"
-                    />
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
-                    Hora inicio *
-                  </span>
-                  <input
-                    type="time"
-                    value={cronogramaForm.hora_inicio}
-                    disabled={readOnly}
-                    onChange={(e) =>
-                      setCronogramaForm((prev) => ({
-                        ...prev,
-                        hora_inicio: e.target.value,
-                      }))
-                    }
-                    className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl text-center font-bold text-sm outline-none focus:border-brand-chartreuse/50 h-12"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
-                    Hora fin (opcional)
-                  </span>
-                  <input
-                    type="time"
-                    value={cronogramaForm.hora_fin}
-                    disabled={readOnly}
-                    onChange={(e) =>
-                      setCronogramaForm((prev) => ({
-                        ...prev,
-                        hora_fin: e.target.value,
-                      }))
-                    }
-                    className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl text-center font-bold text-sm outline-none focus:border-brand-chartreuse/50 h-12"
-                  />
-                </div>
+              <div>
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                  Sede
+                </span>
+                <CustomDropdown
+                  value={activeSedeId}
+                  onChange={setActiveSedeId}
+                  options={sedesOptions}
+                  placeholder="Elegí sede..."
+                  disabled={readOnly}
+                />
               </div>
 
               <div>
@@ -1102,10 +981,10 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                       return (
                         <label
                           key={id}
-                          className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${
+                          className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs cursor-pointer ${
                             checked
-                              ? "bg-brand-chartreuse/10 border-brand-chartreuse/40"
-                              : "bg-brand-input border-white/10 hover:border-white/20"
+                              ? "border-brand-chartreuse/40 bg-brand-chartreuse/10 text-white"
+                              : "border-white/10 bg-black/20 text-gray-400"
                           }`}
                         >
                           <input
@@ -1113,9 +992,9 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                             checked={checked}
                             disabled={readOnly}
                             onChange={() => toggleCancha(id)}
-                            className="size-4 rounded border-white/20 text-brand-chartreuse"
+                            className="rounded border-white/20"
                           />
-                          <span className="text-xs font-bold text-white truncate">
+                          <span className="font-semibold truncate">
                             {cancha.nombre}
                           </span>
                         </label>
@@ -1127,163 +1006,52 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
 
               <button
                 type="button"
-                onClick={() => void handleAddDiaCronograma()}
-                disabled={readOnly || saving}
-                className="w-full bg-brand-chartreuse text-brand-black p-3.5 rounded-xl font-black text-sm hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40"
+                disabled={readOnly || saving || selectedCanchaIds.length === 0}
+                onClick={() => void handleGuardarCanchasSede()}
+                className="w-full sm:w-auto bg-brand-chartreuse text-brand-black px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider disabled:opacity-40 cursor-pointer"
               >
-                <Plus className="size-4" />
-                Agregar día al cronograma
-                {selectedCanchaIds.length > 0 &&
-                  ` (${selectedCanchaIds.length} cancha${selectedCanchaIds.length === 1 ? "" : "s"})`}
+                {saving ? "Guardando…" : "Guardar canchas de la sede"}
               </button>
             </div>
           )}
 
-          {/* Cronograma cargado */}
-          {groupedByDate.length > 0 && (
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  Filtrar por día
-                </span>
-                <span className="text-[11px] font-bold text-brand-chartreuse">
-                  {dispList.length}{" "}
-                  {dispList.length === 1 ? "bloque cargado" : "bloques cargados"}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-                <button
-                  type="button"
-                  onClick={() => setSelectedDateFilter("all")}
-                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all border shrink-0 cursor-pointer ${
-                    selectedDateFilter === "all"
-                      ? "bg-brand-chartreuse text-brand-black border-brand-chartreuse"
-                      : "bg-brand-input border-white/10 text-gray-300"
-                  }`}
-                >
-                  Todos ({dispList.length})
-                </button>
-                {groupedByDate.map((group) => (
-                  <button
-                    key={group.rawFecha}
-                    type="button"
-                    onClick={() => setSelectedDateFilter(group.rawFecha)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer ${
-                      selectedDateFilter === group.rawFecha
-                        ? "bg-brand-chartreuse text-brand-black border-brand-chartreuse"
-                        : "bg-brand-input border-white/10 text-gray-300"
-                    }`}
-                  >
-                    {formatDateLabel(group.rawFecha)} ({group.items.length})
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-4 pt-2">
-            {dispList.length === 0 ? (
+          <div className="space-y-3 pt-2">
+            <h5 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+              Contratadas ({canchasContratadas.length})
+            </h5>
+            {canchasContratadas.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-6 border border-dashed border-white/10 rounded-2xl">
-                No hay días cargados en el cronograma todavía.
+                Todavía no hay canchas asociadas al torneo.
               </p>
             ) : (
-              groupedByDate
-                .filter(
-                  (group) =>
-                    selectedDateFilter === "all" ||
-                    selectedDateFilter === group.rawFecha,
-                )
-                .map((group) => (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {canchasContratadas.map((c) => (
                   <div
-                    key={group.rawFecha}
-                    className="bg-brand-input/30 border border-white/10 rounded-2xl p-4 space-y-3"
+                    key={`${c.club_id}|${c.cancha_id}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-brand-input px-3 py-2.5"
                   >
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2 gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Calendar className="size-4 text-brand-chartreuse shrink-0" />
-                        <span className="font-extrabold text-sm text-white uppercase tracking-wide truncate">
-                          {formatDateLabel(group.rawFecha)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[11px] font-bold text-gray-400">
-                          {group.items.length} cancha
-                          {group.items.length === 1 ? "" : "s"}
-                        </span>
-                        {!readOnly && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void handleRemoveDiaCompleto(group.rawFecha)
-                            }
-                            className="text-[10px] font-bold text-red-400 hover:text-red-300 cursor-pointer"
-                          >
-                            Eliminar día
-                          </button>
-                        )}
-                      </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">
+                        {c.canchaNombre}
+                      </p>
+                      <p className="text-[11px] text-gray-500 truncate">
+                        {c.clubNombre}
+                      </p>
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {group.items.map(({ item: d, originalIndex }) => {
-                        const clubName =
-                          (d as { clubes?: { nombre?: string } }).clubes
-                            ?.nombre ||
-                          selectedClubs.find(
-                            (sc) => String(sc.id) === String(d.club_id),
-                          )?.nombre ||
-                          "Sede";
-                        const canchaName =
-                          (d as { canchas?: { nombre?: string } }).canchas
-                            ?.nombre || "Cancha";
-                        const horaClean = String(d.hora_inicio || "").slice(
-                          0,
-                          5,
-                        );
-                        const horaFinClean = d.hora_fin
-                          ? String(d.hora_fin).slice(0, 5)
-                          : "";
-
-                        return (
-                          <div
-                            key={originalIndex}
-                            className="flex items-center justify-between bg-brand-input border border-white/10 p-3 rounded-xl"
-                          >
-                            <div className="min-w-0 pr-2">
-                              <p className="font-bold text-xs text-white truncate">
-                                {clubName}
-                              </p>
-                              <p className="text-[11px] text-gray-400 truncate">
-                                {canchaName}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="inline-flex items-center gap-1 bg-brand-chartreuse/10 border border-brand-chartreuse/30 text-brand-chartreuse px-2 py-1 rounded-lg text-xs font-black">
-                                <Clock className="size-3" />
-                                {horaFinClean
-                                  ? `${horaClean}–${horaFinClean}`
-                                  : `${horaClean} hs`}
-                              </span>
-                              {!readOnly && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    void handleRemoveCanchaDisp(originalIndex)
-                                  }
-                                  className="text-gray-500 hover:text-red-500 p-1.5 cursor-pointer rounded-lg hover:bg-red-500/10"
-                                  title="Quitar del cronograma"
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <button
+                      type="button"
+                      disabled={readOnly || saving}
+                      onClick={() =>
+                        void handleQuitarCanchaTorneo(c.club_id, c.cancha_id)
+                      }
+                      className="text-gray-500 hover:text-red-400 p-1.5 cursor-pointer disabled:opacity-40"
+                      aria-label="Quitar cancha"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
                   </div>
-                ))
+                ))}
+              </div>
             )}
           </div>
         </div>

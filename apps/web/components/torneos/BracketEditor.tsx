@@ -17,7 +17,7 @@ import {
   Printer,
   CalendarClock,
 } from "lucide-react";
-import { ProgramacionTab } from "./ProgramacionTab";
+import { ProgramacionEntryPanel } from "./programador/ProgramacionEntryPanel";
 import { ZonaCard } from "./ZonaCard";
 import FeedbackModal, {
   FeedbackModalProps,
@@ -1029,12 +1029,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       </div>
 
       {activeView === "programacion" && (
-        <ProgramacionTab
-          torneoId={torneoId}
-          partidos={partidos}
-          isReadOnly={isReadOnly}
-          onRefresh={onRefresh}
-        />
+        <ProgramacionEntryPanel torneoId={torneoId} />
       )}
 
       {/* PANEL SIEMBRA — Drag & Drop primera ronda de Eliminatoria Directa */}

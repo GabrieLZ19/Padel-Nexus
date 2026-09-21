@@ -29,15 +29,12 @@ type Props = {
 
 const SLOT = 220;
 const CARD_W = 300;
-const COL_GAP = 28;
+const COL_GAP = 36;
 const JOIN_GUTTER = 44;
-const LEAF_W = 172;
 const PAD_Y = 36;
 const PAD_X = 12;
 const CARD_H = 200;
 const PAD_RIGHT = 32;
-/** Borde derecho del chip de zona (fuente de las líneas). */
-const LEAF_RIGHT = PAD_X + LEAF_W;
 
 function formatSeed(ref: string): string {
   const m = /^([123])([A-L])$/i.exec(ref.trim());
@@ -66,13 +63,32 @@ function depthOf(byNo: Map<number, FapMatrixMatch>, matchNo: number): number {
   return Math.max(side(m.a), side(m.b));
 }
 
+function entryMatchForLeaf(
+  matches: FapMatrixMatch[],
+  leaf: string,
+): { matchNo: number; side: "a" | "b" } | null {
+  for (const m of matches) {
+    if (m.a === leaf) return { matchNo: m.matchNo, side: "a" };
+    if (m.b === leaf) return { matchNo: m.matchNo, side: "b" };
+  }
+  return null;
+}
+
 const ZOOM_MIN = 0.35;
 const ZOOM_MAX = 1.5;
 const ZOOM_STEP = 0.1;
 
+type Feed = { x: number; y: number };
+
 /**
- * Solo dibuja ENTRADAS a cada cruce (zona→join o ganador→join).
- * Así no se duplican líneas al pasar de semis a final.
+ * Plantilla FAP (matrices ELEMENTOS):
+ * - Sin columna de chips “Por clasificar” (redundante: el MatchCard ya muestra 1º A / Gan. #N).
+ * - Semillas que entran en ronda > 0 (pase directo) ocupan un **slot BYE** del mismo
+ *   tamaño que un partido de apertura, para mantener la jerarquía visual del draw.
+ * - Partidos de apertura: sin horquilla a la izquierda (no hay ronda previa).
+ *
+ * Reglamento: 2ª etapa = llave de simple eliminación con clasificados de zona;
+ * la estructura de byes/pases la define la matriz oficial, no un label suelto.
  */
 export function FapBracketDiagram({
   matches,
@@ -153,14 +169,11 @@ export function FapBracketDiagram({
     const leaves = collectLeaves(byNo, final.matchNo);
     const leafIndex = new Map(leaves.map((l, i) => [l, i]));
     const maxDepth = depthOf(byNo, final.matchNo);
-    const colStride = JOIN_GUTTER + CARD_W + COL_GAP;
+    const colStride = CARD_W + COL_GAP + JOIN_GUTTER;
 
     const leafY = (idx: number) => PAD_Y + idx * SLOT + SLOT / 2;
-    // Siempre dejar gutter entre chip de zona y el join (depth 0 no puede
-    // caer en LEAF_RIGHT: si no, las horizontales salen con largo 0).
-    const joinX = (depth: number) =>
-      PAD_X + LEAF_W + JOIN_GUTTER + depth * colStride;
-    const cardX = (depth: number) => joinX(depth) + JOIN_GUTTER;
+    const cardX = (depth: number) => PAD_X + depth * colStride;
+    const joinX = (depth: number) => cardX(depth) - JOIN_GUTTER;
 
     const spanOf = (ref: string) => {
       if (!ref.startsWith("W")) {
@@ -182,34 +195,42 @@ export function FapBracketDiagram({
         .map((p) => [Number(p.orden), p]),
     );
 
-    const resolveLeafSide = (leaf: string) => {
-      for (const m of matches) {
-        if (m.a === leaf || m.b === leaf) {
-          const side = m.a === leaf ? ("a" as const) : ("b" as const);
-          return {
-            matchNo: m.matchNo,
-            side,
-            partido: partidoByOrden.get(m.matchNo),
-          };
-        }
-      }
-      return null;
-    };
-
-    const feeder = (ref: string) => {
-      if (!ref.startsWith("W")) {
+    // Semillas que entran en depth > 0 → slot BYE en columna 0 (mismo tamaño que un partido).
+    const byeSlots = leaves
+      .map((leaf) => {
+        const entry = entryMatchForLeaf(matches, leaf);
+        if (!entry) return null;
+        const d = depthOf(byNo, entry.matchNo);
+        if (d <= 0) return null;
+        const partido = partidoByOrden.get(entry.matchNo);
+        const y = leafY(leafIndex.get(leaf) ?? 0);
         return {
-          x: LEAF_RIGHT,
-          y: leafY(leafIndex.get(ref) ?? 0),
-          fromMatch: false as const,
+          leaf,
+          seed: formatSeed(leaf),
+          side: entry.side,
+          targetMatchNo: entry.matchNo,
+          partido,
+          cardX: cardX(0),
+          y: y - CARD_H / 2,
+          midY: y,
+          rightX: cardX(0) + CARD_W,
         };
+      })
+      .filter((n): n is NonNullable<typeof n> => n != null);
+
+    const byeByLeaf = new Map(byeSlots.map((b) => [b.leaf, b]));
+
+    const feeder = (ref: string): Feed | null => {
+      if (!ref.startsWith("W")) {
+        const bye = byeByLeaf.get(ref);
+        if (!bye) return null; // semilla de un partido de apertura: sin nodo previo
+        return { x: bye.rightX, y: bye.midY };
       }
       const prevNo = Number(ref.slice(1));
       const prevDepth = depthOf(byNo, prevNo);
       return {
         x: cardX(prevDepth) + CARD_W,
         y: spanOf(ref).mid,
-        fromMatch: true as const,
       };
     };
 
@@ -218,28 +239,41 @@ export function FapBracketDiagram({
       const aSpan = spanOf(m.a);
       const bSpan = spanOf(m.b);
       const mid = (aSpan.mid + bSpan.mid) / 2;
+      const feedA = feeder(m.a);
+      const feedB = feeder(m.b);
+      const feeds = [feedA, feedB].filter((f): f is Feed => f != null);
+      // Solo dibujar join si hay al menos un alimentador (partido previo o slot BYE).
+      const showJoin = feeds.length > 0 && d > 0;
+      const showFullJoin = feeds.length === 2;
+
+      // Si un solo lado alimenta, la horquilla vertical se reduce a ese lado + mid.
+      let yTop = aSpan.mid;
+      let yBot = bSpan.mid;
+      if (showJoin && !showFullJoin) {
+        const only = feeds[0];
+        yTop = Math.min(only.y, mid);
+        yBot = Math.max(only.y, mid);
+      }
+
       return {
         ...m,
         depth: d,
         joinX: joinX(d),
         cardX: cardX(d),
         y: mid - CARD_H / 2,
-        yTop: aSpan.mid,
-        yBot: bSpan.mid,
+        yTop,
+        yBot,
         yMid: mid,
-        feedA: feeder(m.a),
-        feedB: feeder(m.b),
+        feedA,
+        feedB,
+        showJoin,
+        showFullJoin,
         partido: partidoByOrden.get(m.matchNo),
       };
     });
 
     return {
-      leaves: leaves.map((leaf, idx) => ({
-        leaf,
-        seed: formatSeed(leaf),
-        y: leafY(idx),
-        resolved: resolveLeafSide(leaf),
-      })),
+      byeSlots,
       matchNodes,
       width: cardX(maxDepth) + CARD_W + PAD_RIGHT,
       height: PAD_Y * 2 + Math.max(leaves.length, 1) * SLOT,
@@ -250,8 +284,6 @@ export function FapBracketDiagram({
     if (layout) layoutWidthRef.current = layout.width;
   }, [layout]);
 
-  // Solo un auto-ajuste inicial en mobile; no pisar el zoom del usuario
-  // cuando refrescan partidos / cambia el layout.
   useEffect(() => {
     if (!layout || !(compact || mobile) || fullscreen) return;
     if (zoomTouchedRef.current || initialFitDoneRef.current) return;
@@ -270,7 +302,6 @@ export function FapBracketDiagram({
       if (e.key === "Escape") closeFullscreen();
     };
     window.addEventListener("keydown", onKey);
-    // Ajustar una sola vez al abrir fullscreen; después el usuario manda.
     const t = window.setTimeout(() => fitWidth(), 80);
     return () => {
       document.body.style.overflow = prevOverflow;
@@ -423,231 +454,261 @@ export function FapBracketDiagram({
               backgroundSize: "14px 14px",
             }}
           >
-          <svg
-            className="absolute inset-0 pointer-events-none z-[1]"
-            width={layout.width}
-            height={layout.height}
-            aria-hidden
-          >
-            {layout.matchNodes.map((node) => {
-              const stroke = node.partido?.ganador ? inkHi : ink;
+            <svg
+              className="absolute inset-0 pointer-events-none z-[1]"
+              width={layout.width}
+              height={layout.height}
+              aria-hidden
+            >
+              {layout.matchNodes.map((node) => {
+                if (!node.showJoin) return null;
+                const stroke = node.partido?.ganador ? inkHi : ink;
 
-              const drawFeed = (
-                feed: { x: number; y: number; fromMatch: boolean },
-                entryY: number,
-                key: string,
-              ) => {
-                // Zona → join: horizontal directa (misma Y)
-                if (!feed.fromMatch) {
+                const drawFeed = (feed: Feed | null, entryY: number, key: string) => {
+                  if (!feed) return null;
+                  const ex = feed.x + Math.max(14, (node.joinX - feed.x) * 0.45);
+                  if (Math.abs(feed.y - entryY) < 1) {
+                    return (
+                      <line
+                        key={key}
+                        x1={feed.x}
+                        y1={entryY}
+                        x2={node.joinX}
+                        y2={entryY}
+                        stroke={stroke}
+                        strokeWidth={2}
+                        strokeLinecap="square"
+                      />
+                    );
+                  }
                   return (
-                    <line
-                      key={key}
-                      x1={feed.x}
-                      y1={entryY}
-                      x2={node.joinX}
-                      y2={entryY}
-                      stroke={stroke}
-                      strokeWidth={2}
-                      strokeLinecap="square"
-                    />
+                    <g key={key}>
+                      <line
+                        x1={feed.x}
+                        y1={feed.y}
+                        x2={ex}
+                        y2={feed.y}
+                        stroke={stroke}
+                        strokeWidth={2}
+                        strokeLinecap="square"
+                      />
+                      <line
+                        x1={ex}
+                        y1={feed.y}
+                        x2={ex}
+                        y2={entryY}
+                        stroke={stroke}
+                        strokeWidth={2}
+                        strokeLinecap="square"
+                      />
+                      <line
+                        x1={ex}
+                        y1={entryY}
+                        x2={node.joinX}
+                        y2={entryY}
+                        stroke={stroke}
+                        strokeWidth={2}
+                        strokeLinecap="square"
+                      />
+                    </g>
                   );
-                }
-                // Partido previo → join: un solo camino con codo
-                const ex = feed.x + Math.max(14, (node.joinX - feed.x) * 0.45);
-                if (Math.abs(feed.y - entryY) < 1) {
-                  return (
-                    <line
-                      key={key}
-                      x1={feed.x}
-                      y1={entryY}
-                      x2={node.joinX}
-                      y2={entryY}
-                      stroke={stroke}
-                      strokeWidth={2}
-                      strokeLinecap="square"
-                    />
-                  );
-                }
+                };
+
+                // Entry Y: si hay feed, usar su Y; si no (lado BYE ya representado), usar mid.
+                const entryA = node.feedA ? node.feedA.y : node.yMid;
+                const entryB = node.feedB ? node.feedB.y : node.yMid;
+
                 return (
-                  <g key={key}>
+                  <g key={`line-${node.matchNo}`}>
+                    {drawFeed(node.feedA, entryA, `${node.matchNo}-a`)}
+                    {drawFeed(node.feedB, entryB, `${node.matchNo}-b`)}
+                    {node.showFullJoin ||
+                    (node.feedA && node.feedB) ||
+                    Math.abs(node.yTop - node.yBot) > 2 ? (
+                      <line
+                        x1={node.joinX}
+                        y1={node.yTop}
+                        x2={node.joinX}
+                        y2={node.yBot}
+                        stroke={stroke}
+                        strokeWidth={2}
+                        strokeLinecap="square"
+                      />
+                    ) : null}
                     <line
-                      x1={feed.x}
-                      y1={feed.y}
-                      x2={ex}
-                      y2={feed.y}
-                      stroke={stroke}
-                      strokeWidth={2}
-                      strokeLinecap="square"
-                    />
-                    <line
-                      x1={ex}
-                      y1={feed.y}
-                      x2={ex}
-                      y2={entryY}
-                      stroke={stroke}
-                      strokeWidth={2}
-                      strokeLinecap="square"
-                    />
-                    <line
-                      x1={ex}
-                      y1={entryY}
-                      x2={node.joinX}
-                      y2={entryY}
+                      x1={node.joinX}
+                      y1={node.yMid}
+                      x2={node.cardX}
+                      y2={node.yMid}
                       stroke={stroke}
                       strokeWidth={2}
                       strokeLinecap="square"
                     />
                   </g>
                 );
-              };
+              })}
+            </svg>
 
-              return (
-                <g key={`line-${node.matchNo}`}>
-                  {drawFeed(node.feedA, node.yTop, `${node.matchNo}-a`)}
-                  {drawFeed(node.feedB, node.yBot, `${node.matchNo}-b`)}
-                  <line
-                    x1={node.joinX}
-                    y1={node.yTop}
-                    x2={node.joinX}
-                    y2={node.yBot}
-                    stroke={stroke}
-                    strokeWidth={2}
-                    strokeLinecap="square"
-                  />
-                  <line
-                    x1={node.joinX}
-                    y1={node.yMid}
-                    x2={node.cardX}
-                    y2={node.yMid}
-                    stroke={stroke}
-                    strokeWidth={2}
-                    strokeLinecap="square"
-                  />
-                </g>
-              );
-            })}
-          </svg>
-
-          {layout.matchNodes.map((node) => (
-            <div
-              key={`badge-${node.matchNo}`}
-              className="absolute z-[3] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ left: node.joinX, top: node.yMid }}
-            >
-              <span className="inline-flex min-w-[1.75rem] items-center justify-center rounded-md border border-brand-chartreuse/40 bg-[#121212] px-1.5 py-0.5 text-[11px] font-black tabular-nums text-brand-chartreuse shadow-sm">
-                {node.matchNo}
-              </span>
-            </div>
-          ))}
-
-          {layout.leaves.map((leaf) => {
-            const p = leaf.resolved?.partido;
-            const side = leaf.resolved?.side;
-            const j1 = side === "a" ? p?.equipo_a_j1 : p?.equipo_b_j1;
-            const j2 = side === "a" ? p?.equipo_a_j2 : p?.equipo_b_j2;
-            const avatarJ1 =
-              side === "a" ? p?.equipo_a_avatar_j1 : p?.equipo_b_avatar_j1;
-            const avatarJ2 =
-              side === "a" ? p?.equipo_a_avatar_j2 : p?.equipo_b_avatar_j2;
-            const usuarioId =
-              side === "a" ? p?.equipo_a_usuario_id : p?.equipo_b_usuario_id;
-            const usuario2Id =
-              side === "a" ? p?.equipo_a_usuario2_id : p?.equipo_b_usuario2_id;
-            const denominacion =
-              side === "a" ? p?.equipo_a_denominacion : p?.equipo_b_denominacion;
-            const pairId = side === "a" ? p?.equipo_a_id : p?.equipo_b_id;
-            const isCabeza =
-              !!pairId && !!cabezasSerieIds?.has(String(pairId));
-
-            return (
-              <div
-                key={leaf.leaf}
-                className="absolute z-[2] box-border -translate-y-1/2 rounded-xl border border-brand-input bg-brand-card px-2.5 py-2 shadow-sm"
-                style={{ left: PAD_X, top: leaf.y, width: LEAF_W }}
-              >
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] font-black text-brand-chartreuse">
-                    {leaf.seed}
+            {layout.matchNodes
+              .filter((n) => n.showJoin)
+              .map((node) => (
+                <div
+                  key={`badge-${node.matchNo}`}
+                  className="absolute z-[3] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                  style={{ left: node.joinX, top: node.yMid }}
+                >
+                  <span className="inline-flex min-w-[1.75rem] items-center justify-center rounded-md border border-brand-chartreuse/40 bg-[#121212] px-1.5 py-0.5 text-[11px] font-black tabular-nums text-brand-chartreuse shadow-sm">
+                    {node.matchNo}
                   </span>
-                  {isCabeza && (
-                    <span className="text-[9px] font-bold text-amber-500 bg-amber-400/15 border border-amber-400/30 px-1 rounded">
-                      #1
-                    </span>
-                  )}
                 </div>
-                {j1 || j2 ? (
-                  <PairDisplay
-                    j1={j1}
-                    j2={j2}
-                    avatarJ1={avatarJ1}
-                    avatarJ2={avatarJ2}
-                    usuarioId={usuarioId}
-                    usuario2Id={usuario2Id}
-                    denominacion={denominacion}
-                    alcanceNacional={nacional}
-                    compact
-                    variant="stacked"
-                  />
-                ) : (
-                  <div className="flex items-center gap-2 min-h-[2rem]">
-                    <PlayerAvatar src={null} size="sm" />
-                    <span className="text-[11px] text-gray-500 italic">
-                      Por clasificar
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              ))}
 
-          {layout.matchNodes.map((node) => {
-            if (!node.partido) {
+            {/* Slots BYE: mismo tamaño que MatchCard, columna de apertura */}
+            {layout.byeSlots.map((bye) => {
+              const p = bye.partido;
+              const side = bye.side;
+              const j1 = side === "a" ? p?.equipo_a_j1 : p?.equipo_b_j1;
+              const j2 = side === "a" ? p?.equipo_a_j2 : p?.equipo_b_j2;
+              const avatarJ1 =
+                side === "a" ? p?.equipo_a_avatar_j1 : p?.equipo_b_avatar_j1;
+              const avatarJ2 =
+                side === "a" ? p?.equipo_a_avatar_j2 : p?.equipo_b_avatar_j2;
+              const usuarioId =
+                side === "a" ? p?.equipo_a_usuario_id : p?.equipo_b_usuario_id;
+              const usuario2Id =
+                side === "a"
+                  ? p?.equipo_a_usuario2_id
+                  : p?.equipo_b_usuario2_id;
+              const denominacion =
+                side === "a"
+                  ? p?.equipo_a_denominacion
+                  : p?.equipo_b_denominacion;
+              const pairId = side === "a" ? p?.equipo_a_id : p?.equipo_b_id;
+              const isCabeza =
+                !!pairId && !!cabezasSerieIds?.has(String(pairId));
+
               return (
                 <div
-                  key={node.matchNo}
-                  className="absolute z-[2] rounded-2xl border border-dashed border-white/10 bg-black/20 flex items-center justify-center text-xs text-gray-500"
+                  key={`bye-${bye.leaf}`}
+                  className="absolute z-[2] box-border rounded-2xl border border-dashed border-brand-chartreuse/40 bg-brand-card px-3 py-3 shadow-sm"
                   style={{
-                    left: node.cardX,
-                    top: node.y,
+                    left: bye.cardX,
+                    top: bye.y,
                     width: CARD_W,
                     minHeight: CARD_H,
                   }}
+                  title={`Pase directo → partido #${bye.targetMatchNo}`}
                 >
-                  Partido #{node.matchNo}
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                      Pase directo
+                    </span>
+                    <span className="text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
+                      → #{bye.targetMatchNo}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="min-w-0 space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-1">
+                        <span className="text-[9px] font-bold tracking-wide text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
+                          {bye.seed}
+                        </span>
+                        {isCabeza ? (
+                          <span className="text-[9px] font-bold tracking-wide text-amber-500 bg-amber-400/15 border border-amber-400/30 px-1.5 py-0.5 rounded">
+                            #1
+                          </span>
+                        ) : null}
+                      </div>
+                      {j1 || j2 ? (
+                        <PairDisplay
+                          j1={j1}
+                          j2={j2}
+                          avatarJ1={avatarJ1}
+                          avatarJ2={avatarJ2}
+                          usuarioId={usuarioId}
+                          usuario2Id={usuario2Id}
+                          denominacion={denominacion}
+                          alcanceNacional={nacional}
+                          compact
+                          variant="stacked"
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2 min-h-[2.25rem]">
+                          <PlayerAvatar src={null} size="md" />
+                          <p className="text-[12px] font-medium text-gray-500 italic">
+                            Por clasificar
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border-t border-white/5 pt-3">
+                      <div className="flex flex-wrap items-center gap-1 mb-1.5">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400/90 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded">
+                          BYE
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 min-h-[2.25rem]">
+                        <PlayerAvatar src={null} size="md" />
+                        <p className="text-[12px] font-medium text-gray-500 italic">
+                          Sin rival (avanza)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               );
-            }
+            })}
 
-            return (
-              <div
-                key={node.matchNo}
-                className="absolute z-[2]"
-                style={{ left: node.cardX, top: node.y, width: CARD_W }}
-              >
-                <MatchCard
-                  partido={node.partido}
-                  isInteractive={interactive}
-                  alcance={alcance}
-                  origenEquipoA={formatSeed(node.a)}
-                  origenEquipoB={formatSeed(node.b)}
-                  esCabezaSerieA={
-                    !!node.partido.equipo_a_id &&
-                    !!cabezasSerieIds?.has(String(node.partido.equipo_a_id))
-                  }
-                  esCabezaSerieB={
-                    !!node.partido.equipo_b_id &&
-                    !!cabezasSerieIds?.has(String(node.partido.equipo_b_id))
-                  }
-                  onEditSelect={onMatchClick}
-                  isActive={
-                    node.partido.ganador == null &&
-                    node.partido.equipo_a_id != null &&
-                    node.partido.equipo_b_id != null
-                  }
-                />
-              </div>
-            );
-          })}
+            {layout.matchNodes.map((node) => {
+              if (!node.partido) {
+                return (
+                  <div
+                    key={node.matchNo}
+                    className="absolute z-[2] rounded-2xl border border-dashed border-white/10 bg-black/20 flex items-center justify-center text-xs text-gray-500"
+                    style={{
+                      left: node.cardX,
+                      top: node.y,
+                      width: CARD_W,
+                      minHeight: CARD_H,
+                    }}
+                  >
+                    Partido #{node.matchNo}
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={node.matchNo}
+                  className="absolute z-[2]"
+                  style={{ left: node.cardX, top: node.y, width: CARD_W }}
+                >
+                  <MatchCard
+                    partido={node.partido}
+                    isInteractive={interactive}
+                    alcance={alcance}
+                    origenEquipoA={formatSeed(node.a)}
+                    origenEquipoB={formatSeed(node.b)}
+                    esCabezaSerieA={
+                      !!node.partido.equipo_a_id &&
+                      !!cabezasSerieIds?.has(String(node.partido.equipo_a_id))
+                    }
+                    esCabezaSerieB={
+                      !!node.partido.equipo_b_id &&
+                      !!cabezasSerieIds?.has(String(node.partido.equipo_b_id))
+                    }
+                    onEditSelect={onMatchClick}
+                    isActive={
+                      node.partido.ganador == null &&
+                      node.partido.equipo_a_id != null &&
+                      node.partido.equipo_b_id != null
+                    }
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

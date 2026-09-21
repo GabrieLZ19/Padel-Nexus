@@ -73,9 +73,9 @@ export const ALL_STEPS: StepDefinition[] = [
     id: "times",
     number: 5,
     label: "Sedes",
-    desc: "Canchas y disponibilidades",
+    desc: "Clubes y canchas del torneo",
     group: "logistics",
-    keywords: ["sedes", "canchas", "horarios", "disponibilidad", "turnos", "club"],
+    keywords: ["sedes", "canchas", "club", "sede"],
     icon: MapPin,
   },
   {

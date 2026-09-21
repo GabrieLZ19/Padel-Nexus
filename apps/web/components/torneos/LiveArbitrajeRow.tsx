@@ -1,25 +1,18 @@
 import { Partido } from "@/utils/types";
-import { Loader2, Trophy, AlertCircle, CalendarClock } from "lucide-react";
+import { Loader2, Trophy, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
-import CustomDropdown from "@/components/ui/CustomDropdown";
-import { TorneosService } from "@/utils/services/torneos";
 import { TeamBox } from "@/components/torneos/MatchTeamBox";
 import { canchaAsignadaReal } from "@/utils/fiscalPartidos";
 
 export const LiveArbitrajeRow = ({
   partido,
   torneo,
-  todosLosPartidos = [],
-  disponibilidades = [],
   onSave,
-  onPartidoUpdated,
   isSaving,
   onError,
 }: {
   partido: Partido;
   torneo?: any;
-  todosLosPartidos?: Partido[];
-  disponibilidades?: any[];
   onSave: (
     partidoId: string,
     ganadorId: string,
@@ -35,7 +28,6 @@ export const LiveArbitrajeRow = ({
       es_injustificado_wo: boolean;
     },
   ) => void;
-  onPartidoUpdated?: () => void;
   isSaving: boolean;
   onError: (msg: string) => void;
 }) => {
@@ -90,164 +82,33 @@ export const LiveArbitrajeRow = ({
   );
   const [ganadorWo, setGanadorWo] = useState<"A" | "B">("A");
 
-  // Helper para nombre completo de la cancha
-  const getCanchaFullName = (d: any) => {
-    const club = d.clubes?.nombre || d.club_nombre || "";
-    const cancha =
-      d.canchas?.nombre ||
-      d.cancha_nombre ||
-      (d.cancha_id ? `Cancha ${d.cancha_id.slice(0, 4)}` : null);
-    if (!cancha) return "";
-    return club ? `${club} - ${cancha}` : cancha;
-  };
-
-  // Cancha, fecha y hora asignadas (ignora el placeholder "Cancha N" de la generación)
-  const [canchaEdit, setCanchaEdit] = useState<string>(
-    canchaAsignadaReal(partido.cancha_asignada) || "",
-  );
-
-  const getInitialFechaHora = (isoStr?: string | null) => {
-    if (!isoStr) return { fecha: "", hora: "" };
-    try {
-      const d = new Date(isoStr);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mins = String(d.getMinutes()).padStart(2, "0");
-      return {
-        fecha: `${yyyy}-${mm}-${dd}`,
-        hora: `${hh}:${mins}:00`,
-      };
-    } catch {
-      return { fecha: "", hora: "" };
-    }
-  };
-
-  const initialFH = getInitialFechaHora(partido.fecha_partido);
-  const [fechaEdit, setFechaEdit] = useState<string>(initialFH.fecha);
-  const [horaEdit, setHoraEdit] = useState<string>(initialFH.hora);
-  const [showProgramacion, setShowProgramacion] = useState(false);
-
-  // Calcular slots de cancha + fecha + hora ocupados por OTROS partidos
-  const occupiedSlots = new Set<string>();
-  todosLosPartidos.forEach((p) => {
-    if (p.id === partido.id) return;
-    if (canchaAsignadaReal(p.cancha_asignada) && p.fecha_partido) {
+  const programacionLabel = (() => {
+    const parts: string[] = [];
+    const cancha = canchaAsignadaReal(partido.cancha_asignada);
+    if (cancha) parts.push(cancha);
+    if (partido.fecha_partido) {
       try {
-        const d = new Date(p.fecha_partido);
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        const hh = String(d.getHours()).padStart(2, "0");
-        const mins = String(d.getMinutes()).padStart(2, "0");
-        const fStr = `${yyyy}-${mm}-${dd}`;
-        const hStr = `${hh}:${mins}:00`;
-        occupiedSlots.add(`${p.cancha_asignada}|${fStr}|${hStr}`);
-      } catch {}
-    }
-  });
-
-  // Opciones de Cancha (Filtrar solo canchas con al menos 1 slot disponible u ocupado por este partido)
-  const mapCanchas = new Set<string>();
-  disponibilidades.forEach((d) => {
-    const name = getCanchaFullName(d);
-    if (!name) return;
-
-    if (canchaEdit === name) {
-      mapCanchas.add(name);
-      return;
-    }
-
-    const key = `${name}|${d.fecha}|${d.hora_inicio}`;
-    if (!occupiedSlots.has(key)) {
-      mapCanchas.add(name);
-    }
-  });
-  const canchaOptions = [
-    { value: "", label: "Pendiente" },
-    ...Array.from(mapCanchas).map((c) => ({
-      value: c,
-      label: c,
-    })),
-  ];
-
-  // Opciones de Fecha para la cancha seleccionada
-  const mapFechas = new Set<string>();
-  disponibilidades.forEach((d) => {
-    const name = getCanchaFullName(d);
-    if (!canchaEdit || name === canchaEdit) {
-      if (d.fecha) mapFechas.add(d.fecha);
-    }
-  });
-
-  const formatDateLabel = (fStr: string) => {
-    try {
-      const [yyyy, mm, dd] = fStr.split("-");
-      const dateObj = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
-      const dayName = dateObj.toLocaleDateString("es-AR", { weekday: "short" });
-      const capDay =
-        dayName.charAt(0).toUpperCase() + dayName.slice(1).replace(".", "");
-      return `${capDay} ${dd}/${mm}/${yyyy}`;
-    } catch {
-      return fStr;
-    }
-  };
-
-  const fechaOptions = Array.from(mapFechas)
-    .sort()
-    .map((f) => ({
-      value: f,
-      label: formatDateLabel(f),
-    }));
-
-  // Opciones de Hora (filtrando los horarios ocupados por otros partidos)
-  const mapHoras = new Set<string>();
-  disponibilidades.forEach((d) => {
-    const name = getCanchaFullName(d);
-    if (canchaEdit && name !== canchaEdit) return;
-    if (fechaEdit && d.fecha !== fechaEdit) return;
-    if (!d.hora_inicio) return;
-
-    const key = `${canchaEdit || name}|${fechaEdit || d.fecha}|${d.hora_inicio}`;
-    if (!occupiedSlots.has(key)) {
-      mapHoras.add(d.hora_inicio);
-    }
-  });
-
-  const horaOptions = Array.from(mapHoras)
-    .sort()
-    .map((h) => ({
-      value: h,
-      label: `${h.slice(0, 5)} hs`,
-    }));
-
-  const handleSelectDateTimeCourt = async (
-    newCancha: string,
-    newFecha: string,
-    newHora: string,
-  ) => {
-    setCanchaEdit(newCancha);
-    setFechaEdit(newFecha);
-    setHoraEdit(newHora);
-
-    try {
-      let isoStr: string | null = null;
-      if (newFecha && newHora) {
-        const [yyyy, mm, dd] = newFecha.split("-").map(Number);
-        const [hh, mins] = newHora.split(":").map(Number);
-        const d = new Date(yyyy, mm - 1, dd, hh, mins, 0);
-        isoStr = d.toISOString();
+        const d = new Date(partido.fecha_partido);
+        if (!Number.isNaN(d.getTime())) {
+          const fecha = d.toLocaleDateString("es-AR", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+          });
+          const hora = d.toLocaleTimeString("es-AR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          });
+          parts.push(fecha);
+          parts.push(`${hora} hs`);
+        }
+      } catch {
+        /* ignore */
       }
-      await TorneosService.actualizarPartido(partido.id, {
-        cancha_asignada: newCancha || null,
-        fecha_partido: isoStr,
-      });
-      onPartidoUpdated?.();
-    } catch (e) {
-      console.error("Error al actualizar partido:", e);
     }
-  };
+    return parts.length > 0 ? parts.join(" · ") : null;
+  })();
 
   const set1Completado = s1A !== "" && s1B !== "";
   const set2Completado = s2A !== "" && s2B !== "";
@@ -287,14 +148,6 @@ export const LiveArbitrajeRow = ({
   };
 
   const { setsA, setsB } = getSetsGanados();
-
-  const programacionLabel = (() => {
-    const parts: string[] = [];
-    if (canchaEdit?.trim()) parts.push(canchaEdit.trim());
-    if (fechaEdit?.trim()) parts.push(formatDateLabel(fechaEdit));
-    if (horaEdit?.trim()) parts.push(`${horaEdit.slice(0, 5)} hs`);
-    return parts.length > 0 ? parts.join(" · ") : null;
-  })();
 
   const handleFinalizar = () => {
     if (esWo) {
@@ -473,21 +326,10 @@ export const LiveArbitrajeRow = ({
             </span>
           ) : (
             <span className="text-[10px] font-semibold text-gray-500 basis-full sm:basis-auto">
-              Sin sede/horario
+              Sin sede/horario · definí en el programador
             </span>
           )}
           <div className="flex items-center gap-2 ml-auto shrink-0">
-            <button
-              type="button"
-              onClick={() => setShowProgramacion((v) => !v)}
-              className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-white border border-white/10 hover:border-white/20 bg-white/5 px-2 py-1 rounded-lg cursor-pointer"
-            >
-              <CalendarClock className="size-3" />
-              <span className="hidden sm:inline">
-                {showProgramacion ? "Ocultar" : "Ajustar sede"}
-              </span>
-              <span className="sm:hidden">{showProgramacion ? "OK" : "Sede"}</span>
-            </button>
             <label className="flex items-center gap-1 font-bold text-gray-400 cursor-pointer text-[10px]">
               <input
                 type="checkbox"
@@ -510,39 +352,6 @@ export const LiveArbitrajeRow = ({
             )}
           </div>
         </div>
-        {showProgramacion && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-            <CustomDropdown
-              value={canchaEdit}
-              onChange={(val) => {
-                handleSelectDateTimeCourt(val, fechaEdit, horaEdit);
-              }}
-              options={canchaOptions}
-              placeholder={
-                mapCanchas.size === 0 && !canchaEdit ? "Sin canchas" : "Pendiente"
-              }
-              disabled={mapCanchas.size === 0 && !canchaEdit}
-            />
-            <CustomDropdown
-              value={fechaEdit}
-              onChange={(val) => {
-                handleSelectDateTimeCourt(canchaEdit, val, horaEdit);
-              }}
-              options={fechaOptions}
-              placeholder={fechaOptions.length === 0 ? "Sin fechas" : "Fecha..."}
-              disabled={fechaOptions.length === 0 || !canchaEdit}
-            />
-            <CustomDropdown
-              value={horaEdit}
-              onChange={(val) => {
-                handleSelectDateTimeCourt(canchaEdit, fechaEdit, val);
-              }}
-              options={horaOptions}
-              placeholder={horaOptions.length === 0 ? "Sin horas" : "Hora..."}
-              disabled={horaOptions.length === 0 || !canchaEdit || !fechaEdit}
-            />
-          </div>
-        )}
       </div>
 
       {esWo ? (

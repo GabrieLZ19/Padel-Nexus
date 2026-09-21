@@ -1,7 +1,8 @@
 /**
  * Etiqueta de representación en torneos nacionales: "NEUQUÉN A", "BUENOS AIRES C".
  * Espejo del helper de API para UI/PDF.
- * Provincia completa en mayúsculas + letra de prioridad (sin abreviaturas).
+ * Provincia = ASOCIACIÓN de planilla (en perfil.lugar_residencia) o, si no vino, la residencia ya cargada.
+ * Letra = LETRA de la planilla (letra_prioridad).
  */
 
 /** Abreviaturas legacy → nombre completo (por si llega una denominación vieja). */

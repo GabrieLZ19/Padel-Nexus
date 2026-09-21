@@ -281,6 +281,82 @@ export const TorneosService = {
     );
     return response.data;
   },
+
+  async getProgramacionBoard(
+    torneoId: string,
+    params?: { duracion?: number; descanso?: number },
+  ): Promise<ProgramacionBoard> {
+    const response = await api.get<ProgramacionBoard>(
+      `/torneos/${torneoId}/programacion/board`,
+      { params },
+    );
+    return response.data;
+  },
+
+  async asignarProgramacion(
+    torneoId: string,
+    payload: {
+      partido_id: string;
+      fecha_iso: string;
+      cancha_label: string;
+      motivo?: string;
+    },
+  ): Promise<ProgramacionBoard> {
+    const response = await api.put<ProgramacionBoard>(
+      `/torneos/${torneoId}/programacion/asignar`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async desasignarProgramacion(
+    torneoId: string,
+    payload: { partido_id: string; motivo?: string },
+  ): Promise<ProgramacionBoard> {
+    const response = await api.put<ProgramacionBoard>(
+      `/torneos/${torneoId}/programacion/desasignar`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async limpiarProgramacion(
+    torneoId: string,
+    payload: { motivo?: string } = {},
+  ): Promise<ProgramacionBoard> {
+    const response = await api.post<ProgramacionBoard>(
+      `/torneos/${torneoId}/programacion/limpiar`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async autoAsignarProgramacion(
+    torneoId: string,
+    payload: {
+      estrategia?: "smart" | "continuous";
+      duracionMinutos?: number;
+      descansoMinutos?: number;
+      motivo?: string;
+    } = {},
+  ): Promise<ProgramacionBoard> {
+    const response = await api.post<ProgramacionBoard>(
+      `/torneos/${torneoId}/programacion/auto`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async nuevaEdicionProgramacion(
+    torneoId: string,
+    payload: { motivo?: string } = {},
+  ): Promise<ProgramacionBoard> {
+    const response = await api.post<ProgramacionBoard>(
+      `/torneos/${torneoId}/programacion/nueva-edicion`,
+      payload,
+    );
+    return response.data;
+  },
 };
 
 /**
@@ -306,4 +382,63 @@ export interface ProgramacionPreview {
   programacion_estado: ProgramacionEstado;
   partidos: PartidoProgramado[];
   sin_horario: string[];
+}
+
+export type IssueSeverity = "ok" | "wait" | "bad";
+
+export interface ProgramacionIssue {
+  partido_id: string;
+  severity: IssueSeverity;
+  message: string;
+}
+
+export interface BoardPartido {
+  id: string;
+  ronda: string | null;
+  orden: number | null;
+  phase: "zones" | "bracket";
+  equipo_a_id: string | null;
+  equipo_b_id: string | null;
+  label_a: string;
+  label_b: string;
+  label: string;
+  estado_partido: string | null;
+  cancha_asignada: string | null;
+  fecha_partido: string | null;
+  horario_bloqueado: boolean;
+  assigned: boolean;
+  slot_key: string | null;
+}
+
+export interface ProgramacionBoard {
+  torneo_id: string;
+  nombre: string;
+  estado: string | null;
+  programacion_estado: ProgramacionEstado;
+  programacion_publicada_en: string | null;
+  duracion_partido_minutos: number;
+  descanso_minutos: number;
+  dias: string[];
+  canchas: Array<{
+    label: string;
+    club: string;
+    cancha: string;
+    club_id: string;
+    cancha_id: string;
+  }>;
+  slots: Array<{
+    key: string;
+    fecha: string;
+    hora: string;
+    cancha_label: string;
+    fecha_iso: string;
+  }>;
+  partidos: BoardPartido[];
+  issues: ProgramacionIssue[];
+  summary: {
+    total: number;
+    asignados: number;
+    pendientes: number;
+    advertencias: number;
+  };
 }

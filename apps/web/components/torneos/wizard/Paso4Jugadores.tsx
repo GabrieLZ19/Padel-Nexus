@@ -24,6 +24,9 @@ import {
   descargarPlantillaInscripcion,
   leerPlanillaDesdeArchivo,
 } from "@/utils/inscripcionPlanilla";
+import { importarPlanillaConProgreso } from "@/utils/planillaImportProgress";
+import { PlanillaImportProgressBar } from "@/components/inscripciones/PlanillaImportProgressBar";
+import type { PlanillaImportProgressState } from "@/components/inscripciones/PlanillaImportProgressBar";
 import { esModalidadIndividual } from "@/utils/formatFecha";
 
 function apiErrorMessage(error: unknown, fallback: string): string {
@@ -71,6 +74,8 @@ export const Paso4Jugadores = ({
   const nacional = esAlcanceNacional(torneo.alcance);
 
   const [importingCSV, setImportingCSV] = useState(false);
+  const [importProgress, setImportProgress] =
+    useState<PlanillaImportProgressState | null>(null);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [pagoModal, setPagoModal] = useState({
     isOpen: false,
@@ -96,6 +101,11 @@ export const Paso4Jugadores = ({
     if (!file) return;
 
     setImportingCSV(true);
+    setImportProgress({
+      percent: 5,
+      label: "Leyendo planilla…",
+      detail: file.name,
+    });
     try {
       const { filas } = await leerPlanillaDesdeArchivo(file);
       if (filas.length === 0) {
@@ -110,14 +120,24 @@ export const Paso4Jugadores = ({
         return;
       }
 
-      const resultado = await InscripcionesService.importarPlanilla({
-        torneo_id: torneo.id,
+      setImportProgress({
+        percent: 15,
+        label: "Planilla leída",
+        detail: `${filas.length} fila(s) encontradas`,
+      });
+
+      const resultado = await importarPlanillaConProgreso({
+        torneoId: torneo.id,
         filas,
         modalidad: torneo.modalidad,
+        onProgress: setImportProgress,
       });
 
       triggerRefresh();
       const isIndiv = esModalidadIndividual(torneo.modalidad);
+
+      // Breve instante en 100% para que se vea el cierre.
+      await new Promise((r) => setTimeout(r, 450));
 
       if (resultado.errores.length === 0) {
         setFeedbackModal((prev: { isOpen?: boolean }) => ({
@@ -148,6 +168,7 @@ export const Paso4Jugadores = ({
       }));
     } finally {
       setImportingCSV(false);
+      setImportProgress(null);
       e.target.value = "";
     }
   };
@@ -241,6 +262,8 @@ export const Paso4Jugadores = ({
           </button>
         </div>
       </div>
+
+      {importProgress ? <PlanillaImportProgressBar state={importProgress} /> : null}
 
       {/* Tabla de Inscritos */}
       {inscripciones.length === 0 ? (

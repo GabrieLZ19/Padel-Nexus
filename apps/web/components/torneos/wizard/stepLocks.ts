@@ -49,7 +49,7 @@ export function textoBannerModoLectura(estado: string): string {
     return "Los pasos de configuración y logística están bloqueados. Los cuadros y la carga de resultados permanecen habilitados en modo lectura.";
   }
   if (estado === "Programado") {
-    return "Fixture generado. Los pasos de datos, logos, categorías, jugadores, fiscales y cierre están bloqueados. Podés ajustar sedes/horarios, cuadros y resultados. Al publicar la programación o cargar un resultado el torneo pasa a En curso.";
+    return "Fixture generado. Los pasos de datos, logos, categorías, jugadores, fiscales y cierre están bloqueados. Podés ajustar sedes/canchas, cuadros y resultados. Al publicar la programación o cargar un resultado el torneo pasa a En curso.";
   }
-  return "Los pasos de datos, logos, categorías, jugadores, fiscales y cierre están bloqueados. Sedes y horarios siguen editables para ampliar canchas y cronograma. Los cuadros y resultados permanecen habilitados.";
+  return "Los pasos de datos, logos, categorías, jugadores, fiscales y cierre están bloqueados. Sedes y canchas siguen editables. Los cuadros y resultados permanecen habilitados.";
 }

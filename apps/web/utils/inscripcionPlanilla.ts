@@ -104,6 +104,9 @@ export function parsearFilasPlanilla(matrix: unknown[][]): ParsePlanillaResult {
   const idxDireccion = indiceColumna(headerRow, /DIRECC/);
 
   const filas: FilaPlanillaInscripcion[] = [];
+  /** En planillas FAP, LETRA/ASOCIACIÓN suelen venir solo en la 1ª fila de la pareja. */
+  let ultimaLetra: string | undefined;
+  let ultimaAsociacion: string | undefined;
 
   for (let r = headerIndex + 1; r < matrix.length; r++) {
     const row = matrix[r] || [];
@@ -114,16 +117,22 @@ export function parsearFilasPlanilla(matrix: unknown[][]): ParsePlanillaResult {
 
     if (!apellidoNombre && !dni) continue;
 
+    const letraRaw =
+      idxLetraOrden >= 0
+        ? normalizarLetraOrden(row[idxLetraOrden])
+        : undefined;
+    if (letraRaw) ultimaLetra = letraRaw;
+
+    const asociacionRaw =
+      idxAsociacion >= 0
+        ? normalizarTexto(row[idxAsociacion]) || undefined
+        : undefined;
+    if (asociacionRaw) ultimaAsociacion = asociacionRaw;
+
     filas.push({
       fila: r + 1,
-      letraOrden:
-        idxLetraOrden >= 0
-          ? normalizarLetraOrden(row[idxLetraOrden])
-          : undefined,
-      asociacion:
-        idxAsociacion >= 0
-          ? normalizarTexto(row[idxAsociacion]) || undefined
-          : undefined,
+      letraOrden: letraRaw || ultimaLetra,
+      asociacion: asociacionRaw || ultimaAsociacion,
       apellidoNombre,
       dni,
       fechaNacimiento:

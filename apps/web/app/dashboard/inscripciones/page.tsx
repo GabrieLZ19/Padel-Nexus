@@ -36,6 +36,9 @@ import {
   etiquetaTipoPlanillaInscripcion,
   leerPlanillaDesdeArchivo,
 } from "@/utils/inscripcionPlanilla";
+import { importarPlanillaConProgreso } from "@/utils/planillaImportProgress";
+import { PlanillaImportProgressBar } from "@/components/inscripciones/PlanillaImportProgressBar";
+import type { PlanillaImportProgressState } from "@/components/inscripciones/PlanillaImportProgressBar";
 import { esModalidadIndividual } from "@/utils/formatFecha";
 
 const TABS = ["Todas", "Pendientes", "Confirmadas", "Rechazadas"] as const;
@@ -89,6 +92,8 @@ export default function GestionInscripcionesPage() {
   const selectedTorneo = torneos.find((t) => t.id === filterTorneo);
 
   const [importingCSV, setImportingCSV] = useState(false);
+  const [importProgress, setImportProgress] =
+    useState<PlanillaImportProgressState | null>(null);
 
   const handleDescargarPlantilla = () => {
     if (!selectedTorneo) return;
@@ -104,6 +109,11 @@ export default function GestionInscripcionesPage() {
     if (!file || !selectedTorneo) return;
 
     setImportingCSV(true);
+    setImportProgress({
+      percent: 5,
+      label: "Leyendo planilla…",
+      detail: file.name,
+    });
     try {
       const { filas } = await leerPlanillaDesdeArchivo(file);
       if (filas.length === 0) {
@@ -119,14 +129,23 @@ export default function GestionInscripcionesPage() {
         return;
       }
 
-      const resultado = await InscripcionesService.importarPlanilla({
-        torneo_id: selectedTorneo.id,
+      setImportProgress({
+        percent: 15,
+        label: "Planilla leída",
+        detail: `${filas.length} fila(s) encontradas`,
+      });
+
+      const resultado = await importarPlanillaConProgreso({
+        torneoId: selectedTorneo.id,
         filas,
         modalidad: selectedTorneo.modalidad,
+        onProgress: setImportProgress,
       });
 
       setRefreshKey((prev) => prev + 1);
       const isIndiv = esModalidadIndividual(selectedTorneo.modalidad);
+
+      await new Promise((r) => setTimeout(r, 450));
 
       if (resultado.errores.length === 0) {
         setFeedbackModal({
@@ -159,6 +178,7 @@ export default function GestionInscripcionesPage() {
       });
     } finally {
       setImportingCSV(false);
+      setImportProgress(null);
       e.target.value = "";
     }
   };
@@ -411,6 +431,11 @@ export default function GestionInscripcionesPage() {
                   : "Pareja"}
               </button>
             </div>
+            {importProgress ? (
+              <div className="rounded-xl overflow-hidden border border-white/5">
+                <PlanillaImportProgressBar state={importProgress} />
+              </div>
+            ) : null}
             <p className="text-[11px] text-gray-500 sm:text-right">
               Planilla{" "}
               {etiquetaTipoPlanillaInscripcion({

@@ -122,20 +122,33 @@ export const InscripcionesService = {
     const response = await api.post("/inscripciones/manual", data);
     return response.data;
   },
-  async importarPlanilla(data: {
-    torneo_id: string;
-    filas: FilaPlanillaInscripcion[];
-    modalidad?: string;
-    omitir_validaciones?: boolean;
-    motivo?: string;
-  }) {
+  async importarPlanilla(
+    data: {
+      torneo_id: string;
+      filas: FilaPlanillaInscripcion[];
+      modalidad?: string;
+      omitir_validaciones?: boolean;
+      motivo?: string;
+    },
+    options?: {
+      onUploadProgress?: (percent: number) => void;
+    },
+  ) {
     const response = await api.post<{
       exito: boolean;
       inscripcionesOk: number;
       jugadoresCreados: number;
       errores: string[];
       totalFilas: number;
-    }>("/inscripciones/importar-planilla", data);
+    }>("/inscripciones/importar-planilla", data, {
+      onUploadProgress: (event) => {
+        if (!options?.onUploadProgress) return;
+        if (!event.total || event.total <= 0) return;
+        options.onUploadProgress(
+          Math.round((event.loaded / event.total) * 100),
+        );
+      },
+    });
     return response.data;
   },
   async eliminar(id: string | number): Promise<void> {

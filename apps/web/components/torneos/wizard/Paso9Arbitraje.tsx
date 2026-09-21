@@ -159,7 +159,6 @@ export const PasoResultados = ({
   const [guardandoPartidoId, setGuardandoPartidoId] = useState<string | null>(
     null,
   );
-  const [disponibilidadesPaso5, setDisponibilidadesPaso5] = useState<any[]>([]);
   const [zonasColapsadas, setZonasColapsadas] = useState<
     Record<string, boolean>
   >({});
@@ -167,20 +166,6 @@ export const PasoResultados = ({
     Record<string, boolean>
   >({});
   const [vistaRapida, setVistaRapida] = useState<VistaRapida>("pendientes");
-
-  useEffect(() => {
-    if (!torneoId) return;
-    TorneosService.getCanchasDisponibilidad(torneoId)
-      .then((payload) => {
-        const list = Array.isArray(payload)
-          ? payload
-          : Array.isArray((payload as { data?: unknown })?.data)
-            ? (payload as { data: unknown[] }).data
-            : [];
-        setDisponibilidadesPaso5(list);
-      })
-      .catch(() => setDisponibilidadesPaso5([]));
-  }, [torneoId]);
 
   const partidosJugables = useMemo(
     () =>
@@ -576,10 +561,7 @@ export const PasoResultados = ({
         key={partido.id}
         partido={partido}
         torneo={torneo}
-        todosLosPartidos={partidos}
-        disponibilidades={disponibilidadesPaso5}
         onSave={handleGuardarResultadoLive}
-        onPartidoUpdated={triggerRefresh}
         isSaving={guardandoPartidoId === partido.id}
         onError={showErrorModal}
       />
