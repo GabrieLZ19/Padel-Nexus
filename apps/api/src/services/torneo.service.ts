@@ -16,6 +16,53 @@ import {
 } from "../utils/playoffAvance";
 import { armarGruposTorneo, nombreBaseTorneo } from "../utils/gruposTorneo";
 import { resolverReglamentoPersistido } from "../utils/reglamentoTorneo";
+import { debeDescalificarPorWoDeZona } from "../utils/walkoverZona";
+
+async function marcarDescalificacionesDeZona(
+  torneoId: string,
+  ronda: string,
+) {
+  if (!ronda.toUpperCase().startsWith("ZONA")) return;
+
+  const [{ data: partidos }, { data: grupo }] = await Promise.all([
+    supabaseAdmin
+      .from("partidos")
+      .select("orden, ganador, es_wo, es_lesion, equipo_a_id, equipo_b_id")
+      .eq("torneo_id", torneoId)
+      .eq("ronda", ronda),
+    supabaseAdmin
+      .from("grupos")
+      .select("id, grupo_parejas(inscripcion_id)")
+      .eq("torneo_id", torneoId)
+      .eq("nombre_grupo", ronda)
+      .maybeSingle(),
+  ]);
+
+  const parejas = grupo?.grupo_parejas || [];
+  if (!grupo || parejas.length === 0) return;
+
+  for (const pareja of parejas) {
+    const id = pareja.inscripcion_id;
+    if (!id) continue;
+    const propios = (partidos || []).filter(
+      (p) => p.equipo_a_id === id || p.equipo_b_id === id,
+    );
+    const descalificada = debeDescalificarPorWoDeZona(
+      propios.map((p) => ({
+        orden: p.orden ?? 0,
+        finalizado: Boolean(p.ganador),
+        esWo: Boolean(p.es_wo),
+        esLesion: Boolean(p.es_lesion),
+        gano: p.ganador === id,
+      })),
+    );
+    await supabaseAdmin
+      .from("grupo_parejas")
+      .update({ descalificada })
+      .eq("grupo_id", grupo.id)
+      .eq("inscripcion_id", id);
+  }
+}
 
 function mapInscripcionPartido(ins: Record<string, unknown>) {
   const perfiles = ins.perfiles as
@@ -1570,7 +1617,15 @@ export class TorneoService {
     esSupertiebreak?: boolean,
     esWo?: boolean,
     esInjustificadoWo?: boolean,
+    esLesion?: boolean,
   ) {
+    const { data: previo } = await supabaseAdmin
+      .from("partidos")
+      .select("ganador")
+      .eq("id", partidoId)
+      .maybeSingle();
+    const yaTeniaResultado = Boolean(previo?.ganador);
+
     const { data: partido, error: updateError } = await supabaseAdmin
       .from("partidos")
       .update({
@@ -1584,6 +1639,7 @@ export class TorneoService {
         es_supertiebreak: esSupertiebreak || false,
         es_wo: esWo || false,
         es_injustificado_wo: esInjustificadoWo || false,
+        es_lesion: esLesion || false,
         estado_partido: FAP_ESTADOS_TORNEO.FINALIZADO,
       })
       .eq("id", partidoId)
@@ -1639,7 +1695,7 @@ export class TorneoService {
       }
     }
 
-    if (torneoInfo) {
+    if (torneoInfo && !yaTeniaResultado) {
       let TABLA_PUNTOS: Record<string, { ganador: number; perdedor: number }> =
         {
           "16AVOS": { ganador: 45, perdedor: 10 },
@@ -1934,6 +1990,8 @@ export class TorneoService {
 
     // Si el partido finalizado es de zona (ej. "Zona A"), sincronizar avance interno y llave
     if (partido.ronda.toUpperCase().startsWith("ZONA")) {
+      await marcarDescalificacionesDeZona(partido.torneo_id, partido.ronda);
+
       await avanzarPartidosInternosZonaCuatro(
         partido.torneo_id,
         partido.ronda,

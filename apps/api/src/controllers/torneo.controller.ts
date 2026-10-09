@@ -321,6 +321,7 @@ export const actualizarResultado = async (
       es_supertiebreak,
       es_wo,
       es_injustificado_wo,
+      es_lesion,
     } = req.body;
 
     const user_id = req.user?.id;
@@ -396,6 +397,7 @@ export const actualizarResultado = async (
       Boolean(es_supertiebreak),
       Boolean(es_wo),
       Boolean(es_injustificado_wo),
+      Boolean(es_lesion),
     );
     return res.status(200).json({
       message: "Resultado cargado y estadísticas distribuidas con éxito",

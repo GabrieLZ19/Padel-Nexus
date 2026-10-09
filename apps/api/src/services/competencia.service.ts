@@ -462,6 +462,7 @@ export class CompetenciaService {
         grupo_parejas (
           id,
           seed,
+          descalificada,
           inscripcion_id,
         inscripciones (
             id,

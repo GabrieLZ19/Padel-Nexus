@@ -66,7 +66,7 @@ export class ClasificacionService {
         stats[p.ganador].partidosGanados += 1;
 
         const processStats = (isTeamA: boolean, teamId: string) => {
-          if (p.es_wo) {
+          if (p.es_wo && !p.es_lesion) {
             if (p.ganador === teamId) {
               stats[teamId].setsAFavor += 2;
               stats[teamId].gamesAFavor += 12;
@@ -208,6 +208,26 @@ export class ClasificacionService {
       }
     }
 
-    return resultadoOrdenado;
+    const { data: grupo } = await supabaseAdmin
+      .from("grupos")
+      .select("grupo_parejas(inscripcion_id, descalificada)")
+      .eq("torneo_id", torneoId)
+      .eq("nombre_grupo", nombreZona)
+      .maybeSingle();
+    const descalificadas = new Set(
+      (grupo?.grupo_parejas || [])
+        .filter((gp) => gp.descalificada)
+        .map((gp) => gp.inscripcion_id),
+    );
+    if (descalificadas.size === 0) return resultadoOrdenado;
+
+    return [
+      ...resultadoOrdenado.filter(
+        (row) => !descalificadas.has(row.inscripcionId),
+      ),
+      ...resultadoOrdenado.filter((row) =>
+        descalificadas.has(row.inscripcionId),
+      ),
+    ];
   }
 }
