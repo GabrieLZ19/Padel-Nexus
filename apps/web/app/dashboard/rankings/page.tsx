@@ -19,6 +19,11 @@ import {
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { useProfileStore } from "@/store/useProfileStore";
 import { PROVINCIAS_ARG, NIVELES_PADEL } from "@/utils/constants/padelConfig";
+import {
+  etiquetaCategoriaRanking,
+  tituloRankingEntidad,
+  tituloRankingNacional,
+} from "@/utils/rankings/etiquetas";
 
 // -----------------------------------------------------------------------------
 // Config: tabs por tipo de ranking (menores / ladies-veteranos / libres)
@@ -251,27 +256,14 @@ export default function RankingsPage() {
     return "Tabla General de Rankings";
   }, [rol, esFederacion]);
 
-  const etiquetaCategoria =
-    NIVELES_PADEL.find((nivel) => nivel.value === categoria)?.label || "";
-  const etiquetaRama =
-    tipo === "menores"
-      ? ""
-      : rama === "masculino"
-        ? "Masculino"
-        : rama === "femenino"
-          ? "Femenino"
-          : "";
   const tituloDetalle = esFederacion
-    ? [
-        "Ranking Nacional",
-        tipo === "libres" ? "de Libres" : tipoConfig.label,
-        etiquetaRama,
-        etiquetaCategoria,
-      ]
-        .filter(Boolean)
-        .join(" ")
+    ? tituloRankingNacional({
+        tipo,
+        rama: tipo === "menores" ? "" : rama,
+        categoria,
+      })
     : esEntidadLocal
-      ? ["Ranking", etiquetaRama, etiquetaCategoria].filter(Boolean).join(" ")
+      ? tituloRankingEntidad(rama || "masculino", categoria)
       : tipoConfig.label;
 
   const subtituloContexto = useMemo(() => {
@@ -406,11 +398,14 @@ export default function RankingsPage() {
             esEntidadLocal
               ? CATEGORIAS_ENTIDAD.map((c) => ({
                   value: c,
-                  label: NIVELES_PADEL.find((nivel) => nivel.value === c)?.label || c,
+                  label: etiquetaCategoriaRanking(c),
                 }))
               : [
                   { value: "", label: `Todas las categorias (${tipoConfig.label})` },
-                  ...categoriasDelTipo.map((c) => ({ value: c, label: c })),
+                  ...categoriasDelTipo.map((c) => ({
+                    value: c,
+                    label: etiquetaCategoriaRanking(c),
+                  })),
                 ]
           }
           placeholder="Categoría"
