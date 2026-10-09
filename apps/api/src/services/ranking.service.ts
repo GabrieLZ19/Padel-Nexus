@@ -9,7 +9,11 @@ import {
   type RamaRanking,
   type TipoRanking,
 } from "../constants/rankings";
-import { puntosInscripcionPorMejorInstancia } from "../utils/puntosProvincia";
+import {
+  leerConfigPuntosProvincia,
+  puntosInscripcionPorMejorInstancia,
+  sumarPuntosPorProvincia,
+} from "../utils/puntosProvincia";
 
 export interface ActualizarPuntosDTO {
   usuarioId: string;
@@ -356,6 +360,28 @@ export class RankingService {
    * 8 campeón · 6 finalista · 4 semis · 2 cuartos · 1 octavos.
    */
   static async rankingProvincialPorTorneo(torneoId: string) {
+    const { data: torneo, error: errorTorneo } = await supabaseAdmin
+      .from("torneos")
+      .select("alcance, configuracion_puntos")
+      .eq("id", torneoId)
+      .maybeSingle();
+
+    if (errorTorneo) throw new Error(errorTorneo.message);
+    if (!String(torneo?.alcance || "").toLowerCase().includes("nacional")) {
+      return {
+        torneoId,
+        provincias: [] as Array<{
+          provincia: string;
+          puntos: number;
+          parejas: number;
+        }>,
+      };
+    }
+
+    const configProvincia = leerConfigPuntosProvincia(
+      torneo?.configuracion_puntos,
+    );
+
     const { data: partidos, error } = await supabaseAdmin
       .from("partidos")
       .select("ronda, ganador, equipo_a_id, equipo_b_id")
@@ -382,6 +408,7 @@ export class RankingService {
               ? p.equipo_b_id
               : p.equipo_a_id,
         })),
+      configProvincia,
     );
 
     // Campeón: ganador de FINAL = 8 (ya aplicado). Finalista = 6.
@@ -419,35 +446,19 @@ export class RankingService {
       );
     };
 
-    const agg = new Map<string, { puntos: number; parejas: number }>();
-    for (const ins of inscs || []) {
-      const pts = puntosPorInscripcion.get(ins.id) || 0;
-      if (pts <= 0) continue;
-      const provA = provinciaDe(ins.perfiles);
-      const provB = provinciaDe(ins.perfiles_j2);
-      // Si misma provincia, suma una vez; si distintas, reparte mitad a cada una
-      if (provA === provB) {
-        const cur = agg.get(provA) || { puntos: 0, parejas: 0 };
-        cur.puntos += pts;
-        cur.parejas += 1;
-        agg.set(provA, cur);
-      } else {
-        for (const prov of [provA, provB]) {
-          const cur = agg.get(prov) || { puntos: 0, parejas: 0 };
-          cur.puntos += pts / 2;
-          cur.parejas += 0.5;
-          agg.set(prov, cur);
-        }
-      }
-    }
-
-    const provincias = [...agg.entries()]
-      .map(([provincia, v]) => ({
-        provincia,
-        puntos: Math.round(v.puntos * 10) / 10,
-        parejas: Math.round(v.parejas * 10) / 10,
-      }))
-      .sort((a, b) => b.puntos - a.puntos);
+    const provinciasPorInscripcion = new Map(
+      (inscs || []).map((ins) => [
+        ins.id as string,
+        {
+          provinciaA: provinciaDe(ins.perfiles),
+          provinciaB: provinciaDe(ins.perfiles_j2),
+        },
+      ]),
+    );
+    const provincias = sumarPuntosPorProvincia(
+      puntosPorInscripcion,
+      provinciasPorInscripcion,
+    );
 
     return { torneoId, provincias };
   }
