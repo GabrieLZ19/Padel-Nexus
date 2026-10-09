@@ -10,15 +10,22 @@ router.post("/", AfiliacionController.solicitar);
 router.get("/mias", AfiliacionController.listarMias);
 router.patch("/:id/cancelar", AfiliacionController.cancelar);
 
+const ROLES_AFILIACION = [
+  "superadmin",
+  "admin",
+  "admin_federacion",
+  "admin_provincial",
+];
+
 router.get(
   "/",
-  authorize(["superadmin", "admin"]),
+  authorize(ROLES_AFILIACION),
   AfiliacionController.listarAdmin,
 );
 
 router.patch(
   "/:id/estado",
-  authorize(["superadmin", "admin"]),
+  authorize(ROLES_AFILIACION),
   AfiliacionController.cambiarEstado,
 );
 

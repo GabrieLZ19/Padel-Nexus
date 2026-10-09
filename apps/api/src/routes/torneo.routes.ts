@@ -26,6 +26,8 @@ import {
   guardarSiembraCustom,
   actualizarPartido,
   gestionarParejaLlave,
+  opcionesPromocionMenores,
+  promoverParejaMenores,
 } from "../controllers/torneo.controller";
 import {
   listarFiscales,
@@ -144,6 +146,16 @@ router.put(
   "/partidos/:partido_id/equipos",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   actualizarEquiposPartido,
+);
+router.get(
+  "/:id/promocion-menores",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  opcionesPromocionMenores,
+);
+router.put(
+  "/:id/promover-pareja",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  promoverParejaMenores,
 );
 router.put(
   "/:id/llave/pareja",

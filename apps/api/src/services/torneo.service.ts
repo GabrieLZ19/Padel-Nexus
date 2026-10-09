@@ -17,6 +17,7 @@ import {
 import { armarGruposTorneo, nombreBaseTorneo } from "../utils/gruposTorneo";
 import { resolverReglamentoPersistido } from "../utils/reglamentoTorneo";
 import { debeDescalificarPorWoDeZona } from "../utils/walkoverZona";
+import { normalizarAlcanceTorneo } from "../utils/pasesRepresentacion";
 
 async function marcarDescalificacionesDeZona(
   torneoId: string,
@@ -261,7 +262,14 @@ export interface TorneoPayload {
   modalidad: string;
   precio_inscripcion: number;
   formato: string;
-  alcance?: "Nacional" | "Provincial" | "Regional" | "Local" | "Privado" | null;
+  alcance?:
+    | "Nacional"
+    | "Provincial"
+    | "Regional"
+    | "Local"
+    | "Privado"
+    | "Clasificatorio"
+    | null;
   premios?: { uno?: string; dos?: string; tres?: string };
   canchas_disponibles?: number;
   duracion_partido_minutos?: number;
@@ -1012,15 +1020,8 @@ export class TorneoService {
 
   public static normalizarAlcance(
     alcance?: string | null,
-  ): "Nacional" | "Provincial" | "Regional" | "Local" | "Privado" {
-    if (!alcance) return "Provincial";
-    const val = String(alcance).trim();
-    if (/nacional/i.test(val)) return "Nacional";
-    if (/regional/i.test(val)) return "Regional";
-    if (/^privado$/i.test(val)) return "Privado";
-    if (/local/i.test(val)) return "Local";
-    if (/provincial/i.test(val)) return "Provincial";
-    return "Provincial";
+  ): "Nacional" | "Provincial" | "Regional" | "Local" | "Privado" | "Clasificatorio" {
+    return normalizarAlcanceTorneo(alcance);
   }
 
   /**
@@ -2025,26 +2026,67 @@ export class TorneoService {
     // 1. Validar que el partido existe
     const { data: partido, error } = await supabaseAdmin
       .from("partidos")
-      .select("id, torneo_id, ronda")
+      .select(
+        "id, torneo_id, ronda, orden, equipo_a_id, equipo_b_id, ganador, set1_a, set1_b",
+      )
       .eq("id", partidoId)
       .single();
 
     if (error || !partido) throw new Error("Partido no encontrado");
 
-    // 2. Actualizar los equipos del partido
+    const { PromocionMenoresService } = await import(
+      "./promocionMenores.service"
+    );
+    const { ORDEN_RONDAS_LLAVE, normalizarRonda } = await import(
+      "../utils/edicionLlaveMenores"
+    );
+    const esLlave = (ORDEN_RONDAS_LLAVE as readonly string[]).includes(
+      normalizarRonda(partido.ronda || ""),
+    );
+    if (!esLlave) {
+      const { error: updateZona } = await supabaseAdmin
+        .from("partidos")
+        .update({
+          equipo_a_id: equipoAId,
+          equipo_b_id: equipoBId,
+          ganador: null,
+          set1_a: null,
+          set1_b: null,
+          estado_partido: "Programado",
+        })
+        .eq("id", partidoId);
+      if (updateZona) throw new Error(updateZona.message);
+    } else {
+    const parche = await PromocionMenoresService.editarLados(
+      partido.torneo_id,
+      {
+        id: partido.id,
+        ronda: partido.ronda,
+        orden: partido.orden,
+        equipoAId: partido.equipo_a_id,
+        equipoBId: partido.equipo_b_id,
+        ganador: partido.ganador,
+        set1A: partido.set1_a,
+        set1B: partido.set1_b,
+      },
+      equipoAId,
+      equipoBId,
+    );
+
     const { error: updateError } = await supabaseAdmin
       .from("partidos")
       .update({
-        equipo_a_id: equipoAId,
-        equipo_b_id: equipoBId,
-        ganador: null,
-        set1_a: null,
-        set1_b: null,
-        estado_partido: "Programado",
+        equipo_a_id: parche.equipoAId,
+        equipo_b_id: parche.equipoBId,
+        ganador: parche.ganador,
+        set1_a: parche.set1A,
+        set1_b: parche.set1B,
+        estado_partido: parche.estado,
       })
       .eq("id", partidoId);
 
     if (updateError) throw new Error(updateError.message);
+    }
 
     // 3. Registrar en auditoría
     await supabaseAdmin.from("logs_auditoria").insert({

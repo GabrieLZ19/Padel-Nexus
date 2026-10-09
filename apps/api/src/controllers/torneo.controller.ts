@@ -459,6 +459,61 @@ export const gestionarParejaLlave = async (
   }
 };
 
+export const opcionesPromocionMenores = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { PromocionMenoresService } = await import(
+      "../services/promocionMenores.service"
+    );
+    const opciones = await PromocionMenoresService.opciones(req.params.id);
+    return res.status(200).json(opciones);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error";
+    return res.status(400).json({ message });
+  }
+};
+
+export const promoverParejaMenores = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const adminId = req.user?.id;
+    if (!adminId) return res.status(401).json({ message: "No autorizado" });
+    const { inscripcion_id, torneo_destino_id, partido_destino_id, lado, motivo } =
+      req.body as {
+        inscripcion_id?: string;
+        torneo_destino_id?: string;
+        partido_destino_id?: string | null;
+        lado?: "a" | "b" | null;
+        motivo?: string;
+      };
+    if (!inscripcion_id || !torneo_destino_id) {
+      return res
+        .status(400)
+        .json({ message: "Falta la pareja o la categoría destino." });
+    }
+    const { PromocionMenoresService } = await import(
+      "../services/promocionMenores.service"
+    );
+    const resultado = await PromocionMenoresService.promover({
+      torneoOrigenId: req.params.id,
+      inscripcionId: inscripcion_id,
+      torneoDestinoId: torneo_destino_id,
+      partidoDestinoId: partido_destino_id || null,
+      ladoDestino: lado === "a" || lado === "b" ? lado : null,
+      motivo: motivo || "",
+      adminId,
+    });
+    return res.status(200).json(resultado);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error";
+    return res.status(400).json({ message });
+  }
+};
+
 export const getZonasByTorneo = async (
   req: Request,
   res: Response,

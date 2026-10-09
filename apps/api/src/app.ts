@@ -49,6 +49,7 @@ app.get("/health", (req: Request, res: Response) => {
 import asociacionesRoutes from "./routes/asociacion.routes";
 import federacionesRoutes from "./routes/federacion.routes";
 import afiliacionesRoutes from "./routes/afiliacion.routes";
+import pasesRoutes from "./routes/pase.routes";
 
 // Registro de Rutas
 app.use("/api/torneos", torneosRoutes);
@@ -57,6 +58,7 @@ app.use("/api/licencias", licenciasRoutes);
 app.use("/api/asociaciones", asociacionesRoutes);
 app.use("/api/federaciones", federacionesRoutes);
 app.use("/api/afiliaciones", afiliacionesRoutes);
+app.use("/api/pases", pasesRoutes);
 app.use("/api/clubes", clubesRoutes);
 app.use("/api/inscripciones", inscripcionesRoutes);
 app.use("/api/partidos", partidosRoutes);

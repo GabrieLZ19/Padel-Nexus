@@ -1,8 +1,5 @@
 import { supabaseAdmin } from "../config/supabase";
-import {
-  AFILIACION_ESTADOS,
-  AFILIACION_ESTADOS_BLOQUEANTES,
-} from "../constants/afiliacion";
+import { AFILIACION_ESTADOS } from "../constants/afiliacion";
 import { NotificacionService } from "./notificacion.service";
 
 function fechaVencimientoDefault(meses = 12): string {
@@ -121,72 +118,10 @@ export class AfiliacionService {
     }
   }
 
-  static async solicitar(usuarioId: string, clubId: string) {
-    const { data: club, error: clubError } = await supabaseAdmin
-      .from("clubes")
-      .select("id, nombre, asociacion_id, estado")
-      .eq("id", clubId)
-      .single();
-
-    if (clubError || !club) {
-      throw new Error("El club seleccionado no existe.");
-    }
-
-    const { data: conflicto } = await supabaseAdmin
-      .from("afiliaciones")
-      .select("id, estado")
-      .eq("usuario_id", usuarioId)
-      .eq("club_id", clubId)
-      .in("estado", [...AFILIACION_ESTADOS_BLOQUEANTES])
-      .maybeSingle();
-
-    if (conflicto) {
-      throw new Error(
-        conflicto.estado === AFILIACION_ESTADOS.PENDIENTE
-          ? "Ya tenés una solicitud pendiente para este club."
-          : "Ya estás afiliado a este club.",
-      );
-    }
-
-    // También bloquear legacy por nombre
-    const { data: legacy } = await supabaseAdmin
-      .from("afiliaciones")
-      .select("id, estado")
-      .eq("usuario_id", usuarioId)
-      .eq("entidad", club.nombre)
-      .in("estado", [...AFILIACION_ESTADOS_BLOQUEANTES])
-      .maybeSingle();
-
-    if (legacy) {
-      throw new Error("Ya tenés una afiliación activa o pendiente a este club.");
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from("afiliaciones")
-      .insert([
-        {
-          usuario_id: usuarioId,
-          entidad: club.nombre,
-          estado: AFILIACION_ESTADOS.PENDIENTE,
-          fecha_vencimiento: fechaVencimientoDefault(),
-          club_id: club.id,
-          asociacion_id: club.asociacion_id || null,
-        },
-      ])
-      .select("*")
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    NotificacionService.notificarAdmins({
-      titulo: "Nueva solicitud de afiliación",
-      mensaje: `Un jugador solicitó afiliarse a ${club.nombre}.`,
-      tipo: "info",
-    }).catch((err) =>
-      console.error("Error al notificar admins de afiliación:", err),
+  static async solicitar(_usuarioId: string, _clubId: string) {
+    throw new Error(
+      "No hace falta afiliarse a un club para jugar sus torneos. Reservá la cancha o inscribite al torneo. Para cambiar de provincia pedí un pase entre asociaciones.",
     );
-
-    return data;
   }
 
   static async listarMias(usuarioId: string) {
