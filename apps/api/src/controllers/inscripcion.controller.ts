@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import { InscripcionService } from "../services/inscripcion.service";
 import type { FilaPlanillaInscripcion } from "../utils/inscripcionPlanilla";
+import { AlcanceCuentaService } from "../services/alcanceCuenta.service";
+import { supabaseAdmin } from "../config/supabase";
 export const getAllInscripciones = async (
   req: Request,
   res: Response,
@@ -16,6 +18,33 @@ export const getAllInscripciones = async (
 
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
+    const cuenta = await AlcanceCuentaService.resolver(req.user);
+    let torneoIds: string[] | undefined;
+
+    if (cuenta.rol === "admin_provincial") {
+      if (!cuenta.provincia) {
+        return res.status(200).json({
+          data: [],
+          total: 0,
+          aviso: cuenta.aviso,
+          resumen: { pendientes: 0, confirmadas: 0, rechazadas: 0, recaudacion: 0 },
+        });
+      }
+      const clubIds = await AlcanceCuentaService.idsClubesDeProvincia(cuenta.provincia);
+      if (clubIds.length === 0) {
+        torneoIds = [];
+      } else {
+        const { data: torneosProvincia } = await supabaseAdmin
+          .from("torneos")
+          .select("id")
+          .in("club_id", clubIds)
+          .neq("alcance", "Nacional");
+        torneoIds = (torneosProvincia || []).map((torneo) => torneo.id as string);
+      }
+      if (typeof torneo_id === "string" && torneo_id && !torneoIds.includes(torneo_id)) {
+        return res.status(403).json({ message: "Esa inscripción no es de tu provincia." });
+      }
+    }
 
     const resultado = await InscripcionService.obtenerInscripcionesPaginadas(
       torneo_id as string | undefined,
@@ -24,14 +53,16 @@ export const getAllInscripciones = async (
       {
         search: typeof search === "string" ? search : undefined,
         estadoPago: typeof estado_pago === "string" ? estado_pago : undefined,
+        torneoIds: torneo_id ? undefined : torneoIds,
       },
     );
 
     const resumen = await InscripcionService.obtenerResumenInscripciones(
       torneo_id as string | undefined,
+      torneo_id ? undefined : torneoIds,
     );
 
-    return res.status(200).json({ ...resultado, resumen });
+    return res.status(200).json({ ...resultado, resumen, aviso: cuenta.aviso });
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";

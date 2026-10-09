@@ -59,7 +59,7 @@ const router = Router();
 
 // Lectura pública; si hay sesión de club, el listado se acota a su club_id
 router.get("/", optionalAuthenticate, getAllTorneos);
-router.get("/:id", getTorneoById);
+router.get("/:id", optionalAuthenticate, getTorneoById);
 router.get("/:id/partidos", getPartidosByTorneo);
 router.get("/:id/posiciones", obtenerPosicionesZona);
 router.get("/:id/zonas", getZonasByTorneo);

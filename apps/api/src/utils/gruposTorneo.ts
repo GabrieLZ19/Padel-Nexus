@@ -4,6 +4,11 @@ export interface TorneoAgrupable {
   nivel?: string | null;
   rama?: string | null;
   grupo_id?: string | null;
+  alcance?: string | null;
+  club_id?: string | null;
+  clubes?: { provincia?: string | null } | null;
+  solo_lectura?: boolean;
+  puede_cargar_resultados?: boolean;
 }
 
 export interface RamaGrupo {

@@ -14,6 +14,7 @@ import {
   listarBloqueosClub,
   crearBloqueoClub,
   eliminarBloqueoClub,
+  limitarClubAProvincia,
 } from "../controllers/club.controller";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -21,6 +22,7 @@ const router = Router();
 
 // Rutas de lectura (Cualquier usuario logueado puede ver los clubes y sus canchas)
 router.get("/", authenticate, getAllClubes);
+router.use("/:id", authenticate, limitarClubAProvincia);
 router.get("/:id", authenticate, getClubById);
 router.get("/:id/canchas", authenticate, getCanchasPorClub);
 

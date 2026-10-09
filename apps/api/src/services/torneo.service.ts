@@ -131,6 +131,9 @@ export interface FiltrosTorneo {
   estado?: string;
   incluirBorradores?: boolean;
   clubId?: string;
+  /** Clubes de la provincia de la cuenta. Vacío significa ninguno. */
+  clubIds?: string[];
+  incluirNacionales?: boolean;
   /** Vista operativa del listado CRM. `auto` elige la más urgente. */
   vista?: string;
   /** Agrupa por competencia y, dentro, por rama. Pagina grupos, no torneos. */
@@ -337,6 +340,20 @@ export class TorneoService {
 
     if (filtros?.clubId) {
       query = query.eq("club_id", filtros.clubId);
+    }
+
+    if (filtros?.clubIds) {
+      const ids = filtros.clubIds.filter(Boolean);
+      if (filtros.incluirNacionales) {
+        query =
+          ids.length === 0
+            ? query.eq("alcance", "Nacional")
+            : query.or(`alcance.eq.Nacional,club_id.in.(${ids.join(",")})`);
+      } else if (ids.length === 0) {
+        query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+      } else {
+        query = query.in("club_id", ids);
+      }
     }
 
     if (!vistaPedida && filtros?.search) {

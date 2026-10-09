@@ -1,5 +1,34 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { ClubService } from "../services/club.service";
+import { AlcanceCuentaService } from "../services/alcanceCuenta.service";
+import { mismaProvincia } from "../utils/alcanceCuenta";
+
+export async function limitarClubAProvincia(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const clubId = typeof req.params.id === "string" ? req.params.id : "";
+  if (!clubId) {
+    next();
+    return;
+  }
+  const cuenta = await AlcanceCuentaService.resolver(req.user);
+  if (cuenta.rol !== "admin_provincial") {
+    next();
+    return;
+  }
+  if (!cuenta.provincia) {
+    res.status(403).json({ message: cuenta.aviso });
+    return;
+  }
+  const ids = await AlcanceCuentaService.idsClubesDeProvincia(cuenta.provincia);
+  if (!ids.includes(clubId)) {
+    res.status(403).json({ message: "Este club no es de tu provincia." });
+    return;
+  }
+  next();
+}
 
 export const getAllClubes = async (
   req: Request,
@@ -46,15 +75,38 @@ export const getAllClubes = async (
 
     const pageNum = parseInt(page as string, 10);
     const limitNum = parseInt(limit as string, 10);
+    const cuenta = await AlcanceCuentaService.resolver(req.user);
+    let provinciaFiltro = provincia as string | undefined;
+    let clubIds: string[] | undefined;
+
+    if (cuenta.rol === "admin_provincial") {
+      if (!cuenta.provincia) {
+        return res.status(200).json({
+          exito: true,
+          data: [],
+          total: 0,
+          aviso: cuenta.aviso,
+        });
+      }
+      if (
+        provinciaFiltro &&
+        !mismaProvincia(provinciaFiltro, cuenta.provincia)
+      ) {
+        return res.status(200).json({ exito: true, data: [], total: 0 });
+      }
+      clubIds = await AlcanceCuentaService.idsClubesDeProvincia(cuenta.provincia);
+      provinciaFiltro = undefined;
+    }
 
     const resultado = await ClubService.obtenerClubesPaginados(
       pageNum,
       limitNum,
       search as string | undefined,
-      provincia as string | undefined,
+      provinciaFiltro,
+      clubIds,
     );
 
-    return res.status(200).json({ exito: true, ...resultado });
+    return res.status(200).json({ exito: true, ...resultado, aviso: cuenta.aviso });
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";

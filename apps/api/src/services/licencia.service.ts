@@ -13,6 +13,7 @@ import {
   descripcionVigenciaLicencia,
   periodoDesdeFecha,
 } from "../utils/licenciaConfig";
+import { resumirLicenciasPorJugador } from "../utils/resumenLicencias";
 
 function normalizarTexto(input?: string | null): string {
   if (!input) return "";
@@ -153,13 +154,95 @@ export class LicenciaService {
       });
 
       const total = rows.length;
-      return { data: rows.slice(from, to + 1), total };
+      const resumen = await LicenciaService.resumenEstados(
+        search,
+        alcanceProvincial,
+      );
+      return { data: rows.slice(from, to + 1), total, resumen };
     }
 
+    const resumen = await LicenciaService.resumenEstados(search, null);
     return {
       data: rows,
       total: count || 0,
+      resumen,
     };
+  }
+
+  /**
+   * Cuenta jugadores por estado de licencia en todo el alcance, sin paginar
+   * y sin el filtro de una pestaña. Es la misma cifra que muestra el listado.
+   */
+  private static async resumenEstados(
+    search: string | undefined,
+    alcanceProvincial: {
+      asociacionId: string | null;
+      provincia: string;
+    } | null,
+  ) {
+    const select =
+      "id, lugar_residencia, licencias:licencias!fk_licencias_usuario!inner(estado, asociacion_id)";
+
+    const filas: Array<{
+      id: string;
+      lugar_residencia?: string | null;
+      licencias?:
+        | { estado?: string | null; asociacion_id?: string | null }
+        | { estado?: string | null; asociacion_id?: string | null }[];
+    }> = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      let query = supabaseAdmin.from("perfiles").select(select);
+      if (search) {
+        const term = `%${search.trim()}%`;
+        query = query.or(
+          `nombre.ilike.${term},apellido.ilike.${term},email.ilike.${term},licencias.nro_licencia.ilike.${term}`,
+        );
+      }
+      if (alcanceProvincial) {
+        query = query.ilike(
+          "lugar_residencia",
+          `%${alcanceProvincial.provincia}%`,
+        );
+      }
+      const { data, error } = await query.range(from, from + pageSize - 1);
+      if (error) throw new Error(error.message || "Error al resumir licencias");
+      filas.push(...(data || []));
+      if (!data || data.length < pageSize) break;
+    }
+
+    let rows = filas;
+    if (alcanceProvincial) {
+      const target = normalizarTexto(alcanceProvincial.provincia);
+      const asocId = alcanceProvincial.asociacionId;
+      if (asocId) {
+        const { data: extra, error } = await supabaseAdmin
+          .from("perfiles")
+          .select(select)
+          .eq("licencias.asociacion_id", asocId);
+        if (error) throw new Error(error.message || "Error al resumir licencias");
+        const byId = new Map(rows.map((row) => [row.id, row]));
+        for (const row of extra || []) byId.set(row.id, row);
+        rows = [...byId.values()];
+      }
+
+      rows = rows.filter((perfil) => {
+        const licencias = Array.isArray(perfil.licencias)
+          ? perfil.licencias
+          : perfil.licencias
+            ? [perfil.licencias]
+            : [];
+        if (
+          asocId &&
+          licencias.some((licencia) => licencia.asociacion_id === asocId)
+        ) {
+          return true;
+        }
+        return normalizarTexto(perfil.lugar_residencia) === target;
+      });
+    }
+
+    return resumirLicenciasPorJugador(rows);
   }
 
   /**

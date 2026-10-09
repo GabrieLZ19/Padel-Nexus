@@ -1,4 +1,9 @@
 import { supabase, supabaseAdmin } from "../config/supabase";
+import {
+  armarFilasAgenda,
+  hoyArgentina,
+  type ReservaEnAgenda,
+} from "../utils/agendaReservas";
 
 export interface CrearClubDTO {
   nombre: string;
@@ -152,6 +157,7 @@ export class ClubService {
     limit: number,
     search?: string,
     provincia?: string,
+    clubIds?: string[],
   ) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
@@ -162,7 +168,12 @@ export class ClubService {
       .range(from, to);
 
     if (search) query = query.ilike("nombre", `%${search}%`);
-    if (provincia) query = query.eq("provincia", provincia);
+    if (clubIds) {
+      if (clubIds.length === 0) return { data: [], total: 0 };
+      query = query.in("id", clubIds);
+    } else if (provincia) {
+      query = query.eq("provincia", provincia);
+    }
 
     const { data, error, count } = await query;
     if (error) throw new Error("Error interno al obtener los clubes.");
@@ -512,9 +523,11 @@ export class ClubService {
       cancha_id?: string;
       page?: number;
       limit?: number;
+      solo_atrasadas?: boolean;
     },
   ) {
-    const { fecha, estado_pago, cancha_id, page = 1, limit = 20 } = filtros;
+    const { fecha, estado_pago, cancha_id, page = 1, limit = 20, solo_atrasadas } = filtros;
+    const hoy = hoyArgentina();
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
@@ -527,7 +540,7 @@ export class ClubService {
     const canchaIds = (canchas || []).map((c) => c.id);
 
     if (canchaIds.length === 0) {
-      return { data: [], total: 0 };
+      return { data: [], total: 0, atrasadas: 0 };
     }
 
     // Armar la consulta
@@ -575,16 +588,204 @@ export class ClubService {
       );
     }
 
-    if (fecha) query = query.eq("fecha_reserva", fecha);
-    if (estado_pago) query = query.eq("estado_pago", estado_pago);
+    if (solo_atrasadas) {
+      query = query.lt("fecha_reserva", hoy).eq("estado_reserva", "pendiente");
+    } else {
+      if (fecha) query = query.eq("fecha_reserva", fecha);
+      if (estado_pago) query = query.eq("estado_pago", estado_pago);
+    }
 
     query = query.order("fecha_reserva", { ascending: false }).range(from, to);
+
+    const turnoIds = cancha_id
+      ? (
+          await supabaseAdmin.from("turnos").select("id").eq("cancha_id", cancha_id)
+        ).data?.map((turno) => turno.id) || []
+      : (
+          await supabaseAdmin.from("turnos").select("id").in("cancha_id", canchaIds)
+        ).data?.map((turno) => turno.id) || [];
+
+    const { count: atrasadas } = await supabaseAdmin
+      .from("reservas")
+      .select("id", { count: "exact", head: true })
+      .in(
+        "turno_id",
+        turnoIds.length > 0 ? turnoIds : ["00000000-0000-0000-0000-000000000000"],
+      )
+      .lt("fecha_reserva", hoy)
+      .eq("estado_reserva", "pendiente");
 
     const { data, error, count } = await query;
     if (error)
       throw new Error("Error al obtener reservas del club: " + error.message);
 
-    return { data: data || [], total: count || 0 };
+    return { data: data || [], total: count || 0, atrasadas: atrasadas || 0 };
+  }
+
+  static async agendaReservasClub(clubId: string, fecha: string) {
+    const diaSemana = new Date(`${fecha}T12:00:00Z`).getUTCDay();
+    const { data: canchas, error: errorCanchas } = await supabaseAdmin
+      .from("canchas")
+      .select("id, nombre")
+      .eq("club_id", clubId)
+      .eq("activa", true)
+      .order("nombre", { ascending: true });
+
+    if (errorCanchas) throw new Error(errorCanchas.message);
+    const listaCanchas = canchas || [];
+    const canchaIds = listaCanchas.map((cancha) => cancha.id);
+    if (canchaIds.length === 0) {
+      return { fecha, canchas: [], filas: [] };
+    }
+
+    const { data: turnos, error: errorTurnos } = await supabaseAdmin
+      .from("turnos")
+      .select("id, cancha_id, hora_inicio, hora_fin, precio")
+      .in("cancha_id", canchaIds)
+      .eq("dia_semana", diaSemana);
+
+    if (errorTurnos) throw new Error(errorTurnos.message);
+
+    const turnoIds = (turnos || []).map((turno) => turno.id);
+    const { data: reservas, error: errorReservas } = turnoIds.length
+      ? await supabaseAdmin
+          .from("reservas")
+          .select(
+            "id, turno_id, estado_reserva, estado_pago, perfiles(nombre, apellido)",
+          )
+          .in("turno_id", turnoIds)
+          .eq("fecha_reserva", fecha)
+          .neq("estado_reserva", "cancelada")
+      : { data: [], error: null };
+
+    if (errorReservas) throw new Error(errorReservas.message);
+
+    const precioPorTurno = new Map(
+      (turnos || []).map((turno) => [turno.id, Number(turno.precio) || 0]),
+    );
+    const reservasAgenda: ReservaEnAgenda[] = (reservas || []).map((reserva) => {
+      const perfil = Array.isArray(reserva.perfiles)
+        ? reserva.perfiles[0]
+        : reserva.perfiles;
+      const apellido = perfil?.apellido || "";
+      const nombre = perfil?.nombre || "";
+      return {
+        id: reserva.id,
+        turno_id: reserva.turno_id,
+        estado_reserva: reserva.estado_reserva,
+        estado_pago: reserva.estado_pago,
+        jugador: [apellido, nombre].filter(Boolean).join(", ") || "Jugador",
+        precio: precioPorTurno.get(reserva.turno_id) || 0,
+      };
+    });
+
+    return {
+      fecha,
+      canchas: listaCanchas,
+      filas: armarFilasAgenda(canchaIds, turnos || [], reservasAgenda),
+    };
+  }
+
+  static async gestionarReservaClub(
+    clubId: string,
+    reservaId: string,
+    accion: "confirmar" | "cobrar" | "cancelar" | "ausente",
+  ) {
+    const { data: reserva, error } = await supabaseAdmin
+      .from("reservas")
+      .select(
+        "id, usuario_id, estado_reserva, estado_pago, turno_id, turnos(precio, cancha_id, canchas(club_id))",
+      )
+      .eq("id", reservaId)
+      .single();
+
+    if (error || !reserva) throw new Error("Reserva no encontrada.");
+
+    const turno = Array.isArray(reserva.turnos) ? reserva.turnos[0] : reserva.turnos;
+    const cancha = turno
+      ? Array.isArray(turno.canchas)
+        ? turno.canchas[0]
+        : turno.canchas
+      : null;
+    if (!cancha || cancha.club_id !== clubId) {
+      throw new Error("La reserva no pertenece a este club.");
+    }
+    if (reserva.estado_reserva === "cancelada") {
+      throw new Error("La reserva está cancelada.");
+    }
+
+    if (accion === "confirmar") {
+      if (reserva.estado_reserva === "ausente") {
+        throw new Error("Una ausencia no se confirma.");
+      }
+      const { error: updateError } = await supabaseAdmin
+        .from("reservas")
+        .update({ estado_reserva: "confirmada" })
+        .eq("id", reservaId);
+      if (updateError) throw new Error(updateError.message);
+      return { id: reservaId, estado_reserva: "confirmada", estado_pago: reserva.estado_pago };
+    }
+
+    if (accion === "ausente") {
+      const { error: updateError } = await supabaseAdmin
+        .from("reservas")
+        .update({ estado_reserva: "ausente" })
+        .eq("id", reservaId);
+      if (updateError) throw new Error(updateError.message);
+      return { id: reservaId, estado_reserva: "ausente", estado_pago: reserva.estado_pago };
+    }
+
+    if (accion === "cancelar") {
+      const { error: updateError } = await supabaseAdmin
+        .from("reservas")
+        .update({ estado_reserva: "cancelada" })
+        .eq("id", reservaId);
+      if (updateError) throw new Error(updateError.message);
+      return { id: reservaId, estado_reserva: "cancelada", estado_pago: reserva.estado_pago };
+    }
+
+    if (reserva.estado_reserva === "ausente") {
+      throw new Error("No se cobra una reserva marcada como ausencia.");
+    }
+    if (reserva.estado_pago === "completado") {
+      throw new Error("Esta reserva ya está paga.");
+    }
+
+    const monto = Number(turno?.precio) || 0;
+    const { data: pagoPrevio } = await supabaseAdmin
+      .from("pagos")
+      .select("id")
+      .eq("reserva_id", reservaId)
+      .neq("estado", "completado")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (pagoPrevio?.id) {
+      const { error: pagoError } = await supabaseAdmin
+        .from("pagos")
+        .update({ estado: "completado", metodo_pago: "efectivo", monto })
+        .eq("id", pagoPrevio.id);
+      if (pagoError) throw new Error(pagoError.message);
+    } else {
+      const { error: pagoError } = await supabaseAdmin.from("pagos").insert({
+        reserva_id: reservaId,
+        usuario_id: reserva.usuario_id,
+        monto,
+        metodo_pago: "efectivo",
+        estado: "completado",
+        referencia_pago: "caja-club",
+      });
+      if (pagoError) throw new Error(pagoError.message);
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from("reservas")
+      .update({ estado_reserva: "confirmada", estado_pago: "completado" })
+      .eq("id", reservaId);
+    if (updateError) throw new Error(updateError.message);
+
+    return { id: reservaId, estado_reserva: "confirmada", estado_pago: "completado", monto };
   }
 
   /**

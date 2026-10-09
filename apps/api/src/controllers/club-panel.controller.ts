@@ -225,7 +225,7 @@ export class ClubPanelController {
   static async obtenerReservas(req: Request, res: Response) {
     try {
       const clubId = await ClubPanelController.getClubIdDelUsuario(req.user!.id);
-      const { fecha, estado_pago, cancha_id, page, limit } = req.query;
+      const { fecha, estado_pago, cancha_id, page, limit, solo_atrasadas } = req.query;
 
       const filtros = {
         fecha: fecha as string | undefined,
@@ -233,10 +233,57 @@ export class ClubPanelController {
         cancha_id: cancha_id as string | undefined,
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
+        solo_atrasadas: solo_atrasadas === "1" || solo_atrasadas === "true",
       };
 
       const data = await ClubService.obtenerReservasClub(clubId, filtros);
       return res.status(200).json({ exito: true, ...data });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  }
+
+  /**
+   * GET /api/club/mi-club/reservas/agenda?fecha=YYYY-MM-DD
+   */
+  static async agendaReservas(req: Request, res: Response) {
+    try {
+      const clubId = await ClubPanelController.getClubIdDelUsuario(req.user!.id);
+      const fecha = String(req.query.fecha || "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+        return res.status(400).json({ exito: false, error: "Indicá la fecha de la agenda." });
+      }
+      const data = await ClubService.agendaReservasClub(clubId, fecha);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  }
+
+  /**
+   * POST /api/club/mi-club/reservas/:reservaId/gestionar
+   * accion: confirmar | cobrar | cancelar | ausente
+   */
+  static async gestionarReserva(req: Request, res: Response) {
+    try {
+      const clubId = await ClubPanelController.getClubIdDelUsuario(req.user!.id);
+      const reservaId = String(req.params.reservaId || "");
+      const accion = req.body?.accion;
+      if (
+        accion !== "confirmar" &&
+        accion !== "cobrar" &&
+        accion !== "cancelar" &&
+        accion !== "ausente"
+      ) {
+        return res.status(400).json({
+          exito: false,
+          error: "La acción tiene que ser confirmar, cobrar, cancelar o ausente.",
+        });
+      }
+      const data = await ClubService.gestionarReservaClub(clubId, reservaId, accion);
+      return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Error desconocido";
       return res.status(400).json({ exito: false, error: message });

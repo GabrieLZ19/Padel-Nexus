@@ -1,5 +1,18 @@
 import { Request, Response } from "express";
+import { AlcanceCuentaService } from "../services/alcanceCuenta.service";
 import { ProgramacionService } from "../services/programacion.service";
+
+async function rechazarSiNoEdita(
+  req: Request,
+  torneoId: string,
+  res: Response,
+): Promise<Response | null> {
+  const decision = await AlcanceCuentaService.consultar(req.user, torneoId, "editar");
+  if (decision.permitido) return null;
+  return res.status(403).json({
+    message: decision.motivo || "No tenés permiso para cambiar este torneo.",
+  });
+}
 
 /**
  * GET /api/torneos/:id/programacion/preview
@@ -12,6 +25,12 @@ export const previewProgramacion = async (
 ): Promise<Response> => {
   try {
     const { id } = req.params;
+    const ver = await AlcanceCuentaService.consultar(req.user, id, "ver");
+    if (!ver.permitido) {
+      return res.status(403).json({
+        message: ver.motivo || "No tenés permiso para ver este torneo.",
+      });
+    }
     const data = await ProgramacionService.preview(id);
     return res.status(200).json(data);
   } catch (err: any) {
@@ -35,6 +54,8 @@ export const reprogramarProgramacion = async (
 ): Promise<Response> => {
   try {
     const { id } = req.params;
+    const bloqueo = await rechazarSiNoEdita(req, id, res);
+    if (bloqueo) return bloqueo;
     const { motivo } = req.body || {};
     const data = await ProgramacionService.reprogramar(id, {
       motivo,
@@ -60,6 +81,8 @@ export const publicarProgramacion = async (
 ): Promise<Response> => {
   try {
     const { id } = req.params;
+    const bloqueo = await rechazarSiNoEdita(req, id, res);
+    if (bloqueo) return bloqueo;
     const data = await ProgramacionService.publicar(id, {
       adminId: req.user?.id,
     });
@@ -97,6 +120,13 @@ export const getProgramacionBoard = async (
       ? Number(req.query.jornadas)
       : undefined;
     const descansoModo = req.query.descansoModo;
+    const ver = await AlcanceCuentaService.consultar(req.user, id, "ver");
+    if (!ver.permitido) {
+      return res.status(403).json({
+        message: ver.motivo || "No tenés permiso para ver este torneo.",
+      });
+    }
+    const editar = await AlcanceCuentaService.consultar(req.user, id, "editar");
     const data = await ProgramacionService.getBoard(id, {
       duracionMinutos: Number.isFinite(duracion) ? duracion : undefined,
       descansoMinutos: Number.isFinite(descanso) ? descanso : undefined,
@@ -117,7 +147,11 @@ export const getProgramacionBoard = async (
       horaFin:
         typeof req.query.horaFin === "string" ? req.query.horaFin : undefined,
     });
-    return res.status(200).json(data);
+    return res.status(200).json({
+      ...data,
+      solo_lectura: !editar.permitido,
+      aviso_alcance: editar.permitido ? null : editar.motivo,
+    });
   } catch (err: any) {
     return res.status(400).json({
       message: "No se pudo cargar el programador",
@@ -133,6 +167,8 @@ export const asignarProgramacion = async (
 ): Promise<Response> => {
   try {
     const { id } = req.params;
+    const bloqueo = await rechazarSiNoEdita(req, id, res);
+    if (bloqueo) return bloqueo;
     const { partido_id, fecha_iso, cancha_label, motivo } = req.body || {};
     const data = await ProgramacionService.asignar(id, {
       partido_id,
@@ -157,6 +193,8 @@ export const desasignarProgramacion = async (
 ): Promise<Response> => {
   try {
     const { id } = req.params;
+    const bloqueo = await rechazarSiNoEdita(req, id, res);
+    if (bloqueo) return bloqueo;
     const { partido_id, motivo } = req.body || {};
     const data = await ProgramacionService.desasignar(id, {
       partido_id,
@@ -179,6 +217,8 @@ export const limpiarProgramacion = async (
 ): Promise<Response> => {
   try {
     const { id } = req.params;
+    const bloqueo = await rechazarSiNoEdita(req, id, res);
+    if (bloqueo) return bloqueo;
     const { motivo } = req.body || {};
     const data = await ProgramacionService.limpiar(id, {
       motivo,
@@ -200,6 +240,8 @@ export const autoAsignarProgramacion = async (
 ): Promise<Response> => {
   try {
     const { id } = req.params;
+    const bloqueo = await rechazarSiNoEdita(req, id, res);
+    if (bloqueo) return bloqueo;
     const {
       estrategia,
       distribucion,
@@ -239,6 +281,8 @@ export const guardarBorradorProgramacion = async (
 ): Promise<Response> => {
   try {
     const { id } = req.params;
+    const bloqueo = await rechazarSiNoEdita(req, id, res);
+    if (bloqueo) return bloqueo;
     const {
       motivo,
       duracionMinutos,
@@ -274,6 +318,8 @@ export const nuevaEdicionProgramacion = async (
 ): Promise<Response> => {
   try {
     const { id } = req.params;
+    const bloqueo = await rechazarSiNoEdita(req, id, res);
+    if (bloqueo) return bloqueo;
     const { motivo } = req.body || {};
     const data = await ProgramacionService.abrirNuevaEdicion(id, {
       motivo,

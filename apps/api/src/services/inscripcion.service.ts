@@ -347,7 +347,7 @@ export class InscripcionService {
     torneoId?: string,
     page: number = 1,
     limit: number = 10,
-    filtros?: { search?: string; estadoPago?: string },
+    filtros?: { search?: string; estadoPago?: string; torneoIds?: string[] },
   ) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
@@ -363,6 +363,11 @@ export class InscripcionService {
 
     if (torneoId) {
       query = query.eq("torneo_id", torneoId);
+    } else if (filtros?.torneoIds) {
+      if (filtros.torneoIds.length === 0) {
+        return { data: [], total: 0 };
+      }
+      query = query.in("torneo_id", filtros.torneoIds);
     }
 
     if (filtros?.estadoPago) {
@@ -425,13 +430,18 @@ export class InscripcionService {
     return { data: formattedData, total: count };
   }
 
-  static async obtenerResumenInscripciones(torneoId?: string) {
+  static async obtenerResumenInscripciones(torneoId?: string, torneoIds?: string[]) {
     let query = supabaseAdmin
       .from("inscripciones")
       .select("estado_pago, monto");
 
     if (torneoId) {
       query = query.eq("torneo_id", torneoId);
+    } else if (torneoIds) {
+      if (torneoIds.length === 0) {
+        return { pendientes: 0, confirmadas: 0, rechazadas: 0, recaudacion: 0 };
+      }
+      query = query.in("torneo_id", torneoIds);
     }
 
     const { data, error } = await query;

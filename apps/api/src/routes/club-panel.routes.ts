@@ -31,7 +31,9 @@ router.post(
 );
 
 // Reservas
+router.get("/mi-club/reservas/agenda", ClubPanelController.agendaReservas);
 router.get("/mi-club/reservas", ClubPanelController.obtenerReservas);
+router.post("/mi-club/reservas/:reservaId/gestionar", ClubPanelController.gestionarReserva);
 
 // Bloqueos de franjas (no disponibles para reserva online)
 router.get("/mi-club/bloqueos", ClubPanelController.listarBloqueos);
