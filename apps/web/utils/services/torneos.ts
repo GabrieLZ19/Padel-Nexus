@@ -1,10 +1,17 @@
 import { api } from "../api";
-import { Torneo, FormTorneoState, Partido } from "../types";
+import { Torneo, FormTorneoState, Partido, GrupoTorneoListado } from "../types";
 import { hydrateTorneoRestrictions } from "../inscripcionElegibilidad";
+import type { VistaTorneoId, VistaTorneoParam } from "../constants/padelConfig";
 
 export interface PaginatedTorneos {
   data: Torneo[];
   total: number;
+  vista?: VistaTorneoId | "todos";
+  vista_automatica?: boolean;
+  contadores?: Record<VistaTorneoId, number>;
+  requieren_programacion?: number;
+  total_torneos?: number;
+  grupos?: GrupoTorneoListado[];
 }
 
 export const TorneosService = {
@@ -28,7 +35,12 @@ export const TorneosService = {
     limit: number,
     search?: string,
     estado?: string,
-    options?: { incluirBorradores?: boolean; clubId?: string },
+    options?: {
+      incluirBorradores?: boolean;
+      clubId?: string;
+      vista?: VistaTorneoParam;
+      agrupar?: boolean;
+    },
   ): Promise<PaginatedTorneos> {
     const response = await api.get<PaginatedTorneos | Torneo[]>("/torneos", {
       params: {
@@ -38,6 +50,8 @@ export const TorneosService = {
         estado,
         incluir_borradores: options?.incluirBorradores ? "true" : undefined,
         club_id: options?.clubId || undefined,
+        vista: options?.vista,
+        agrupar: options?.agrupar ? "true" : undefined,
       },
     });
 
@@ -56,6 +70,17 @@ export const TorneosService = {
 
   async create(torneoData: FormTorneoState): Promise<Torneo> {
     const response = await api.post<Torneo>("/torneos", torneoData);
+    return response.data;
+  },
+
+  async agrupar(
+    nombre: string,
+    torneoIds: string[],
+  ): Promise<{ id: string | null; nombre: string | null }> {
+    const response = await api.post<{ id: string | null; nombre: string | null }>(
+      "/torneos/grupos",
+      { nombre, torneo_ids: torneoIds },
+    );
     return response.data;
   },
 

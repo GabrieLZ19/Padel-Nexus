@@ -1,35 +1,37 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
-  Search,
   Pencil,
   Trash2,
   Trophy,
   LayoutDashboard,
   Printer,
   Copy,
+  Layers,
 } from "lucide-react";
 import { TorneosService } from "../../../utils/services/torneos";
 import { ClubesService } from "../../../utils/services/clubes";
 import { AsociacionesService } from "../../../utils/services/asociaciones";
 import Pagination from "../../../components/ui/Pagination";
-import { Torneo, Club, FormTorneoState } from "../../../utils/types";
+import { Torneo, Club, FormTorneoState, GrupoTorneoListado } from "../../../utils/types";
 
 import TorneoModal from "../../../components/torneos/TorneoModal";
 import ReplicarTorneoModal from "../../../components/torneos/ReplicarTorneoModal";
+import AgruparTorneosModal from "../../../components/torneos/AgruparTorneosModal";
+import TorneoFilasAgrupadas from "../../../components/torneos/TorneoFilasAgrupadas";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "../../../components/ui/FeedbackModal";
 import { useProfileStore } from "@/store/useProfileStore";
 import { esRolFiscal } from "@/utils/auth/roles";
 import { formatFechaCalendario } from "@/utils/formatFecha";
+import TorneoVistaFiltros from "@/components/torneos/TorneoVistaFiltros";
 import {
-  TORNEO_LIST_TABS,
-  estadoParamDesdeTabTorneo,
-  tabTorneoIncluyeBorradores,
+  CONTADORES_VISTA_VACIOS,
+  type VistaTorneoId,
 } from "@/utils/constants/padelConfig";
 
 const ESTADO_INICIAL: FormTorneoState = {
@@ -68,11 +70,16 @@ export default function TorneosPage() {
     }
   }, [profile?.rol, router]);
 
-  // Aterriza en Todos para ver el listado completo.
-  const [activeTab, setActiveTab] = useState<string>("Todos");
+  const [vista, setVista] = useState<VistaTorneoId | "todos" | null>(null);
+  const [vistaAutomatica, setVistaAutomatica] = useState(false);
+  const [contadores, setContadores] = useState(CONTADORES_VISTA_VACIOS);
+  const [requierenProgramacion, setRequierenProgramacion] = useState(0);
+  const aplicarVistaServidor = useRef(false);
   const [search, setSearch] = useState<string>("");
   const [tournaments, setTournaments] = useState<Torneo[]>([]);
+  const [grupos, setGrupos] = useState<GrupoTorneoListado[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalTorneosVista, setTotalTorneosVista] = useState(0);
   const [clubs, setClubs] = useState<Club[]>([]);
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -86,6 +93,10 @@ export default function TorneosPage() {
   const [formData, setFormData] = useState<FormTorneoState>(ESTADO_INICIAL);
 
   const [replicarTorneo, setReplicarTorneo] = useState<Torneo | null>(null);
+  const [agrupacion, setAgrupacion] = useState<{
+    nombre: string;
+    torneos: Torneo[];
+  } | null>(null);
 
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
     isOpen: false,
@@ -95,23 +106,42 @@ export default function TorneosPage() {
   });
 
   useEffect(() => {
+    if (aplicarVistaServidor.current) {
+      aplicarVistaServidor.current = false;
+      return;
+    }
+
     let isMounted = true;
 
     const fetchData = async () => {
       try {
-        const estadoParam = estadoParamDesdeTabTorneo(activeTab);
-
         const [torneosData, clubesResponse] = await Promise.all([
-          TorneosService.getByPage(page, PAGE_SIZE, search, estadoParam, {
-            incluirBorradores: tabTorneoIncluyeBorradores(activeTab),
+          TorneosService.getByPage(page, PAGE_SIZE, search, undefined, {
+            vista: vista ?? "auto",
+            agrupar: true,
           }),
           ClubesService.getAll().catch(() => ({ data: [], total: 0 })),
         ]);
 
         if (isMounted) {
           setTournaments(torneosData.data || []);
+          setGrupos(torneosData.grupos || []);
           setTotal(torneosData.total || 0);
+          setTotalTorneosVista(
+            torneosData.total_torneos ?? torneosData.total ?? 0,
+          );
+          setContadores(torneosData.contadores ?? CONTADORES_VISTA_VACIOS);
+          setRequierenProgramacion(torneosData.requieren_programacion ?? 0);
+          setVistaAutomatica(Boolean(torneosData.vista_automatica));
           setClubs(clubesResponse?.data || []);
+          if (
+            vista === null &&
+            torneosData.vista &&
+            torneosData.vista !== "todos"
+          ) {
+            aplicarVistaServidor.current = true;
+            setVista(torneosData.vista);
+          }
         }
       } catch (error: unknown) {
         console.error("Error al conectar con la API:", error);
@@ -125,7 +155,7 @@ export default function TorneosPage() {
     return () => {
       isMounted = false;
     };
-  }, [refreshKey, page, search, activeTab]);
+  }, [refreshKey, page, search, vista]);
 
   // --- MANEJADORES DE ACCIONES ---
   const handleOpenCreate = () => {
@@ -247,6 +277,16 @@ export default function TorneosPage() {
     });
   };
 
+  const gruposVista: GrupoTorneoListado[] = grupos.length
+    ? grupos
+    : [
+        {
+          id: null,
+          nombre: null,
+          ramas: [{ rama: "", etiqueta: "", torneos: tournaments }],
+        },
+      ];
+
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 space-y-8 md:px-10 md:py-10">
       {/* HEADER */}
@@ -255,7 +295,7 @@ export default function TorneosPage() {
           <h1 className="text-3xl font-bold text-white tracking-tight">
             Gestión de torneos
           </h1>
-          <p className="text-gray-400 mt-1">{total} torneos en total</p>
+          <p className="text-gray-400 mt-1">{totalTorneosVista} torneos en esta vista</p>
         </div>
         <button
           onClick={handleOpenCreate}
@@ -265,41 +305,22 @@ export default function TorneosPage() {
         </button>
       </div>
 
-      {/* FILTROS Y TABS */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-        <div className="inline-flex bg-[#111111] p-1.5 rounded-xl border border-white/5 overflow-x-auto w-full sm:w-auto">
-          {TORNEO_LIST_TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => {
-                setActiveTab(tab);
-                setPage(1);
-              }}
-              className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition-all ${
-                activeTab === tab
-                  ? "bg-brand-chartreuse text-brand-card shadow-[0_0_10px_rgba(204,255,0,0.15)]"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 size-4" />
-          <input
-            type="text"
-            placeholder="Buscar torneo..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            className="w-full pl-11 pr-4 py-2.5 bg-[#111111] rounded-xl border border-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors"
-          />
-        </div>
-      </div>
+      <TorneoVistaFiltros
+        vista={vista}
+        contadores={contadores}
+        vistaAutomatica={vistaAutomatica}
+        requierenProgramacion={requierenProgramacion}
+        busqueda={search}
+        onBusqueda={(valor) => {
+          setSearch(valor);
+          setPage(1);
+        }}
+        onVista={(siguiente) => {
+          setVistaAutomatica(false);
+          setVista(siguiente);
+          setPage(1);
+        }}
+      />
 
       {/* TABLA DE RESULTADOS */}
       <div className="bg-[#111111] rounded-3xl border border-white/5 overflow-hidden shadow-xl">
@@ -382,12 +403,25 @@ export default function TorneosPage() {
                     </td>
                   </tr>
                 ) : (
-                  tournaments.map((t) => (
+                  <TorneoFilasAgrupadas
+                    grupos={gruposVista}
+                    colSpan={5}
+                    onSumar={(grupo) =>
+                      setAgrupacion({
+                        nombre: grupo.nombre || "",
+                        torneos: grupo.ramas.flatMap((rama) => rama.torneos),
+                      })
+                    }
+                    renderFila={(t, enGrupo) => (
                     <tr
                       key={t.id}
-                      className="hover:bg-white/2 transition-colors group"
+                      className={`transition-colors group ${
+                        enGrupo
+                          ? "bg-brand-chartreuse/[0.04] shadow-[inset_3px_0_0_0_var(--color-brand-chartreuse)]"
+                          : "hover:bg-white/2"
+                      }`}
                     >
-                      <td className="py-4 px-8">
+                      <td className={enGrupo ? "py-2.5 pl-12 pr-8" : "py-4 px-8"}>
                         <div className="font-bold text-white group-hover:text-brand-chartreuse transition-colors text-[15px]">
                           {t.nombre}
                         </div>
@@ -396,7 +430,7 @@ export default function TorneosPage() {
                         </div>
                       </td>
 
-                      <td className="py-4 px-6">
+                      <td className={enGrupo ? "py-2.5 px-6" : "py-4 px-6"}>
                         <div className="text-[14px] font-bold text-brand-white">
                           {t.clubes?.nombre || "Sede a confirmar"}
                         </div>
@@ -411,7 +445,7 @@ export default function TorneosPage() {
                         </div>
                       </td>
 
-                      <td className="py-4 px-6 text-center">
+                      <td className={`text-center ${enGrupo ? "py-2.5 px-6" : "py-4 px-6"}`}>
                         <div className="inline-flex items-center justify-center bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
                           <span className="text-[14px] font-black text-white">
                             {Array.isArray((t as any).inscripciones)
@@ -424,7 +458,7 @@ export default function TorneosPage() {
                         </div>
                       </td>
 
-                      <td className="py-4 px-6">
+                      <td className={enGrupo ? "py-2.5 px-6" : "py-4 px-6"}>
                         <div className="flex items-center gap-2">
                           <span
                             className={`w-2 h-2 rounded-full ${
@@ -456,12 +490,13 @@ export default function TorneosPage() {
                                         : "text-gray-400"
                             }`}
                           >
-                            {t.estado || "Borrador"}
+                            {t.pendiente || t.estado || "Borrador"}
+                            {t.tiene_partidos_hoy ? " · Partidos hoy" : ""}
                           </span>
                         </div>
                       </td>
 
-                      <td className="py-4 px-8 text-right">
+                      <td className={`text-right ${enGrupo ? "py-2.5 px-8" : "py-4 px-8"}`}>
                         <div className="flex justify-end gap-2 items-center">
                           {/* Botón de Impresión PDF solo para torneos Finalizados */}
                           {t.estado === "Finalizado" && (
@@ -492,6 +527,34 @@ export default function TorneosPage() {
                           </button>
 
                           <button
+                            onClick={() => {
+                              const grupo = grupos.find(
+                                (item) =>
+                                  item.nombre &&
+                                  item.ramas.some((rama) =>
+                                    rama.torneos.some((itemTorneo) => itemTorneo.id === t.id),
+                                  ),
+                              );
+                              if (grupo?.nombre) {
+                                setAgrupacion({
+                                  nombre: grupo.nombre,
+                                  torneos: grupo.ramas.flatMap((rama) => rama.torneos),
+                                });
+                                return;
+                              }
+                              const base = t.nombre.replace(/\s+[—–-]\s+.*$/, "").trim();
+                              setAgrupacion({
+                                nombre: base || t.nombre,
+                                torneos: [t],
+                              });
+                            }}
+                            className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-brand-chartreuse transition-colors"
+                            title="Agrupar en una competencia"
+                          >
+                            <Layers className="size-4" />
+                          </button>
+
+                          <button
                             onClick={() => setReplicarTorneo(t)}
                             className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-brand-chartreuse transition-colors"
                             title="Replicar a otras categorías"
@@ -516,7 +579,8 @@ export default function TorneosPage() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                    )}
+                  />
                 )}
               </tbody>
             </table>
@@ -528,7 +592,7 @@ export default function TorneosPage() {
         page={page}
         total={total}
         pageSize={PAGE_SIZE}
-        currentCount={tournaments.length}
+        currentCount={grupos.length || tournaments.length}
         onPageChange={setPage}
       />
 
@@ -541,6 +605,36 @@ export default function TorneosPage() {
         clubs={clubs}
         isSaving={saving}
         editingId={editingId}
+      />
+
+      <AgruparTorneosModal
+        isOpen={Boolean(agrupacion)}
+        nombreInicial={agrupacion?.nombre || ""}
+        torneosFijos={agrupacion?.torneos || []}
+        onClose={() => setAgrupacion(null)}
+        onSuccess={(nombre) => {
+          setRefreshKey((k) => k + 1);
+          setFeedbackModal({
+            isOpen: true,
+            type: "success",
+            title: "Competencia agrupada",
+            description: nombre
+              ? `Los torneos quedaron en «${nombre}», separados por rama.`
+              : "Los torneos seleccionados volvieron a mostrarse por separado.",
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        }}
+        onError={(message) => {
+          setFeedbackModal({
+            isOpen: true,
+            type: "error",
+            title: "No se pudo agrupar",
+            description: message,
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        }}
       />
 
       <ReplicarTorneoModal

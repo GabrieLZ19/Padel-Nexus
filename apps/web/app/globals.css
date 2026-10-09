@@ -218,6 +218,17 @@ html.light img[src$="LogoHorizontal.svg"] {
   filter: invert(0.9) brightness(0.2) contrast(1.2) !important;
 }
 
+/* Variantes oficiales del manual: fondo oscuro vs fondo claro, sin alterar colores */
+.brand-logo-on-light {
+  display: none;
+}
+html.light .brand-logo-on-dark {
+  display: none;
+}
+html.light .brand-logo-on-light {
+  display: block;
+}
+
 /* Ocultar flechas de inputs de tipo number */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {

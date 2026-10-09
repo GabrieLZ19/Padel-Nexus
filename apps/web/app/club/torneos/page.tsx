@@ -1,31 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
-  Search,
   Pencil,
   Trash2,
   Trophy,
   Building2,
   Calendar,
   Copy,
+  Layers,
   LayoutDashboard,
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { ClubPanelService } from "@/utils/services/club-panel";
 import Pagination from "@/components/ui/Pagination";
-import { Torneo, Club, FormTorneoState } from "@/utils/types";
+import { Torneo, Club, FormTorneoState, GrupoTorneoListado } from "@/utils/types";
 import TorneoModal from "@/components/torneos/TorneoModal";
 import ReplicarTorneoModal from "@/components/torneos/ReplicarTorneoModal";
+import AgruparTorneosModal from "@/components/torneos/AgruparTorneosModal";
+import TorneoFilasAgrupadas from "@/components/torneos/TorneoFilasAgrupadas";
 import FeedbackModal, { FeedbackModalProps } from "@/components/ui/FeedbackModal";
 import { formatFechaCalendario } from "@/utils/formatFecha";
-import { FAP_ESTADOS_TORNEO } from "@/utils/constants/fap";
+import TorneoVistaFiltros from "@/components/torneos/TorneoVistaFiltros";
 import {
-  TORNEO_LIST_TABS,
-  estadoParamDesdeTabTorneo,
-  tabTorneoIncluyeBorradores,
+  CONTADORES_VISTA_VACIOS,
+  type VistaTorneoId,
 } from "@/utils/constants/padelConfig";
 
 const PAGE_SIZE = 6;
@@ -34,7 +35,11 @@ export default function ClubTorneosPage() {
   const router = useRouter();
 
   const [club, setClub] = useState<Club | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("Todos");
+  const [vista, setVista] = useState<VistaTorneoId | "todos" | null>(null);
+  const [vistaAutomatica, setVistaAutomatica] = useState(false);
+  const [contadores, setContadores] = useState(CONTADORES_VISTA_VACIOS);
+  const [requierenProgramacion, setRequierenProgramacion] = useState(0);
+  const aplicarVistaServidor = useRef(false);
   const [search, setSearch] = useState<string>("");
   const [tournaments, setTournaments] = useState<Torneo[]>([]);
   const [total, setTotal] = useState(0);
@@ -44,6 +49,11 @@ export default function ClubTorneosPage() {
   const [saving, setSaving] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [replicarTorneo, setReplicarTorneo] = useState<Torneo | null>(null);
+  const [agrupacion, setAgrupacion] = useState<{
+    nombre: string;
+    torneos: Torneo[];
+  } | null>(null);
+  const [grupos, setGrupos] = useState<GrupoTorneoListado[]>([]);
 
   const [formData, setFormData] = useState<FormTorneoState>({
     nombre: "",
@@ -101,15 +111,14 @@ export default function ClubTorneosPage() {
     }
     try {
       setLoading(true);
-      const estadoParam = estadoParamDesdeTabTorneo(activeTab);
-
       const res = await TorneosService.getByPage(
         currentPage,
         PAGE_SIZE,
         search,
-        estadoParam,
+        undefined,
         {
-          incluirBorradores: tabTorneoIncluyeBorradores(activeTab),
+          vista: vista ?? "auto",
+          agrupar: true,
           clubId: String(club.id),
         },
       );
@@ -119,11 +128,21 @@ export default function ClubTorneosPage() {
         (t) => String(t.club_id) === String(club.id),
       );
       setTournaments(propios);
+      setGrupos(
+        propios.length === (res.data || []).length ? res.grupos || [] : [],
+      );
       setTotal(
         propios.length === (res.data || []).length
           ? res.total || propios.length
           : propios.length,
       );
+      setContadores(res.contadores ?? CONTADORES_VISTA_VACIOS);
+      setRequierenProgramacion(res.requieren_programacion ?? 0);
+      setVistaAutomatica(Boolean(res.vista_automatica));
+      if (vista === null && res.vista && res.vista !== "todos") {
+        aplicarVistaServidor.current = true;
+        setVista(res.vista);
+      }
     } catch (err) {
       console.error("Error al cargar torneos del club:", err);
       setTournaments([]);
@@ -134,16 +153,15 @@ export default function ClubTorneosPage() {
   };
 
   useEffect(() => {
+    if (aplicarVistaServidor.current) {
+      aplicarVistaServidor.current = false;
+      return;
+    }
     if (club) {
       void loadData();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData usa club/tab/page/search
-  }, [currentPage, search, club, activeTab]);
-
-  const handleChangeTab = (tab: string) => {
-    setActiveTab(tab);
-    setCurrentPage(1);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadData usa club/vista/page/search
+  }, [currentPage, search, club, vista]);
 
   const handleOpenCreateModal = () => {
     setEditingId(null);
@@ -224,7 +242,7 @@ export default function ClubTorneosPage() {
 
       setIsModalOpen(false);
       if (!editingId) {
-        setActiveTab(FAP_ESTADOS_TORNEO.BORRADOR);
+        setVista("preparacion");
         setCurrentPage(1);
       } else {
         void loadData();
@@ -312,38 +330,22 @@ export default function ClubTorneosPage() {
         </button>
       </div>
 
-      {/* FILTROS Y BÚSQUEDA */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between border-b border-brand-white/5 pb-4">
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0">
-          {TORNEO_LIST_TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => handleChangeTab(tab)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                activeTab === tab
-                  ? "bg-brand-chartreuse text-brand-black shadow-lg"
-                  : "bg-brand-card text-gray-400 hover:text-white border border-brand-white/5"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-500" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Buscar por nombre..."
-            className="w-full bg-brand-card border border-brand-white/5 text-white pl-10 pr-4 py-2 rounded-xl text-xs focus:border-brand-white/10 outline-none"
-          />
-        </div>
-      </div>
+      <TorneoVistaFiltros
+        vista={vista}
+        contadores={contadores}
+        vistaAutomatica={vistaAutomatica}
+        requierenProgramacion={requierenProgramacion}
+        busqueda={search}
+        onBusqueda={(valor) => {
+          setSearch(valor);
+          setCurrentPage(1);
+        }}
+        onVista={(siguiente) => {
+          setVistaAutomatica(false);
+          setVista(siguiente);
+          setCurrentPage(1);
+        }}
+      />
 
       {/* TABLA DE TORNEOS */}
       <div className="bg-brand-card border border-brand-white/5 rounded-3xl overflow-hidden shadow-xl">
@@ -373,35 +375,64 @@ export default function ClubTorneosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-white/5 text-sm">
-                {filteredTournaments.map((t) => (
+                <TorneoFilasAgrupadas
+                  grupos={
+                    grupos.length
+                      ? grupos
+                      : [
+                          {
+                            id: null,
+                            nombre: null,
+                            ramas: [
+                              {
+                                rama: "",
+                                etiqueta: "",
+                                torneos: filteredTournaments,
+                              },
+                            ],
+                          },
+                        ]
+                  }
+                  colSpan={6}
+                  onSumar={(grupo) =>
+                    setAgrupacion({
+                      nombre: grupo.nombre || "",
+                      torneos: grupo.ramas.flatMap((rama) => rama.torneos),
+                    })
+                  }
+                  renderFila={(t, enGrupo) => (
                   <tr
                     key={t.id}
-                    className="hover:bg-brand-white/2 transition-colors cursor-pointer"
+                    className={`transition-colors cursor-pointer ${
+                      enGrupo
+                        ? "bg-brand-chartreuse/[0.04] shadow-[inset_3px_0_0_0_var(--color-brand-chartreuse)]"
+                        : "hover:bg-brand-white/2"
+                    }`}
                     onClick={() => router.push(`/club/torneos/${t.id}`)}
                   >
-                    <td className="py-4 px-6">
+                    <td className={enGrupo ? "py-2.5 pl-12 pr-6" : "py-4 px-6"}>
                       <p className="font-bold text-white">{t.nombre}</p>
                       <p className="text-xs text-gray-500 mt-0.5 font-medium">
                         {(t as any).rama || ""}{(t as any).rama ? " · " : ""}{t.nivel || "Sin nivel"} · {t.categoria || "General"}
                       </p>
                     </td>
-                    <td className="py-4 px-6 text-gray-300 font-medium">
+                    <td className={`text-gray-300 font-medium ${enGrupo ? "py-2.5 px-6" : "py-4 px-6"}`}>
                       {formatFechaCalendario(t.fecha, {
                         day: "2-digit",
                         month: "short",
                         year: "numeric",
                       })}
                     </td>
-                    <td className="py-4 px-6">
+                    <td className={enGrupo ? "py-2.5 px-6" : "py-4 px-6"}>
                       <span className="bg-brand-white/5 text-gray-300 border border-brand-white/10 px-3 py-1 rounded-full text-xs font-bold uppercase">
                         {t.alcance || "Local"}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-center">
+                    <td className={`text-center ${enGrupo ? "py-2.5 px-6" : "py-4 px-6"}`}>
                       <span className="text-white font-black">{t.cupos_actuales || 0}</span>
                       <span className="text-gray-500 font-medium"> / {t.cupos_maximos || 16}</span>
                     </td>
-                    <td className="py-4 px-6">
+                    <td className={enGrupo ? "py-2.5 px-6" : "py-4 px-6"}>
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-black uppercase ${
                           t.estado === "Inscripción"
@@ -415,10 +446,11 @@ export default function ClubTorneosPage() {
                                   : "bg-white/5 text-gray-400 border border-white/10"
                         }`}
                       >
-                        {t.estado || "Borrador"}
+                        {t.pendiente || t.estado || "Borrador"}
+                        {t.tiene_partidos_hoy ? " · Partidos hoy" : ""}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className={`text-right ${enGrupo ? "py-2.5 px-6" : "py-4 px-6"}`} onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => router.push(`/club/torneos/${t.id}`)}
@@ -426,6 +458,33 @@ export default function ClubTorneosPage() {
                           title="Gestionar torneo"
                         >
                           <LayoutDashboard className="size-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const grupo = grupos.find(
+                              (item) =>
+                                item.nombre &&
+                                item.ramas.some((rama) =>
+                                  rama.torneos.some((itemTorneo) => itemTorneo.id === t.id),
+                                ),
+                            );
+                            if (grupo?.nombre) {
+                              setAgrupacion({
+                                nombre: grupo.nombre,
+                                torneos: grupo.ramas.flatMap((rama) => rama.torneos),
+                              });
+                              return;
+                            }
+                            const base = t.nombre.replace(/\s+[—–-]\s+.*$/, "").trim();
+                            setAgrupacion({
+                              nombre: base || t.nombre,
+                              torneos: [t],
+                            });
+                          }}
+                          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-brand-chartreuse transition-colors cursor-pointer"
+                          title="Agrupar en una competencia"
+                        >
+                          <Layers className="size-4" />
                         </button>
                         <button
                           onClick={() => setReplicarTorneo(t)}
@@ -451,7 +510,8 @@ export default function ClubTorneosPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )}
+                />
               </tbody>
             </table>
           </div>
@@ -464,7 +524,7 @@ export default function ClubTorneosPage() {
           page={currentPage}
           pageSize={PAGE_SIZE}
           total={total}
-          currentCount={filteredTournaments.length}
+          currentCount={grupos.length || filteredTournaments.length}
           onPageChange={setCurrentPage}
         />
       )}
@@ -483,6 +543,35 @@ export default function ClubTorneosPage() {
           sedeFija
         />
       )}
+
+      <AgruparTorneosModal
+        isOpen={Boolean(agrupacion)}
+        nombreInicial={agrupacion?.nombre || ""}
+        torneosFijos={agrupacion?.torneos || []}
+        clubId={club?.id ? String(club.id) : undefined}
+        onClose={() => setAgrupacion(null)}
+        onSuccess={(nombre) => {
+          void loadData();
+          setFeedbackModal({
+            isOpen: true,
+            type: "success",
+            title: "Competencia agrupada",
+            description: nombre
+              ? `Los torneos quedaron en «${nombre}», separados por rama.`
+              : "Los torneos seleccionados volvieron a mostrarse por separado.",
+            onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        }}
+        onError={(message) => {
+          setFeedbackModal({
+            isOpen: true,
+            type: "error",
+            title: "No se pudo agrupar",
+            description: message,
+            onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        }}
+      />
 
       <ReplicarTorneoModal
         isOpen={Boolean(replicarTorneo)}

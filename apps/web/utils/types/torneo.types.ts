@@ -10,6 +10,16 @@ export type EstadoTorneo =
   | "Finalizado";
 export type FormatoTorneo = "Eliminatoria Directa" | "Fase de Grupos" | "Mixto";
 
+export interface GrupoTorneoListado {
+  id: string | null;
+  nombre: string | null;
+  ramas: Array<{
+    rama: string;
+    etiqueta: string;
+    torneos: Torneo[];
+  }>;
+}
+
 export interface Torneo {
   id: string;
   created_at?: string;
@@ -18,6 +28,11 @@ export interface Torneo {
   club_id?: string | null;
   fecha?: string | null;
   estado: EstadoTorneo;
+  /** Señal operativa del listado: pendiente concreto o horarios sin publicar. */
+  pendiente?: string | null;
+  tiene_partidos_hoy?: boolean;
+  programacion_estado?: string | null;
+  grupo_id?: string | null;
   cupos_maximos: number;
   cupos_actuales: number;
   rama?: RamaPadel | string | null;

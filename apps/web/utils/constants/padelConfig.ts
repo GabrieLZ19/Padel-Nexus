@@ -140,29 +140,28 @@ export const ESTADOS_TORNEO = [
   { value: FAP_ESTADOS_TORNEO.FINALIZADO, label: "Finalizado" },
 ] as const;
 
-/** Tabs de filtro en listas CRM/club — un tab por estado FAP. */
-export const TORNEO_LIST_TABS = [
-  "Todos",
-  FAP_ESTADOS_TORNEO.INSCRIPCION,
-  FAP_ESTADOS_TORNEO.CERRADO,
-  FAP_ESTADOS_TORNEO.PROGRAMADO,
-  FAP_ESTADOS_TORNEO.EN_CURSO,
-  FAP_ESTADOS_TORNEO.BORRADOR,
-  FAP_ESTADOS_TORNEO.FINALIZADO,
+/** Vistas operativas del listado. No son un estado nuevo: agrupan los estados FAP. */
+export const VISTAS_TORNEO = [
+  { id: "en_curso", label: "En curso" },
+  { id: "por_iniciar", label: "Por iniciar" },
+  { id: "inscripciones", label: "Inscripciones abiertas" },
+  { id: "preparacion", label: "En preparación" },
+  { id: "finalizados", label: "Finalizados" },
 ] as const;
 
-export type TorneoListTab = (typeof TORNEO_LIST_TABS)[number];
+export type VistaTorneoId = (typeof VISTAS_TORNEO)[number]["id"];
+export type VistaTorneoParam = VistaTorneoId | "todos" | "auto";
 
-/** Resuelve el query `estado` para TorneosService.getByPage según el tab activo. */
-export function estadoParamDesdeTabTorneo(
-  tab: string,
-): string | undefined {
-  if (tab === "Todos") return undefined;
-  return tab;
-}
+export const CONTADORES_VISTA_VACIOS: Record<VistaTorneoId, number> = {
+  en_curso: 0,
+  por_iniciar: 0,
+  inscripciones: 0,
+  preparacion: 0,
+  finalizados: 0,
+};
 
-export function tabTorneoIncluyeBorradores(tab: string): boolean {
-  return tab === "Todos" || tab === FAP_ESTADOS_TORNEO.BORRADOR;
+export function etiquetaVistaTorneo(id: VistaTorneoId): string {
+  return VISTAS_TORNEO.find((vista) => vista.id === id)?.label ?? id;
 }
 
 export const MODALIDADES_TORNEO = [

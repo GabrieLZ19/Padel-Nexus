@@ -105,37 +105,50 @@ function AuthPageContent() {
     <div className="flex min-h-dvh bg-brand-black text-brand-white font-sans relative">
       {/* Columna Izquierda - Branding Showcase */}
       <div className="hidden lg:flex lg:w-1/2 bg-brand-card flex-col justify-center px-20 border-r border-brand-white/5 relative z-10">
-        <div className="mb-10 relative size-24 drop-shadow-[0_0_20px_rgba(203,254,1,0.15)]">
+        <div className="mb-8">
           <Image
-            src="/brand/LogoAccessory.svg"
+            src="/brand/Logo.svg"
             alt="Padel Nexus"
-            width={96}
-            height={96}
-            className="w-full h-full object-contain"
+            width={220}
+            height={181}
+            className="brand-logo-on-dark h-auto w-[220px] object-contain"
+            priority
+          />
+          <Image
+            src="/brand/LogoOnLight.svg"
+            alt=""
+            width={220}
+            height={134}
+            className="brand-logo-on-light h-auto w-[220px] object-contain"
             priority
           />
         </div>
-        <h2 className="text-4xl font-semibold text-brand-white mb-2 tracking-tight">
-          Panel unificado
-        </h2>
-        <h1 className="text-7xl font-extrabold mb-8 tracking-tight text-brand-white">
-          Padel Nexus
-        </h1>
-        <p className="text-xl text-gray-400 mb-12 max-w-lg leading-relaxed">
-          Gestioná torneos, clubes, jugadores, licencias y estadísticas
-          federativas.
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-chartreuse mb-4">
+          El ecosistema digital del pádel
         </p>
-        <ul className="space-y-5 text-gray-300">
+        <p className="mt-4 text-2xl font-medium text-brand-white">
+          Todo el pádel conectado.
+        </p>
+        <p className="mt-6 text-lg text-gray-400 max-w-lg leading-relaxed">
+          Federaciones nacionales, asociaciones provinciales, clubes y
+          jugadores. Cada uno con su espacio. Todos conectados a través de
+          Padel Nexus.
+        </p>
+        <ul className="mt-10 space-y-4 text-gray-300">
           {[
-            "Control total de torneos y cuadros",
-            "Validación de licencias por federación",
-            "Reportes y estadísticas en tiempo real",
-          ].map((item) => (
-            <li key={item} className="flex items-center gap-4 text-lg">
-              <div className="size-8 rounded-full bg-brand-chartreuse flex items-center justify-center border border-brand-white/10 shadow-lg">
+            ["Federaciones nacionales", "La visión nacional. Una red conectada."],
+            ["Asociaciones provinciales", "Cada provincia, parte de la misma red."],
+            ["Clubes", "Tu club tiene su lugar."],
+            ["Jugadores", "Un perfil. Todo tu mundo de pádel."],
+          ].map(([titulo, frase]) => (
+            <li key={titulo} className="flex items-start gap-4">
+              <div className="mt-0.5 size-8 shrink-0 rounded-full bg-brand-chartreuse flex items-center justify-center border border-brand-white/10 shadow-lg">
                 <Check className="text-brand-black size-5 stroke-3" />
               </div>
-              {item}
+              <div>
+                <p className="text-base font-semibold text-brand-white">{titulo}</p>
+                <p className="text-sm text-gray-400">{frase}</p>
+              </div>
             </li>
           ))}
         </ul>
@@ -149,16 +162,23 @@ function AuthPageContent() {
               <Image
                 src="/brand/LogoHorizontal.svg"
                 alt="Padel Nexus"
-                width={140}
+                width={168}
                 height={35}
-                className="h-8 w-auto object-contain"
+                className="brand-logo-on-dark h-8 w-auto object-contain"
+              />
+              <Image
+                src="/brand/LogoHorizontalOnLight.svg"
+                alt=""
+                width={168}
+                height={61}
+                className="brand-logo-on-light h-8 w-auto object-contain"
               />
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-brand-white mb-2 tracking-tight">
               Bienvenido
             </h2>
             <p className="text-base sm:text-lg text-gray-400">
-              Elegí cómo querés ingresar a la plataforma.
+              El ecosistema digital del pádel. Todo el pádel conectado.
             </p>
           </div>
 
@@ -304,7 +324,7 @@ function AuthPageContent() {
 
           <div className="mt-8 pt-6 border-t border-brand-white/5 text-center">
             <p className="text-gray-400 text-sm">
-              ¿No tenés una account?{" "}
+              ¿No tenés una cuenta?{" "}
               <Link
                 href="/signup"
                 className="text-brand-chartreuse font-bold hover:underline"
