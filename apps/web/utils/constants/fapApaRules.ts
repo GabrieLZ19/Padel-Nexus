@@ -227,6 +227,7 @@ const TODOS_LOS_ALCANCES: AlcanceOption[] = [
   { value: "Local", label: "Local" },
   { value: "Privado", label: "Privado" },
   { value: "Provincial", label: "Provincial" },
+  { value: "Clasificatorio", label: "Clasificatorio" },
   { value: "Regional", label: "Regional" },
   { value: "Nacional", label: "Nacional" },
 ];

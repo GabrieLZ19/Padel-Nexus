@@ -46,7 +46,7 @@ export interface Torneo {
   premio_2?: string | null;
   premio_3?: string | null;
   lugar?: string | null;
-  alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | 'Privado' | null;
+  alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | 'Privado' | 'Clasificatorio' | null;
   reglamento?: 'FAP' | 'APA' | 'Amateur' | null;
   asociacion?: 'FAP' | 'APA' | 'Amateur' | null;
   asociacion_id?: string | null;
@@ -186,7 +186,7 @@ export interface FormTorneoState {
   precio_inscripcion?: number;
   es_gratis?: boolean | null;
   formato: string;
-  alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | 'Privado' | null;
+  alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | 'Privado' | 'Clasificatorio' | null;
   asociacion?: 'FAP' | 'APA' | 'Amateur' | null;
   asociacion_id?: string | null;
   premio_1?: string;

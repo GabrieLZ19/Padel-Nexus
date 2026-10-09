@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { ProgramacionEntryPanel } from "./programador/ProgramacionEntryPanel";
 import { ZonaCard } from "./ZonaCard";
+import { PromoverParejaMenores } from "./PromoverParejaMenores";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
@@ -1413,6 +1414,13 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               </div>
             )}
           </div>
+
+          {puedeEditarLlave && (
+            <PromoverParejaMenores
+              torneoId={torneoId}
+              onMoved={() => onRefresh?.()}
+            />
+          )}
 
           <div className="relative rounded-2xl border border-brand-input bg-brand-card overflow-hidden">
             <div className="relative p-4 sm:p-6 overflow-x-auto">

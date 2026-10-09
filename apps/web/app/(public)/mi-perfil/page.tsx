@@ -222,14 +222,13 @@ export default function PlayerDashboard() {
                 )}
               </div>
 
-              {/* Afiliaciones a clubes (independiente del carnet FAP) */}
               <div className="mt-4 pt-4 border-t border-brand-white/5 w-full relative z-10 flex flex-col items-center">
                 {profile.afiliaciones &&
                 profile.afiliaciones.filter((af) => afiliacionVisible(af.estado))
                   .length > 0 ? (
                   <>
                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2">
-                      Clubes afiliados (
+                      Representación provincial (
                       {
                         profile.afiliaciones.filter((af) =>
                           afiliacionVisible(af.estado),
@@ -255,14 +254,14 @@ export default function PlayerDashboard() {
                   </>
                 ) : (
                   <p className="text-xs text-gray-500 italic mb-3">
-                    Sin clubes activos.
+                    Sin asociación activa. No hace falta afiliarte a un club para jugar.
                   </p>
                 )}
                 <button
                   onClick={() => setIsAfiliacionOpen(true)}
                   className="w-full max-w-50 py-2 bg-brand-white/5 hover:bg-brand-white/10 text-brand-white border border-brand-white/10 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
-                  + Asociarme a un club
+                  Pedir pase de provincia
                 </button>
               </div>
             </div>

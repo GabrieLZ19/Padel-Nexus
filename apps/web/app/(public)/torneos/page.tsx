@@ -171,7 +171,7 @@ function TorneosContent() {
   ).sort() as string[];
 
   const GENEROS_FIJOS = ["Masculino", "Femenino", "Mixto"];
-  const ALCANCES_FIJOS = ["Nacional", "Provincial", "Regional", "Local", "Privado"];
+  const ALCANCES_FIJOS = ["Nacional", "Provincial", "Clasificatorio", "Regional", "Local", "Privado"];
 
   const ORGANIZADORES_DINAMICOS = Array.from(
     new Set(tournaments.map((t) => t.clubes?.nombre).filter(Boolean)),

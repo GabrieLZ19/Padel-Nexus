@@ -246,6 +246,49 @@ export const TorneosService = {
     return response.data;
   },
 
+  async opcionesPromocionMenores(torneoId: string): Promise<{
+    habilitado: boolean;
+    motivo: string | null;
+    parejas: {
+      inscripcionId: string;
+      nombre: string;
+      partidoId: string;
+      lado: "a" | "b";
+      ronda: string;
+    }[];
+    destinos: {
+      id: string;
+      nombre: string;
+      categoria: string | null;
+      byes: {
+        partidoId: string;
+        lado: "a" | "b";
+        rival: string;
+        ronda: string | null;
+      }[];
+    }[];
+  }> {
+    const response = await api.get(`/torneos/${torneoId}/promocion-menores`);
+    return response.data;
+  },
+
+  async promoverParejaMenores(
+    torneoId: string,
+    payload: {
+      inscripcion_id: string;
+      torneo_destino_id: string;
+      partido_destino_id: string | null;
+      lado: "a" | "b" | null;
+      motivo: string;
+    },
+  ) {
+    const response = await api.put(
+      `/torneos/${torneoId}/promover-pareja`,
+      payload,
+    );
+    return response.data as { mensaje?: string };
+  },
+
   async gestionarParejaLlave(
     torneoId: string,
     payload: {

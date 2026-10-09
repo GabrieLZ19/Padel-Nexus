@@ -2,14 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, MapPin, X, Loader2 } from "lucide-react";
-import Link from "next/link";
-import { ClubesService } from "@/utils/services/clubes";
-import { AfiliacionesService } from "@/utils/services/afiliaciones";
-import { Club, Perfil } from "@/utils/types";
+import { ArrowRightLeft, X, Loader2 } from "lucide-react";
+import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
+import { PasesService } from "@/utils/services/pases";
+import { Perfil } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal from "@/components/ui/FeedbackModal";
-import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
 
 interface AfiliacionModalProps {
   isOpen: boolean;
@@ -24,9 +22,9 @@ export default function AfiliacionModal({
   userProfile,
   fetchProfile,
 }: AfiliacionModalProps) {
-  const [provincia, setProvincia] = useState("");
-  const [selectedClub, setSelectedClub] = useState("");
-  const [allClubes, setAllClubes] = useState<Club[]>([]);
+  const [asociaciones, setAsociaciones] = useState<Asociacion[]>([]);
+  const [destinoId, setDestinoId] = useState("");
+  const [motivo, setMotivo] = useState("");
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{
     isOpen: boolean;
@@ -41,35 +39,35 @@ export default function AfiliacionModal({
     type: "info",
   });
 
+  const origen = userProfile?.afiliaciones?.find(
+    (af) => af.asociacion_id && af.estado?.toLowerCase() === "activo",
+  );
+
   useEffect(() => {
     if (!isOpen) {
-      setProvincia("");
-      setSelectedClub("");
+      setDestinoId("");
+      setMotivo("");
       return;
     }
 
     let mounted = true;
-    ClubesService.getAll()
-      .then((response) => {
-        if (mounted) setAllClubes(response.data || []);
+    AsociacionesService.getAll()
+      .then((items) => {
+        if (mounted) setAsociaciones(items);
       })
-      .catch((err) => console.error("Error cargando clubes:", err));
+      .catch((err) => console.error("Error cargando asociaciones:", err));
 
     return () => {
       mounted = false;
     };
   }, [isOpen]);
 
-  const filteredClubes = provincia
-    ? allClubes.filter(
-        (c) => c.provincia === provincia && c.estado === "Activo",
-      )
-    : [];
-
-  const clubOptions = filteredClubes.map((c) => ({
-    value: c.id,
-    label: c.nombre,
-  }));
+  const opciones = asociaciones
+    .filter((asoc) => asoc.id !== origen?.asociacion_id)
+    .map((asoc) => ({
+      value: asoc.id,
+      label: asoc.provincia ? `${asoc.nombre} · ${asoc.provincia}` : asoc.nombre,
+    }));
 
   const handleCloseFeedback = () => {
     setFeedback((prev) => ({ ...prev, isOpen: false }));
@@ -78,23 +76,11 @@ export default function AfiliacionModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!userProfile?.dni) {
+    if (!destinoId || !motivo.trim()) {
       setFeedback({
         isOpen: true,
-        title: "Perfil incompleto",
-        description:
-          "Completá tu DNI en ajustes de perfil antes de asociarte a un club.",
-        type: "warning",
-      });
-      return;
-    }
-
-    if (!selectedClub) {
-      setFeedback({
-        isOpen: true,
-        title: "Seleccioná un club",
-        description: "Elegí provincia y club para continuar.",
+        title: "Faltan datos",
+        description: "Elegí la asociación de destino y escribí el motivo.",
         type: "warning",
       });
       return;
@@ -102,13 +88,13 @@ export default function AfiliacionModal({
 
     setLoading(true);
     try {
-      await AfiliacionesService.solicitar(selectedClub);
+      await PasesService.solicitar(destinoId, motivo.trim());
       fetchProfile();
       setFeedback({
         isOpen: true,
-        title: "Solicitud enviada",
+        title: "Pase enviado",
         description:
-          "Tu pedido de afiliación quedó pendiente de aprobación por un administrador.",
+          "La asociación de destino queda pendiente hasta que un administrador lo apruebe.",
         type: "success",
         isSuccessFlow: true,
       });
@@ -119,12 +105,12 @@ export default function AfiliacionModal({
       };
       setFeedback({
         isOpen: true,
-        title: "No se pudo solicitar",
+        title: "No se pudo pedir el pase",
         description:
           apiError.response?.data?.error ||
           apiError.response?.data?.message ||
           apiError.message ||
-          "Hubo un error al enviar la solicitud.",
+          "Hubo un error al enviar el pase.",
         type: "error",
       });
     } finally {
@@ -151,64 +137,46 @@ export default function AfiliacionModal({
 
           <div className="mb-6">
             <div className="inline-flex items-center gap-2 bg-brand-chartreuse/10 text-brand-chartreuse px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest mb-3 border border-brand-chartreuse/20">
-              <Building2 className="size-3" />
-              Asociarme a un club
+              <ArrowRightLeft className="size-3" />
+              Pase de provincia
             </div>
-            <h2 className="text-2xl font-bold text-white">Elegí tu club</h2>
+            <h2 className="text-2xl font-bold text-white">Cambiar de asociación</h2>
             <p className="text-sm text-gray-400 mt-1">
-              La solicitud queda pendiente hasta que un admin la apruebe. Esto
-              no reemplaza el carnet FAP.
+              No hace falta afiliarte a un club para jugar. El pase cambia la
+              asociación que te representa.
+            </p>
+            <p className="text-xs text-gray-500 mt-3">
+              Origen: {origen?.entidad || "sin asociación activa"}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                <MapPin className="size-3 text-brand-chartreuse" />
-                Provincia
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 block">
+                Asociación de destino
               </label>
               <CustomDropdown
-                options={PROVINCIAS_ARG}
-                value={provincia}
-                onChange={(v) => {
-                  setProvincia(v);
-                  setSelectedClub("");
-                }}
-                placeholder="Seleccioná provincia"
+                options={opciones}
+                value={destinoId}
+                onChange={setDestinoId}
+                placeholder="Elegí la asociación"
               />
             </div>
-
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                <Building2 className="size-3 text-brand-chartreuse" />
-                Club
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 block">
+                Motivo
               </label>
-              <CustomDropdown
-                options={clubOptions}
-                value={selectedClub}
-                onChange={setSelectedClub}
-                placeholder={
-                  provincia ? "Seleccioná club" : "Primero elegí provincia"
-                }
-                disabled={!provincia}
+              <textarea
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                rows={3}
+                className="w-full bg-brand-input border border-brand-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-brand-chartreuse/40"
+                placeholder="Por qué pedís el cambio de provincia"
               />
             </div>
-
-            {!userProfile?.dni && (
-              <p className="text-xs text-amber-300/90">
-                Falta DNI en tu perfil.{" "}
-                <Link
-                  href="/mi-perfil/ajustes"
-                  className="underline text-brand-chartreuse"
-                >
-                  Ir a ajustes
-                </Link>
-              </p>
-            )}
-
             <button
               type="submit"
-              disabled={loading || !selectedClub}
+              disabled={loading || !destinoId || !motivo.trim()}
               className="w-full bg-brand-chartreuse disabled:opacity-40 text-brand-black py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 cursor-pointer"
             >
               {loading ? (
@@ -217,7 +185,7 @@ export default function AfiliacionModal({
                   Enviando...
                 </>
               ) : (
-                "Enviar solicitud"
+                "Pedir pase"
               )}
             </button>
           </form>

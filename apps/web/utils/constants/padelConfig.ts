@@ -179,5 +179,6 @@ export const ALCANCES_TORNEO = [
   { value: "Privado", label: "Privado" },
   { value: "Regional", label: "Regional" },
   { value: "Provincial", label: "Provincial" },
+  { value: "Clasificatorio", label: "Clasificatorio" },
   { value: "Nacional", label: "Nacional" },
 ] as const;

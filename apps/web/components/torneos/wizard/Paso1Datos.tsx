@@ -467,7 +467,7 @@ export const Paso1Datos = ({
           {(userRole === "admin" || userRole === "admin_club") && (
             <p className="text-[10px] text-yellow-500/80 mt-1.5 font-semibold">
               Tu perfil de Club solo permite organizar torneos Locales, Privados,
-              Regionales o Provinciales.
+              Regionales, Provinciales o Clasificatorios.
             </p>
           )}
           {userRole === "admin_provincial" && (
