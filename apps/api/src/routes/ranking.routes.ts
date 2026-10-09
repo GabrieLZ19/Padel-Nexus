@@ -7,6 +7,10 @@ const router = Router();
 // --- Rutas Públicas (Cualquier jugador o visitante puede ver las estadísticas) ---
 router.get("/", RankingsController.obtenerRankingGlobal);
 router.get(
+  "/provincial-nacional",
+  RankingsController.rankingProvincialNacional,
+);
+router.get(
   "/provincial/:torneo_id",
   RankingsController.rankingProvincialTorneo,
 );

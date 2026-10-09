@@ -1,11 +1,15 @@
 import { supabaseAdmin } from "../config/supabase";
 import {
+  CATEGORIAS_LIBRES,
+  CATEGORIAS_MENORES,
+  CATEGORIAS_VETERANOS,
   categoriasPorTipoRanking,
   normalizarProvincia,
   normalizarRama,
   type RamaRanking,
   type TipoRanking,
 } from "../constants/rankings";
+import { puntosInscripcionPorMejorInstancia } from "../utils/puntosProvincia";
 
 export interface ActualizarPuntosDTO {
   usuarioId: string;
@@ -348,19 +352,10 @@ export class RankingService {
   }
 
   /**
-   * Ranking por provincias en torneos nacionales (FAP):
+   * Ranking por provincias en torneos nacionales:
    * 8 campeón · 6 finalista · 4 semis · 2 cuartos · 1 octavos.
    */
   static async rankingProvincialPorTorneo(torneoId: string) {
-    const PUNTOS_POR_RONDA: Record<string, { ganador: number; perdedor: number }> =
-      {
-        FINAL: { ganador: 8, perdedor: 6 },
-        SEMIS: { ganador: 0, perdedor: 4 },
-        SEMIFINAL: { ganador: 0, perdedor: 4 },
-        CUARTOS: { ganador: 0, perdedor: 2 },
-        OCTAVOS: { ganador: 0, perdedor: 1 },
-      };
-
     const { data: partidos, error } = await supabaseAdmin
       .from("partidos")
       .select("ronda, ganador, equipo_a_id, equipo_b_id")
@@ -372,48 +367,22 @@ export class RankingService {
         "SEMIFINAL",
         "CUARTOS",
         "OCTAVOS",
-        "PRELIMINARES",
       ]);
 
     if (error) throw new Error(error.message);
 
-    const puntosPorInscripcion = new Map<string, number>();
-    const mejorRonda = new Map<string, number>();
-    const rankRonda = (r: string) => {
-      const u = r.toUpperCase();
-      if (u === "FINAL") return 5;
-      if (u.startsWith("SEMI")) return 4;
-      if (u === "CUARTOS") return 3;
-      if (u === "OCTAVOS") return 2;
-      return 1;
-    };
-
-    for (const p of partidos || []) {
-      const ronda = String(p.ronda || "").toUpperCase().trim();
-      const tabla = PUNTOS_POR_RONDA[ronda];
-      if (!tabla || !p.ganador) continue;
-
-      const perdedor =
-        p.ganador === p.equipo_a_id ? p.equipo_b_id : p.equipo_a_id;
-
-      const apply = (inscripcionId: string | null, pts: number) => {
-        if (!inscripcionId || pts <= 0) return;
-        const prevRank = mejorRonda.get(inscripcionId) || 0;
-        const thisRank = rankRonda(ronda);
-        // Solo sumar puntos de la mejor instancia (evitar doble conteo de avances)
-        if (thisRank < prevRank) return;
-        if (thisRank > prevRank) {
-          puntosPorInscripcion.set(inscripcionId, pts);
-          mejorRonda.set(inscripcionId, thisRank);
-        } else {
-          const cur = puntosPorInscripcion.get(inscripcionId) || 0;
-          if (pts > cur) puntosPorInscripcion.set(inscripcionId, pts);
-        }
-      };
-
-      apply(p.ganador, tabla.ganador);
-      apply(perdedor, tabla.perdedor);
-    }
+    const puntosPorInscripcion = puntosInscripcionPorMejorInstancia(
+      (partidos || [])
+        .filter((p) => p.ganador)
+        .map((p) => ({
+          ronda: String(p.ronda || ""),
+          ganadorId: String(p.ganador),
+          perdedorId:
+            p.ganador === p.equipo_a_id
+              ? p.equipo_b_id
+              : p.equipo_a_id,
+        })),
+    );
 
     // Campeón: ganador de FINAL = 8 (ya aplicado). Finalista = 6.
     const inscIds = [...puntosPorInscripcion.keys()];
@@ -482,4 +451,91 @@ export class RankingService {
 
     return { torneoId, provincias };
   }
+
+  /**
+   * Suma el ranking de provincias de todos los torneos nacionales
+   * que coinciden con tipo, categoría y rama.
+   */
+  static async rankingProvincialNacional(filtros: {
+    tipo: TipoRanking;
+    categoria?: string | null;
+    rama?: RamaRanking | null;
+  }) {
+    const { data, error } = await supabaseAdmin
+      .from("torneos")
+      .select("id, categoria, nivel, rama, alcance")
+      .ilike("alcance", "%nacional%");
+
+    if (error) throw new Error(error.message);
+
+    const categoriaFiltro = (filtros.categoria || "").trim();
+    const ids = (data || [])
+      .filter((torneo) =>
+        torneoNacionalCoincide(torneo, filtros.tipo, categoriaFiltro, filtros.rama),
+      )
+      .map((torneo) => torneo.id as string);
+
+    const acumulado = new Map<
+      string,
+      { puntos: number; parejas: number; provincia: string }
+    >();
+    for (const id of ids) {
+      const parcial = await RankingService.rankingProvincialPorTorneo(id);
+      for (const fila of parcial.provincias) {
+        const clave = normalizarProvincia(fila.provincia) || fila.provincia;
+        const cur = acumulado.get(clave) || {
+          puntos: 0,
+          parejas: 0,
+          provincia: fila.provincia,
+        };
+        cur.puntos += fila.puntos;
+        cur.parejas += fila.parejas;
+        acumulado.set(clave, cur);
+      }
+    }
+
+    const provincias = [...acumulado.values()]
+      .map((fila) => ({
+        provincia: fila.provincia,
+        puntos: Math.round(fila.puntos * 10) / 10,
+        parejas: Math.round(fila.parejas * 10) / 10,
+      }))
+      .sort((a, b) => b.puntos - a.puntos);
+
+    return { torneos: ids.length, provincias };
+  }
+}
+
+function torneoNacionalCoincide(
+  torneo: { categoria?: string | null; nivel?: string | null; rama?: string | null },
+  tipo: TipoRanking,
+  categoria: string,
+  rama?: RamaRanking | null,
+): boolean {
+  const familia = (torneo.categoria || "").toLowerCase();
+  const nivel = torneo.nivel || "";
+  const libres = CATEGORIAS_LIBRES as readonly string[];
+  const menores = CATEGORIAS_MENORES as readonly string[];
+  const veteranos = CATEGORIAS_VETERANOS as readonly string[];
+
+  const coincideTipo =
+    tipo === "libres"
+      ? familia.includes("libre") || libres.includes(nivel) || libres.includes(familia)
+      : tipo === "menores"
+        ? familia.includes("menor") || menores.includes(nivel)
+        : familia.includes("veteran") ||
+          familia.includes("lad") ||
+          veteranos.includes(nivel);
+
+  if (!coincideTipo) return false;
+  if (categoria && nivel !== categoria && (torneo.categoria || "") !== categoria) {
+    return false;
+  }
+  if (tipo === "menores" || !rama) return true;
+
+  const valor = (torneo.rama || "").toLowerCase();
+  if (rama === "masculino") {
+    return valor.startsWith("masculin") || valor === "caballeros" || valor === "m";
+  }
+  return valor.startsWith("femenin") || valor.startsWith("dama") || valor.startsWith("lad");
 }

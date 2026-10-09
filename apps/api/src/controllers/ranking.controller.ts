@@ -121,6 +121,38 @@ export const RankingsController = {
     }
   },
 
+  async rankingProvincialNacional(
+    req: Request,
+    res: Response,
+  ): Promise<Response> {
+    try {
+      const tipo = String(req.query.tipo || "").trim();
+      if (tipo !== "menores" && tipo !== "veteranos" && tipo !== "libres") {
+        return res.status(400).json({
+          exito: false,
+          error: "tipo debe ser menores, veteranos o libres",
+        });
+      }
+      const categoria = String(req.query.categoria || "").trim() || null;
+      const ramaRaw = String(req.query.rama || "").trim();
+      const rama =
+        ramaRaw === "masculino" || ramaRaw === "femenino" ? ramaRaw : null;
+
+      const data = await RankingService.rankingProvincialNacional({
+        tipo,
+        categoria,
+        rama: tipo === "menores" ? null : rama,
+      });
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al calcular el ranking nacional por provincia.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
   async rankingProvincialTorneo(
     req: Request,
     res: Response,
