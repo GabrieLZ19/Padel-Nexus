@@ -15,6 +15,7 @@ import {
   sincronizarClasificadosALlave,
 } from "../utils/playoffAvance";
 import { armarGruposTorneo, nombreBaseTorneo } from "../utils/gruposTorneo";
+import { resolverReglamentoPersistido } from "../utils/reglamentoTorneo";
 
 function mapInscripcionPartido(ins: Record<string, unknown>) {
   const perfiles = ins.perfiles as
@@ -688,13 +689,11 @@ export class TorneoService {
       if (fapId) resolvedAsociacionId = fapId;
     }
 
-    let reglamento =
-      (datos as any).reglamento ?? (datos as any).asociacion ?? "FAP";
-    if (forzarFap) reglamento = "FAP";
-    if (reglamento === "Amateur") {
-      // Amateur solo aplica fuera del circuito federativo nacional
-      if (forzarFap) reglamento = "FAP";
-    }
+    const reglamento = resolverReglamentoPersistido({
+      alcance: alcanceNormalizado,
+      reglamento: (datos as any).reglamento,
+      asociacion: (datos as any).asociacion,
+    });
 
     const { data: torneo, error: torneoError } = await supabaseAdmin
       .from("torneos")
@@ -1021,9 +1020,16 @@ export class TorneoService {
       }
     }
 
-    // Alcance Nacional ⇒ organizadora y reglamento FAP
+    if (updateData.alcance !== undefined || updateData.reglamento !== undefined) {
+      updateData.reglamento = resolverReglamentoPersistido({
+        alcance: updateData.alcance as string | null | undefined,
+        reglamento: updateData.reglamento as string | null | undefined,
+        asociacion: updateData.asociacion as string | null | undefined,
+      });
+    }
+
+    // Alcance Nacional ⇒ organizadora FAP
     if (updateData.alcance === "Nacional") {
-      updateData.reglamento = "FAP";
       const fapId = await TorneoService.resolveFapAsociacionId();
       if (fapId) updateData.asociacion_id = fapId;
     }

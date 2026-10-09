@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
     "build": "tsc",
-    "start": "node dist/app.js"
+    "start": "node dist/app.js",
+    "test": "node --experimental-strip-types --import ./test/register-ts-loader.mjs --test test/**/*.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",

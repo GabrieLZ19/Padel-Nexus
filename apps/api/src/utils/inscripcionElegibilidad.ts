@@ -116,7 +116,7 @@ export function clasificarNivelEspecial(
     return { tipo: "sub", edadMaximaExclusiva: Number(subMatch[1]) };
   }
 
-  const seniorMatch = raw.match(/^(Seniors|Women)\s*\+(\d+)$/i);
+  const seniorMatch = raw.match(/^(Seniors?|Women)\s*\+(\d+)$/i);
   if (seniorMatch) {
     return { tipo: "senior", edadMinima: Number(seniorMatch[2]) };
   }
