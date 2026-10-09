@@ -1,6 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
+import CustomDropdown from "@/components/ui/CustomDropdown";
 import {
   CONTADORES_VISTA_VACIOS,
   VISTAS_TORNEO,
@@ -69,21 +70,24 @@ export default function TorneoVistaFiltros({
               className="w-full rounded-xl border border-white/5 bg-[#111111] py-2.5 pl-11 pr-4 text-sm text-white placeholder-gray-500 transition-colors focus:border-brand-chartreuse/50 focus:outline-none"
             />
           </div>
-          <select
-            aria-label="Alcance del listado"
-            value={vista === "todos" ? "todos" : "vista"}
-            onChange={(event) => {
-              if (event.target.value === "todos") {
-                onVista("todos");
-                return;
-              }
-              onVista(vistaActiva ?? "en_curso");
-            }}
-            className="rounded-xl border border-white/5 bg-[#111111] px-3 py-2.5 text-sm text-white focus:border-brand-chartreuse/50 focus:outline-none"
-          >
-            <option value="vista">Vista actual</option>
-            <option value="todos">Todos los estados</option>
-          </select>
+          <div className="w-full sm:w-56">
+            <CustomDropdown
+              value={vista === "todos" ? "todos" : "vista"}
+              onChange={(valor) => {
+                if (valor === "todos") {
+                  onVista("todos");
+                  return;
+                }
+                onVista(vistaActiva ?? "en_curso");
+              }}
+              options={[
+                { value: "vista", label: "Vista actual" },
+                { value: "todos", label: "Todos los estados" },
+              ]}
+              placeholder="Vista actual"
+              className="!py-2.5 text-sm"
+            />
+          </div>
         </div>
       </div>
 

@@ -414,7 +414,7 @@ function getCapacidadesZonasPreferidas(
       const count3 = Math.floor((total - 8) / 3);
       if (count3 >= 0) return [4, 4, ...Array(count3).fill(3)];
     }
-    if (total === 5) return [3, 2];
+    if (total === 5) return [2, 3];
     if (total === 4) return [4];
   } else {
     const mod = total % 4;
@@ -431,7 +431,7 @@ function getCapacidadesZonasPreferidas(
       const count4 = Math.floor((total - 3) / 4);
       if (count4 >= 0) return [...Array(count4).fill(4), 3];
     }
-    if (total === 5) return [3, 2];
+    if (total === 5) return [2, 3];
     if (total === 3) return [3];
   }
   const count = Math.max(1, Math.floor(total / preferredSize));

@@ -72,6 +72,10 @@ export const Paso4Jugadores = ({
     userRole,
   );
   const nacional = esAlcanceNacional(torneo.alcance);
+  const gratuito =
+    typeof torneo.es_gratis === "boolean"
+      ? torneo.es_gratis
+      : Number(torneo.precio_inscripcion || 0) === 0;
 
   const [importingCSV, setImportingCSV] = useState(false);
   const [importProgress, setImportProgress] =
@@ -228,8 +232,11 @@ export const Paso4Jugadores = ({
       <div className="p-6 border-b border-white/5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-black/20">
         <h3 className="font-bold text-white flex items-center gap-2">
           <CheckCircle2 className="size-5 text-[#00ff88]" />
-          Inscripciones ({confirmadasCount} confirmadas de{" "}
-          {torneo.cupos_maximos || 16})
+          Inscripciones (
+          {gratuito
+            ? `${inscripciones.length} inscriptas`
+            : `${confirmadasCount} confirmadas`}{" "}
+          de {torneo.cupos_maximos || 16})
         </h3>
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
           <button
@@ -286,7 +293,7 @@ export const Paso4Jugadores = ({
             </thead>
             <tbody className="divide-y divide-white/5">
               {inscripciones.map((ins) => {
-                const isConfirmed = ins.estado_pago === "Confirmado";
+                const isConfirmed = !gratuito && ins.estado_pago === "Confirmado";
                 return (
                   <tr
                     key={ins.id}
@@ -295,24 +302,28 @@ export const Paso4Jugadores = ({
                     }`}
                   >
                     <td className="px-8 py-5 text-center">
-                      <input
-                        type="checkbox"
-                        checked={isConfirmed}
-                        disabled={isConfirmed}
-                        onChange={() => {
-                          if (!isConfirmed) {
-                            setPagoModal({
-                              isOpen: true,
-                              inscripcionId: String(ins.id),
-                              montoDefecto: Number(
-                                ins.monto || torneo.precio_inscripcion || 0,
-                              ),
-                              isLoading: false,
-                            });
-                          }
-                        }}
-                        className="size-4 rounded border-white/10 text-brand-chartreuse cursor-pointer disabled:cursor-not-allowed"
-                      />
+                      {gratuito ? (
+                        <span className="text-xs font-bold text-gray-500">N/A</span>
+                      ) : (
+                        <input
+                          type="checkbox"
+                          checked={isConfirmed}
+                          disabled={isConfirmed}
+                          onChange={() => {
+                            if (!isConfirmed) {
+                              setPagoModal({
+                                isOpen: true,
+                                inscripcionId: String(ins.id),
+                                montoDefecto: Number(
+                                  ins.monto || torneo.precio_inscripcion || 0,
+                                ),
+                                isLoading: false,
+                              });
+                            }
+                          }}
+                          className="size-4 rounded border-white/10 text-brand-chartreuse cursor-pointer disabled:cursor-not-allowed"
+                        />
+                      )}
                     </td>
                     <td className="px-8 py-5 font-mono text-gray-500 text-sm">
                       {String(ins.id).slice(0, 8).toUpperCase()}
@@ -352,13 +363,15 @@ export const Paso4Jugadores = ({
                             : "bg-gray-500/10 text-gray-400 border border-gray-500/20"
                         }`}
                       >
-                        {isConfirmed
-                          ? modoFederacion
-                            ? "Pagó"
-                            : "Confirmado"
-                          : modoFederacion
-                            ? "No pagó"
-                            : "Pendiente de pago"}
+                        {gratuito
+                          ? "N/A"
+                          : isConfirmed
+                            ? modoFederacion
+                              ? "Pagó"
+                              : "Confirmado"
+                            : modoFederacion
+                              ? "No pagó"
+                              : "Pendiente de pago"}
                       </span>
                     </td>
                     <td className="px-8 py-5 text-right font-semibold text-sm">

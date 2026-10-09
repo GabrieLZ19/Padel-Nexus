@@ -56,6 +56,10 @@ export default function InscripcionManualModal({
   });
 
   const esNacional = /nacional/i.test(String(torneo.alcance || ""));
+  const gratuito =
+    typeof torneo.es_gratis === "boolean"
+      ? torneo.es_gratis
+      : Number(torneo.precio_inscripcion || 0) === 0;
 
   const handleSubmit = async () => {
     if (!j1) {
@@ -100,11 +104,13 @@ export default function InscripcionManualModal({
         jugador1_identificador: j1.trim(),
         jugador2_identificador: j2.trim() || undefined,
         monto: Number(monto),
-        metodo_pago: modoFederacion
-          ? estadoPago === "Confirmado"
-            ? "Confirmado"
-            : undefined
-          : estadoPago || undefined,
+        metodo_pago: gratuito
+          ? undefined
+          : modoFederacion
+            ? estadoPago === "Confirmado"
+              ? "Confirmado"
+              : undefined
+            : estadoPago || undefined,
         omitir_validaciones: omitirValidaciones,
         motivo: omitirValidaciones ? motivoOverride.trim() : undefined,
         letra_prioridad: esNacional ? letraPrioridad.trim().toUpperCase() : undefined,
@@ -254,16 +260,26 @@ export default function InscripcionManualModal({
 
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
-                      {modoFederacion ? "Estado de pago" : "Método de Pago (Cobro)"}
+                      {gratuito
+                        ? "Pago"
+                        : modoFederacion
+                          ? "Estado de pago"
+                          : "Método de Pago (Cobro)"}
                     </label>
-                    <CustomDropdown
-                      value={estadoPago}
-                      onChange={setEstadoPago}
-                      options={pagoOptions}
-                      placeholder="Seleccionar..."
-                      haciaArriba={true}
-                      className="py-2.5! text-sm!"
-                    />
+                    {gratuito ? (
+                      <div className="flex h-[46px] items-center rounded-xl border border-white/5 bg-[#111] px-4 text-sm font-bold text-gray-400">
+                        N/A
+                      </div>
+                    ) : (
+                      <CustomDropdown
+                        value={estadoPago}
+                        onChange={setEstadoPago}
+                        options={pagoOptions}
+                        placeholder="Seleccionar..."
+                        haciaArriba={true}
+                        className="py-2.5! text-sm!"
+                      />
+                    )}
                   </div>
                 </div>
 

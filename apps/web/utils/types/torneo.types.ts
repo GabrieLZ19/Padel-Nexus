@@ -40,6 +40,7 @@ export interface Torneo {
   categoria?: string | null;
   modalidad: string;
   precio_inscripcion: number;
+  es_gratis?: boolean | null;
   formato: string;
   premio_1?: string | null;
   premio_2?: string | null;
@@ -162,6 +163,7 @@ export interface FormTorneoState {
   categoria: string;
   modalidad: string;
   precio_inscripcion?: number;
+  es_gratis?: boolean | null;
   formato: string;
   alcance?: 'Nacional' | 'Provincial' | 'Regional' | 'Local' | 'Privado' | null;
   asociacion?: 'FAP' | 'APA' | 'Amateur' | null;
