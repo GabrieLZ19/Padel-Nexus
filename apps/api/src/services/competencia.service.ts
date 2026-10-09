@@ -8,6 +8,10 @@ import {
 } from "../utils/denominacionNacional";
 import { getCapacidadesZonasPreferidas } from "../utils/capacidadesZonas";
 import {
+  aplicarHorarioConservado,
+  horariosPorCruce,
+} from "../utils/horariosZona";
+import {
   buildFeedersByMatchNo,
   buildOcupadosDesdePartidos,
   programarPartidosConDisponibilidad,
@@ -665,9 +669,20 @@ export class CompetenciaService {
     // 1. Conservar partidos con resultado; borrar solo los pendientes
     const { data: existentes } = await supabaseAdmin
       .from("partidos")
-      .select("id, equipo_a_id, equipo_b_id, ganador, orden")
+      .select(
+        "id, equipo_a_id, equipo_b_id, ganador, orden, cancha_asignada, fecha_partido",
+      )
       .eq("torneo_id", torneoId)
       .eq("ronda", nombreGrupo);
+
+    const horariosPrevios = horariosPorCruce(
+      (existentes || []).map((m) => ({
+        equipoAId: m.equipo_a_id,
+        equipoBId: m.equipo_b_id,
+        cancha: m.cancha_asignada,
+        fecha: m.fecha_partido,
+      })),
+    );
 
     const jugados = (existentes || []).filter((m) => m.ganador);
     const pendientesIds = (existentes || [])
@@ -695,7 +710,7 @@ export class CompetenciaService {
 
     if (!parejas || parejas.length < 2) return;
 
-    const partidos: Record<string, unknown>[] = [];
+    const partidos: PartidoProgramable[] = [];
     const pushIfNew = (orden: number, aId: string, bId: string) => {
       if (pairsJugados.has(pairKey(aId, bId))) return;
       partidos.push({
@@ -754,16 +769,19 @@ export class CompetenciaService {
     }
 
     if (partidos.length > 0) {
+      const conHorario = partidos.map((partido) =>
+        aplicarHorarioConservado(partido, horariosPrevios),
+      );
       const { data: partidosProgramados } = await supabaseAdmin
         .from("partidos")
         .select("cancha_asignada, fecha_partido")
         .eq("torneo_id", torneoId);
 
       const ocupados = buildOcupadosDesdePartidos(partidosProgramados || []);
-      await programarPartidosConDisponibilidad(torneoId, partidos, {
+      await programarPartidosConDisponibilidad(torneoId, conHorario, {
         ocupados,
       });
-      await supabaseAdmin.from("partidos").insert(partidos);
+      await supabaseAdmin.from("partidos").insert(conHorario);
     }
   }
 
