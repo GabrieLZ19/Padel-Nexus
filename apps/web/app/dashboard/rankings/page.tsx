@@ -80,6 +80,16 @@ const RAMAS_OPCIONES = [
 
 const RAMA_NO_APLICA = [{ value: "", label: "No aplica" }];
 
+const RAMAS_ENTIDAD = [
+  { value: "masculino", label: "Masculino" },
+  { value: "femenino", label: "Femenino" },
+];
+
+const CATEGORIAS_ENTIDAD = [
+  ...CATEGORIAS_POR_TIPO.libres.filter((categoria) => categoria !== "Inicial").reverse(),
+  ...CATEGORIAS_POR_TIPO.menores,
+];
+
 type FilaProvincia = {
   provincia: string;
   puntos: number;
@@ -139,6 +149,7 @@ export default function RankingsPage() {
   }, [scopePorRol, provinciaForzada]);
 
   const esFederacion = rol === "admin_federacion" || rol === "superadmin";
+  const esEntidadLocal = rol === "admin_provincial" || rol === "admin_club";
   const vistaProvincia = esFederacion && vista === "provincia";
   const ramaEfectiva = tipo === "menores" ? "" : rama;
 
@@ -160,7 +171,7 @@ export default function RankingsPage() {
           }
         } else {
           const params: RankingsQueryParams = {
-            tipo_ranking: tipo,
+            tipo_ranking: esEntidadLocal ? undefined : tipo,
             scope,
             rama: ramaEfectiva || undefined,
             categoria: categoria || undefined,
@@ -184,13 +195,18 @@ export default function RankingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [tipo, ramaEfectiva, categoria, provincia, scope, vistaProvincia]);
+  }, [tipo, ramaEfectiva, categoria, provincia, scope, vistaProvincia, esEntidadLocal]);
 
   // Reset de categoria al cambiar de tipo (evita valores invalidos entre grupos).
   useEffect(() => {
+    if (esEntidadLocal) {
+      setCategoria((actual) => actual || "8ª");
+      setRama((actual) => actual || "masculino");
+      return;
+    }
     setCategoria("");
     if (tipo === "menores") setRama("");
-  }, [tipo]);
+  }, [tipo, esEntidadLocal]);
 
   const tipoConfig = TIPOS_RANKING_CONFIG.find((t) => t.value === tipo)!;
   const categoriasDelTipo = useMemo(() => {
@@ -254,14 +270,16 @@ export default function RankingsPage() {
       ]
         .filter(Boolean)
         .join(" ")
-    : tipoConfig.label;
+    : esEntidadLocal
+      ? ["Ranking", etiquetaRama, etiquetaCategoria].filter(Boolean).join(" ")
+      : tipoConfig.label;
 
   const subtituloContexto = useMemo(() => {
     if (rol === "admin_provincial") {
-      return `Jugadores de ${provinciaForzada || "tu provincia"} por categoría y género, de 8ª a 1ª.`;
+      return `Jugadores de ${provinciaForzada || "tu provincia"}. Primero el género y después la categoría, de 8ª a 1ª, más las de menores.`;
     }
     if (rol === "admin_club") {
-      return "Ranking del circuito del club, por género y categorías de 8ª a 1ª.";
+      return "Ranking del circuito del club. Primero el género y después la categoría, de 8ª a 1ª, más las de menores.";
     }
     if (esFederacion && vistaProvincia) {
       return "Puntos por provincia en torneos nacionales, desde octavos: 8 campeón, 6 finalista, 4 semifinal, 2 cuartos y 1 octavos.";
@@ -304,7 +322,8 @@ export default function RankingsPage() {
         </span>
       </div>
 
-      {/* Tabs por tipo de ranking */}
+      {/* El tipo de torneo y la vista por provincia son solo de federación. */}
+      {!esEntidadLocal && (
       <div className="flex flex-wrap gap-2 border-b border-white/10 pb-2">
         {TIPOS_RANKING_CONFIG.map((t) => (
           <button
@@ -320,6 +339,7 @@ export default function RankingsPage() {
           </button>
         ))}
       </div>
+      )}
 
       {esFederacion && (
         <div className="flex flex-wrap gap-2">
@@ -366,20 +386,33 @@ export default function RankingsPage() {
         </div>
 
         <CustomDropdown
-          value={ramaEfectiva}
+          value={esEntidadLocal ? rama || "masculino" : ramaEfectiva}
           onChange={setRama}
-          disabled={!tipoConfig.permiteRama}
-          options={tipoConfig.permiteRama ? RAMAS_OPCIONES : RAMA_NO_APLICA}
+          disabled={!esEntidadLocal && !tipoConfig.permiteRama}
+          options={
+            esEntidadLocal
+              ? RAMAS_ENTIDAD
+              : tipoConfig.permiteRama
+                ? RAMAS_OPCIONES
+                : RAMA_NO_APLICA
+          }
           placeholder="Género"
         />
 
         <CustomDropdown
           value={categoria}
           onChange={setCategoria}
-          options={[
-            { value: "", label: `Todas las categorias (${tipoConfig.label})` },
-            ...categoriasDelTipo.map((c) => ({ value: c, label: c })),
-          ]}
+          options={
+            esEntidadLocal
+              ? CATEGORIAS_ENTIDAD.map((c) => ({
+                  value: c,
+                  label: NIVELES_PADEL.find((nivel) => nivel.value === c)?.label || c,
+                }))
+              : [
+                  { value: "", label: `Todas las categorias (${tipoConfig.label})` },
+                  ...categoriasDelTipo.map((c) => ({ value: c, label: c })),
+                ]
+          }
           placeholder="Categoría"
         />
 
