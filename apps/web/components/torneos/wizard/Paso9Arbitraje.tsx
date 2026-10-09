@@ -804,8 +804,8 @@ export const PasoResultados = ({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="sticky top-0 z-20 -mx-1 px-1 pt-1 pb-2 bg-gradient-to-b from-[#0b0b0b] via-[#0b0b0b]/97 to-transparent">
-        <header className="rounded-2xl border border-white/10 bg-[#121212] shadow-[0_8px_30px_rgba(0,0,0,0.35)] overflow-hidden">
+      <div className="sticky top-0 z-20 -mx-1 px-1 pt-1 pb-2 bg-gradient-to-b from-brand-black via-brand-black/97 to-transparent">
+        <header className="rounded-2xl border border-white/10 bg-brand-card shadow-[0_8px_30px_rgba(0,0,0,0.35)] overflow-hidden">
           {/* Fila superior: título + acciones */}
           <div className="flex items-center justify-between gap-3 px-3.5 sm:px-4 py-3 border-b border-white/5">
             <div className="min-w-0">
@@ -850,8 +850,8 @@ export const PasoResultados = ({
                   onClick={() => setVistaRapida(v.id)}
                   className={`relative flex flex-col items-center justify-center gap-0.5 py-3 sm:py-3.5 px-2 transition-colors cursor-pointer ${
                     activo
-                      ? "bg-[#161616] text-brand-chartreuse"
-                      : "bg-[#0e0e0e] text-gray-500 hover:text-gray-300 hover:bg-[#121212]"
+                      ? "bg-brand-card text-brand-chartreuse"
+                      : "bg-brand-black text-gray-500 hover:text-gray-300 hover:bg-brand-card"
                   }`}
                 >
                   {activo && (

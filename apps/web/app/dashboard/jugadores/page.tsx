@@ -14,7 +14,11 @@ import {
   ChevronUp,
   MapPin,
 } from "lucide-react";
-import { LicenciasService, type LicenciaConfigData } from "@/utils/services/licencias";
+import {
+  LicenciasService,
+  type LicenciaConfigData,
+  type ResumenLicencias,
+} from "@/utils/services/licencias";
 import { ClubesService } from "@/utils/services/clubes";
 import { Licencia, Perfil } from "@/utils/types";
 import FeedbackModal from "@/components/ui/FeedbackModal";
@@ -74,6 +78,7 @@ export default function JugadoresLicenciasPage() {
   const [licencias, setLicencias] = useState<Perfil[]>([]);
   const [clubes, setClubes] = useState<{ [id: string]: string }>({});
   const [total, setTotal] = useState<number>(0);
+  const [resumen, setResumen] = useState<ResumenLicencias | null>(null);
   const [page, setPage] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>("");
@@ -150,6 +155,7 @@ export default function JugadoresLicenciasPage() {
         if (isMounted) {
           setLicencias(response.data || []);
           setTotal(response.total || 0);
+          if (response.resumen) setResumen(response.resumen);
         }
       } catch (error) {
         console.error("Error al cargar licencias:", error);
@@ -272,9 +278,11 @@ export default function JugadoresLicenciasPage() {
     }
   };
 
-  const pendientes = contarPorEstado(licencias, "Pendiente");
-  const vigentes = contarPorEstado(licencias, "Activa");
-  const vencidas = contarPorEstado(licencias, "Vencida");
+  const pendientes = resumen?.pendientes ?? contarPorEstado(licencias, "Pendiente");
+  const vigentes = resumen?.vigentes ?? contarPorEstado(licencias, "Activa");
+  const vencidas = resumen?.vencidas ?? contarPorEstado(licencias, "Vencida");
+  const rechazadas = resumen?.rechazadas ?? contarPorEstado(licencias, "Suspendida");
+  const totalJugadores = resumen?.total ?? total;
 
   return (
     <div className="w-full max-w-[1600px] mx-auto p-6 lg:p-8 xl:p-10 space-y-6">
@@ -327,30 +335,37 @@ export default function JugadoresLicenciasPage() {
         </div>
 
         {/* Stats rápidas — también actúan como atajo de filtro */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {(
             [
-              { filtro: "Todas" as FiltroLicencia, label: "Total", value: total, icon: Users, color: "text-white" },
+              { filtro: "Todas" as FiltroLicencia, label: "Total", value: totalJugadores, icon: Users, color: "text-white" },
               {
                 filtro: "Pendientes" as FiltroLicencia,
                 label: "Pendientes",
-                value: filtroActivo === "Pendientes" ? total : pendientes,
+                value: pendientes,
                 icon: Clock,
                 color: "text-yellow-400",
               },
               {
                 filtro: "Vigentes" as FiltroLicencia,
                 label: "Vigentes",
-                value: filtroActivo === "Vigentes" ? total : vigentes,
+                value: vigentes,
                 icon: ShieldCheck,
                 color: "text-green-400",
               },
               {
                 filtro: "Vencidas" as FiltroLicencia,
                 label: "Vencidas",
-                value: filtroActivo === "Vencidas" ? total : vencidas,
+                value: vencidas,
                 icon: AlertTriangle,
                 color: "text-red-400",
+              },
+              {
+                filtro: "Rechazadas" as FiltroLicencia,
+                label: "Rechazadas",
+                value: rechazadas,
+                icon: XCircle,
+                color: "text-red-300",
               },
             ] as const
           ).map((stat) => (

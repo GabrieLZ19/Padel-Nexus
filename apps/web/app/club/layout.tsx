@@ -190,9 +190,9 @@ export default function ClubLayout({
               }`
         }
       >
-        <div className="h-28 px-8 flex items-center justify-between gap-3 border-b border-white/5 md:border-none">
+        <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-white/5 px-4 md:border-none">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(204,255,0,0.15)] bg-[#cbfe01]">
+            <div className="size-9 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(204,255,0,0.15)] bg-[#cbfe01]">
               <Image
                 src="/brand/LogoAccessory.svg"
                 alt="Padel Nexus"
@@ -219,17 +219,17 @@ export default function ClubLayout({
           </button>
         </div>
 
-        <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
+        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-1">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link key={item.name} href={item.href} className="block relative group">
                 <div
-                  className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
+                  className={`flex h-10 items-center gap-3 rounded-xl px-3 transition-colors ${
                     isActive ? "bg-brand-chartreuse text-[#111] font-bold" : "text-gray-400 hover:bg-white/5"
                   }`}
                 >
-                  <item.icon className="size-5" />
+                  <item.icon className="size-4 shrink-0" />
                   <span className="text-[14px] flex-1">{item.name}</span>
                   {Number((item as { badge?: number }).badge) > 0 ? (
                     <span className="min-w-5 h-5 flex items-center justify-center bg-brand-chartreuse text-brand-black rounded-full text-[10px] font-black px-1 shadow-[0_0_8px_rgba(203,254,1,0.3)]">
@@ -244,9 +244,9 @@ export default function ClubLayout({
           })}
         </nav>
 
-        <div className="p-6 border-t border-white/5 bg-[#111111] flex items-center gap-3">
-          <div className="size-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
-            <User className="size-5 text-gray-400" />
+        <div className="flex h-16 shrink-0 items-center gap-2 border-t border-white/5 bg-[#111111] px-3">
+          <div className="size-8 shrink-0 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+            <User className="size-4 text-gray-400" />
           </div>
           <div className="flex flex-col flex-1 overflow-hidden">
             <span className="text-[13px] font-bold text-brand-white truncate">{displayName}</span>
@@ -274,7 +274,7 @@ export default function ClubLayout({
       )}
 
       {/* Main Panel */}
-      <main className="flex-1 overflow-y-auto bg-brand-black min-w-0">
+      <main className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-brand-black min-w-0">
         <div className={`${programadorPantallaCompleta ? "hidden" : "lg:hidden"} sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4 bg-brand-card/80 backdrop-blur-md border-b border-brand-white/5`}>
           <button
             onClick={() => setMobileMenuOpen(true)}

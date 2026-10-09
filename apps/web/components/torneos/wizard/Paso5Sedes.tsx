@@ -5,6 +5,9 @@ interface Paso7SedesProps {
   setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
   readOnly?: boolean;
+  /** Paso que sigue a Sedes. El club no tiene Fiscales y pasa directo a Cierre. */
+  siguienteId?: string;
+  siguienteLabel?: string;
 }
 
 export const Paso7Sedes = ({
@@ -12,6 +15,8 @@ export const Paso7Sedes = ({
   setActiveTab,
   triggerRefresh,
   readOnly = false,
+  siguienteId = "fiscales",
+  siguienteLabel = "Fiscales",
 }: Paso7SedesProps) => {
   return (
     <div className="space-y-6">
@@ -29,10 +34,10 @@ export const Paso7Sedes = ({
           Atrás
         </button>
         <button
-          onClick={() => setActiveTab("fiscales")}
+          onClick={() => setActiveTab(siguienteId)}
           className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
         >
-          Siguiente Paso: Fiscales
+          Siguiente Paso: {siguienteLabel}
         </button>
       </div>
     </div>

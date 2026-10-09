@@ -13,7 +13,9 @@ import {
   Layers,
   LayoutDashboard,
 } from "lucide-react";
+import { sileo } from "sileo";
 import { TorneosService } from "@/utils/services/torneos";
+import { AsociacionesService } from "@/utils/services/asociaciones";
 import { ClubPanelService } from "@/utils/services/club-panel";
 import Pagination from "@/components/ui/Pagination";
 import { Torneo, Club, FormTorneoState, GrupoTorneoListado } from "@/utils/types";
@@ -30,6 +32,23 @@ import {
 } from "@/utils/constants/padelConfig";
 
 const PAGE_SIZE = 6;
+
+function normalizarProvincia(valor?: string | null) {
+  return (valor || "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+async function idAsociacionDeProvincia(provincia: string) {
+  const lista = await AsociacionesService.getAll(undefined, provincia);
+  const clave = normalizarProvincia(provincia);
+  const match =
+    lista.find((item) => normalizarProvincia(item.provincia) === clave) ??
+    lista[0];
+  return match?.id ?? null;
+}
 
 export default function ClubTorneosPage() {
   const router = useRouter();
@@ -169,9 +188,9 @@ export default function ClubTorneosPage() {
       nombre: "",
       club_id: club ? String(club.id) : "",
       fecha: "",
-      nivel: "5ª",
+      nivel: "",
       rama: "Masculina",
-      categoria: "Libres",
+      categoria: "",
       estado: "Borrador",
       cupos_maximos: 16,
       modalidad: "Parejas",
@@ -216,12 +235,18 @@ export default function ClubTorneosPage() {
   };
 
   const handleSave = async () => {
-    if (!formData.nombre || !formData.fecha) {
+    if (
+      !formData.nombre ||
+      !formData.fecha ||
+      !formData.categoria ||
+      !formData.nivel
+    ) {
       setFeedbackModal({
         isOpen: true,
         type: "warning",
         title: "Campos Incompletos",
-        description: "Completá el nombre y la fecha de inicio del torneo.",
+        description:
+          "Completá el nombre, la categoría, el nivel y la fecha de inicio del torneo.",
         onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
       });
       return;
@@ -234,28 +259,34 @@ export default function ClubTorneosPage() {
         club_id: club ? String(club.id) : formData.club_id,
       };
 
-      if (editingId) {
-        await TorneosService.update(editingId, payload);
-      } else {
-        await TorneosService.create(payload);
+      if (
+        (payload.alcance === "Provincial" || payload.alcance === "Regional") &&
+        club?.provincia
+      ) {
+        payload.asociacion_id = await idAsociacionDeProvincia(club.provincia);
       }
 
-      setIsModalOpen(false);
-      if (!editingId) {
-        setVista("preparacion");
-        setCurrentPage(1);
-      } else {
+      if (editingId) {
+        await TorneosService.update(editingId, payload);
+        setIsModalOpen(false);
         void loadData();
+        setFeedbackModal({
+          isOpen: true,
+          type: "success",
+          title: "¡Torneo Actualizado!",
+          description: "Los cambios en el torneo se guardaron con éxito.",
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+      } else {
+        const creado = await TorneosService.create(payload);
+        setIsModalOpen(false);
+        sileo.success({
+          title: "Torneo creado",
+          description: "Seguí la configuración en el paso 1.",
+        });
+        router.push(`/club/torneos/${creado.id}?step=edit`);
       }
-      setFeedbackModal({
-        isOpen: true,
-        type: "success",
-        title: editingId ? "¡Torneo Actualizado!" : "¡Torneo Creado!",
-        description: editingId
-          ? "Los cambios en el torneo se guardaron con éxito."
-          : "El borrador del torneo ha sido generado con éxito.",
-        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
-      });
     } catch (err: any) {
       setFeedbackModal({
         isOpen: true,
@@ -459,6 +490,8 @@ export default function ClubTorneosPage() {
                         >
                           <LayoutDashboard className="size-4" />
                         </button>
+                        {!t.solo_lectura && (
+                        <>
                         <button
                           onClick={() => {
                             const grupo = grupos.find(
@@ -507,6 +540,8 @@ export default function ClubTorneosPage() {
                         >
                           <Trash2 className="size-4" />
                         </button>
+                        </>
+                        )}
                       </div>
                     </td>
                   </tr>

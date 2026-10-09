@@ -113,3 +113,37 @@ git push origin main && git push whapy main
 ```
 
 Playbook completo: `docs/WHAPY_DUAL_REMOTE.md`.
+
+---
+
+## 7. Auditorías de producto (al 9 de octubre de 2026)
+
+La fuente de los pedidos del cliente es el documento del 25/9 y `Padel Nexus — Auditoría UX y Requerimientos 27-9`. Lo que falta está en `docs/pendientes-auditoria-27-9.md`: se avanza de arriba hacia abajo, un requerimiento por vez. El estado de abajo es el del código, no el que figuraba como pendiente el 27/9.
+
+### Hecho a partir de las observaciones del 25/9
+*   Login con los slogans de marca y la palabra «cuenta» (PUB-03).
+*   Torneo gratuito sin estado «Pagó» (ASI-03).
+*   Reglamentos FAP y APA, y Amateur solo en Local o Privado (ASI-04, ya verificado en el documento).
+*   Numeración de partidos después de las zonas, rondas en español y orden octavos → final (CUA-01, CUA-02).
+*   W.O. separado de lesión, y corrección de un resultado ya cargado (RES-02, RES-01).
+*   Llave y zonas editables después de cargar resultados. El pase de una pareja de menores a una categoría superior del mismo grupo no regenera la llave: saca a la pareja con bye y la inserta en un hueco o en un partido nuevo, con motivo y auditoría (ASI-05).
+*   Ranking nacional filtrable, sin «FAP» fijo en el título, y puntos de provincia 8/6/4/2/1 configurables en el cierre (RAN-01, RAN-02, GEN-07 en la parte de ranking).
+*   Rankings de asociación y club por género y después por categoría, con los nombres de categoría del documento (RAN-03).
+*   El programador conserva cancha y horario al rearmar una zona, y permite mover parejas con motivo (parte de PRO-05).
+*   Tarjetas de zona legibles en modo claro.
+
+### Circuito competitivo (síntesis del 25/9)
+*   El jugador no se afilia a un club para jugar. El cambio de provincia es un pase entre asociaciones (`pases_representacion`), con motivo, un pendiente por jugador, y aprobación de federación o asociación.
+*   Alcance `Clasificatorio` para el torneo de un club cuando no hay asociación provincial. No fuerza el reglamento FAP.
+*   La afiliación a club que se crea al aprobar una licencia sigue existiendo. Lo que se quitó es la solicitud del jugador.
+
+### Auditoría 27/9 — en curso
+*   **ACC-01 (crítica):** una cuenta de asociación solo lista torneos, inscripciones y clubes de su provincia. Los nacionales se ven en lectura y el servidor rechaza editar, eliminar o cargar resultados. Sin provincia asignada, las listas vuelven vacías con un aviso. El club sede puede cargar resultados de un nacional que se juega en sus canchas, y no puede editarlo ni eliminarlo. Probado con la asociación de Tucumán (listas vacías de clubes e inscripciones, nacionales en lectura) y con el club New Center (locales y privados editables, nacionales sin editar ni eliminar). El programador de un nacional en el club sede queda en consulta: el servidor rechaza publicar, asignar o limpiar horarios. La regla del club sede era una propuesta abierta del documento; quedó aplicada así hasta que se decida otra cosa.
+*   **SEC-01:** Estadísticas y Moderación no tenían página y el menú caía en el 404 público. Salieron del menú hasta que esas secciones existan.
+*   **ASI-01:** el índice del asistente es una barra horizontal debajo del título. A 1366×641 se ven los 9 pasos, con candado en los bloqueados. En modo claro las pastillas inactivas son tarjetas blancas con borde, y los filtros de Resultados dejan de quedar en negro.
+*   **CLU-01:** el alta de un torneo de club cabe en la ventana (el título y el cierre quedan fijos si hace falta desplazar el formulario), exige elegir categoría y nivel, abre el paso 1 al crear, numera los pasos del club sin el salto de Fiscales (Sedes sigue a Cierre) y, en alcance Provincial o Regional, deja como organizadora la asociación de la provincia del club.
+*   **CLU-02:** el club confirma, cobra en efectivo, cancela o marca ausencia desde la lista. La fecha arranca en hoy, las pendientes de días anteriores se señalan, y la agenda del día muestra las canchas en columnas.
+*   **GEN-01:** el menú de federación muestra los 11 ítems y el usuario a 1366×768 y a 1366×641, sin barra propia. Estadísticas no está: no tiene página.
+*   **GEN-02:** a 1366×641, Torneos, Inscripciones, Jugadores y el asistente usan solo el scroll de la página. La tabla de torneos ya no fuerza 1000 px y el chat ocupa el alto del panel, así la lista de conversaciones no tiene barra propia. La llave y el programador siguen aparte.
+*   **GEN-08 (en curso):** el programador separa el estado de la competencia del de los horarios. La recaudación del tablero y la de Inscripciones salen del mismo resumen, y los estados de licencia de Jugadores suman el total que también muestra el tablero. No se cambia qué evento pasa un torneo a En curso hasta que el cliente lo defina.
+*   Varios ítems que el 27/9 figuraban pendientes ya están hechos y no se rehacen: PUB-03, ASI-03, ASI-04, ASI-05, CUA-01, CUA-02, RES-01, RES-02, RAN-01, RAN-02, RAN-03.

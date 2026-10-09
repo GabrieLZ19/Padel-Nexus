@@ -19,8 +19,6 @@ const MENU_POR_ROL: Record<string, string[]> = {
     "/dashboard/rankings",
     "/dashboard/marketplace",
     "/dashboard/comunicaciones",
-    "/dashboard/moderacion",
-    "/dashboard/estadisticas",
     "/dashboard/chat",
     "/dashboard/usuarios",
   ],
@@ -36,7 +34,6 @@ const MENU_POR_ROL: Record<string, string[]> = {
     "/dashboard/rankings",
     "/dashboard/marketplace",
     "/dashboard/comunicaciones",
-    "/dashboard/estadisticas",
     "/dashboard/chat",
   ],
 
@@ -51,7 +48,6 @@ const MENU_POR_ROL: Record<string, string[]> = {
     "/dashboard/rankings",
     "/dashboard/marketplace",
     "/dashboard/comunicaciones",
-    "/dashboard/estadisticas",
     "/dashboard/chat",
   ],
 
@@ -123,8 +119,6 @@ export const GRUPOS_MENU_SUPERADMIN: MenuGroup[] = [
       "/dashboard/afiliaciones",
       "/dashboard/marketplace",
       "/dashboard/comunicaciones",
-      "/dashboard/moderacion",
-      "/dashboard/estadisticas",
     ],
   },
 ];

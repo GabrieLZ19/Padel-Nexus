@@ -57,6 +57,13 @@ export const InscripcionesService = {
     }
     return Array.isArray(payload.data) ? payload.data : [];
   },
+  async getResumen(): Promise<NonNullable<PaginatedInscripciones["resumen"]>> {
+    const vacio = { pendientes: 0, confirmadas: 0, rechazadas: 0, recaudacion: 0 };
+    const response = await api.get<PaginatedInscripciones>("/inscripciones", {
+      params: { page: 1, limit: 1 },
+    });
+    return response.data.resumen ?? vacio;
+  },
   async getByPage(
     torneoId: string,
     page: number,

@@ -12,6 +12,7 @@ export interface PaginatedTorneos {
   requieren_programacion?: number;
   total_torneos?: number;
   grupos?: GrupoTorneoListado[];
+  aviso?: string | null;
 }
 
 export const TorneosService = {
@@ -517,6 +518,8 @@ export interface ProgramacionBoard {
   nombre: string;
   estado: string | null;
   programacion_estado: ProgramacionEstado;
+  solo_lectura?: boolean;
+  aviso_alcance?: string | null;
   programacion_publicada_en: string | null;
   duracion_partido_minutos: number;
   descanso_minutos: number;

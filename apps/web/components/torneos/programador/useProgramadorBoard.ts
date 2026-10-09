@@ -173,7 +173,9 @@ export function useProgramadorBoard(torneoId: string) {
     [torneoId, applyBoard],
   );
 
-  const isReadOnly = board?.programacion_estado === "publicado";
+  const bloqueadoPorAlcance = board?.solo_lectura === true;
+  const isReadOnly =
+    board?.programacion_estado === "publicado" || bloqueadoPorAlcance;
 
   const asignar = useCallback(
     async (
@@ -182,6 +184,15 @@ export function useProgramadorBoard(torneoId: string) {
       canchaLabel: string,
       motivo?: string,
     ) => {
+      if (boardRef.current?.solo_lectura) {
+        sileo.error({
+          title: "Solo lectura",
+          description:
+            boardRef.current.aviso_alcance ||
+            "No podés cambiar los horarios de este torneo.",
+        });
+        return;
+      }
       if (isReadOnly) {
         sileo.error({
           title: "Programación publicada",
@@ -259,6 +270,17 @@ export function useProgramadorBoard(torneoId: string) {
       motivo?: string,
       opts?: { silent?: boolean },
     ) => {
+      if (boardRef.current?.solo_lectura) {
+        if (!opts?.silent) {
+          sileo.error({
+            title: "Solo lectura",
+            description:
+              boardRef.current.aviso_alcance ||
+              "No podés cambiar los horarios de este torneo.",
+          });
+        }
+        return;
+      }
       if (isReadOnly) {
         sileo.error({
           title: "Programación publicada",
@@ -443,6 +465,7 @@ export function useProgramadorBoard(torneoId: string) {
     activeDay,
     setActiveDay,
     isReadOnly,
+    bloqueadoPorAlcance,
     reloadWithConfig,
     load,
     asignar,

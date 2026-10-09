@@ -34,8 +34,12 @@ export default function TorneoVistaFiltros({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="inline-flex w-full overflow-x-auto rounded-xl border border-white/5 bg-[#111111] p-1.5 sm:w-auto">
+      <div className="flex flex-wrap items-center gap-3">
+        <div
+          role="tablist"
+          aria-label="Estados de los torneos"
+          className="flex w-fit max-w-full flex-wrap gap-1 rounded-xl border border-white/10 bg-brand-card p-1"
+        >
           {VISTAS_TORNEO.map((item) => {
             const activa = vistaActiva === item.id;
             const cantidad = contadores[item.id] ?? 0;
@@ -43,15 +47,19 @@ export default function TorneoVistaFiltros({
               <button
                 key={item.id}
                 type="button"
+                role="tab"
+                aria-selected={activa}
                 onClick={() => onVista(item.id)}
-                className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold transition-all ${
+                className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm font-bold transition-colors ${
                   activa
                     ? "bg-brand-chartreuse text-brand-card shadow-[0_0_10px_rgba(204,255,0,0.15)]"
-                    : "text-gray-400 hover:text-white"
+                    : "text-gray-400 hover:bg-white/5 hover:text-white"
                 }`}
               >
                 {item.label}
-                <span className={`ml-2 text-xs ${activa ? "text-brand-card/70" : "text-gray-500"}`}>
+                <span
+                  className={`text-xs tabular-nums ${activa ? "text-brand-card/70" : "text-gray-500"}`}
+                >
                   {cantidad}
                 </span>
               </button>

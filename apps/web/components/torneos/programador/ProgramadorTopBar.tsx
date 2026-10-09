@@ -16,6 +16,7 @@ interface Props {
   busy: boolean;
   syncing?: boolean;
   isReadOnly: boolean;
+  soloLectura?: boolean;
   onAgregarSede: () => void;
   onGuardarBorrador: () => void;
   onAuto: () => void;
@@ -26,14 +27,20 @@ interface Props {
   onFocusConflictos?: () => void;
 }
 
+function etiquetaHorarios(estado: string): string {
+  if (estado === "publicado") return "Horarios publicados";
+  if (estado === "programado") return "Horarios guardados";
+  return "Horarios en borrador";
+}
+
 function estadoHint(estado: string): string {
   if (estado === "publicado") {
-    return "Visible y bloqueado. Usá Nueva edición para cambiar.";
+    return "Los horarios están visibles y bloqueados. Usá Nueva edición para cambiar.";
   }
   if (estado === "programado") {
-    return "Horarios guardados al soltar. Publicá cuando esté listo para el público.";
+    return "Los horarios se guardan al soltar. Publicá cuando estén listos para el público.";
   }
-  return "Los cambios se guardan al soltar. Todavía no es público.";
+  return "Los cambios de horario se guardan al soltar. Todavía no son públicos.";
 }
 
 export function ProgramadorTopBar({
@@ -41,6 +48,7 @@ export function ProgramadorTopBar({
   busy,
   syncing,
   isReadOnly,
+  soloLectura = false,
   onAgregarSede,
   onGuardarBorrador,
   onAuto,
@@ -51,12 +59,8 @@ export function ProgramadorTopBar({
   onFocusConflictos,
 }: Props) {
   const estado = board.programacion_estado;
-  const estadoLabel =
-    estado === "publicado"
-      ? "Publicado"
-      : estado === "programado"
-        ? "Programado"
-        : "Borrador";
+  const estadoLabel = etiquetaHorarios(estado);
+  const estadoTorneo = board.estado?.trim() || null;
 
   const canLimpiar = !isReadOnly && board.summary.asignados > 0;
 
@@ -76,6 +80,11 @@ export function ProgramadorTopBar({
             <h1 className="text-xl font-bold text-white truncate">
               Programador visual
             </h1>
+            {estadoTorneo ? (
+              <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-gray-200">
+                {estadoTorneo}
+              </span>
+            ) : null}
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
                 estado === "publicado"
@@ -99,7 +108,12 @@ export function ProgramadorTopBar({
             ) : null}
           </div>
           <p className="mt-1 text-sm text-gray-400 truncate">{board.nombre}</p>
-          <p className="mt-1 text-xs text-gray-500">{estadoHint(estado)}</p>
+          <p className="mt-1 text-xs text-gray-500">
+            {soloLectura
+              ? board.aviso_alcance ||
+                "Los horarios de este torneo se consultan y no se cambian."
+              : estadoHint(estado)}
+          </p>
           <p className="mt-1 text-xs text-gray-500">
             {board.summary.asignados}/{board.summary.total} asignados
             {board.summary.advertencias > 0 ? (
@@ -119,6 +133,7 @@ export function ProgramadorTopBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        {soloLectura ? null : (
         <button
           type="button"
           onClick={onAgregarSede}
@@ -127,7 +142,8 @@ export function ProgramadorTopBar({
         >
           Agregar club / cancha
         </button>
-        {isReadOnly ? (
+        )}
+        {soloLectura ? null : isReadOnly ? (
           <button
             type="button"
             disabled={busy}

@@ -23,7 +23,7 @@ import { TournamentWizardNav } from "@/components/torneos/TournamentWizardNav";
 import type { SaveStepHandler } from "@/components/torneos/wizard/types";
 import {
   esEstadoTorneoModoLectura,
-  isWizardPasoReadOnly,
+  pasoBloqueadoPorAlcance,
   textoBannerModoLectura,
 } from "@/components/torneos/wizard/stepLocks";
 import { useProfileStore } from "@/store/useProfileStore";
@@ -165,7 +165,7 @@ export default function TorneoDetallePage() {
       />
 
       {/* BANNER AVISO MODO SOLO LECTURA SI EL TORNEO ESTÁ PROGRAMADO, EN CURSO O FINALIZADO */}
-      {esEstadoTorneoModoLectura(torneo.estado) && (
+      {(torneo.solo_lectura || esEstadoTorneoModoLectura(torneo.estado)) && (
         <div className="bg-black/20 border border-white/10 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs my-1 shadow-sm">
           <div className="flex items-center gap-2.5 text-gray-400">
             <span className="relative flex h-2 w-2 shrink-0">
@@ -173,68 +173,75 @@ export default function TorneoDetallePage() {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-chartreuse"></span>
             </span>
             <span>
-              <strong className="text-white">Modo Lectura ({torneo.estado}):</strong>{" "}
-              {textoBannerModoLectura(String(torneo.estado))}
+              {torneo.solo_lectura ? (
+                <>
+                  <strong className="text-white">Modo lectura:</strong>{" "}
+                  {torneo.puede_cargar_resultados
+                    ? "Este torneo es de otra entidad. Podés cargar resultados, no editarlo ni eliminarlo."
+                    : "Este torneo no es de tu entidad. Solo podés consultarlo."}
+                </>
+              ) : (
+                <>
+                  <strong className="text-white">Modo Lectura ({torneo.estado}):</strong>{" "}
+                  {textoBannerModoLectura(String(torneo.estado))}
+                </>
+              )}
             </span>
           </div>
         </div>
       )}
 
-      {/* GRID DE LAYOUT NATIVO DE NAVEGACIÓN Y CONTENIDO */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6 items-start">
-        {/* NAVEGADOR DE PASOS LATERAL / MOBILE */}
-        <div className="lg:col-span-1 order-1 lg:order-2 lg:sticky lg:top-6 self-start z-30 min-w-0">
-          <TournamentWizardNav
-            activeTab={activeTab}
-            setActiveTab={navigateToTab}
-            torneoEstado={torneo.estado}
-          />
-        </div>
+      <TournamentWizardNav
+        activeTab={activeTab}
+        setActiveTab={navigateToTab}
+        torneoEstado={torneo.estado}
+        soloLectura={torneo.solo_lectura}
+        puedeCargarResultados={torneo.puede_cargar_resultados}
+      />
 
-        {/* CONTENIDO DEL PASO ACTIVO */}
-        <div className="lg:col-span-3 order-2 lg:order-1 min-w-0 overflow-x-hidden">
+      <div className="min-w-0 overflow-x-hidden">
           {activeTab === "edit" && (
             <Paso1Datos
               {...commonProps}
-              readOnly={isWizardPasoReadOnly(torneo.estado, "edit")}
+              readOnly={pasoBloqueadoPorAlcance(torneo, "edit")}
             />
           )}
           {activeTab === "logos" && (
             <Paso2Logos
               {...commonProps}
-              readOnly={isWizardPasoReadOnly(torneo.estado, "logos")}
+              readOnly={pasoBloqueadoPorAlcance(torneo, "logos")}
             />
           )}
           {activeTab === "categories" && (
             <Paso3Categorias
               {...commonProps}
-              readOnly={isWizardPasoReadOnly(torneo.estado, "categories")}
+              readOnly={pasoBloqueadoPorAlcance(torneo, "categories")}
             />
           )}
           {activeTab === "players" && (
             <Paso4Jugadores
               {...commonProps}
               inscripciones={inscripciones}
-              readOnly={isWizardPasoReadOnly(torneo.estado, "players")}
+              readOnly={pasoBloqueadoPorAlcance(torneo, "players")}
             />
           )}
           {activeTab === "times" && (
             <Paso7Sedes
               {...commonProps}
-              readOnly={isWizardPasoReadOnly(torneo.estado, "times")}
+              readOnly={pasoBloqueadoPorAlcance(torneo, "times")}
             />
           )}
           {activeTab === "fiscales" && (
             <Paso6Fiscales
               {...commonProps}
-              readOnly={isWizardPasoReadOnly(torneo.estado, "fiscales")}
+              readOnly={pasoBloqueadoPorAlcance(torneo, "fiscales")}
             />
           )}
           {activeTab === "cierre" && (
             <Paso5Cierre
               {...commonProps}
               inscripciones={inscripciones}
-              readOnly={isWizardPasoReadOnly(torneo.estado, "cierre")}
+              readOnly={pasoBloqueadoPorAlcance(torneo, "cierre")}
             />
           )}
           {activeTab === "draws" && (
@@ -242,7 +249,7 @@ export default function TorneoDetallePage() {
               {...commonProps}
               inscripciones={inscripciones}
               partidos={partidos}
-              isReadOnly={isWizardPasoReadOnly(torneo.estado, "draws")}
+              isReadOnly={pasoBloqueadoPorAlcance(torneo, "draws")}
             />
           )}
           {activeTab === "matches" && (
@@ -250,10 +257,9 @@ export default function TorneoDetallePage() {
               {...commonProps}
               torneoId={id}
               partidos={partidos}
-              isReadOnly={isWizardPasoReadOnly(torneo.estado, "matches")}
+              isReadOnly={pasoBloqueadoPorAlcance(torneo, "matches")}
             />
           )}
-        </div>
       </div>
 
       <FeedbackModal {...feedbackModal} />

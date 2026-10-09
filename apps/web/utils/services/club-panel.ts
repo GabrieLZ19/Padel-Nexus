@@ -8,6 +8,47 @@ import {
   CrearBloqueoPayload,
 } from "../types";
 
+export type AccionReservaClub = "confirmar" | "cobrar" | "cancelar" | "ausente";
+
+export interface ReservaClubFila {
+  id: string;
+  fecha_reserva: string;
+  estado_pago: string;
+  estado_reserva: string;
+  perfiles?: {
+    nombre?: string | null;
+    apellido?: string | null;
+    email?: string | null;
+  } | null;
+  turnos?: {
+    hora_inicio?: string | null;
+    hora_fin?: string | null;
+    precio?: number | null;
+    canchas?: { id?: string; nombre?: string | null } | null;
+  } | null;
+}
+
+export interface AgendaReservasClub {
+  fecha: string;
+  canchas: { id: string; nombre: string }[];
+  filas: {
+    hora_inicio: string;
+    hora_fin: string;
+    celdas: {
+      cancha_id: string;
+      turno_id: string | null;
+      reserva: {
+        id: string;
+        turno_id: string;
+        estado_reserva: string;
+        estado_pago: string;
+        jugador: string;
+        precio: number;
+      } | null;
+    }[];
+  }[];
+}
+
 export class ClubPanelService {
   static async getMiClub(): Promise<Club> {
     const { data } = await api.get("/club/mi-club");
@@ -92,9 +133,33 @@ export class ClubPanelService {
     cancha_id?: string;
     page?: number;
     limit?: number;
-  }): Promise<{ data: any[]; total: number }> {
-    const { data } = await api.get("/club/mi-club/reservas", { params: filtros });
-    return { data: data.data || [], total: data.total || 0 };
+    solo_atrasadas?: boolean;
+  }): Promise<{ data: ReservaClubFila[]; total: number; atrasadas: number }> {
+    const { data } = await api.get("/club/mi-club/reservas", {
+      params: {
+        ...filtros,
+        solo_atrasadas: filtros.solo_atrasadas ? "1" : undefined,
+      },
+    });
+    return {
+      data: data.data || [],
+      total: data.total || 0,
+      atrasadas: data.atrasadas || 0,
+    };
+  }
+
+  static async getAgenda(fecha: string): Promise<AgendaReservasClub> {
+    const { data } = await api.get("/club/mi-club/reservas/agenda", {
+      params: { fecha },
+    });
+    return data.data;
+  }
+
+  static async gestionarReserva(
+    reservaId: string,
+    accion: AccionReservaClub,
+  ): Promise<void> {
+    await api.post(`/club/mi-club/reservas/${reservaId}/gestionar`, { accion });
   }
 
   static async getBloqueos(params?: {

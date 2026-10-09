@@ -20,13 +20,15 @@ import { TorneosService } from "@/utils/services/torneos";
 import { InscripcionesService } from "@/utils/services/inscripciones";
 import { ClubesService } from "@/utils/services/clubes";
 import { Torneo, Inscripcion, Club } from "@/utils/types";
-import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "@/utils/constants/fap";
+import { FAP_ESTADOS_TORNEO } from "@/utils/constants/fap";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 
 export default function DashboardProvincial() {
   const router = useRouter();
   const [torneos, setTorneos] = useState<Torneo[]>([]);
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
+  const [pagosConfirmados, setPagosConfirmados] = useState(0);
+  const [recaudacionConfirmada, setRecaudacionConfirmada] = useState(0);
   const [clubes, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,11 +47,19 @@ export default function DashboardProvincial() {
     Promise.all([
       TorneosService.getAll().catch(() => []),
       InscripcionesService.getAll().catch(() => []),
+      InscripcionesService.getResumen().catch(() => ({
+        pendientes: 0,
+        confirmadas: 0,
+        rechazadas: 0,
+        recaudacion: 0,
+      })),
       ClubesService.getAll().catch(() => ({ data: [], total: 0 })),
-    ]).then(([torneosData, inscripcionesData, clubesData]) => {
+    ]).then(([torneosData, inscripcionesData, resumenPagos, clubesData]) => {
       if (isMounted) {
         setTorneos(torneosData || []);
         setInscripciones(inscripcionesData || []);
+        setPagosConfirmados(resumenPagos.confirmadas);
+        setRecaudacionConfirmada(resumenPagos.recaudacion);
         setClubs(clubesData?.data || []);
         setLoading(false);
       }
@@ -72,14 +82,6 @@ export default function DashboardProvincial() {
       (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.CERRADO.toLowerCase() ||
       (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.PROGRAMADO.toLowerCase() ||
       (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.EN_CURSO.toLowerCase(),
-  );
-
-  const inscripcionesConfirmadas = inscripciones.filter(
-    (i) => i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO,
-  );
-  const recaudacionTotal = inscripcionesConfirmadas.reduce(
-    (acc, i) => acc + Number(i.monto),
-    0,
   );
 
   const jugadoresUnicos = new Set<string>();
@@ -138,7 +140,7 @@ export default function DashboardProvincial() {
     },
     {
       title: "Parejas Inscritas",
-      value: inscripcionesConfirmadas.length.toString(),
+      value: pagosConfirmados.toString(),
       change: "Confirmadas",
       icon: Shield,
       trendIcon: Shield,
@@ -148,7 +150,7 @@ export default function DashboardProvincial() {
     },
     {
       title: "Recaudación Provincial",
-      value: formatMoney(recaudacionTotal),
+      value: formatMoney(recaudacionConfirmada),
       change: "Consolidado",
       icon: BadgeDollarSign,
       trendIcon: TrendingUp,

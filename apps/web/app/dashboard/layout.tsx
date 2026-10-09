@@ -15,7 +15,6 @@ import {
   Users,
   ShoppingBag,
   Shield,
-  Activity,
   MessageSquare,
   LogOut,
   User,
@@ -28,7 +27,6 @@ import {
   Star,
   Award,
   Scale,
-  ShieldAlert,
   Megaphone,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
@@ -206,8 +204,6 @@ export default function DashboardLayout({
       icon: Megaphone,
       href: "/dashboard/comunicaciones",
     },
-    { name: "Moderación", icon: ShieldAlert, href: "/dashboard/moderacion" },
-    { name: "Estadísticas", icon: Activity, href: "/dashboard/estadisticas" },
     { name: "Chat interno", icon: MessageSquare, href: "/dashboard/chat", badge: chatNoLeidos },
     { name: "Gestión de Usuarios", icon: UserCog, href: "/dashboard/usuarios" },
   ];
@@ -279,11 +275,9 @@ export default function DashboardLayout({
             : `fixed inset-y-0 left-0 z-30 w-72 transform bg-[#111111] flex flex-col shrink-0 border-r border-white/5 shadow-2xl transition-transform duration-300 lg:relative lg:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`
         }
       >
-        <div className={`flex items-center justify-between gap-3 border-b border-white/5 md:border-none ${
-          profile.rol === "superadmin" ? "h-20 px-6" : "h-28 px-8"
-        }`}>
+        <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-white/5 px-4 md:border-none">
           <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(204,255,0,0.15)] bg-[#cbfe01]">
+            <div className="size-9 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(204,255,0,0.15)] bg-[#cbfe01]">
               <Image
                 src="/brand/LogoAccessory.svg"
                 alt="Padel Nexus"
@@ -335,7 +329,7 @@ export default function DashboardLayout({
             onNavigate={closeMobileMenu}
           />
         ) : (
-          <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
+          <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-1">
             {menuItems.map((item) => {
               const isActive =
                 pathname === item.href ||
@@ -351,9 +345,9 @@ export default function DashboardLayout({
                   className="block relative group"
                 >
                   <motion.div
-                    className={`flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${isActive ? "bg-brand-chartreuse text-[#111] font-bold" : "text-gray-400 hover:bg-white/5"}`}
+                    className={`flex h-10 items-center gap-3 rounded-xl px-3 transition-colors ${isActive ? "bg-brand-chartreuse text-[#111] font-bold" : "text-gray-400 hover:bg-white/5"}`}
                   >
-                    <item.icon className="size-5" />
+                    <item.icon className="size-4 shrink-0" />
                     <span className="text-[14px] flex-1">{item.name}</span>
                     {unread > 0 ? (
                       <span className="min-w-5 h-5 flex items-center justify-center bg-brand-chartreuse text-brand-black rounded-full text-[10px] font-black px-1 shadow-[0_0_8px_rgba(203,254,1,0.3)]">
@@ -367,11 +361,9 @@ export default function DashboardLayout({
           </nav>
         )}
 
-        <div className={`border-t border-white/5 bg-[#111111] flex items-center gap-3 ${
-          profile.rol === "superadmin" ? "p-4" : "p-6"
-        }`}>
-          <div className="size-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
-            <User className="size-5 text-gray-400" />
+        <div className="flex h-16 shrink-0 items-center gap-2 border-t border-white/5 bg-[#111111] px-3">
+          <div className="size-8 shrink-0 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+            <User className="size-4 text-gray-400" />
           </div>
           <div className="flex flex-col flex-1 overflow-hidden">
             <span className="text-[13px] font-bold text-brand-white truncate">
@@ -409,7 +401,7 @@ export default function DashboardLayout({
         ></div>
       )}
 
-      <main className="flex-1 overflow-y-auto bg-brand-black min-w-0">
+      <main className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-brand-black min-w-0">
         <div className={`${programadorPantallaCompleta ? "hidden" : "lg:hidden"} sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4 bg-brand-card/80 backdrop-blur-md border-b border-brand-white/5`}>
           <button
             onClick={toggleMobileMenu}

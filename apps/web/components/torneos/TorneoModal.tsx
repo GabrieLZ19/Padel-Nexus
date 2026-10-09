@@ -8,6 +8,8 @@ import { useProfileStore } from "../../store/useProfileStore";
 import {
   RAMAS_PADEL,
   getAlcancesPermitidos,
+  getCategoriasParaAsociacion,
+  getNivelesParaCategoria,
 } from "../../utils/constants/fapApaRules";
 import type { RolUsuario } from "../../utils/types/user.types";
 
@@ -61,9 +63,17 @@ export default function TorneoModal({
     label: r.label,
   }));
 
+  const reglamento = formData.asociacion || "FAP";
+  const categorias = getCategoriasParaAsociacion(reglamento);
+  const niveles = formData.categoria
+    ? getNivelesParaCategoria(reglamento, formData.categoria)
+    : [];
+
   const canSave =
     Boolean(formData.nombre) &&
     Boolean(formData.fecha) &&
+    Boolean(formData.categoria) &&
+    Boolean(formData.nivel) &&
     (!sedeFija || Boolean(formData.club_id));
 
   const sedeNombre =
@@ -73,15 +83,16 @@ export default function TorneoModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm">
+          <div className="flex min-h-full items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.2 }}
-            className="bg-[#1a1a1a] p-8 rounded-4xl border border-white/5 w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.8)] relative"
+            className="bg-[#1a1a1a] my-auto w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-4xl border border-white/5 shadow-[0_20px_60px_rgba(0,0,0,0.8)] relative"
           >
-            <div className="flex justify-between items-start mb-6 border-b border-white/10 pb-4">
+            <div className="sticky top-0 z-10 flex justify-between items-start gap-3 border-b border-white/10 bg-[#1a1a1a] px-5 py-4">
               <div>
                 <h2 className="text-xl font-black text-white tracking-tight leading-none mb-1">
                   {editingId ? "Editar Torneo" : "Nuevo Torneo"}
@@ -99,14 +110,14 @@ export default function TorneoModal({
               </button>
             </div>
 
-            <div className="space-y-5">
+            <div className="space-y-3 px-5 py-4">
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
                   Nombre del Torneo
                 </label>
                 <input
                   placeholder="Ej: Master Series BA"
-                  className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
+                  className="w-full bg-brand-card p-3 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors"
                   value={formData.nombre}
                   onChange={(e) =>
                     setFormData({ ...formData, nombre: e.target.value })
@@ -114,22 +125,53 @@ export default function TorneoModal({
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                    Categoría
+                  </label>
+                  <CustomDropdown
+                    value={formData.categoria || ""}
+                    onChange={(val) =>
+                      setFormData({ ...formData, categoria: val, nivel: "" })
+                    }
+                    options={categorias}
+                    placeholder="Elegir categoría..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                    Nivel
+                  </label>
+                  <CustomDropdown
+                    value={formData.nivel || ""}
+                    onChange={(val) => setFormData({ ...formData, nivel: val })}
+                    options={niveles}
+                    placeholder={
+                      formData.categoria
+                        ? "Elegir nivel..."
+                        : "Primero la categoría"
+                    }
+                    disabled={!formData.categoria}
+                    haciaArriba
+                  />
+                </div>
+              </div>
+
               {sedeFija && sedeNombre && (
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
                     Centro de Cómputos
                   </label>
-                  <div className="w-full bg-brand-card/50 p-4 rounded-xl border border-white/5 text-gray-300 text-sm font-semibold">
+                  <div className="w-full bg-brand-card/50 px-3 py-2.5 rounded-xl border border-white/5 text-gray-300 text-sm font-semibold">
                     {sedeNombre}
                   </div>
-                  <p className="text-[10px] text-gray-500 mt-1.5">
-                    Se asigna automáticamente al club de tu panel.
-                  </p>
                 </div>
               )}
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
                   Rama
                 </label>
                 <CustomDropdown
@@ -143,8 +185,8 @@ export default function TorneoModal({
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                  Alcance del Torneo
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                  Alcance
                 </label>
                 <CustomDropdown
                   value={formData.alcance ?? "Provincial"}
@@ -177,15 +219,16 @@ export default function TorneoModal({
                   </p>
                 )}
               </div>
+              </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
                   Fecha de Inicio
                 </label>
                 <input
                   type="date"
                   min={minDate}
-                  className="w-full bg-brand-card p-4 rounded-xl border border-transparent focus:border-white/10 text-brand-white focus:outline-none text-sm transition-colors cursor-pointer"
+                  className="w-full bg-brand-card p-3 rounded-xl border border-transparent focus:border-white/10 text-brand-white focus:outline-none text-sm transition-colors cursor-pointer"
                   value={fechaFormulario}
                   onClick={(e) => {
                     try {
@@ -207,7 +250,7 @@ export default function TorneoModal({
               <button
                 disabled={isSaving || !canSave}
                 onClick={onSave}
-                className="w-full bg-brand-chartreuse disabled:opacity-50 text-brand-black font-bold py-4 rounded-xl mt-4 flex items-center justify-center gap-2 transition-all hover:opacity-90 shadow-lg cursor-pointer"
+                className="w-full bg-brand-chartreuse disabled:opacity-50 text-brand-black font-bold py-3 rounded-xl mt-1 flex items-center justify-center gap-2 transition-all hover:opacity-90 shadow-lg cursor-pointer"
               >
                 {isSaving ? (
                   "Procesando..."
@@ -222,6 +265,7 @@ export default function TorneoModal({
               </button>
             </div>
           </motion.div>
+          </div>
         </div>
       )}
     </AnimatePresence>

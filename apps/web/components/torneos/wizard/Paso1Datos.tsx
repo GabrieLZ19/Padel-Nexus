@@ -28,6 +28,25 @@ function organizadorValue(kind: "fed" | "aso", id: string) {
   return kind === "fed" ? `${FED_PREFIX}${id}` : `${ASO_PREFIX}${id}`;
 }
 
+function normalizarProvincia(valor?: string | null) {
+  return (valor || "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+function asociacionDeLaProvincia(
+  asociaciones: Asociacion[],
+  provincia?: string | null,
+) {
+  const clave = normalizarProvincia(provincia);
+  if (!clave) return undefined;
+  return asociaciones.find(
+    (item) => normalizarProvincia(item.provincia) === clave,
+  );
+}
+
 function organizadorFromTorneo(torneo: Torneo): string {
   const asoId = torneo.asociacion_id;
   const fedId = torneo.federacion_id;
@@ -189,10 +208,16 @@ export const Paso1Datos = ({
       const fap =
         feds.find((f) => (f.sigla || "").toUpperCase() === "FAP") ||
         feds.find((f) => /federaci[oó]n argentina/i.test(f.nombre || ""));
-      if (fap?.id) {
-        setFapFederacionId(fap.id);
-        // Default: FAP (federación), no una asociación provincial
-        if (!editOrganizador) {
+      if (fap?.id) setFapFederacionId(fap.id);
+      if (!editOrganizador) {
+        const provincial =
+          torneo.alcance === "Provincial" || torneo.alcance === "Regional";
+        const deProvincia = provincial
+          ? asociacionDeLaProvincia(asocsRes || [], torneo.clubes?.provincia)
+          : undefined;
+        if (deProvincia) {
+          setEditOrganizador(organizadorValue("aso", deProvincia.id));
+        } else if (fap?.id) {
           setEditOrganizador(organizadorValue("fed", fap.id));
         }
       }
@@ -208,8 +233,18 @@ export const Paso1Datos = ({
   useEffect(() => {
     setEditAsociacion(reglamentoFromTorneo(torneo, userRole));
     const org = organizadorFromTorneo(torneo);
-    if (org) setEditOrganizador(org);
-    else if (fapFederacionId) {
+    if (org) {
+      setEditOrganizador(org);
+      return;
+    }
+    const provincial =
+      torneo.alcance === "Provincial" || torneo.alcance === "Regional";
+    const deProvincia = provincial
+      ? asociacionDeLaProvincia(asociacionesList, torneo.clubes?.provincia)
+      : undefined;
+    if (deProvincia) {
+      setEditOrganizador(organizadorValue("aso", deProvincia.id));
+    } else if (fapFederacionId) {
       setEditOrganizador(organizadorValue("fed", fapFederacionId));
     }
   }, [
@@ -218,6 +253,9 @@ export const Paso1Datos = ({
     torneo.asociacion,
     torneo.asociacion_id,
     torneo.federacion_id,
+    torneo.alcance,
+    torneo.clubes?.provincia,
+    asociacionesList,
     fapFederacionId,
     userRole,
   ]);
@@ -527,7 +565,9 @@ export const Paso1Datos = ({
               ? "Alcance Local o Privado: organiza el club sede (u otra entidad no federativa). No aplica FAP ni asociación provincial."
               : forzarFap
                 ? "Alcance Nacional: organiza la Federación Argentina de Pádel (FAP)."
-                : "Por defecto FAP. Podés elegir una asociación provincial del ecosistema."}
+                : editAlcance === "Provincial" || editAlcance === "Regional"
+                  ? "Arranca en la asociación de la provincia del club. Podés cambiarla."
+                  : "Por defecto FAP. Podés elegir una asociación provincial del ecosistema."}
           </p>
         </div>
         <div>

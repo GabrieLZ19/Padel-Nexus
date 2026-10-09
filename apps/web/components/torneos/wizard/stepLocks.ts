@@ -44,6 +44,21 @@ export function isWizardPasoReadOnly(
   return true;
 }
 
+export function pasoBloqueadoPorAlcance(
+  torneo: {
+    estado?: string | null;
+    solo_lectura?: boolean;
+    puede_cargar_resultados?: boolean;
+  },
+  pasoId: WizardPasoId,
+): boolean {
+  if (torneo.solo_lectura) {
+    if (pasoId === "matches") return torneo.puede_cargar_resultados === false;
+    return true;
+  }
+  return isWizardPasoReadOnly(torneo.estado, pasoId);
+}
+
 export function textoBannerModoLectura(estado: string): string {
   if (estado === "Finalizado") {
     return "Los pasos de configuración y logística están bloqueados. Los cuadros y la carga de resultados permanecen habilitados en modo lectura.";

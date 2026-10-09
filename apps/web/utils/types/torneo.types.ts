@@ -32,6 +32,8 @@ export interface Torneo {
   pendiente?: string | null;
   tiene_partidos_hoy?: boolean;
   programacion_estado?: string | null;
+  solo_lectura?: boolean;
+  puede_cargar_resultados?: boolean;
   grupo_id?: string | null;
   cupos_maximos: number;
   cupos_actuales: number;

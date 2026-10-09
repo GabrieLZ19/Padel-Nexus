@@ -14,9 +14,9 @@ interface Props {
 }
 
 function estadoLabel(estado: string): string {
-  if (estado === "publicado") return "Publicado";
-  if (estado === "programado") return "Programado";
-  return "Borrador";
+  if (estado === "publicado") return "Horarios publicados";
+  if (estado === "programado") return "Horarios guardados";
+  return "Horarios en borrador";
 }
 
 export function ProgramacionEntryPanel({ torneoId }: Props) {

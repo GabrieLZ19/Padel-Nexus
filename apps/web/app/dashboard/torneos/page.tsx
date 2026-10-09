@@ -92,6 +92,7 @@ export default function TorneosPage() {
 
   const [formData, setFormData] = useState<FormTorneoState>(ESTADO_INICIAL);
 
+  const [avisoAlcance, setAvisoAlcance] = useState<string | null>(null);
   const [replicarTorneo, setReplicarTorneo] = useState<Torneo | null>(null);
   const [agrupacion, setAgrupacion] = useState<{
     nombre: string;
@@ -132,6 +133,7 @@ export default function TorneosPage() {
           );
           setContadores(torneosData.contadores ?? CONTADORES_VISTA_VACIOS);
           setRequierenProgramacion(torneosData.requieren_programacion ?? 0);
+          setAvisoAlcance(torneosData.aviso || null);
           setVistaAutomatica(Boolean(torneosData.vista_automatica));
           setClubs(clubesResponse?.data || []);
           if (
@@ -296,6 +298,11 @@ export default function TorneosPage() {
             Gestión de torneos
           </h1>
           <p className="text-gray-400 mt-1">{totalTorneosVista} torneos en esta vista</p>
+          {avisoAlcance && (
+            <p className="mt-3 text-sm text-amber-200 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+              {avisoAlcance}
+            </p>
+          )}
         </div>
         <button
           onClick={handleOpenCreate}
@@ -327,7 +334,7 @@ export default function TorneosPage() {
         {loading ? (
           /* SKELETON LOADER PREMIUM */
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-250">
+            <table className="w-full table-fixed text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 bg-black/20">
                   <th className="py-5 px-8">
@@ -377,7 +384,14 @@ export default function TorneosPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-250">
+            <table className="w-full table-fixed text-left border-collapse">
+              <colgroup>
+                <col className="w-[32%]" />
+                <col className="w-[24%]" />
+                <col className="w-[14%]" />
+                <col className="w-[16%]" />
+                <col className="w-[14%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-white/5 text-gray-400 text-xs font-bold uppercase tracking-wider bg-black/20">
                   <th className="py-5 px-8">Torneo</th>
@@ -422,7 +436,7 @@ export default function TorneosPage() {
                       }`}
                     >
                       <td className={enGrupo ? "py-2.5 pl-12 pr-8" : "py-4 px-8"}>
-                        <div className="font-bold text-white group-hover:text-brand-chartreuse transition-colors text-[15px]">
+                        <div className="font-bold text-white group-hover:text-brand-chartreuse transition-colors text-[15px] wrap-break-word">
                           {t.nombre}
                         </div>
                         <div className="text-[13px] text-gray-500 mt-0.5 font-medium">
@@ -526,6 +540,8 @@ export default function TorneosPage() {
                             <LayoutDashboard className="size-4" />
                           </button>
 
+                          {!t.solo_lectura && (
+                          <>
                           <button
                             onClick={() => {
                               const grupo = grupos.find(
@@ -576,6 +592,8 @@ export default function TorneosPage() {
                           >
                             <Trash2 className="size-4" />
                           </button>
+                          </>
+                          )}
                         </div>
                       </td>
                     </tr>

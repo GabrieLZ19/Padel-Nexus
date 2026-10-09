@@ -48,6 +48,8 @@ interface ChatInboxProps {
   defaultTab?: ChatInboxTab;
   showSoporteButton?: boolean;
   className?: string;
+  /** En el panel con menú lateral el alto ya es el de la pantalla. */
+  ocuparAlto?: boolean;
 }
 
 function formatPrecio(precio: number) {
@@ -91,6 +93,7 @@ export default function ChatInbox({
   defaultTab = "todos",
   showSoporteButton = false,
   className = "",
+  ocuparAlto = false,
 }: ChatInboxProps) {
   const { profile } = useProfileStore();
   const router = useRouter();
@@ -612,7 +615,11 @@ export default function ChatInbox({
 
   return (
     <div
-      className={`flex flex-col min-h-0 h-[calc(100dvh-4.5rem)] md:h-[calc(100dvh-5.5rem)] ${className}`}
+      className={`flex min-h-0 flex-1 flex-col ${
+        ocuparAlto
+          ? "h-[calc(100dvh-4.5rem)] lg:h-full"
+          : "h-[calc(100dvh-4.5rem)] md:h-[calc(100dvh-5.5rem)]"
+      } ${className}`}
     >
       <div
         className={`px-4 md:px-6 lg:px-10 py-4 md:py-6 border-b border-brand-white/5 shrink-0 ${

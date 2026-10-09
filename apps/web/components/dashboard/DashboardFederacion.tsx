@@ -18,24 +18,22 @@ import {
   Calendar,
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
-import { LicenciasService } from "@/utils/services/licencias";
+import { LicenciasService, type ResumenLicencias } from "@/utils/services/licencias";
 import { ClubesService } from "@/utils/services/clubes";
 import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
-import { RankingsService, JugadorRanking } from "@/utils/services/rankings";
 import { InscripcionesService } from "@/utils/services/inscripciones";
-import { Torneo, Inscripcion, Club } from "@/utils/types";
-import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "@/utils/constants/fap";
+import { Torneo, Club } from "@/utils/types";
+import { FAP_ESTADOS_TORNEO } from "@/utils/constants/fap";
 import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 
 export default function DashboardFederacion() {
   const router = useRouter();
   const [torneos, setTorneos] = useState<Torneo[]>([]);
-  const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
   const [clubes, setClubs] = useState<Club[]>([]);
   const [asociaciones, setAsociaciones] = useState<Asociacion[]>([]);
-  const [jugadoresRank, setJugadoresRank] = useState<JugadorRanking[]>([]);
-  const [licenciasTotal, setLicenciasTotal] = useState(0);
+  const [licenciasResumen, setLicenciasResumen] = useState<ResumenLicencias | null>(null);
+  const [recaudacionConfirmada, setRecaudacionConfirmada] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const today = new Date();
@@ -52,19 +50,24 @@ export default function DashboardFederacion() {
     let isMounted = true;
     Promise.all([
       TorneosService.getAll().catch(() => []),
-      InscripcionesService.getAll().catch(() => []),
       ClubesService.getAll().catch(() => ({ data: [], total: 0 })),
-      LicenciasService.getAll().catch(() => []),
+      LicenciasService.getByPage(1, 1).catch(() => ({ data: [], total: 0 })),
+      InscripcionesService.getResumen().catch(() => ({
+        pendientes: 0,
+        confirmadas: 0,
+        rechazadas: 0,
+        recaudacion: 0,
+      })),
       AsociacionesService.getAll().catch(() => []),
-      RankingsService.getAll().catch(() => []),
-    ]).then(([torneosData, inscripcionesData, clubesData, licenciasData, asociacionesData, rankData]) => {
+    ]).then(([torneosData, clubesData, licenciasData, resumenPagos, asociacionesData]) => {
       if (isMounted) {
         setTorneos(torneosData || []);
-        setInscripciones(inscripcionesData || []);
         setClubs(clubesData?.data || []);
-        setLicenciasTotal(Array.isArray(licenciasData) ? licenciasData.length : 0);
+        setLicenciasResumen(
+          "resumen" in licenciasData ? licenciasData.resumen ?? null : null,
+        );
+        setRecaudacionConfirmada(resumenPagos.recaudacion);
         setAsociaciones(asociacionesData || []);
-        setJugadoresRank(rankData || []);
         setLoading(false);
       }
     });
@@ -88,61 +91,11 @@ export default function DashboardFederacion() {
   );
   const asociacionesActivas = provinciasConAsociacion.size;
 
-  const inscripcionesConfirmadas = inscripciones.filter(
-    (i) => i.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO,
-  );
-  const recaudacionTotal = inscripcionesConfirmadas.reduce(
-    (acc, i) => acc + Number(i.monto),
-    0,
-  );
-  const recaudacionPendiente = inscripciones
-    .filter((i) => i.estado_pago === FAP_ESTADOS_PAGO.PENDIENTE)
-    .reduce((a, b) => a + Number(b.monto), 0);
-
-  const jugadoresUnicos = new Set<string>();
-  inscripciones.forEach((i) => {
-    if (i.jugador1_nombre) jugadoresUnicos.add(i.jugador1_nombre.toLowerCase().trim());
-    if (i.jugador2_nombre && i.jugador2_nombre !== "-")
-      jugadoresUnicos.add(i.jugador2_nombre.toLowerCase().trim());
-  });
-
   const formatMoney = (amount: number) => {
     if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1).replace(".0", "")}M`;
     if (amount >= 1000) return `$${(amount / 1000).toFixed(1).replace(".0", "")}K`;
     return `$${amount.toLocaleString("es-AR")}`;
   };
-
-  let mayoresCount = 0;
-  let menoresCount = 0;
-
-  if (jugadoresRank.length > 0) {
-    const currentYear = new Date().getFullYear();
-    jugadoresRank.forEach((j: any) => {
-      const fn = j.fecha_nacimiento || j.perfiles?.fecha_nacimiento;
-      if (fn) {
-        const birthYear = new Date(fn).getFullYear();
-        const age = currentYear - birthYear;
-        if (age < 18) menoresCount++;
-        else mayoresCount++;
-      } else {
-        const cat = (j.categoria_padel || j.categoria || "").toLowerCase();
-        if (cat.includes("sub") || cat.includes("menor")) menoresCount++;
-        else mayoresCount++;
-      }
-    });
-  } else {
-    // Fallback con inscripciones si aún no cargaron los perfiles de ranking
-    inscripciones.forEach((ins: any) => {
-      const esMenor = (ins.categoria || "").toLowerCase().includes("menor") || (ins.categoria || "").toLowerCase().includes("sub");
-      if (esMenor) {
-        menoresCount += ins.jugador2_nombre && ins.jugador2_nombre !== "-" ? 2 : 1;
-      } else {
-        mayoresCount += ins.jugador2_nombre && ins.jugador2_nombre !== "-" ? 2 : 1;
-      }
-    });
-  }
-
-  const totalJugadores = jugadoresRank.length || mayoresCount + menoresCount || jugadoresUnicos.size;
 
   const metrics = [
     {
@@ -167,8 +120,8 @@ export default function DashboardFederacion() {
     },
     {
       title: "Licencias/Carnet Vigentes",
-      value: licenciasTotal.toString(),
-      change: "Activas",
+      value: String(licenciasResumen?.vigentes ?? 0),
+      change: `${licenciasResumen?.pendientes ?? 0} pendientes · ${licenciasResumen?.vencidas ?? 0} vencidas`,
       icon: Shield,
       trendIcon: TrendingUp,
       color: "bg-purple-500/10",
@@ -177,8 +130,8 @@ export default function DashboardFederacion() {
     },
     {
       title: "Jugadores Federados",
-      value: totalJugadores.toString(),
-      change: `${mayoresCount} Mayores / ${menoresCount} Menores`,
+      value: String(licenciasResumen?.total ?? 0),
+      change: `${licenciasResumen?.vigentes ?? 0} con licencia vigente`,
       icon: Users,
       trendIcon: TrendingUp,
       color: "bg-emerald-500/10",
@@ -197,7 +150,7 @@ export default function DashboardFederacion() {
     },
     {
       title: "Recaudación Neta Nacional",
-      value: formatMoney(recaudacionTotal),
+      value: formatMoney(recaudacionConfirmada),
       change: "Ingresos confirmados",
       icon: BadgeDollarSign,
       trendIcon: TrendingUp,

@@ -556,7 +556,7 @@ export default function GestionInscripcionesPage() {
       <div className="bg-[#111111] rounded-3xl border border-white/10 overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
         {loading ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-250">
+            <table className="w-full table-fixed text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 bg-black/20">
                   <th className="py-5 px-8">
@@ -622,7 +622,15 @@ export default function GestionInscripcionesPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[900px]">
+            <table className="w-full table-fixed text-left border-collapse">
+              <colgroup>
+                <col className="w-[24%]" />
+                <col className="w-[22%]" />
+                <col className="w-[12%]" />
+                <col className="w-[16%]" />
+                <col className="w-[12%]" />
+                <col className="w-[14%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-white/5 text-gray-400 text-xs font-bold uppercase tracking-wider bg-black/20">
                   <th className="py-4 px-8">Jugador / Pareja</th>
@@ -653,7 +661,7 @@ export default function GestionInscripcionesPage() {
                             <User className="size-4 text-brand-chartreuse" />
                           )}
                           <div>
-                            <div className="font-bold text-white text-[14px]">
+                            <div className="font-bold text-white text-[14px] wrap-break-word">
                               {/* Eliminamos ins.perfiles porque el backend ya inyectó el nombre dentro de jugador1_nombre */}
                               {cleanName(ins.jugador1_nombre)}
                               {esPareja && ins.jugador2_nombre && (

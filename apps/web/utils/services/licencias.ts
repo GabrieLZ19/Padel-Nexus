@@ -9,9 +9,19 @@ interface DatosSolicitud {
   provincia: string;
 }
 
+export interface ResumenLicencias {
+  total: number;
+  pendientes: number;
+  vigentes: number;
+  vencidas: number;
+  rechazadas: number;
+  otros: number;
+}
+
 export interface PaginatedLicencias {
   data: Perfil[];
   total: number;
+  resumen?: ResumenLicencias;
 }
 
 export type LicenciaVigenciaModo = "fecha_fija" | "meses_desde_emision";
@@ -114,9 +124,14 @@ export const LicenciasService = {
       return { data: payload, total: payload.length };
     }
     if ("data" in payload && Array.isArray(payload.data)) {
+      const resumen =
+        "resumen" in payload && payload.resumen && typeof payload.resumen === "object"
+          ? (payload.resumen as PaginatedLicencias["resumen"])
+          : undefined;
       return {
         data: payload.data,
         total: typeof payload.total === "number" ? payload.total : payload.data.length,
+        resumen,
       };
     }
     return payload as PaginatedLicencias;

@@ -38,6 +38,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
     activeDay,
     setActiveDay,
     isReadOnly,
+    bloqueadoPorAlcance,
     reloadWithConfig,
     asignar,
     desasignar,
@@ -142,6 +143,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
         busy={busy}
         syncing={syncing}
         isReadOnly={isReadOnly}
+        soloLectura={bloqueadoPorAlcance}
         onAgregarSede={() => setSedesAbiertas(true)}
         onGuardarBorrador={() => void guardarBorrador()}
         onAuto={() => void autoAsignar()}
