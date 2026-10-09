@@ -10,7 +10,7 @@ export const getAllTorneos = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    const { page, limit, search, estado, incluir_borradores, club_id } =
+    const { page, limit, search, estado, incluir_borradores, club_id, vista, agrupar } =
       req.query;
     const pageNum = page ? Number(page) : undefined;
     const limitNum = Number(limit || "10");
@@ -41,15 +41,29 @@ export const getAllTorneos = async (
       estado: estado as string | undefined,
       incluirBorradores: incluir_borradores === "true",
       clubId: clubIdFiltro,
+      vista: typeof vista === "string" ? vista : undefined,
+      agrupar: agrupar === "true",
     });
 
-    return res
-      .status(200)
-      .json(
-        resultado.paginated
-          ? { data: resultado.data, total: resultado.total }
-          : resultado.data,
-      );
+    return res.status(200).json(
+      resultado.paginated
+        ? {
+            data: resultado.data,
+            total: resultado.total,
+            ...(resultado.total_torneos !== undefined
+              ? { total_torneos: resultado.total_torneos, grupos: resultado.grupos }
+              : {}),
+            ...(resultado.vista
+              ? {
+                  vista: resultado.vista,
+                  vista_automatica: resultado.vista_automatica,
+                  contadores: resultado.contadores,
+                  requieren_programacion: resultado.requieren_programacion,
+                }
+              : {}),
+          }
+        : resultado.data,
+    );
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Error desconocido";
     return res
@@ -82,6 +96,45 @@ export const createTorneo = async (
     return res
       .status(500)
       .json({ message: "Error al crear torneo", error: msg });
+  }
+};
+
+export const agruparTorneos = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const nombre = String(req.body?.nombre || "");
+    const torneoIds = Array.isArray(req.body?.torneo_ids)
+      ? req.body.torneo_ids.map((id: unknown) => String(id))
+      : [];
+
+    if (req.user?.rol === "admin_club" && req.user.id) {
+      const { data: perfil } = await supabaseAdmin
+        .from("perfiles")
+        .select("club_id")
+        .eq("id", req.user.id)
+        .maybeSingle();
+      if (!perfil?.club_id) {
+        return res.status(403).json({ message: "El club no tiene sede asignada." });
+      }
+      const { data: propios } = await supabaseAdmin
+        .from("torneos")
+        .select("id")
+        .in("id", torneoIds)
+        .eq("club_id", perfil.club_id);
+      const permitidos = new Set((propios || []).map((torneo) => torneo.id));
+      const ajenos = torneoIds.filter((id: string) => !permitidos.has(id));
+      if (ajenos.length) {
+        return res.status(403).json({ message: "Solo podés agrupar torneos de tu club." });
+      }
+    }
+
+    const grupo = await TorneoService.agruparTorneos(nombre, torneoIds);
+    return res.status(200).json(grupo);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Error desconocido";
+    return res.status(400).json({ message: msg });
   }
 };
 

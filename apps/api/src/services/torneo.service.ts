@@ -14,6 +14,7 @@ import {
   avanzarPartidosInternosZonaCuatro,
   sincronizarClasificadosALlave,
 } from "../utils/playoffAvance";
+import { armarGruposTorneo, nombreBaseTorneo } from "../utils/gruposTorneo";
 
 function mapInscripcionPartido(ins: Record<string, unknown>) {
   const perfiles = ins.perfiles as
@@ -57,11 +58,147 @@ function mapInscripcionPartido(ins: Record<string, unknown>) {
   };
 }
 
+export const VISTAS_OPERATIVAS_TORNEO = [
+  "en_curso",
+  "por_iniciar",
+  "inscripciones",
+  "preparacion",
+  "finalizados",
+] as const;
+
+export type VistaOperativaTorneo = (typeof VISTAS_OPERATIVAS_TORNEO)[number];
+export type VistaListadoTorneo = VistaOperativaTorneo | "todos" | "auto";
+
+export interface ContadoresVistasTorneo {
+  en_curso: number;
+  por_iniciar: number;
+  inscripciones: number;
+  preparacion: number;
+  finalizados: number;
+}
+
 export interface FiltrosTorneo {
   search?: string;
   estado?: string;
   incluirBorradores?: boolean;
   clubId?: string;
+  /** Vista operativa del listado CRM. `auto` elige la más urgente. */
+  vista?: string;
+  /** Agrupa por competencia y, dentro, por rama. Pagina grupos, no torneos. */
+  agrupar?: boolean;
+}
+
+function esVistaListado(valor: string | undefined): valor is VistaListadoTorneo {
+  return (
+    valor === "auto" ||
+    valor === "todos" ||
+    VISTAS_OPERATIVAS_TORNEO.includes(valor as VistaOperativaTorneo)
+  );
+}
+
+function vistaDeEstado(estado: string | null | undefined): VistaOperativaTorneo | null {
+  switch (estado) {
+    case FAP_ESTADOS_TORNEO.EN_CURSO:
+      return "en_curso";
+    case FAP_ESTADOS_TORNEO.PROGRAMADO:
+      return "por_iniciar";
+    case FAP_ESTADOS_TORNEO.INSCRIPCION:
+      return "inscripciones";
+    case FAP_ESTADOS_TORNEO.BORRADOR:
+    case FAP_ESTADOS_TORNEO.CERRADO:
+      return "preparacion";
+    case FAP_ESTADOS_TORNEO.FINALIZADO:
+      return "finalizados";
+    default:
+      return null;
+  }
+}
+
+function pendienteOperativo(torneo: {
+  estado?: string | null;
+  programacion_estado?: string | null;
+}): string | null {
+  const prog = torneo.programacion_estado || null;
+  if (torneo.estado === FAP_ESTADOS_TORNEO.BORRADOR) {
+    return prog === "programado" || prog === "publicado"
+      ? "Borrador · Revisar horarios"
+      : "Borrador · Completar configuración";
+  }
+  if (torneo.estado === FAP_ESTADOS_TORNEO.CERRADO) {
+    return prog === "programado"
+      ? "Inscripción cerrada · Revisar horarios"
+      : "Inscripción cerrada · Falta generar llave";
+  }
+  if (
+    torneo.estado === FAP_ESTADOS_TORNEO.PROGRAMADO &&
+    prog !== "publicado"
+  ) {
+    return "Programado · Horarios sin publicar";
+  }
+  return null;
+}
+
+function requiereProgramacion(pendiente: string | null): boolean {
+  if (!pendiente) return false;
+  return (
+    pendiente.includes("Falta generar llave") ||
+    pendiente.includes("Revisar horarios")
+  );
+}
+
+function timestampOrden(valor: string | null | undefined): number | null {
+  if (!valor) return null;
+  const ts = Date.parse(valor);
+  return Number.isNaN(ts) ? null : ts;
+}
+
+function rangoHoyArgentina(ahora = new Date()): { inicio: string; fin: string } {
+  const dia = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(ahora);
+  const inicio = new Date(`${dia}T00:00:00-03:00`);
+  const fin = new Date(inicio.getTime() + 24 * 60 * 60 * 1000);
+  return { inicio: inicio.toISOString(), fin: fin.toISOString() };
+}
+
+function textoBusquedaTorneo(torneo: {
+  nombre?: string | null;
+  categoria?: string | null;
+  nivel?: string | null;
+  rama?: string | null;
+  lugar?: string | null;
+  fecha?: string | null;
+  subtitulo?: string | null;
+  clubes?: { nombre?: string | null; provincia?: string | null } | null;
+}): string {
+  const fecha = timestampOrden(torneo.fecha);
+  const fechaLocal =
+    fecha === null
+      ? ""
+      : new Date(fecha).toLocaleDateString("es-AR", {
+          timeZone: "America/Argentina/Buenos_Aires",
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+  return [
+    torneo.nombre,
+    torneo.subtitulo,
+    torneo.categoria,
+    torneo.nivel,
+    torneo.rama,
+    torneo.lugar,
+    torneo.clubes?.nombre,
+    torneo.clubes?.provincia,
+    torneo.fecha,
+    fechaLocal,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 }
 
 export interface TorneoPayload {
@@ -133,6 +270,8 @@ export class TorneoService {
     limit: number = 10,
     filtros?: FiltrosTorneo,
   ) {
+    const vistaPedida = esVistaListado(filtros?.vista) ? filtros.vista : undefined;
+
     let query = supabaseAdmin
       .from("torneos")
       .select(
@@ -144,13 +283,15 @@ export class TorneoService {
       query = query.eq("club_id", filtros.clubId);
     }
 
-    if (filtros?.search) query = query.ilike("nombre", `%${filtros.search}%`);
+    if (!vistaPedida && filtros?.search) {
+      query = query.ilike("nombre", `%${filtros.search}%`);
+    }
 
-    if (!filtros?.estado && !filtros?.incluirBorradores) {
+    if (!vistaPedida && !filtros?.estado && !filtros?.incluirBorradores) {
       query = query.neq("estado", FAP_ESTADOS_TORNEO.BORRADOR);
     }
 
-    if (filtros?.estado) {
+    if (!vistaPedida && filtros?.estado) {
       const estados = filtros.estado
         .split(",")
         .map((item) => item.trim())
@@ -168,15 +309,17 @@ export class TorneoService {
     }
 
     type DbTorneo = Record<string, any> & {
+      id?: string;
+      estado?: string | null;
       cupos_actuales?: number;
       cupos_maximos?: number;
       fecha?: string | null;
+      fecha_cierre_inscripcion?: string | null;
       created_at?: string | null;
+      programacion_estado?: string | null;
     };
 
-    // Traemos el set filtrado completo para ordenar por estado (prioridad) y
-    // paginar en memoria: así "En curso" siempre aparece primero aunque la
-    // página 1 no coincida con created_at DESC.
+    // Traemos el set filtrado completo para ordenar y paginar en memoria.
     const result = await query.limit(5000);
     if (result.error) throw new Error(result.error.message);
 
@@ -184,39 +327,329 @@ export class TorneoService {
       const realInscriptos = Array.isArray(t.inscripciones)
         ? t.inscripciones.length
         : t.cupos_actuales || 0;
-      return TorneoService.evaluateDynamicState({
+      const evaluado = TorneoService.evaluateDynamicState({
         ...t,
         cupos_actuales: realInscriptos,
         cupos_maximos: t.cupos_maximos || 0,
       });
+      return {
+        ...evaluado,
+        pendiente: pendienteOperativo(evaluado),
+        tiene_partidos_hoy: false,
+      };
     });
 
-    // Si filtraron específicamente por estado en el query string, volver a filtrar en memoria por si el estado dinámico lo cambió
-    if (filtros?.estado) {
+    if (!vistaPedida && filtros?.estado) {
       const requestedStates = filtros.estado.split(",").map((s) => s.trim());
       formatted = formatted.filter((t) => requestedStates.includes(t.estado));
     }
 
-    formatted.sort((a, b) => {
-      const byEstado =
-        TorneoService.prioridadEstadoListado(a.estado) -
-        TorneoService.prioridadEstadoListado(b.estado);
-      if (byEstado !== 0) return byEstado;
-      return (
-        TorneoService.fechaOrdenListado(b) - TorneoService.fechaOrdenListado(a)
+    const busqueda = filtros?.search?.trim().toLowerCase();
+    if (vistaPedida && busqueda) {
+      formatted = formatted.filter((t) =>
+        textoBusquedaTorneo(t).includes(busqueda),
       );
-    });
+    }
 
-    const total = formatted.length;
+    const contadores: ContadoresVistasTorneo = {
+      en_curso: 0,
+      por_iniciar: 0,
+      inscripciones: 0,
+      preparacion: 0,
+      finalizados: 0,
+    };
+    let requierenProgramacion = 0;
+    for (const torneo of formatted) {
+      const vista = vistaDeEstado(torneo.estado);
+      if (vista) contadores[vista] += 1;
+      if (vista === "preparacion" && requiereProgramacion(torneo.pendiente)) {
+        requierenProgramacion += 1;
+      }
+    }
 
-    if (page !== undefined) {
+    let vistaActiva: VistaOperativaTorneo | "todos" | undefined;
+    let vistaAutomatica = false;
+    if (vistaPedida) {
+      if (vistaPedida === "auto") {
+        vistaAutomatica = true;
+        vistaActiva =
+          contadores.en_curso > 0
+            ? "en_curso"
+            : contadores.por_iniciar > 0
+              ? "por_iniciar"
+              : "inscripciones";
+      } else {
+        vistaActiva = vistaPedida;
+      }
+
+      if (vistaActiva !== "todos") {
+        formatted = formatted.filter(
+          (t) => vistaDeEstado(t.estado) === vistaActiva,
+        );
+      }
+    }
+
+    if (vistaActiva === "en_curso") {
+      const ids = formatted
+        .map((t) => t.id)
+        .filter((id): id is string => Boolean(id));
+      const conPartidoHoy = await TorneoService.torneosConPartidoHoy(ids);
+      formatted = formatted.map((t) => ({
+        ...t,
+        tiene_partidos_hoy: Boolean(t.id && conPartidoHoy.has(t.id)),
+      }));
+    }
+
+    formatted.sort((a, b) =>
+      TorneoService.compararListado(a, b, vistaActiva),
+    );
+
+    let grupos: ReturnType<typeof armarGruposTorneo> | undefined;
+    let totalTorneos = formatted.length;
+    let total = formatted.length;
+
+    if (filtros?.agrupar) {
+      const nombresGrupo = await TorneoService.nombresDeGrupos(formatted);
+      const todosLosGrupos = armarGruposTorneo(formatted, nombresGrupo);
+      total = todosLosGrupos.length;
+      totalTorneos = formatted.length;
+      const pagina =
+        page !== undefined
+          ? todosLosGrupos.slice((page - 1) * limit, page * limit)
+          : todosLosGrupos.slice(0, limit);
+      grupos = pagina;
+      formatted = pagina.flatMap((grupo) =>
+        grupo.ramas.flatMap((rama) => rama.torneos),
+      );
+    } else if (page !== undefined) {
       const from = (page - 1) * limit;
       formatted = formatted.slice(from, from + limit);
     } else {
       formatted = formatted.slice(0, limit);
     }
 
-    return { data: formatted, total, paginated: page !== undefined };
+    return {
+      data: formatted,
+      total,
+      total_torneos: filtros?.agrupar ? totalTorneos : undefined,
+      grupos,
+      paginated: page !== undefined,
+      ...(vistaPedida
+        ? {
+            vista: vistaActiva,
+            vista_automatica: vistaAutomatica,
+            contadores,
+            requieren_programacion: requierenProgramacion,
+          }
+        : {}),
+    };
+  }
+
+  private static async nombresDeGrupos(
+    torneos: Array<{ grupo_id?: string | null }>,
+  ): Promise<Map<string, string>> {
+    const mapa = new Map<string, string>();
+    const ids = [
+      ...new Set(
+        torneos
+          .map((torneo) => torneo.grupo_id)
+          .filter((valor): valor is string => Boolean(valor)),
+      ),
+    ];
+    if (!ids.length) return mapa;
+    const { data, error } = await supabaseAdmin
+      .from("grupos_torneo")
+      .select("id, nombre")
+      .in("id", ids);
+    if (error || !data) return mapa;
+    for (const fila of data) {
+      if (fila.id && fila.nombre) mapa.set(String(fila.id), String(fila.nombre));
+    }
+    return mapa;
+  }
+
+  private static async vincularGrupoReplicacion(
+    origen: {
+      id: string;
+      grupo_id?: string | null;
+      nombre?: string | null;
+      nivel?: string | null;
+      rama?: string | null;
+    },
+    ids: string[],
+  ): Promise<void> {
+    try {
+      let grupoId = origen.grupo_id || null;
+      if (!grupoId) {
+        const nombre = nombreBaseTorneo(origen.nombre, origen.nivel, origen.rama);
+        const { data, error } = await supabaseAdmin
+          .from("grupos_torneo")
+          .insert({ nombre })
+          .select("id")
+          .single();
+        if (error || !data?.id) return;
+        grupoId = data.id as string;
+      }
+      await supabaseAdmin.from("torneos").update({ grupo_id: grupoId }).in("id", ids);
+    } catch (error) {
+      console.warn("Grupo de competencia no persistido:", error);
+    }
+  }
+
+  static async agruparTorneos(nombre: string, torneoIds: string[]) {
+    const limpio = nombre.trim();
+    const ids = [
+      ...new Set(torneoIds.map((valor) => String(valor || "").trim()).filter(Boolean)),
+    ];
+    if (!ids.length) throw new Error("Seleccioná al menos un torneo.");
+
+    if (!limpio) {
+      const { error } = await supabaseAdmin
+        .from("torneos")
+        .update({ grupo_id: null })
+        .in("id", ids);
+      if (error) throw new Error(error.message);
+      return { id: null, nombre: null };
+    }
+
+    const { data: actuales, error: lecturaError } = await supabaseAdmin
+      .from("torneos")
+      .select("id, grupo_id")
+      .in("id", ids);
+    if (lecturaError) {
+      throw new Error(
+        "No se pudo agrupar. Aplicá la migración grupos_torneo en Supabase.",
+      );
+    }
+
+    let grupoId = actuales?.find((torneo) => torneo.grupo_id)?.grupo_id as
+      | string
+      | undefined;
+    if (grupoId) {
+      const { error } = await supabaseAdmin
+        .from("grupos_torneo")
+        .update({ nombre: limpio })
+        .eq("id", grupoId);
+      if (error) throw new Error(error.message);
+    } else {
+      const { data, error } = await supabaseAdmin
+        .from("grupos_torneo")
+        .insert({ nombre: limpio })
+        .select("id")
+        .single();
+      if (error || !data?.id) {
+        throw new Error(
+          "No se pudo crear el grupo. Aplicá la migración grupos_torneo en Supabase.",
+        );
+      }
+      grupoId = data.id as string;
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from("torneos")
+      .update({ grupo_id: grupoId })
+      .in("id", ids);
+    if (updateError) throw new Error(updateError.message);
+
+    const previos = [
+      ...new Set(
+        (actuales || [])
+          .map((torneo) => torneo.grupo_id)
+          .filter((valor): valor is string => Boolean(valor) && valor !== grupoId),
+      ),
+    ];
+    for (const previo of previos) {
+      const { count } = await supabaseAdmin
+        .from("torneos")
+        .select("id", { count: "exact", head: true })
+        .eq("grupo_id", previo);
+      if (count === 0) {
+        await supabaseAdmin.from("grupos_torneo").delete().eq("id", previo);
+      }
+    }
+
+    return { id: grupoId, nombre: limpio };
+  }
+
+  private static async torneosConPartidoHoy(ids: string[]): Promise<Set<string>> {
+    const encontrados = new Set<string>();
+    if (!ids.length) return encontrados;
+    const { inicio, fin } = rangoHoyArgentina();
+    const { data, error } = await supabaseAdmin
+      .from("partidos")
+      .select("torneo_id")
+      .in("torneo_id", ids)
+      .gte("fecha_partido", inicio)
+      .lt("fecha_partido", fin);
+    if (error) return encontrados;
+    for (const fila of data || []) {
+      if (fila.torneo_id) encontrados.add(String(fila.torneo_id));
+    }
+    return encontrados;
+  }
+
+  private static compararListado(
+    a: {
+      estado?: string | null;
+      fecha?: string | null;
+      fecha_cierre_inscripcion?: string | null;
+      created_at?: string | null;
+      tiene_partidos_hoy?: boolean;
+    },
+    b: {
+      estado?: string | null;
+      fecha?: string | null;
+      fecha_cierre_inscripcion?: string | null;
+      created_at?: string | null;
+      tiene_partidos_hoy?: boolean;
+    },
+    vista?: VistaOperativaTorneo | "todos",
+  ): number {
+    const asc = (izq: number | null, der: number | null) => {
+      if (izq === null && der === null) return 0;
+      if (izq === null) return 1;
+      if (der === null) return -1;
+      return izq - der;
+    };
+    const desc = (izq: number | null, der: number | null) => asc(der, izq);
+
+    if (vista === "en_curso") {
+      const hoy =
+        Number(Boolean(b.tiene_partidos_hoy)) -
+        Number(Boolean(a.tiene_partidos_hoy));
+      if (hoy !== 0) return hoy;
+      return asc(timestampOrden(a.fecha), timestampOrden(b.fecha));
+    }
+    if (vista === "por_iniciar") {
+      return asc(timestampOrden(a.fecha), timestampOrden(b.fecha));
+    }
+    if (vista === "inscripciones") {
+      return asc(
+        timestampOrden(a.fecha_cierre_inscripcion || a.fecha),
+        timestampOrden(b.fecha_cierre_inscripcion || b.fecha),
+      );
+    }
+    if (vista === "finalizados") {
+      return desc(
+        timestampOrden(a.fecha || a.created_at),
+        timestampOrden(b.fecha || b.created_at),
+      );
+    }
+    if (vista === "preparacion") {
+      const prioridad =
+        TorneoService.prioridadEstadoListado(a.estado) -
+        TorneoService.prioridadEstadoListado(b.estado);
+      if (prioridad !== 0) return prioridad;
+      return asc(timestampOrden(a.fecha), timestampOrden(b.fecha));
+    }
+
+    const byEstado =
+      TorneoService.prioridadEstadoListado(a.estado) -
+      TorneoService.prioridadEstadoListado(b.estado);
+    if (byEstado !== 0) return byEstado;
+    return (
+      TorneoService.fechaOrdenListado(b) - TorneoService.fechaOrdenListado(a)
+    );
   }
 
   static async obtenerPorId(id: string) {
@@ -327,24 +760,7 @@ export class TorneoService {
     nivelNuevo: string,
     ramaNueva: string,
   ): string {
-    let base = (nombreOrigen || "Torneo").trim();
-    const sufijos = [
-      `${nivelOrigen || ""} ${TorneoService.ramaCorta(ramaOrigen)}`,
-      nivelOrigen || "",
-      TorneoService.ramaCorta(ramaOrigen),
-      ramaOrigen || "",
-    ]
-      .filter((s) => s.trim().length > 0)
-      .map((s) => s.trim());
-
-    for (const s of sufijos) {
-      const re = new RegExp(
-        `[\\s—\\-–]*${s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`,
-        "i",
-      );
-      base = base.replace(re, "").trim();
-    }
-
+    const base = nombreBaseTorneo(nombreOrigen, nivelOrigen, ramaOrigen);
     return `${base} — ${nivelNuevo} ${TorneoService.ramaCorta(ramaNueva)}`;
   }
 
@@ -467,6 +883,14 @@ export class TorneoService {
       }
     }
 
+    const idsGrupo = [
+      id,
+      ...creados
+        .map((creado) => (creado as { id?: string }).id)
+        .filter((valor): valor is string => Boolean(valor)),
+    ];
+    await TorneoService.vincularGrupoReplicacion(origen, idsGrupo);
+
     if (adminId) {
       await supabaseAdmin.from("logs_auditoria").insert({
         usuario_id_admin: adminId,
@@ -537,6 +961,7 @@ export class TorneoService {
     "rama",
     "asociacion_id",
     "federacion_id",
+    "grupo_id",
   ]);
 
   public static normalizarAlcance(
@@ -1180,13 +1605,18 @@ export class TorneoService {
 
     const { data: torneoInfo } = await supabaseAdmin
       .from("torneos")
-      .select("nivel, categoria, modalidad, configuracion_puntos, estado")
+      .select(
+        "nivel, categoria, modalidad, configuracion_puntos, estado, programacion_estado",
+      )
       .eq("id", partido.torneo_id)
       .single();
 
-    // Fallback: primer resultado carga el torneo de Programado → En curso
-    // (cubre torneos que no publican programación de horarios).
-    if (torneoInfo?.estado === FAP_ESTADOS_TORNEO.PROGRAMADO) {
+    // El primer resultado pasa a En curso solo si los horarios ya se publicaron.
+    // Una carga durante la revisión deja el torneo en Por iniciar.
+    if (
+      torneoInfo?.estado === FAP_ESTADOS_TORNEO.PROGRAMADO &&
+      torneoInfo.programacion_estado === "publicado"
+    ) {
       await supabaseAdmin
         .from("torneos")
         .update({ estado: FAP_ESTADOS_TORNEO.EN_CURSO })
