@@ -15,6 +15,10 @@ import {
   FileDown,
 } from "lucide-react";
 import { zonaGrupoCompleta } from "@/utils/clasificacionZonas";
+import {
+  etiquetaRondaLlave,
+  ordenRondaLlave,
+} from "@/utils/rondasLlave";
 
 type VistaRapida = "pendientes" | "finalizados" | "todo";
 
@@ -29,17 +33,18 @@ interface PasoResultadosProps {
 }
 
 /** Orden de competencia de la llave (no alfabético). */
-const RONDA_LLAVE_ORDEN: Record<string, number> = {
-  "32AVOS": 10,
-  "16AVOS": 20,
-  OCTAVOS: 30,
-  CUARTOS: 40,
-  SEMIS: 50,
-  SEMIFINAL: 50,
-  FINAL: 60,
-};
-
-const PLAYOFF_ROUNDS = new Set(Object.keys(RONDA_LLAVE_ORDEN));
+const PLAYOFF_ROUNDS = new Set([
+  "32AVOS",
+  "16AVOS",
+  "PRELIMINARES",
+  "PRELIMINAR",
+  "OCTAVOS",
+  "CUARTOS",
+  "SEMIS",
+  "SEMIFINAL",
+  "SEMIFINALES",
+  "FINAL",
+]);
 
 const isZonaRonda = (ronda?: string | null) => {
   const r = String(ronda || "").toUpperCase();
@@ -52,31 +57,11 @@ const normalizarRonda = (ronda?: string | null) =>
   String(ronda || "").toUpperCase().trim();
 
 const prioridadRondaLlave = (ronda?: string | null): number => {
-  const r = normalizarRonda(ronda);
   if (isZonaRonda(ronda)) return 0;
-  return RONDA_LLAVE_ORDEN[r] ?? 900;
+  return ordenRondaLlave(ronda);
 };
 
-const labelRondaLlave = (ronda: string): string => {
-  const r = normalizarRonda(ronda);
-  switch (r) {
-    case "32AVOS":
-      return "32avos";
-    case "16AVOS":
-      return "16avos";
-    case "OCTAVOS":
-      return "Octavos";
-    case "CUARTOS":
-      return "Cuartos";
-    case "SEMIS":
-    case "SEMIFINAL":
-      return "Semifinales";
-    case "FINAL":
-      return "Final";
-    default:
-      return ronda;
-  }
-};
+const labelRondaLlave = (ronda: string): string => etiquetaRondaLlave(ronda);
 
 /** Sin horario al final; con horario por fecha/hora ascendente. */
 const timestampPartido = (p: Partido): number => {

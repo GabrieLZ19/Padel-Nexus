@@ -32,6 +32,11 @@ import {
 import { generarPdfZonas } from "@/utils/grillaPdf";
 import { textoClasificacionZonas, zonaGrupoCompleta } from "@/utils/clasificacionZonas";
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
+import {
+  etiquetaRondaLlave,
+  numerosVisiblesDePartidos,
+  numerosVisiblesLlave,
+} from "@/utils/rondasLlave";
 
 interface BracketEditorProps {
   torneoId: string;
@@ -529,10 +534,13 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   const totalParejas = zonas.reduce((acc, z) => acc + z.parejas.length, 0);
 
   const RONDAS_CONFIG = [
-    { id: "OCTAVOS", label: "Octavos", required: 8 },
-    { id: "CUARTOS", label: "Cuartos", required: 4 },
-    { id: "SEMIS", label: "Semis", required: 2 },
-    { id: "FINAL", label: "Final", required: 1 },
+    { id: "32AVOS", label: etiquetaRondaLlave("32AVOS"), required: 32 },
+    { id: "16AVOS", label: etiquetaRondaLlave("16AVOS"), required: 16 },
+    { id: "PRELIMINARES", label: etiquetaRondaLlave("PRELIMINARES"), required: 16 },
+    { id: "OCTAVOS", label: etiquetaRondaLlave("OCTAVOS"), required: 8 },
+    { id: "CUARTOS", label: etiquetaRondaLlave("CUARTOS"), required: 4 },
+    { id: "SEMIS", label: etiquetaRondaLlave("SEMIS"), required: 2 },
+    { id: "FINAL", label: etiquetaRondaLlave("FINAL"), required: 1 },
   ];
 
   const getPlayoffSize = (zonasCount: number): number => {
@@ -567,12 +575,21 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     partidos.map((p) => (p.ronda || "").toUpperCase()),
   );
 
-  const PLAYOFF_ROUND_IDS = ["32AVOS", "16AVOS", "OCTAVOS", "CUARTOS", "SEMIS", "FINAL"];
+  const PLAYOFF_ROUND_IDS = [
+    "32AVOS",
+    "16AVOS",
+    "PRELIMINARES",
+    "OCTAVOS",
+    "CUARTOS",
+    "SEMIS",
+    "FINAL",
+  ];
   const playoffPartidos = partidos.filter((p) =>
     PLAYOFF_ROUND_IDS.includes((p.ronda || "").toUpperCase()),
   );
 
   const rondasToShow = RONDAS_CONFIG.filter((r) => {
+    if (r.id === "PRELIMINARES" && !rondasInPartidos.has(r.id)) return false;
     if (rondasInPartidos.has(r.id)) return true;
     // Sin partidos aún: mostrar rondas del tamaño de llave. Con partidos ya generados,
     // no inventar rondas vacías (evita cuartos fantasma en draws con BYE).
@@ -687,12 +704,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   const llaveCompleta =
     playoffTotal > 0 && playoffFinalizados === playoffTotal;
   const labelRondaEnCurso = rondaEnCurso
-    ? RONDAS_CONFIG.find((r) => r.id === rondaEnCurso)?.label ||
-      ({
-        "32AVOS": "32avos",
-        "16AVOS": "16avos",
-      } as Record<string, string>)[rondaEnCurso] ||
-      rondaEnCurso
+    ? etiquetaRondaLlave(rondaEnCurso)
     : null;
 
   /** Origen FAP por inscripción: "1º A" (seed de zona = posición provisional). */
@@ -768,9 +780,26 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     };
   }, [torneoId]);
 
+  const numerosLlave = React.useMemo(
+    () =>
+      numerosVisiblesLlave(
+        fapMatrixMatches.map((m) => m.matchNo),
+        partidosZona.length + 1,
+      ),
+    [fapMatrixMatches, partidosZona.length],
+  );
+
+  const numerosPartido = React.useMemo(
+    () => numerosVisiblesDePartidos(partidos),
+    [partidos],
+  );
+
   const formatFapSide = (ref: string | null | undefined): string | null => {
     if (!ref) return null;
-    if (ref.startsWith("W")) return `Gan. #${ref.slice(1)}`;
+    if (ref.startsWith("W")) {
+      const matchNo = Number(ref.slice(1));
+      return `Gan. #${numerosLlave.get(matchNo) ?? matchNo}`;
+    }
     const m = /^([123])([A-L])$/i.exec(ref);
     if (!m) return ref;
     return `${m[1]}º ${m[2].toUpperCase()}`;
@@ -1399,6 +1428,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 <FapBracketDiagram
                   matches={fapMatrixMatches}
                   partidos={playoffPartidos}
+                  inicioNumeracion={partidosZona.length + 1}
                   pairCount={fapPairCount ?? undefined}
                   alcance={torneo?.alcance}
                   cabezasSerieIds={cabezasSerieIds}
@@ -1433,6 +1463,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                               <MatchCard
                                 partido={partido}
                                 isInteractive={puedeEditarLlave}
+                                numeroVisible={numerosPartido.get(partido.id)}
                                 alcance={torneo?.alcance}
                                 origenEquipoA={
                                   partido.equipo_a_id
@@ -1626,7 +1657,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-white/8 bg-white/[0.02]">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-chartreuse mb-1">
-                  {selectedMatchToEdit.ronda || "Llave de campeonato"}
+                  {etiquetaRondaLlave(selectedMatchToEdit.ronda) ||
+                    "Llave de campeonato"}
                 </p>
                 <h4 className="text-white font-extrabold text-lg tracking-tight">
                   Gestionar partido

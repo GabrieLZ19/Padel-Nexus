@@ -558,7 +558,7 @@ export const Paso1Datos = ({
           />
           <p className="text-[10px] text-gray-500 mt-1.5">
             {editFormato === "Eliminatoria Directa"
-              ? "Los partidos comienzan directamente en llaves (32avos, 16avos, Octavos…). Sin fase de grupos."
+              ? "Los partidos comienzan directamente en llaves (treintaidosavos, dieciseisavos, octavos…). Sin fase de grupos."
               : "Se juegan primero zonas de grupos y luego los clasificados pasan a la llave de eliminación."}
           </p>
         </div>

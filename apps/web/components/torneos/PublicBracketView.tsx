@@ -7,14 +7,19 @@ import {
   PairDisplay,
   esAlcanceNacional,
 } from "@/components/torneos/PairDisplay";
+import {
+  etiquetaRondaLlave,
+  numerosVisiblesDePartidos,
+} from "@/utils/rondasLlave";
 
 const RONDAS_CONFIG = [
-  { id: "32AVOS", label: "32avos" },
-  { id: "16AVOS", label: "16avos" },
-  { id: "OCTAVOS", label: "Octavos" },
-  { id: "CUARTOS", label: "Cuartos" },
-  { id: "SEMIS", label: "Semis" },
-  { id: "FINAL", label: "Final" },
+  { id: "32AVOS", label: etiquetaRondaLlave("32AVOS") },
+  { id: "16AVOS", label: etiquetaRondaLlave("16AVOS") },
+  { id: "PRELIMINARES", label: etiquetaRondaLlave("PRELIMINARES") },
+  { id: "OCTAVOS", label: etiquetaRondaLlave("OCTAVOS") },
+  { id: "CUARTOS", label: etiquetaRondaLlave("CUARTOS") },
+  { id: "SEMIS", label: etiquetaRondaLlave("SEMIS") },
+  { id: "FINAL", label: etiquetaRondaLlave("FINAL") },
 ] as const;
 
 const MIN_COL_W = 300;
@@ -113,10 +118,12 @@ function BracketMatchCell({
   partido,
   width,
   alcanceNacional,
+  numero,
 }: {
   partido: Partido;
   width: number;
   alcanceNacional?: boolean;
+  numero?: number;
 }) {
   const isA =
     partido.ganador === partido.equipo_a_id && partido.ganador != null;
@@ -158,6 +165,13 @@ function BracketMatchCell({
       }`}
       style={{ width }}
     >
+      {numero != null ? (
+        <div className="px-2.5 py-1 border-b border-brand-input bg-brand-black/30">
+          <span className="text-[10px] font-black text-brand-chartreuse/90 tabular-nums">
+            #{numero}
+          </span>
+        </div>
+      ) : null}
       {/* Fila equipo A */}
       <div className="flex items-stretch border-b border-brand-input">
         <div className="min-w-0 flex-1">
@@ -304,6 +318,8 @@ export default function PublicBracketView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  const numeros = numerosVisiblesDePartidos(partidos || []);
 
   const knockout = (partidos || []).filter((p) => {
     const r = (p.ronda || "").toUpperCase();
@@ -452,6 +468,7 @@ export default function PublicBracketView({
                         partido={match}
                         width={cardW}
                         alcanceNacional={nacional}
+                        numero={numeros.get(match.id)}
                       />
                     </div>
                   ))}

@@ -13,6 +13,7 @@ export const MatchCard = ({
   esCabezaSerieA = false,
   esCabezaSerieB = false,
   alcance,
+  numeroVisible,
 }: {
   partido: Partido;
   isInteractive?: boolean;
@@ -23,6 +24,8 @@ export const MatchCard = ({
   esCabezaSerieA?: boolean;
   esCabezaSerieB?: boolean;
   alcance?: string | null;
+  /** Número que ve el usuario. Si no viene, se muestra `partido.orden`. */
+  numeroVisible?: number | null;
 }) => {
   const isA =
     partido.ganador === partido.equipo_a_id && partido.ganador !== null;
@@ -199,9 +202,9 @@ export const MatchCard = ({
     >
       <div className="flex items-center justify-between gap-3 px-3.5 py-2 bg-brand-input/60 border-b border-brand-input min-h-[2rem]">
         <div className="flex items-center gap-2 min-w-0">
-          {partido.orden != null && (
+          {(numeroVisible ?? partido.orden) != null && (
             <span className="text-[10px] font-black text-brand-chartreuse/90 tabular-nums">
-              #{partido.orden}
+              #{numeroVisible ?? partido.orden}
             </span>
           )}
           {partido.es_wo && (

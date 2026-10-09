@@ -482,7 +482,7 @@ export const Paso5Cierre = ({
               </div>
               <div>
                 <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider block mb-1">
-                  Cuartos
+                  Cuartos de final
                 </label>
                 <input
                   type="number"
@@ -493,7 +493,7 @@ export const Paso5Cierre = ({
               </div>
               <div>
                 <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider block mb-1">
-                  Octavos
+                  Octavos de final
                 </label>
                 <input
                   type="number"
@@ -504,7 +504,7 @@ export const Paso5Cierre = ({
               </div>
               <div>
                 <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider block mb-1">
-                  16avos
+                  Dieciseisavos
                 </label>
                 <input
                   type="number"
@@ -515,7 +515,7 @@ export const Paso5Cierre = ({
               </div>
               <div>
                 <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider block mb-1">
-                  32avos
+                  Treintaidosavos
                 </label>
                 <input
                   type="number"

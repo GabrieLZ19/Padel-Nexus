@@ -1,20 +1,5 @@
 import type { Partido } from "@/utils/types";
-
-const ORDEN_RONDAS = [
-  "ZONA A",
-  "ZONA B",
-  "ZONA C",
-  "ZONA D",
-  "ZONA E",
-  "ZONA F",
-  "32AVOS",
-  "16AVOS",
-  "OCTAVOS",
-  "CUARTOS",
-  "SEMIS",
-  "SEMIFINAL",
-  "FINAL",
-];
+import { etiquetaRondaLlave, ordenRondaLlave } from "@/utils/rondasLlave";
 
 /** Placeholder que deja la generación de llaves (`Cancha 1`), no una sede real. */
 export function esCanchaPlaceholder(cancha?: string | null): boolean {
@@ -45,29 +30,11 @@ export function partidoEstaDefinido(p: Partido): boolean {
 }
 
 export function labelRonda(ronda?: string | null): string {
-  const r = String(ronda || "").trim();
-  const map: Record<string, string> = {
-    OCTAVOS: "Octavos",
-    CUARTOS: "Cuartos",
-    SEMIS: "Semifinales",
-    SEMIFINAL: "Semifinales",
-    FINAL: "Final",
-    "32AVOS": "32avos",
-    "16AVOS": "16avos",
-  };
-  const upper = r.toUpperCase();
-  if (map[upper]) return map[upper];
-  if (/^zona/i.test(r)) return r.replace(/^zona/i, "Zona");
-  return r || "Ronda";
+  return etiquetaRondaLlave(ronda);
 }
 
 function pesoRonda(ronda?: string | null): number {
-  const upper = String(ronda || "").trim().toUpperCase();
-  const idx = ORDEN_RONDAS.indexOf(upper);
-  if (idx >= 0) return idx;
-  const zona = upper.match(/^ZONA\s+([A-Z])/);
-  if (zona) return zona[1].charCodeAt(0) - 65;
-  return 80;
+  return ordenRondaLlave(ronda);
 }
 
 export function partidosDefinidosOrdenados(partidos: Partido[]): Partido[] {

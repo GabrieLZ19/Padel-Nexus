@@ -30,6 +30,7 @@ import {
   isInscripcionTemporalmenteAbierta,
 } from "@/utils/inscripcionElegibilidad";
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
+import { esRondaDeZona } from "@/utils/rondasLlave";
 
 const PLAYOFF_RONDAS = new Set([
   "PRELIMINARES",
@@ -500,6 +501,10 @@ export default function TorneoDetallePage() {
                       <div className="relative p-3 sm:p-5 overflow-x-auto">
                         <FapBracketDiagram
                           matches={fapMatrixMatches}
+                          inicioNumeracion={
+                            partidos.filter((p) => esRondaDeZona(p.ronda))
+                              .length + 1
+                          }
                           partidos={partidos.filter((p) =>
                             PLAYOFF_RONDAS.has(
                               String(p.ronda || "").toUpperCase().trim(),

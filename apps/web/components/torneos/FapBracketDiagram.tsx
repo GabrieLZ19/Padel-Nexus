@@ -7,6 +7,13 @@ import type { Partido } from "@/utils/types";
 import { MatchCard } from "./MatchCard";
 import { PairDisplay, esAlcanceNacional } from "@/components/torneos/PairDisplay";
 import { PlayerAvatar } from "@/components/torneos/MatchTeamBox";
+import {
+  codigoRondaPorNumeroFap,
+  columnasRondaLlave,
+  etiquetaRondaLlave,
+  numerosVisiblesLlave,
+  vincularPartidosAMatriz,
+} from "@/utils/rondasLlave";
 
 export type FapMatrixMatch = {
   matchNo: number;
@@ -25,6 +32,8 @@ type Props = {
   onMatchClick?: (partido: Partido) => void;
   /** Vista pública / mobile: zoom inicial más bajo y tipografía compacta. */
   compact?: boolean;
+  /** Primer número visible de la llave. Con 16 partidos de zona, es 17. */
+  inicioNumeracion?: number;
 };
 
 const SLOT = 220;
@@ -32,13 +41,19 @@ const CARD_W = 300;
 const COL_GAP = 36;
 const JOIN_GUTTER = 44;
 const PAD_Y = 36;
+const HEADER_H = 36;
 const PAD_X = 12;
 const CARD_H = 200;
 const PAD_RIGHT = 32;
 
-function formatSeed(ref: string): string {
-  const m = /^([123])([A-L])$/i.exec(ref.trim());
-  if (!m) return ref.startsWith("W") ? `Gan. #${ref.slice(1)}` : ref;
+function formatSeed(ref: string, numeros: Map<number, number>): string {
+  const raw = ref.trim();
+  if (raw.startsWith("W")) {
+    const matchNo = Number(raw.slice(1));
+    return `Gan. #${numeros.get(matchNo) ?? matchNo}`;
+  }
+  const m = /^([123])([A-L])$/i.exec(raw);
+  if (!m) return raw;
   return `${m[1]}º ${m[2].toUpperCase()}`;
 }
 
@@ -53,14 +68,6 @@ function collectLeaves(
       ? collectLeaves(byNo, Number(ref.slice(1)))
       : [ref];
   return [...side(m.a), ...side(m.b)];
-}
-
-function depthOf(byNo: Map<number, FapMatrixMatch>, matchNo: number): number {
-  const m = byNo.get(matchNo);
-  if (!m) return 0;
-  const side = (ref: string) =>
-    ref.startsWith("W") ? depthOf(byNo, Number(ref.slice(1))) + 1 : 0;
-  return Math.max(side(m.a), side(m.b));
 }
 
 function entryMatchForLeaf(
@@ -99,6 +106,7 @@ export function FapBracketDiagram({
   interactive = false,
   onMatchClick,
   compact = false,
+  inicioNumeracion = 1,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const layoutWidthRef = useRef(0);
@@ -168,12 +176,18 @@ export function FapBracketDiagram({
 
     const leaves = collectLeaves(byNo, final.matchNo);
     const leafIndex = new Map(leaves.map((l, i) => [l, i]));
-    const maxDepth = depthOf(byNo, final.matchNo);
     const colStride = CARD_W + COL_GAP + JOIN_GUTTER;
+    const columnas = columnasRondaLlave(matches.map((m) => m.matchNo));
+    const numeros = numerosVisiblesLlave(
+      matches.map((m) => m.matchNo),
+      inicioNumeracion,
+    );
+    const colDe = (matchNo: number) => columnas.get(matchNo) ?? 0;
+    const maxCol = Math.max(0, ...matches.map((m) => colDe(m.matchNo)));
 
-    const leafY = (idx: number) => PAD_Y + idx * SLOT + SLOT / 2;
-    const cardX = (depth: number) => PAD_X + depth * colStride;
-    const joinX = (depth: number) => cardX(depth) - JOIN_GUTTER;
+    const leafY = (idx: number) => HEADER_H + PAD_Y + idx * SLOT + SLOT / 2;
+    const cardX = (col: number) => PAD_X + col * colStride;
+    const joinX = (col: number) => cardX(col) - JOIN_GUTTER;
 
     const spanOf = (ref: string) => {
       if (!ref.startsWith("W")) {
@@ -189,31 +203,37 @@ export function FapBracketDiagram({
       return { min, max, mid: (min + max) / 2 };
     };
 
-    const partidoByOrden = new Map(
-      partidos
-        .filter((p) => p.orden != null)
-        .map((p) => [Number(p.orden), p]),
+    const partidoById = new Map(partidos.map((p) => [p.id, p]));
+    const vinculo = vincularPartidosAMatriz(
+      matches.map((m) => m.matchNo),
+      partidos,
     );
+    const partidoDe = (matchNo: number) => {
+      const id = vinculo.get(matchNo);
+      return id ? partidoById.get(id) : undefined;
+    };
 
-    // Semillas que entran en depth > 0 → slot BYE en columna 0 (mismo tamaño que un partido).
+    // Semilla que entra después de la primera ronda: slot BYE en la columna anterior.
     const byeSlots = leaves
       .map((leaf) => {
         const entry = entryMatchForLeaf(matches, leaf);
         if (!entry) return null;
-        const d = depthOf(byNo, entry.matchNo);
-        if (d <= 0) return null;
-        const partido = partidoByOrden.get(entry.matchNo);
+        const col = colDe(entry.matchNo);
+        if (col <= 0) return null;
+        const partido = partidoDe(entry.matchNo);
         const y = leafY(leafIndex.get(leaf) ?? 0);
+        const byeCol = col - 1;
         return {
           leaf,
-          seed: formatSeed(leaf),
+          seed: formatSeed(leaf, numeros),
           side: entry.side,
           targetMatchNo: entry.matchNo,
+          targetNumero: numeros.get(entry.matchNo) ?? entry.matchNo,
           partido,
-          cardX: cardX(0),
+          cardX: cardX(byeCol),
           y: y - CARD_H / 2,
           midY: y,
-          rightX: cardX(0) + CARD_W,
+          rightX: cardX(byeCol) + CARD_W,
         };
       })
       .filter((n): n is NonNullable<typeof n> => n != null);
@@ -227,15 +247,14 @@ export function FapBracketDiagram({
         return { x: bye.rightX, y: bye.midY };
       }
       const prevNo = Number(ref.slice(1));
-      const prevDepth = depthOf(byNo, prevNo);
       return {
-        x: cardX(prevDepth) + CARD_W,
+        x: cardX(colDe(prevNo)) + CARD_W,
         y: spanOf(ref).mid,
       };
     };
 
     const matchNodes = matches.map((m) => {
-      const d = depthOf(byNo, m.matchNo);
+      const col = colDe(m.matchNo);
       const aSpan = spanOf(m.a);
       const bSpan = spanOf(m.b);
       const mid = (aSpan.mid + bSpan.mid) / 2;
@@ -243,7 +262,7 @@ export function FapBracketDiagram({
       const feedB = feeder(m.b);
       const feeds = [feedA, feedB].filter((f): f is Feed => f != null);
       // Solo dibujar join si hay al menos un alimentador (partido previo o slot BYE).
-      const showJoin = feeds.length > 0 && d > 0;
+      const showJoin = feeds.length > 0 && col > 0;
       const showFullJoin = feeds.length === 2;
 
       // Si un solo lado alimenta, la horquilla vertical se reduce a ese lado + mid.
@@ -257,9 +276,11 @@ export function FapBracketDiagram({
 
       return {
         ...m,
-        depth: d,
-        joinX: joinX(d),
-        cardX: cardX(d),
+        depth: col,
+        numero: numeros.get(m.matchNo) ?? m.matchNo,
+        etiqueta: etiquetaRondaLlave(codigoRondaPorNumeroFap(m.matchNo)),
+        joinX: joinX(col),
+        cardX: cardX(col),
         y: mid - CARD_H / 2,
         yTop,
         yBot,
@@ -268,17 +289,33 @@ export function FapBracketDiagram({
         feedB,
         showJoin,
         showFullJoin,
-        partido: partidoByOrden.get(m.matchNo),
+        partido: partidoDe(m.matchNo),
       };
     });
+
+    const headers: { key: string; label: string; x: number }[] = [];
+    const seen = new Set<number>();
+    for (const m of matches) {
+      const col = colDe(m.matchNo);
+      if (seen.has(col)) continue;
+      seen.add(col);
+      headers.push({
+        key: codigoRondaPorNumeroFap(m.matchNo),
+        label: etiquetaRondaLlave(codigoRondaPorNumeroFap(m.matchNo)),
+        x: cardX(col),
+      });
+    }
+    headers.sort((a, b) => a.x - b.x);
 
     return {
       byeSlots,
       matchNodes,
-      width: cardX(maxDepth) + CARD_W + PAD_RIGHT,
-      height: PAD_Y * 2 + Math.max(leaves.length, 1) * SLOT,
+      headers,
+      numeros,
+      width: cardX(maxCol) + CARD_W + PAD_RIGHT,
+      height: HEADER_H + PAD_Y * 2 + Math.max(leaves.length, 1) * SLOT,
     };
-  }, [matches, partidos]);
+  }, [matches, partidos, inicioNumeracion]);
 
   useEffect(() => {
     if (layout) layoutWidthRef.current = layout.width;
@@ -454,6 +491,16 @@ export function FapBracketDiagram({
               backgroundSize: "14px 14px",
             }}
           >
+            {layout.headers.map((header) => (
+              <p
+                key={header.key}
+                className="absolute z-[2] text-center text-[10px] font-black uppercase tracking-[0.16em] text-brand-chartreuse/90"
+                style={{ left: header.x, top: 8, width: CARD_W }}
+              >
+                {header.label}
+              </p>
+            ))}
+
             <svg
               className="absolute inset-0 pointer-events-none z-[1]"
               width={layout.width}
@@ -558,7 +605,7 @@ export function FapBracketDiagram({
                   style={{ left: node.joinX, top: node.yMid }}
                 >
                   <span className="inline-flex min-w-[1.75rem] items-center justify-center rounded-md border border-brand-chartreuse/40 bg-[#121212] px-1.5 py-0.5 text-[11px] font-black tabular-nums text-brand-chartreuse shadow-sm">
-                    {node.matchNo}
+                    {node.numero}
                   </span>
                 </div>
               ))}
@@ -597,14 +644,14 @@ export function FapBracketDiagram({
                     width: CARD_W,
                     minHeight: CARD_H,
                   }}
-                  title={`Pase directo → partido #${bye.targetMatchNo}`}
+                  title={`Pase directo → partido #${bye.targetNumero}`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
                       Pase directo
                     </span>
                     <span className="text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
-                      → #{bye.targetMatchNo}
+                      → #{bye.targetNumero}
                     </span>
                   </div>
 
@@ -674,7 +721,7 @@ export function FapBracketDiagram({
                       minHeight: CARD_H,
                     }}
                   >
-                    Partido #{node.matchNo}
+                    Partido #{node.numero}
                   </div>
                 );
               }
@@ -689,8 +736,9 @@ export function FapBracketDiagram({
                     partido={node.partido}
                     isInteractive={interactive}
                     alcance={alcance}
-                    origenEquipoA={formatSeed(node.a)}
-                    origenEquipoB={formatSeed(node.b)}
+                    numeroVisible={node.numero}
+                    origenEquipoA={formatSeed(node.a, layout.numeros)}
+                    origenEquipoB={formatSeed(node.b, layout.numeros)}
                     esCabezaSerieA={
                       !!node.partido.equipo_a_id &&
                       !!cabezasSerieIds?.has(String(node.partido.equipo_a_id))
