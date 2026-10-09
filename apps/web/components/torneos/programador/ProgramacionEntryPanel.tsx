@@ -92,6 +92,8 @@ export function ProgramacionEntryPanel({ torneoId }: Props) {
 
         <Link
           href={href}
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-chartreuse px-5 py-3 text-sm font-bold text-black hover:brightness-110"
         >
           Abrir programador visual

@@ -108,7 +108,7 @@ function BookingCard({
           hasIssue ? "pl-4" : ""
         }`}
       >
-        {partido.ronda}
+        {partido.ronda_etiqueta || partido.ronda}
       </p>
       <p className="text-[11px] font-semibold leading-tight text-white line-clamp-2">
         {partido.label_a}

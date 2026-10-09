@@ -4,11 +4,11 @@ import {
   CalendarClock,
   Eraser,
   Lock,
+  Save,
   Sparkles,
   Upload,
   Unlock,
 } from "lucide-react";
-import Link from "next/link";
 import type { ProgramacionBoard } from "@/utils/services/torneos";
 
 interface Props {
@@ -16,7 +16,8 @@ interface Props {
   busy: boolean;
   syncing?: boolean;
   isReadOnly: boolean;
-  sedesHref: string;
+  onAgregarSede: () => void;
+  onGuardarBorrador: () => void;
   onAuto: () => void;
   onLimpiar: () => void;
   onPublicar: () => void;
@@ -40,7 +41,8 @@ export function ProgramadorTopBar({
   busy,
   syncing,
   isReadOnly,
-  sedesHref,
+  onAgregarSede,
+  onGuardarBorrador,
   onAuto,
   onLimpiar,
   onPublicar,
@@ -117,13 +119,14 @@ export function ProgramadorTopBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href={sedesHref}
-          title="Agregar sede o cancha y volvé; la grilla se recalcula"
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-semibold text-gray-300 hover:bg-white/10"
+        <button
+          type="button"
+          onClick={onAgregarSede}
+          title="Agregar club o cancha sin salir del programador"
+          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-semibold text-gray-300 hover:bg-white/10 cursor-pointer"
         >
-          + Club / cancha
-        </Link>
+          Agregar club / cancha
+        </button>
         {isReadOnly ? (
           <button
             type="button"
@@ -149,11 +152,21 @@ export function ProgramadorTopBar({
             <button
               type="button"
               disabled={busy}
+              onClick={onGuardarBorrador}
+              title="Conservar los horarios como borrador, sin publicarlos"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-semibold text-gray-300 hover:bg-white/10 disabled:opacity-50 cursor-pointer"
+            >
+              <Save className="size-4" />
+              Guardar borrador
+            </button>
+            <button
+              type="button"
+              disabled={busy}
               onClick={onAuto}
               className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50 cursor-pointer"
             >
               <Sparkles className="size-4 text-brand-chartreuse" />
-              Auto-asignar
+              Asignar automáticamente
             </button>
             <button
               type="button"

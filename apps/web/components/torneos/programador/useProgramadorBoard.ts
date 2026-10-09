@@ -8,12 +8,30 @@ import {
 } from "@/utils/services/torneos";
 import { sileo } from "sileo";
 
-export type EstrategiaAuto = "smart" | "continuous";
+export type ModoDescansoProgramador =
+  | "tras_fin_60"
+  | "tras_fin_120"
+  | "entre_inicios_240";
+
+export type DistribucionProgramacion = "zonas_primero" | "continua";
 
 export interface ProgramadorConfig {
   duracion: 60 | 75 | 90;
-  descanso: number;
-  estrategia: EstrategiaAuto;
+  descansoModo: ModoDescansoProgramador;
+  distribucion: DistribucionProgramacion;
+  jornadas: 0 | 1 | 2 | 3 | 4;
+  horaInicio: string;
+  horaFin: string;
+}
+
+function boardQuery(config: ProgramadorConfig) {
+  return {
+    duracion: config.duracion,
+    descansoModo: config.descansoModo,
+    ...(config.jornadas ? { jornadas: config.jornadas } : {}),
+    horaInicio: config.horaInicio,
+    ...(config.horaFin ? { horaFin: config.horaFin } : {}),
+  };
 }
 
 const CONFIG_DEBOUNCE_MS = 400;
@@ -36,8 +54,11 @@ export function useProgramadorBoard(torneoId: string) {
   const [syncing, setSyncing] = useState(false);
   const [config, setConfig] = useState<ProgramadorConfig>({
     duracion: 90,
-    descanso: 60,
-    estrategia: "smart",
+    descansoModo: "tras_fin_60",
+    distribucion: "zonas_primero",
+    jornadas: 0,
+    horaInicio: "08:00",
+    horaFin: "",
   });
   const [activeDay, setActiveDay] = useState<string>("");
 
@@ -61,7 +82,6 @@ export function useProgramadorBoard(torneoId: string) {
       duracion: ([60, 75, 90].includes(data.duracion_partido_minutos)
         ? data.duracion_partido_minutos
         : c.duracion) as 60 | 75 | 90,
-      descanso: data.descanso_minutos || c.descanso,
     }));
     setActiveDay((prev) => {
       if (prev && data.dias.includes(prev)) return prev;
@@ -73,10 +93,10 @@ export function useProgramadorBoard(torneoId: string) {
     if (!torneoId) return;
     setLoading(true);
     try {
-      const data = await TorneosService.getProgramacionBoard(torneoId, {
-        duracion: configRef.current.duracion,
-        descanso: configRef.current.descanso,
-      });
+      const data = await TorneosService.getProgramacionBoard(
+        torneoId,
+        boardQuery(configRef.current),
+      );
       applyBoard(data);
     } catch (e: unknown) {
       sileo.error({ title: apiErrorMessage(e, "Error al cargar el programador") });
@@ -100,10 +120,10 @@ export function useProgramadorBoard(torneoId: string) {
     syncTimerRef.current = setTimeout(async () => {
       setSyncing(true);
       try {
-        const data = await TorneosService.getProgramacionBoard(torneoId, {
-          duracion: configRef.current.duracion,
-          descanso: configRef.current.descanso,
-        });
+        const data = await TorneosService.getProgramacionBoard(
+          torneoId,
+          boardQuery(configRef.current),
+        );
         if (gen !== syncGenRef.current) return;
         applyBoard(data);
       } catch {
@@ -120,8 +140,12 @@ export function useProgramadorBoard(torneoId: string) {
       setConfig(merged);
       configRef.current = merged;
 
-      // Estrategia solo afecta auto-asignar: no recargar grilla.
-      if (next && Object.keys(next).length === 1 && next.estrategia != null) {
+      // La distribución solo cambia el orden del auto-asignar.
+      if (
+        next &&
+        Object.keys(next).length === 1 &&
+        next.distribucion != null
+      ) {
         return;
       }
 
@@ -134,10 +158,10 @@ export function useProgramadorBoard(torneoId: string) {
               duracion_partido_minutos: merged.duracion,
             } as Parameters<typeof TorneosService.update>[1]);
           }
-          const data = await TorneosService.getProgramacionBoard(torneoId, {
-            duracion: merged.duracion,
-            descanso: merged.descanso,
-          });
+          const data = await TorneosService.getProgramacionBoard(
+            torneoId,
+            boardQuery(merged),
+          );
           applyBoard(data);
         } catch {
           sileo.error({ title: "No se pudo actualizar la grilla" });
@@ -303,14 +327,46 @@ export function useProgramadorBoard(torneoId: string) {
     setBusy(true);
     try {
       const data = await TorneosService.autoAsignarProgramacion(torneoId, {
-        estrategia: configRef.current.estrategia,
+        distribucion: configRef.current.distribucion,
         duracionMinutos: configRef.current.duracion,
-        descansoMinutos: configRef.current.descanso,
+        descansoModo: configRef.current.descansoModo,
+        ...(configRef.current.jornadas
+          ? { jornadas: configRef.current.jornadas }
+          : {}),
+        horaInicio: configRef.current.horaInicio,
+        ...(configRef.current.horaFin
+          ? { horaFin: configRef.current.horaFin }
+          : {}),
       });
       applyBoard(data);
       sileo.success({ title: "Auto-asignación aplicada" });
     } catch (e: unknown) {
       sileo.error({ title: apiErrorMessage(e, "Error en auto-asignación") });
+    } finally {
+      setBusy(false);
+    }
+  }, [isReadOnly, torneoId, applyBoard]);
+
+  const guardarBorrador = useCallback(async () => {
+    if (isReadOnly) return;
+    setBusy(true);
+    try {
+      const actual = configRef.current;
+      const data = await TorneosService.guardarBorradorProgramacion(torneoId, {
+        motivo: "Guardar borrador desde el programador visual",
+        duracionMinutos: actual.duracion,
+        descansoModo: actual.descansoModo,
+        ...(actual.jornadas ? { jornadas: actual.jornadas } : {}),
+        horaInicio: actual.horaInicio,
+        ...(actual.horaFin ? { horaFin: actual.horaFin } : {}),
+      });
+      applyBoard(data);
+      sileo.success({
+        title: "Borrador guardado",
+        description: "Los horarios quedaron cargados y todavía no son públicos.",
+      });
+    } catch (e: unknown) {
+      sileo.error({ title: apiErrorMessage(e, "No se pudo guardar el borrador") });
     } finally {
       setBusy(false);
     }
@@ -393,6 +449,7 @@ export function useProgramadorBoard(torneoId: string) {
     desasignar,
     limpiar,
     autoAsignar,
+    guardarBorrador,
     publicar,
     nuevaEdicion,
     issueByPartido,

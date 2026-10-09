@@ -309,7 +309,14 @@ export const TorneosService = {
 
   async getProgramacionBoard(
     torneoId: string,
-    params?: { duracion?: number; descanso?: number },
+    params?: {
+      duracion?: number;
+      descanso?: number;
+      descansoModo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+      jornadas?: number;
+      horaInicio?: string;
+      horaFin?: string;
+    },
   ): Promise<ProgramacionBoard> {
     const response = await api.get<ProgramacionBoard>(
       `/torneos/${torneoId}/programacion/board`,
@@ -360,13 +367,37 @@ export const TorneosService = {
     torneoId: string,
     payload: {
       estrategia?: "smart" | "continuous";
+      distribucion?: "zonas_primero" | "continua";
       duracionMinutos?: number;
       descansoMinutos?: number;
+      descansoModo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+      jornadas?: number;
+      horaInicio?: string;
+      horaFin?: string;
       motivo?: string;
     } = {},
   ): Promise<ProgramacionBoard> {
     const response = await api.post<ProgramacionBoard>(
       `/torneos/${torneoId}/programacion/auto`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async guardarBorradorProgramacion(
+    torneoId: string,
+    payload: {
+      motivo?: string;
+      duracionMinutos?: number;
+      descansoMinutos?: number;
+      descansoModo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+      jornadas?: number;
+      horaInicio?: string;
+      horaFin?: string;
+    } = {},
+  ): Promise<ProgramacionBoard> {
+    const response = await api.post<ProgramacionBoard>(
+      `/torneos/${torneoId}/programacion/borrador`,
       payload,
     );
     return response.data;
@@ -420,6 +451,8 @@ export interface ProgramacionIssue {
 export interface BoardPartido {
   id: string;
   ronda: string | null;
+  ronda_etiqueta?: string;
+  ronda_orden?: number;
   orden: number | null;
   phase: "zones" | "bracket";
   equipo_a_id: string | null;
@@ -443,6 +476,8 @@ export interface ProgramacionBoard {
   programacion_publicada_en: string | null;
   duracion_partido_minutos: number;
   descanso_minutos: number;
+  descanso_modo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+  sugerencia?: { canchas: number; horas: number; mensaje: string };
   dias: string[];
   canchas: Array<{
     label: string;

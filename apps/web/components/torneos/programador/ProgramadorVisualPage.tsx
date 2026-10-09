@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import FeedbackModal from "@/components/ui/FeedbackModal";
+import { SedesFiscalesTab } from "@/components/torneos/SedesFiscalesTab";
 import type { BoardPartido } from "@/utils/services/torneos";
 import { ConflictosPanel } from "./ConflictosPanel";
 import { ProgramadorConfigBar } from "./ProgramadorConfigBar";
@@ -27,9 +28,6 @@ interface Props {
 
 export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
   const router = useRouter();
-  const sedesHref = backHref.includes("/club/")
-    ? `/club/torneos/${torneoId}?step=times`
-    : `/dashboard/torneos/${torneoId}?step=times`;
   const {
     board,
     loading,
@@ -44,7 +42,9 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
     desasignar,
     limpiar,
     autoAsignar,
+    guardarBorrador,
     publicar,
+    load,
     nuevaEdicion,
     issueByPartido,
     partidoEnSlot,
@@ -54,6 +54,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
   const [confirmPublicar, setConfirmPublicar] = useState(false);
   const [confirmEdicion, setConfirmEdicion] = useState(false);
   const [confirmLimpiar, setConfirmLimpiar] = useState(false);
+  const [sedesAbiertas, setSedesAbiertas] = useState(false);
   const [highlightedPartidoId, setHighlightedPartidoId] = useState<
     string | null
   >(null);
@@ -140,7 +141,8 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
         busy={busy}
         syncing={syncing}
         isReadOnly={isReadOnly}
-        sedesHref={sedesHref}
+        onAgregarSede={() => setSedesAbiertas(true)}
+        onGuardarBorrador={() => void guardarBorrador()}
         onAuto={() => void autoAsignar()}
         onLimpiar={() => setConfirmLimpiar(true)}
         onPublicar={() => setConfirmPublicar(true)}
@@ -156,6 +158,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
         disabled={isReadOnly || busy}
         syncing={syncing}
         onDayChange={setActiveDay}
+        sugerencia={board.sugerencia?.mensaje}
         onChange={(next) => reloadWithConfig(next)}
       />
 
@@ -196,7 +199,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
           {activeDrag ? (
             <div className="rounded-xl border border-brand-chartreuse/50 bg-[#1a1a1a] px-3 py-2 shadow-xl">
               <p className="text-[10px] font-bold text-brand-chartreuse">
-                {activeDrag.ronda}
+                {activeDrag.ronda_etiqueta || activeDrag.ronda}
               </p>
               <p className="text-xs font-semibold text-white">
                 {activeDrag.label}
@@ -252,6 +255,37 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
           void nuevaEdicion(inputValue || undefined);
         }}
       />
+
+      {sedesAbiertas ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-3 sm:p-6">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#101010] shadow-2xl">
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+              <div>
+                <p className="text-sm font-bold text-white">Agregar club o cancha</p>
+                <p className="text-xs text-gray-500">
+                  La grilla se actualiza al cerrar, sin salir del programador.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSedesAbiertas(false);
+                  void load();
+                }}
+                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-gray-200 hover:bg-white/10 cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="overflow-y-auto p-3 sm:p-4">
+              <SedesFiscalesTab
+                torneoId={torneoId}
+                onRefresh={() => void load()}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

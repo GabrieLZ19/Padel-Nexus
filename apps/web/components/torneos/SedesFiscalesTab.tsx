@@ -104,6 +104,7 @@ function categoriaTorneoLabel(torneo: {
 
 export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   torneoId,
+  onRefresh,
   readOnly = false,
 }) => {
   const [clubs, setClubs] = useState<Club[]>([]);
@@ -317,6 +318,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
           description: successMessage,
         });
       }
+      onRefresh?.();
     } catch (e) {
       console.error(e);
       sileo.error({
@@ -535,6 +537,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       const clubAdded = clubs.find((c) => String(c.id) === newClubId);
       if (clubAdded) setSelectedClubs([...selectedClubs, clubAdded]);
       setNewClubId("");
+      onRefresh?.();
     } catch (e) {
       console.error(e);
     } finally {
@@ -564,6 +567,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
         const disp = await TorneosService.getCanchasDisponibilidad(torneoId);
         setDispList((disp as typeof dispList) || []);
       }
+      onRefresh?.();
     } catch (e) {
       console.error(e);
     } finally {

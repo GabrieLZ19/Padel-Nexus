@@ -71,7 +71,7 @@ export function ConflictosPanel({
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-bold text-white">
-                    {p?.ronda || "Partido"}
+                    {p?.ronda_etiqueta || p?.ronda || "Partido"}
                     {p?.orden != null ? ` · #${p.orden}` : ""}
                   </span>
                   <span className="block text-xs text-amber-50/90">

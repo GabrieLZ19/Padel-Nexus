@@ -51,7 +51,7 @@ function PendingCard({
         )}
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-bold uppercase tracking-wide text-brand-chartreuse/80">
-            {partido.ronda || "Partido"}
+            {partido.ronda_etiqueta || partido.ronda || "Partido"}
             {partido.orden != null ? ` · #${partido.orden}` : ""}
           </p>
           <p className="mt-0.5 text-xs font-medium text-white leading-snug line-clamp-2">
@@ -99,7 +99,19 @@ export function PendingMatchesSidebar({ partidos, issues, readOnly }: Props) {
       list.push(p);
       map.set(key, list);
     }
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+    return [...map.entries()]
+      .map(([ronda, list]) => {
+        const ordenados = [...list].sort(
+          (a, b) => (a.orden || 0) - (b.orden || 0),
+        );
+        return [ronda, ordenados] as const;
+      })
+      .sort((a, b) => {
+        const oa = a[1][0]?.ronda_orden ?? 99;
+        const ob = b[1][0]?.ronda_orden ?? 99;
+        if (oa !== ob) return oa - ob;
+        return a[0].localeCompare(b[0], "es");
+      });
   }, [filtered]);
 
   const issueMap = useMemo(() => {
@@ -172,7 +184,7 @@ export function PendingMatchesSidebar({ partidos, issues, readOnly }: Props) {
             <details key={ronda} open className="group rounded-xl bg-black/20">
               <summary className="cursor-pointer list-none px-2.5 py-2 text-xs font-bold text-gray-300 [&::-webkit-details-marker]:hidden">
                 <span className="flex items-center justify-between gap-2">
-                  <span>{ronda}</span>
+                  <span>{list[0]?.ronda_etiqueta || ronda}</span>
                   <span className="text-[10px] font-medium text-gray-500">
                     {list.length}
                   </span>

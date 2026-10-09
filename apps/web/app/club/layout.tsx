@@ -176,13 +176,19 @@ export default function ClubLayout({
     );
   }
 
+  const programadorPantallaCompleta = pathname.includes("/programacion");
+
   return (
     <div className="flex h-screen bg-brand-black text-brand-white font-sans overflow-hidden">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-72 transform bg-[#111111] flex flex-col shrink-0 border-r border-white/5 shadow-2xl transition-transform duration-300 lg:relative lg:translate-x-0 ${
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={
+          programadorPantallaCompleta
+            ? "hidden"
+            : `fixed inset-y-0 left-0 z-30 w-72 transform bg-[#111111] flex flex-col shrink-0 border-r border-white/5 shadow-2xl transition-transform duration-300 lg:relative lg:translate-x-0 ${
+                mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+              }`
+        }
       >
         <div className="h-28 px-8 flex items-center justify-between gap-3 border-b border-white/5 md:border-none">
           <div className="flex items-center gap-3">
@@ -263,13 +269,13 @@ export default function ClubLayout({
         </div>
       </aside>
 
-      {mobileMenuOpen && (
+      {mobileMenuOpen && !programadorPantallaCompleta && (
         <div className="fixed inset-0 z-20 bg-black/60 lg:hidden" onClick={() => setMobileMenuOpen(false)}></div>
       )}
 
       {/* Main Panel */}
       <main className="flex-1 overflow-y-auto bg-brand-black min-w-0">
-        <div className="lg:hidden sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4 bg-brand-card/80 backdrop-blur-md border-b border-brand-white/5">
+        <div className={`${programadorPantallaCompleta ? "hidden" : "lg:hidden"} sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4 bg-brand-card/80 backdrop-blur-md border-b border-brand-white/5`}>
           <button
             onClick={() => setMobileMenuOpen(true)}
             className="p-2.5 rounded-xl bg-brand-card text-brand-white border border-brand-white/10 cursor-pointer hover:bg-brand-card/80 transition-colors"
@@ -285,7 +291,9 @@ export default function ClubLayout({
           />
           <NotificationCenter />
         </div>
-        <div className="p-4 sm:p-6 md:p-8 lg:p-10">{children}</div>
+        <div className={programadorPantallaCompleta ? "" : "p-4 sm:p-6 md:p-8 lg:p-10"}>
+          {children}
+        </div>
       </main>
     </div>
   );

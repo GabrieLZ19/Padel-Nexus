@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Trophy, Check, Printer } from "lucide-react";
 import { TorneosService } from "../../../../utils/services/torneos";
 import { Torneo, Inscripcion, Partido } from "../../../../utils/types";
@@ -44,6 +44,7 @@ const WIZARD_STEPS = [
 
 export default function TorneoDetallePage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params?.id as string;
   const router = useRouter();
   const profile = useProfileStore((s) => s.profile);
@@ -60,7 +61,10 @@ export default function TorneoDetallePage() {
   const [partidos, setPartidos] = useState<Partido[]>([]);
 
   // Estados de UI
-  const [activeTab, setActiveTab] = useState<string>("edit");
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const paso = searchParams.get("step");
+    return paso && WIZARD_STEPS.some((item) => item.id === paso) ? paso : "edit";
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const saveHandlerRef = useRef<SaveStepHandler | null>(null);

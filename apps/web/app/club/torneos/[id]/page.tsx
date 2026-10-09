@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Inscripcion, Partido } from "@/utils/types";
@@ -28,6 +28,7 @@ import { labelModalidad } from "@/utils/formatFecha";
 
 export default function ClubTorneoDetallePage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params?.id as string;
   const router = useRouter();
 
@@ -35,7 +36,15 @@ export default function ClubTorneoDetallePage() {
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
   const [partidos, setPartidos] = useState<Partido[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<string>("edit");
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const paso = searchParams.get("step");
+    return paso &&
+      ["edit", "logos", "categories", "players", "times", "cierre", "draws", "matches"].includes(
+        paso,
+      )
+      ? paso
+      : "edit";
+  });
   const [refreshKey, setRefreshKey] = useState(0);
   const saveHandlerRef = useRef<SaveStepHandler | null>(null);
   const activeTabRef = useRef(activeTab);

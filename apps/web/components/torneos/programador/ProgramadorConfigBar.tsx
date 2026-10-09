@@ -1,12 +1,17 @@
 "use client";
 
 import CustomDropdown from "@/components/ui/CustomDropdown";
-import type { ProgramadorConfig, EstrategiaAuto } from "./useProgramadorBoard";
+import type {
+  DistribucionProgramacion,
+  ModoDescansoProgramador,
+  ProgramadorConfig,
+} from "./useProgramadorBoard";
 
 interface Props {
   config: ProgramadorConfig;
   dias: string[];
   activeDay: string;
+  sugerencia?: string;
   disabled?: boolean;
   syncing?: boolean;
   onDayChange: (day: string) => void;
@@ -33,21 +38,41 @@ const TURNO_OPTS = [
 ] as const;
 
 const DESCANSO_OPTS = [
-  { value: "45", label: "45 min" },
-  { value: "60", label: "60 min" },
-  { value: "90", label: "90 min" },
-  { value: "120", label: "120 min" },
+  { value: "tras_fin_60", label: "60 min desde el final" },
+  { value: "tras_fin_120", label: "120 min desde el final" },
+  { value: "entre_inicios_240", label: "4 h entre inicios" },
 ] as const;
 
-const ESTRATEGIA_OPTS = [
-  { value: "smart", label: "Smart (jornadas)" },
-  { value: "continuous", label: "Continuo" },
+const DISTRIBUCION_OPTS = [
+  { value: "zonas_primero", label: "Zonas primero y llaves al final" },
+  { value: "continua", label: "Cronológica continua" },
 ] as const;
+
+const JORNADA_OPTS = [
+  { value: "0", label: "Fechas del torneo" },
+  { value: "1", label: "1 día" },
+  { value: "2", label: "2 días" },
+  { value: "3", label: "3 días" },
+  { value: "4", label: "4 días" },
+] as const;
+
+function horasOpciones(desde?: string): { value: string; label: string }[] {
+  const piso = desde ? Number(desde.slice(0, 2)) * 60 + Number(desde.slice(3, 5)) : 8 * 60;
+  const opts: { value: string; label: string }[] = [];
+  for (let min = 8 * 60; min <= 21 * 60; min += 30) {
+    if (desde && min < piso) continue;
+    const h = String(Math.floor(min / 60)).padStart(2, "0");
+    const m = String(min % 60).padStart(2, "0");
+    opts.push({ value: `${h}:${m}`, label: `${h}:${m}` });
+  }
+  return opts;
+}
 
 export function ProgramadorConfigBar({
   config,
   dias,
   activeDay,
+  sugerencia,
   disabled,
   syncing,
   onDayChange,
@@ -57,6 +82,10 @@ export function ProgramadorConfigBar({
     value: d,
     label: formatDia(d),
   }));
+  const finOpts = [
+    { value: "", label: "Sin hora de fin" },
+    ...horasOpciones(config.horaInicio),
+  ];
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#161616] p-3 sm:p-4">
@@ -73,7 +102,7 @@ export function ProgramadorConfigBar({
 
       {dias.length === 0 ? (
         <p className="text-sm text-amber-200/90">
-          Sin canchas. Configurá sedes y canchas en Paso 5.
+          Sin canchas. Agregá un club y sus canchas desde el programador.
         </p>
       ) : dias.length <= 6 ? (
         <div className="flex flex-wrap gap-2">
@@ -105,7 +134,7 @@ export function ProgramadorConfigBar({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <div>
           <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">
             Turno
@@ -126,8 +155,10 @@ export function ProgramadorConfigBar({
             Descanso
           </span>
           <CustomDropdown
-            value={String(config.descanso)}
-            onChange={(v) => onChange({ descanso: Number(v) })}
+            value={config.descansoModo}
+            onChange={(v) =>
+              onChange({ descansoModo: v as ModoDescansoProgramador })
+            }
             options={[...DESCANSO_OPTS]}
             placeholder="Descanso"
             disabled={disabled}
@@ -136,20 +167,67 @@ export function ProgramadorConfigBar({
         </div>
         <div>
           <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Estrategia auto
+            Distribución
           </span>
           <CustomDropdown
-            value={config.estrategia}
+            value={config.distribucion}
             onChange={(v) =>
-              onChange({ estrategia: v as EstrategiaAuto })
+              onChange({ distribucion: v as DistribucionProgramacion })
             }
-            options={[...ESTRATEGIA_OPTS]}
-            placeholder="Estrategia"
+            options={[...DISTRIBUCION_OPTS]}
+            placeholder="Distribución"
+            disabled={disabled}
+            className="!py-2.5 !text-sm"
+          />
+        </div>
+        <div>
+          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">
+            Jornadas
+          </span>
+          <CustomDropdown
+            value={String(config.jornadas)}
+            onChange={(v) =>
+              onChange({ jornadas: Number(v) as ProgramadorConfig["jornadas"] })
+            }
+            options={[...JORNADA_OPTS]}
+            placeholder="Jornadas"
+            disabled={disabled}
+            className="!py-2.5 !text-sm"
+          />
+        </div>
+        <div>
+          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">
+            Horario de inicio
+          </span>
+          <CustomDropdown
+            value={config.horaInicio}
+            onChange={(v) => onChange({ horaInicio: v })}
+            options={horasOpciones()}
+            placeholder="Inicio"
+            disabled={disabled}
+            className="!py-2.5 !text-sm"
+          />
+        </div>
+        <div>
+          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">
+            Horario de fin
+          </span>
+          <CustomDropdown
+            value={config.horaFin}
+            onChange={(v) => onChange({ horaFin: v })}
+            options={finOpts}
+            placeholder="Fin"
             disabled={disabled}
             className="!py-2.5 !text-sm"
           />
         </div>
       </div>
+
+      {sugerencia ? (
+        <p className="rounded-xl border border-brand-chartreuse/20 bg-brand-chartreuse/10 px-3 py-2 text-sm text-brand-chartreuse">
+          {sugerencia}
+        </p>
+      ) : null}
     </div>
   );
 }
