@@ -152,6 +152,51 @@ export const RankingsService = {
     return Array.isArray(data) ? (data as RankingJugador[]) : [];
   },
 
+  /**
+   * Ranking por provincias de todos los torneos nacionales del tipo,
+   * la categoría y la rama elegidos.
+   */
+  async getProvincialNacional(params: {
+    tipo: TipoRankingFront;
+    categoria?: string;
+    rama?: string;
+  }): Promise<{
+    torneos: number;
+    provincias: Array<{ provincia: string; puntos: number; parejas: number }>;
+  }> {
+    const res = await api.get<RankingApiResponse>(
+      "/rankings/provincial-nacional",
+      {
+        params: {
+          tipo: params.tipo,
+          categoria: params.categoria || undefined,
+          rama: params.rama || undefined,
+        },
+      },
+    );
+    const data = res.data?.data;
+    if (
+      isRecord(data) &&
+      Array.isArray((data as { provincias?: unknown }).provincias)
+    ) {
+      const torneos =
+        typeof (data as { torneos?: unknown }).torneos === "number"
+          ? (data as { torneos: number }).torneos
+          : 0;
+      return {
+        torneos,
+        provincias: (data as {
+          provincias: Array<{
+            provincia: string;
+            puntos: number;
+            parejas: number;
+          }>;
+        }).provincias,
+      };
+    }
+    return { torneos: 0, provincias: [] };
+  },
+
   /** Ranking por provincias basado en resultados de un torneo nacional. */
   async getProvincialPorTorneo(torneoId: string): Promise<{
     torneoId: string;

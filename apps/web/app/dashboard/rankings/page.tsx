@@ -16,7 +16,6 @@ import {
   type RankingsQueryParams,
   type TipoRankingFront,
 } from "@/utils/services/rankings";
-import { TorneosService } from "@/utils/services/torneos";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { useProfileStore } from "@/store/useProfileStore";
 import { PROVINCIAS_ARG, NIVELES_PADEL } from "@/utils/constants/padelConfig";
@@ -40,7 +39,7 @@ const TIPOS_RANKING_CONFIG: TipoRankingConfig[] = [
   {
     value: "libres",
     label: "Libres",
-    descripcion: "Damas y Caballeros por nivel (1ª a 8ª e Inicial).",
+    descripcion: "Por género y categorías de 8ª a 1ª.",
     grupoNivel: "Libres",
     ramaForzada: null,
     permiteRama: true,
@@ -57,10 +56,10 @@ const TIPOS_RANKING_CONFIG: TipoRankingConfig[] = [
   {
     value: "menores",
     label: "Menores",
-    descripcion: "Sub-10 a Sub-18 y promocionales.",
+    descripcion: "Sub-10 a Sub-18 y promocionales. El género no aplica.",
     grupoNivel: "Menores",
     ramaForzada: null,
-    permiteRama: true,
+    permiteRama: false,
   },
 ];
 
@@ -74,123 +73,18 @@ const CATEGORIAS_POR_TIPO: Record<TipoRankingFront, string[]> = {
 };
 
 const RAMAS_OPCIONES = [
-  { value: "", label: "Todas las Ramas" },
-  { value: "masculino", label: "Caballeros / Masculino" },
-  { value: "femenino", label: "Damas / Femenino" },
+  { value: "", label: "Todos los géneros" },
+  { value: "masculino", label: "Masculino" },
+  { value: "femenino", label: "Femenino" },
 ];
 
-// -----------------------------------------------------------------------------
-// Panel: ranking por provincias en torneos nacionales
-// -----------------------------------------------------------------------------
+const RAMA_NO_APLICA = [{ value: "", label: "No aplica" }];
 
-function RankingProvincialPanel() {
-  const [torneos, setTorneos] = useState<Array<{ id: string; nombre: string }>>(
-    [],
-  );
-  const [torneoId, setTorneoId] = useState("");
-  const [rows, setRows] = useState<
-    Array<{ provincia: string; puntos: number; parejas: number }>
-  >([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const list = await TorneosService.getByPage(1, 50, undefined, undefined, {
-          incluirBorradores: false,
-        });
-        if (cancelled) return;
-        setTorneos(
-          list.data
-            .filter((t) =>
-              String(t.alcance || "")
-                .toLowerCase()
-                .includes("nacional"),
-            )
-            .map((t) => ({ id: t.id, nombre: t.nombre })),
-        );
-      } catch {
-        if (!cancelled) setTorneos([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!torneoId) {
-      setRows([]);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        setLoading(true);
-        const data = await RankingsService.getProvincialPorTorneo(torneoId);
-        if (cancelled) return;
-        setRows(data.provincias || []);
-      } catch {
-        if (!cancelled) setRows([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [torneoId]);
-
-  return (
-    <div className="bg-brand-card border border-white/10 rounded-3xl p-6 space-y-4">
-      <div className="flex items-center gap-2 text-brand-chartreuse text-xs font-bold uppercase tracking-widest">
-        <MapPin className="size-4" /> Ranking por provincias (nacionales)
-      </div>
-      <CustomDropdown
-        value={torneoId}
-        onChange={setTorneoId}
-        options={[
-          { value: "", label: "Elegí un torneo nacional…" },
-          ...torneos.map((t) => ({ value: t.id, label: t.nombre })),
-        ]}
-        placeholder="Torneo nacional"
-      />
-      {loading ? (
-        <p className="text-sm text-gray-500">Calculando…</p>
-      ) : rows.length === 0 ? (
-        <p className="text-sm text-gray-500">
-          Sin datos aún (hace falta llave con resultados).
-        </p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-400 border-b border-white/10">
-                <th className="py-2 pr-4">#</th>
-                <th className="py-2 pr-4">Provincia</th>
-                <th className="py-2 pr-4">Puntos</th>
-                <th className="py-2">Parejas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={r.provincia} className="border-b border-white/5 text-white">
-                  <td className="py-2 pr-4 text-brand-chartreuse font-bold">
-                    {i + 1}
-                  </td>
-                  <td className="py-2 pr-4 font-semibold">{r.provincia}</td>
-                  <td className="py-2 pr-4">{r.puntos}</td>
-                  <td className="py-2">{r.parejas}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
+type FilaProvincia = {
+  provincia: string;
+  puntos: number;
+  parejas: number;
+};
 
 // -----------------------------------------------------------------------------
 // Pagina principal
@@ -223,9 +117,14 @@ export default function RankingsPage() {
   const [provincia, setProvincia] = useState<string>(provinciaForzada);
   const [scope, setScope] = useState<string>(scopePorRol);
   const [search, setSearch] = useState<string>("");
+  const [vista, setVista] = useState<"jugador" | "provincia">("jugador");
 
   // Datos
   const [rankings, setRankings] = useState<JugadorRanking[]>([]);
+  const [provinciasRanking, setProvinciasRanking] = useState<FilaProvincia[]>(
+    [],
+  );
+  const [torneosContados, setTorneosContados] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Modal expediente
@@ -239,25 +138,45 @@ export default function RankingsPage() {
     setProvincia(provinciaForzada);
   }, [scopePorRol, provinciaForzada]);
 
+  const esFederacion = rol === "admin_federacion" || rol === "superadmin";
+  const vistaProvincia = esFederacion && vista === "provincia";
+  const ramaEfectiva = tipo === "menores" ? "" : rama;
+
   // Fetch al cambiar filtros
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       setLoading(true);
       try {
-        const params: RankingsQueryParams = {
-          tipo_ranking: tipo,
-          scope,
-          rama: rama || undefined,
-          categoria: categoria || undefined,
-          provincia: provincia || undefined,
-          limit: 200,
-        };
-        const data = await RankingsService.getAll(params);
-        if (!cancelled) setRankings(data);
+        if (vistaProvincia) {
+          const data = await RankingsService.getProvincialNacional({
+            tipo,
+            categoria: categoria || undefined,
+            rama: ramaEfectiva || undefined,
+          });
+          if (!cancelled) {
+            setProvinciasRanking(data.provincias);
+            setTorneosContados(data.torneos);
+          }
+        } else {
+          const params: RankingsQueryParams = {
+            tipo_ranking: tipo,
+            scope,
+            rama: ramaEfectiva || undefined,
+            categoria: categoria || undefined,
+            provincia: provincia || undefined,
+            limit: 200,
+          };
+          const data = await RankingsService.getAll(params);
+          if (!cancelled) setRankings(data);
+        }
       } catch (err) {
         console.error("Error al cargar rankings:", err);
-        if (!cancelled) setRankings([]);
+        if (!cancelled) {
+          setRankings([]);
+          setProvinciasRanking([]);
+          setTorneosContados(0);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -265,15 +184,22 @@ export default function RankingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [tipo, rama, categoria, provincia, scope]);
+  }, [tipo, ramaEfectiva, categoria, provincia, scope, vistaProvincia]);
 
   // Reset de categoria al cambiar de tipo (evita valores invalidos entre grupos).
   useEffect(() => {
     setCategoria("");
+    if (tipo === "menores") setRama("");
   }, [tipo]);
 
   const tipoConfig = TIPOS_RANKING_CONFIG.find((t) => t.value === tipo)!;
-  const categoriasDelTipo = CATEGORIAS_POR_TIPO[tipo];
+  const categoriasDelTipo = useMemo(() => {
+    const list = CATEGORIAS_POR_TIPO[tipo];
+    if (tipo !== "libres") return list;
+    const inicial = list.filter((c) => c === "Inicial");
+    const niveles = list.filter((c) => c !== "Inicial").reverse();
+    return [...niveles, ...inicial];
+  }, [tipo]);
 
   const filteredRankings = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -284,6 +210,17 @@ export default function RankingsPage() {
     });
   }, [rankings, search]);
 
+  const provinciasFiltradas = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    const base = provincia
+      ? provinciasRanking.filter(
+          (fila) => fila.provincia.toLowerCase() === provincia.toLowerCase(),
+        )
+      : provinciasRanking;
+    if (!q) return base;
+    return base.filter((fila) => fila.provincia.toLowerCase().includes(q));
+  }, [provinciasRanking, provincia, search]);
+
   const handleOpenJugador = (j: JugadorRanking, posIndex: number) => {
     setSelectedJugador({
       ...j,
@@ -293,21 +230,47 @@ export default function RankingsPage() {
 
   const tituloContexto = useMemo(() => {
     if (rol === "admin_provincial") return "Ranking Provincial / Regional";
-    if (rol === "admin_federacion" || rol === "superadmin")
-      return "Ranking Nacional FAP";
+    if (esFederacion) return "Ranking Nacional";
     if (rol === "admin_club") return "Ranking del Circuito del Club";
     return "Tabla General de Rankings";
-  }, [rol]);
+  }, [rol, esFederacion]);
+
+  const etiquetaCategoria =
+    NIVELES_PADEL.find((nivel) => nivel.value === categoria)?.label || "";
+  const etiquetaRama =
+    tipo === "menores"
+      ? ""
+      : rama === "masculino"
+        ? "Masculino"
+        : rama === "femenino"
+          ? "Femenino"
+          : "";
+  const tituloDetalle = esFederacion
+    ? [
+        "Ranking Nacional",
+        tipo === "libres" ? "de Libres" : tipoConfig.label,
+        etiquetaRama,
+        etiquetaCategoria,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : tipoConfig.label;
 
   const subtituloContexto = useMemo(() => {
     if (rol === "admin_provincial") {
-      return `Jugadores de ${provinciaForzada || "tu provincia"} por categoria y rama. Usa "Ver Ranking Nacional" para consultar el ranking federativo.`;
+      return `Jugadores de ${provinciaForzada || "tu provincia"} por categoría y género, de 8ª a 1ª.`;
     }
     if (rol === "admin_club") {
-      return "Ranking filtrado por circuito privado. Se muestran solo las categorias que administra el club.";
+      return "Ranking del circuito del club, por género y categorías de 8ª a 1ª.";
     }
-    return "Posiciones oficiales, rendimiento y expedientes completos por categoria y rama.";
-  }, [rol, provinciaForzada]);
+    if (esFederacion && vistaProvincia) {
+      return "Puntos por provincia en torneos nacionales, desde octavos: 8 campeón, 6 finalista, 4 semifinal, 2 cuartos y 1 octavos.";
+    }
+    if (esFederacion) {
+      return "Puntos de jugador según la configuración de cada torneo, por categoría y género.";
+    }
+    return "Posiciones oficiales, rendimiento y expedientes completos por categoría y género.";
+  }, [rol, provinciaForzada, esFederacion, vistaProvincia]);
 
   return (
     <div className="p-6 md:p-8 max-w-full mx-auto space-y-8">
@@ -317,7 +280,7 @@ export default function RankingsPage() {
           <Trophy className="size-4" /> {tituloContexto}
         </div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight">
-          {tipoConfig.label}
+          {tituloDetalle}
         </h1>
         <p className="text-gray-400 text-sm mt-1">{subtituloContexto}</p>
         {rol === "admin_provincial" && (
@@ -341,11 +304,6 @@ export default function RankingsPage() {
         </span>
       </div>
 
-      {/* Ranking provincial por torneo nacional (solo fed / superadmin) */}
-      {(rol === "admin_federacion" || rol === "superadmin") && (
-        <RankingProvincialPanel />
-      )}
-
       {/* Tabs por tipo de ranking */}
       <div className="flex flex-wrap gap-2 border-b border-white/10 pb-2">
         {TIPOS_RANKING_CONFIG.map((t) => (
@@ -363,13 +321,44 @@ export default function RankingsPage() {
         ))}
       </div>
 
+      {esFederacion && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setVista("jugador")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest cursor-pointer ${
+              vista === "jugador"
+                ? "bg-white text-brand-black"
+                : "bg-white/5 text-gray-400 hover:bg-white/10"
+            }`}
+          >
+            Por jugador
+          </button>
+          <button
+            type="button"
+            onClick={() => setVista("provincia")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest cursor-pointer ${
+              vista === "provincia"
+                ? "bg-white text-brand-black"
+                : "bg-white/5 text-gray-400 hover:bg-white/10"
+            }`}
+          >
+            Por provincia
+          </button>
+        </div>
+      )}
+
       {/* Filtros contextuales */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="relative">
           <Search className="absolute left-4 top-3.5 size-4 text-gray-500" />
           <input
             type="text"
-            placeholder="Buscar por nombre o apellido..."
+            placeholder={
+              vistaProvincia
+                ? "Buscar provincia..."
+                : "Buscar por nombre o apellido..."
+            }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-brand-card border border-white/10 text-white pl-11 pr-4 py-3 rounded-xl text-sm font-semibold focus:outline-none focus:border-brand-chartreuse/50"
@@ -377,10 +366,11 @@ export default function RankingsPage() {
         </div>
 
         <CustomDropdown
-          value={rama}
+          value={ramaEfectiva}
           onChange={setRama}
-          options={RAMAS_OPCIONES}
-          placeholder="Rama"
+          disabled={!tipoConfig.permiteRama}
+          options={tipoConfig.permiteRama ? RAMAS_OPCIONES : RAMA_NO_APLICA}
+          placeholder="Género"
         />
 
         <CustomDropdown
@@ -417,6 +407,52 @@ export default function RankingsPage() {
         <div className="p-12 text-center text-gray-500 font-semibold">
           Cargando tabla de posiciones...
         </div>
+      ) : vistaProvincia ? (
+        provinciasFiltradas.length === 0 ? (
+          <div className="p-12 text-center border border-dashed border-white/10 rounded-3xl text-gray-500 space-y-2">
+            <p className="font-semibold">
+              Todavía no hay puntos de provincia para{" "}
+              <span className="text-white">{tituloDetalle}</span>.
+            </p>
+            <p className="text-xs">
+              Se suman los torneos nacionales con resultados desde octavos.
+              {torneosContados > 0
+                ? ` Se revisaron ${torneosContados} torneos.`
+                : " No hay torneos nacionales que coincidan con estos filtros."}
+            </p>
+          </div>
+        ) : (
+          <div className="bg-[#161616] border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 text-[10px] text-gray-500 font-bold uppercase tracking-wider bg-black/30">
+                    <th className="px-6 py-4 text-center">Pos.</th>
+                    <th className="px-6 py-4">Provincia</th>
+                    <th className="px-6 py-4 text-center">Parejas</th>
+                    <th className="px-6 py-4 text-right">Puntos</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 text-sm font-semibold text-gray-300">
+                  {provinciasFiltradas.map((fila, idx) => (
+                    <tr key={fila.provincia} className="hover:bg-white/5">
+                      <td className="px-6 py-4 text-center text-brand-chartreuse font-black">
+                        {idx + 1}
+                      </td>
+                      <td className="px-6 py-4 text-white font-bold">
+                        {fila.provincia}
+                      </td>
+                      <td className="px-6 py-4 text-center">{fila.parejas}</td>
+                      <td className="px-6 py-4 text-right text-brand-chartreuse font-black">
+                        {fila.puntos}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
       ) : filteredRankings.length === 0 ? (
         <div className="p-12 text-center border border-dashed border-white/10 rounded-3xl text-gray-500 space-y-2">
           {rankings.length === 0 ? (
@@ -449,7 +485,7 @@ export default function RankingsPage() {
                   <th className="px-6 py-4">Provincia</th>
                   <th className="px-6 py-4 text-center">Partidos</th>
                   <th className="px-6 py-4 text-center">Efectividad</th>
-                  <th className="px-6 py-4 text-right">Puntos FAP</th>
+                  <th className="px-6 py-4 text-right">Puntos</th>
                   <th className="px-6 py-4 text-right">Expediente</th>
                 </tr>
               </thead>
@@ -655,7 +691,7 @@ export default function RankingsPage() {
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="bg-white/5 p-2.5 rounded-xl">
                   <span className="text-[10px] text-gray-500 block">
-                    Puntos FAP
+                    Puntos
                   </span>
                   <span className="text-sm font-black text-brand-chartreuse">
                     {selectedJugador.puntos || 0} pts

@@ -501,7 +501,7 @@ export default function DetalleAsociacionPage() {
               </h4>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="bg-white/5 p-2.5 rounded-xl">
-                  <span className="text-[10px] text-gray-500 block">Puntos FAP</span>
+                  <span className="text-[10px] text-gray-500 block">Puntos</span>
                   <span className="text-sm font-black text-brand-chartreuse">{selectedJugador.puntos || 0} pts</span>
                 </div>
                 <div className="bg-white/5 p-2.5 rounded-xl">
