@@ -18,24 +18,62 @@ import {
   type ProgramacionIssue,
   type SlotProgramacion,
 } from "../utils/programacionPartidos";
+import {
+  esDistribucionProgramacion,
+  esModoDescanso,
+  etiquetaRondaProgramador,
+  jornadasDesdeInicio,
+  minutosDeModoDescanso,
+  minutosDesdeHora,
+  ordenDeAsignacion,
+  ordenRondaProgramador,
+  sugerirCanchasYHoras,
+  type DistribucionProgramacion,
+  type ModoDescanso,
+} from "../utils/programadorReglas";
 
 const PROGRAMACION_ESTADOS = ["borrador", "programado", "publicado"] as const;
 export type ProgramacionEstado = (typeof PROGRAMACION_ESTADOS)[number];
 
-function slotsDesdeContexto(
+function diasDelContexto(
   contexto: Awaited<ReturnType<typeof cargarContextoProgramacion>>,
-  duracionMinutos: number,
-): SlotProgramacion[] {
+  jornadas?: number,
+): string[] {
   const dias = resolverDiasProgramacion({
     fecha: contexto.fecha,
     fecha_fin: contexto.fecha_fin,
     dias_juego: contexto.dias_juego,
     disponibilidad: contexto.disponibilidad,
   });
+  if (!jornadas || jornadas < 1) return dias;
+  const inicio = contexto.fecha || dias[0];
+  if (!inicio) return dias;
+  return jornadasDesdeInicio(inicio, jornadas);
+}
+
+function slotsDesdeContexto(
+  contexto: Awaited<ReturnType<typeof cargarContextoProgramacion>>,
+  duracionMinutos: number,
+  ventana?: {
+    jornadas?: number;
+    horaInicio?: string;
+    horaFin?: string;
+  },
+): SlotProgramacion[] {
+  const dias = diasDelContexto(contexto, ventana?.jornadas);
+  const horaInicioMin = minutosDesdeHora(ventana?.horaInicio) ?? undefined;
+  const horaFinMin = minutosDesdeHora(ventana?.horaFin) ?? undefined;
   return generarSlotsDesdeSedesYVentana({
     canchas: contexto.disponibilidad,
     dias,
     duracionMinutos,
+    horaInicioMin,
+    horaFinMin:
+      horaInicioMin != null &&
+      horaFinMin != null &&
+      horaFinMin < horaInicioMin
+        ? undefined
+        : horaFinMin,
   });
 }
 
@@ -392,6 +430,10 @@ export class ProgramacionService {
     opciones: {
       duracionMinutos?: number;
       descansoMinutos?: number;
+      descansoModo?: ModoDescanso;
+      jornadas?: number;
+      horaInicio?: string;
+      horaFin?: string;
     } = {},
   ): Promise<ProgramacionBoard> {
     const [{ data: torneo }, { data: partidosDb }, contexto, labels, bracketLabels] =
@@ -420,19 +462,26 @@ export class ProgramacionService {
     const duracion =
       opciones.duracionMinutos ||
       Number(torneo.duracion_partido_minutos || contexto.duracionMinutos || 90);
-    const descanso = opciones.descansoMinutos ?? 60;
+    const descansoModo = esModoDescanso(opciones.descansoModo)
+      ? opciones.descansoModo
+      : undefined;
+    const descanso = descansoModo
+      ? minutosDeModoDescanso(descansoModo)
+      : (opciones.descansoMinutos ?? 60);
 
-    const dias = resolverDiasProgramacion({
-      fecha: contexto.fecha,
-      fecha_fin: contexto.fecha_fin,
-      dias_juego: contexto.dias_juego,
-      disponibilidad: contexto.disponibilidad,
-    });
+    const dias = diasDelContexto(contexto, opciones.jornadas);
 
     const slots = generarSlotsDesdeSedesYVentana({
       canchas: contexto.disponibilidad,
       dias,
       duracionMinutos: duracion,
+      horaInicioMin: minutosDesdeHora(opciones.horaInicio) ?? undefined,
+      horaFinMin: (() => {
+        const inicio = minutosDesdeHora(opciones.horaInicio);
+        const fin = minutosDesdeHora(opciones.horaFin);
+        if (inicio != null && fin != null && fin < inicio) return undefined;
+        return fin ?? undefined;
+      })(),
     });
 
     const canchasMap = new Map<
@@ -480,6 +529,8 @@ export class ProgramacionService {
       return {
         id: p.id,
         ronda: p.ronda,
+        ronda_etiqueta: etiquetaRondaProgramador(p.ronda),
+        ronda_orden: ordenRondaProgramador(p.ronda),
         orden: p.orden,
         phase: esZona ? "zones" : "bracket",
         equipo_a_id: p.equipo_a_id,
@@ -510,6 +561,8 @@ export class ProgramacionService {
     const issues = evaluateProgramacionIssues(drafts, {
       duracionMinutos: duracion,
       descansoMinutos: descanso,
+      descansoModo,
+      fechaInicio: contexto.fecha,
       feedersByMatchNo: feeders,
     });
 
@@ -526,6 +579,12 @@ export class ProgramacionService {
       programacion_publicada_en: torneo.programacion_publicada_en || null,
       duracion_partido_minutos: duracion,
       descanso_minutos: descanso,
+      descanso_modo: descansoModo || "tras_fin_60",
+      sugerencia: sugerirCanchasYHoras({
+        partidos: partidos.length,
+        duracionMinutos: duracion,
+        jornadas: Math.min(4, Math.max(1, dias.length || opciones.jornadas || 1)),
+      }),
       dias,
       canchas: [...canchasMap.values()],
       slots: slots.map((s) => ({
@@ -734,8 +793,13 @@ export class ProgramacionService {
     torneoId: string,
     opciones: {
       estrategia?: "smart" | "continuous";
+      distribucion?: DistribucionProgramacion;
       duracionMinutos?: number;
       descansoMinutos?: number;
+      descansoModo?: ModoDescanso;
+      jornadas?: number;
+      horaInicio?: string;
+      horaFin?: string;
       motivo?: string;
       adminId?: string;
     } = {},
@@ -800,38 +864,67 @@ export class ProgramacionService {
       (d) => !/^ZONA\s+/i.test(String(d.ronda || "")),
     );
 
-    const estrategia = opciones.estrategia || "smart";
+    const distribucion: DistribucionProgramacion = esDistribucionProgramacion(
+      opciones.distribucion,
+    )
+      ? opciones.distribucion
+      : opciones.estrategia === "continuous"
+        ? "continua"
+        : "zonas_primero";
+    const ventana = {
+      jornadas: opciones.jornadas,
+      horaInicio: opciones.horaInicio,
+      horaFin: opciones.horaFin,
+    };
 
-    if (zonasDrafts.length) {
-      const dur = duracionParaFase(duracion, "zonas");
-      const baseSlots = slotsDesdeContexto(contexto, dur);
-      const slots =
-        estrategia === "smart"
-          ? filtrarSlotsSmart(baseSlots, contexto.disponibilidad)
-          : baseSlots;
-      asignarHorariosAPartidos(zonasDrafts, slots, ocupados, {
-        duracionMinutos: dur,
-      });
-    }
-
-    const ocupadosDespues = buildOcupadosDesdePartidos(
-      drafts.filter((d) => d.cancha_asignada && d.fecha_partido),
-    );
-    for (const k of ocupados) ocupadosDespues.add(k);
-
-    if (llaveDrafts.length) {
+    if (distribucion === "continua") {
       const feeders = await this.feedersForTorneo(torneoId);
-      const dur = duracionParaFase(duracion, "llave");
-      const baseSlots = slotsDesdeContexto(contexto, dur);
-      const slots =
-        estrategia === "smart"
-          ? filtrarSlotsSmart(baseSlots, contexto.disponibilidad)
-          : baseSlots;
-      asignarHorariosAPartidos(llaveDrafts, slots, ocupadosDespues, {
-        duracionMinutos: dur,
+      const ordenados = ordenDeAsignacion(drafts, "continua");
+      const slots = slotsDesdeContexto(contexto, duracion, ventana);
+      asignarHorariosAPartidos(ordenados, slots, ocupados, {
+        duracionMinutos: duracion,
         feedersByMatchNo: feeders,
         permitirSinEquipos: true,
+        distribucion: "continua",
       });
+    } else if (zonasDrafts.length || llaveDrafts.length) {
+      if (zonasDrafts.length) {
+        const dur = duracionParaFase(duracion, "zonas");
+        const slots = filtrarSlotsSmart(
+          slotsDesdeContexto(contexto, dur, ventana),
+          contexto.disponibilidad,
+        );
+        asignarHorariosAPartidos(
+          ordenDeAsignacion(zonasDrafts, "zonas_primero"),
+          slots,
+          ocupados,
+          { duracionMinutos: dur },
+        );
+      }
+
+      const ocupadosDespues = buildOcupadosDesdePartidos(
+        drafts.filter((d) => d.cancha_asignada && d.fecha_partido),
+      );
+      for (const k of ocupados) ocupadosDespues.add(k);
+
+      if (llaveDrafts.length) {
+        const feeders = await this.feedersForTorneo(torneoId);
+        const dur = duracionParaFase(duracion, "llave");
+        const slots = filtrarSlotsSmart(
+          slotsDesdeContexto(contexto, dur, ventana),
+          contexto.disponibilidad,
+        );
+        asignarHorariosAPartidos(
+          ordenDeAsignacion(llaveDrafts, "zonas_primero"),
+          slots,
+          ocupadosDespues,
+          {
+            duracionMinutos: dur,
+            feedersByMatchNo: feeders,
+            permitirSinEquipos: true,
+          },
+        );
+      }
     }
 
     for (const p of partidos) {
@@ -859,8 +952,9 @@ export class ProgramacionService {
         accion: "auto_asignar_programacion",
         entidad_afectada: torneoId,
         detalles: {
-          estrategia,
+          distribucion,
           duracion,
+          descanso_modo: opciones.descansoModo || null,
           motivo: motivo || null,
         },
       });
@@ -869,6 +963,65 @@ export class ProgramacionService {
     return this.getBoard(torneoId, {
       duracionMinutos: duracion,
       descansoMinutos: opciones.descansoMinutos,
+      descansoModo: opciones.descansoModo,
+      jornadas: opciones.jornadas,
+      horaInicio: opciones.horaInicio,
+      horaFin: opciones.horaFin,
+    });
+  }
+
+  /**
+   * Deja los horarios cargados y el estado en borrador, sin publicarlos.
+   */
+  static async guardarBorrador(
+    torneoId: string,
+    opciones: {
+      motivo?: string;
+      adminId?: string;
+      duracionMinutos?: number;
+      descansoMinutos?: number;
+      descansoModo?: ModoDescanso;
+      jornadas?: number;
+      horaInicio?: string;
+      horaFin?: string;
+    } = {},
+  ): Promise<ProgramacionBoard> {
+    const { data: torneo } = await supabaseAdmin
+      .from("torneos")
+      .select("id, programacion_estado")
+      .eq("id", torneoId)
+      .maybeSingle();
+    if (!torneo) throw new Error("Torneo no encontrado");
+    if (torneo.programacion_estado === "publicado") {
+      throw new Error(
+        "La programación está publicada. Creá una nueva edición para editar.",
+      );
+    }
+
+    const { error } = await supabaseAdmin
+      .from("torneos")
+      .update({ programacion_estado: "borrador" })
+      .eq("id", torneoId);
+    if (error) throw new Error(error.message);
+
+    if (opciones.adminId) {
+      await supabaseAdmin.from("logs_auditoria").insert({
+        usuario_id_admin: opciones.adminId,
+        accion: "guardar_borrador_programacion",
+        entidad_afectada: torneoId,
+        detalles: {
+          motivo: opciones.motivo?.trim() || "Guardar borrador de programación",
+        },
+      });
+    }
+
+    return this.getBoard(torneoId, {
+      duracionMinutos: opciones.duracionMinutos,
+      descansoMinutos: opciones.descansoMinutos,
+      descansoModo: opciones.descansoModo,
+      jornadas: opciones.jornadas,
+      horaInicio: opciones.horaInicio,
+      horaFin: opciones.horaFin,
     });
   }
 
@@ -912,6 +1065,8 @@ export class ProgramacionService {
 export interface BoardPartido {
   id: string;
   ronda: string | null;
+  ronda_etiqueta: string;
+  ronda_orden: number;
   orden: number | null;
   phase: "zones" | "bracket";
   equipo_a_id: string | null;
@@ -935,6 +1090,8 @@ export interface ProgramacionBoard {
   programacion_publicada_en: string | null;
   duracion_partido_minutos: number;
   descanso_minutos: number;
+  descanso_modo: ModoDescanso;
+  sugerencia: { canchas: number; horas: number; mensaje: string };
   dias: string[];
   canchas: Array<{
     label: string;

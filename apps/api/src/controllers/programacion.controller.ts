@@ -93,9 +93,29 @@ export const getProgramacionBoard = async (
     const descanso = req.query.descanso
       ? Number(req.query.descanso)
       : undefined;
+    const jornadas = req.query.jornadas
+      ? Number(req.query.jornadas)
+      : undefined;
+    const descansoModo = req.query.descansoModo;
     const data = await ProgramacionService.getBoard(id, {
       duracionMinutos: Number.isFinite(duracion) ? duracion : undefined,
       descansoMinutos: Number.isFinite(descanso) ? descanso : undefined,
+      descansoModo:
+        descansoModo === "tras_fin_60" ||
+        descansoModo === "tras_fin_120" ||
+        descansoModo === "entre_inicios_240"
+          ? descansoModo
+          : undefined,
+      jornadas:
+        jornadas === 1 || jornadas === 2 || jornadas === 3 || jornadas === 4
+          ? jornadas
+          : undefined,
+      horaInicio:
+        typeof req.query.horaInicio === "string"
+          ? req.query.horaInicio
+          : undefined,
+      horaFin:
+        typeof req.query.horaFin === "string" ? req.query.horaFin : undefined,
     });
     return res.status(200).json(data);
   } catch (err: any) {
@@ -180,12 +200,26 @@ export const autoAsignarProgramacion = async (
 ): Promise<Response> => {
   try {
     const { id } = req.params;
-    const { estrategia, duracionMinutos, descansoMinutos, motivo } =
-      req.body || {};
-    const data = await ProgramacionService.autoAsignar(id, {
+    const {
       estrategia,
+      distribucion,
       duracionMinutos,
       descansoMinutos,
+      descansoModo,
+      jornadas,
+      horaInicio,
+      horaFin,
+      motivo,
+    } = req.body || {};
+    const data = await ProgramacionService.autoAsignar(id, {
+      estrategia,
+      distribucion,
+      duracionMinutos,
+      descansoMinutos,
+      descansoModo,
+      jornadas,
+      horaInicio,
+      horaFin,
       motivo,
       adminId: req.user?.id,
     });
@@ -193,6 +227,41 @@ export const autoAsignarProgramacion = async (
   } catch (err: any) {
     return res.status(400).json({
       message: "No se pudo auto-asignar",
+      error: err.message,
+    });
+  }
+};
+
+/** POST /api/torneos/:id/programacion/borrador */
+export const guardarBorradorProgramacion = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const {
+      motivo,
+      duracionMinutos,
+      descansoMinutos,
+      descansoModo,
+      jornadas,
+      horaInicio,
+      horaFin,
+    } = req.body || {};
+    const data = await ProgramacionService.guardarBorrador(id, {
+      motivo,
+      duracionMinutos,
+      descansoMinutos,
+      descansoModo,
+      jornadas,
+      horaInicio,
+      horaFin,
+      adminId: req.user?.id,
+    });
+    return res.status(200).json(data);
+  } catch (err: any) {
+    return res.status(400).json({
+      message: "No se pudo guardar el borrador",
       error: err.message,
     });
   }

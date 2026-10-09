@@ -1,4 +1,12 @@
 import { supabaseAdmin } from "../config/supabase";
+import {
+  clasificacionSuperaLimiteLocal,
+  esRondaDeZona,
+  evaluarDescansoInsuficiente,
+  ordenRondaProgramador,
+  type DistribucionProgramacion,
+  type ModoDescanso,
+} from "./programadorReglas";
 
 export interface PartidoProgramable {
   ronda?: string;
@@ -317,8 +325,12 @@ export function generarSlotsDesdeSedesYVentana(params: {
   canchas: DisponibilidadTorneo[];
   dias: string[];
   duracionMinutos: number;
+  horaInicioMin?: number;
+  horaFinMin?: number;
 }): SlotProgramacion[] {
   const duracion = Math.max(30, params.duracionMinutos || 90);
+  const horaInicio = params.horaInicioMin ?? PROGRAMADOR_HORA_INICIO_MIN;
+  const horaFin = params.horaFinMin ?? PROGRAMADOR_HORA_INICIO_MAX;
   const slots: SlotProgramacion[] = [];
   const canchas = extraerCanchasUnicas(params.canchas);
   const dias = [
@@ -332,8 +344,8 @@ export function generarSlotsDesdeSedesYVentana(params: {
       const canchaLabel = buildCanchaLabel(cancha);
       if (!canchaLabel) continue;
       for (
-        let minuto = PROGRAMADOR_HORA_INICIO_MIN;
-        minuto <= PROGRAMADOR_HORA_INICIO_MAX;
+        let minuto = horaInicio;
+        minuto <= horaFin;
         minuto += duracion
       ) {
         try {
@@ -358,24 +370,7 @@ export function generarSlotsDesdeSedesYVentana(params: {
 }
 
 function pesoRonda(ronda: string): number {
-  const upper = String(ronda || "")
-    .trim()
-    .toUpperCase();
-  const zona = upper.match(/^ZONA\s+([A-Z])/);
-  if (zona) return zona[1].charCodeAt(0) - 65;
-
-  const ordenPlayoff = [
-    "PRELIMINARES",
-    "32AVOS",
-    "16AVOS",
-    "OCTAVOS",
-    "CUARTOS",
-    "SEMIS",
-    "SEMIFINAL",
-    "FINAL",
-  ];
-  const idx = ordenPlayoff.indexOf(upper);
-  return idx >= 0 ? 100 + idx : 200;
+  return ordenRondaProgramador(ronda);
 }
 
 function esRondaZona(ronda?: string | null): boolean {
@@ -765,6 +760,7 @@ export function asignarHorariosAPartidos(
      * sin equipos definidos (usando solo feeders para el ordenamiento).
      */
     permitirSinEquipos?: boolean;
+    distribucion?: DistribucionProgramacion;
   },
 ): void {
   if (!slots.length || !partidos.length) return;
@@ -782,6 +778,41 @@ export function asignarHorariosAPartidos(
     .filter(({ partido }) =>
       necesitaHorario(partido, { permitirSinEquipos }),
     );
+
+  if (opciones?.distribucion === "continua") {
+    const secuencia = [...pendientes].sort((a, b) => {
+      const porOrden = (a.partido.orden || 0) - (b.partido.orden || 0);
+      if (porOrden !== 0) return porOrden;
+      return pesoRonda(a.partido.ronda || "") - pesoRonda(b.partido.ronda || "");
+    });
+    for (const item of secuencia) {
+      if (partidos[item.index].fecha_partido) continue;
+      const ids = equiposDePartido(item.partido);
+      const notBefore = notBeforeDesdeFeeders(
+        item.partido,
+        partidos,
+        feedersByMatchNo,
+        duracionMinutos,
+      );
+      const slot = buscarSlotIndividual(
+        slots,
+        ocupados,
+        historial,
+        ids,
+        duracionMinutos,
+        notBefore,
+      );
+      if (!slot) continue;
+      asignarSlotAPartido(
+        partidos[item.index],
+        slot,
+        ocupados,
+        historial,
+        duracionMinutos,
+      );
+    }
+    return;
+  }
 
   // Agrupar por zona para oleadas FAP; el resto secuencial
   const porZona = new Map<string, { partido: PartidoProgramable; index: number }[]>();
@@ -1292,6 +1323,8 @@ export function evaluateProgramacionIssues(
   opciones: {
     duracionMinutos: number;
     descansoMinutos?: number;
+    descansoModo?: ModoDescanso;
+    fechaInicio?: string | null;
     feedersByMatchNo?: Map<number, number[]>;
   },
 ): ProgramacionIssue[] {
@@ -1347,7 +1380,14 @@ export function evaluateProgramacionIssues(
           });
         } else if (
           fp.fecha === parsed.fecha &&
-          parsed.startMin - (fp.startMin + duracion) < descanso
+          (opciones.descansoModo
+            ? evaluarDescansoInsuficiente(
+                opciones.descansoModo,
+                fp.startMin,
+                parsed.startMin,
+                duracion,
+              )
+            : parsed.startMin - (fp.startMin + duracion) < descanso)
         ) {
           issues.push({
             partido_id: id,
@@ -1388,14 +1428,42 @@ export function evaluateProgramacionIssues(
         });
       } else {
         const gap = Math.abs(op.startMin - parsed.startMin) - duracion;
-        if (gap < descanso) {
+        const insuficiente = opciones.descansoModo
+          ? evaluarDescansoInsuficiente(
+              opciones.descansoModo,
+              op.startMin,
+              parsed.startMin,
+              duracion,
+            )
+          : gap < descanso;
+        if (insuficiente) {
           issues.push({
             partido_id: id,
             severity: "bad",
-            message: `Descanso insuficiente: ${Math.max(0, gap)} min`,
+            message: opciones.descansoModo === "entre_inicios_240"
+              ? "Descanso insuficiente: hacen falta 4 h entre inicios"
+              : `Descanso insuficiente: ${Math.max(0, gap)} min`,
           });
         }
       }
+    }
+
+    if (
+      opciones.fechaInicio &&
+      esRondaDeZona(p.ronda) &&
+      clasificacionSuperaLimiteLocal({
+        fechaInicio: opciones.fechaInicio,
+        fechaPartido: parsed.fecha,
+        startMin: parsed.startMin,
+        duracionMinutos: duracion,
+      })
+    ) {
+      issues.push({
+        partido_id: id,
+        severity: "bad",
+        message:
+          "La clasificación debe terminar a las 11:00 del día siguiente al inicio del torneo",
+      });
     }
   }
 

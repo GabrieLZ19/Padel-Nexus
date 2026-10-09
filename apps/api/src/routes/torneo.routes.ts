@@ -48,6 +48,7 @@ import {
   desasignarProgramacion,
   limpiarProgramacion,
   autoAsignarProgramacion,
+  guardarBorradorProgramacion,
   nuevaEdicionProgramacion,
 } from "../controllers/programacion.controller";
 import { authenticate, authorize, optionalAuthenticate } from "../middleware/auth";
@@ -205,6 +206,11 @@ router.post(
   "/:id/programacion/auto",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   autoAsignarProgramacion,
+);
+router.post(
+  "/:id/programacion/borrador",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  guardarBorradorProgramacion,
 );
 router.post(
   "/:id/programacion/nueva-edicion",
