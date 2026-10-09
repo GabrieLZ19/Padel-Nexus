@@ -29,7 +29,10 @@ describe("programador paso 5", () => {
     assert.equal(etiquetaRondaProgramador("SEMIS"), "Semifinales");
     assert.equal(etiquetaRondaProgramador("FINAL"), "Final");
     assert.equal(etiquetaRondaProgramador("ZONA A"), "Zona A");
-    assert.equal(etiquetaRondaProgramador("PRELIMINARES"), "Ronda inicial");
+    assert.equal(
+      etiquetaRondaProgramador("PRELIMINARES"),
+      "Dieciseisavos de final",
+    );
 
     for (const ronda of [...RONDAS, "PRELIMINARES"]) {
       const etiqueta = etiquetaRondaProgramador(ronda);
@@ -46,6 +49,10 @@ describe("programador paso 5", () => {
     );
     assert.ok(ordenRondaProgramador("32AVOS") < ordenRondaProgramador("16AVOS"));
     assert.ok(ordenRondaProgramador("16AVOS") < ordenRondaProgramador("OCTAVOS"));
+    assert.equal(
+      ordenRondaProgramador("PRELIMINARES"),
+      ordenRondaProgramador("16AVOS"),
+    );
     assert.ok(ordenRondaProgramador("ZONA A") < ordenRondaProgramador("ZONA B"));
     assert.ok(ordenRondaProgramador("ZONA B") < ordenRondaProgramador("OCTAVOS"));
   });

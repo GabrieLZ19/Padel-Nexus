@@ -22,13 +22,13 @@ const ETIQUETAS_LLAVE: Record<string, string> = {
   SEMIFINAL: "Semifinales",
   SEMIFINALES: "Semifinales",
   FINAL: "Final",
-  PRELIMINARES: "Ronda inicial",
-  PRELIMINAR: "Ronda inicial",
+  PRELIMINARES: "Dieciseisavos de final",
+  PRELIMINAR: "Dieciseisavos de final",
 };
 
 const ORDEN_LLAVE: Record<string, number> = {
-  PRELIMINARES: 80,
-  PRELIMINAR: 80,
+  PRELIMINARES: 110,
+  PRELIMINAR: 110,
   "32AVOS": 100,
   "16AVOS": 110,
   OCTAVOS: 120,
