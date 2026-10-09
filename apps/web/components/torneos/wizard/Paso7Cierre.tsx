@@ -37,8 +37,13 @@ export const Paso5Cierre = ({
     estadoNorm === "inscripcion" ||
     estadoNorm === "habilitado";
 
+  const esNacional = String(torneo.alcance || "")
+    .toLowerCase()
+    .includes("nacional");
+
   // Parsear puntos iniciales
-  const rawPuntos = (torneo as any).configuracion_puntos || {};
+  const rawPuntos = torneo.configuracion_puntos || {};
+  const rawProvincia = rawPuntos.puntos_provincia || {};
   const [puntosActivados, setPuntosActivados] = useState(
     rawPuntos.puntos_activados || false
   );
@@ -65,6 +70,22 @@ export const Paso5Cierre = ({
   );
   const [puntosZona, setPuntosZona] = useState(
     rawPuntos.puntos_zona ?? 0
+  );
+  const [provinciaDesde, setProvinciaDesde] = useState<
+    "OCTAVOS" | "CUARTOS" | "SEMIS" | "FINAL"
+  >(rawProvincia.desde || "OCTAVOS");
+  const [provinciaCampeon, setProvinciaCampeon] = useState(
+    rawProvincia.campeon ?? 8,
+  );
+  const [provinciaFinalista, setProvinciaFinalista] = useState(
+    rawProvincia.finalista ?? 6,
+  );
+  const [provinciaSemis, setProvinciaSemis] = useState(rawProvincia.semis ?? 4);
+  const [provinciaCuartos, setProvinciaCuartos] = useState(
+    rawProvincia.cuartos ?? 2,
+  );
+  const [provinciaOctavos, setProvinciaOctavos] = useState(
+    rawProvincia.octavos ?? 1,
   );
 
   // Parsear reglas iniciales
@@ -107,6 +128,18 @@ export const Paso5Cierre = ({
           puntos_16avos: Number(puntos16avos),
           puntos_32avos: Number(puntos32avos),
           puntos_zona: Number(puntosZona),
+          ...(esNacional
+            ? {
+                puntos_provincia: {
+                  desde: provinciaDesde,
+                  campeon: Number(provinciaCampeon),
+                  finalista: Number(provinciaFinalista),
+                  semis: Number(provinciaSemis),
+                  cuartos: Number(provinciaCuartos),
+                  octavos: Number(provinciaOctavos),
+                },
+              }
+            : {}),
         },
         reglas_arbitraje: {
           punto_oro: puntoOro,
@@ -118,7 +151,7 @@ export const Paso5Cierre = ({
           supertiebreak_diferencia: supertiebreakDiferencia,
           instancia_limite_stb: instanciaLimiteStb,
         },
-      } as any);
+      });
       onTorneoUpdated?.(updated);
       if (!options?.silent) {
         triggerRefresh();
@@ -221,12 +254,19 @@ export const Paso5Cierre = ({
                 </td>
                 <td className="p-4">{torneo.categoria || "General"} {torneo.nivel || ""}</td>
                 <td className="p-4">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 text-[10px]">
-                    <CheckCircle className="size-3" /> Aprobado
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] border ${
+                      puntosActivados
+                        ? "bg-green-500/10 text-green-400 border-green-500/20"
+                        : "bg-white/5 text-gray-400 border-white/10"
+                    }`}
+                  >
+                    <CheckCircle className="size-3" />
+                    {puntosActivados ? "Asigna puntos" : "Sin asignar"}
                   </span>
                 </td>
                 <td className="p-4 text-right text-brand-chartreuse font-black">
-                  {puntosActivados ? puntosCampeon : 0} Pts
+                  {puntosCampeon} Pts
                 </td>
               </tr>
             </tbody>
@@ -440,6 +480,103 @@ export const Paso5Cierre = ({
             />
           </div>
         </div>
+
+        {esNacional && (
+          <div className="space-y-4 bg-brand-input/40 p-5 rounded-2xl border border-white/10 shadow-sm">
+            <h5 className="text-[11px] font-black text-white uppercase tracking-wider flex items-center gap-1 border-b border-white/5 pb-2">
+              <Trophy className="size-3.5 text-brand-chartreuse" /> Puntos por provincia
+            </h5>
+            <p className="text-[10px] text-gray-500 font-medium">
+              En un torneo nacional cada pareja representa a su provincia. Se queda con los puntos de la mejor instancia, desde la ronda que elijas.
+            </p>
+            <div>
+              <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider block mb-1">
+                Empiezan a sumar desde
+              </label>
+              <CustomDropdown
+                value={provinciaDesde}
+                onChange={(val) => {
+                  if (
+                    val === "OCTAVOS" ||
+                    val === "CUARTOS" ||
+                    val === "SEMIS" ||
+                    val === "FINAL"
+                  ) {
+                    setProvinciaDesde(val);
+                  }
+                }}
+                options={[
+                  { value: "OCTAVOS", label: "Octavos de final" },
+                  { value: "CUARTOS", label: "Cuartos de final" },
+                  { value: "SEMIS", label: "Semifinales" },
+                  { value: "FINAL", label: "Final" },
+                ]}
+                placeholder="Instancia"
+              />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+              <div>
+                <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider block mb-1">
+                  Campeona
+                </label>
+                <input
+                  type="number"
+                  value={provinciaCampeon}
+                  onChange={(e) => setProvinciaCampeon(Number(e.target.value))}
+                  className="w-full bg-brand-input border border-white/10 text-white p-2.5 rounded-lg text-xs font-bold focus:border-brand-chartreuse/50 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider block mb-1">
+                  Subcampeona
+                </label>
+                <input
+                  type="number"
+                  value={provinciaFinalista}
+                  onChange={(e) => setProvinciaFinalista(Number(e.target.value))}
+                  className="w-full bg-brand-input border border-white/10 text-white p-2.5 rounded-lg text-xs font-bold focus:border-brand-chartreuse/50 outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider block mb-1">
+                  Semifinal
+                </label>
+                <input
+                  type="number"
+                  value={provinciaSemis}
+                  onChange={(e) => setProvinciaSemis(Number(e.target.value))}
+                  className="w-full bg-brand-input border border-white/10 text-white p-2.5 rounded-lg text-xs font-bold focus:border-brand-chartreuse/50 outline-none"
+                />
+              </div>
+              {(provinciaDesde === "OCTAVOS" || provinciaDesde === "CUARTOS") && (
+                <div>
+                  <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider block mb-1">
+                    Cuartos
+                  </label>
+                  <input
+                    type="number"
+                    value={provinciaCuartos}
+                    onChange={(e) => setProvinciaCuartos(Number(e.target.value))}
+                    className="w-full bg-brand-input border border-white/10 text-white p-2.5 rounded-lg text-xs font-bold focus:border-brand-chartreuse/50 outline-none"
+                  />
+                </div>
+              )}
+              {provinciaDesde === "OCTAVOS" && (
+                <div>
+                  <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider block mb-1">
+                    Octavos
+                  </label>
+                  <input
+                    type="number"
+                    value={provinciaOctavos}
+                    onChange={(e) => setProvinciaOctavos(Number(e.target.value))}
+                    className="w-full bg-brand-input border border-white/10 text-white p-2.5 rounded-lg text-xs font-bold focus:border-brand-chartreuse/50 outline-none"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {puntosActivados && (
           <div className="space-y-4 bg-brand-input/40 p-5 rounded-2xl border border-white/10 animate-fadeIn shadow-sm">

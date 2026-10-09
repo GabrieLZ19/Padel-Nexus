@@ -100,7 +100,7 @@ export const TorneosService = {
     return response.data;
   },
 
-  async update(id: string, torneoData: FormTorneoState): Promise<Torneo> {
+  async update(id: string, torneoData: Partial<FormTorneoState>): Promise<Torneo> {
     const response = await api.put<Torneo>(`/torneos/${id}`, torneoData);
     return response.data;
   },

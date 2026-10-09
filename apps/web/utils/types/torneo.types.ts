@@ -59,6 +59,25 @@ export interface Torneo {
   fecha_cierre_inscripcion?: string | null;
   validar_edad?: boolean | null;
   reglas_arbitraje?: Record<string, unknown> | null;
+  configuracion_puntos?: {
+    puntos_activados?: boolean;
+    puntos_campeon?: number;
+    puntos_final?: number;
+    puntos_semis?: number;
+    puntos_cuartos?: number;
+    puntos_octavos?: number;
+    puntos_16avos?: number;
+    puntos_32avos?: number;
+    puntos_zona?: number;
+    puntos_provincia?: {
+      desde?: "OCTAVOS" | "CUARTOS" | "SEMIS" | "FINAL";
+      campeon?: number;
+      finalista?: number;
+      semis?: number;
+      cuartos?: number;
+      octavos?: number;
+    };
+  } | null;
   banners?: string[];
 
   // Relaciones
@@ -183,4 +202,6 @@ export interface FormTorneoState {
   hora_inicio_jornada?: string;
   requiere_carnet_federativo?: boolean;
   monto_carnet?: number;
+  reglas_arbitraje?: Record<string, unknown> | null;
+  configuracion_puntos?: Torneo["configuracion_puntos"];
 }
