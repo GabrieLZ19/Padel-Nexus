@@ -26,6 +26,7 @@ export const LiveArbitrajeRow = ({
       es_supertiebreak: boolean;
       es_wo: boolean;
       es_injustificado_wo: boolean;
+      es_lesion: boolean;
     },
   ) => void;
   isSaving: boolean;
@@ -77,8 +78,8 @@ export const LiveArbitrajeRow = ({
     (partido as any).es_supertiebreak || false,
   );
   const [esWo, setEsWo] = useState<boolean>((partido as any).es_wo || false);
-  const [esInjustificadoWo, setEsInjustificadoWo] = useState<boolean>(
-    (partido as any).es_injustificado_wo || false,
+  const [esLesion, setEsLesion] = useState<boolean>(
+    (partido as any).es_lesion || false,
   );
   const [ganadorWo, setGanadorWo] = useState<"A" | "B">("A");
 
@@ -150,7 +151,7 @@ export const LiveArbitrajeRow = ({
   const { setsA, setsB } = getSetsGanados();
 
   const handleFinalizar = () => {
-    if (esWo) {
+    if (esWo && !esLesion) {
       const ganadorId =
         ganadorWo === "A" ? partido.equipo_a_id : partido.equipo_b_id;
       if (!ganadorId) {
@@ -166,7 +167,8 @@ export const LiveArbitrajeRow = ({
         set3_b: null,
         es_supertiebreak: false,
         es_wo: true,
-        es_injustificado_wo: esInjustificadoWo,
+        es_injustificado_wo: false,
+        es_lesion: false,
       });
       return;
     }
@@ -301,8 +303,9 @@ export const LiveArbitrajeRow = ({
       set3_a: finalS3A,
       set3_b: finalS3B,
       es_supertiebreak: !esTercerSetCompleto,
-      es_wo: false,
+      es_wo: esWo && esLesion,
       es_injustificado_wo: false,
+      es_lesion: esWo && esLesion,
     });
   };
 
@@ -334,7 +337,10 @@ export const LiveArbitrajeRow = ({
               <input
                 type="checkbox"
                 checked={esWo}
-                onChange={(e) => setEsWo(e.target.checked)}
+                onChange={(e) => {
+                  setEsWo(e.target.checked);
+                  if (!e.target.checked) setEsLesion(false);
+                }}
                 className="accent-brand-chartreuse rounded"
               />
               W.O.
@@ -343,8 +349,8 @@ export const LiveArbitrajeRow = ({
               <label className="flex items-center gap-1 text-red-400 font-bold cursor-pointer text-[10px]">
                 <input
                   type="checkbox"
-                  checked={esInjustificadoWo}
-                  onChange={(e) => setEsInjustificadoWo(e.target.checked)}
+                  checked={esLesion}
+                  onChange={(e) => setEsLesion(e.target.checked)}
                   className="accent-red-500 rounded"
                 />
                 Inj.
@@ -354,7 +360,7 @@ export const LiveArbitrajeRow = ({
         </div>
       </div>
 
-      {esWo ? (
+      {esWo && !esLesion ? (
         <div className="p-2.5 sm:p-3 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
@@ -394,11 +400,17 @@ export const LiveArbitrajeRow = ({
           </div>
           <div className="flex items-center gap-2 text-amber-400 text-[11px] font-semibold">
             <AlertCircle className="size-3.5 shrink-0" />
-            Tocá el equipo ganador por Walkover.
+            Sin inicio: el marcador queda 6-0 6-0 para la pareja presente.
           </div>
         </div>
       ) : (
         <div className="p-2.5 sm:p-3 space-y-3">
+          {esWo && esLesion ? (
+            <p className="text-[11px] font-semibold text-amber-400">
+              Retiro por lesión: cargá el marcador final, con lo jugado y los
+              games que se completan para la pareja que sigue.
+            </p>
+          ) : null}
           <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 md:gap-3 items-stretch">
             <TeamBox
               j1={partido.equipo_a_j1}

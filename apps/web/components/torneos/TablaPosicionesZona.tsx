@@ -33,6 +33,7 @@ export interface ParejaStats {
   dg: number;
   stb: number;
   cabezaDeSerie: boolean;
+  descalificada: boolean;
   seed?: number;
   jugador1_nombre?: string | null;
   jugador2_nombre?: string | null;
@@ -51,6 +52,7 @@ interface TablaPosicionesZonaProps {
     jugador2_nombre?: string | null;
     club?: string;
     cabezaDeSerie?: boolean;
+    descalificada?: boolean;
     seed?: number;
     usuario_id?: string | null;
     usuario2_id?: string | null;
@@ -106,6 +108,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
         dg: 0,
         stb: 0,
         cabezaDeSerie: Boolean(p.cabezaDeSerie),
+        descalificada: Boolean(p.descalificada),
         seed: p.seed,
         jugador1_nombre: p.jugador1_nombre,
         jugador2_nombre: p.jugador2_nombre,
@@ -133,7 +136,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
         stA.pj += 1;
         stB.pj += 1;
 
-        if (match.es_wo) {
+        if (match.es_wo && !match.es_lesion) {
           if (match.ganador === idA) {
             stA.pg += 1;
             stA.pts += 2;
@@ -224,6 +227,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
     }));
 
     lista.sort((a, b) => {
+      if (a.descalificada !== b.descalificada) return a.descalificada ? 1 : -1;
       if (b.pts !== a.pts) return b.pts - a.pts;
       if (b.ds !== a.ds) return b.ds - a.ds;
       return b.dg - a.dg;
@@ -299,7 +303,8 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
           </thead>
           <tbody className="divide-y divide-white/5 font-semibold text-gray-300">
             {stats.map((row, idx) => {
-              const isClasificado = idx < cupoClasificacion && row.pj > 0;
+              const isClasificado =
+                idx < cupoClasificacion && row.pj > 0 && !row.descalificada;
               return (
                 <tr
                   key={row.inscripcionId}
@@ -336,6 +341,11 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
                           variant="stacked"
                           compact
                         />
+                        {row.descalificada && (
+                          <span className="inline-flex shrink-0 text-[8px] font-black text-red-300 bg-red-400/10 border border-red-400/30 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
+                            Descalificada
+                          </span>
+                        )}
                         {row.cabezaDeSerie && (
                           <span className="inline-flex items-center gap-0.5 shrink-0 text-[8px] font-black text-amber-300 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
                             <Star className="size-2.5 fill-amber-300" />

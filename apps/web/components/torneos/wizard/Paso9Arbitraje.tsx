@@ -151,6 +151,9 @@ export const PasoResultados = ({
     Record<string, boolean>
   >({});
   const [vistaRapida, setVistaRapida] = useState<VistaRapida>("pendientes");
+  const [partidoEnCorreccion, setPartidoEnCorreccion] = useState<string | null>(
+    null,
+  );
 
   const partidosJugables = useMemo(
     () =>
@@ -431,6 +434,27 @@ export const PasoResultados = ({
       p.orden != null ? String(p.orden).padStart(2, "0") : p.id.slice(0, 4)
     ).toUpperCase();
 
+    if (!isReadOnly && partidoEnCorreccion === p.id) {
+      return (
+        <div key={p.id} className="space-y-2">
+          <LiveArbitrajeRow
+            partido={p}
+            torneo={torneo}
+            onSave={handleGuardarResultadoLive}
+            isSaving={guardandoPartidoId === p.id}
+            onError={showErrorModal}
+          />
+          <button
+            type="button"
+            onClick={() => setPartidoEnCorreccion(null)}
+            className="text-[11px] font-bold text-gray-400 hover:text-white cursor-pointer"
+          >
+            Cancelar corrección
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div
         key={p.id}
@@ -476,6 +500,15 @@ export const PasoResultados = ({
           </span>
           {meta && <span className="text-emerald-400/90">{meta}</span>}
           <span className="text-gray-500 uppercase tracking-wide">{p.ronda}</span>
+          {!isReadOnly && (
+            <button
+              type="button"
+              onClick={() => setPartidoEnCorreccion(p.id)}
+              className="ml-auto text-[10px] font-black uppercase tracking-wide text-brand-chartreuse hover:underline cursor-pointer"
+            >
+              Corregir
+            </button>
+          )}
         </div>
       </div>
     );
@@ -494,6 +527,7 @@ export const PasoResultados = ({
       es_supertiebreak?: boolean;
       es_wo?: boolean;
       es_injustificado_wo?: boolean;
+      es_lesion?: boolean;
     },
   ) => {
     try {
@@ -503,6 +537,7 @@ export const PasoResultados = ({
         ...scorePayload,
       });
 
+      setPartidoEnCorreccion(null);
       triggerRefresh();
 
       setFeedbackModal((prev: any) => ({
@@ -510,8 +545,7 @@ export const PasoResultados = ({
         isOpen: true,
         type: "success",
         title: "¡Marcador guardado!",
-        description:
-          "El marcador fue guardado y el ganador avanzó en la llave.",
+        description: "El marcador quedó guardado.",
       }));
     } catch (error: any) {
       const apiMsg =

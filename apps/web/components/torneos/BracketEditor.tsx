@@ -147,6 +147,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             letra_prioridad: gp.inscripciones?.letra_prioridad,
           }),
           cabezaDeSerie: gp.cabezaDeSerie,
+          descalificada: Boolean(gp.descalificada),
           usuario_id: gp.inscripciones?.usuario_id ?? null,
           usuario2_id: gp.inscripciones?.usuario2_id ?? null,
           denominacion_nacional:
@@ -643,22 +644,18 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       return zonaGrupoCompleta(matches);
     });
   const hayResultadoEnZonas = partidosZona.some((p) => p.ganador != null);
-  const hayResultadoEnLlave = playoffPartidos.some((p) => p.ganador != null);
 
   /**
-   * FAP: una vez confeccionados zonas/draw, no se modifican salvo fiscal.
-   * En CRM: se bloquea edición estructural al cerrar zonas o al cargar el 1er resultado.
+   * Un resultado cargado no cierra el arrastre de zonas ni la llave.
+   * Regenerar el cuadro sí queda bloqueado: borra los marcadores.
    */
   const puedeEditarZonas =
-    !isReadOnly &&
-    torneo?.estado !== "Finalizado" &&
-    !faseZonasCerrada &&
-    !hayResultadoEnZonas;
+    !isReadOnly && torneo?.estado !== "Finalizado";
+  const puedeRegenerarZonas =
+    puedeEditarZonas && !faseZonasCerrada && !hayResultadoEnZonas;
 
   const puedeEditarLlave =
-    !isReadOnly &&
-    torneo?.estado !== "Finalizado" &&
-    !hayResultadoEnLlave;
+    !isReadOnly && torneo?.estado !== "Finalizado";
 
   React.useEffect(() => {
     if (autoSwitchedToLlave.current) return;
@@ -1149,7 +1146,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             )}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-              {puedeEditarZonas && (
+              {puedeRegenerarZonas && (
               <button
                 id="btn-regenerar"
                 onClick={handleRegenerarZonas}

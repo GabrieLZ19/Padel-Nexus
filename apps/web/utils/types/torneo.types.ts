@@ -112,6 +112,8 @@ export interface Partido {
   es_wo?: boolean;
   es_supertiebreak?: boolean;
   es_injustificado_wo?: boolean;
+  /** Retiro durante el partido: el marcador es el jugado, no 6-0 6-0. */
+  es_lesion?: boolean;
   ganador?: string | null; // UUID de la inscripción ganadora
   equipo_a_id?: string | null;
   equipo_b_id?: string | null;

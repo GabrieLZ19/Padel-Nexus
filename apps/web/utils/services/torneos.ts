@@ -147,6 +147,7 @@ export const TorneosService = {
       es_supertiebreak?: boolean;
       es_wo?: boolean;
       es_injustificado_wo?: boolean;
+      es_lesion?: boolean;
     },
   ) {
     const response = await api.put(

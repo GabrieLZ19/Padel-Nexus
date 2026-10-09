@@ -444,6 +444,7 @@ export default function TorneoDetallePage() {
                             letra_prioridad: gp.inscripciones?.letra_prioridad,
                           }),
                           cabezaDeSerie: gp.cabezaDeSerie,
+                          descalificada: Boolean(gp.descalificada),
                           usuario_id: gp.inscripciones?.usuario_id ?? null,
                           usuario2_id: gp.inscripciones?.usuario2_id ?? null,
                           denominacion_nacional:
