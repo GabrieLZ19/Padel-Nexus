@@ -1311,7 +1311,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                           <a
                             key={z.id}
                             href={`#zona-${z.id}`}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-black/60 backdrop-blur-sm text-xs font-black text-white hover:border-brand-chartreuse/50 hover:text-brand-chartreuse transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-brand-card text-xs font-black text-white hover:border-brand-chartreuse/50 hover:text-brand-chartreuse transition-colors"
                           >
                             <span className="size-5 rounded-md bg-brand-chartreuse/15 text-brand-chartreuse inline-flex items-center justify-center text-[10px]">
                               {letra}

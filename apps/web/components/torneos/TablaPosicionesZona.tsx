@@ -320,9 +320,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
                             ? "bg-amber-400 text-brand-black"
                             : idx === 0
                               ? "bg-brand-chartreuse text-brand-black"
-                              : idx === 1
-                                ? "bg-white/10 text-white"
-                                : "bg-black/40 text-gray-500"
+                              : "bg-brand-input text-gray-500"
                         }`}
                       >
                         {idx + 1}

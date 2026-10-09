@@ -18,6 +18,7 @@ import { ConflictosPanel } from "./ConflictosPanel";
 import { ProgramadorConfigBar } from "./ProgramadorConfigBar";
 import { ProgramadorTopBar } from "./ProgramadorTopBar";
 import { PendingMatchesSidebar } from "./PendingMatchesSidebar";
+import ZonaParejasPanel from "./ZonaParejasPanel";
 import { ScheduleGrid } from "./ScheduleGrid";
 import { useProgramadorBoard } from "./useProgramadorBoard";
 
@@ -175,7 +176,12 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
         onDragEnd={handleDragEnd}
       >
         <div className="grid min-h-[60vh] grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
-          <div className="order-2 max-h-[40vh] lg:order-1 lg:max-h-[calc(100vh-220px)]">
+          <div className="order-2 max-h-[40vh] overflow-auto lg:order-1 lg:max-h-[calc(100vh-220px)]">
+            <ZonaParejasPanel
+              torneoId={torneoId}
+              readOnly={isReadOnly}
+              onMoved={() => void load()}
+            />
             <PendingMatchesSidebar
               partidos={board.partidos}
               issues={board.issues}

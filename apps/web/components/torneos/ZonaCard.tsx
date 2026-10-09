@@ -176,10 +176,10 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
   return (
     <section
       id={anchorId}
-      className="scroll-mt-24 rounded-2xl border border-white/10 bg-gradient-to-br from-[#141414] to-[#0c0c0c] overflow-hidden shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
+      className="scroll-mt-24 rounded-2xl border border-white/10 bg-brand-card overflow-hidden"
     >
       {/* Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-5 py-3.5 border-b border-white/5 bg-black/30">
+      <header className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-5 py-3.5 border-b border-white/5 bg-brand-input/40">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <span className="inline-flex items-center justify-center size-10 rounded-xl bg-brand-chartreuse text-brand-black font-black text-base shrink-0 shadow-[0_0_18px_rgba(204,255,0,0.25)]">
             {letra || "Z"}
@@ -221,7 +221,7 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
                 {progresoPct}%
               </span>
             </div>
-            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-1.5 rounded-full bg-brand-input overflow-hidden">
               <div
                 className="h-full rounded-full bg-brand-chartreuse transition-[width] duration-500 ease-out"
                 style={{ width: `${progresoPct}%` }}
@@ -340,7 +340,7 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
                         tercerSetCompleto={tercerSetCompleto}
                       />
                     ) : (
-                      <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-gray-500 px-2 py-1 rounded-md bg-white/5">
+                      <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-gray-500 px-2 py-1 rounded-md bg-brand-card border border-white/10">
                         Pendiente
                       </span>
                     )}
