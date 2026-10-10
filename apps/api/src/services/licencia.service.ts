@@ -14,6 +14,7 @@ import {
   periodoDesdeFecha,
 } from "../utils/licenciaConfig";
 import { resumirLicenciasPorJugador } from "../utils/resumenLicencias";
+import { fechaLatina } from "../utils/fechaArgentina";
 
 function normalizarTexto(input?: string | null): string {
   if (!input) return "";
@@ -460,21 +461,19 @@ export class LicenciaService {
 
     data = updatedData;
 
-    // Helper para formatear fechas sin timezone shift
-    const formatFecha = (iso?: string | null) => {
-      if (!iso) return "";
-      const [year, month, day] = iso.split("T")[0].split("-");
-      return `${day}/${month}/${year}`;
-    };
-
     // 4. Emitir notificaciones para otros cambios de estado
     if (estado === "Activa" && estadoPrevio !== "Activa") {
+      const vence = fechaLatina(data.fecha_vencimiento);
       await NotificacionService.crearNotificacion({
         usuario_id,
         titulo: "Licencia Aprobada",
-        mensaje: `¡Felicidades! Tu licencia N° ${data.nro_licencia} fue aprobada. Vence el ${formatFecha(data.fecha_vencimiento)}. Ya podés ver tu carnet digital.`,
+        mensaje: `¡Felicidades! Tu licencia N° ${data.nro_licencia} fue aprobada. Vence el ${vence}. Ya podés ver tu carnet digital.`,
         tipo: "success",
-        metadata: { nro_licencia: data.nro_licencia, licencia_id: data.id },
+        metadata: {
+          nro_licencia: data.nro_licencia,
+          licencia_id: data.id,
+          fecha_vencimiento: data.fecha_vencimiento,
+        },
       });
     } else if (estado === "Suspendida" && estadoPrevio === "Activa") {
       await NotificacionService.crearNotificacion({
@@ -927,7 +926,7 @@ export class LicenciaService {
     await NotificacionService.crearNotificacion({
       usuario_id: licencia.usuario_id,
       titulo: "Pago de licencia registrado",
-      mensaje: `Se registró el pago del período ${periodo} de tu licencia ${updated.nro_licencia}. Vigente hasta ${fechaVencimiento.split("-").reverse().join("/")}.`,
+      mensaje: `Se registró el pago del período ${periodo} de tu licencia ${updated.nro_licencia}. Vigente hasta ${fechaLatina(fechaVencimiento)}.`,
       tipo: "success",
       metadata: {
         tipo: "licencia",

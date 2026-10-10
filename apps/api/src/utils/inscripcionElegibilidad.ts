@@ -422,6 +422,26 @@ export function inscripcionAbiertaPorFechas(
   return diasRestantes >= FAP_REGLAS.DIAS_CIERRE_INSCRIPCION;
 }
 
+/** Programado, en curso o finalizado: el paso de jugadores no admite altas ni bajas. */
+export function assertPasoJugadoresEditable(torneo: {
+  estado?: string | null;
+}): void {
+  const estado = (torneo.estado || "").trim();
+  const bloqueados = [
+    FAP_ESTADOS_TORNEO.PROGRAMADO,
+    FAP_ESTADOS_TORNEO.EN_CURSO,
+    FAP_ESTADOS_TORNEO.FINALIZADO,
+  ];
+  if (!bloqueados.includes(estado)) return;
+  const frase =
+    estado === FAP_ESTADOS_TORNEO.EN_CURSO
+      ? "está en curso"
+      : `está ${estado.toLowerCase()}`;
+  throw new Error(
+    `El torneo ${frase}. No se pueden inscribir ni borrar parejas.`,
+  );
+}
+
 export function assertInscripcionAbierta(torneo: TorneoElegibilidad): void {
   const estado = (torneo.estado || "").trim();
   const estadoLower = estado.toLowerCase();

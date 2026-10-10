@@ -11,6 +11,12 @@ import {
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
 import { randomBytes } from "crypto";
+import { NotificacionService } from "./notificacion.service";
+import {
+  CATEGORIAS_LIBRES,
+  CATEGORIAS_MENORES,
+  CATEGORIAS_VETERANOS,
+} from "../constants/rankings";
 
 export interface PreferenciasNotificacion {
   push: boolean;
@@ -178,6 +184,13 @@ export class PerfilService {
     const nombreCapitalizado = capitalizarTexto(datos.nombre);
     const apellidoCapitalizado = capitalizarTexto(datos.apellido);
 
+    if (
+      datos.lugar_residencia !== undefined &&
+      !datos.lugar_residencia.trim()
+    ) {
+      throw new Error("La provincia de residencia es obligatoria.");
+    }
+
     const { data, error } = await supabaseAdmin
       .from("perfiles")
       .update(
@@ -185,10 +198,8 @@ export class PerfilService {
           nombre: nombreCapitalizado,
           apellido: apellidoCapitalizado,
           telefono: datos.telefono,
-          categoria_padel: datos.categoria_padel,
           lado_preferido: datos.lado_preferido,
           lugar_residencia: datos.lugar_residencia,
-          dni: datos.dni,
           sexo: datos.sexo,
           fecha_nacimiento: normalizeFechaNacimiento(datos.fecha_nacimiento),
           avatar_url: datos.avatar_url,
@@ -531,5 +542,110 @@ export class PerfilService {
     }
 
     return data;
+  }
+
+  /**
+   * El jugador pide cambiar DNI o categoría. No modifica la ficha.
+   */
+  static async solicitarCambioFicha(
+    userId: string,
+    campo: string,
+    valorPedido: string,
+  ) {
+    if (campo !== "dni" && campo !== "categoria") {
+      throw new Error("Solo se puede pedir cambio de DNI o de categoría.");
+    }
+
+    const pedido = valorPedido.trim();
+    if (!pedido) throw new Error("Indicá el valor que querés pedir.");
+
+    const { data: perfil, error: readError } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, nombre, apellido, dni, categoria_padel")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (readError || !perfil) throw new Error("Perfil no encontrado.");
+
+    const actual =
+      campo === "dni"
+        ? String(perfil.dni || "").replace(/\./g, "")
+        : String(perfil.categoria_padel || "");
+
+    let normalizado = pedido;
+    if (campo === "dni") {
+      normalizado = pedido.replace(/\D/g, "");
+      if (!/^\d{7,8}$/.test(normalizado)) {
+        throw new Error("El DNI debe tener 7 u 8 dígitos.");
+      }
+    } else {
+      const permitidas = new Set<string>([
+        ...CATEGORIAS_LIBRES,
+        ...CATEGORIAS_MENORES,
+        ...CATEGORIAS_VETERANOS,
+      ]);
+      if (!permitidas.has(pedido)) {
+        throw new Error("Esa categoría no existe en el circuito.");
+      }
+    }
+
+    if (normalizado === actual) {
+      throw new Error("Ese valor ya es el de tu ficha.");
+    }
+
+    const { data: pendiente } = await supabaseAdmin
+      .from("solicitudes_cambio_ficha")
+      .select("id")
+      .eq("usuario_id", userId)
+      .eq("campo", campo)
+      .eq("estado", "pendiente")
+      .maybeSingle();
+
+    const fila = pendiente
+      ? await supabaseAdmin
+          .from("solicitudes_cambio_ficha")
+          .update({ valor_pedido: normalizado, valor_actual: actual || null })
+          .eq("id", pendiente.id)
+          .select("id, campo, valor_pedido, estado")
+          .single()
+      : await supabaseAdmin
+          .from("solicitudes_cambio_ficha")
+          .insert({
+            usuario_id: userId,
+            campo,
+            valor_actual: actual || null,
+            valor_pedido: normalizado,
+          })
+          .select("id, campo, valor_pedido, estado")
+          .single();
+
+    if (fila.error || !fila.data) {
+      throw new Error("No se pudo registrar el pedido.");
+    }
+
+    const etiqueta = campo === "dni" ? "DNI" : "categoría";
+    const quien = [perfil.apellido, perfil.nombre].filter(Boolean).join(", ");
+    const { data: admins } = await supabaseAdmin
+      .from("perfiles")
+      .select("id")
+      .in("rol", [
+        "admin",
+        "superadmin",
+        "admin_federacion",
+        "admin_provincial",
+      ]);
+    await Promise.allSettled(
+      (admins || []).map((admin) =>
+        NotificacionService.crearNotificacion({
+          usuario_id: admin.id,
+          titulo: "Pedido de cambio de ficha",
+          mensaje: `${quien || "Un jugador"} pidió cambiar su ${etiqueta}.`,
+          tipo: "info",
+          metadata: { solicitud_id: fila.data.id, campo },
+        }),
+      ),
+    );
+
+    return fila.data;
   }
 }

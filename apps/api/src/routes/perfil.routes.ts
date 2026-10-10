@@ -28,6 +28,8 @@ router.use(authenticate);
 // ==========================================
 router.post("/actualizar-password", PerfilController.ActualizarPassword);
 router.get("/me", PerfilController.getMiPerfil);
+router.get("/me/panel", PerfilController.getMiPanel);
+router.post("/me/solicitar-cambio", PerfilController.solicitarCambioFicha);
 router.put("/me", PerfilController.updatePerfil);
 router.post("/push-token", PerfilController.registrarPushToken);
 router.post("/avatar", PerfilController.subirAvatar);

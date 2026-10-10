@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { PerfilService, ActualizarPerfilDTO } from "../services/perfil.service";
+import { PanelJugadorService } from "../services/panelJugador.service";
 import { AuthService, RegistroDTO } from "../services/auth.service";
 import { FiscalSesionService } from "../services/fiscal-sesion.service";
 import { MenoresService } from "../services/menores.service";
@@ -26,6 +27,27 @@ export const PerfilController = {
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Error al obtener tu perfil.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * GET /api/perfil/me/panel
+   * Inscripciones, próximo partido, resultados y puesto del jugador.
+   */
+  async getMiPanel(req: Request, res: Response): Promise<Response> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "Usuario no autorizado." });
+      }
+      const data = await PanelJugadorService.obtener(userId);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al armar tu panel.";
       return res.status(500).json({ exito: false, error: message });
     }
   },
@@ -75,6 +97,36 @@ export const PerfilController = {
           ? error.message
           : "Error al obtener el perfil solicitado.";
       return res.status(404).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * POST /api/perfil/me/solicitar-cambio
+   * Registra un pedido de cambio de DNI o categoría. No modifica la ficha.
+   */
+  async solicitarCambioFicha(req: Request, res: Response): Promise<Response> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "Usuario no autorizado." });
+      }
+
+      const campo = String(req.body?.campo || "");
+      const valorPedido = String(req.body?.valorPedido || "");
+      const data = await PerfilService.solicitarCambioFicha(
+        userId,
+        campo,
+        valorPedido,
+      );
+      return res.status(201).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo registrar el pedido.";
+      return res.status(400).json({ exito: false, error: message });
     }
   },
 

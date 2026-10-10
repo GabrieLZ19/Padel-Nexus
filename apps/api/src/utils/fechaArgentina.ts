@@ -33,6 +33,14 @@ export function horaAMinutos(hora: string): number {
   return Number(h) * 60 + Number(m ?? 0);
 }
 
+/** Fecha de calendario YYYY-MM-DD mostrada como DD/MM/AAAA, sin corrimiento de huso. */
+export function fechaLatina(iso?: string | null): string {
+  if (!iso) return "";
+  const [year, month, day] = iso.split("T")[0].split("-");
+  if (!year || !month || !day) return "";
+  return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
+}
+
 /** Fecha YYYY-MM-DD del día actual en Argentina. */
 export function fechaHoyArgentina(ahora: Date = new Date()): string {
   return partesEnArgentina(ahora).fecha;

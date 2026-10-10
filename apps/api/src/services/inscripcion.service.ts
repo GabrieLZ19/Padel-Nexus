@@ -8,6 +8,7 @@ import {
   assertCategoria,
   assertEdad,
   assertInscripcionAbierta,
+  assertPasoJugadoresEditable,
   assertRama,
   runSyncCheck,
   torneoExigeAfiliacionOrganizadora,
@@ -710,6 +711,13 @@ export class InscripcionService {
     if (fetchError || !inscripcion)
       throw new Error("Inscripción no encontrada.");
 
+    const { data: torneoInscripcion } = await supabaseAdmin
+      .from("torneos")
+      .select("estado")
+      .eq("id", inscripcion.torneo_id)
+      .maybeSingle();
+    assertPasoJugadoresEditable(torneoInscripcion || {});
+
     // Desvincular de partidos: hay FKs restrictivas en equipo_a/equipo_b/ganador.
     await supabaseAdmin
       .from("partidos")
@@ -832,6 +840,7 @@ export class InscripcionService {
     }
 
     const torneo = await InscripcionService.cargarTorneoElegibilidad(torneoId);
+    assertPasoJugadoresEditable(torneo);
 
     if (esTorneoNacional(torneo) && !letraPrioridad?.trim()) {
       throw new Error(
@@ -950,6 +959,7 @@ export class InscripcionService {
     }
 
     const torneo = await InscripcionService.cargarTorneoElegibilidad(torneoId);
+    assertPasoJugadoresEditable(torneo);
     const { data: torneoCompleto } = await supabaseAdmin
       .from("torneos")
       .select("modalidad, precio_inscripcion")

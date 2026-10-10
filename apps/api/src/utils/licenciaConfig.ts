@@ -1,3 +1,5 @@
+import { fechaHoyArgentina } from "./fechaArgentina";
+
 export type LicenciaVigenciaModo = "fecha_fija" | "meses_desde_emision";
 export type LicenciaFrecuenciaPago = "anual" | "mensual";
 
@@ -144,21 +146,29 @@ export function mergeLicenciaConfig(
  * Calcula vencimiento tras un pago mensual: cubre hasta el dia_cobro
  * del mes siguiente al período pagado.
  */
+function isoCalendario(year: number, month: number, day: number): string {
+  const fecha = new Date(Date.UTC(year, month - 1, day));
+  const y = fecha.getUTCFullYear();
+  const m = String(fecha.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(fecha.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export function calcularVencimientoTrasPagoMensual(
   diaCobro: number | null | undefined,
   fechaPago: Date = new Date(),
 ): string {
   const dia = clampDiaCobro(diaCobro) ?? 1;
-  const year = fechaPago.getFullYear();
-  const month = fechaPago.getMonth(); // 0-indexed
-  // Si ya pasó el día de cobro de este mes, el ciclo actual es el próximo.
-  let targetMonth = month;
-  if (fechaPago.getDate() >= dia) {
-    targetMonth = month + 1;
+  const [yearStr, monthStr, dayStr] = fechaHoyArgentina(fechaPago).split("-");
+  let year = Number(yearStr);
+  let month = Number(monthStr);
+  if (Number(dayStr) >= dia) month += 1;
+  month += 1;
+  while (month > 12) {
+    month -= 12;
+    year += 1;
   }
-  // El pago cubre hasta el dia_cobro del mes siguiente al ciclo.
-  const venc = new Date(year, targetMonth + 1, dia);
-  return venc.toISOString().split("T")[0];
+  return isoCalendario(year, month, dia);
 }
 
 /** Calcula la fecha de vencimiento según la config de la organización. */
@@ -173,22 +183,27 @@ export function calcularFechaVencimientoLicencia(
     );
   }
 
+  const hoy = fechaHoyArgentina(fechaReferencia);
+
   if (config.vigenciaModo === "meses_desde_emision") {
-    const venc = new Date(fechaReferencia);
-    venc.setMonth(venc.getMonth() + config.vigenciaMeses);
-    return venc.toISOString().split("T")[0];
+    const [yearStr, monthStr, dayStr] = hoy.split("-");
+    let year = Number(yearStr);
+    let month = Number(monthStr) + config.vigenciaMeses;
+    while (month > 12) {
+      month -= 12;
+      year += 1;
+    }
+    return isoCalendario(year, month, Number(dayStr));
   }
 
   const mes = config.vencimientoMes ?? 12;
   const dia = config.vencimientoDia ?? 31;
-  const year = fechaReferencia.getFullYear();
-
-  const candidata = new Date(year, mes - 1, dia);
-  if (fechaReferencia > candidata) {
-    candidata.setFullYear(year + 1);
+  const year = Number(hoy.slice(0, 4));
+  let candidata = isoCalendario(year, mes, dia);
+  if (hoy > candidata) {
+    candidata = isoCalendario(year + 1, mes, dia);
   }
-
-  return candidata.toISOString().split("T")[0];
+  return candidata;
 }
 
 export function descripcionVigenciaLicencia(
