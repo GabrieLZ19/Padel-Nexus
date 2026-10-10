@@ -171,6 +171,33 @@ export class LicenciaService {
   }
 
   /**
+   * Cuenta jugadores por estado leyendo solo la tabla de licencias.
+   * Evita recorrer todo el padrón de perfiles en cada apertura del tablero.
+   */
+  private static async resumenDesdeTablaLicencias() {
+    const porJugador = new Map<string, { estado?: string | null }[]>();
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabaseAdmin
+        .from("licencias")
+        .select("usuario_id, estado")
+        .range(from, from + pageSize - 1);
+      if (error) throw new Error(error.message || "Error al resumir licencias");
+      for (const row of data || []) {
+        const id = String(row.usuario_id || "");
+        if (!id) continue;
+        const lista = porJugador.get(id) || [];
+        lista.push({ estado: row.estado as string | null });
+        porJugador.set(id, lista);
+      }
+      if (!data || data.length < pageSize) break;
+    }
+    return resumirLicenciasPorJugador(
+      [...porJugador.values()].map((licencias) => ({ licencias })),
+    );
+  }
+
+  /**
    * Cuenta jugadores por estado de licencia en todo el alcance, sin paginar
    * y sin el filtro de una pestaña. Es la misma cifra que muestra el listado.
    */
@@ -181,6 +208,10 @@ export class LicenciaService {
       provincia: string;
     } | null,
   ) {
+    if (!search?.trim() && !alcanceProvincial) {
+      return LicenciaService.resumenDesdeTablaLicencias();
+    }
+
     const select =
       "id, lugar_residencia, licencias:licencias!fk_licencias_usuario!inner(estado, asociacion_id)";
 

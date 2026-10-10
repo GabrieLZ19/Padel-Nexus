@@ -68,6 +68,16 @@ export const getAllTorneos = async (
       incluirNacionales = true;
     }
 
+    if (req.query.resumen === "tablero") {
+      const data = await TorneoService.resumenTablero({
+        clubId: clubIdFiltro,
+        clubIds,
+        incluirNacionales,
+        ocultarPrueba: !esRolAccesoCrm(req.user?.rol),
+      });
+      return res.status(200).json(data);
+    }
+
     const resultado = await TorneoService.listarTorneos(pageNum, limitNum, {
       search: search as string | undefined,
       estado: estado as string | undefined,

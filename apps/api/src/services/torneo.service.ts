@@ -327,6 +327,70 @@ export class TorneoService {
     return Number.isNaN(ts) ? 0 : ts;
   }
 
+  /** Cifras del tablero: sin traer las inscripciones de cada torneo. */
+  static async resumenTablero(filtros?: FiltrosTorneo) {
+    let query = supabaseAdmin
+      .from("torneos")
+      .select(
+        "id, nombre, estado, alcance, categoria, nivel, rama, created_at, fecha, fecha_cierre_inscripcion, cupos_actuales, cupos_maximos, clubes!club_id(nombre)",
+      )
+      .order("created_at", { ascending: false });
+
+    if (filtros?.clubId) {
+      query = query.eq("club_id", filtros.clubId);
+    }
+    if (filtros?.clubIds) {
+      const ids = filtros.clubIds.filter(Boolean);
+      if (filtros.incluirNacionales) {
+        query =
+          ids.length === 0
+            ? query.eq("alcance", "Nacional")
+            : query.or(`alcance.eq.Nacional,club_id.in.(${ids.join(",")})`);
+      } else if (ids.length === 0) {
+        query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+      } else {
+        query = query.in("club_id", ids);
+      }
+    }
+
+    const result = await query.limit(2000);
+    if (result.error) throw new Error(result.error.message);
+
+    let filas = ((result.data as Record<string, unknown>[]) || []).map((torneo) =>
+      TorneoService.evaluateDynamicState({ ...torneo }),
+    );
+    if (filtros?.ocultarPrueba) {
+      filas = filas.filter((torneo) => !esTorneoDePrueba(torneo));
+    }
+
+    const estadosActivos = new Set<string>([
+      FAP_ESTADOS_TORNEO.INSCRIPCION,
+      FAP_ESTADOS_TORNEO.CERRADO,
+      FAP_ESTADOS_TORNEO.PROGRAMADO,
+      FAP_ESTADOS_TORNEO.EN_CURSO,
+    ]);
+    const porAlcance: Record<string, number> = {
+      Nacional: 0,
+      Provincial: 0,
+      Regional: 0,
+      Local: 0,
+      Privado: 0,
+    };
+    let activos = 0;
+    for (const torneo of filas) {
+      const alcance = String(torneo.alcance || "");
+      if (alcance in porAlcance) porAlcance[alcance] += 1;
+      if (estadosActivos.has(String(torneo.estado || ""))) activos += 1;
+    }
+
+    return {
+      total: filas.length,
+      activos,
+      porAlcance,
+      ultimos: filas.slice(0, 5),
+    };
+  }
+
   static async listarTorneos(
     page?: number,
     limit: number = 10,
@@ -337,7 +401,7 @@ export class TorneoService {
     let query = supabaseAdmin
       .from("torneos")
       .select(
-        `*, clubes!club_id(nombre, provincia), inscripciones(usuario_id)`,
+        `*, clubes!club_id(nombre, provincia)`,
       )
       .order("created_at", { ascending: false });
 
@@ -400,9 +464,7 @@ export class TorneoService {
     if (result.error) throw new Error(result.error.message);
 
     let formatted = ((result.data as DbTorneo[]) || []).map((t) => {
-      const realInscriptos = Array.isArray(t.inscripciones)
-        ? t.inscripciones.length
-        : t.cupos_actuales || 0;
+      const realInscriptos = t.cupos_actuales || 0;
       const evaluado = TorneoService.evaluateDynamicState({
         ...t,
         cupos_actuales: realInscriptos,
