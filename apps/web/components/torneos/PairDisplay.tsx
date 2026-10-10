@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
 import { PlayerAvatar, splitPlayerName } from "@/components/torneos/MatchTeamBox";
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
+import {
+  POR_DEFINIR,
+  apellidoVisible,
+  denominacionVisible,
+  esAlcanceNacional,
+} from "@/utils/etiquetaPareja";
 
-export function esAlcanceNacional(alcance?: string | null): boolean {
-  return /nacional/i.test(String(alcance || "").trim());
-}
+export { esAlcanceNacional };
 
 export function jugadorHref(userId?: string | null): string | null {
   if (!userId) return null;
@@ -18,18 +20,21 @@ export function jugadorHref(userId?: string | null): string | null {
 function PlayerNameLink({
   fullName,
   userId,
+  etiqueta,
   className,
   won,
   openInNewTab = true,
 }: {
   fullName?: string | null;
   userId?: string | null;
+  /** Si viene, se muestra este texto (apellido) en lugar de «Apellido, Nombre». */
+  etiqueta?: string | null;
   className?: string;
   won?: boolean;
   openInNewTab?: boolean;
 }) {
   const { apellido, nombre } = splitPlayerName(fullName);
-  const label = nombre ? `${apellido}, ${nombre}` : apellido;
+  const label = etiqueta || (nombre ? `${apellido}, ${nombre}` : apellido);
   const href = jugadorHref(userId);
   const base = `${className || ""} ${
     won ? "text-brand-chartreuse" : "text-brand-white"
@@ -92,10 +97,9 @@ export function PairDisplay({
   align = "left",
   compact = false,
   showAvatars = true,
-  emptyLabel = "—",
+  emptyLabel = POR_DEFINIR,
   variant = "stacked",
 }: PairDisplayProps) {
-  const [expanded, setExpanded] = useState(false);
   const denomRaw = etiquetaInstitucion({
     denominacion_nacional: denominacion,
     provincia,
@@ -105,8 +109,13 @@ export function PairDisplay({
   const denomLabel = denomRaw === "Sin denominación" ? "" : denomRaw;
   const empty = !j1 && !j2 && !denomLabel;
   const hasJ2 = Boolean(j2 && j2 !== "-");
-  // Nacional + denominación → chip colapsable; si faltan datos → solo nombres (sin error).
-  const useDenominacion = Boolean(denomLabel) && alcanceNacional;
+  const denomTitulo = denominacionVisible({
+    provincia,
+    letra: letra_prioridad,
+    denominacion: denomLabel || denominacion,
+  });
+  const apellido1 = apellidoVisible(j1);
+  const apellido2 = apellidoVisible(j2);
   const isRight = align === "right";
 
   if (empty) {
@@ -154,8 +163,54 @@ export function PairDisplay({
     </div>
   );
 
-  if (!useDenominacion) {
-    if (variant === "inline") {
+  if (alcanceNacional && (denomTitulo || apellido1 || apellido2)) {
+    return (
+      <span
+        className={`inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0 ${
+          isRight ? "justify-end" : ""
+        }`}
+      >
+        {showAvatars ? (
+          <PlayerAvatar src={avatarJ1} size={compact ? "sm" : "md"} />
+        ) : null}
+        {denomTitulo ? (
+          <span
+            className={`font-black tracking-wide text-xs shrink-0 ${
+              won ? "text-brand-chartreuse" : "text-brand-white"
+            }`}
+          >
+            {denomTitulo}
+          </span>
+        ) : null}
+        {denomTitulo && (apellido1 || apellido2) ? (
+          <span className="text-gray-500 font-medium">·</span>
+        ) : null}
+        {apellido1 ? (
+          <PlayerNameLink
+            fullName={j1}
+            userId={usuarioId}
+            etiqueta={apellido1}
+            won={won}
+            className="font-bold text-xs"
+          />
+        ) : null}
+        {apellido1 && apellido2 ? (
+          <span className="text-gray-500 font-medium">/</span>
+        ) : null}
+        {apellido2 ? (
+          <PlayerNameLink
+            fullName={j2}
+            userId={usuario2Id}
+            etiqueta={apellido2}
+            won={won}
+            className="font-bold text-xs text-gray-400"
+          />
+        ) : null}
+      </span>
+    );
+  }
+
+  if (variant === "inline") {
       return (
         <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5 min-w-0">
           <PlayerNameLink
@@ -177,74 +232,7 @@ export function PairDisplay({
           ) : null}
         </span>
       );
-    }
-    return namesBlock;
   }
 
-  if (variant === "inline") {
-    return (
-      <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0">
-        <span
-          className={`font-black tracking-wide text-[11px] sm:text-xs shrink-0 ${
-            won ? "text-brand-chartreuse" : "text-brand-white"
-          }`}
-        >
-          {denomLabel}
-        </span>
-        <span className="text-gray-600 font-medium">·</span>
-        <PlayerNameLink
-          fullName={j1}
-          userId={usuarioId}
-          won={won}
-          className="font-bold text-sm"
-        />
-        {hasJ2 ? (
-          <>
-            <span className="text-gray-500 font-medium">/</span>
-            <PlayerNameLink
-              fullName={j2}
-              userId={usuario2Id}
-              won={won}
-              className="font-bold text-sm text-gray-500"
-            />
-          </>
-        ) : null}
-      </span>
-    );
-  }
-
-  return (
-    <div className={`min-w-0 ${isRight ? "text-right" : "text-left"}`}>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setExpanded((v) => !v);
-        }}
-        className={`inline-flex items-center gap-1.5 max-w-full rounded-lg px-2 py-1 transition-colors cursor-pointer ${
-          won
-            ? "bg-brand-chartreuse/15 text-brand-chartreuse"
-            : "bg-brand-input text-brand-white hover:bg-brand-input/80"
-        } ${isRight ? "flex-row-reverse" : ""}`}
-        aria-expanded={expanded}
-        title={expanded ? "Ocultar nombres" : "Ver nombres de la pareja"}
-      >
-        <span
-          className={`font-black tracking-wide truncate ${
-            compact ? "text-[11px]" : "text-xs sm:text-sm"
-          }`}
-        >
-          {denomLabel}
-        </span>
-        <ChevronDown
-          className={`size-3.5 shrink-0 opacity-70 transition-transform ${
-            expanded ? "rotate-180" : ""
-          }`}
-        />
-      </button>
-      {expanded ? (
-        <div className={`mt-1.5 ${compact ? "pl-1" : "pl-2"}`}>{namesBlock}</div>
-      ) : null}
-    </div>
-  );
+  return namesBlock;
 }

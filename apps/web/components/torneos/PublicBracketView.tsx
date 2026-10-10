@@ -7,6 +7,7 @@ import {
   PairDisplay,
   esAlcanceNacional,
 } from "@/components/torneos/PairDisplay";
+import { LIBRE, POR_DEFINIR } from "@/utils/etiquetaPareja";
 import {
   etiquetaRondaLlave,
   numerosVisiblesDePartidos,
@@ -62,6 +63,8 @@ function BracketTeamRow({
   usuarioId,
   usuario2Id,
   denominacion,
+  provincia,
+  letra,
   alcanceNacional,
   won,
   emptyLabel,
@@ -73,11 +76,13 @@ function BracketTeamRow({
   usuarioId?: string | null;
   usuario2Id?: string | null;
   denominacion?: string | null;
+  provincia?: string | null;
+  letra?: string | null;
   alcanceNacional?: boolean;
   won?: boolean;
   emptyLabel?: string;
 }) {
-  const empty = !j1 && !j2 && !denominacion;
+  const empty = !j1 && !j2 && !denominacion && !provincia;
 
   return (
     <div
@@ -89,7 +94,7 @@ function BracketTeamRow({
         <>
           <span className="size-7 rounded-full border border-dashed border-white/15 shrink-0" />
           <p className="text-xs sm:text-[13px] font-medium truncate leading-tight text-gray-600 italic">
-            {emptyLabel || "—"}
+            {emptyLabel || POR_DEFINIR}
           </p>
         </>
       ) : (
@@ -102,6 +107,8 @@ function BracketTeamRow({
             usuarioId={usuarioId}
             usuario2Id={usuario2Id}
             denominacion={denominacion}
+            provincia={provincia}
+            letra_prioridad={letra}
             alcanceNacional={alcanceNacional}
             won={won}
             compact
@@ -183,9 +190,11 @@ function BracketMatchCell({
             usuarioId={partido.equipo_a_usuario_id}
             usuario2Id={partido.equipo_a_usuario2_id}
             denominacion={partido.equipo_a_denominacion}
+            provincia={partido.equipo_a_provincia}
+            letra={partido.equipo_a_letra_prioridad}
             alcanceNacional={alcanceNacional}
             won={isA || esByeA}
-            emptyLabel={esByeB ? "BYE" : "TBD"}
+            emptyLabel={esByeB ? LIBRE : POR_DEFINIR}
           />
         </div>
         <div
@@ -209,9 +218,11 @@ function BracketMatchCell({
             usuarioId={partido.equipo_b_usuario_id}
             usuario2Id={partido.equipo_b_usuario2_id}
             denominacion={partido.equipo_b_denominacion}
+            provincia={partido.equipo_b_provincia}
+            letra={partido.equipo_b_letra_prioridad}
             alcanceNacional={alcanceNacional}
             won={isB || esByeB}
-            emptyLabel={esByeA ? "BYE" : "TBD"}
+            emptyLabel={esByeA ? LIBRE : POR_DEFINIR}
           />
         </div>
         <div

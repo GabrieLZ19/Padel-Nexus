@@ -134,11 +134,13 @@ export class ClubPanelService {
     page?: number;
     limit?: number;
     solo_atrasadas?: boolean;
+    proximas?: boolean;
   }): Promise<{ data: ReservaClubFila[]; total: number; atrasadas: number }> {
     const { data } = await api.get("/club/mi-club/reservas", {
       params: {
         ...filtros,
         solo_atrasadas: filtros.solo_atrasadas ? "1" : undefined,
+        proximas: filtros.proximas ? "1" : undefined,
       },
     });
     return {

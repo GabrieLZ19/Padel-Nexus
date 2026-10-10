@@ -3,6 +3,7 @@ import { Loader2, Trophy, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { TeamBox } from "@/components/torneos/MatchTeamBox";
 import { canchaAsignadaReal } from "@/utils/fiscalPartidos";
+import { esAlcanceNacional } from "@/utils/etiquetaPareja";
 
 export const LiveArbitrajeRow = ({
   partido,
@@ -376,6 +377,10 @@ export const LiveArbitrajeRow = ({
                 avatarJ1={partido.equipo_a_avatar_j1}
                 avatarJ2={partido.equipo_a_avatar_j2}
                 club={partido.equipo_a_club}
+                provincia={partido.equipo_a_provincia}
+                letra={partido.equipo_a_letra_prioridad}
+                denominacion={partido.equipo_a_denominacion}
+                alcanceNacional={esAlcanceNacional(torneo?.alcance)}
                 align="left"
                 isWinner={ganadorWo === "A"}
               />
@@ -393,6 +398,10 @@ export const LiveArbitrajeRow = ({
                 avatarJ1={partido.equipo_b_avatar_j1}
                 avatarJ2={partido.equipo_b_avatar_j2}
                 club={partido.equipo_b_club}
+                provincia={partido.equipo_b_provincia}
+                letra={partido.equipo_b_letra_prioridad}
+                denominacion={partido.equipo_b_denominacion}
+                alcanceNacional={esAlcanceNacional(torneo?.alcance)}
                 align="right"
                 isWinner={ganadorWo === "B"}
               />
@@ -418,6 +427,10 @@ export const LiveArbitrajeRow = ({
               avatarJ1={partido.equipo_a_avatar_j1}
               avatarJ2={partido.equipo_a_avatar_j2}
               club={partido.equipo_a_club}
+              provincia={partido.equipo_a_provincia}
+              letra={partido.equipo_a_letra_prioridad}
+              denominacion={partido.equipo_a_denominacion}
+              alcanceNacional={esAlcanceNacional(torneo?.alcance)}
               align="left"
               isWinner={setsA >= 2}
             />
@@ -532,6 +545,10 @@ export const LiveArbitrajeRow = ({
               avatarJ1={partido.equipo_b_avatar_j1}
               avatarJ2={partido.equipo_b_avatar_j2}
               club={partido.equipo_b_club}
+              provincia={partido.equipo_b_provincia}
+              letra={partido.equipo_b_letra_prioridad}
+              denominacion={partido.equipo_b_denominacion}
+              alcanceNacional={esAlcanceNacional(torneo?.alcance)}
               align="right"
               isWinner={setsB >= 2}
             />

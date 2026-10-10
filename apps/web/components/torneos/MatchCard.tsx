@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from "react";
 import { Partido } from "@/utils/types";
 import { PairDisplay, esAlcanceNacional } from "@/components/torneos/PairDisplay";
+import { LIBRE, POR_DEFINIR } from "@/utils/etiquetaPareja";
 import { PlayerAvatar } from "@/components/torneos/MatchTeamBox";
 
 export const MatchCard = ({
@@ -80,6 +81,12 @@ export const MatchCard = ({
       side === "a" ? partido.equipo_a_usuario2_id : partido.equipo_b_usuario2_id;
     const denominacion =
       side === "a" ? partido.equipo_a_denominacion : partido.equipo_b_denominacion;
+    const provincia =
+      side === "a" ? partido.equipo_a_provincia : partido.equipo_b_provincia;
+    const letra =
+      side === "a"
+        ? partido.equipo_a_letra_prioridad
+        : partido.equipo_b_letra_prioridad;
     const empty = !j1 && !j2;
 
     return (
@@ -95,22 +102,13 @@ export const MatchCard = ({
               #1
             </span>
           ) : null}
-          {!origen && !esCabezaSerie && empty ? (
-            <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">
-              {esBye ? "BYE" : "Libre"}
-            </span>
-          ) : null}
         </div>
 
         {empty ? (
           <div className="flex items-center gap-2 min-h-[2.25rem]">
             <PlayerAvatar src={null} size="md" />
-            <p className="text-[12px] font-medium text-gray-500 italic">
-              {origen
-                ? "Por clasificar"
-                : esBye
-                  ? "BYE"
-                  : "Esperando rival…"}
+            <p className="text-xs font-medium text-gray-500 italic">
+              {esBye && !origen ? LIBRE : POR_DEFINIR}
             </p>
           </div>
         ) : (
@@ -122,6 +120,8 @@ export const MatchCard = ({
             usuarioId={usuarioId}
             usuario2Id={usuario2Id}
             denominacion={denominacion}
+            provincia={provincia}
+            letra_prioridad={letra}
             alcanceNacional={nacional}
             won={won}
             compact

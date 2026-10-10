@@ -1,11 +1,19 @@
 "use client";
 
-import React, { useMemo, useState, useCallback, useEffect, useRef } from "react";
+import React, {
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import { createPortal } from "react-dom";
 import { ZoomIn, ZoomOut, Maximize2, Minimize2, X } from "lucide-react";
 import type { Partido } from "@/utils/types";
 import { MatchCard } from "./MatchCard";
 import { PairDisplay, esAlcanceNacional } from "@/components/torneos/PairDisplay";
+import { POR_DEFINIR } from "@/utils/etiquetaPareja";
 import { PlayerAvatar } from "@/components/torneos/MatchTeamBox";
 import {
   codigoRondaPorNumeroFap,
@@ -14,6 +22,12 @@ import {
   numerosVisiblesLlave,
   vincularPartidosAMatriz,
 } from "@/utils/rondasLlave";
+import {
+  MEDIDA_LLAVE,
+  anchoColumnaLlave,
+  anchoLienzoLlave,
+  zoomAjustadoAlAncho,
+} from "@/utils/medidaLlave";
 
 export type FapMatrixMatch = {
   matchNo: number;
@@ -37,14 +51,13 @@ type Props = {
 };
 
 const SLOT = 220;
-const CARD_W = 300;
-const COL_GAP = 36;
-const JOIN_GUTTER = 44;
+const CARD_W = MEDIDA_LLAVE.cardW;
+const JOIN_GUTTER = MEDIDA_LLAVE.joinGutter;
 const PAD_Y = 36;
 const HEADER_H = 36;
-const PAD_X = 12;
+const PAD_X = MEDIDA_LLAVE.padX;
 const CARD_H = 200;
-const PAD_RIGHT = 32;
+const PAD_RIGHT = MEDIDA_LLAVE.padRight;
 
 function formatSeed(ref: string, numeros: Map<number, number>): string {
   const raw = ref.trim();
@@ -81,8 +94,8 @@ function entryMatchForLeaf(
   return null;
 }
 
-const ZOOM_MIN = 0.35;
-const ZOOM_MAX = 1.5;
+const ZOOM_MIN = MEDIDA_LLAVE.zoomMin;
+const ZOOM_MAX = MEDIDA_LLAVE.zoomMax;
 const ZOOM_STEP = 0.1;
 
 type Feed = { x: number; y: number };
@@ -111,8 +124,7 @@ export function FapBracketDiagram({
   const scrollRef = useRef<HTMLDivElement>(null);
   const layoutWidthRef = useRef(0);
   const zoomTouchedRef = useRef(false);
-  const initialFitDoneRef = useRef(false);
-  const [zoom, setZoom] = useState(compact ? 0.48 : 1);
+  const [zoom, setZoom] = useState<number>(ZOOM_MIN);
   const [mobile, setMobile] = useState(compact);
   const [fullscreen, setFullscreen] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
@@ -148,11 +160,7 @@ export function FapBracketDiagram({
     const el = scrollRef.current;
     if (!el || !layoutWidthRef.current) return;
     const available = el.clientWidth - 8;
-    const next = Math.min(
-      1,
-      Math.max(ZOOM_MIN, available / layoutWidthRef.current),
-    );
-    setZoom(Math.round(next * 100) / 100);
+    setZoom(zoomAjustadoAlAncho(layoutWidthRef.current, available));
   }, []);
 
   const fitWidthFromUser = useCallback(() => {
@@ -176,7 +184,7 @@ export function FapBracketDiagram({
 
     const leaves = collectLeaves(byNo, final.matchNo);
     const leafIndex = new Map(leaves.map((l, i) => [l, i]));
-    const colStride = CARD_W + COL_GAP + JOIN_GUTTER;
+    const colStride = anchoColumnaLlave();
     const columnas = columnasRondaLlave(matches.map((m) => m.matchNo));
     const numeros = numerosVisiblesLlave(
       matches.map((m) => m.matchNo),
@@ -312,7 +320,7 @@ export function FapBracketDiagram({
       matchNodes,
       headers,
       numeros,
-      width: cardX(maxCol) + CARD_W + PAD_RIGHT,
+      width: anchoLienzoLlave(maxCol + 1),
       height: HEADER_H + PAD_Y * 2 + Math.max(leaves.length, 1) * SLOT,
     };
   }, [matches, partidos, inicioNumeracion]);
@@ -321,15 +329,20 @@ export function FapBracketDiagram({
     if (layout) layoutWidthRef.current = layout.width;
   }, [layout]);
 
-  useEffect(() => {
-    if (!layout || !(compact || mobile) || fullscreen) return;
-    if (zoomTouchedRef.current || initialFitDoneRef.current) return;
-    const t = window.setTimeout(() => {
+  useLayoutEffect(() => {
+    if (!layout || fullscreen) return;
+    layoutWidthRef.current = layout.width;
+    const el = scrollRef.current;
+    if (!el) return;
+    const apply = () => {
+      if (zoomTouchedRef.current) return;
       fitWidth();
-      initialFitDoneRef.current = true;
-    }, 50);
-    return () => window.clearTimeout(t);
-  }, [layout, compact, mobile, fitWidth, fullscreen]);
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [layout, fullscreen, fitWidth]);
 
   useEffect(() => {
     if (!fullscreen) return;
@@ -355,8 +368,6 @@ export function FapBracketDiagram({
     );
   }
 
-  const ink = "rgba(255,255,255,0.28)";
-  const inkHi = "rgba(203,254,1,0.55)";
   const nacional = esAlcanceNacional(alcance);
 
   const shell = (
@@ -472,15 +483,14 @@ export function FapBracketDiagram({
         }}
       >
         <div
-          className="origin-top-left"
+          className="relative overflow-hidden"
           style={{
             width: layout.width * zoom,
             height: layout.height * zoom,
-            minWidth: zoom < 1 ? undefined : "100%",
           }}
         >
           <div
-            className="relative"
+            className="absolute top-0 left-0"
             style={{
               width: layout.width,
               height: layout.height,
@@ -509,7 +519,9 @@ export function FapBracketDiagram({
             >
               {layout.matchNodes.map((node) => {
                 if (!node.showJoin) return null;
-                const stroke = node.partido?.ganador ? inkHi : ink;
+                const trazo = node.partido?.ganador
+                  ? "text-brand-chartreuse"
+                  : "text-gray-400";
 
                 const drawFeed = (feed: Feed | null, entryY: number, key: string) => {
                   if (!feed) return null;
@@ -522,7 +534,8 @@ export function FapBracketDiagram({
                         y1={entryY}
                         x2={node.joinX}
                         y2={entryY}
-                        stroke={stroke}
+                        className={trazo}
+                        stroke="currentColor"
                         strokeWidth={2}
                         strokeLinecap="square"
                       />
@@ -535,7 +548,8 @@ export function FapBracketDiagram({
                         y1={feed.y}
                         x2={ex}
                         y2={feed.y}
-                        stroke={stroke}
+                        className={trazo}
+                        stroke="currentColor"
                         strokeWidth={2}
                         strokeLinecap="square"
                       />
@@ -544,7 +558,8 @@ export function FapBracketDiagram({
                         y1={feed.y}
                         x2={ex}
                         y2={entryY}
-                        stroke={stroke}
+                        className={trazo}
+                        stroke="currentColor"
                         strokeWidth={2}
                         strokeLinecap="square"
                       />
@@ -553,7 +568,8 @@ export function FapBracketDiagram({
                         y1={entryY}
                         x2={node.joinX}
                         y2={entryY}
-                        stroke={stroke}
+                        className={trazo}
+                        stroke="currentColor"
                         strokeWidth={2}
                         strokeLinecap="square"
                       />
@@ -577,7 +593,8 @@ export function FapBracketDiagram({
                         y1={node.yTop}
                         x2={node.joinX}
                         y2={node.yBot}
-                        stroke={stroke}
+                        className={trazo}
+                        stroke="currentColor"
                         strokeWidth={2}
                         strokeLinecap="square"
                       />
@@ -587,7 +604,8 @@ export function FapBracketDiagram({
                       y1={node.yMid}
                       x2={node.cardX}
                       y2={node.yMid}
-                      stroke={stroke}
+                        className={trazo}
+                        stroke="currentColor"
                       strokeWidth={2}
                       strokeLinecap="square"
                     />
@@ -630,6 +648,12 @@ export function FapBracketDiagram({
                 side === "a"
                   ? p?.equipo_a_denominacion
                   : p?.equipo_b_denominacion;
+              const provincia =
+                side === "a" ? p?.equipo_a_provincia : p?.equipo_b_provincia;
+              const letra =
+                side === "a"
+                  ? p?.equipo_a_letra_prioridad
+                  : p?.equipo_b_letra_prioridad;
               const pairId = side === "a" ? p?.equipo_a_id : p?.equipo_b_id;
               const isCabeza =
                 !!pairId && !!cabezasSerieIds?.has(String(pairId));
@@ -676,6 +700,8 @@ export function FapBracketDiagram({
                           usuarioId={usuarioId}
                           usuario2Id={usuario2Id}
                           denominacion={denominacion}
+                          provincia={provincia}
+                          letra_prioridad={letra}
                           alcanceNacional={nacional}
                           compact
                           variant="stacked"
@@ -683,8 +709,8 @@ export function FapBracketDiagram({
                       ) : (
                         <div className="flex items-center gap-2 min-h-[2.25rem]">
                           <PlayerAvatar src={null} size="md" />
-                          <p className="text-[12px] font-medium text-gray-500 italic">
-                            Por clasificar
+                          <p className="text-xs font-medium text-gray-500 italic">
+                            {POR_DEFINIR}
                           </p>
                         </div>
                       )}
@@ -693,13 +719,13 @@ export function FapBracketDiagram({
                     <div className="border-t border-white/5 pt-3">
                       <div className="flex flex-wrap items-center gap-1 mb-1.5">
                         <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400/90 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded">
-                          BYE
+                          Libre
                         </span>
                       </div>
                       <div className="flex items-center gap-2 min-h-[2.25rem]">
                         <PlayerAvatar src={null} size="md" />
-                        <p className="text-[12px] font-medium text-gray-500 italic">
-                          Sin rival (avanza)
+                        <p className="text-xs font-medium text-gray-500 italic">
+                          Libre
                         </p>
                       </div>
                     </div>

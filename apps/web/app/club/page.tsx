@@ -12,7 +12,7 @@ import {
   Trophy,
 } from "lucide-react";
 import Link from "next/link";
-import { ClubPanelService } from "@/utils/services/club-panel";
+import { ClubPanelService, type ReservaClubFila } from "@/utils/services/club-panel";
 import type { Club } from "@/utils/types";
 import { formatFechaCalendario } from "@/utils/formatFecha";
 
@@ -27,7 +27,7 @@ interface Estadisticas {
 export default function ClubDashboardPage() {
   const [club, setClub] = useState<Club | null>(null);
   const [stats, setStats] = useState<Estadisticas | null>(null);
-  const [proximasReservas, setProximasReservas] = useState<any[]>([]);
+  const [proximasReservas, setProximasReservas] = useState<ReservaClubFila[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,6 +42,7 @@ export default function ClubDashboardPage() {
         const reservasData = await ClubPanelService.getReservas({
           page: 1,
           limit: 5,
+          proximas: true,
         });
         setProximasReservas(reservasData.data);
       } catch (err) {
@@ -244,8 +245,8 @@ export default function ClubDashboardPage() {
                       {res.turnos?.canchas?.nombre}
                     </td>
                     <td className="py-4 px-4 text-gray-300 font-medium">
-                      {formatHora(res.turnos?.hora_inicio)} -{" "}
-                      {formatHora(res.turnos?.hora_fin)}
+                      {formatHora(res.turnos?.hora_inicio || "")} -{" "}
+                      {formatHora(res.turnos?.hora_fin || "")}
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex flex-col">

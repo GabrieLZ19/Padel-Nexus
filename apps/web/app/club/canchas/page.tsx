@@ -14,6 +14,7 @@ import {
   DollarSign,
   Ban,
 } from "lucide-react";
+import { sileo } from "sileo";
 import { ClubPanelService } from "@/utils/services/club-panel";
 import type { Cancha, Turno } from "@/utils/types";
 import FeedbackModal, {
@@ -103,7 +104,14 @@ export default function ClubCanchasPage() {
       setIsCanchaModalOpen(false);
       fetchCanchas();
     } catch (err) {
-      console.error("Error al guardar cancha:", err);
+      const descripcion =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
+          : undefined;
+      sileo.error({
+        title: "No se pudo guardar la cancha",
+        description: descripcion || "Revisá el nombre y volvé a intentar.",
+      });
     } finally {
       setSaving(false);
     }
@@ -255,7 +263,7 @@ export default function ClubCanchasPage() {
                 {/* Cabecera Cancha */}
                 <div className="p-6 flex items-start justify-between gap-4 border-b border-brand-white/5 bg-brand-card/50">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-brand-white truncate">
+                    <h3 className="text-lg font-bold text-brand-white break-words">
                       {cancha.nombre}
                     </h3>
                     <div className="flex flex-wrap items-center gap-2 mt-2">

@@ -3,6 +3,11 @@
 import React from "react";
 import { User, CheckCircle2 } from "lucide-react";
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
+import { clasesResultadoFinalizado } from "@/utils/marcadorSets";
+import {
+  POR_DEFINIR,
+  etiquetaParejaVisible,
+} from "@/utils/etiquetaPareja";
 
 export function splitPlayerName(full?: string | null): {
   apellido: string;
@@ -110,6 +115,10 @@ export function TeamBox({
   avatarJ1,
   avatarJ2,
   club,
+  provincia,
+  letra,
+  denominacion,
+  alcanceNacional = false,
   align = "left",
   isWinner = false,
   compact = false,
@@ -119,11 +128,25 @@ export function TeamBox({
   avatarJ1?: string | null;
   avatarJ2?: string | null;
   club?: string | null;
+  provincia?: string | null;
+  letra?: string | null;
+  denominacion?: string | null;
+  alcanceNacional?: boolean;
   align?: "left" | "right";
   isWinner?: boolean;
   compact?: boolean;
 }) {
   const isRight = align === "right";
+  const etiqueta = alcanceNacional
+    ? etiquetaParejaVisible({
+        j1,
+        j2,
+        provincia,
+        letra,
+        denominacion: denominacion || club,
+        nacional: true,
+      }) || POR_DEFINIR
+    : "";
   const institucion = etiquetaInstitucion({
     denominacion_nacional: club,
   });
@@ -135,6 +158,16 @@ export function TeamBox({
           : "bg-brand-card border-brand-input"
       } ${isRight ? "text-right" : "text-left"}`}
     >
+      {alcanceNacional ? (
+        <p
+          className={`text-xs font-bold leading-snug ${
+            isWinner ? "text-brand-chartreuse" : "text-brand-white"
+          } ${isRight ? "text-right" : "text-left"}`}
+        >
+          {etiqueta}
+        </p>
+      ) : (
+        <>
       <div
         className={`flex items-center gap-1.5 mb-1.5 ${
           isRight ? "justify-end" : "justify-start"
@@ -163,6 +196,8 @@ export function TeamBox({
           />
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }
@@ -218,18 +253,14 @@ export function FinishedMatchScore({
 
   const scoreBox = (value: number | null, won: boolean) => (
     <span
-      className={`inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg font-black text-sm sm:text-base tabular-nums border ${
-        won
-          ? "bg-brand-chartreuse text-brand-black border-brand-chartreuse"
-          : "bg-[#161616] text-gray-300 border-white/12"
-      }`}
+      className={`inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg font-black text-sm sm:text-base tabular-nums border ${clasesResultadoFinalizado(won).puntos}`}
     >
       {value ?? "–"}
     </span>
   );
 
   return (
-    <div className="flex flex-col items-center justify-center gap-1.5 px-2 py-2 rounded-xl bg-[#0a0a0a]/80 border border-white/8 min-w-[7.5rem]">
+    <div className={`flex flex-col items-center justify-center gap-1.5 px-2 py-2 rounded-xl border min-w-[7.5rem] ${clasesResultadoFinalizado(false).panel}`}>
       <div className="flex gap-1.5">
         {sets.map((s) => (
           <span
@@ -250,7 +281,7 @@ export function FinishedMatchScore({
           </React.Fragment>
         ))}
       </div>
-      <div className="h-px w-full max-w-[7rem] bg-white/10" />
+      <div className="h-px w-full max-w-[7rem] bg-gray-500/40" />
       <div className="flex gap-1.5">
         {sets.map((s) => (
           <React.Fragment key={`b-${s.label}`}>

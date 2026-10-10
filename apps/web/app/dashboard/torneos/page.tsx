@@ -60,6 +60,11 @@ const ESTADO_INICIAL: FormTorneoState = {
 
 const PAGE_SIZE = 5;
 
+const accionTorneo =
+  "inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors";
+const accionTorneoNeutra = `${accionTorneo} bg-white/5 text-gray-300 hover:bg-white/10 hover:text-brand-chartreuse`;
+const accionTorneoAbrir = `${accionTorneo} bg-brand-chartreuse/10 text-brand-chartreuse hover:bg-brand-chartreuse/20`;
+
 export default function TorneosPage() {
   // 2. Inicializamos el router
   const router = useRouter();
@@ -289,6 +294,185 @@ export default function TorneosPage() {
         },
       ];
 
+  const accionesDe = (t: Torneo) => (
+    <>
+      {t.estado === "Finalizado" && (
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const partidos = await TorneosService.getPartidos(t.id);
+              const { generarPdfGrillaPartidos } = await import("@/utils/grillaPdf");
+              generarPdfGrillaPartidos(t, partidos || []);
+            } catch (err) {
+              console.error("Error al imprimir PDF:", err);
+            }
+          }}
+          className={accionTorneoNeutra}
+          aria-label="Informe de resultados"
+          title="Informe de resultados (PDF)"
+        >
+          <Printer className="size-4" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
+        className={accionTorneoAbrir}
+        aria-label="Abrir el paso del estado"
+        title="Abrir el paso del estado"
+      >
+        <LayoutDashboard className="size-4" />
+      </button>
+      {!t.solo_lectura && (
+        <>
+          <button
+            type="button"
+            onClick={() => handleOpenEdit(t)}
+            className={accionTorneoNeutra}
+            aria-label="Editar"
+            title="Editar"
+          >
+            <Pencil className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setReplicarTorneo(t)}
+            className={accionTorneoNeutra}
+            aria-label="Replicar"
+            title="Replicar"
+          >
+            <Copy className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const grupo = grupos.find(
+                (item) =>
+                  item.nombre &&
+                  item.ramas.some((rama) =>
+                    rama.torneos.some((itemTorneo) => itemTorneo.id === t.id),
+                  ),
+              );
+              if (grupo?.nombre) {
+                setAgrupacion({
+                  nombre: grupo.nombre,
+                  torneos: grupo.ramas.flatMap((rama) => rama.torneos),
+                });
+                return;
+              }
+              const base = t.nombre.replace(/\s+[—–-]\s+.*$/, "").trim();
+              setAgrupacion({
+                nombre: base || t.nombre,
+                torneos: [t],
+              });
+            }}
+            className={accionTorneoNeutra}
+            aria-label="Agrupar en una competencia"
+            title="Agrupar en una competencia"
+          >
+            <Layers className="size-4" />
+          </button>
+          <MenuPuntos
+            etiqueta={`Más acciones de ${t.nombre}`}
+            items={[
+              {
+                label: "Eliminar",
+                danger: true,
+                onSelect: () => handleDeleteRequest(t.id, t.nombre),
+              },
+            ]}
+          />
+        </>
+      )}
+    </>
+  );
+
+  const tarjetaDe = (t: Torneo, enGrupo: boolean) => {
+    const inscriptos = Array.isArray((t as Torneo & { inscripciones?: unknown[] }).inscripciones)
+      ? (t as Torneo & { inscripciones: unknown[] }).inscripciones.length
+      : t.cupos_actuales || 0;
+    return (
+      <article
+        className={`rounded-2xl border border-white/10 bg-white/[0.03] p-4 ${
+          enGrupo ? "border-l-[3px] border-l-brand-chartreuse" : ""
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
+            className="cursor-pointer text-left text-[15px] font-bold text-white"
+          >
+            {t.nombre}
+          </button>
+          <span
+            className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-bold ${
+              t.estado === "Inscripción"
+                ? "text-[#00ff88]"
+                : t.estado === "Programado"
+                  ? "text-violet-400"
+                  : t.estado === "En curso"
+                    ? "text-[#ffb800]"
+                    : t.estado === "Finalizado"
+                      ? "text-blue-500"
+                      : "text-gray-400"
+            }`}
+          >
+            <span
+              className={`size-1.5 rounded-full ${
+                t.estado === "Inscripción"
+                  ? "bg-[#00ff88]"
+                  : t.estado === "Programado"
+                    ? "bg-violet-500"
+                    : t.estado === "En curso"
+                      ? "bg-[#ffb800]"
+                      : t.estado === "Finalizado"
+                        ? "bg-blue-500"
+                        : "bg-gray-500"
+              }`}
+            />
+            {t.pendiente || t.estado || "Borrador"}
+            {t.tiene_partidos_hoy ? " · Hoy" : ""}
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-gray-500">
+          {t.rama || ""}
+          {t.rama ? " · " : ""}
+          {t.nivel || "Sin nivel"} · {t.categoria || "General"}
+        </p>
+        <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <dt className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Sede</dt>
+            <dd className="font-bold text-brand-white">{t.clubes?.nombre || "Sede a confirmar"}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Fecha</dt>
+            <dd className="font-medium text-brand-white">
+              {t.fecha
+                ? formatFechaCalendario(t.fecha, {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "A confirmar"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Inscriptos</dt>
+            <dd className="font-black text-white">
+              {inscriptos}
+              <span className="font-bold text-gray-500"> / {t.cupos_maximos || 32}</span>
+            </dd>
+          </div>
+        </dl>
+        <div className="mt-3 flex items-center justify-end gap-1 border-t border-white/10 pt-3">
+          {accionesDe(t)}
+        </div>
+      </article>
+    );
+  };
+
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 space-y-8 md:px-10 md:py-10">
       {/* HEADER */}
@@ -332,8 +516,13 @@ export default function TorneosPage() {
       {/* TABLA DE RESULTADOS */}
       <div className="bg-[#111111] rounded-3xl border border-white/5 overflow-hidden shadow-xl">
         {loading ? (
-          /* SKELETON LOADER PREMIUM */
-          <div className="overflow-x-auto">
+          <>
+          <div className="space-y-3 p-3 xl:hidden">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-32 animate-pulse rounded-2xl bg-white/5" />
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto xl:block">
             <table className="w-full table-fixed text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 bg-black/20">
@@ -382,23 +571,40 @@ export default function TorneosPage() {
               </tbody>
             </table>
           </div>
+          </>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full table-fixed text-left border-collapse">
-              <colgroup>
-                <col className="w-[32%]" />
-                <col className="w-[24%]" />
-                <col className="w-[14%]" />
-                <col className="w-[16%]" />
-                <col className="w-[14%]" />
-              </colgroup>
+          <>
+          <div className="p-3 xl:hidden">
+            {tournaments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-12 text-center text-gray-500">
+                <Trophy className="mb-4 size-10 opacity-50" />
+                <span className="text-lg font-medium text-white">No se encontraron torneos</span>
+                <span className="mt-1 text-sm">Ajustá los filtros o creá uno nuevo.</span>
+              </div>
+            ) : (
+              <TorneoFilasAgrupadas
+                grupos={gruposVista}
+                colSpan={5}
+                presentacion="tarjetas"
+                onSumar={(grupo) =>
+                  setAgrupacion({
+                    nombre: grupo.nombre || "",
+                    torneos: grupo.ramas.flatMap((rama) => rama.torneos),
+                  })
+                }
+                renderFila={tarjetaDe}
+              />
+            )}
+          </div>
+          <div className="hidden overflow-x-auto xl:block">
+            <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 text-gray-400 text-xs font-bold uppercase tracking-wider bg-black/20">
                   <th className="py-5 px-8">Torneo</th>
                   <th className="py-5 px-6">Sede / Fecha</th>
                   <th className="py-5 px-6 text-center">Inscriptos</th>
                   <th className="py-5 px-6">Estado</th>
-                  <th className="py-5 px-8 text-right">Acciones</th>
+                  <th className="py-5 px-4 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -514,94 +720,9 @@ export default function TorneosPage() {
                         </div>
                       </td>
 
-                      <td className={`text-right ${enGrupo ? "py-2.5 px-8" : "py-4 px-8"}`}>
-                        <div className="flex flex-wrap justify-end gap-2 items-center">
-                          {/* Botón de Impresión PDF solo para torneos Finalizados */}
-                          {t.estado === "Finalizado" && (
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const partidos = await TorneosService.getPartidos(t.id);
-                                  const { generarPdfGrillaPartidos } = await import("@/utils/grillaPdf");
-                                  generarPdfGrillaPartidos(t, partidos || []);
-                                } catch (err) {
-                                  console.error("Error al imprimir PDF:", err);
-                                }
-                              }}
-                              className="p-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-lg transition-colors"
-                              title="Informe de resultados (PDF)"
-                            >
-                              <Printer className="size-4" />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
-                            className="p-2 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-transparent hover:border-brand-chartreuse/30 rounded-lg transition-colors cursor-pointer"
-                            title="Abrir el paso del estado"
-                          >
-                            <LayoutDashboard className="size-4" />
-                          </button>
-
-                          {!t.solo_lectura && (
-                          <>
-                          <button
-                            onClick={() => {
-                              const grupo = grupos.find(
-                                (item) =>
-                                  item.nombre &&
-                                  item.ramas.some((rama) =>
-                                    rama.torneos.some((itemTorneo) => itemTorneo.id === t.id),
-                                  ),
-                              );
-                              if (grupo?.nombre) {
-                                setAgrupacion({
-                                  nombre: grupo.nombre,
-                                  torneos: grupo.ramas.flatMap((rama) => rama.torneos),
-                                });
-                                return;
-                              }
-                              const base = t.nombre.replace(/\s+[—–-]\s+.*$/, "").trim();
-                              setAgrupacion({
-                                nombre: base || t.nombre,
-                                torneos: [t],
-                              });
-                            }}
-                            className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-brand-chartreuse transition-colors"
-                            title="Agrupar en una competencia"
-                          >
-                            <Layers className="size-4" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setReplicarTorneo(t)}
-                            className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-white/5 px-2 py-1.5 text-xs font-bold text-gray-300 hover:bg-white/10 hover:text-brand-chartreuse"
-                          >
-                            <Copy className="size-3.5" />
-                            Replicar
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(t)}
-                            className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-white/5 px-2 py-1.5 text-xs font-bold text-gray-300 hover:bg-white/10 hover:text-white"
-                          >
-                            <Pencil className="size-3.5" />
-                            Editar
-                          </button>
-                          <MenuPuntos
-                            etiqueta={`Más acciones de ${t.nombre}`}
-                            items={[
-                              {
-                                label: "Eliminar",
-                                danger: true,
-                                onSelect: () => handleDeleteRequest(t.id, t.nombre),
-                              },
-                            ]}
-                          />
-                          </>
-                          )}
+                      <td className={`whitespace-nowrap text-right ${enGrupo ? "py-2.5 px-4" : "py-3 px-4"}`}>
+                        <div className="flex items-center justify-end gap-1">
+                          {accionesDe(t)}
                         </div>
                       </td>
                     </tr>
@@ -611,6 +732,7 @@ export default function TorneosPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

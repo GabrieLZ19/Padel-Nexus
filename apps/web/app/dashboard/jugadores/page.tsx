@@ -504,7 +504,7 @@ export default function JugadoresLicenciasPage() {
             <ConfigLicenciasPanel
               scope="contexto"
               compact
-              puedeEditar={contextoConfig?.puede_editar !== false}
+              puedeEditar
             />
           </div>
         </aside>

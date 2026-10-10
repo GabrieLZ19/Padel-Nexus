@@ -12,7 +12,12 @@ import type { Partido } from "@/utils/types";
 import { TablaPosicionesZona } from "./TablaPosicionesZona";
 import type { ZonaDrag } from "./DragDropPairing";
 import { clasificadosPorZona } from "@/utils/clasificacionZonas";
-import { formatNombrePareja } from "@/utils/nombrePareja";
+import { clasePuntosSet } from "@/utils/marcadorSets";
+import {
+  POR_DEFINIR,
+  esAlcanceNacional,
+  etiquetaParejaVisible,
+} from "@/utils/etiquetaPareja";
 
 /**
  * Panel de zona en "Fase de grupos".
@@ -99,13 +104,7 @@ function MarcadorSets({
             }
           >
             <span
-              className={`text-xs font-black tabular-nums leading-none ${
-                !s.jugado
-                  ? "text-white/15"
-                  : winA
-                    ? "text-brand-chartreuse"
-                    : "text-white/90"
-              }`}
+              className={`text-xs font-black tabular-nums leading-none ${clasePuntosSet(s.jugado, winA)}`}
             >
               {s.jugado ? s.a : "·"}
             </span>
@@ -122,13 +121,7 @@ function MarcadorSets({
             }`}
           >
             <span
-              className={`text-xs font-black tabular-nums leading-none ${
-                !s.jugado
-                  ? "text-white/15"
-                  : winB
-                    ? "text-brand-chartreuse"
-                    : "text-white/55"
-              }`}
+              className={`text-xs font-black tabular-nums leading-none ${clasePuntosSet(s.jugado, winB)}`}
             >
               {s.jugado ? s.b : "·"}
             </span>
@@ -313,11 +306,15 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
                         }`}
                       >
                         {parejaA
-                          ? formatNombrePareja(
-                              parejaA.jugador1_nombre,
-                              parejaA.jugador2_nombre,
-                            ) || "Por definir"
-                          : "Por definir"}
+                          ? etiquetaParejaVisible({
+                              j1: parejaA.jugador1_nombre,
+                              j2: parejaA.jugador2_nombre,
+                              provincia: parejaA.provincia,
+                              letra: parejaA.letra_prioridad,
+                              denominacion: parejaA.denominacion_nacional,
+                              nacional: esAlcanceNacional(alcance),
+                            }) || POR_DEFINIR
+                          : POR_DEFINIR}
                       </p>
                       <p
                         className={`text-xs truncate ${
@@ -327,11 +324,15 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
                         }`}
                       >
                         {parejaB
-                          ? formatNombrePareja(
-                              parejaB.jugador1_nombre,
-                              parejaB.jugador2_nombre,
-                            ) || "Por definir"
-                          : "Por definir"}
+                          ? etiquetaParejaVisible({
+                              j1: parejaB.jugador1_nombre,
+                              j2: parejaB.jugador2_nombre,
+                              provincia: parejaB.provincia,
+                              letra: parejaB.letra_prioridad,
+                              denominacion: parejaB.denominacion_nacional,
+                              nacional: esAlcanceNacional(alcance),
+                            }) || POR_DEFINIR
+                          : POR_DEFINIR}
                       </p>
                     </div>
                     {tieneMarcador ? (

@@ -20,6 +20,11 @@ import {
   etiquetaRondaLlave,
   ordenRondaLlave,
 } from "@/utils/rondasLlave";
+import {
+  POR_DEFINIR,
+  esAlcanceNacional,
+  etiquetaParejaVisible,
+} from "@/utils/etiquetaPareja";
 
 type VistaRapida = "pendientes" | "finalizados" | "todo";
 
@@ -375,11 +380,18 @@ export const PasoResultados = ({
     const code = (
       p.orden != null ? String(p.orden).padStart(2, "0") : p.id.slice(0, 4)
     ).toUpperCase();
-    const shortPair = (j1?: string | null, j2?: string | null) => {
-      const a = (j1 || "").split(",")[0]?.trim() || "—";
-      const b = (j2 || "").split(",")[0]?.trim();
-      return b && b !== "-" ? `${a} · ${b}` : a;
-    };
+    const nacional = esAlcanceNacional(torneo?.alcance);
+    const etiquetaLado = (side: "a" | "b") =>
+      etiquetaParejaVisible({
+        j1: side === "a" ? p.equipo_a_j1 : p.equipo_b_j1,
+        j2: side === "a" ? p.equipo_a_j2 : p.equipo_b_j2,
+        provincia: side === "a" ? p.equipo_a_provincia : p.equipo_b_provincia,
+        letra:
+          side === "a" ? p.equipo_a_letra_prioridad : p.equipo_b_letra_prioridad,
+        denominacion:
+          side === "a" ? p.equipo_a_denominacion : p.equipo_b_denominacion,
+        nacional,
+      }) || POR_DEFINIR;
     const done = p.ganador != null;
     const horaCorta = (() => {
       if (!p.fecha_partido) return null;
@@ -407,13 +419,13 @@ export const PasoResultados = ({
         <span
           className={`truncate font-bold min-w-0 ${done ? "text-gray-500" : "text-white"}`}
         >
-          {shortPair(p.equipo_a_j1, p.equipo_a_j2)}
+          {etiquetaLado("a")}
         </span>
         <span className="text-gray-600 shrink-0">vs</span>
         <span
           className={`truncate font-bold min-w-0 ${done ? "text-gray-500" : "text-white"}`}
         >
-          {shortPair(p.equipo_b_j1, p.equipo_b_j2)}
+          {etiquetaLado("b")}
         </span>
         {done ? (
           <span className="ml-auto text-brand-chartreuse font-black shrink-0">
@@ -460,7 +472,7 @@ export const PasoResultados = ({
     return (
       <div
         key={p.id}
-        className="rounded-2xl border border-white/8 bg-[#0a0a0a]/60 p-3 space-y-2.5"
+        className="rounded-2xl border border-brand-input bg-brand-card p-3 space-y-2.5"
       >
         <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2.5 md:gap-3 items-stretch">
           <TeamBox
@@ -469,6 +481,10 @@ export const PasoResultados = ({
             avatarJ1={p.equipo_a_avatar_j1}
             avatarJ2={p.equipo_a_avatar_j2}
             club={p.equipo_a_club}
+            provincia={p.equipo_a_provincia}
+            letra={p.equipo_a_letra_prioridad}
+            denominacion={p.equipo_a_denominacion}
+            alcanceNacional={esAlcanceNacional(torneo?.alcance)}
             align="left"
             isWinner={isGanadorA}
             compact
@@ -491,16 +507,20 @@ export const PasoResultados = ({
             avatarJ1={p.equipo_b_avatar_j1}
             avatarJ2={p.equipo_b_avatar_j2}
             club={p.equipo_b_club}
+            provincia={p.equipo_b_provincia}
+            letra={p.equipo_b_letra_prioridad}
+            denominacion={p.equipo_b_denominacion}
+            alcanceNacional={esAlcanceNacional(torneo?.alcance)}
             align="right"
             isWinner={isGanadorB}
             compact
           />
         </div>
         <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-[10px] font-bold border-t border-white/5 pt-2">
-          <span className="text-sky-400 bg-sky-400/10 border border-sky-400/20 px-1.5 py-0.5 rounded">
+          <span className="text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-1.5 py-0.5 rounded">
             #{code}
           </span>
-          {meta && <span className="text-emerald-400/90">{meta}</span>}
+          {meta && <span className="text-gray-400">{meta}</span>}
           <span className="text-gray-500 uppercase tracking-wide">{p.ronda}</span>
           {!isReadOnly && (
             <button

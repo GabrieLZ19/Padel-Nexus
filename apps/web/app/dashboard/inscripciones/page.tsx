@@ -371,6 +371,127 @@ export default function GestionInscripcionesPage() {
     document.body.removeChild(link);
   };
 
+  const fechaDe = (ins: Inscripcion) =>
+    new Date(ins.created_at || new Date()).toLocaleDateString("es-AR", {
+      day: "2-digit",
+      month: "short",
+    });
+
+  const destinoDe = (ins: Inscripcion) =>
+    ins.tipo === "Reserva cancha"
+      ? ins.cancha_nombre || "Cancha no asignada"
+      : ins.torneo_nombre || "Torneo no asignado";
+
+  const accionesDe = (ins: Inscripcion) =>
+    ins.estado_pago === FAP_ESTADOS_PAGO.PENDIENTE ? (
+      <>
+        <button
+          type="button"
+          onClick={() =>
+            handleCambiarEstado(
+              String(ins.id),
+              FAP_ESTADOS_PAGO.CONFIRMADO,
+              Number(ins.monto || 0),
+            )
+          }
+          className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-green-500/20 bg-green-500/10 text-[#00ff88] transition-colors hover:bg-green-500/20"
+          title="Aprobar inscripción"
+          aria-label="Aprobar inscripción"
+        >
+          <Check className="size-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            handleCambiarEstado(String(ins.id), FAP_ESTADOS_PAGO.RECHAZADO)
+          }
+          className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-red-500/20 bg-red-500/10 text-[#ff4444] transition-colors hover:bg-red-500/20"
+          title="Rechazar inscripción"
+          aria-label="Rechazar inscripción"
+        >
+          <X className="size-4" />
+        </button>
+      </>
+    ) : (
+      <button
+        type="button"
+        onClick={() => handleOpenDetalle(ins)}
+        className="inline-flex cursor-pointer items-center gap-1 text-[13px] font-semibold text-gray-400 transition-colors hover:text-brand-chartreuse"
+      >
+        Detalles <ChevronRight className="size-4" />
+      </button>
+    );
+
+  const tarjetaDe = (ins: Inscripcion) => {
+    const segundo = ins.jugador2_nombre?.trim() ?? "";
+    const esPareja = segundo !== "" && segundo !== "-";
+    return (
+      <article
+        key={ins.id}
+        className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-bold text-white">
+              {cleanName(ins.jugador1_nombre)}
+              {esPareja && ins.jugador2_nombre ? (
+                <span className="font-medium text-gray-400">
+                  {" "}
+                  / {cleanName(ins.jugador2_nombre)}
+                </span>
+              ) : null}
+            </p>
+            <p className="mt-0.5 text-sm text-gray-500">
+              {ins.tipo || "Inscripción torneo"}
+            </p>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-semibold text-gray-300">
+            <span
+              className={`size-1.5 rounded-full ${
+                ins.estado_pago === "Confirmado"
+                  ? "bg-[#00ff88]"
+                  : ins.estado_pago === "Pendiente"
+                    ? "bg-[#ffb800]"
+                    : "bg-[#ff4444]"
+              }`}
+            />
+            {ins.estado_pago}
+          </span>
+        </div>
+        <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+          <div className="col-span-2">
+            <dt className="text-[11px] font-bold uppercase tracking-wide text-gray-500">
+              {ins.tipo === "Reserva cancha" ? "Cancha" : "Torneo"}
+            </dt>
+            <dd className="font-semibold text-brand-white">{destinoDe(ins)}</dd>
+            {ins.categoria && ins.categoria !== "-" ? (
+              <dd className="text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                {ins.categoria}
+              </dd>
+            ) : null}
+          </div>
+          <div>
+            <dt className="text-[11px] font-bold uppercase tracking-wide text-gray-500">
+              Fecha
+            </dt>
+            <dd className="font-medium text-brand-white">{fechaDe(ins)}</dd>
+          </div>
+          <div>
+            <dt className="text-[11px] font-bold uppercase tracking-wide text-gray-500">
+              Monto
+            </dt>
+            <dd className="font-black text-white">
+              ${Number(ins.monto || 0).toLocaleString("es-AR")}
+            </dd>
+          </div>
+        </dl>
+        <div className="mt-3 flex items-center justify-end gap-2 border-t border-white/10 pt-3">
+          {accionesDe(ins)}
+        </div>
+      </article>
+    );
+  };
+
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 space-y-8 md:px-10 md:py-10">
       {/* HEADER PRINCIPAL */}
@@ -555,7 +676,13 @@ export default function GestionInscripcionesPage() {
       {/* TABLA PRINCIPAL DE INSCRIPCIONES */}
       <div className="bg-[#111111] rounded-3xl border border-white/10 overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
         {loading ? (
-          <div className="overflow-x-auto">
+          <>
+          <div className="space-y-3 p-3 xl:hidden">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-36 animate-pulse rounded-2xl bg-white/5" />
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto xl:block">
             <table className="w-full table-fixed text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 bg-black/20">
@@ -607,6 +734,7 @@ export default function GestionInscripcionesPage() {
               </tbody>
             </table>
           </div>
+          </>
         ) : inscripciones.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center text-center">
             <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 text-gray-500">
@@ -621,16 +749,12 @@ export default function GestionInscripcionesPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full table-fixed text-left border-collapse">
-              <colgroup>
-                <col className="w-[24%]" />
-                <col className="w-[22%]" />
-                <col className="w-[12%]" />
-                <col className="w-[16%]" />
-                <col className="w-[12%]" />
-                <col className="w-[14%]" />
-              </colgroup>
+          <>
+          <div className="flex flex-col gap-3 p-3 xl:hidden">
+            {inscripciones.map((ins) => tarjetaDe(ins))}
+          </div>
+          <div className="hidden overflow-x-auto xl:block">
+            <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 text-gray-400 text-xs font-bold uppercase tracking-wider bg-black/20">
                   <th className="py-4 px-8">Jugador / Pareja</th>
@@ -696,14 +820,11 @@ export default function GestionInscripcionesPage() {
                         )}
                       </td>
 
-                      <td className="py-4 px-6 text-[13px] text-gray-400 flex items-center gap-2">
-                        <Clock className="size-3.5" />
-                        {new Date(
-                          ins.created_at || new Date(),
-                        ).toLocaleDateString("es-AR", {
-                          day: "2-digit",
-                          month: "short",
-                        })}
+                      <td className="py-4 px-6 text-[13px] text-gray-400">
+                        <span className="inline-flex items-center gap-2">
+                          <Clock className="size-3.5" />
+                          {fechaDe(ins)}
+                        </span>
                       </td>
 
                       <td className="py-4 px-6">
@@ -721,49 +842,16 @@ export default function GestionInscripcionesPage() {
                         </div>
                       </td>
 
-                      <td className="py-4 px-6 font-bold text-brand-white flex items-center gap-1.5 text-[14px]">
-                        <CreditCard className="size-4 text-gray-500" />$
-                        {Number(ins.monto || 0).toLocaleString("es-AR")}
+                      <td className="py-4 px-6 text-[14px] font-bold text-brand-white">
+                        <span className="inline-flex items-center gap-1.5">
+                          <CreditCard className="size-4 text-gray-500" />$
+                          {Number(ins.monto || 0).toLocaleString("es-AR")}
+                        </span>
                       </td>
 
-                      <td className="py-4 px-8 text-right">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          {ins.estado_pago === FAP_ESTADOS_PAGO.PENDIENTE ? (
-                            <>
-                              <button
-                                onClick={() =>
-                                  handleCambiarEstado(
-                                    String(ins.id),
-                                    FAP_ESTADOS_PAGO.CONFIRMADO,
-                                    Number(ins.monto || 0),
-                                  )
-                                }
-                                className="p-2.5 bg-green-500/10 hover:bg-green-500/20 text-[#00ff88] rounded-xl transition-all border border-green-500/20"
-                                title="Aprobar Inscripción"
-                              >
-                                <Check className="size-4" />
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleCambiarEstado(
-                                    String(ins.id),
-                                    FAP_ESTADOS_PAGO.RECHAZADO,
-                                  )
-                                }
-                                className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-[#ff4444] rounded-xl transition-all border border-red-500/20"
-                                title="Rechazar Inscripción"
-                              >
-                                <X className="size-4" />
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => handleOpenDetalle(ins)}
-                              className="flex items-center gap-1 text-gray-400 hover:text-brand-chartreuse font-semibold text-[13px] transition-colors"
-                            >
-                              Detalles <ChevronRight className="size-4" />
-                            </button>
-                          )}
+                      <td className="whitespace-nowrap py-4 px-8 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {accionesDe(ins)}
                         </div>
                       </td>
                     </tr>
@@ -772,6 +860,7 @@ export default function GestionInscripcionesPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

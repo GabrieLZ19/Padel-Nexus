@@ -504,7 +504,7 @@ export default function TorneoDetallePage() {
                       </div>
                     </div>
                     <div className="relative rounded-2xl border border-white/8 bg-[#0f0f0f] overflow-hidden">
-                      <div className="relative p-3 sm:p-5 overflow-x-auto">
+                      <div className="relative p-3 sm:p-5 overflow-x-hidden">
                         <FapBracketDiagram
                           matches={fapMatrixMatches}
                           inicioNumeracion={

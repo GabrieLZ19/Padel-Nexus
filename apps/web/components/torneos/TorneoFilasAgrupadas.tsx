@@ -2,16 +2,18 @@
 
 import { Fragment, useState, type ReactNode } from "react";
 import { ChevronRight, Plus } from "lucide-react";
-import type { GrupoTorneoListado, Torneo } from "@/utils/types";
+import type { EstadoTorneo, GrupoTorneoListado, Torneo } from "@/utils/types";
 
 interface TorneoFilasAgrupadasProps {
   grupos: GrupoTorneoListado[];
   colSpan: number;
   renderFila: (torneo: Torneo, enGrupo: boolean) => ReactNode;
   onSumar?: (grupo: GrupoTorneoListado) => void;
+  /** En pantallas chicas cada torneo es una tarjeta, no una fila de tabla. */
+  presentacion?: "tabla" | "tarjetas";
 }
 
-const PRIORIDAD_ESTADO = [
+const PRIORIDAD_ESTADO: EstadoTorneo[] = [
   "En curso",
   "Inscripción",
   "Programado",
@@ -71,6 +73,7 @@ export default function TorneoFilasAgrupadas({
   colSpan,
   renderFila,
   onSumar,
+  presentacion = "tabla",
 }: TorneoFilasAgrupadasProps) {
   const [competenciasAbiertas, setCompetenciasAbiertas] = useState<
     Record<string, boolean>
@@ -78,6 +81,121 @@ export default function TorneoFilasAgrupadas({
   const [ramasAbiertas, setRamasAbiertas] = useState<Record<string, boolean>>(
     {},
   );
+
+  if (presentacion === "tarjetas") {
+    return (
+      <div className="flex flex-col gap-3">
+        {grupos.map((grupo, index) => {
+          const clave = grupo.id || grupo.nombre || `grupo-${index}`;
+          if (!grupo.nombre) {
+            return (
+              <Fragment key={clave}>
+                {grupo.ramas.flatMap((rama) =>
+                  rama.torneos.map((torneo) => (
+                    <Fragment key={torneo.id}>{renderFila(torneo, false)}</Fragment>
+                  )),
+                )}
+              </Fragment>
+            );
+          }
+
+          const torneos = grupo.ramas.flatMap((rama) => rama.torneos);
+          const abierta = Boolean(competenciasAbiertas[clave]);
+          const categorias = torneos.length;
+          const estado = resumenEstado(torneos);
+
+          return (
+            <div key={clave} className="overflow-hidden rounded-2xl border border-white/10">
+              <div className="flex items-stretch border-l-[3px] border-brand-chartreuse bg-brand-chartreuse/10">
+                <button
+                  type="button"
+                  aria-expanded={abierta}
+                  aria-label={`${abierta ? "Cerrar" : "Abrir"} ${grupo.nombre}`}
+                  onClick={() =>
+                    setCompetenciasAbiertas((actual) => ({
+                      ...actual,
+                      [clave]: !actual[clave],
+                    }))
+                  }
+                  className="flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left"
+                >
+                  <ChevronRight
+                    className={`size-4 shrink-0 text-brand-chartreuse transition-transform ${
+                      abierta ? "rotate-90" : ""
+                    }`}
+                  />
+                  <span className="font-bold text-white">{grupo.nombre}</span>
+                  <span className="text-xs font-medium text-gray-500">
+                    {categorias} {categorias === 1 ? "categoría" : "categorías"}
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1.5 text-xs font-bold ${tonoEstado(estado.estado)}`}
+                  >
+                    <span className={`size-1.5 rounded-full ${puntoEstado(estado.estado)}`} />
+                    {estado.etiqueta}
+                  </span>
+                </button>
+                {onSumar && (
+                  <button
+                    type="button"
+                    onClick={() => onSumar(grupo)}
+                    aria-label="Sumar torneos"
+                    className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 px-3 text-xs font-bold text-brand-chartreuse"
+                  >
+                    <Plus className="size-3.5" />
+                    <span className="hidden sm:inline">Sumar torneos</span>
+                  </button>
+                )}
+              </div>
+              {abierta && (
+                <div className="flex flex-col gap-2 p-3">
+                  {grupo.ramas.map((rama) => {
+                    const claveRama = `${clave}:${rama.rama || "sin"}`;
+                    const ramaAbierta = Boolean(ramasAbiertas[claveRama]);
+                    const nombreRama = etiquetaCorta(rama.etiqueta) || "Sin rama";
+                    return (
+                      <div key={claveRama}>
+                        <button
+                          type="button"
+                          aria-expanded={ramaAbierta}
+                          aria-label={`${ramaAbierta ? "Cerrar" : "Abrir"} ${nombreRama} de ${grupo.nombre}`}
+                          onClick={() =>
+                            setRamasAbiertas((actual) => ({
+                              ...actual,
+                              [claveRama]: !actual[claveRama],
+                            }))
+                          }
+                          className="flex w-full cursor-pointer items-center gap-2 py-1.5 text-left"
+                        >
+                          <ChevronRight
+                            className={`size-3.5 shrink-0 text-gray-400 transition-transform ${
+                              ramaAbierta ? "rotate-90" : ""
+                            }`}
+                          />
+                          <span className="text-sm font-semibold text-white">{nombreRama}</span>
+                          <span className="text-xs font-medium text-gray-500">
+                            {rama.torneos.length}{" "}
+                            {rama.torneos.length === 1 ? "categoría" : "categorías"}
+                          </span>
+                        </button>
+                        {ramaAbierta && (
+                          <div className="mt-2 flex flex-col gap-2">
+                            {rama.torneos.map((torneo) => (
+                              <Fragment key={torneo.id}>{renderFila(torneo, true)}</Fragment>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <>

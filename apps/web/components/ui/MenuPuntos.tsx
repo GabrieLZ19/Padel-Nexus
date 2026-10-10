@@ -41,7 +41,7 @@ export function MenuPuntos({
           event.stopPropagation();
           setAbierto((valor) => !valor);
         }}
-        className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors cursor-pointer"
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors cursor-pointer"
       >
         <MoreHorizontal className="size-4" />
       </button>

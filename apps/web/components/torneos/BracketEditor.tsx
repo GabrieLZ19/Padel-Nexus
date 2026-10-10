@@ -1423,7 +1423,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           )}
 
           <div className="relative rounded-2xl border border-brand-input bg-brand-card overflow-hidden">
-            <div className="relative p-4 sm:p-6 overflow-x-auto">
+            <div className="relative p-4 sm:p-6 overflow-x-hidden">
               {playoffPartidos.length === 0 && partidos.length === 0 ? (
                 <div className="text-center p-12 text-gray-500 border border-dashed border-brand-input rounded-2xl">
                   Aún no se ha generado el cuadro de eliminatoria para este
@@ -1445,12 +1445,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   }}
                 />
               ) : (
-                <div className="flex gap-0 min-w-max pb-4 pt-1">
+                <div
+                  className="grid pb-4 pt-1"
+                  style={{
+                    gridTemplateColumns: `repeat(${Math.max(rondasToShow.length, 1)}, minmax(0, 1fr))`,
+                  }}
+                >
                   {rondasToShow.map((ronda, rondaIndex) => (
-                    <div
-                      key={ronda.id}
-                      className="flex flex-col w-[21rem] sm:w-[24.5rem]"
-                    >
+                    <div key={ronda.id} className="flex min-w-0 flex-col">
                       <h3 className="text-center text-[10px] font-black text-gray-500 uppercase tracking-[0.22em] mb-6">
                         {ronda.label}
                       </h3>
