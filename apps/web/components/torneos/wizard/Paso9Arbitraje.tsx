@@ -15,6 +15,7 @@ import {
   esAlcanceNacional,
   etiquetaParejaVisible,
 } from "@/utils/etiquetaPareja";
+import CustomDropdown from "@/components/ui/CustomDropdown";
 
 type VistaRapida = "pendientes" | "finalizados" | "todo";
 
@@ -721,22 +722,21 @@ export const PasoResultados = ({
             <h3 className="shrink-0 text-sm font-extrabold tracking-tight text-white">
               Paso {numeroPaso}: Resultados
             </h3>
-            <label className="sr-only" htmlFor="filtro-zona-ronda">
-              Zona o ronda
-            </label>
-            <select
-              id="filtro-zona-ronda"
-              value={filtroGrupo}
-              onChange={(e) => setFiltroGrupo(e.target.value)}
-              className="h-8 min-w-36 cursor-pointer rounded-lg border border-white/10 bg-brand-black px-2 text-xs font-bold text-white outline-none focus:border-brand-chartreuse"
-            >
-              <option value="todas">Todas las zonas y rondas</option>
-              {opcionesFiltro.map((opcion) => (
-                <option key={opcion.id} value={opcion.id}>
-                  {opcion.label}
-                </option>
-              ))}
-            </select>
+            <div className="w-full min-w-52 sm:w-64">
+              <CustomDropdown
+                compacto
+                value={filtroGrupo}
+                onChange={setFiltroGrupo}
+                placeholder="Zona o ronda"
+                options={[
+                  { value: "todas", label: "Todas las zonas y rondas" },
+                  ...opcionesFiltro.map((opcion) => ({
+                    value: opcion.id,
+                    label: opcion.label,
+                  })),
+                ]}
+              />
+            </div>
             <div className="flex items-center gap-1" role="tablist" aria-label="Filtrar resultados">
               {VISTAS.map((v) => {
                 const activo = vistaRapida === v.id;

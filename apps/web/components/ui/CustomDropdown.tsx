@@ -18,6 +18,8 @@ export interface CustomDropdownProps {
   haciaArriba?: boolean; // ➡️ Prop opcional declarado correctamente para evitar ts(2322)
   hasError?: boolean;
   className?: string;
+  /** Alto de barra (paginación, filtros). El resto de los formularios sigue en el tamaño de campo. */
+  compacto?: boolean;
 }
 
 export default function CustomDropdown({
@@ -29,6 +31,7 @@ export default function CustomDropdown({
   haciaArriba = false, // Por defecto se despliega hacia abajo
   hasError = false,
   className = "",
+  compacto = false,
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -116,7 +119,9 @@ export default function CustomDropdown({
         }
         onKeyDown={onKeyDown}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full bg-brand-input px-4 py-3.5 rounded-xl border text-sm md:text-base flex justify-between items-center gap-2 transition-all duration-200 select-none min-w-0 ${
+        className={`w-full bg-brand-input rounded-xl border flex justify-between items-center gap-2 transition-all duration-200 select-none min-w-0 ${
+          compacto ? "px-3 py-2 text-xs" : "px-4 py-3.5 text-sm md:text-base"
+        } ${
           isOpen
             ? "border-brand-chartreuse ring-1 ring-brand-chartreuse shadow-[0_0_15px_rgba(203,254,1,0.05)]"
             : hasError
@@ -180,7 +185,9 @@ export default function CustomDropdown({
                       aria-selected={isSelected}
                       onMouseEnter={() => setActiveIndex(index)}
                       onClick={() => elegir(index)}
-                      className={`w-full px-4 py-3 text-sm md:text-base cursor-pointer transition-colors text-left flex items-center ${
+                      className={`w-full cursor-pointer transition-colors text-left flex items-center ${
+                        compacto ? "px-3 py-2 text-xs" : "px-4 py-3 text-sm md:text-base"
+                      } ${
                         isSelected || activo
                           ? "text-brand-chartreuse font-bold bg-brand-chartreuse/5 border-l-2 border-brand-chartreuse"
                           : "text-gray-300 border-l-2 border-transparent hover:bg-brand-white/5 hover:text-brand-white"
