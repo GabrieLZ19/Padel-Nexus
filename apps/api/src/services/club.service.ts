@@ -4,6 +4,17 @@ import {
   hoyArgentina,
   type ReservaEnAgenda,
 } from "../utils/agendaReservas";
+import {
+  precioDeTurno,
+  rangoMesCalendario,
+  tasaOcupacion,
+  turnosDisponiblesEntre,
+} from "../utils/ocupacionClub";
+import {
+  compararCanchas,
+  nombreCanchaNormalizado,
+  nombreCanchaVisible,
+} from "../utils/ordenCanchas";
 
 export interface CrearClubDTO {
   nombre: string;
@@ -326,26 +337,28 @@ export class ClubService {
   // ── Canchas CRUD ──────────────────────────────────────────────────────
 
   static async obtenerCanchasPorClub(clubId: string) {
-    // Trae las canchas con sus turnos asociados
     const { data, error } = await supabaseAdmin
       .from("canchas")
       .select("*, turnos(*)")
       .eq("club_id", clubId);
 
     if (error) throw new Error("Error al obtener las canchas del club.");
-    return data || [];
+    return (data || []).slice().sort(compararCanchas);
   }
 
   static async crearCancha(
     clubId: string,
     datos: { nombre: string; tipo_suelo: string; techada: boolean },
   ) {
+    const nombre = nombreCanchaVisible(datos.nombre);
+    await ClubService.assertNombreCanchaDisponible(clubId, nombre);
+
     const { data, error } = await supabaseAdmin
       .from("canchas")
       .insert([
         {
           club_id: clubId,
-          nombre: datos.nombre,
+          nombre,
           tipo_suelo: datos.tipo_suelo || null,
           techada: datos.techada,
           activa: true,
@@ -367,9 +380,27 @@ export class ClubService {
       activa?: boolean;
     },
   ) {
+    const payload = { ...datos };
+    if (payload.nombre !== undefined) {
+      const { data: actual, error: errorActual } = await supabaseAdmin
+        .from("canchas")
+        .select("club_id")
+        .eq("id", canchaId)
+        .single();
+      if (errorActual || !actual?.club_id) {
+        throw new Error("No se encontró la cancha.");
+      }
+      payload.nombre = nombreCanchaVisible(payload.nombre);
+      await ClubService.assertNombreCanchaDisponible(
+        actual.club_id,
+        payload.nombre,
+        canchaId,
+      );
+    }
+
     const { data, error } = await supabaseAdmin
       .from("canchas")
-      .update(datos)
+      .update(payload)
       .eq("id", canchaId)
       .select()
       .single();
@@ -377,6 +408,27 @@ export class ClubService {
     if (error)
       throw new Error(`Error al actualizar la cancha: ${error.message}`);
     return data;
+  }
+
+  private static async assertNombreCanchaDisponible(
+    clubId: string,
+    nombre: string,
+    exceptoId?: string,
+  ) {
+    const normalizado = nombreCanchaNormalizado(nombre);
+    const { data, error } = await supabaseAdmin
+      .from("canchas")
+      .select("id, nombre")
+      .eq("club_id", clubId);
+
+    if (error) throw new Error("No se pudo validar el nombre de la cancha.");
+
+    const repetida = (data || []).some(
+      (cancha) =>
+        cancha.id !== exceptoId &&
+        nombreCanchaNormalizado(cancha.nombre || "") === normalizado,
+    );
+    if (repetida) throw new Error("Ya hay una cancha con ese nombre.");
   }
 
   static async eliminarCancha(canchaId: string) {
@@ -442,76 +494,61 @@ export class ClubService {
   }
 
   static async obtenerEstadisticasClub(clubId: string) {
-    // 1. Obtener canchas del club
-    const { data: canchas } = await supabaseAdmin
+    const { data: canchas, error: errorCanchas } = await supabaseAdmin
       .from("canchas")
       .select("id, activa")
       .eq("club_id", clubId);
 
-    const canchaIds = (canchas || []).map((c) => c.id);
-    const canchasActivas = (canchas || []).filter((c) => c.activa).length;
+    if (errorCanchas) throw new Error("Error al obtener las canchas del club.");
 
-    if (canchaIds.length === 0) {
-      return {
-        canchas_totales: 0,
-        canchas_activas: 0,
-        reservas_mes: 0,
-        ingresos_estimados: 0,
-        tasa_ocupacion: 0,
-      };
-    }
+    const listaCanchas = canchas || [];
+    const canchasActivas = listaCanchas.filter((cancha) => cancha.activa).length;
+    const vacio = {
+      canchas_totales: listaCanchas.length,
+      canchas_activas: canchasActivas,
+      reservas_mes: 0,
+      ingresos_estimados: 0,
+      tasa_ocupacion: 0,
+    };
+    if (listaCanchas.length === 0) return vacio;
 
-    // 2. Obtener turnos asociados a esas canchas
-    const { data: turnos } = await supabaseAdmin
+    const { desde, hasta } = rangoMesCalendario(hoyArgentina());
+
+    const { data: turnos, error: errorTurnos } = await supabaseAdmin
       .from("turnos")
-      .select("id")
-      .in("cancha_id", canchaIds);
+      .select("dia_semana, canchas!inner(club_id, activa)")
+      .eq("canchas.club_id", clubId)
+      .eq("canchas.activa", true);
 
-    const turnoIds = (turnos || []).map((t) => t.id);
+    if (errorTurnos) throw new Error("Error al obtener los turnos del club.");
 
-    if (turnoIds.length === 0) {
-      return {
-        canchas_totales: canchaIds.length,
-        canchas_activas: canchasActivas,
-        reservas_mes: 0,
-        ingresos_estimados: 0,
-        tasa_ocupacion: 0,
-      };
-    }
-
-    // 3. Reservas del mes actual
-    const inicioMes = new Date();
-    inicioMes.setDate(1);
-    inicioMes.setHours(0, 0, 0, 0);
-
-    const { data: reservas } = await supabaseAdmin
+    const { data: reservas, error: errorReservas } = await supabaseAdmin
       .from("reservas")
-      .select("id, turno_id, estado_pago, turnos(precio)")
-      .in("turno_id", turnoIds)
-      .gte("fecha_reserva", inicioMes.toISOString().split("T")[0]);
+      .select("id, turnos!inner(precio, canchas!inner(club_id))")
+      .eq("turnos.canchas.club_id", clubId)
+      .gte("fecha_reserva", desde)
+      .lt("fecha_reserva", hasta)
+      .neq("estado_reserva", "cancelada");
+
+    if (errorReservas) throw new Error("Error al obtener las reservas del mes.");
 
     const reservasMes = (reservas || []).length;
-
-    // Calcular ingresos estimados del mes (precio de las reservas confirmadas/completadas o todas)
-    const ingresosEstimados = (reservas || []).reduce((acc, res) => {
-      const precio = (res.turnos as any)?.precio || 0;
-      return acc + Number(precio);
-    }, 0);
-
-    // Calcular tasa de ocupación aproximada: reservas realizadas / turnos totales disponibles en el mes
-    const diasTranscurridos = new Date().getDate();
-    const turnosTotalesDisponibles = turnoIds.length * diasTranscurridos;
-    const tasaOcupacion =
-      turnosTotalesDisponibles > 0
-        ? Math.round((reservasMes / turnosTotalesDisponibles) * 100)
-        : 0;
+    const ingresosEstimados = (reservas || []).reduce(
+      (total, reserva) => total + precioDeTurno(reserva.turnos),
+      0,
+    );
+    const disponibles = turnosDisponiblesEntre(
+      (turnos || []).map((turno) => ({ dia_semana: Number(turno.dia_semana) })),
+      desde,
+      hasta,
+    );
 
     return {
-      canchas_totales: canchaIds.length,
+      canchas_totales: listaCanchas.length,
       canchas_activas: canchasActivas,
       reservas_mes: reservasMes,
       ingresos_estimados: ingresosEstimados,
-      tasa_ocupacion: Math.min(tasaOcupacion, 100),
+      tasa_ocupacion: tasaOcupacion(reservasMes, disponibles),
     };
   }
 
@@ -524,9 +561,18 @@ export class ClubService {
       page?: number;
       limit?: number;
       solo_atrasadas?: boolean;
+      proximas?: boolean;
     },
   ) {
-    const { fecha, estado_pago, cancha_id, page = 1, limit = 20, solo_atrasadas } = filtros;
+    const {
+      fecha,
+      estado_pago,
+      cancha_id,
+      page = 1,
+      limit = 20,
+      solo_atrasadas,
+      proximas,
+    } = filtros;
     const hoy = hoyArgentina();
     const from = (page - 1) * limit;
     const to = from + limit - 1;
@@ -589,13 +635,23 @@ export class ClubService {
     }
 
     if (solo_atrasadas) {
-      query = query.lt("fecha_reserva", hoy).eq("estado_reserva", "pendiente");
+      query = query
+        .lt("fecha_reserva", hoy)
+        .eq("estado_reserva", "pendiente")
+        .order("fecha_reserva", { ascending: false });
+    } else if (proximas) {
+      query = query
+        .gte("fecha_reserva", hoy)
+        .neq("estado_reserva", "cancelada")
+        .order("fecha_reserva", { ascending: true })
+        .order("hora_inicio", { ascending: true, referencedTable: "turnos" });
     } else {
       if (fecha) query = query.eq("fecha_reserva", fecha);
       if (estado_pago) query = query.eq("estado_pago", estado_pago);
+      query = query.order("fecha_reserva", { ascending: false });
     }
 
-    query = query.order("fecha_reserva", { ascending: false }).range(from, to);
+    query = query.range(from, to);
 
     const turnoIds = cancha_id
       ? (
@@ -628,11 +684,10 @@ export class ClubService {
       .from("canchas")
       .select("id, nombre")
       .eq("club_id", clubId)
-      .eq("activa", true)
-      .order("nombre", { ascending: true });
+      .eq("activa", true);
 
     if (errorCanchas) throw new Error(errorCanchas.message);
-    const listaCanchas = canchas || [];
+    const listaCanchas = (canchas || []).slice().sort(compararCanchas);
     const canchaIds = listaCanchas.map((cancha) => cancha.id);
     if (canchaIds.length === 0) {
       return { fecha, canchas: [], filas: [] };

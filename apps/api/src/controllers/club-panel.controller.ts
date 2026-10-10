@@ -225,7 +225,8 @@ export class ClubPanelController {
   static async obtenerReservas(req: Request, res: Response) {
     try {
       const clubId = await ClubPanelController.getClubIdDelUsuario(req.user!.id);
-      const { fecha, estado_pago, cancha_id, page, limit, solo_atrasadas } = req.query;
+      const { fecha, estado_pago, cancha_id, page, limit, solo_atrasadas, proximas } =
+        req.query;
 
       const filtros = {
         fecha: fecha as string | undefined,
@@ -234,6 +235,7 @@ export class ClubPanelController {
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
         solo_atrasadas: solo_atrasadas === "1" || solo_atrasadas === "true",
+        proximas: proximas === "1" || proximas === "true",
       };
 
       const data = await ClubService.obtenerReservasClub(clubId, filtros);
