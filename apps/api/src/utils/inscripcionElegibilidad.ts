@@ -427,7 +427,7 @@ export function assertPasoJugadoresEditable(torneo: {
   estado?: string | null;
 }): void {
   const estado = (torneo.estado || "").trim();
-  const bloqueados = [
+  const bloqueados: readonly string[] = [
     FAP_ESTADOS_TORNEO.PROGRAMADO,
     FAP_ESTADOS_TORNEO.EN_CURSO,
     FAP_ESTADOS_TORNEO.FINALIZADO,
