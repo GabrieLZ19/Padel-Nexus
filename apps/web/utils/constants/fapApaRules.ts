@@ -360,10 +360,7 @@ export function findFapAsociacion<
     tipo?: string | null;
   },
 >(list: T[]): T | undefined {
-  return (
-    list.find((a) => esAsociacionFap(a)) ||
-    list.find((a) => (a.tipo || "").toLowerCase() === "federacion")
-  );
+  return list.find((a) => esAsociacionFap(a));
 }
 
 /** Alcance Nacional siempre organiza FAP. */

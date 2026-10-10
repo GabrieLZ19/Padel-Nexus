@@ -22,7 +22,7 @@ No implementar estas partes hasta que respondan.
 | Qué puede hacer un club sede en un torneo de otra entidad | ACC-01, si hay que cambiar la regla | Propuesta del documento: carga resultados y no edita ni elimina. Probado con New Center |
 | Tipografía de los textos corridos | GEN-03, el cuerpo del texto | Unigeo sigue sin cargar (el archivo responde 404) |
 | Pareja repetida «Córdoba B» en el ejemplo de puntos | RAN-02, solo ese total | Los puntos 8/6/4/2/1 ya se configuran en el cierre |
-| Cómo interviene un fiscal en un torneo en curso | SEC-02, el flujo | — |
+| Cómo interviene un fiscal en un torneo en curso | SEC-02, el flujo | El colegio de Federación es el de FAP, no el de la asociación provincial |
 
 ## Críticos
 
@@ -46,7 +46,9 @@ No implementar estas partes hasta que respondan.
 - [x] **PRO-05 · Lista de pendientes legible.** (9/10) La lista ocupa el alto libre del programador. Cada partido son dos líneas, las zonas y las rondas se pliegan, y la pestaña Llave agrupa por ronda para arrastrar igual que en Zonas. Mover parejas entre zonas sigue conservando el horario.
 - [x] **PUB-02 · Sitio público sin datos de prueba ni cifras ficticias.** (9/10) Sin sesión no aparecen torneos ni jugadores de ensayo. La portada muestra 9 jugadores, 0 torneos, 7 clubes y 14 canchas, que salen de la base. No está «Apertura Pilar» ni el acceso a las tiendas. El panel del club sigue viendo los torneos de prueba.
 - [x] **RAN-04 · Desempate y categorías en el ranking público.** (9/10) Abre en 6ª, sin «Todas». 6ª y 6ta comparten la misma tabla. Si empatan en puntos, el orden es por apellido y, si coincide, por nombre. El primero figura «1.º».
-- [ ] **SEC-02 · Colegio de Fiscales de la propia entidad.** Federación ve el colegio de APA, vacío, y la sigla APA también nombra a una asociación provincial. Aceptación: una demo de cómo interviene un fiscal en un torneo en curso. El flujo espera al cliente.
+- [ ] **SEC-02 · Colegio de Fiscales de la propia entidad.**
+  - [x] Colegio (10/10): Federación ve el padrón de FAP (Federación Argentina de Pádel). La Asociación Paranaense queda como asociación provincial, con sigla APP, afiliada a FAP. La sigla APA sigue siendo el reglamento de la Asociación de Pádel Argentina. Alta, edición e inhabilitación del padrón quedan en la federación nacional.
+  - [ ] Cómo interviene un fiscal en un torneo en curso. Sigue esperando al cliente.
 - [ ] **TOR-02 · Agrupar por competencia, rama y categoría.** Replicar crea torneos sueltos. Debe existir una competencia que los agrupe y el listado la muestre como fila desplegable. Aceptación: replicar a 6 categorías deja una sola fila que se abre en rama y después en categoría, igual en Federación, Asociación y Club.
 - [ ] **TOR-03 · Abrir el torneo en el paso de su estado.** El centro de control abre el paso 1, bloqueado si el torneo está en curso. Un clic en el nombre debe abrir Datos, Jugadores, Cuadros o Resultados según el estado. Aceptación: en PRUEBA FINAL HR, el clic abre Resultados.
 

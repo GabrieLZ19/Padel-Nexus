@@ -20,19 +20,21 @@ import {
   Check,
 } from "lucide-react";
 import { FiscalesService, Fiscal, AccesoFiscal } from "@/utils/services/fiscales";
-import { AsociacionesService, type Asociacion } from "@/utils/services/asociaciones";
+import { FederacionesService, type Federacion } from "@/utils/services/federaciones";
 import { sileo } from "sileo";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
-
-const FAP_ID = "818c6a07-f056-41dc-9a07-b8c03d88cee1";
+import { useProfileStore } from "@/store/useProfileStore";
+import { esRolFederacionNacional } from "@/utils/auth/roles";
 
 export default function ColegioFiscalesPage() {
+  const profile = useProfileStore((s) => s.profile);
+  const puedeGestionarColegio = esRolFederacionNacional(profile?.rol);
   const [fiscales, setFiscales] = useState<Fiscal[]>([]);
-  const [federaciones, setFederaciones] = useState<Asociacion[]>([]);
-  const [colegioId, setColegioId] = useState(FAP_ID);
+  const [federaciones, setFederaciones] = useState<Federacion[]>([]);
+  const [colegioId, setColegioId] = useState("");
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"table" | "cards">("cards");
@@ -59,7 +61,7 @@ export default function ColegioFiscalesPage() {
     direccion: "",
     correo: "",
     rango: "Provincial" as "Local" | "Regional" | "Provincial" | "Nacional",
-    asociacion_id: FAP_ID,
+    asociacion_id: "",
   });
   const [saving, setSaving] = useState(false);
   const [accesoEmail, setAccesoEmail] = useState("");
@@ -67,34 +69,29 @@ export default function ColegioFiscalesPage() {
   const [credenciales, setCredenciales] = useState<AccesoFiscal | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const colegioLabel =
-    federaciones.find((f) => f.id === colegioId)?.sigla ||
-    federaciones.find((f) => f.id === colegioId)?.nombre ||
-    "Entidad nacional";
+  const colegio = federaciones.find((f) => f.id === colegioId);
+  const colegioLabel = colegio?.sigla || colegio?.nombre || "Federación";
+  const colegioNombre = colegio?.nombre || "la federación nacional";
+  const puedeElegirColegio =
+    profile?.rol === "superadmin" && federaciones.length > 1;
 
   useEffect(() => {
-    AsociacionesService.getAll()
+    FederacionesService.getAll()
       .then((list) => {
-        const feds = list
-          .filter((a) => a.tipo === "federacion" && a.estado !== "inactivo")
+        const activas = list
+          .filter((f) => f.estado !== "inactivo")
           .sort((a, b) =>
             String(a.sigla || a.nombre).localeCompare(
               String(b.sigla || b.nombre),
               "es",
             ),
           );
-        // Fallback: si aún no hay federaciones tipadas, incluir FAP por id/sigla
-        const resolved =
-          feds.length > 0
-            ? feds
-            : list.filter((a) => a.id === FAP_ID || a.sigla === "FAP");
-        setFederaciones(resolved.length > 0 ? resolved : list);
+        setFederaciones(activas);
         const preferida =
-          resolved.find((a) => a.sigla === "FAP")?.id ||
-          resolved[0]?.id ||
-          list[0]?.id ||
-          FAP_ID;
-        setColegioId(preferida);
+          activas.find((f) => (f.sigla || "").toUpperCase() === "FAP") ||
+          activas[0];
+        if (preferida?.id) setColegioId(preferida.id);
+        else setLoading(false);
       })
       .catch((err) => console.error("Error al cargar entidades:", err));
   }, []);
@@ -315,35 +312,41 @@ export default function ColegioFiscalesPage() {
             Colegio de Fiscales
           </h1>
           <p className="text-gray-400 text-sm mt-1">
-            Cada entidad nacional tiene su propio padrón. La asignación a torneos
-            es centralizada; los fiscales no configuran eventos.
+            Padrón de {colegioNombre}. Cada federación nacional tiene el suyo.
+            La asignación a torneos es centralizada; los fiscales no configuran eventos.
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreate}
-          className="flex items-center justify-center gap-2 bg-brand-chartreuse hover:opacity-90 text-brand-black px-5 py-3 rounded-xl font-bold transition-all shadow-lg text-sm cursor-pointer"
-        >
-          <Plus className="size-4" /> Registrar Nuevo Fiscal
-        </button>
+        {puedeGestionarColegio && (
+          <button
+            onClick={handleOpenCreate}
+            className="flex items-center justify-center gap-2 bg-brand-chartreuse hover:opacity-90 text-brand-black px-5 py-3 rounded-xl font-bold transition-all shadow-lg text-sm cursor-pointer"
+          >
+            <Plus className="size-4" /> Registrar Nuevo Fiscal
+          </button>
+        )}
       </div>
 
       {/* Barra de Filtros y Conmutador de Vista */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row gap-3 w-full lg:max-w-3xl min-w-0">
           <div className="w-full sm:w-[min(100%,320px)] sm:min-w-[260px] sm:max-w-[340px] shrink-0">
-            <CustomDropdown
-              value={colegioId}
-              onChange={setColegioId}
-              options={federaciones.map((f) => ({
-                value: f.id,
-                label: f.sigla
-                  ? `${f.sigla} — ${f.nombre}`
-                  : f.nombre,
-              }))}
-              placeholder="Entidad nacional"
-              className="!py-3"
-            />
+            {puedeElegirColegio ? (
+              <CustomDropdown
+                value={colegioId}
+                onChange={setColegioId}
+                options={federaciones.map((f) => ({
+                  value: f.id,
+                  label: f.sigla ? `${f.sigla} — ${f.nombre}` : f.nombre,
+                }))}
+                placeholder="Entidad nacional"
+                className="!py-3"
+              />
+            ) : (
+              <div className="w-full bg-brand-card border border-white/10 text-white px-4 py-3 rounded-xl text-sm font-semibold">
+                {colegio?.sigla ? `${colegio.sigla} — ${colegio.nombre}` : colegioNombre}
+              </div>
+            )}
             <p className="text-[10px] text-gray-500 mt-1.5 px-1">
               {federaciones.length}{" "}
               {federaciones.length === 1
@@ -468,17 +471,23 @@ export default function ColegioFiscalesPage() {
                 </div>
 
                 <div className="flex items-center justify-between pt-1">
-                  <button
-                    onClick={() => requestToggleEstado(f)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                      isActivo
-                        ? "bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/20"
-                        : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20"
-                    }`}
-                  >
-                    <Power className="size-3.5" />
-                    {isActivo ? "Inhabilitar" : "Habilitar"}
-                  </button>
+                  {puedeGestionarColegio ? (
+                    <button
+                      onClick={() => requestToggleEstado(f)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                        isActivo
+                          ? "bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/20"
+                          : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20"
+                      }`}
+                    >
+                      <Power className="size-3.5" />
+                      {isActivo ? "Inhabilitar" : "Habilitar"}
+                    </button>
+                  ) : (
+                    <span className="text-[11px] text-gray-500">
+                      Lo administra {colegioLabel}
+                    </span>
+                  )}
 
                   <div className="flex items-center gap-2">
                     <button
@@ -488,13 +497,15 @@ export default function ColegioFiscalesPage() {
                     >
                       <Eye className="size-4" />
                     </button>
-                    <button
-                      onClick={() => handleOpenEdit(f)}
-                      className="p-2 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse rounded-xl transition-colors cursor-pointer"
-                      title="Editar Fiscal"
-                    >
-                      <Edit2 className="size-4" />
-                    </button>
+                    {puedeGestionarColegio && (
+                      <button
+                        onClick={() => handleOpenEdit(f)}
+                        className="p-2 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse rounded-xl transition-colors cursor-pointer"
+                        title="Editar Fiscal"
+                      >
+                        <Edit2 className="size-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -555,17 +566,29 @@ export default function ColegioFiscalesPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => requestToggleEstado(f)}
-                          className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 mx-auto ${
-                            isActivo
-                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
-                              : "bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20"
-                          }`}
-                        >
-                          <Power className="size-3" />
-                          {isActivo ? "Habilitado" : "Inhabilitado"}
-                        </button>
+                        {puedeGestionarColegio ? (
+                          <button
+                            onClick={() => requestToggleEstado(f)}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 mx-auto ${
+                              isActivo
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
+                                : "bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20"
+                            }`}
+                          >
+                            <Power className="size-3" />
+                            {isActivo ? "Habilitado" : "Inhabilitado"}
+                          </button>
+                        ) : (
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-bold border inline-flex ${
+                              isActivo
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                            }`}
+                          >
+                            {isActivo ? "Habilitado" : "Inhabilitado"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2 items-center">
@@ -576,13 +599,15 @@ export default function ColegioFiscalesPage() {
                           >
                             <Eye className="size-4" />
                           </button>
-                          <button
-                            onClick={() => handleOpenEdit(f)}
-                            className="p-2 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse rounded-xl transition-colors cursor-pointer"
-                            title="Editar Datos"
-                          >
-                            <Edit2 className="size-4" />
-                          </button>
+                          {puedeGestionarColegio && (
+                            <button
+                              onClick={() => handleOpenEdit(f)}
+                              className="p-2 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse rounded-xl transition-colors cursor-pointer"
+                              title="Editar Datos"
+                            >
+                              <Edit2 className="size-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -683,25 +708,29 @@ export default function ColegioFiscalesPage() {
                 <p className="text-gray-500">
                   El fiscal entra con email y contraseña, no con el DNI.
                 </p>
-                <input
-                  type="email"
-                  value={accesoEmail}
-                  onChange={(e) => setAccesoEmail(e.target.value)}
-                  placeholder="correo@federacion.org"
-                  className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-semibold outline-none focus:border-brand-chartreuse/50"
-                />
-                <button
-                  type="button"
-                  onClick={handleHabilitarAcceso}
-                  disabled={generandoAcceso}
-                  className="w-full py-2.5 bg-brand-chartreuse text-brand-black rounded-xl font-bold disabled:opacity-50 cursor-pointer"
-                >
-                  {generandoAcceso
-                    ? "Generando…"
-                    : selectedFiscal.usuario_id
-                      ? "Restablecer contraseña"
-                      : "Crear acceso"}
-                </button>
+                {puedeGestionarColegio && (
+                  <>
+                    <input
+                      type="email"
+                      value={accesoEmail}
+                      onChange={(e) => setAccesoEmail(e.target.value)}
+                      placeholder="correo@federacion.org"
+                      className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-semibold outline-none focus:border-brand-chartreuse/50"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleHabilitarAcceso}
+                      disabled={generandoAcceso}
+                      className="w-full py-2.5 bg-brand-chartreuse text-brand-black rounded-xl font-bold disabled:opacity-50 cursor-pointer"
+                    >
+                      {generandoAcceso
+                        ? "Generando…"
+                        : selectedFiscal.usuario_id
+                          ? "Restablecer contraseña"
+                          : "Crear acceso"}
+                    </button>
+                  </>
+                )}
                 {credenciales && (
                   <div className="bg-[#111] border border-brand-chartreuse/20 rounded-xl p-3 space-y-2">
                     <p className="text-brand-chartreuse font-bold">
