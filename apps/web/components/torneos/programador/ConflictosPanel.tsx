@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, MapPin } from "lucide-react";
+import { AlertTriangle, ChevronDown, MapPin } from "lucide-react";
+import { useState } from "react";
 import type {
   BoardPartido,
   ProgramacionIssue,
@@ -27,6 +28,7 @@ export function ConflictosPanel({
   highlightedId,
   onSelect,
 }: Props) {
+  const [abierto, setAbierto] = useState(false);
   const activos = issues.filter((i) => i.severity !== "ok");
   if (activos.length === 0) return null;
 
@@ -35,20 +37,27 @@ export function ConflictosPanel({
   return (
     <div
       id="programador-conflictos"
-      className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3"
+      className="shrink-0 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2"
     >
-      <div className="mb-2 flex items-start gap-2">
-        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-300" />
-        <div>
-          <p className="text-sm font-semibold text-amber-100">
-            {activos.length} conflicto(s) o advertencia(s)
-          </p>
-          <p className="text-xs text-amber-100/70">
-            No bloquean el guardado. Tocá uno para ir al partido en la grilla.
-          </p>
-        </div>
-      </div>
-      <ul className="space-y-1.5">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        className="flex w-full cursor-pointer items-center gap-2 text-left"
+      >
+        <AlertTriangle className="size-4 shrink-0 text-amber-300" />
+        <span className="min-w-0 flex-1 text-xs font-semibold text-amber-100">
+          {activos.length} conflicto(s) o advertencia(s). No bloquean el guardado.
+        </span>
+        <ChevronDown
+          className={`size-3.5 shrink-0 text-amber-200 transition-transform ${
+            abierto ? "" : "-rotate-90"
+          }`}
+          aria-hidden
+        />
+      </button>
+      {abierto ? (
+      <ul className="mt-2 max-h-28 space-y-1.5 overflow-y-auto">
         {activos.map((issue) => {
           const p = partidoMap.get(issue.partido_id);
           const active = highlightedId === issue.partido_id;
@@ -78,7 +87,7 @@ export function ConflictosPanel({
                     {issue.message}
                   </span>
                   {slotLabel ? (
-                    <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-gray-400">
+                    <span className="mt-0.5 inline-flex items-center gap-1 text-xs text-gray-400">
                       <MapPin className="size-3" />
                       {slotLabel}
                     </span>
@@ -89,6 +98,7 @@ export function ConflictosPanel({
           );
         })}
       </ul>
+      ) : null}
     </div>
   );
 }

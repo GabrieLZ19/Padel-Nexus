@@ -65,7 +65,7 @@ export function ProgramadorTopBar({
   const canLimpiar = !isReadOnly && board.summary.asignados > 0;
 
   return (
-    <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <header className="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex items-start gap-3 min-w-0">
         <button
           type="button"
@@ -77,7 +77,7 @@ export function ProgramadorTopBar({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <CalendarClock className="size-5 text-brand-chartreuse shrink-0" />
-            <h1 className="text-xl font-bold text-white truncate">
+            <h1 className="text-lg font-bold text-white truncate">
               Programador visual
             </h1>
             {estadoTorneo ? (
@@ -86,7 +86,13 @@ export function ProgramadorTopBar({
               </span>
             ) : null}
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+              title={
+                soloLectura
+                  ? board.aviso_alcance ||
+                    "Los horarios de este torneo se consultan y no se cambian."
+                  : estadoHint(estado)
+              }
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide ${
                 estado === "publicado"
                   ? "bg-emerald-500/15 text-emerald-300"
                   : estado === "programado"
@@ -107,14 +113,9 @@ export function ProgramadorTopBar({
               </span>
             ) : null}
           </div>
-          <p className="mt-1 text-sm text-gray-400 truncate">{board.nombre}</p>
-          <p className="mt-1 text-xs text-gray-500">
-            {soloLectura
-              ? board.aviso_alcance ||
-                "Los horarios de este torneo se consultan y no se cambian."
-              : estadoHint(estado)}
-          </p>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="text-xs text-gray-400 truncate">
+            {board.nombre}
+            {" · "}
             {board.summary.asignados}/{board.summary.total} asignados
             {board.summary.advertencias > 0 ? (
               <>
@@ -122,7 +123,7 @@ export function ProgramadorTopBar({
                 <button
                   type="button"
                   onClick={onFocusConflictos}
-                  className="text-amber-300 underline-offset-2 hover:underline cursor-pointer"
+                  className="text-amber-200 underline-offset-2 hover:underline cursor-pointer"
                 >
                   {board.summary.advertencias} alerta(s)
                 </button>

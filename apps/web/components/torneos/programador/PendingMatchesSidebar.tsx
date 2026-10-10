@@ -2,7 +2,7 @@
 
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { ChevronDown, GripVertical } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { BoardPartido, ProgramacionIssue } from "@/utils/services/torneos";
 
@@ -33,11 +33,26 @@ function PendingCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const meta = [
+    partido.ronda_etiqueta || partido.ronda || "Partido",
+    partido.orden != null ? `#${partido.orden}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const aviso =
+    issue && issue.severity !== "ok" ? issue.message : null;
+  const titulo = `${partido.label_a} vs ${partido.label_b}. ${meta}${
+    aviso ? `. ${aviso}` : ""
+  }`;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 text-left ${
+      title={titulo}
+      className={`rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-left ${
+        partido.assigned ? "opacity-60" : ""
+      } ${
         !readOnly && !partido.assigned
           ? "cursor-grab active:cursor-grabbing"
           : ""
@@ -45,31 +60,28 @@ function PendingCard({
       {...listeners}
       {...attributes}
     >
-      <div className="flex items-start gap-1.5">
+      <div className="flex items-center gap-1.5">
         {!readOnly && !partido.assigned && (
-          <GripVertical className="mt-0.5 size-3.5 shrink-0 text-gray-500" />
+          <GripVertical className="size-3.5 shrink-0 text-gray-500" aria-hidden />
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-brand-chartreuse/80">
-            {partido.ronda_etiqueta || partido.ronda || "Partido"}
-            {partido.orden != null ? ` · #${partido.orden}` : ""}
-          </p>
-          <p className="mt-0.5 text-xs font-medium text-white leading-snug line-clamp-2">
-            {partido.label_a}
-          </p>
-          <p className="text-[10px] text-gray-500">vs</p>
-          <p className="text-xs font-medium text-white leading-snug line-clamp-2">
+          <p className="truncate text-xs font-semibold leading-none text-white">
+            {partido.label_a}{" "}
+            <span className="font-normal text-gray-500">vs</span>{" "}
             {partido.label_b}
           </p>
-          {issue && issue.severity !== "ok" && (
-            <p
-              className={`mt-1 text-[10px] ${
-                issue.severity === "bad" ? "text-red-400" : "text-amber-300"
-              }`}
-            >
-              {issue.message}
-            </p>
-          )}
+          <p
+            className={`mt-0.5 truncate text-xs leading-none ${
+              issue?.severity === "bad"
+                ? "text-red-300"
+                : issue?.severity === "wait"
+                  ? "text-amber-200"
+                  : "text-gray-400"
+            }`}
+          >
+            {meta}
+            {aviso ? ` · ${aviso}` : ""}
+          </p>
         </div>
       </div>
     </div>
@@ -79,6 +91,7 @@ function PendingCard({
 export function PendingMatchesSidebar({ partidos, issues, readOnly }: Props) {
   const [tab, setTab] = useState<"zones" | "bracket">("zones");
   const [mostrarAsignados, setMostrarAsignados] = useState(false);
+  const [plegados, setPlegados] = useState<Record<string, boolean>>({});
   const { setNodeRef, isOver } = useDroppable({
     id: "pending-tray",
     data: { type: "pending-tray" },
@@ -123,85 +136,111 @@ export function PendingMatchesSidebar({ partidos, issues, readOnly }: Props) {
   const phasePartidos = partidos.filter((p) => p.phase === tab);
   const pendientes = phasePartidos.filter((p) => !p.assigned).length;
 
+  const toggleGrupo = (clave: string) => {
+    setPlegados((prev) => ({ ...prev, [clave]: !prev[clave] }));
+  };
+
   return (
     <aside
       ref={setNodeRef}
+      title="Soltá un partido acá para quitarle el horario"
       className={`flex h-full min-h-0 flex-col rounded-2xl border bg-[#161616] ${
         isOver
           ? "border-brand-chartreuse/60 ring-1 ring-brand-chartreuse/40"
           : "border-white/10"
       }`}
     >
-      <div className="border-b border-white/10 p-3">
-        <h2 className="text-sm font-bold text-white">Pendientes</h2>
-        <p className="text-xs text-gray-500">
-          {pendientes} sin horario · soltá aquí para desasignar
-        </p>
-        <div className="mt-2 flex gap-1 rounded-lg bg-black/30 p-1">
-          <button
-            type="button"
-            onClick={() => setTab("zones")}
-            className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold cursor-pointer ${
-              tab === "zones"
-                ? "bg-brand-chartreuse text-black"
-                : "text-gray-400 hover:text-white"
-            }`}
-          >
-            Zonas
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("bracket")}
-            className={`flex-1 rounded-md px-2 py-1.5 text-xs font-semibold cursor-pointer ${
-              tab === "bracket"
-                ? "bg-brand-chartreuse text-black"
-                : "text-gray-400 hover:text-white"
-            }`}
-          >
-            Llave
-          </button>
+      <div className="shrink-0 border-b border-white/10 px-2 py-1.5">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-sm font-bold text-white">Pendientes</h2>
+          <p className="text-xs text-gray-400">
+            {pendientes} sin horario
+          </p>
         </div>
-        <label className="mt-2 flex cursor-pointer items-center gap-2 text-[11px] text-gray-400">
-          <input
-            type="checkbox"
-            checked={mostrarAsignados}
-            onChange={(e) => setMostrarAsignados(e.target.checked)}
-            className="rounded border-white/20 bg-black/40"
-          />
-          Mostrar asignados
-        </label>
+        <div className="mt-1 flex items-center gap-1.5">
+          <div className="flex min-w-0 flex-1 gap-1 rounded-lg bg-black/30 p-0.5">
+            <button
+              type="button"
+              onClick={() => setTab("zones")}
+              className={`flex-1 rounded-md px-2 py-1 text-xs font-semibold cursor-pointer ${
+                tab === "zones"
+                  ? "bg-brand-chartreuse text-black"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Zonas
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("bracket")}
+              className={`flex-1 rounded-md px-2 py-1 text-xs font-semibold cursor-pointer ${
+                tab === "bracket"
+                  ? "bg-brand-chartreuse text-black"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Llave
+            </button>
+          </div>
+          <label
+            title="Mostrar asignados"
+            className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-gray-400"
+          >
+            <input
+              type="checkbox"
+              checked={mostrarAsignados}
+              onChange={(e) => setMostrarAsignados(e.target.checked)}
+              className="rounded border-white/20 bg-black/40"
+            />
+            Asignados
+          </label>
+        </div>
       </div>
 
-      <div className="flex-1 space-y-2 overflow-y-auto p-2">
+      <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1">
         {groups.length === 0 ? (
-          <p className="p-3 text-center text-xs text-gray-500">
+          <p className="p-3 text-center text-xs text-gray-400">
             {pendientes === 0 && !mostrarAsignados
               ? "Todos tienen horario en esta fase."
               : "No hay partidos en esta fase."}
           </p>
         ) : (
-          groups.map(([ronda, list]) => (
-            <details key={ronda} open className="group rounded-xl bg-black/20">
-              <summary className="cursor-pointer list-none px-2.5 py-2 text-xs font-bold text-gray-300 [&::-webkit-details-marker]:hidden">
-                <span className="flex items-center justify-between gap-2">
-                  <span>{list[0]?.ronda_etiqueta || ronda}</span>
-                  <span className="text-[10px] font-medium text-gray-500">
-                    {list.length}
-                  </span>
-                </span>
-              </summary>
-              <div className="space-y-1.5 px-1.5 pb-2">
-                {list.map((p) => (
-                  <PendingCard
-                    key={p.id}
-                    partido={p}
-                    issue={issueMap.get(p.id)}
-                    readOnly={readOnly}
+          groups.map(([ronda, list]) => {
+            const clave = `${tab}:${ronda}`;
+            const plegado = plegados[clave] === true;
+            const titulo = list[0]?.ronda_etiqueta || ronda;
+            return (
+              <section key={clave} className="rounded-lg bg-black/20">
+                <button
+                  type="button"
+                  onClick={() => toggleGrupo(clave)}
+                  aria-expanded={!plegado}
+                  className="flex w-full cursor-pointer items-center gap-1.5 px-2 py-0.5 text-left text-xs font-bold text-gray-200"
+                >
+                  <ChevronDown
+                    className={`size-3.5 shrink-0 text-gray-400 transition-transform ${
+                      plegado ? "-rotate-90" : ""
+                    }`}
+                    aria-hidden
                   />
-                ))}
-              </div>
-            </details>
-          ))
+                  <span className="min-w-0 flex-1 truncate">{titulo}</span>
+                  <span className="font-medium text-gray-400">{list.length}</span>
+                </button>
+                {plegado ? null : (
+                  <div className="space-y-0.5 px-1 pb-1">
+                    {list.map((p) => (
+                      <PendingCard
+                        key={p.id}
+                        partido={p}
+                        issue={issueMap.get(p.id)}
+                        readOnly={readOnly}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })
         )}
       </div>
     </aside>

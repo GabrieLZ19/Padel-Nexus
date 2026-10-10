@@ -8,7 +8,6 @@ import {
   Menu,
   X,
   Search,
-  Smartphone,
   User,
   LogOut,
   Settings,
@@ -250,11 +249,6 @@ export default function Navbar() {
             )}
           </button>
 
-          {/* Botón Descargar App */}
-          <button className="hidden md:flex items-center gap-2 bg-brand-chartreuse hover:opacity-90 text-brand-black px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200 shadow-sm shadow-brand-chartreuse/20 cursor-pointer">
-            <Smartphone className="size-4" /> Descargar app
-          </button>
-
           {/* Menú de Usuario Desktop basado en Zustand */}
           <div className="hidden md:block relative">
             {profile ? (
@@ -480,9 +474,6 @@ export default function Navbar() {
                 </>
               ) : (
                 <>
-                  <button className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-white/10 bg-brand-chartreuse px-4 py-3 text-sm font-bold text-brand-black transition duration-200 ease-out hover:opacity-90 shadow-md shadow-brand-chartreuse/15 cursor-pointer">
-                    <Smartphone className="size-4" /> Descargar app
-                  </button>
                   <Link
                     href="/login"
                     className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-brand-white/10 px-4 py-3 text-sm font-semibold text-gray-300 transition duration-200 ease-out hover:bg-white/5 hover:text-white"

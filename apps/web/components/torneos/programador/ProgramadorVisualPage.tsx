@@ -137,7 +137,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-3 py-4 md:px-6 md:py-6">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-col gap-1.5 overflow-hidden px-3 py-1.5 md:px-4">
       <ProgramadorTopBar
         board={board}
         busy={busy}
@@ -177,20 +177,22 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="grid min-h-[60vh] grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
-          <div className="order-2 max-h-[40vh] overflow-auto lg:order-1 lg:max-h-[calc(100vh-220px)]">
+        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1.4fr)] gap-2 overflow-hidden lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
+          <div className="order-2 flex h-full min-h-0 flex-col gap-2 overflow-hidden lg:order-1">
             <ZonaParejasPanel
               torneoId={torneoId}
               readOnly={isReadOnly}
               onMoved={() => void load()}
             />
-            <PendingMatchesSidebar
-              partidos={board.partidos}
-              issues={board.issues}
-              readOnly={isReadOnly}
-            />
+            <div className="min-h-0 flex-1">
+              <PendingMatchesSidebar
+                partidos={board.partidos}
+                issues={board.issues}
+                readOnly={isReadOnly}
+              />
+            </div>
           </div>
-          <div className="order-1 min-w-0 lg:order-2 lg:max-h-[calc(100vh-220px)] overflow-auto">
+          <div className="order-1 h-full min-h-0 min-w-0 overflow-auto lg:order-2">
             <ScheduleGrid
               board={board}
               day={activeDay}

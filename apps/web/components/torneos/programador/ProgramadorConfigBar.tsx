@@ -88,55 +88,59 @@ export function ProgramadorConfigBar({
   ];
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#161616] p-3 sm:p-4">
+    <div className="flex shrink-0 flex-col gap-1.5 rounded-2xl border border-white/10 bg-[#161616] px-2.5 py-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
-          Jornada
-        </p>
+        {dias.length === 0 ? (
+          <p className="text-xs text-amber-200/90">
+            Sin canchas. Agregá un club y sus canchas desde el programador.
+          </p>
+        ) : dias.length <= 6 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {dias.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => onDayChange(d)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold capitalize cursor-pointer ${
+                  activeDay === d
+                    ? "bg-brand-chartreuse text-black"
+                    : "bg-white/5 text-gray-300 hover:bg-white/10"
+                }`}
+              >
+                {formatDia(d)}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="max-w-xs">
+            <CustomDropdown
+              value={activeDay}
+              onChange={onDayChange}
+              options={diaOptions}
+              placeholder="Elegí jornada…"
+              disabled={disabled}
+              className="!px-2.5 !py-1.5 !text-xs"
+            />
+          </div>
+        )}
+        {sugerencia ? (
+          <p
+            className="min-w-0 flex-1 truncate text-xs text-brand-chartreuse"
+            title={sugerencia}
+          >
+            {sugerencia}
+          </p>
+        ) : null}
         {syncing ? (
-          <span className="text-[11px] text-brand-chartreuse/80 animate-pulse">
+          <span className="text-xs text-brand-chartreuse/80 animate-pulse">
             Guardando…
           </span>
         ) : null}
       </div>
 
-      {dias.length === 0 ? (
-        <p className="text-sm text-amber-200/90">
-          Sin canchas. Agregá un club y sus canchas desde el programador.
-        </p>
-      ) : dias.length <= 6 ? (
-        <div className="flex flex-wrap gap-2">
-          {dias.map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => onDayChange(d)}
-              className={`rounded-xl px-3 py-1.5 text-xs font-semibold capitalize cursor-pointer ${
-                activeDay === d
-                  ? "bg-brand-chartreuse text-black"
-                  : "bg-white/5 text-gray-300 hover:bg-white/10"
-              }`}
-            >
-              {formatDia(d)}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="max-w-xs">
-          <CustomDropdown
-            value={activeDay}
-            onChange={onDayChange}
-            options={diaOptions}
-            placeholder="Elegí jornada…"
-            disabled={disabled}
-            className="!py-2.5 !text-sm"
-          />
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
         <div>
-          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">
+          <span className="mb-0.5 block text-xs font-bold uppercase tracking-wider text-gray-400">
             Turno
           </span>
           <CustomDropdown
@@ -147,11 +151,11 @@ export function ProgramadorConfigBar({
             options={[...TURNO_OPTS]}
             placeholder="Duración"
             disabled={disabled}
-            className="!py-2.5 !text-sm"
+            className="!px-2.5 !py-1.5 !text-xs"
           />
         </div>
         <div>
-          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">
+          <span className="mb-0.5 block text-xs font-bold uppercase tracking-wider text-gray-400">
             Descanso
           </span>
           <CustomDropdown
@@ -162,11 +166,11 @@ export function ProgramadorConfigBar({
             options={[...DESCANSO_OPTS]}
             placeholder="Descanso"
             disabled={disabled}
-            className="!py-2.5 !text-sm"
+            className="!px-2.5 !py-1.5 !text-xs"
           />
         </div>
         <div>
-          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">
+          <span className="mb-0.5 block text-xs font-bold uppercase tracking-wider text-gray-400">
             Distribución
           </span>
           <CustomDropdown
@@ -177,11 +181,11 @@ export function ProgramadorConfigBar({
             options={[...DISTRIBUCION_OPTS]}
             placeholder="Distribución"
             disabled={disabled}
-            className="!py-2.5 !text-sm"
+            className="!px-2.5 !py-1.5 !text-xs"
           />
         </div>
         <div>
-          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">
+          <span className="mb-0.5 block text-xs font-bold uppercase tracking-wider text-gray-400">
             Jornadas
           </span>
           <CustomDropdown
@@ -192,12 +196,12 @@ export function ProgramadorConfigBar({
             options={[...JORNADA_OPTS]}
             placeholder="Jornadas"
             disabled={disabled}
-            className="!py-2.5 !text-sm"
+            className="!px-2.5 !py-1.5 !text-xs"
           />
         </div>
         <div>
-          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Horario de inicio
+          <span className="mb-0.5 block text-xs font-bold uppercase tracking-wider text-gray-400">
+            Inicio
           </span>
           <CustomDropdown
             value={config.horaInicio}
@@ -205,12 +209,12 @@ export function ProgramadorConfigBar({
             options={horasOpciones()}
             placeholder="Inicio"
             disabled={disabled}
-            className="!py-2.5 !text-sm"
+            className="!px-2.5 !py-1.5 !text-xs"
           />
         </div>
         <div>
-          <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Horario de fin
+          <span className="mb-0.5 block text-xs font-bold uppercase tracking-wider text-gray-400">
+            Fin
           </span>
           <CustomDropdown
             value={config.horaFin}
@@ -218,16 +222,10 @@ export function ProgramadorConfigBar({
             options={finOpts}
             placeholder="Fin"
             disabled={disabled}
-            className="!py-2.5 !text-sm"
+            className="!px-2.5 !py-1.5 !text-xs"
           />
         </div>
       </div>
-
-      {sugerencia ? (
-        <p className="rounded-xl border border-brand-chartreuse/20 bg-brand-chartreuse/10 px-3 py-2 text-sm text-brand-chartreuse">
-          {sugerencia}
-        </p>
-      ) : null}
     </div>
   );
 }

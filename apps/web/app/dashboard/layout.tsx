@@ -401,7 +401,11 @@ export default function DashboardLayout({
         ></div>
       )}
 
-      <main className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-brand-black min-w-0">
+      <main
+        className={`relative flex min-h-0 flex-1 flex-col bg-brand-black min-w-0 ${
+          programadorPantallaCompleta ? "overflow-hidden" : "overflow-y-auto"
+        }`}
+      >
         <div className={`${programadorPantallaCompleta ? "hidden" : "lg:hidden"} sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4 bg-brand-card/80 backdrop-blur-md border-b border-brand-white/5`}>
           <button
             onClick={toggleMobileMenu}
@@ -421,6 +425,11 @@ export default function DashboardLayout({
           </div>
         </div>
         <motion.div
+          className={
+            programadorPantallaCompleta
+              ? "flex h-full min-h-0 flex-col"
+              : undefined
+          }
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}

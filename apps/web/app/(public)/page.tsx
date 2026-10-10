@@ -3,11 +3,29 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Search, Trophy, TrendingUp, Play, Calendar } from "lucide-react";
+import { Search, Trophy, TrendingUp, Calendar } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { RankingsService } from "@/utils/services/ranking";
+import {
+  SitioPublicoService,
+  type CifrasSitioPublico,
+} from "@/utils/services/sitioPublico";
 import { Torneo, RankingJugador } from "@/utils/types";
 import { formatFechaCalendario } from "@/utils/formatFecha";
+
+function formatoCifra(valor: number): string {
+  return new Intl.NumberFormat("es-AR").format(valor);
+}
+
+function proximoPublico(lista: Torneo[]): Torneo | null {
+  const hoy = new Date();
+  const isoHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+  return (
+    lista
+      .filter((torneo) => torneo.fecha && String(torneo.fecha).slice(0, 10) >= isoHoy)
+      .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))[0] || null
+  );
+}
 
 export default function LandingPage() {
   const router = useRouter();
@@ -16,15 +34,16 @@ export default function LandingPage() {
   // Estados para los widgets
   const [tournaments, setTournaments] = useState<Torneo[]>([]);
   const [rankings, setRankings] = useState<RankingJugador[]>([]);
+  const [cifras, setCifras] = useState<CifrasSitioPublico | null>(null);
+  const [listo, setListo] = useState(false);
 
   useEffect(() => {
-    // Control sutil de promesas adaptado a las respuestas seguras del backend ({ data })
     Promise.all([
       TorneosService.getAll().catch(() => ({ data: [] })),
       RankingsService.getGlobal().catch(() => ({ data: [] })),
+      SitioPublicoService.cifras().catch(() => null),
     ])
-      .then(([tData, rData]) => {
-        // Validación de estructuras para prevenir fallos de tipos en cascada
+      .then(([tData, rData, cifrasData]) => {
         const listadoTorneos = Array.isArray(tData) ? tData : tData?.data || [];
         const listadoRankings = Array.isArray(rData)
           ? rData
@@ -32,11 +51,15 @@ export default function LandingPage() {
 
         setTournaments(listadoTorneos.slice(0, 4));
         setRankings(listadoRankings.slice(0, 5));
+        setCifras(cifrasData);
+        setListo(true);
       })
       .catch((err) =>
         console.log("Manejo de consulta de perfiles e invitados:", err.message),
       );
   }, []);
+
+  const siguiente = proximoPublico(tournaments);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,33 +113,6 @@ export default function LandingPage() {
             </button>
           </form>
 
-          <div className="flex flex-col sm:flex-row flex-wrap items-center gap-4 pt-4">
-            <button className="flex items-center gap-3 px-6 py-3 rounded-2xl border border-brand-white/10 bg-brand-card hover:bg-brand-white/5 transition-all w-full sm:w-auto cursor-pointer">
-              <svg
-                className="size-6 text-brand-white fill-brand-white"
-                viewBox="0 0 24 24"
-              >
-                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.19 2.31-.88 3.5-.8 1.48.06 2.76.62 3.56 1.63-3.15 1.87-2.6 6.01.5 7.33-.74 1.83-1.63 3.32-2.64 4.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
-              </svg>
-              <div className="text-left">
-                <div className="text-[10px] text-gray-400 uppercase font-semibold leading-none">
-                  Descargá en
-                </div>
-                <div className="text-sm font-bold leading-tight">App Store</div>
-              </div>
-            </button>
-            <button className="flex items-center gap-3 px-6 py-3 rounded-2xl border border-brand-white/10 bg-brand-card hover:bg-brand-white/5 transition-all w-full sm:w-auto cursor-pointer">
-              <Play className="size-6 text-brand-white fill-brand-white" />
-              <div className="text-left">
-                <div className="text-[10px] text-gray-400 uppercase font-semibold leading-none">
-                  Disponible en
-                </div>
-                <div className="text-sm font-bold leading-tight">
-                  Google Play
-                </div>
-              </div>
-            </button>
-          </div>
         </div>
 
         {/* --- CONTENEDOR HERO DERECHO CON GLOW EN CAPAS --- */}
@@ -134,22 +130,26 @@ export default function LandingPage() {
               />
             </div>
 
-            {/* Card del Próximo Torneo */}
-            <div className="absolute inset-x-0 top-6 sm:top-12 px-6 sm:px-0 z-20">
-              <div className="mx-auto max-w-sm sm:max-w-xs bg-[#1a1a1a]/90 backdrop-blur-md border border-brand-white/10 px-5 py-4 rounded-2xl flex items-center gap-4 shadow-2xl sm:transform sm:-translate-x-8">
-                <div className="bg-brand-white/5 p-2.5 rounded-xl border border-brand-white/5">
-                  <Trophy className="size-5 text-brand-chartreuse" />
-                </div>
-                <div>
-                  <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
-                    Próximo torneo
+            {siguiente ? (
+              <div className="absolute inset-x-0 top-6 sm:top-12 px-6 sm:px-0 z-20">
+                <div className="mx-auto max-w-sm sm:max-w-xs bg-[#1a1a1a]/90 backdrop-blur-md border border-brand-white/10 px-5 py-4 rounded-2xl flex items-center gap-4 shadow-2xl sm:transform sm:-translate-x-8">
+                  <div className="bg-brand-white/5 p-2.5 rounded-xl border border-brand-white/5">
+                    <Trophy className="size-5 text-brand-chartreuse" />
                   </div>
-                  <div className="text-sm font-bold text-brand-white mt-0.5">
-                    Apertura Pilar · Sáb
+                  <div className="min-w-0">
+                    <div className="text-xs text-gray-400 uppercase font-bold tracking-wider">
+                      Próximo torneo
+                    </div>
+                    <div className="truncate text-sm font-bold text-brand-white mt-0.5">
+                      {siguiente.nombre}
+                      {siguiente.fecha
+                        ? ` · ${formatFechaCalendario(siguiente.fecha)}`
+                        : ""}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : null}
           </div>
         </div>
       </main>
@@ -159,7 +159,7 @@ export default function LandingPage() {
         <div className="lg:col-span-2 space-y-6">
           <h2 className="text-2xl font-bold">Próximos Torneos</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {tournaments.length > 0 ? (
+            {!listo ? null : tournaments.length > 0 ? (
               tournaments.map((t) => (
                 <div
                   key={t.id}
@@ -181,8 +181,9 @@ export default function LandingPage() {
                 </div>
               ))
             ) : (
-              <p className="text-gray-500 text-sm">
-                No hay torneos programados en este momento.
+              <p className="text-sm text-gray-400">
+                Todavía no hay torneos publicados. Cuando una sede abra la
+                inscripción, van a aparecer acá.
               </p>
             )}
           </div>
@@ -196,7 +197,7 @@ export default function LandingPage() {
             </h2>
           </div>
           <div className="space-y-4">
-            {rankings.length > 0 ? (
+            {!listo ? null : rankings.length > 0 ? (
               rankings.map((r, i) => (
                 <div
                   key={r.usuario_id || i}
@@ -216,8 +217,9 @@ export default function LandingPage() {
                 </div>
               ))
             ) : (
-              <p className="text-gray-500 text-sm">
-                Estadísticas de clasificación no disponibles.
+              <p className="text-sm text-gray-400">
+                Todavía no hay un ranking publicado. Los puntos aparecen cuando
+                se cierran torneos oficiales.
               </p>
             )}
           </div>
@@ -225,42 +227,29 @@ export default function LandingPage() {
       </section>
 
       {/* --- SECCIÓN METRICAS / STATS DEL FOOTER --- */}
-      <section className="border-t border-brand-white/5 bg-[#0d0d0d] relative z-10">
-        <div className="max-w-[1600px] mx-auto px-6 sm:px-10 py-12 sm:py-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 text-center divide-y divide-brand-white/5 sm:divide-y-0 sm:divide-x divide-solid">
-          <div className="space-y-3 py-6">
-            <div className="text-5xl sm:text-6xl font-black text-brand-chartreuse">
-              +25.000
-            </div>
-            <div className="text-sm text-gray-400 font-semibold tracking-wide">
-              Jugadores activos
-            </div>
+      {cifras ? (
+        <section className="border-t border-brand-white/5 bg-[#0d0d0d] relative z-10">
+          <div className="max-w-[1600px] mx-auto px-6 sm:px-10 py-12 sm:py-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 text-center divide-y divide-brand-white/5 sm:divide-y-0 sm:divide-x divide-solid">
+            {(
+              [
+                ["Jugadores", cifras.jugadores],
+                ["Torneos", cifras.torneos],
+                ["Clubes", cifras.clubes],
+                ["Canchas", cifras.canchas],
+              ] as const
+            ).map(([etiqueta, valor]) => (
+              <div key={etiqueta} className="space-y-3 py-6 sm:pl-4 first:sm:pl-0">
+                <div className="text-5xl sm:text-6xl font-black text-brand-chartreuse">
+                  {formatoCifra(valor)}
+                </div>
+                <div className="text-sm text-gray-400 font-semibold tracking-wide">
+                  {etiqueta}
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="space-y-3 py-6 sm:pl-4">
-            <div className="text-5xl sm:text-6xl font-black text-brand-chartreuse">
-              1.200
-            </div>
-            <div className="text-sm text-gray-400 font-semibold tracking-wide">
-              Torneos por año
-            </div>
-          </div>
-          <div className="space-y-3 py-6 sm:pl-4">
-            <div className="text-5xl sm:text-6xl font-black text-brand-chartreuse">
-              340
-            </div>
-            <div className="text-sm text-gray-400 font-semibold tracking-wide">
-              Clubes adheridos
-            </div>
-          </div>
-          <div className="space-y-3 py-6 sm:pl-4">
-            <div className="text-5xl sm:text-6xl font-black text-brand-chartreuse">
-              2.800
-            </div>
-            <div className="text-sm text-gray-400 font-semibold tracking-wide">
-              Canchas disponibles
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
     </div>
   );
 }

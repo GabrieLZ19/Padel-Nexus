@@ -10,7 +10,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { ChevronDown, GripVertical } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { sileo } from "sileo";
 import FeedbackModal from "@/components/ui/FeedbackModal";
@@ -155,6 +155,7 @@ export default function ZonaParejasPanel({
   onMoved: () => void;
 }) {
   const [zonas, setZonas] = useState<ZonaPanel[]>([]);
+  const [abierto, setAbierto] = useState(false);
   const [movimiento, setMovimiento] = useState<Movimiento | null>(null);
   const [guardando, setGuardando] = useState(false);
   const sensors = useSensors(
@@ -217,19 +218,39 @@ export default function ZonaParejasPanel({
   if (zonas.length === 0) return null;
 
   return (
-    <section className="mb-3 rounded-2xl border border-white/10 bg-[#141414] p-3">
-      <h3 className="mb-2 text-xs font-bold text-white">Parejas por zona</h3>
-      <p className="mb-2 text-[11px] leading-snug text-white/50">
-        Arrastrá una pareja a otra zona. El cambio se guarda en los cuadros y
-        conserva el horario de los cruces que siguen iguales.
-      </p>
-      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-        <div className="max-h-64 space-y-2 overflow-auto pr-1">
-          {zonas.map((zona) => (
-            <ZonaDrop key={zona.id} zona={zona} readOnly={readOnly} />
-          ))}
-        </div>
-      </DndContext>
+    <section className="shrink-0 rounded-2xl border border-white/10 bg-[#141414]">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        className="flex w-full cursor-pointer items-center gap-1.5 px-2.5 py-2 text-left"
+      >
+        <ChevronDown
+          className={`size-3.5 shrink-0 text-gray-400 transition-transform ${
+            abierto ? "" : "-rotate-90"
+          }`}
+          aria-hidden
+        />
+        <h3 className="min-w-0 flex-1 truncate text-xs font-bold text-white">
+          Parejas por zona
+        </h3>
+        <span className="text-xs font-medium text-gray-400">{zonas.length}</span>
+      </button>
+      {abierto ? (
+        <>
+          <p className="px-2.5 pb-2 text-xs leading-4 text-gray-400">
+            Arrastrá una pareja a otra zona. El cambio se guarda en los cuadros
+            y conserva el horario de los cruces que siguen iguales.
+          </p>
+          <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+            <div className="max-h-36 space-y-2 overflow-auto px-2.5 pb-2">
+              {zonas.map((zona) => (
+                <ZonaDrop key={zona.id} zona={zona} readOnly={readOnly} />
+              ))}
+            </div>
+          </DndContext>
+        </>
+      ) : null}
       <FeedbackModal
         isOpen={movimiento !== null}
         onClose={() => {

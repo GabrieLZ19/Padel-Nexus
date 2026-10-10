@@ -274,7 +274,11 @@ export default function ClubLayout({
       )}
 
       {/* Main Panel */}
-      <main className="relative flex min-h-0 flex-1 flex-col overflow-y-auto bg-brand-black min-w-0">
+      <main
+        className={`relative flex min-h-0 flex-1 flex-col bg-brand-black min-w-0 ${
+          programadorPantallaCompleta ? "overflow-hidden" : "overflow-y-auto"
+        }`}
+      >
         <div className={`${programadorPantallaCompleta ? "hidden" : "lg:hidden"} sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4 bg-brand-card/80 backdrop-blur-md border-b border-brand-white/5`}>
           <button
             onClick={() => setMobileMenuOpen(true)}
@@ -291,7 +295,13 @@ export default function ClubLayout({
           />
           <NotificationCenter />
         </div>
-        <div className={programadorPantallaCompleta ? "" : "p-4 sm:p-6 md:p-8 lg:p-10"}>
+        <div
+          className={
+            programadorPantallaCompleta
+              ? "flex h-full min-h-0 flex-col"
+              : "p-4 sm:p-6 md:p-8 lg:p-10"
+          }
+        >
           {children}
         </div>
       </main>
