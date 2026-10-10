@@ -97,6 +97,53 @@ export function categoriasPorTipoRanking(
 }
 
 /**
+ * Une notaciones de la misma categoría (`6ª`, `6ta`, `6TA`).
+ * El valor guardado no se reescribe: solo sirve para filtrar y comparar.
+ */
+export function claveCategoria(valor: string): string {
+  const base = valor
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[ªº]/g, "");
+  const ordinal = base.match(/^(\d+)\s*(?:ra|da|ta|ma|va)?$/);
+  if (ordinal) return ordinal[1];
+  return base.replace(/\s+/g, " ");
+}
+
+/** Valores de `rankings.categoria` que representan la misma categoría. */
+export function variantesCategoria(categoria: string): string[] {
+  const clave = claveCategoria(categoria);
+  const conocidas = [
+    ...CATEGORIAS_LIBRES,
+    ...CATEGORIAS_MENORES,
+    ...CATEGORIAS_VETERANOS,
+  ].filter((item) => claveCategoria(item) === clave);
+  return [...new Set([categoria, ...conocidas])];
+}
+
+/**
+ * Orden del ranking publicado:
+ * 1. Puntos, de mayor a menor.
+ * 2. Ante igualdad, apellido (A-Z, sin distinguir mayúsculas ni tildes).
+ * 3. Si el apellido coincide, nombre con el mismo criterio.
+ */
+export function compararPosicionRanking(
+  a: { puntos: number; apellido?: string | null; nombre?: string | null },
+  b: { puntos: number; apellido?: string | null; nombre?: string | null },
+): number {
+  if (a.puntos !== b.puntos) return b.puntos - a.puntos;
+  const apellido = (a.apellido || "").localeCompare(b.apellido || "", "es", {
+    sensitivity: "base",
+  });
+  if (apellido !== 0) return apellido;
+  return (a.nombre || "").localeCompare(b.nombre || "", "es", {
+    sensitivity: "base",
+  });
+}
+
+/**
  * Normaliza un nombre de provincia quitando acentos y bajando a minusculas.
  * Necesario porque `perfiles.lugar_residencia` mezcla `Cordoba` y `Cordoba`.
  */

@@ -1,4 +1,9 @@
 import { supabaseAdmin } from "../config/supabase";
+import {
+  claveCategoria,
+  compararPosicionRanking,
+  variantesCategoria,
+} from "../constants/rankings";
 import { elegirProximoPartido } from "../utils/proximoPartido";
 
 type InscripcionFila = {
@@ -253,16 +258,6 @@ async function cargarPartidos(ids: string[]): Promise<PartidoFila[]> {
   return (data || []) as PartidoFila[];
 }
 
-function claveCategoria(valor: string) {
-  return valor
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/ª|º/g, "")
-    .replace(/ta$/, "")
-    .trim();
-}
-
 async function puestoEnCategoria(usuarioId: string) {
   const { data: perfil } = await supabaseAdmin
     .from("perfiles")
@@ -297,7 +292,7 @@ async function puestoEnCategoria(usuarioId: string) {
   const { data: tabla } = await supabaseAdmin
     .from("rankings")
     .select("usuario_id, puntos, perfiles(apellido, nombre)")
-    .eq("categoria", String(fila.categoria))
+    .in("categoria", variantesCategoria(String(fila.categoria)))
     .eq("alcance", fila.alcance);
 
   const ordenada = (tabla || [])
@@ -311,18 +306,20 @@ async function puestoEnCategoria(usuarioId: string) {
       return {
         usuarioId: item.usuario_id as string,
         puntos: Number(item.puntos || 0),
-        apellido: (persona?.apellido || "").toLowerCase(),
-        nombre: (persona?.nombre || "").toLowerCase(),
+        apellido: persona?.apellido || "",
+        nombre: persona?.nombre || "",
       };
     })
-    .sort((a, b) => {
-      if (b.puntos !== a.puntos) return b.puntos - a.puntos;
-      const apellido = a.apellido.localeCompare(b.apellido, "es");
-      if (apellido !== 0) return apellido;
-      return a.nombre.localeCompare(b.nombre, "es");
-    });
+    .sort(compararPosicionRanking);
 
-  const indice = ordenada.findIndex((item) => item.usuarioId === usuarioId);
+  const vistos = new Set<string>();
+  const unicos = ordenada.filter((item) => {
+    if (vistos.has(item.usuarioId)) return false;
+    vistos.add(item.usuarioId);
+    return true;
+  });
+
+  const indice = unicos.findIndex((item) => item.usuarioId === usuarioId);
   if (indice < 0) return null;
 
   return {

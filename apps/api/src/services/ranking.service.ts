@@ -4,8 +4,10 @@ import {
   CATEGORIAS_MENORES,
   CATEGORIAS_VETERANOS,
   categoriasPorTipoRanking,
+  compararPosicionRanking,
   normalizarProvincia,
   normalizarRama,
+  variantesCategoria,
   type RamaRanking,
   type TipoRanking,
 } from "../constants/rankings";
@@ -109,9 +111,12 @@ export class RankingService {
    * Obtiene el listado de clasificacion general filtrado por nivel/categoria,
    * alcance jurisdiccional, rama y tipo de ranking (menores/veteranos/libres).
    *
-   * Reglas de ordenamiento (reglamento FAP):
-   * 1. Puntos DESC.
-   * 2. Ante igualdad, apellido y nombre ASC (orden alfabetico).
+   * Reglas de ordenamiento:
+   * 1. Puntos, de mayor a menor.
+   * 2. Ante igualdad, apellido y después nombre, de la A a la Z.
+   * El orden de la consulta solo acerca los puntajes altos. El desempate
+   * se aplica en memoria porque ordenar la tabla embebida no reordena
+   * las filas del ranking.
    */
   static async obtenerRankingGlobal(filtros: RankingGlobalFiltros = {}) {
     const {
@@ -157,23 +162,11 @@ export class RankingService {
       query = query.eq("alcance", alcanceBusqueda);
     }
 
-    // Orden principal + desempate alfabetico por apellido y nombre.
-    query = query
-      .order("puntos", { ascending: false })
-      .order("apellido", {
-        foreignTable: "perfiles",
-        ascending: true,
-        nullsFirst: false,
-      })
-      .order("nombre", {
-        foreignTable: "perfiles",
-        ascending: true,
-        nullsFirst: false,
-      })
-      .limit(Math.max(limit, 500));
+    // El límite trae los puntajes altos. El desempate se resuelve después.
+    query = query.order("puntos", { ascending: false }).limit(Math.max(limit, 500));
 
     if (categoria && categoria !== "Todas") {
-      query = query.eq("categoria", categoria);
+      query = query.in("categoria", variantesCategoria(categoria));
     } else if (tipoRanking) {
       // Si no viene categoria puntual pero si tipo de ranking, filtramos por
       // el conjunto de categorias definido para ese tipo.
@@ -209,6 +202,7 @@ export class RankingService {
     // Tipamos la respuesta para evitar 'any' de manera segura
     type RowRanking = Record<string, unknown> & {
       usuario_id: string;
+      puntos?: number;
       pj?: number;
       pg?: number;
       tendencia?: number;
@@ -237,8 +231,22 @@ export class RankingService {
         (jugador) =>
           normalizarProvincia(jugador.perfiles?.lugar_residencia) === provNorm,
       );
-      // Aplicamos el limite original una vez filtrado en memoria.
     }
+
+    filas.sort((a, b) =>
+      compararPosicionRanking(
+        {
+          puntos: Number(a.puntos ?? 0),
+          apellido: a.perfiles?.apellido,
+          nombre: a.perfiles?.nombre,
+        },
+        {
+          puntos: Number(b.puntos ?? 0),
+          apellido: b.perfiles?.apellido,
+          nombre: b.perfiles?.nombre,
+        },
+      ),
+    );
     filas = filas.slice(0, limit);
 
     // Deduplicar jugadores por usuario_id (tomando su categoria con mayor
