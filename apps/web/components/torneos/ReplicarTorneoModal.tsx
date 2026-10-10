@@ -76,10 +76,8 @@ export default function ReplicarTorneoModal({
 
   useEffect(() => {
     if (!isOpen || !torneo) return;
-    setNivelesSel(
-      nivelesOpts.map((n) => n.value).filter((v) => v !== torneo.nivel),
-    );
-    setRamasSel([torneo.rama || "Masculina"]);
+    setNivelesSel([]);
+    setRamasSel(modoClub ? [] : [torneo.rama || "Masculina"]);
   }, [isOpen, torneo, nivelesOpts]);
 
   const paresPreview = useMemo(() => {
@@ -181,6 +179,8 @@ export default function ReplicarTorneoModal({
               <button
                 type="button"
                 onClick={onClose}
+                title="Cerrar"
+                aria-label="Cerrar"
                 className="p-1.5 rounded-full hover:bg-white/5 text-gray-400 hover:text-white cursor-pointer"
               >
                 <X className="size-5" />

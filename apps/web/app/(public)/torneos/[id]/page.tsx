@@ -54,6 +54,11 @@ export default function TorneoDetallePage() {
   const [activeTabPublica, setActiveTabPublica] = useState<"zonas" | "llaves">(
     "zonas",
   );
+
+  useEffect(() => {
+    const vista = new URLSearchParams(window.location.search).get("vista");
+    if (vista === "llaves") setActiveTabPublica("llaves");
+  }, []);
   const [fapMatrixMatches, setFapMatrixMatches] = useState<FapMatrixMatch[]>(
     [],
   );

@@ -92,6 +92,16 @@ export const Paso4Jugadores = ({
     (i) => i.estado_pago === "Confirmado",
   ).length;
 
+  const motivoLectura = !readOnly
+    ? null
+    : torneo.solo_lectura
+      ? "Este torneo es de otra entidad. No se pueden inscribir ni borrar parejas."
+      : torneo.estado === "Finalizado"
+        ? "El torneo está finalizado. No se pueden inscribir ni borrar parejas."
+        : torneo.estado === "Programado"
+          ? "El fixture ya está generado. No se pueden inscribir ni borrar parejas."
+          : "El torneo está en curso. No se pueden inscribir ni borrar parejas.";
+
   const handleDescargarPlantilla = () => {
     descargarPlantillaInscripcion({
       alcance: torneo.alcance,
@@ -177,13 +187,17 @@ export const Paso4Jugadores = ({
     }
   };
 
-  const handleEliminarInscripcion = (inscripcionId: string | number) => {
+  const handleEliminarInscripcion = (
+    inscripcionId: string | number,
+    nombre: string,
+  ) => {
+    if (readOnly) return;
     setFeedbackModal((prev: any) => ({
       ...prev,
       isOpen: true,
       type: "danger",
       title: "¿Eliminar inscripción?",
-      description: "Esta acción liberará los cupos del torneo. ¿Estás seguro?",
+      description: `¿Eliminar la inscripción de ${nombre}? Se liberan los cupos del torneo.`,
       confirmText: "Eliminar",
       cancelText: "Cancelar",
       isLoading: false,
@@ -227,7 +241,7 @@ export const Paso4Jugadores = ({
   };
 
   return (
-    <div className={`bg-[#111111] rounded-3xl border border-white/5 overflow-hidden shadow-xl ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
+    <div className="bg-[#111111] rounded-3xl border border-white/5 overflow-hidden shadow-xl">
       {/* Cabecera y botones de acción */}
       <div className="p-6 border-b border-white/5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-black/20">
         <h3 className="font-bold text-white flex items-center gap-2">
@@ -245,30 +259,42 @@ export const Paso4Jugadores = ({
           >
             <Download className="size-3.5" /> Plantilla
           </button>
-          <div className="relative flex-1 lg:flex-none">
+          <div
+            className="relative flex-1 lg:flex-none"
+            title={motivoLectura || "Subir planilla"}
+          >
             <input
               type="file"
               accept=".xls,.xlsx"
               onChange={handleSubirPlanilla}
-              disabled={importingCSV}
-              className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
+              disabled={importingCSV || readOnly}
+              className="absolute inset-0 opacity-0 cursor-pointer disabled:pointer-events-none disabled:cursor-not-allowed"
             />
             <button
-              disabled={importingCSV}
-              className="w-full flex justify-center items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 disabled:opacity-50"
+              type="button"
+              disabled={importingCSV || readOnly}
+              className="w-full flex justify-center items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Upload className="size-3.5" />{" "}
               {importingCSV ? "Importando..." : "Subir Planilla"}
             </button>
           </div>
           <button
+            type="button"
+            disabled={readOnly}
+            title={motivoLectura || "Nueva inscripción"}
             onClick={() => setIsManualModalOpen(true)}
-            className="w-full lg:w-auto flex justify-center items-center gap-1.5 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-4 py-2.5 rounded-xl font-bold text-xs transition-all"
+            className="w-full lg:w-auto flex justify-center items-center gap-1.5 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-4 py-2.5 rounded-xl font-bold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Plus className="size-3.5" /> Nueva Inscripción
           </button>
         </div>
       </div>
+      {motivoLectura ? (
+        <p className="px-6 py-2 text-xs text-gray-400 border-b border-white/5">
+          {motivoLectura}
+        </p>
+      ) : null}
 
       {importProgress ? <PlanillaImportProgressBar state={importProgress} /> : null}
 
@@ -308,7 +334,8 @@ export const Paso4Jugadores = ({
                         <input
                           type="checkbox"
                           checked={isConfirmed}
-                          disabled={isConfirmed}
+                          disabled={isConfirmed || readOnly}
+                          title={motivoLectura || undefined}
                           onChange={() => {
                             if (!isConfirmed) {
                               setPagoModal({
@@ -379,8 +406,25 @@ export const Paso4Jugadores = ({
                     </td>
                     <td className="px-8 py-5 text-center">
                       <button
-                        onClick={() => handleEliminarInscripcion(ins.id)}
-                        className="text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded-lg cursor-pointer"
+                        type="button"
+                        disabled={readOnly}
+                        title={
+                          motivoLectura ||
+                          `Eliminar inscripción de ${ins.jugador1_nombre || "esta pareja"}`
+                        }
+                        aria-label={
+                          motivoLectura ||
+                          `Eliminar inscripción de ${ins.jugador1_nombre || "esta pareja"}`
+                        }
+                        onClick={() =>
+                          handleEliminarInscripcion(
+                            ins.id,
+                            [ins.jugador1_nombre, ins.jugador2_nombre]
+                              .filter((nombre) => nombre && nombre !== "-")
+                              .join(" / ") || "esta pareja",
+                          )
+                        }
+                        className="text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded-lg cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                       >
                         <Trash2 className="size-4" />
                       </button>

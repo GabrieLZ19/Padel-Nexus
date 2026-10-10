@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   User,
   ShieldCheck,
-  Ban,
   ExternalLink,
   Hash,
   IdCard,
@@ -12,6 +11,7 @@ import {
 import { Licencia, Perfil } from "@/utils/types";
 import { LicenciaVencimientoEditor } from "./LicenciaVencimientoEditor";
 import { LicenciaPagosHistorial } from "./LicenciaPagosHistorial";
+import { MenuPuntos } from "@/components/ui/MenuPuntos";
 
 interface LicenciaJugadorCardProps {
   jugador: Perfil;
@@ -159,14 +159,16 @@ export function LicenciaJugadorCard({
               Validar solicitud
             </button>
           ) : licencia.estado === "Activa" ? (
-            <button
-              type="button"
-              onClick={() => onCambiarEstado(licencia.id, "Suspendida")}
-              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-colors"
-            >
-              <Ban className="size-4" />
-              Revocar
-            </button>
+            <MenuPuntos
+              etiqueta={`Más acciones de ${nombreCompleto}`}
+              items={[
+                {
+                  label: "Revocar",
+                  danger: true,
+                  onSelect: () => onCambiarEstado(licencia.id, "Suspendida"),
+                },
+              ]}
+            />
           ) : (
             <button
               type="button"

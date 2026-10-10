@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   Plus,
   Pencil,
-  Trash2,
   Trophy,
   Building2,
   Calendar,
@@ -26,6 +25,7 @@ import TorneoFilasAgrupadas from "@/components/torneos/TorneoFilasAgrupadas";
 import FeedbackModal, { FeedbackModalProps } from "@/components/ui/FeedbackModal";
 import { formatFechaCalendario } from "@/utils/formatFecha";
 import TorneoVistaFiltros from "@/components/torneos/TorneoVistaFiltros";
+import { MenuPuntos } from "@/components/ui/MenuPuntos";
 import {
   CONTADORES_VISTA_VACIOS,
   type VistaTorneoId,
@@ -533,13 +533,16 @@ export default function ClubTorneosPage() {
                         >
                           <Pencil className="size-4" />
                         </button>
-                        <button
-                          onClick={() => handleConfirmDelete(t.id, t.nombre)}
-                          className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors cursor-pointer"
-                          title="Eliminar torneo"
-                        >
-                          <Trash2 className="size-4" />
-                        </button>
+                        <MenuPuntos
+                          etiqueta={`Más acciones de ${t.nombre}`}
+                          items={[
+                            {
+                              label: "Eliminar",
+                              danger: true,
+                              onSelect: () => handleConfirmDelete(t.id, t.nombre),
+                            },
+                          ]}
+                        />
                         </>
                         )}
                       </div>

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   Plus,
   Pencil,
-  Trash2,
   Trophy,
   LayoutDashboard,
   Printer,
@@ -29,6 +28,7 @@ import { useProfileStore } from "@/store/useProfileStore";
 import { esRolFiscal } from "@/utils/auth/roles";
 import { formatFechaCalendario } from "@/utils/formatFecha";
 import TorneoVistaFiltros from "@/components/torneos/TorneoVistaFiltros";
+import { MenuPuntos } from "@/components/ui/MenuPuntos";
 import {
   CONTADORES_VISTA_VACIOS,
   type VistaTorneoId,
@@ -237,13 +237,12 @@ export default function TorneosPage() {
     }
   };
 
-  const handleDeleteRequest = (id: string) => {
+  const handleDeleteRequest = (id: string, nombre: string) => {
     setFeedbackModal({
       isOpen: true,
       type: "danger",
       title: "Eliminar Torneo",
-      description:
-        "¿Estás seguro? Se borrará el torneo y todas sus inscripciones asociadas. Esta acción no se puede deshacer.",
+      description: `¿Eliminar el torneo «${nombre}»? Se borran también sus inscripciones. Esta acción no se puede deshacer.`,
       confirmText: "Sí, eliminar",
       cancelText: "Cancelar",
       onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
@@ -585,13 +584,16 @@ export default function TorneosPage() {
                           >
                             <Pencil className="size-4" />
                           </button>
-                          <button
-                            onClick={() => handleDeleteRequest(t.id)}
-                            className="p-2 bg-red-500/10 hover:bg-red-500/20 border border-transparent hover:border-red-500/20 rounded-lg text-red-500 transition-colors"
-                            title="Eliminar Torneo"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
+                          <MenuPuntos
+                            etiqueta={`Más acciones de ${t.nombre}`}
+                            items={[
+                              {
+                                label: "Eliminar",
+                                danger: true,
+                                onSelect: () => handleDeleteRequest(t.id, t.nombre),
+                              },
+                            ]}
+                          />
                           </>
                           )}
                         </div>

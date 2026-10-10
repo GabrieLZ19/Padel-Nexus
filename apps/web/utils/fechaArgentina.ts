@@ -33,6 +33,13 @@ export function horaAMinutos(hora: string): number {
   return Number(h) * 60 + Number(m ?? 0);
 }
 
+export function fechaLatina(iso?: string | null): string {
+  if (!iso) return "";
+  const [year, month, day] = iso.split("T")[0].split("-");
+  if (!year || !month || !day) return "";
+  return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
+}
+
 export function fechaHoyArgentina(ahora: Date = new Date()): string {
   return partesEnArgentina(ahora).fecha;
 }

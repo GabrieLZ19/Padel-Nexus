@@ -17,9 +17,10 @@ import {
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { useProfileStore } from "@/store/useProfileStore";
-import { NIVELES_PADEL, LADOS_PADEL, PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
+import { LADOS_PADEL, PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
 import { toDateInputValue } from "@/utils/dateUtils";
 import { validateNombre, validateDni, validateTelefono } from "@/utils/validation";
+import { sileo } from "sileo";
 
 export const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-white/5 rounded-2xl ${className}`} />
@@ -29,6 +30,8 @@ export default function ProfileSettings() {
   const [profile, setProfile] = useState<Perfil | null>(null);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [pedidoAbierto, setPedidoAbierto] = useState(false);
+  const [pedidoEnviando, setPedidoEnviando] = useState(false);
 
   // Estados para subida de avatar
   const [uploading, setUploading] = useState(false);
@@ -123,11 +126,14 @@ export default function ProfileSettings() {
     setSaving(true);
     try {
       const cleanedProfile = {
-        ...profile,
         nombre: (profile.nombre || "").trim(),
         apellido: (profile.apellido || "").trim(),
-        dni: (profile.dni || "").trim().replace(/\./g, ""),
         telefono: profile.telefono?.trim() || null,
+        lugar_residencia: profile.lugar_residencia,
+        sexo: profile.sexo,
+        lado_preferido: profile.lado_preferido,
+        fecha_nacimiento: profile.fecha_nacimiento,
+        avatar_url: profile.avatar_url,
       };
       const fechaInput = toDateInputValue(profile.fecha_nacimiento);
       if (fechaInput) {
@@ -142,6 +148,30 @@ export default function ProfileSettings() {
       console.error("Error al actualizar:", error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const enviarPedido = async (valor?: string, campo?: string) => {
+    if (!valor?.trim() || (campo !== "dni" && campo !== "categoria")) return;
+    setPedidoEnviando(true);
+    try {
+      await PerfilService.solicitarCambio(campo, valor.trim());
+      setPedidoAbierto(false);
+      sileo.success({
+        title: "Pedido registrado",
+        description: "La federación va a revisar el cambio. Tu ficha no se modificó.",
+      });
+    } catch (error: unknown) {
+      const mensaje =
+        error && typeof error === "object" && "response" in error
+          ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
+          : null;
+      sileo.error({
+        title: "No se pudo registrar el pedido",
+        description: mensaje || "Intentá de nuevo.",
+      });
+    } finally {
+      setPedidoEnviando(false);
     }
   };
 
@@ -280,23 +310,19 @@ export default function ProfileSettings() {
             </div>
 
             <div className="space-y-1">
-              <label className={labelStyles}>DNI (Ficha Oficial) *</label>
+              <label className={labelStyles}>DNI (Ficha Oficial)</label>
               <div className="relative group">
-                <Fingerprint className={`absolute left-4 top-1/2 -translate-y-1/2 size-4 transition-colors ${errors.dni ? "text-red-400" : "text-gray-500"}`} />
+                <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-gray-500" />
                 <input
-                  className={getInputStyles(!!errors.dni, true)}
+                  className={getInputStyles(false, true)}
                   type="text"
                   value={profile.dni || ""}
-                  onChange={(e) => {
-                    setProfile({ ...profile, dni: e.target.value.replace(/[^0-9.]/g, "").slice(0, 10) });
-                    if (errors.dni) setErrors((p) => ({ ...p, dni: undefined }));
-                  }}
-                  required
+                  readOnly
+                  aria-readonly="true"
+                  title="El DNI lo cambia la federación"
                 />
               </div>
-              {errors.dni && (
-                <p className="text-red-400 text-xs mt-1 ml-1">{errors.dni}</p>
-              )}
+              <p className="text-xs text-gray-500 ml-1">Dato oficial. No se edita desde acá.</p>
             </div>
 
             <div className="space-y-1">
@@ -374,16 +400,25 @@ export default function ProfileSettings() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1">
-              <label className={labelStyles}>Categoría oficial *</label>
-              <CustomDropdown
-                value={profile.categoria_padel || ""}
-                onChange={(val) =>
-                  setProfile({ ...profile, categoria_padel: val })
-                }
-                options={NIVELES_PADEL}
-                placeholder="Seleccionar categoría"
-                haciaArriba={true}
+              <label className={labelStyles}>Categoría oficial</label>
+              <input
+                className={getInputStyles(false, false)}
+                type="text"
+                value={profile.categoria_padel || "Sin categoría"}
+                readOnly
+                aria-readonly="true"
+                title="La categoría la cambia la federación"
               />
+              <p className="text-xs text-gray-500 ml-1">Dato oficial. No se edita desde acá.</p>
+            </div>
+            <div className="md:col-span-2">
+              <button
+                type="button"
+                onClick={() => setPedidoAbierto(true)}
+                className="text-sm font-bold text-brand-chartreuse hover:underline cursor-pointer"
+              >
+                Solicitar cambio
+              </button>
             </div>
             <div className="space-y-1">
               <label className={labelStyles}>Lado preferido en cancha *</label>
@@ -416,6 +451,29 @@ export default function ProfileSettings() {
           </button>
         </div>
       </form>
+
+      <FeedbackModal
+        isOpen={pedidoAbierto}
+        onClose={() => {
+          if (!pedidoEnviando) setPedidoAbierto(false);
+        }}
+        title="Solicitar cambio"
+        description="El DNI y la categoría oficial los cambia la federación. El pedido queda registrado y tu ficha no se modifica."
+        type="info"
+        confirmText="Enviar pedido"
+        cancelText="Cancelar"
+        isLoading={pedidoEnviando}
+        showSelect
+        selectLabel="Dato"
+        selectOptions={[
+          { value: "dni", label: "DNI" },
+          { value: "categoria", label: "Categoría" },
+        ]}
+        showInput
+        inputLabel="Valor pedido"
+        inputPlaceholder="Nuevo DNI o categoría, por ejemplo 6ª"
+        onConfirm={enviarPedido}
+      />
 
       <FeedbackModal
         isOpen={showModal}

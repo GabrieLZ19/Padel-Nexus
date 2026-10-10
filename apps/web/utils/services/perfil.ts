@@ -53,10 +53,54 @@ export interface RegistroResponse {
   };
 }
 
+export type PanelJugador = {
+  proximoPartido: {
+    id: string;
+    torneoId: string;
+    torneoNombre: string;
+    fecha: string | null;
+    cancha: string | null;
+    ronda: string | null;
+    rival: string;
+  } | null;
+  inscripciones: Array<{
+    id: string;
+    torneoId: string;
+    torneoNombre: string;
+    categoria: string | null;
+    nivel: string | null;
+    estadoTorneo: string | null;
+    estadoPago: string | null;
+    monto: number;
+    sinCosto: boolean;
+  }>;
+  resultados: Array<{
+    id: string;
+    torneoId: string;
+    torneoNombre: string;
+    fecha: string | null;
+    ronda: string | null;
+    marcador: string;
+    gano: boolean;
+    rival: string;
+  }>;
+  ranking: {
+    puesto: number;
+    categoria: string;
+    puntos: number;
+    alcance: string;
+  } | null;
+};
+
 export const PerfilService = {
   /**
    * Obtiene los datos del perfil logueado y extrae la propiedad interna data
    */
+  async getMiPanel(): Promise<PanelJugador> {
+    const response = await api.get<ApiResponse<PanelJugador>>("/perfil/me/panel");
+    return response.data.data;
+  },
+
   async getMe(): Promise<Perfil | null> {
     try {
       // Indicamos que Axios recibirá la estructura ApiResponse wrapping el Perfil
@@ -74,6 +118,16 @@ export const PerfilService = {
   /**
    * Actualiza los datos de la ficha personal del jugador
    */
+  async solicitarCambio(
+    campo: "dni" | "categoria",
+    valorPedido: string,
+  ): Promise<{ id: string; campo: string; valor_pedido: string; estado: string }> {
+    const response = await api.post<
+      ApiResponse<{ id: string; campo: string; valor_pedido: string; estado: string }>
+    >("/perfil/me/solicitar-cambio", { campo, valorPedido });
+    return response.data.data;
+  },
+
   async updateMe(perfilData: Partial<Perfil>): Promise<Perfil> {
     const response = await api.put<ApiResponse<Perfil>>(
       "/perfil/me",

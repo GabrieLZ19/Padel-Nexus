@@ -16,7 +16,6 @@ import {
   List,
   Map,
   Edit2,
-  Power,
   Eye,
   ShieldCheck,
   X,
@@ -28,6 +27,7 @@ import FeedbackModal, {
 } from "@/components/ui/FeedbackModal";
 import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
 import { sileo } from "sileo";
+import { MenuPuntos } from "@/components/ui/MenuPuntos";
 
 const MapaClubs = dynamic(() => import("@/components/reservas/MapaClubs"), {
   ssr: false,
@@ -120,9 +120,7 @@ export default function PadrónAsociacionesPage() {
     setShowEditModal(true);
   };
 
-  const requestToggleEstado = (e: React.MouseEvent, a: Asociacion) => {
-    e.stopPropagation();
-    e.preventDefault();
+  const requestToggleEstado = (a: Asociacion) => {
     const esActivo = (a.estado ?? a.estado_aprobacion) === "activo";
     const nuevoEstado = esActivo ? "inactivo" : "activo";
 
@@ -453,17 +451,16 @@ export default function PadrónAsociacionesPage() {
                 </div>
 
                 <div className="flex items-center justify-between pt-5 mt-4 border-t border-white/5">
-                  <button
-                    onClick={(e) => requestToggleEstado(e, a)}
-                    className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                      esActivo
-                        ? "bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/20"
-                        : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20"
-                    }`}
-                  >
-                    <Power className="size-3" />
-                    {esActivo ? "Inhabilitar" : "Habilitar"}
-                  </button>
+                  <MenuPuntos
+                    etiqueta={`Más acciones de ${a.nombre}`}
+                    items={[
+                      {
+                        label: esActivo ? "Inhabilitar" : "Habilitar",
+                        danger: esActivo,
+                        onSelect: () => requestToggleEstado(a),
+                      },
+                    ]}
+                  />
 
                   <button
                     onClick={(e) => handleOpenEdit(e, a)}
@@ -546,6 +543,16 @@ export default function PadrónAsociacionesPage() {
                           >
                             <Edit2 className="size-4" />
                           </button>
+                          <MenuPuntos
+                            etiqueta={`Más acciones de ${a.nombre}`}
+                            items={[
+                              {
+                                label: esActivo ? "Inhabilitar" : "Habilitar",
+                                danger: esActivo,
+                                onSelect: () => requestToggleEstado(a),
+                              },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>

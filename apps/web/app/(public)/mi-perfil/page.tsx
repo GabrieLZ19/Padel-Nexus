@@ -15,12 +15,15 @@ import {
   MapPin,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
+import { PerfilService, type PanelJugador } from "@/utils/services/perfil";
+import { PanelJugadorResumen } from "@/components/perfil/PanelJugadorResumen";
 import { PARTIDOS_ABIERTOS } from "@/utils/constants/partidosAbiertos";
 import { useSocket } from "@/hooks/useSocket";
 import CredencialDigital from "@/components/perfil/CredencialDigital";
 import LicenciaModal from "@/components/perfil/LicenciaModal";
 import AfiliacionModal from "@/components/perfil/AfiliacionModal";
 import { MinorModeBanner } from "@/components/legal/MinorModeBanner";
+import { fechaLatina } from "@/utils/fechaArgentina";
 
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-white/5 rounded-3xl ${className}`} />
@@ -44,10 +47,25 @@ export default function PlayerDashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAfiliacionOpen, setIsAfiliacionOpen] = useState(false);
   const [activeLicenciaIndex, setActiveLicenciaIndex] = useState(0);
+  const [panel, setPanel] = useState<PanelJugador | null>(null);
 
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  useEffect(() => {
+    let activo = true;
+    PerfilService.getMiPanel()
+      .then((data) => {
+        if (activo) setPanel(data);
+      })
+      .catch(() => {
+        if (activo) setPanel(null);
+      });
+    return () => {
+      activo = false;
+    };
+  }, []);
 
   // Refrescar el perfil en tiempo real cuando cambia el estado de una licencia
   const handleSocketNotif = useCallback(
@@ -86,6 +104,8 @@ export default function PlayerDashboard() {
           Nueva Reserva
         </Link>
       </header>
+
+      <PanelJugadorResumen panel={panel} />
 
       <MinorModeBanner />
 
@@ -183,6 +203,11 @@ export default function PlayerDashboard() {
                             <p className="text-xs md:text-sm text-brand-chartreuse uppercase font-black tracking-widest mt-1">
                               Estado: Activa
                             </p>
+                            {currentLic.fecha_vencimiento ? (
+                              <p className="text-xs text-gray-400 mt-1">
+                                Vence el {fechaLatina(currentLic.fecha_vencimiento)}
+                              </p>
+                            ) : null}
                           </div>
                         ) : currentLic.estado === "Pendiente" ? (
                           <div className="w-full flex flex-col items-center gap-3">
@@ -283,29 +308,26 @@ export default function PlayerDashboard() {
                     </h2>
                   </div>
                 </div>
-                {/* Marca de agua decorativa */}
-                <div className="absolute -right-6 top-1/2 -translate-y-1/2 select-none pointer-events-none z-0">
-                  <span
-                    className="font-black text-[120px] italic"
-                    style={{ color: "var(--color-brand-white)", opacity: 0.07 }}
-                  >
-                    {profile.categoria_padel || "S/C"}
-                  </span>
-                </div>
               </div>
 
               {/* Accesos rápidos — 4 columnas en desktop */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
                 <Link
-                  href="/torneos"
+                  href="/mi-perfil/torneos"
                   className="bg-brand-card p-5 md:p-6 rounded-3xl border border-brand-white/5 hover:border-brand-chartreuse/40 transition-all flex flex-col items-center justify-center text-center gap-3 group cursor-pointer"
                 >
                   <div className="p-3 bg-brand-white/5 rounded-2xl group-hover:bg-brand-chartreuse/10 transition-colors">
                     <ClipboardList className="text-brand-white group-hover:text-brand-chartreuse size-6 md:size-8 transition-colors" />
                   </div>
                   <div>
-                    <h2 className="text-base md:text-lg font-bold text-brand-white">Historial</h2>
-                    <p className="text-[10px] md:text-xs text-gray-400 mt-0.5">Mis Torneos</p>
+                    <h2 className="text-base md:text-lg font-bold text-brand-white">Mis torneos</h2>
+                    <p className="text-[10px] md:text-xs text-gray-400 mt-0.5">
+                      {panel
+                        ? panel.inscripciones.length === 1
+                          ? "1 inscripción"
+                          : `${panel.inscripciones.length} inscripciones`
+                        : "Tus inscripciones"}
+                    </p>
                   </div>
                 </Link>
 

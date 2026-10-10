@@ -124,6 +124,9 @@ export default function JugadoresLicenciasPage() {
     title: string;
     description: string;
     type: "success" | "danger" | "warning" | "info" | "error";
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm?: () => void;
   }>({ isOpen: false, title: "", description: "", type: "info" });
 
   const [licenciaAVerificar, setLicenciaAVerificar] = useState<Licencia | null>(
@@ -176,6 +179,29 @@ export default function JugadoresLicenciasPage() {
       clearTimeout(defer);
     };
   }, [fetchLicencias, page, search, filtroActivo]);
+
+  const pedirCambioEstado = (
+    licenciaId: string,
+    nuevoEstado: "Activa" | "Suspendida",
+    nombre: string,
+  ) => {
+    if (nuevoEstado !== "Suspendida") {
+      void handleCambiarEstadoRapido(licenciaId, nuevoEstado);
+      return;
+    }
+    setFeedback({
+      isOpen: true,
+      type: "danger",
+      title: "¿Revocar licencia?",
+      description: `¿Confirmás revocar la licencia de ${nombre}?`,
+      confirmText: "Revocar",
+      cancelText: "Cancelar",
+      onConfirm: () => {
+        setFeedback((prev) => ({ ...prev, isOpen: false, onConfirm: undefined }));
+        void handleCambiarEstadoRapido(licenciaId, nuevoEstado);
+      },
+    });
+  };
 
   const handleCambiarEstadoRapido = async (
     licenciaId: string,
@@ -529,7 +555,15 @@ export default function JugadoresLicenciasPage() {
                     onValidar={() =>
                       setLicenciaAVerificar({ ...licencia, perfiles: jugador })
                     }
-                    onCambiarEstado={handleCambiarEstadoRapido}
+                    onCambiarEstado={(licenciaId, estado) =>
+                      pedirCambioEstado(
+                        licenciaId,
+                        estado,
+                        jugador.nombre
+                          ? `${jugador.apellido || ""}, ${jugador.nombre}`.replace(/^, /, "")
+                          : "este jugador",
+                      )
+                    }
                     savingFecha={savingFecha}
                   />
                 );
@@ -680,6 +714,9 @@ export default function JugadoresLicenciasPage() {
         title={feedback.title}
         description={feedback.description}
         type={feedback.type}
+        confirmText={feedback.confirmText}
+        cancelText={feedback.cancelText}
+        onConfirm={feedback.onConfirm}
       />
     </div>
   );

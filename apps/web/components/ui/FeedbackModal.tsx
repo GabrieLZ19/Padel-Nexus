@@ -19,6 +19,7 @@ export interface FeedbackModalProps {
   inputType?: string;
   inputLabel?: string;
   showSelect?: boolean;
+  selectLabel?: string;
   selectOptions?: { value: string; label: string }[];
   onConfirm?: (inputValue?: string, selectValue?: string) => void;
 }
@@ -38,6 +39,7 @@ export default function FeedbackModal({
   inputType = "text",
   inputLabel = "Valor",
   showSelect = false,
+  selectLabel = "Método",
   selectOptions = [],
 }: FeedbackModalProps) {
   // Guard defensivo: si onClose es undefined, usar noop seguro
@@ -155,7 +157,7 @@ export default function FeedbackModal({
                 {showSelect && (
                   <div>
                     <label className="block text-xs font-bold text-gray-400 mb-1">
-                      Método
+                      {selectLabel}
                     </label>
                     <CustomDropdown
                       value={selectValue}

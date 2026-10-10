@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Perfil } from "@/utils/types";
 import CredencialDigital from "@/components/perfil/CredencialDigital";
+import FeedbackModal from "@/components/ui/FeedbackModal";
 
 export default function PerfilJugadorAdminPage() {
   const { id } = useParams();
@@ -31,6 +32,7 @@ export default function PerfilJugadorAdminPage() {
   const [editingFecha, setEditingFecha] = useState(false);
   const [fechaVencimientoInput, setFechaVencimientoInput] = useState("");
   const [activeLicenciaIndex, setActiveLicenciaIndex] = useState(0);
+  const [confirmarRevocar, setConfirmarRevocar] = useState(false);
 
   const licenciasList = perfil?.licencias || [];
   const currentLicencia =
@@ -353,7 +355,7 @@ export default function PerfilJugadorAdminPage() {
                     {currentLicencia.estado === "Activa" ? (
                       <button
                         disabled={actualizando}
-                        onClick={() => handleUpdateLicencia("Suspendida")}
+                        onClick={() => setConfirmarRevocar(true)}
                         className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50"
                       >
                         <Ban size={14} /> Revocar Licencia
@@ -434,6 +436,25 @@ export default function PerfilJugadorAdminPage() {
           </div>
         </div>
       </div>
+      <FeedbackModal
+        isOpen={confirmarRevocar}
+        type="danger"
+        title="¿Revocar licencia?"
+        description={`¿Confirmás revocar la licencia de ${
+          perfil.nombre
+            ? `${perfil.apellido ? `${perfil.apellido}, ` : ""}${perfil.nombre}`
+            : "este jugador"
+        }?`}
+        confirmText="Revocar"
+        cancelText="Cancelar"
+        isLoading={actualizando}
+        onClose={() => setConfirmarRevocar(false)}
+        onConfirm={() => {
+          void handleUpdateLicencia("Suspendida").finally(() =>
+            setConfirmarRevocar(false),
+          );
+        }}
+      />
     </div>
   );
 }
