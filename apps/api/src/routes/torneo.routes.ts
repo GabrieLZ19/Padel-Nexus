@@ -238,22 +238,22 @@ router.get(
 );
 router.post(
   "/fiscales",
-  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  authorize(["superadmin", "admin_federacion"]),
   crearFiscal,
 );
 router.put(
   "/fiscales/:id",
-  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  authorize(["superadmin", "admin_federacion"]),
   actualizarFiscal,
 );
 router.patch(
   "/fiscales/:id/estado",
-  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  authorize(["superadmin", "admin_federacion"]),
   cambiarEstadoFiscal,
 );
 router.post(
   "/fiscales/:id/acceso",
-  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  authorize(["superadmin", "admin_federacion"]),
   habilitarAccesoFiscal,
 );
 router.get(

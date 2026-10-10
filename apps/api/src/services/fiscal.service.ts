@@ -36,26 +36,62 @@ export interface AccesoFiscalResultado {
   mensaje: string;
 }
 
-const FAP_FEDERACION_ID = "818c6a07-f056-41dc-9a07-b8c03d88cee1";
-
 export class FiscalService {
-  /** Resuelve la entidad nacional dueña del colegio a partir de una asociación o federación. */
+  /** Colegio por defecto: la federación nacional FAP. */
+  static async idColegioPorDefecto(): Promise<string> {
+    const { data, error } = await supabaseAdmin
+      .from("federaciones")
+      .select("id")
+      .ilike("sigla", "FAP")
+      .neq("estado", "inactivo")
+      .maybeSingle();
+
+    if (error || !data?.id) {
+      throw new Error(
+        "No hay una federación nacional activa para el colegio de fiscales.",
+      );
+    }
+    return data.id;
+  }
+
+  static async etiquetaColegio(colegioId: string): Promise<{
+    id: string;
+    sigla: string | null;
+    nombre: string;
+  } | null> {
+    const { data } = await supabaseAdmin
+      .from("federaciones")
+      .select("id, sigla, nombre")
+      .eq("id", colegioId)
+      .maybeSingle();
+    return data;
+  }
+
+  /**
+   * El colegio es de una federación nacional.
+   * Una asociación provincial se resuelve a la federación a la que pertenece.
+   */
   static async resolverColegioEntidadId(
     asociacionOFederacionId?: string | null,
   ): Promise<string> {
     const id = String(asociacionOFederacionId || "").trim();
-    if (!id) return FAP_FEDERACION_ID;
+    if (!id) return this.idColegioPorDefecto();
 
-    const { data } = await supabaseAdmin
+    const { data: federacion } = await supabaseAdmin
+      .from("federaciones")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
+    if (federacion?.id) return federacion.id;
+
+    const { data: asociacion } = await supabaseAdmin
       .from("asociaciones")
-      .select("id, tipo, federacion_id")
+      .select("id, federacion_id")
       .eq("id", id)
       .maybeSingle();
 
-    if (!data) return FAP_FEDERACION_ID;
-    if (data.tipo === "federacion") return data.id;
-    if (data.federacion_id) return data.federacion_id;
-    return data.id;
+    if (asociacion?.federacion_id) return asociacion.federacion_id;
+    return this.idColegioPorDefecto();
   }
 
   static async resolverColegioDeTorneo(torneoId: string): Promise<string> {
@@ -77,16 +113,20 @@ export class FiscalService {
 
   static async listarFiscales(asociacionId?: string | null) {
     const colegioId = await this.resolverColegioEntidadId(asociacionId);
-    const { data, error } = await supabaseAdmin
-      .from("fiscales")
-      .select("*, asociaciones:asociacion_id(id, nombre, sigla, tipo)")
-      .eq("asociacion_id", colegioId)
-      .order("apellido", { ascending: true });
+    const [{ data, error }, etiqueta] = await Promise.all([
+      supabaseAdmin
+        .from("fiscales")
+        .select("*, asociaciones:asociacion_id(id, nombre, sigla, tipo)")
+        .eq("asociacion_id", colegioId)
+        .order("apellido", { ascending: true }),
+      this.etiquetaColegio(colegioId),
+    ]);
 
     if (error) throw new Error(error.message);
+    const nombreColegio = etiqueta?.sigla || etiqueta?.nombre || null;
     return (data || []).map((f) => ({
       ...f,
-      asociacion: f.asociaciones?.sigla || f.asociaciones?.nombre || null,
+      asociacion: nombreColegio || f.asociaciones?.sigla || f.asociaciones?.nombre || null,
     }));
   }
 
@@ -95,6 +135,10 @@ export class FiscalService {
       throw new Error("Indicá la entidad nacional dueña del colegio (asociacion_id).");
     }
     const colegioId = await this.resolverColegioEntidadId(datos.asociacion_id);
+    const etiqueta = await this.etiquetaColegio(colegioId);
+    if (!etiqueta) {
+      throw new Error("El colegio pertenece a una federación nacional.");
+    }
 
     let usuarioId = datos.usuario_id || null;
     if (!usuarioId) {
@@ -108,12 +152,6 @@ export class FiscalService {
       }
     }
 
-    const { data: asoc } = await supabaseAdmin
-      .from("asociaciones")
-      .select("sigla, nombre")
-      .eq("id", colegioId)
-      .maybeSingle();
-
     const { data, error } = await supabaseAdmin
       .from("fiscales")
       .insert([
@@ -123,7 +161,7 @@ export class FiscalService {
           dni: datos.dni,
           rango: datos.rango,
           asociacion_id: colegioId,
-          entidad_carga: datos.entidad_carga || asoc?.sigla || asoc?.nombre || null,
+          entidad_carga: datos.entidad_carga || etiqueta.sigla || etiqueta.nombre || null,
           correo: datos.correo || null,
           direccion: datos.direccion || null,
           usuario_id: usuarioId,
@@ -136,7 +174,7 @@ export class FiscalService {
     if (error) throw new Error(`Error al crear fiscal: ${error.message}`);
     return {
       ...data,
-      asociacion: data.asociaciones?.sigla || data.asociaciones?.nombre || null,
+      asociacion: etiqueta.sigla || etiqueta.nombre || null,
     };
   }
 
@@ -163,9 +201,17 @@ export class FiscalService {
       .single();
 
     if (error) throw new Error(`Error al actualizar fiscal: ${error.message}`);
+    const etiqueta = data.asociacion_id
+      ? await this.etiquetaColegio(data.asociacion_id)
+      : null;
     return {
       ...data,
-      asociacion: data.asociaciones?.sigla || data.asociaciones?.nombre || null,
+      asociacion:
+        etiqueta?.sigla ||
+        etiqueta?.nombre ||
+        data.asociaciones?.sigla ||
+        data.asociaciones?.nombre ||
+        null,
     };
   }
 
@@ -178,9 +224,17 @@ export class FiscalService {
       .single();
 
     if (error) throw new Error(`Error al cambiar estado de fiscal: ${error.message}`);
+    const etiqueta = data.asociacion_id
+      ? await this.etiquetaColegio(data.asociacion_id)
+      : null;
     return {
       ...data,
-      asociacion: data.asociaciones?.sigla || data.asociaciones?.nombre || null,
+      asociacion:
+        etiqueta?.sigla ||
+        etiqueta?.nombre ||
+        data.asociaciones?.sigla ||
+        data.asociaciones?.nombre ||
+        null,
     };
   }
 
@@ -375,9 +429,15 @@ export class FiscalService {
 
     if (error) throw new Error(error.message);
     if (!data) return null;
+    const etiqueta = await this.etiquetaColegio(colegioId);
     return {
       ...data,
-      asociacion: data.asociaciones?.sigla || data.asociaciones?.nombre || null,
+      asociacion:
+        etiqueta?.sigla ||
+        etiqueta?.nombre ||
+        data.asociaciones?.sigla ||
+        data.asociaciones?.nombre ||
+        null,
     };
   }
 
@@ -389,20 +449,29 @@ export class FiscalService {
 
     if (error) throw new Error(error.message);
 
-    return (data || [])
-      .map((tf) => {
+    const filas = await Promise.all(
+      (data || []).map(async (tf) => {
         const fiscalRaw = tf.fiscales;
         const fiscal = Array.isArray(fiscalRaw) ? fiscalRaw[0] : fiscalRaw;
         if (!fiscal) return null;
         const asocRaw = fiscal.asociaciones;
         const asoc = Array.isArray(asocRaw) ? asocRaw[0] : asocRaw;
+        const etiqueta = fiscal.asociacion_id
+          ? await this.etiquetaColegio(fiscal.asociacion_id)
+          : null;
         return {
           ...fiscal,
-          asociacion: asoc?.sigla || asoc?.nombre || null,
+          asociacion:
+            etiqueta?.sigla ||
+            etiqueta?.nombre ||
+            asoc?.sigla ||
+            asoc?.nombre ||
+            null,
           rol_torneo: tf.rol || "auxiliar",
         };
-      })
-      .filter(Boolean);
+      }),
+    );
+    return filas.filter(Boolean);
   }
 
   static async asignarFiscalesTorneo(
