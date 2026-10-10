@@ -248,7 +248,7 @@ export default function MarketplaceCrmPanel({
       await MarketplaceService.crmRegistrarTienda(entidadRef, {
         nombre_tienda: nombreTienda || nombreEntidadSeleccionada || "Mi tienda",
         descripcion,
-        provincia,
+        provincia: tipoFijo === "federacion" ? "" : provincia,
         ...logoPayload(),
       });
       sileo.success({
@@ -271,7 +271,7 @@ export default function MarketplaceCrmPanel({
       await MarketplaceService.crmActualizarTienda(entidadRef, {
         nombre_tienda: nombreTienda,
         descripcion,
-        provincia,
+        provincia: tipoFijo === "federacion" ? "" : provincia,
         ...logoPayload(),
       });
       sileo.success({ title: "Guardado", description: "Tienda actualizada." });
@@ -506,6 +506,7 @@ export default function MarketplaceCrmPanel({
                   onChangeNombre={setNombreTienda}
                   onChangeDescripcion={setDescripcion}
                   onChangeProvincia={setProvincia}
+                  mostrarProvincia={tipoFijo !== "federacion"}
                   onChangeLogo={handleChangeLogo}
                   onPublicar={handleRegistrarTienda}
                   onGuardar={handleGuardarTienda}

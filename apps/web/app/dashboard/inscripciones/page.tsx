@@ -40,6 +40,7 @@ import { importarPlanillaConProgreso } from "@/utils/planillaImportProgress";
 import { PlanillaImportProgressBar } from "@/components/inscripciones/PlanillaImportProgressBar";
 import type { PlanillaImportProgressState } from "@/components/inscripciones/PlanillaImportProgressBar";
 import { esModalidadIndividual } from "@/utils/formatFecha";
+import { useProfileStore } from "@/store/useProfileStore";
 
 const TABS = ["Todas", "Pendientes", "Confirmadas", "Rechazadas"] as const;
 type TabInscripcion = (typeof TABS)[number];
@@ -63,6 +64,8 @@ const cleanName = (name?: string | null) => {
 };
 
 export default function GestionInscripcionesPage() {
+  const { profile } = useProfileStore();
+  const esFederacion = profile?.rol === "admin_federacion";
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
   const [torneos, setTorneos] = useState<Torneo[]>([]);
   const [total, setTotal] = useState(0);
@@ -92,6 +95,9 @@ export default function GestionInscripcionesPage() {
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
 
   const selectedTorneo = torneos.find((t) => t.id === filterTorneo);
+  const filas = esFederacion
+    ? inscripciones.filter((ins) => ins.tipo !== "Reserva cancha")
+    : inscripciones;
 
   const [importingCSV, setImportingCSV] = useState(false);
   const [importProgress, setImportProgress] =
@@ -331,7 +337,7 @@ export default function GestionInscripcionesPage() {
       "ID",
       "Jugador 1",
       "Jugador 2",
-      "Torneo/Cancha",
+      esFederacion ? "Torneo" : "Torneo/Cancha",
       "Categoría",
       "Fecha",
       "Monto",
@@ -341,11 +347,13 @@ export default function GestionInscripcionesPage() {
     const escapeCSV = (str: string | number | undefined | null) =>
       `"${String(str || "").replace(/"/g, '""')}"`;
 
-    const csvData = inscripciones.map((ins) => [
+    const csvData = filas.map((ins) => [
       escapeCSV(ins.id),
       escapeCSV(ins.jugador1_nombre),
       escapeCSV(ins.jugador2_nombre || "-"),
-      escapeCSV(ins.torneo_nombre || ins.cancha_nombre),
+      escapeCSV(
+        esFederacion ? ins.torneo_nombre : ins.torneo_nombre || ins.cancha_nombre,
+      ),
       escapeCSV(ins.categoria),
       escapeCSV(
         new Date(ins.created_at || new Date()).toLocaleDateString("es-AR"),
@@ -501,7 +509,7 @@ export default function GestionInscripcionesPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-              Inscripciones y reservas
+              {esFederacion ? "Inscripciones" : "Inscripciones y reservas"}
             </h1>
             <p className="text-gray-400 mt-1 text-sm sm:text-base">
               Control de pagos y validaciones
@@ -509,7 +517,7 @@ export default function GestionInscripcionesPage() {
           </div>
           <button
             onClick={handleExportarExcel}
-            disabled={loading || inscripciones.length === 0}
+            disabled={loading || filas.length === 0}
             className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all disabled:opacity-50 cursor-pointer w-full sm:w-auto shrink-0"
           >
             <Download className="size-4" /> Exportar CSV
@@ -737,7 +745,7 @@ export default function GestionInscripcionesPage() {
             </table>
           </div>
           </>
-        ) : inscripciones.length === 0 ? (
+        ) : filas.length === 0 ? (
           <div className="p-16 flex flex-col items-center justify-center text-center">
             <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 text-gray-500">
               <Search className="size-8" />
@@ -753,14 +761,16 @@ export default function GestionInscripcionesPage() {
         ) : (
           <>
           <div className="flex flex-col gap-3 p-3 xl:hidden">
-            {inscripciones.map((ins) => tarjetaDe(ins))}
+            {filas.map((ins) => tarjetaDe(ins))}
           </div>
           <div className="hidden overflow-x-auto xl:block">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-white/5 text-gray-400 text-xs font-bold uppercase tracking-wider bg-black/20">
                   <th className="py-4 px-8">Jugador / Pareja</th>
-                  <th className="py-4 px-6">Torneo / Cancha</th>
+                  <th className="py-4 px-6">
+                    {esFederacion ? "Torneo" : "Torneo / Cancha"}
+                  </th>
                   <th className="py-4 px-6">Fecha Req.</th>
                   <th className="py-4 px-6">Estado del Pago</th>
                   <th className="py-4 px-6">Monto</th>
@@ -768,7 +778,7 @@ export default function GestionInscripcionesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {inscripciones.map((ins) => {
+                {filas.map((ins) => {
                   const esPareja =
                     ins.jugador2_nombre &&
                     ins.jugador2_nombre.trim() !== "" &&
@@ -870,7 +880,7 @@ export default function GestionInscripcionesPage() {
         page={page}
         total={total}
         pageSize={pageSize}
-        currentCount={inscripciones.length}
+        currentCount={filas.length}
         onPageChange={setPage}
         tamanos={TAMANOS_PAGINA}
         onPageSizeChange={(tamano) => {

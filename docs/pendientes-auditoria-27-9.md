@@ -74,7 +74,7 @@ No implementar estas partes hasta que respondan.
 
 ## Prioridad baja
 
-- [ ] **SEC-03 · Textos según el rol.** Federación ve «reservas» y «cancha» en Inscripciones y en el chat, y la tienda nacional pide provincia. Aceptación: con la cuenta de Federación esos textos no aparecen.
+- [x] **SEC-03 · Textos según el rol.** (10/10) Con la cuenta de Federación, Inscripciones se titula «Inscripciones» y la columna es «Torneo». El chat no ofrece «Reservas» ni muestra la cancha. La tienda nacional no pide provincia.
 
 ## Ya en el código: contrastar, no rehacer
 

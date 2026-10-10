@@ -19,6 +19,8 @@ interface Props {
   onChangeNombre: (v: string) => void;
   onChangeDescripcion: (v: string) => void;
   onChangeProvincia: (v: string) => void;
+  /** La tienda nacional no se limita a una provincia. */
+  mostrarProvincia?: boolean;
   onChangeLogo: (base64: string | null) => void;
   onPublicar: () => void;
   onGuardar: () => void;
@@ -60,6 +62,7 @@ export default function MarketplaceTiendaTab({
   onChangeNombre,
   onChangeDescripcion,
   onChangeProvincia,
+  mostrarProvincia = true,
   onChangeLogo,
   onPublicar,
   onGuardar,
@@ -146,15 +149,17 @@ export default function MarketplaceTiendaTab({
                 className="w-full bg-brand-black/50 border border-brand-white/10 rounded-xl px-4 py-3.5 text-sm focus:border-brand-chartreuse focus:outline-none transition-colors"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase">Provincia</label>
-              <CustomDropdown
-                value={provincia}
-                onChange={onChangeProvincia}
-                placeholder="Seleccioná provincia"
-                options={PROVINCIAS_ARG}
-              />
-            </div>
+            {mostrarProvincia ? (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase">Provincia</label>
+                <CustomDropdown
+                  value={provincia}
+                  onChange={onChangeProvincia}
+                  placeholder="Seleccioná provincia"
+                  options={PROVINCIAS_ARG}
+                />
+              </div>
+            ) : null}
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-500 uppercase">Presentación</label>
               <textarea
@@ -183,10 +188,14 @@ export default function MarketplaceTiendaTab({
               <LogoAvatar src={logoMostrar} nombre={nombreTienda || nombreEntidad || "Tienda"} />
               <div>
                 <p className="font-black text-lg">{nombreTienda || nombreEntidad || "Tu tienda"}</p>
-                <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                  <MapPin className="size-3" />
-                  {provincia || "Provincia"}
-                </p>
+                {mostrarProvincia ? (
+                  <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                    <MapPin className="size-3" />
+                    {provincia || "Provincia"}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-500 mt-0.5">Nacional</p>
+                )}
               </div>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed">
@@ -235,15 +244,17 @@ export default function MarketplaceTiendaTab({
               className="w-full bg-brand-input border border-brand-white/10 rounded-xl px-4 py-3.5 text-sm focus:border-brand-chartreuse focus:outline-none"
             />
           </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-500 uppercase">Provincia</label>
-            <CustomDropdown
-              value={provincia}
-              onChange={onChangeProvincia}
-              placeholder="Provincia"
-              options={PROVINCIAS_ARG}
-            />
-          </div>
+          {mostrarProvincia ? (
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase">Provincia</label>
+              <CustomDropdown
+                value={provincia}
+                onChange={onChangeProvincia}
+                placeholder="Provincia"
+                options={PROVINCIAS_ARG}
+              />
+            </div>
+          ) : null}
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase">Presentación</label>
             <textarea
@@ -270,7 +281,11 @@ export default function MarketplaceTiendaTab({
             <LogoAvatar src={logoMostrar} nombre={nombreTienda} size="md" />
             <div>
               <p className="font-bold">{nombreTienda}</p>
-              <p className="text-[11px] text-gray-500">{provincia}</p>
+              {mostrarProvincia ? (
+                <p className="text-[11px] text-gray-500">{provincia}</p>
+              ) : (
+                <p className="text-xs text-gray-500">Nacional</p>
+              )}
             </div>
           </div>
           <p className="text-sm text-gray-400">{descripcion || "Sin descripción."}</p>

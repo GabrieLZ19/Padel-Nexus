@@ -96,6 +96,7 @@ export default function ChatInbox({
   ocuparAlto = false,
 }: ChatInboxProps) {
   const { profile } = useProfileStore();
+  const esFederacion = profile?.rol === "admin_federacion";
   const router = useRouter();
   const searchParams = useSearchParams();
   const deepLinkConvId = searchParams.get("c");
@@ -163,6 +164,12 @@ export default function ChatInbox({
       setActiveTab("directos");
     }
   }, [tabParam]);
+
+  useEffect(() => {
+    if (esFederacion && activeTab === "partidos") {
+      setActiveTab("todos");
+    }
+  }, [esFederacion, activeTab]);
 
   const fetchMensajes = useCallback(async (convId: string, cursor?: string) => {
     const fetchGen = ++mensajesFetchGenRef.current;
@@ -437,6 +444,7 @@ export default function ChatInbox({
       nombreCancha.includes(q) ||
       nombreGrupo.includes(q);
 
+    if (esFederacion && conv.tipo === "partido") return false;
     return matchTab && matchSearch;
   });
 
@@ -495,7 +503,7 @@ export default function ChatInbox({
       return conv.nombre?.trim() || "Grupo";
     }
     if (conv.tipo === "partido" && conv.partido) {
-      return conv.partido.club_nombre || "Grupo de reserva";
+      return conv.partido.club_nombre || (esFederacion ? "Convocatoria" : "Grupo de reserva");
     }
     return getDisplayName(conv.otro_participante);
   };
@@ -503,7 +511,7 @@ export default function ChatInbox({
   const getConversationSubtitle = (conv: ChatConversacion) => {
     if (conv.tipo !== "partido" || !conv.partido) return null;
     const parts = [
-      conv.partido.cancha_nombre,
+      esFederacion ? null : conv.partido.cancha_nombre,
       formatPartidoFecha(conv.partido.fecha_reserva),
       conv.partido.nivel_requerido,
     ].filter(Boolean);
@@ -606,7 +614,7 @@ export default function ChatInbox({
     { key: "partidos", label: "Reservas" },
     { key: "marketplace", label: "Ventas" },
     { key: "directos", label: "Directos" },
-  ];
+  ].filter((tab) => !(esFederacion && tab.key === "partidos"));
 
   const productoImagen =
     activeConv?.producto?.thumbnail_url ||
@@ -816,7 +824,7 @@ export default function ChatInbox({
                         Marketplace
                       </span>
                     )}
-                    {conv.tipo === "partido" && (
+                    {conv.tipo === "partido" && !esFederacion && (
                       <span className="inline-block mt-1 text-[9px] font-bold uppercase tracking-wider text-brand-chartreuse bg-brand-chartreuse/10 px-2 py-0.5 rounded-md border border-brand-chartreuse/20">
                         Grupo de reserva
                         {conv.partido?.participantes.length
@@ -883,9 +891,13 @@ export default function ChatInbox({
                     {getConversationTitle(activeConv)}
                   </h3>
                   <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                    {activeConv.tipo === "partido" ? (
+                    {activeConv.tipo === "partido" && !esFederacion ? (
                       <span className="text-[9px] md:text-[10px] font-bold uppercase text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 md:px-2 py-0.5 rounded border border-brand-chartreuse/20">
                         Grupo de reserva
+                      </span>
+                    ) : activeConv.tipo === "partido" ? (
+                      <span className="text-[9px] md:text-[10px] font-bold uppercase text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 md:px-2 py-0.5 rounded border border-brand-chartreuse/20">
+                        Convocatoria
                       </span>
                     ) : activeConv.tipo === "grupo" ? (
                       <span className="text-[9px] md:text-[10px] font-bold uppercase text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 md:px-2 py-0.5 rounded border border-brand-chartreuse/20">
@@ -995,7 +1007,7 @@ export default function ChatInbox({
                     </p>
                     <p className="text-[11px] md:text-xs text-gray-400 mt-0.5 truncate">
                       {[
-                        activeConv.partido.cancha_nombre,
+                        esFederacion ? null : activeConv.partido.cancha_nombre,
                         formatPartidoFecha(activeConv.partido.fecha_reserva),
                         activeConv.partido.hora_inicio?.slice(0, 5),
                       ]
