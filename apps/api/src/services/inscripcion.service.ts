@@ -26,6 +26,7 @@ import {
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
 import { esModalidadIndividual } from "../utils/modalidad";
+import { etiquetaCategoriaInscripcion } from "../utils/categoriaInscripcion";
 
 interface RegistroInscripcionDTO {
   torneoId: string;
@@ -356,7 +357,7 @@ export class InscripcionService {
     let query = supabaseAdmin
       .from("inscripciones")
       .select(
-        `*, perfiles!fk_inscripciones_usuario(nombre, apellido), torneos!fk_inscripciones_torneo(nombre, categoria)`,
+        `*, perfiles!fk_inscripciones_usuario(nombre, apellido), torneos!fk_inscripciones_torneo(nombre, categoria, nivel)`,
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
@@ -412,9 +413,10 @@ export class InscripcionService {
       );
 
     type SupabaseInscripcion = Record<string, unknown> & {
+      categoria?: string | null;
       jugador1_nombre?: string;
       perfiles?: { nombre?: string; apellido?: string };
-      torneos?: { nombre?: string };
+      torneos?: { nombre?: string; categoria?: string | null; nivel?: string | null };
     };
 
     const formattedData = ((data as SupabaseInscripcion[]) || []).map(
@@ -425,6 +427,12 @@ export class InscripcionService {
           formatNombreCompleto(ins.perfiles?.apellido, ins.perfiles?.nombre) ||
           "Usuario Desconocido",
         torneo_nombre: ins.torneos?.nombre || "Torneo no asignado",
+        categoria:
+          etiquetaCategoriaInscripcion({
+            categoria: ins.categoria,
+            nivelTorneo: ins.torneos?.nivel,
+            categoriaTorneo: ins.torneos?.categoria,
+          }) || undefined,
       }),
     );
 
