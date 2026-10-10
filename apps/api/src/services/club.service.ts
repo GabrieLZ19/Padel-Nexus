@@ -68,12 +68,12 @@ function formatearClubConCanchas(
   club: Record<string, unknown>,
 ): Record<string, unknown> & { canchas: number } {
   const canchasRel = club.canchas as { count: number }[] | null | undefined;
-  const canchasCount =
-    canchasRel && canchasRel.length > 0 ? canchasRel[0].count : 0;
   const { canchas: _canchas, torneos: _torneos, ...restoClub } = club;
   return {
     ...restoClub,
-    canchas: canchasCount || Number(club.canchas) || 0,
+    canchas: canchasRel && canchasRel.length > 0
+      ? Number(canchasRel[0].count) || 0
+      : Number(club.canchas) || 0,
   };
 }
 
@@ -207,7 +207,7 @@ export class ClubService {
 
       return {
         ...restoClub,
-        canchas: canchasCount || restoClub.canchas || 0, // Fallback al conteo estático si el conteo real es 0
+        canchas: canchasCount,
         torneos_count: torneosCount,
       };
     });
@@ -236,7 +236,7 @@ export class ClubService {
 
     return {
       ...resto,
-      canchas: canchasCount || resto.canchas || 0,
+      canchas: canchasCount,
     };
   }
 

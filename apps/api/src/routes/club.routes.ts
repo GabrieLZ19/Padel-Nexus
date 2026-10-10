@@ -16,15 +16,20 @@ import {
   eliminarBloqueoClub,
   limitarClubAProvincia,
 } from "../controllers/club.controller";
-import { authenticate, authorize } from "../middleware/auth";
+import { authenticate, authorize, optionalAuthenticate } from "../middleware/auth";
 
 const router = Router();
 
-// Rutas de lectura (Cualquier usuario logueado puede ver los clubes y sus canchas)
-router.get("/", authenticate, getAllClubes);
+// El listado y la ficha se leen sin sesión. Reservar un turno sigue pidiendo cuenta.
+router.get("/", optionalAuthenticate, getAllClubes);
+router.get("/:id", optionalAuthenticate, limitarClubAProvincia, getClubById);
+router.get(
+  "/:id/canchas",
+  optionalAuthenticate,
+  limitarClubAProvincia,
+  getCanchasPorClub,
+);
 router.use("/:id", authenticate, limitarClubAProvincia);
-router.get("/:id", authenticate, getClubById);
-router.get("/:id/canchas", authenticate, getCanchasPorClub);
 
 // Rutas protegidas de gestión de clubes (Solo administradores)
 router.post(

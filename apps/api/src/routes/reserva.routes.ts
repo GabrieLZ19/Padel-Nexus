@@ -1,13 +1,17 @@
 import { Router } from "express";
 import { ReservasController } from "../controllers/reserva.controller";
-import { authenticate, authorize } from "../middleware/auth";
+import { authenticate, authorize, optionalAuthenticate } from "../middleware/auth";
 
 const router = Router();
 
 // ── Endpoints públicos (cualquier usuario autenticado) ─────────────────
 
 // Consultar disponibilidad de turnos por club y fecha
-router.get("/disponibles", authenticate, ReservasController.getDisponibilidad);
+router.get(
+  "/disponibles",
+  optionalAuthenticate,
+  ReservasController.getDisponibilidad,
+);
 
 // Obtener reservas del usuario autenticado
 router.get("/mis-reservas", authenticate, ReservasController.getMisReservas);
