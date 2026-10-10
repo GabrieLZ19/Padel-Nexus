@@ -12,6 +12,7 @@ import {
 } from "@/utils/services/sitioPublico";
 import { Torneo, RankingJugador } from "@/utils/types";
 import { formatFechaCalendario } from "@/utils/formatFecha";
+import { CATEGORIA_RANKING_PUBLICO } from "@/utils/rankings/orden";
 
 function formatoCifra(valor: number): string {
   return new Intl.NumberFormat("es-AR").format(valor);
@@ -40,7 +41,9 @@ export default function LandingPage() {
   useEffect(() => {
     Promise.all([
       TorneosService.getAll().catch(() => ({ data: [] })),
-      RankingsService.getGlobal().catch(() => ({ data: [] })),
+      RankingsService.getGlobal({ categoria: CATEGORIA_RANKING_PUBLICO }).catch(() => ({
+        data: [],
+      })),
       SitioPublicoService.cifras().catch(() => null),
     ])
       .then(([tData, rData, cifrasData]) => {
@@ -193,7 +196,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-2 text-brand-chartreuse">
             <TrendingUp className="size-5" />
             <h2 className="text-xl font-bold text-brand-white">
-              Top 5 Ranking
+              Top 5 · {CATEGORIA_RANKING_PUBLICO}
             </h2>
           </div>
           <div className="space-y-4">

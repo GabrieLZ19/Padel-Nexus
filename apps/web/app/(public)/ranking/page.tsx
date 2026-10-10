@@ -10,11 +10,17 @@ import {
   Search,
   X,
   Medal,
+  Info,
 } from "lucide-react";
 
 import { RankingsService } from "@/utils/services/ranking";
 import { RankingJugador } from "@/utils/types";
 import { PROVINCIAS_ARG, NIVELES_PADEL } from "@/utils/constants/padelConfig";
+import {
+  CATEGORIA_RANKING_PUBLICO,
+  REGLA_DESEMPATE_RANKING,
+  compararRankingPublico,
+} from "@/utils/rankings/orden";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import Pagination from "@/components/ui/Pagination";
 import Image from "next/image";
@@ -31,7 +37,9 @@ export default function RankingPublicPage() {
   const [activeProvincia, setActiveProvincia] = useState<string>(
     PROVINCIAS_ARG[0].value,
   );
-  const [activeCategory, setActiveCategory] = useState<string>("Todas");
+  const [activeCategory, setActiveCategory] = useState<string>(
+    CATEGORIA_RANKING_PUBLICO,
+  );
 
   // Reset page when filters change
   useEffect(() => {
@@ -56,7 +64,7 @@ export default function RankingPublicPage() {
         const params = {
           scope: activeScope,
           provincia: activeScope === "Provincial" ? activeProvincia : undefined,
-          categoria: activeCategory === "Todas" ? undefined : activeCategory,
+          categoria: activeCategory,
         };
 
         const data = await RankingsService.getGlobal(params);
@@ -98,9 +106,7 @@ export default function RankingPublicPage() {
     return nombre.includes(query) || apellido.includes(query) || club.includes(query);
   });
 
-  const sortedRankings = [...filteredRankings].sort(
-    (a, b) => b.puntos - a.puntos,
-  );
+  const sortedRankings = [...filteredRankings].sort(compararRankingPublico);
 
   const top1 = sortedRankings[0] || null;
   const top2 = sortedRankings[1] || null;
@@ -113,10 +119,13 @@ export default function RankingPublicPage() {
     label: p.label,
   }));
 
-  const opcionesCategorias = [
-    { value: "Todas", label: "Categorías" },
-    ...NIVELES_PADEL.map((n) => ({ value: n.value, label: n.label })),
-  ];
+  const opcionesCategorias = NIVELES_PADEL.map((n) => ({
+    value: n.value,
+    label: n.label,
+  }));
+  const etiquetaCategoria =
+    opcionesCategorias.find((opcion) => opcion.value === activeCategory)
+      ?.label || activeCategory;
 
   return (
     <div className="min-h-screen bg-brand-black text-brand-white font-sans selection:bg-brand-chartreuse selection:text-brand-black pb-20">
@@ -127,7 +136,11 @@ export default function RankingPublicPage() {
             Ranking Oficial
           </h1>
           <p className="text-sm md:text-base text-gray-400 mt-2 font-medium">
-            Temporada {new Date().getFullYear()} · Actualizado en tiempo real
+            Temporada {new Date().getFullYear()} · {etiquetaCategoria}
+          </p>
+          <p className="mt-3 flex items-start gap-2 text-sm text-gray-400 max-w-3xl">
+            <Info className="size-4 text-brand-chartreuse shrink-0 mt-0.5" />
+            <span>{REGLA_DESEMPATE_RANKING}</span>
           </p>
         </div>
 
@@ -276,8 +289,8 @@ export default function RankingPublicPage() {
                     <User className="size-10 opacity-50" />
                   )}
                 </div>
-                <div className="text-brand-chartreuse font-black text-lg tracking-widest uppercase mb-1 mt-4 md:mt-0">
-                  Campeón
+                <div className="text-brand-chartreuse font-black text-lg tracking-widest mb-1 mt-4 md:mt-0">
+                  1.º
                 </div>
                 <div className="font-black text-2xl md:text-3xl text-brand-white truncate w-full px-2 mb-1">
                   {top1?.perfiles?.nombre ? `${top1.perfiles.apellido?.toUpperCase()}, ${top1.perfiles.nombre}` : "A confirmar"}
@@ -340,15 +353,15 @@ export default function RankingPublicPage() {
                          ? "bg-amber-700/10 text-amber-700 border-amber-700/20"
                          : "bg-brand-white/5 text-gray-400 border-white/5"
                      }`}>
-                      {posicionReal}
+                      {posicionReal === 1 ? "1.º" : posicionReal}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-bold text-white truncate">
                           {player.perfiles?.nombre ? `${player.perfiles.apellido?.toUpperCase()}, ${player.perfiles.nombre}` : "Desconocido"}
                         </span>
-                        <span className="bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-md text-[10px] font-black text-brand-chartreuse uppercase shrink-0">
-                          {(player.perfiles as any)?.categoria_padel || player.categoria}
+                        <span className="bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-md text-xs font-black text-brand-chartreuse uppercase shrink-0">
+                          {activeCategory}
                         </span>
                       </div>
                       <div className="text-xs text-gray-500 truncate">
@@ -420,7 +433,7 @@ export default function RankingPublicPage() {
                                ? "text-amber-700 drop-shadow-[0_0_8px_rgba(180,83,9,0.4)]"
                                : "text-gray-500 group-hover:text-white"
                            }`}>
-                            {posicionReal}
+                            {posicionReal === 1 ? "1.º" : posicionReal}
                           </td>
                           <td className="py-5 px-6 flex items-center gap-4">
                             <div className="w-10 h-10 rounded-full bg-brand-black border border-brand-white/10 flex items-center justify-center text-gray-500 overflow-hidden shrink-0 group-hover:border-brand-chartreuse/50 transition-colors shadow-sm relative">
@@ -441,7 +454,7 @@ export default function RankingPublicPage() {
                           </td>
                           <td className="py-5 px-6">
                             <span className="bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20 px-3 py-1.5 rounded-lg text-xs font-black uppercase">
-                              {(player.perfiles as any)?.categoria_padel || player.categoria}
+                              {activeCategory}
                             </span>
                           </td>
                           <td className="py-5 px-6 text-sm font-medium text-gray-400">
