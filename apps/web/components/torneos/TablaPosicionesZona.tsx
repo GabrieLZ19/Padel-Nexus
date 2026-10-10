@@ -245,15 +245,15 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
       }
     >
       <div
-        className={`flex items-center justify-between gap-3 ${
+        className={`flex flex-wrap items-start justify-between gap-x-3 gap-y-2 ${
           embedded ? "" : "border-b border-white/5 pb-3"
         }`}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <Trophy className="size-4 text-brand-chartreuse shrink-0" />
-          <h4 className="font-extrabold text-white text-sm uppercase tracking-wider truncate">
+        <div className="flex min-w-0 flex-1 basis-full items-start gap-2 sm:basis-48">
+          <Trophy className="mt-0.5 size-4 shrink-0 text-brand-chartreuse" />
+          <h4 className="min-w-0 text-sm font-extrabold uppercase leading-snug tracking-wide text-white text-pretty">
             Posiciones
-            {!embedded && <> · {nombreZona}</>}
+            {!embedded && nombreZona ? <> · {nombreZona}</> : null}
           </h4>
         </div>
         <button

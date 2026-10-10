@@ -174,7 +174,7 @@ function BracketMatchCell({
     >
       {numero != null ? (
         <div className="px-2.5 py-1 border-b border-brand-input bg-brand-black/30">
-          <span className="text-[10px] font-black text-brand-chartreuse/90 tabular-nums">
+          <span className="text-xs font-black text-brand-chartreuse/90 tabular-nums">
             #{numero}
           </span>
         </div>
@@ -198,7 +198,7 @@ function BracketMatchCell({
           />
         </div>
         <div
-          className={`w-9 shrink-0 flex items-center justify-center border-l border-brand-input text-[11px] font-black tabular-nums ${
+          className={`w-9 shrink-0 flex items-center justify-center border-l border-brand-input text-xs font-black tabular-nums ${
             isA || esByeA
               ? "text-brand-chartreuse bg-brand-chartreuse/10"
               : "text-gray-500"
@@ -226,7 +226,7 @@ function BracketMatchCell({
           />
         </div>
         <div
-          className={`w-9 shrink-0 flex items-center justify-center border-l border-brand-input text-[11px] font-black tabular-nums ${
+          className={`w-9 shrink-0 flex items-center justify-center border-l border-brand-input text-xs font-black tabular-nums ${
             isB || esByeB
               ? "text-brand-chartreuse bg-brand-chartreuse/10"
               : "text-gray-500"
@@ -237,7 +237,7 @@ function BracketMatchCell({
       </div>
       {/* Franja inferior: fecha · cancha · hora (solo si hay dato y no es BYE) */}
       {mostrarFranja && (
-        <div className="flex items-center gap-2 px-2.5 py-1.5 border-t border-brand-input bg-brand-black/40 text-[10px] font-semibold text-gray-400">
+        <div className="flex items-center gap-2 px-2.5 py-1.5 border-t border-brand-input bg-brand-black/40 text-xs font-semibold text-gray-400">
           {fecha && (
             <span className="inline-flex items-center gap-1 shrink-0">
               <CalendarDays className="size-3 text-brand-chartreuse/70" />
@@ -413,18 +413,18 @@ export default function PublicBracketView({
           <h2 className="text-lg font-bold text-brand-white tracking-tight">
             Cuadro principal
           </h2>
-          <p className="text-[11px] text-gray-500 mt-0.5">
+          <p className="text-xs text-gray-500 mt-0.5">
             Eliminatoria · deslizá para ver todas las rondas
           </p>
         </div>
         {isLive ? (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/25 text-red-500 text-[10px] font-bold uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/25 text-red-500 text-xs font-bold uppercase tracking-wider">
             <span className="size-1.5 rounded-full bg-red-500 animate-pulse" />
             En vivo
           </span>
         ) : null}
         {isFinished ? (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-input border border-brand-input text-gray-500 text-[10px] font-bold uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-input border border-brand-input text-gray-500 text-xs font-bold uppercase tracking-wider">
             Finalizado
           </span>
         ) : null}
@@ -463,7 +463,7 @@ export default function PublicBracketView({
                 style={{ left: roundIdx * colW, width: colW }}
               >
                 <p
-                  className="flex items-center text-[10px] font-black uppercase tracking-[0.18em] text-brand-chartreuse/90"
+                  className="flex items-center text-xs font-black uppercase tracking-[0.18em] text-brand-chartreuse/90"
                   style={{ height: HEADER_H }}
                 >
                   {round.label}

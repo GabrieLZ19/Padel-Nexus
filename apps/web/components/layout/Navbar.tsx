@@ -167,16 +167,24 @@ export default function Navbar() {
 
   return (
     <header className="border-b border-brand-white/5 bg-brand-black/95 backdrop-blur-xl relative top-0 z-50">
-      <div className="flex items-center justify-between px-6 md:px-10 py-4 md:py-6">
-        <div className="flex items-center gap-5 md:gap-12">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 md:px-10 md:py-6">
+        <div className="flex min-w-0 items-center gap-5 md:gap-12">
           {/* LOGO OFICIAL */}
-          <Link href="/" className="flex items-center cursor-pointer">
+          <Link href="/" className="flex shrink-0 items-center cursor-pointer">
+            <Image
+              src="/brand/LogoHorizontal.svg"
+              alt="Padel Nexus"
+              width={333}
+              height={70}
+              className="h-8 w-auto md:hidden"
+              priority
+            />
             <Image
               src="/brand/Logo.svg"
               alt="Padel Nexus"
-              width={180}
-              height={45}
-              className="h-9 md:h-11 w-auto"
+              width={179}
+              height={147}
+              className="hidden h-11 w-auto md:block"
               priority
             />
           </Link>
@@ -202,15 +210,14 @@ export default function Navbar() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-3 md:gap-4 relative">
-          <button className="w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200 cursor-pointer">
-            <Search className="size-5" />
-          </button>
+        <div className="relative flex shrink-0 items-center gap-1.5 md:gap-4">
+         
 
           {/* Toggle de Tema Claro/Oscuro */}
           <button
+            type="button"
             onClick={toggleTheme}
-            className="w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200 cursor-pointer"
+            className="hidden sm:flex w-10 h-10 rounded-full border border-brand-white/10 items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200 cursor-pointer"
             title="Cambiar tema"
           >
             {theme === "light" ? <Moon className="size-5" /> : <Sun className="size-5" />}
@@ -220,20 +227,7 @@ export default function Navbar() {
           <NotificationCenter />
 
           {/* Mensajes */}
-          {profile && (
-            <Link
-              href="/mensajes"
-              className="w-10 h-10 rounded-full border border-brand-white/10 flex items-center justify-center text-gray-400 hover:text-brand-white hover:bg-brand-white/5 transition-all duration-200 relative"
-              title="Mensajes"
-            >
-              <MessageSquare className="size-5" />
-              {mensajesNoLeidos > 0 && (
-                <span className="absolute -top-1 -right-1 bg-brand-chartreuse text-brand-black text-[10px] font-bold rounded-full min-w-4.5 h-4.5 px-1 flex items-center justify-center">
-                  {mensajesNoLeidos > 99 ? "99+" : mensajesNoLeidos}
-                </span>
-              )}
-            </Link>
-          )}
+      
 
           {/* Icono de Carrito con Badge */}
           <button
@@ -435,6 +429,18 @@ export default function Navbar() {
             </nav>
 
             <div className="flex flex-col gap-3 pt-4 border-t border-brand-white/5">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white rounded-2xl transition-colors w-full text-left cursor-pointer sm:hidden"
+              >
+                {theme === "light" ? (
+                  <Moon className="size-4" />
+                ) : (
+                  <Sun className="size-4" />
+                )}
+                {theme === "light" ? "Tema oscuro" : "Tema claro"}
+              </button>
               {profile ? (
                 <>
                   <Link

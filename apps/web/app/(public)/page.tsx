@@ -83,13 +83,13 @@ export default function LandingPage() {
         <div className="absolute top-[20%] -left-50 w-137.5 h-137.5 rounded-full bg-brand-chartreuse opacity-5 blur-[160px]" />
       </div>
       {/* --- HERO SECTION --- */}
-      <main className="max-w-[1600px] mx-auto px-6 sm:px-10 pt-20 pb-16 sm:pb-20 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center relative z-10">
-        <div className="space-y-8">
-          <h1 className="text-5xl sm:text-6xl md:text-[72px] lg:text-[80px] font-extrabold tracking-tight leading-[1.05]">
-            El ecosistema del <br /> pádel, <br /> en una sola plataforma
+      <main className="max-w-[1600px] mx-auto px-6 sm:px-10 pt-8 pb-12 sm:pt-10 sm:pb-16 xl:pt-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start relative z-10">
+        <div className="max-w-xl space-y-5 sm:space-y-6">
+          <h1 className="text-balance text-[2.35rem] font-extrabold leading-[1.05] tracking-tight sm:text-5xl xl:text-[3.25rem] xl:leading-[1.02] 2xl:text-7xl">
+            El ecosistema del pádel, en una sola plataforma
           </h1>
 
-          <p className="text-lg sm:text-xl text-gray-400 max-w-xl leading-relaxed">
+          <p className="max-w-xl text-base leading-snug text-gray-400 sm:text-lg sm:leading-relaxed">
             Inscribite a torneos, seguí tu ranking, reservá canchas y comprá tu
             equipamiento. Todo en Padel Nexus.
           </p>
@@ -120,7 +120,7 @@ export default function LandingPage() {
 
         {/* --- CONTENEDOR HERO DERECHO CON GLOW EN CAPAS --- */}
         <div className="relative w-full max-w-3xl mx-auto flex items-center justify-center">
-          <div className="relative w-full min-h-105 sm:min-h-130 md:min-h-145 bg-[#0f0f0f]/90 border border-brand-white/5 rounded-[40px] shadow-2xl flex items-center justify-center overflow-hidden backdrop-blur-sm">
+          <div className="relative flex min-h-72 w-full items-center justify-center overflow-hidden rounded-[40px] border border-brand-white/5 bg-[#0f0f0f]/90 shadow-2xl backdrop-blur-sm sm:min-h-96 lg:min-h-[min(32rem,calc(100svh-8.5rem))]">
             {/* Logo de accesorio con sombra difusa controlada */}
             <div className="relative w-44 h-44 sm:w-48 sm:h-48 flex items-center justify-center z-10 transition-transform duration-300 hover:scale-105 filter drop-shadow-[0_0_40px_rgba(203,254,1,0.25)]">
               <Image

@@ -311,14 +311,14 @@ export default function TorneoDetallePage() {
           <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-5">
             <div className="min-w-0 space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md bg-brand-chartreuse text-brand-black">
+                <span className="text-xs font-black uppercase tracking-widest px-2.5 py-1 rounded-md bg-brand-chartreuse text-brand-black">
                   {etiquetaNivelYCategoria(torneo.nivel, torneo.categoria) || "Cat."}
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/5 text-gray-400 border border-white/8">
+                <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/5 text-gray-400 border border-white/8">
                   {torneo.estado}
                 </span>
                 {torneo.rama ? (
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/5 text-gray-400 border border-white/8">
+                  <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/5 text-gray-400 border border-white/8">
                     {torneo.rama}
                   </span>
                 ) : null}
@@ -384,7 +384,7 @@ export default function TorneoDetallePage() {
                 </div>
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3.5">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
                       Formato
                     </p>
                     <p className="text-sm text-white font-medium">
@@ -392,7 +392,7 @@ export default function TorneoDetallePage() {
                     </p>
                   </div>
                   <div className="rounded-xl border border-white/6 bg-white/[0.02] p-3.5">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">
                       Sede
                     </p>
                     <p className="text-sm text-white font-medium truncate">
@@ -410,7 +410,7 @@ export default function TorneoDetallePage() {
                     <button
                       type="button"
                       onClick={() => setActiveTabPublica("zonas")}
-                      className={`flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                      className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                         activeTabPublica === "zonas"
                           ? "bg-brand-chartreuse text-brand-black"
                           : "text-gray-400 hover:text-white"
@@ -421,7 +421,7 @@ export default function TorneoDetallePage() {
                     <button
                       type="button"
                       onClick={() => setActiveTabPublica("llaves")}
-                      className={`flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                      className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
                         activeTabPublica === "llaves"
                           ? "bg-brand-chartreuse text-brand-black"
                           : "text-gray-400 hover:text-white"
@@ -493,7 +493,7 @@ export default function TorneoDetallePage() {
                         <h3 className="text-sm font-black text-white tracking-wide">
                           Cuadro principal
                         </h3>
-                        <p className="text-[11px] text-gray-500 mt-0.5">
+                        <p className="text-xs text-gray-500 mt-0.5">
                           {textoRectora("plantilla", siglaRectora)}
                           {fapPairCount ? ` · ${fapPairCount} parejas` : ""}
                           {isFinalizado
@@ -543,7 +543,7 @@ export default function TorneoDetallePage() {
           {isAbierto ? (
             <aside className="space-y-4 lg:sticky lg:top-24">
               <div className="rounded-2xl border border-brand-chartreuse/20 bg-[#0f0f0f] p-5">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">
                   Inscripción
                 </p>
                 <p className="text-3xl font-black text-brand-chartreuse tabular-nums mb-4">
@@ -587,7 +587,7 @@ export default function TorneoDetallePage() {
                   <div className="space-y-3">
                     {torneo.premio_1 ? (
                       <div className="flex items-center gap-3 text-sm text-gray-300">
-                        <span className="size-7 rounded-full bg-amber-500/15 text-amber-400 text-[11px] font-black flex items-center justify-center border border-amber-500/25">
+                        <span className="size-7 rounded-full bg-amber-500/15 text-amber-400 text-xs font-black flex items-center justify-center border border-amber-500/25">
                           1
                         </span>
                         {torneo.premio_1}
@@ -595,7 +595,7 @@ export default function TorneoDetallePage() {
                     ) : null}
                     {torneo.premio_2 ? (
                       <div className="flex items-center gap-3 text-sm text-gray-300">
-                        <span className="size-7 rounded-full bg-slate-400/15 text-slate-300 text-[11px] font-black flex items-center justify-center border border-slate-400/25">
+                        <span className="size-7 rounded-full bg-slate-400/15 text-slate-300 text-xs font-black flex items-center justify-center border border-slate-400/25">
                           2
                         </span>
                         {torneo.premio_2}
@@ -603,7 +603,7 @@ export default function TorneoDetallePage() {
                     ) : null}
                     {torneo.premio_3 ? (
                       <div className="flex items-center gap-3 text-sm text-gray-300">
-                        <span className="size-7 rounded-full bg-amber-700/15 text-amber-600 text-[11px] font-black flex items-center justify-center border border-amber-700/25">
+                        <span className="size-7 rounded-full bg-amber-700/15 text-amber-600 text-xs font-black flex items-center justify-center border border-amber-700/25">
                           3
                         </span>
                         {torneo.premio_3}
