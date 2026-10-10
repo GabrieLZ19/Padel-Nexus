@@ -68,9 +68,9 @@ No implementar estas partes hasta que respondan.
 - [x] **GEN-12 · Teclado y nombres en los íconos.** (10/10) Rama, Alcance y Formato se alcanzan con Tab, flechas y Enter. Cerrar una ventana tiene nombre. El aviso del sistema usa el tema oscuro para que servidor y navegador coincidan.
 - [x] **JUG-01 · Jugadores en tabla.** (10/10) Cada jugador es una fila (nombre, DNI, categoría, licencia, estado, vencimiento y acciones). Revocar queda en el menú ⋯. Los parámetros del carnet viven en la pestaña Configuración. A 1366×641 entran al menos 10 jugadores.
 - [x] **PER-03 · Reservar en el celular.** (10/10) A 375 px los turnos y «Guardar ajustes» quedan por encima del chat. Sin sesión, Reservar lista los clubes con cancha y pide la cuenta al elegir el turno. «Mis reservas» separa próximas y pasadas. Las notificaciones dicen Éxito, Aviso y Promoción.
-- [ ] **PUB-01 · Buscador de la portada en la primera pantalla.** A 1366×641 el título ocupa cinco líneas y el buscador queda abajo del pliegue. Aceptación: el buscador y el botón principal terminan antes de los 641 px.
-- [ ] **PUB-04 · Torneo público en el celular.** Los títulos de zona se cortan («POSICIONES · ZO…») y hay textos de menos de 12 px. Aceptación: a 375 px ningún título de zona se corta.
-- [ ] **RES-03 · Resultados más compactos.** 13 partidos ocupan varias pantallas y el aviso de sede se repite. Aceptación: a 1366×641 se ven al menos 6 partidos de una zona, y plegar una zona se nota en esa zona.
+- [x] **PUB-01 · Buscador de la portada en la primera pantalla.** (10/10) A 1366×641 el título queda en tres líneas (52 px) y el buscador con el botón Buscar terminan en 489 px.
+- [x] **PUB-04 · Torneo público en el celular.** (10/10) El título de zona se lee entero y, si no entra, pasa a otra línea. Esa vista queda en 12 px como mínimo. En el celular el encabezado usa el logo horizontal, legible al lado de los íconos.
+- [x] **RES-03 · Resultados más compactos.** (10/10) Cada partido es una fila con número, zona, horario, parejas y sets. El aviso de sede queda una sola vez. A 1366×641 entran al menos 6 partidos de la zona, y Plegar actúa en el encabezado de esa zona.
 
 ## Prioridad baja
 

@@ -3,20 +3,9 @@ import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
 import { TorneosService } from "@/utils/services/torneos";
 import { Partido } from "@/utils/types";
 import { LiveArbitrajeRow } from "@/components/torneos/LiveArbitrajeRow";
-import {
-  TeamBox,
-  FinishedMatchScore,
-} from "@/components/torneos/MatchTeamBox";
-import {
-  Trophy,
-  ChevronDown,
-  ChevronUp,
-  FoldVertical,
-  UnfoldVertical,
-  FileDown,
-} from "lucide-react";
+import { Clock, Trophy, ChevronDown, ChevronUp, FileDown, MapPin } from "lucide-react";
 import { zonaGrupoCompleta } from "@/utils/clasificacionZonas";
-import { partidoSinSedeNiHorario } from "@/utils/fiscalPartidos";
+import { canchaAsignadaReal, partidoSinSedeNiHorario } from "@/utils/fiscalPartidos";
 import {
   etiquetaRondaLlave,
   ordenRondaLlave,
@@ -159,6 +148,7 @@ export const PasoResultados = ({
     Record<string, boolean>
   >({});
   const [vistaRapida, setVistaRapida] = useState<VistaRapida>("pendientes");
+  const [filtroGrupo, setFiltroGrupo] = useState("todas");
   const [partidoEnCorreccion, setPartidoEnCorreccion] = useState<string | null>(
     null,
   );
@@ -306,18 +296,6 @@ export const PasoResultados = ({
     });
   };
 
-  const comprimirTodasZonas = () => {
-    setZonasColapsadas(
-      Object.fromEntries(nombresZonas.map((n) => [n, true])),
-    );
-  };
-
-  const expandirTodasZonas = () => {
-    setZonasColapsadas(
-      Object.fromEntries(nombresZonas.map((n) => [n, false])),
-    );
-  };
-
   const llaveEstaColapsada = (nombre: string, pendientesCount: number) => {
     if (Object.prototype.hasOwnProperty.call(llavesColapsadas, nombre)) {
       return llavesColapsadas[nombre] === true;
@@ -334,22 +312,6 @@ export const PasoResultados = ({
         : pendientesCount === 0;
       return { ...prev, [nombre]: !currentlyCollapsed };
     });
-  };
-
-  const comprimirTodasLlaves = () => {
-    setLlavesColapsadas(
-      Object.fromEntries(
-        gruposLlavePorRonda.map((g) => [g.nombre, true]),
-      ),
-    );
-  };
-
-  const expandirTodasLlaves = () => {
-    setLlavesColapsadas(
-      Object.fromEntries(
-        gruposLlavePorRonda.map((g) => [g.nombre, false]),
-      ),
-    );
   };
 
   const formatMatchDateTimeInfo = (
@@ -377,7 +339,21 @@ export const PasoResultados = ({
     return parts.length > 0 ? parts.join(" · ") : null;
   };
 
-  const renderCompactMatchLine = (p: Partido) => {
+  const renderFinishedRow = (p: Partido) => {
+    const isGanadorA = p.ganador === p.equipo_a_id;
+    const isGanadorB = p.ganador === p.equipo_b_id;
+    const meta = formatMatchDateTimeInfo(p.cancha_asignada, p.fecha_partido);
+    const sede = canchaAsignadaReal(p.cancha_asignada);
+    const hora = (() => {
+      if (!p.fecha_partido) return null;
+      const d = new Date(p.fecha_partido);
+      if (Number.isNaN(d.getTime())) return null;
+      return d.toLocaleTimeString("es-AR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+    })();
     const code = (
       p.orden != null ? String(p.orden).padStart(2, "0") : p.id.slice(0, 4)
     ).toUpperCase();
@@ -393,65 +369,10 @@ export const PasoResultados = ({
           side === "a" ? p.equipo_a_denominacion : p.equipo_b_denominacion,
         nacional,
       }) || POR_DEFINIR;
-    const done = p.ganador != null;
-    const horaCorta = (() => {
-      if (!p.fecha_partido) return null;
-      try {
-        const d = new Date(p.fecha_partido);
-        if (Number.isNaN(d.getTime())) return null;
-        return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-      } catch {
-        return null;
-      }
-    })();
-    return (
-      <div
-        key={`compact-${p.id}`}
-        className="flex items-center gap-2 py-1.5 border-b border-white/5 last:border-0 text-xs min-w-0"
-      >
-        <span className="text-sky-400 font-black shrink-0 tabular-nums">
-          #{code}
-        </span>
-        {horaCorta && (
-          <span className="text-emerald-400/80 font-bold shrink-0 tabular-nums">
-            {horaCorta}
-          </span>
-        )}
-        <span
-          className={`truncate font-bold min-w-0 ${done ? "text-brand-ayuda" : "text-white"}`}
-        >
-          {etiquetaLado("a")}
-        </span>
-        <span className="text-brand-ayuda shrink-0">vs</span>
-        <span
-          className={`truncate font-bold min-w-0 ${done ? "text-brand-ayuda" : "text-white"}`}
-        >
-          {etiquetaLado("b")}
-        </span>
-        {done ? (
-          <span className="ml-auto text-brand-chartreuse font-black shrink-0">
-            OK
-          </span>
-        ) : (
-          <span className="ml-auto text-amber-400/80 font-black shrink-0">
-            —
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  const renderFinishedRow = (p: Partido) => {
-    const isGanadorA = p.ganador === p.equipo_a_id;
-    const isGanadorB = p.ganador === p.equipo_b_id;
-    const meta = formatMatchDateTimeInfo(p.cancha_asignada, p.fecha_partido);
-    const code = (
-      p.orden != null ? String(p.orden).padStart(2, "0") : p.id.slice(0, 4)
-    ).toUpperCase();
 
     if (!isReadOnly && partidoEnCorreccion === p.id) {
       return (
-        <div key={p.id} className="space-y-2">
+        <div key={p.id}>
           <LiveArbitrajeRow
             partido={p}
             torneo={torneo}
@@ -459,80 +380,111 @@ export const PasoResultados = ({
             isSaving={guardandoPartidoId === p.id}
             onError={showErrorModal}
           />
-          <button
-            type="button"
-            onClick={() => setPartidoEnCorreccion(null)}
-            className="text-xs font-bold text-gray-400 hover:text-white cursor-pointer"
-          >
-            Cancelar corrección
-          </button>
+          <div className="flex justify-end border-b border-white/8 px-3 pb-2">
+            <button
+              type="button"
+              onClick={() => setPartidoEnCorreccion(null)}
+              className="inline-flex h-8 cursor-pointer items-center rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-semibold text-gray-200 hover:border-white/30 hover:text-white"
+            >
+              Cancelar corrección
+            </button>
+          </div>
         </div>
       );
     }
 
+    const sets = (
+      [
+        [p.set1_a, p.set1_b],
+        [p.set2_a, p.set2_b],
+        [p.set3_a, p.set3_b],
+      ] as const
+    ).filter(([a, b]) => a != null && b != null);
+
     return (
       <div
         key={p.id}
-        className="rounded-2xl border border-brand-input bg-brand-card p-3 space-y-2.5"
+        className="flex items-center gap-4 border-b border-white/8 px-3 py-3 text-xs"
       >
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2.5 md:gap-3 items-stretch">
-          <TeamBox
-            j1={p.equipo_a_j1}
-            j2={p.equipo_a_j2}
-            avatarJ1={p.equipo_a_avatar_j1}
-            avatarJ2={p.equipo_a_avatar_j2}
-            club={p.equipo_a_club}
-            provincia={p.equipo_a_provincia}
-            letra={p.equipo_a_letra_prioridad}
-            denominacion={p.equipo_a_denominacion}
-            alcanceNacional={esAlcanceNacional(torneo?.alcance)}
-            align="left"
-            isWinner={isGanadorA}
-            compact
-          />
-          <div className="flex items-center justify-center self-center">
-            <FinishedMatchScore
-              set1A={p.set1_a ?? null}
-              set1B={p.set1_b ?? null}
-              set2A={p.set2_a ?? null}
-              set2B={p.set2_b ?? null}
-              set3A={p.set3_a ?? null}
-              set3B={p.set3_b ?? null}
-              esWo={Boolean(p.es_wo)}
-              esSupertiebreak={Boolean(p.es_supertiebreak)}
-            />
-          </div>
-          <TeamBox
-            j1={p.equipo_b_j1}
-            j2={p.equipo_b_j2}
-            avatarJ1={p.equipo_b_avatar_j1}
-            avatarJ2={p.equipo_b_avatar_j2}
-            club={p.equipo_b_club}
-            provincia={p.equipo_b_provincia}
-            letra={p.equipo_b_letra_prioridad}
-            denominacion={p.equipo_b_denominacion}
-            alcanceNacional={esAlcanceNacional(torneo?.alcance)}
-            align="right"
-            isWinner={isGanadorB}
-            compact
-          />
+        <div className="w-44 shrink-0 space-y-1.5">
+          <p className="font-black tabular-nums text-sky-400">#{code}</p>
+          <p className="flex items-center gap-1.5 text-sm font-black tabular-nums tracking-tight text-white">
+            <Clock className="size-3.5 shrink-0 text-green-400" aria-hidden />
+            {hora || "Hora a definir"}
+          </p>
+          <p
+            className="flex items-start gap-1.5 font-semibold leading-snug text-green-400"
+            title={meta || sede || undefined}
+          >
+            <MapPin className="mt-0.5 size-3.5 shrink-0 text-green-400" aria-hidden />
+            <span className="line-clamp-2">{sede || "Sede a definir"}</span>
+          </p>
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-xs font-bold border-t border-white/5 pt-2">
-          <span className="text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-1.5 py-0.5 rounded">
-            #{code}
-          </span>
-          {meta && <span className="text-gray-400">{meta}</span>}
-          <span className="text-brand-ayuda uppercase tracking-wide">{p.ronda}</span>
-          {!isReadOnly && (
-            <button
-              type="button"
-              onClick={() => setPartidoEnCorreccion(p.id)}
-              className="ml-auto text-xs font-black uppercase tracking-wide text-brand-chartreuse hover:underline cursor-pointer"
+        <div className="min-w-0 flex-1">
+          {sets.length === 0 ? (
+            <p className="text-right text-xs font-bold text-gray-300">Sin sets</p>
+          ) : (
+            <div
+              className="grid items-center gap-x-1.5 gap-y-0"
+              style={{
+                gridTemplateColumns: `minmax(0,1fr) repeat(${sets.length}, 3.5rem)`,
+              }}
             >
-              Corregir
-            </button>
+              <span />
+              {sets.map((_, index) => (
+                <span
+                  key={`${p.id}-set-label-${index}`}
+                  className="whitespace-nowrap rounded-t-md border border-b-0 border-white/15 bg-white/10 py-1 text-center text-xs font-bold tracking-wide text-brand-ayuda"
+                >
+                  {index === 2 && p.es_supertiebreak ? "STB" : `Set ${index + 1}`}
+                </span>
+              ))}
+              <p
+                className={`truncate text-right font-bold ${
+                  isGanadorA ? "text-brand-chartreuse" : "text-white"
+                }`}
+              >
+                {etiquetaLado("a")}
+              </p>
+              {sets.map(([a], index) => (
+                <span
+                  key={`${p.id}-set-a-${index}`}
+                  className={`border-x border-b border-white/10 bg-white/[0.03] py-1 text-center text-xs font-black tabular-nums ${
+                    isGanadorA ? "text-brand-chartreuse" : "text-white"
+                  }`}
+                >
+                  {a}
+                </span>
+              ))}
+              <p
+                className={`truncate text-right font-bold ${
+                  isGanadorB ? "text-brand-chartreuse" : "text-white"
+                }`}
+              >
+                {etiquetaLado("b")}
+              </p>
+              {sets.map(([, b], index) => (
+                <span
+                  key={`${p.id}-set-b-${index}`}
+                  className={`rounded-b-md border border-t-0 border-white/10 bg-white/[0.03] py-1 text-center text-xs font-black tabular-nums ${
+                    isGanadorB ? "text-brand-chartreuse" : "text-white"
+                  }`}
+                >
+                  {b}
+                </span>
+              ))}
+            </div>
           )}
         </div>
+        {!isReadOnly && (
+          <button
+            type="button"
+            onClick={() => setPartidoEnCorreccion(p.id)}
+            className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-semibold text-gray-200 hover:border-brand-chartreuse/50 hover:text-brand-chartreuse"
+          >
+            Corregir resultado
+          </button>
+        )}
       </div>
     );
   };
@@ -610,6 +562,8 @@ export const PasoResultados = ({
     ));
 
   const renderZonaCard = (nombre: string) => {
+    if (filtroGrupo !== "todas" && filtroGrupo !== nombre) return null;
+
     const porDefinirRaw =
       gruposZonasPorDefinir.find((g) => g.nombre === nombre)?.partidos || [];
     const pendientesRaw =
@@ -646,150 +600,75 @@ export const PasoResultados = ({
     const todosZona = partidos.filter(
       (p) => String(p.ronda) === nombre && isZonaRonda(p.ronda),
     );
-    const totalVisible =
-      porDefinir.length + pendientes.length + finalizados.length;
-    const resumenPartidos = sortPartidosEstable([
-      ...finalizados,
-      ...pendientes,
-      ...porDefinir,
-    ]).slice(0, 6);
     const zonaCerrada = zonaGrupoCompleta(todosZona);
 
     return (
       <div
         key={nombre}
-        className={`bg-[#161616] border rounded-2xl shadow-xl min-w-0 w-full overflow-hidden ${
-          zonaCerrada ? "border-white/5 opacity-95" : "border-white/8"
-        } ${colapsada ? "p-2.5 sm:p-3" : "p-3 sm:p-5 space-y-4 sm:space-y-5"}`}
+        className={`min-w-0 w-full overflow-hidden rounded-xl border bg-[#161616] ${
+          zonaCerrada ? "border-white/5" : "border-white/8"
+        }`}
       >
         <button
           type="button"
           onClick={() => toggleZona(nombre)}
-          className={`w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between cursor-pointer text-left ${
-            colapsada ? "" : "border-b border-white/5 pb-3"
-          }`}
+          className="flex min-h-11 w-full cursor-pointer items-center gap-2 px-3 text-left"
           aria-expanded={!colapsada}
         >
-          <div className="flex items-center gap-2 min-w-0">
-            <Trophy className="size-4 text-brand-chartreuse shrink-0" />
-            <h4 className="font-extrabold text-white text-sm uppercase tracking-wider truncate">
-              {nombre}
-            </h4>
-            {zonaCerrada && (
-              <span className="text-xs font-black uppercase tracking-wider text-brand-chartreuse/80 bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-full shrink-0">
-                Completa
-              </span>
-            )}
-          </div>
-          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-            <div className="flex flex-wrap items-center gap-1.5 text-xs font-black uppercase tracking-wider">
-              {porDefinirRaw.length > 0 && (
-                <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/20">
-                  {porDefinirRaw.length} por definir
-                </span>
-              )}
-              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                {pendientesRaw.length} pend.
-              </span>
-              <span className="px-1.5 py-0.5 rounded bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20">
-                {finalizadosRaw.length} ok
-              </span>
-            </div>
+          <Trophy className="size-3.5 shrink-0 text-brand-chartreuse" />
+          <h4 className="min-w-0 truncate text-xs font-extrabold uppercase tracking-wide text-white">
+            {nombre}
+          </h4>
+          <span className="shrink-0 text-xs font-bold text-amber-300">
+            {pendientesRaw.length} pendientes
+          </span>
+          <span className="shrink-0 text-xs font-bold text-brand-chartreuse">
+            {finalizadosRaw.length} finalizados
+          </span>
+          {zonaCerrada ? (
+            <span className="shrink-0 text-xs font-bold uppercase text-brand-chartreuse/80">
+              Completa
+            </span>
+          ) : null}
+          <span className="ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 text-xs font-semibold text-gray-200">
+            {colapsada ? "Mostrar partidos" : "Ocultar partidos"}
             {colapsada ? (
-              <ChevronDown className="size-4 text-gray-400 shrink-0" />
+              <ChevronDown className="size-3.5" />
             ) : (
-              <ChevronUp className="size-4 text-gray-400 shrink-0" />
+              <ChevronUp className="size-3.5" />
             )}
-          </div>
+          </span>
         </button>
 
-        {colapsada ? (
-          <div className="mt-1 rounded-xl bg-[#0d0d0d] border border-white/5 px-2.5 py-1">
-            {resumenPartidos.length > 0 ? (
-              <>
-                {resumenPartidos.map((p) => renderCompactMatchLine(p))}
-                {totalVisible > resumenPartidos.length && (
-                  <p className="text-xs text-brand-ayuda font-bold py-1.5 text-center">
-                    +{totalVisible - resumenPartidos.length} más · tocá el
-                    título para expandir
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="text-xs text-brand-ayuda text-center py-2">
-                Sin partidos en esta vista
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4 sm:space-y-6">
-            {finalizados.length > 0 && (
-              <section className="space-y-3 rounded-2xl border border-brand-chartreuse/20 bg-brand-chartreuse/[0.04] p-2.5 sm:p-4">
-                <div className="flex items-center gap-2 border-l-2 border-brand-chartreuse pl-3">
-                  <p className="text-xs font-black text-brand-chartreuse uppercase tracking-wider">
-                    Finalizados
-                  </p>
-                  <span className="text-xs font-bold text-brand-chartreuse/70">
-                    ({finalizados.length})
-                  </span>
-                </div>
-                {finalizados.map((p) => renderFinishedRow(p))}
-              </section>
-            )}
-
-            {!isReadOnly && pendientes.length > 0 && (
-              <section className="space-y-3">
-                <div className="flex items-center gap-2 border-l-2 border-amber-400/80 pl-3">
-                  <p className="text-xs font-black text-amber-300 uppercase tracking-wider">
-                    En curso / pendientes
-                  </p>
-                  <span className="text-xs font-bold text-amber-400/70">
-                    ({pendientes.length})
-                  </span>
-                </div>
-                {renderPartidoRows(pendientes)}
-              </section>
-            )}
-
-            {porDefinir.length > 0 && (
-              <section className="space-y-3">
-                <div className="flex items-center gap-2 border-l-2 border-sky-400/80 pl-3">
-                  <p className="text-xs font-black text-sky-300 uppercase tracking-wider">
-                    Pendientes de fase 1
-                  </p>
-                  <span className="text-xs font-bold text-sky-400/70">
-                    ({porDefinir.length})
-                  </span>
-                </div>
-                {porDefinir.map((p) => (
-                  <div
-                    key={p.id}
-                    className="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 sm:px-4 py-3 text-xs text-sky-200"
-                  >
-                    Partido #{String(p.orden || "").padStart(2, "0")} ·{" "}
-                    {p.estado_partido === "Pendiente Ganadores"
-                      ? "Ganador vs Ganador (se habilita al finalizar 1 y 2)"
-                      : "Perdedor vs Perdedor (se habilita al finalizar 1 y 2)"}
-                  </div>
-                ))}
-              </section>
-            )}
-
+        {colapsada ? null : (
+          <div className="border-t border-white/5">
+            {finalizados.map((p) => renderFinishedRow(p))}
+            {!isReadOnly ? renderPartidoRows(pendientes) : null}
+            {porDefinir.map((p) => (
+              <div
+                key={p.id}
+                className="flex min-h-9 items-center border-b border-white/8 px-2 text-xs text-sky-200"
+              >
+                Partido #{String(p.orden || "").padStart(2, "0")} ·{" "}
+                {p.estado_partido === "Pendiente Ganadores"
+                  ? "Ganador vs ganador, se habilita al cerrar los cruces previos"
+                  : "Perdedor vs perdedor, se habilita al cerrar los cruces previos"}
+              </div>
+            ))}
             {pendientes.length === 0 &&
-              finalizados.length === 0 &&
-              porDefinir.length === 0 && (
-                <p className="text-xs text-brand-ayuda text-center py-4">
-                  Sin partidos en esta zona para la vista seleccionada.
-                </p>
-              )}
-
+            finalizados.length === 0 &&
+            porDefinir.length === 0 ? (
+              <p className="px-2 py-2 text-center text-xs text-brand-ayuda">
+                Sin partidos en esta zona para la vista seleccionada.
+              </p>
+            ) : null}
             {isReadOnly &&
-              pendientes.length > 0 &&
-              finalizados.length === 0 && (
-                <p className="text-xs text-brand-ayuda text-center py-2">
-                  Modo lectura: no hay resultados cargados aún.
-                </p>
-              )}
+            pendientes.length > 0 &&
+            finalizados.length === 0 ? (
+              <p className="px-2 py-2 text-center text-xs text-brand-ayuda">
+                Modo lectura: no hay resultados cargados aún.
+              </p>
+            ) : null}
           </div>
         )}
       </div>
@@ -826,85 +705,78 @@ export const PasoResultados = ({
     { id: "todo", label: "Todo", count: totalPartidos },
   ];
 
-  return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="sticky top-0 z-20 -mx-1 px-1 pt-1 pb-2 bg-gradient-to-b from-brand-black via-brand-black/97 to-transparent">
-        <header className="rounded-2xl border border-white/10 bg-brand-card shadow-[0_8px_30px_rgba(0,0,0,0.35)] overflow-hidden">
-          {/* Fila superior: título + acciones */}
-          <div className="flex items-center justify-between gap-3 px-3.5 sm:px-4 py-3 border-b border-white/5">
-            <div className="min-w-0">
-              <h3 className="font-extrabold text-white text-base sm:text-lg tracking-tight leading-none">
-                Paso {numeroPaso}: Resultados
-              </h3>
-              <p className="text-xs text-brand-ayuda font-medium mt-1">
-                Carga de marcadores · {totalPartidos} partidos
-                {haySinProgramar
-                  ? ". Los que no tienen sede ni horario se definen en el programador."
-                  : ""}
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={async () => {
-                  const { generarPdfHojaRuta } = await import("@/utils/grillaPdf");
-                  generarPdfHojaRuta(torneo, partidos);
-                }}
-                className="inline-flex items-center justify-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-lg bg-white/5 hover:bg-white/10 text-gray-200 font-bold text-xs border border-white/10 cursor-pointer transition-colors"
-                title="Grilla de partidos para auxiliares de cancha"
-              >
-                <FileDown className="size-3.5 shrink-0" />
-                <span className="hidden sm:inline">Grilla auxiliares</span>
-                <span className="sm:hidden">PDF</span>
-              </button>
-            </div>
-          </div>
+  const opcionesFiltro = [
+    ...nombresZonas.map((nombre) => ({ id: nombre, label: nombre })),
+    ...gruposLlavePorRonda.map((grupo) => ({
+      id: grupo.nombre,
+      label: grupo.label,
+    })),
+  ];
 
-          {/* Filtros: segmento a ancho completo — acción primaria de la vista */}
-          <div
-            className="grid grid-cols-3 gap-px bg-white/5"
-            role="tablist"
-            aria-label="Filtrar resultados"
-          >
-            {VISTAS.map((v) => {
-              const activo = vistaRapida === v.id;
-              return (
-                <button
-                  key={v.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={activo}
-                  onClick={() => setVistaRapida(v.id)}
-                  className={`relative flex flex-col items-center justify-center gap-0.5 py-3 sm:py-3.5 px-2 transition-colors cursor-pointer ${
-                    activo
-                      ? "bg-brand-card text-brand-chartreuse"
-                      : "bg-brand-black text-brand-ayuda hover:text-gray-300 hover:bg-brand-card"
-                  }`}
-                >
-                  {activo && (
-                    <span
-                      aria-hidden
-                      className="absolute inset-x-0 top-0 h-0.5 bg-brand-chartreuse"
-                    />
-                  )}
-                  <span
-                    className={`text-xs font-black uppercase tracking-wide ${
-                      activo ? "text-brand-chartreuse" : "text-inherit"
+  return (
+    <div className="space-y-3">
+      <div className="sticky top-0 z-20 -mx-1 bg-gradient-to-b from-brand-black via-brand-black to-transparent px-1 pb-2 pt-1">
+        <header className="rounded-xl border border-white/10 bg-brand-card px-2.5 py-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="shrink-0 text-sm font-extrabold tracking-tight text-white">
+              Paso {numeroPaso}: Resultados
+            </h3>
+            <label className="sr-only" htmlFor="filtro-zona-ronda">
+              Zona o ronda
+            </label>
+            <select
+              id="filtro-zona-ronda"
+              value={filtroGrupo}
+              onChange={(e) => setFiltroGrupo(e.target.value)}
+              className="h-8 min-w-36 cursor-pointer rounded-lg border border-white/10 bg-brand-black px-2 text-xs font-bold text-white outline-none focus:border-brand-chartreuse"
+            >
+              <option value="todas">Todas las zonas y rondas</option>
+              {opcionesFiltro.map((opcion) => (
+                <option key={opcion.id} value={opcion.id}>
+                  {opcion.label}
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center gap-1" role="tablist" aria-label="Filtrar resultados">
+              {VISTAS.map((v) => {
+                const activo = vistaRapida === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activo}
+                    onClick={() => setVistaRapida(v.id)}
+                    className={`h-8 cursor-pointer rounded-lg px-2.5 text-xs font-black uppercase ${
+                      activo
+                        ? "bg-brand-chartreuse text-brand-black"
+                        : "bg-white/5 text-gray-300 hover:text-white"
                     }`}
                   >
-                    {v.label}
-                  </span>
-                  <span
-                    className={`text-sm sm:text-base font-black tabular-nums leading-none ${
-                      activo ? "text-white" : "text-gray-400"
-                    }`}
-                  >
-                    {v.count}
-                  </span>
-                </button>
-              );
-            })}
+                    {v.label} {v.count}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                const { generarPdfHojaRuta } = await import("@/utils/grillaPdf");
+                generarPdfHojaRuta(torneo, partidos);
+              }}
+              className="ml-auto inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 text-xs font-bold text-gray-200 hover:bg-white/10"
+              title="Grilla de partidos para auxiliares de cancha"
+            >
+              <FileDown className="size-3.5 shrink-0" />
+              <span className="hidden sm:inline">Grilla</span>
+            </button>
           </div>
+          <p className="mt-1 text-xs font-medium text-brand-ayuda">
+            {totalPartidos} partidos
+            {haySinProgramar
+              ? ". Los que no tienen sede ni horario se definen en el programador."
+              : ""}
+          </p>
         </header>
       </div>
 
@@ -916,253 +788,99 @@ export const PasoResultados = ({
 
       {/* Prioridad: zonas con partidos en curso */}
       {zonasActivas.length > 0 && mostrarZonasActivas && (
-        <div className="space-y-3 sm:space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-            <div className="min-w-0">
-              <h4 className="text-xs font-black text-brand-chartreuse uppercase tracking-widest">
-                Fase de zonas · en curso
-              </h4>
-            </div>
-            {zonasActivas.length > 1 && (
-              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={comprimirTodasZonas}
-                  title="Ocultar el detalle de todas las zonas (solo resumen)"
-                  className="inline-flex items-center gap-1 sm:gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-xs border border-white/10 cursor-pointer"
-                >
-                  <FoldVertical className="size-3.5" />
-                  <span className="hidden xs:inline sm:inline">Comprimir</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={expandirTodasZonas}
-                  title="Mostrar el detalle completo de todas las zonas"
-                  className="inline-flex items-center gap-1 sm:gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-xs border border-white/10 cursor-pointer"
-                >
-                  <UnfoldVertical className="size-3.5" />
-                  <span className="hidden xs:inline sm:inline">Expandir</span>
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col gap-3 sm:gap-5">
-            {zonasActivas.map((nombre) => renderZonaCard(nombre))}
-          </div>
+        <div className="flex flex-col gap-2">
+          {zonasActivas.map((nombre) => renderZonaCard(nombre))}
         </div>
       )}
 
-      {/* Llave agrupada por ronda (colapsable) */}
       {gruposLlavePorRonda.length > 0 && (
-        <div className="space-y-3 sm:space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-            <div>
-              <h4 className="text-xs font-black text-brand-chartreuse uppercase tracking-widest">
-                Llave de campeonato
-              </h4>
-            </div>
-            {gruposLlavePorRonda.length > 1 && (
-              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex flex-col gap-2">
+          {gruposLlavePorRonda.map((grupo) => {
+            if (filtroGrupo !== "todas" && filtroGrupo !== grupo.nombre) {
+              return null;
+            }
+            const pendientesRaw = grupo.partidos.filter((p) => !p.ganador);
+            const finalizadosRaw = grupo.partidos.filter((p) =>
+              Boolean(p.ganador),
+            );
+            const mostrarPendientes =
+              vistaRapida === "todo" || vistaRapida === "pendientes";
+            const mostrarFinalizados =
+              vistaRapida === "todo" || vistaRapida === "finalizados";
+            const pendientes = mostrarPendientes ? pendientesRaw : [];
+            const finalizados = mostrarFinalizados ? finalizadosRaw : [];
+
+            if (pendientes.length === 0 && finalizados.length === 0) {
+              return null;
+            }
+
+            const colapsada = llaveEstaColapsada(
+              grupo.nombre,
+              pendientesRaw.length,
+            );
+            const rondaCerrada =
+              pendientesRaw.length === 0 && finalizadosRaw.length > 0;
+
+            return (
+              <div
+                key={grupo.nombre}
+                className={`overflow-hidden rounded-xl border bg-[#161616] ${
+                  rondaCerrada ? "border-white/5" : "border-white/8"
+                }`}
+              >
                 <button
                   type="button"
-                  onClick={comprimirTodasLlaves}
-                  title="Comprimir todas las rondas de llave"
-                  className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-xs border border-white/10 cursor-pointer"
+                  onClick={() =>
+                    toggleLlave(grupo.nombre, pendientesRaw.length)
+                  }
+                  className="flex min-h-11 w-full cursor-pointer items-center gap-2 px-3 text-left"
+                  aria-expanded={!colapsada}
                 >
-                  <FoldVertical className="size-3.5" />
-                  Comprimir
+                  <Trophy className="size-3.5 shrink-0 text-brand-chartreuse" />
+                  <h5 className="min-w-0 truncate text-xs font-extrabold uppercase tracking-wide text-white">
+                    {grupo.label}
+                  </h5>
+                  <span className="shrink-0 text-xs font-bold text-amber-300">
+                    {pendientesRaw.length} pendientes
+                  </span>
+                  <span className="shrink-0 text-xs font-bold text-brand-chartreuse">
+                    {finalizadosRaw.length} finalizados
+                  </span>
+                  <span className="ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 text-xs font-semibold text-gray-200">
+                    {colapsada ? "Mostrar partidos" : "Ocultar partidos"}
+                    {colapsada ? (
+                      <ChevronDown className="size-3.5" />
+                    ) : (
+                      <ChevronUp className="size-3.5" />
+                    )}
+                  </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={expandirTodasLlaves}
-                  title="Expandir todas las rondas de llave"
-                  className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-xs border border-white/10 cursor-pointer"
-                >
-                  <UnfoldVertical className="size-3.5" />
-                  Expandir
-                </button>
+
+                {colapsada ? null : (
+                  <div className="border-t border-white/5">
+                    {finalizados.map((p) => renderFinishedRow(p))}
+                    {!isReadOnly ? renderPartidoRows(pendientes) : null}
+                    {isReadOnly &&
+                    pendientes.length > 0 &&
+                    finalizados.length === 0 ? (
+                      <p className="px-2 py-2 text-center text-xs text-brand-ayuda">
+                        Modo lectura: no hay resultados cargados aún en esta
+                        ronda.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <div className="space-y-3 sm:space-y-4">
-            {gruposLlavePorRonda.map((grupo) => {
-              const pendientesRaw = grupo.partidos.filter((p) => !p.ganador);
-              const finalizadosRaw = grupo.partidos.filter((p) =>
-                Boolean(p.ganador),
-              );
-              const mostrarPendientes =
-                vistaRapida === "todo" || vistaRapida === "pendientes";
-              const mostrarFinalizados =
-                vistaRapida === "todo" || vistaRapida === "finalizados";
-              const pendientes = mostrarPendientes ? pendientesRaw : [];
-              const finalizados = mostrarFinalizados ? finalizadosRaw : [];
-
-              if (pendientes.length === 0 && finalizados.length === 0) {
-                return null;
-              }
-
-              const colapsada = llaveEstaColapsada(
-                grupo.nombre,
-                pendientesRaw.length,
-              );
-              const resumenPartidos = sortPartidosEstable([
-                ...finalizados,
-                ...pendientes,
-              ]).slice(0, 6);
-              const totalVisible = pendientes.length + finalizados.length;
-              const rondaCerrada =
-                pendientesRaw.length === 0 && finalizadosRaw.length > 0;
-
-              return (
-                <div
-                  key={grupo.nombre}
-                  className={`bg-[#161616] border rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden ${
-                    rondaCerrada
-                      ? "border-white/5 opacity-95"
-                      : "border-white/8"
-                  } ${colapsada ? "p-2.5 sm:p-3" : "p-3 sm:p-5 space-y-3 sm:space-y-4"}`}
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      toggleLlave(grupo.nombre, pendientesRaw.length)
-                    }
-                    className={`w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between cursor-pointer text-left ${
-                      colapsada ? "" : "border-b border-white/5 pb-2.5 sm:pb-3"
-                    }`}
-                    aria-expanded={!colapsada}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Trophy className="size-4 text-brand-chartreuse shrink-0" />
-                      <h5 className="font-extrabold text-white text-sm uppercase tracking-wider">
-                        {grupo.label}
-                      </h5>
-                      {rondaCerrada && (
-                        <span className="text-xs font-black uppercase tracking-wider text-brand-chartreuse/80 bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-full shrink-0">
-                          Completa
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="px-1.5 py-0.5 rounded text-xs font-black uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                          {pendientesRaw.length} pend.
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded text-xs font-black uppercase bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20">
-                          {finalizadosRaw.length} ok
-                        </span>
-                      </div>
-                      {colapsada ? (
-                        <ChevronDown className="size-4 text-gray-400 shrink-0" />
-                      ) : (
-                        <ChevronUp className="size-4 text-gray-400 shrink-0" />
-                      )}
-                    </div>
-                  </button>
-
-                  {colapsada ? (
-                    <div className="mt-1 rounded-xl bg-[#0d0d0d] border border-white/5 px-2.5 py-1">
-                      {resumenPartidos.length > 0 ? (
-                        <>
-                          {resumenPartidos.map((p) =>
-                            renderCompactMatchLine(p),
-                          )}
-                          {totalVisible > resumenPartidos.length && (
-                            <p className="text-xs text-brand-ayuda font-bold py-1.5 text-center">
-                              +{totalVisible - resumenPartidos.length} más ·
-                              tocá el título para expandir
-                            </p>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-xs text-brand-ayuda text-center py-2">
-                          Sin partidos en esta vista
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      {finalizados.length > 0 && (
-                        <section className="space-y-3 rounded-2xl border border-brand-chartreuse/20 bg-brand-chartreuse/[0.04] p-2.5 sm:p-4">
-                          <div className="flex items-center gap-2 border-l-2 border-brand-chartreuse pl-3">
-                            <p className="text-xs font-black text-brand-chartreuse uppercase tracking-wider">
-                              Finalizados
-                            </p>
-                            <span className="text-xs font-bold text-brand-chartreuse/70">
-                              ({finalizados.length})
-                            </span>
-                          </div>
-                          {finalizados.map((p) => renderFinishedRow(p))}
-                        </section>
-                      )}
-
-                      {!isReadOnly && pendientes.length > 0 && (
-                        <section className="space-y-3">
-                          <div className="flex items-center gap-2 border-l-2 border-amber-400/80 pl-3">
-                            <p className="text-xs font-black text-amber-300 uppercase tracking-wider">
-                              En curso / pendientes
-                            </p>
-                            <span className="text-xs font-bold text-amber-400/70">
-                              ({pendientes.length})
-                            </span>
-                          </div>
-                          {renderPartidoRows(pendientes)}
-                        </section>
-                      )}
-
-                      {isReadOnly &&
-                        pendientes.length > 0 &&
-                        finalizados.length === 0 && (
-                          <p className="text-xs text-brand-ayuda text-center py-2">
-                            Modo lectura: no hay resultados cargados aún en
-                            esta ronda.
-                          </p>
-                        )}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+            );
+          })}
         </div>
       )}
 
       {/* Zonas 100% finalizadas al fondo */}
       {zonasCompletas.length > 0 &&
         (vistaRapida === "todo" || vistaRapida === "finalizados") && (
-        <div className="space-y-3 sm:space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-            <div>
-              <h4 className="text-xs font-black text-brand-ayuda uppercase tracking-widest">
-                Fase de zonas · finalizadas
-              </h4>
-            </div>
-            {zonasCompletas.length > 1 && (
-              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={comprimirTodasZonas}
-                  title="Ocultar el detalle de todas las zonas (solo resumen)"
-                  className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-400 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-xs border border-white/10 cursor-pointer"
-                >
-                  <FoldVertical className="size-3.5" />
-                  Comprimir
-                </button>
-                <button
-                  type="button"
-                  onClick={expandirTodasZonas}
-                  title="Mostrar el detalle completo de todas las zonas"
-                  className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-400 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-xs border border-white/10 cursor-pointer"
-                >
-                  <UnfoldVertical className="size-3.5" />
-                  Expandir
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col gap-3 sm:gap-5">
-            {zonasCompletas.map((nombre) => renderZonaCard(nombre))}
-          </div>
+        <div className="flex flex-col gap-2">
+          {zonasCompletas.map((nombre) => renderZonaCard(nombre))}
         </div>
       )}
 

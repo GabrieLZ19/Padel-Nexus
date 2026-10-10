@@ -1,9 +1,12 @@
 import { Partido } from "@/utils/types";
-import { Loader2, Trophy, AlertCircle } from "lucide-react";
+import { Clock, Loader2, MapPin } from "lucide-react";
 import { useState, useEffect } from "react";
-import { TeamBox } from "@/components/torneos/MatchTeamBox";
 import { canchaAsignadaReal } from "@/utils/fiscalPartidos";
-import { esAlcanceNacional } from "@/utils/etiquetaPareja";
+import {
+  POR_DEFINIR,
+  esAlcanceNacional,
+  etiquetaParejaVisible,
+} from "@/utils/etiquetaPareja";
 
 export const LiveArbitrajeRow = ({
   partido,
@@ -310,261 +313,246 @@ export const LiveArbitrajeRow = ({
     });
   };
 
+  const horaPartido = (() => {
+    if (!partido.fecha_partido) return null;
+    const d = new Date(partido.fecha_partido);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleTimeString("es-AR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  })();
+  const sedePartido = canchaAsignadaReal(partido.cancha_asignada);
+
+  const nacional = esAlcanceNacional(torneo?.alcance);
+  const etiquetaLado = (side: "a" | "b") =>
+    etiquetaParejaVisible({
+      j1: side === "a" ? partido.equipo_a_j1 : partido.equipo_b_j1,
+      j2: side === "a" ? partido.equipo_a_j2 : partido.equipo_b_j2,
+      provincia:
+        side === "a" ? partido.equipo_a_provincia : partido.equipo_b_provincia,
+      letra:
+        side === "a"
+          ? partido.equipo_a_letra_prioridad
+          : partido.equipo_b_letra_prioridad,
+      denominacion:
+        side === "a"
+          ? partido.equipo_a_denominacion
+          : partido.equipo_b_denominacion,
+      nacional,
+    }) || POR_DEFINIR;
+
+  const codigo = (
+    partido.orden != null
+      ? String(partido.orden).padStart(2, "0")
+      : partido.id.slice(0, 4)
+  ).toUpperCase();
+
+  const inputCls =
+    "h-8 w-9 rounded-md border border-white/15 bg-[#101010] text-center text-sm font-black tabular-nums text-white outline-none focus:border-brand-chartreuse";
+
+  const casilla = (
+    valor: string,
+    setValor: (v: string) => void,
+    etiqueta: string,
+    disabled = false,
+  ) => (
+    <input
+      type="text"
+      inputMode="numeric"
+      aria-label={etiqueta}
+      value={valor}
+      disabled={disabled}
+      onChange={(e) => setValor(e.target.value.replace(/[^0-9]/g, ""))}
+      className={`${inputCls} ${
+        disabled ? "cursor-not-allowed border-white/10 opacity-40" : ""
+      }`}
+    />
+  );
+
+  const columnas: {
+    id: string;
+    label: string;
+    valorA: string;
+    setA: (v: string) => void;
+    valorB: string;
+    setB: (v: string) => void;
+    disabled?: boolean;
+  }[] = [
+    {
+      id: "1",
+      label: "Set 1",
+      valorA: s1A,
+      setA: setS1A,
+      valorB: s1B,
+      setB: setS1B,
+    },
+    {
+      id: "2",
+      label: "Set 2",
+      valorA: s2A,
+      setA: setS2A,
+      valorB: s2B,
+      setB: setS2B,
+    },
+  ];
+  if (mostrarTercerSet) {
+    columnas.push({
+      id: "3",
+      label: esTercerSetCompleto ? "Set 3" : "STB",
+      valorA: s3A,
+      setA: setS3A,
+      valorB: s3B,
+      setB: setS3B,
+      disabled: !tercerSetEditable,
+    });
+  }
+
   return (
-    <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-md min-w-0">
-      <div className="flex flex-col gap-2 px-2.5 sm:px-3 py-2 sm:py-2.5 bg-white/[0.03] border-b border-white/8">
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
-          <span className="text-xs font-black text-sky-400 bg-sky-400/10 border border-sky-400/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0 tabular-nums">
-            #
-            {(partido.orden != null
-              ? String(partido.orden).padStart(2, "0")
-              : partido.id.slice(0, 4)
-            ).toUpperCase()}
-          </span>
-          <span className="text-xs font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-2 py-0.5 rounded-full uppercase shrink-0">
-            {partido.ronda}
-          </span>
-          {programacionLabel ? (
-            <span className="text-xs font-bold text-emerald-400/90 truncate min-w-0 max-w-full sm:max-w-[min(100%,28rem)] basis-full sm:basis-auto">
-              {programacionLabel}
-            </span>
-          ) : null}
-          <div className="flex items-center gap-2 ml-auto shrink-0">
-            <label className="flex items-center gap-1 font-bold text-gray-400 cursor-pointer text-xs">
-              <input
-                type="checkbox"
-                checked={esWo}
-                onChange={(e) => {
-                  setEsWo(e.target.checked);
-                  if (!e.target.checked) setEsLesion(false);
-                }}
-                className="accent-brand-chartreuse rounded"
-              />
-              W.O.
-            </label>
-            {esWo && (
-              <label className="flex items-center gap-1 text-red-400 font-bold cursor-pointer text-xs">
-                <input
-                  type="checkbox"
-                  checked={esLesion}
-                  onChange={(e) => setEsLesion(e.target.checked)}
-                  className="accent-red-500 rounded"
-                />
-                Inj.
-              </label>
-            )}
-          </div>
-        </div>
+    <div className="flex items-center gap-4 border-b border-white/8 bg-[#0a0a0a] px-3 py-3">
+      <div className="w-44 shrink-0 space-y-1.5">
+        <p className="text-xs font-black tabular-nums text-sky-400">#{codigo}</p>
+        <p className="flex items-center gap-1.5 text-sm font-black tabular-nums tracking-tight text-white">
+          <Clock className="size-3.5 shrink-0 text-green-400" aria-hidden />
+          {horaPartido || "Hora a definir"}
+        </p>
+        <p
+          className="flex items-start gap-1.5 text-xs font-semibold leading-snug text-green-400"
+          title={programacionLabel || sedePartido || undefined}
+        >
+          <MapPin className="mt-0.5 size-3.5 shrink-0 text-green-400" aria-hidden />
+          <span className="line-clamp-2">{sedePartido || "Sede a definir"}</span>
+        </p>
       </div>
 
-      {esWo && !esLesion ? (
-        <div className="p-2.5 sm:p-3 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setGanadorWo("A")}
-              className={`text-left rounded-xl transition-all cursor-pointer ${
-                ganadorWo === "A" ? "ring-2 ring-brand-chartreuse" : ""
-              }`}
-            >
-              <TeamBox
-                j1={partido.equipo_a_j1}
-                j2={partido.equipo_a_j2}
-                avatarJ1={partido.equipo_a_avatar_j1}
-                avatarJ2={partido.equipo_a_avatar_j2}
-                club={partido.equipo_a_club}
-                provincia={partido.equipo_a_provincia}
-                letra={partido.equipo_a_letra_prioridad}
-                denominacion={partido.equipo_a_denominacion}
-                alcanceNacional={esAlcanceNacional(torneo?.alcance)}
-                align="left"
-                isWinner={ganadorWo === "A"}
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => setGanadorWo("B")}
-              className={`text-left rounded-xl transition-all cursor-pointer ${
-                ganadorWo === "B" ? "ring-2 ring-brand-chartreuse" : ""
-              }`}
-            >
-              <TeamBox
-                j1={partido.equipo_b_j1}
-                j2={partido.equipo_b_j2}
-                avatarJ1={partido.equipo_b_avatar_j1}
-                avatarJ2={partido.equipo_b_avatar_j2}
-                club={partido.equipo_b_club}
-                provincia={partido.equipo_b_provincia}
-                letra={partido.equipo_b_letra_prioridad}
-                denominacion={partido.equipo_b_denominacion}
-                alcanceNacional={esAlcanceNacional(torneo?.alcance)}
-                align="right"
-                isWinner={ganadorWo === "B"}
-              />
-            </button>
-          </div>
-          <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold">
-            <AlertCircle className="size-3.5 shrink-0" />
-            Sin inicio: el marcador queda 6-0 6-0 para la pareja presente.
-          </div>
-        </div>
-      ) : (
-        <div className="p-2.5 sm:p-3 space-y-3">
-          {esWo && esLesion ? (
-            <p className="text-xs font-semibold text-amber-400">
-              Retiro por lesión: cargá el marcador final, con lo jugado y los
-              games que se completan para la pareja que sigue.
+      <div className="min-w-0 flex-1">
+        {esWo && !esLesion ? (
+          <div className="space-y-1">
+            <p className="text-right text-xs font-bold text-amber-300">
+              Sin inicio · 6-0 6-0
             </p>
-          ) : null}
-          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 md:gap-3 items-stretch">
-            <TeamBox
-              j1={partido.equipo_a_j1}
-              j2={partido.equipo_a_j2}
-              avatarJ1={partido.equipo_a_avatar_j1}
-              avatarJ2={partido.equipo_a_avatar_j2}
-              club={partido.equipo_a_club}
-              provincia={partido.equipo_a_provincia}
-              letra={partido.equipo_a_letra_prioridad}
-              denominacion={partido.equipo_a_denominacion}
-              alcanceNacional={esAlcanceNacional(torneo?.alcance)}
-              align="left"
-              isWinner={setsA >= 2}
-            />
-
-            <div className="flex flex-col items-center justify-center gap-1 px-1 py-1 self-center">
-              <div className="flex gap-1.5">
-                {(
-                  [
-                    "Set 1",
-                    "Set 2",
-                    ...(mostrarTercerSet
-                      ? [esTercerSetCompleto ? "Set 3" : "STB"]
-                      : []),
-                  ] as string[]
-                ).map((label) => (
-                  <span
-                    key={label}
-                    className={`text-xs font-black uppercase w-12 text-center ${
-                      (label === "Set 3" || label === "STB") && tercerSetEditable
-                        ? "text-brand-chartreuse"
-                        : "text-brand-ayuda"
-                    }`}
-                  >
-                    {label}
-                  </span>
-                ))}
+            {(
+              [
+                ["A", etiquetaLado("a")] as const,
+                ["B", etiquetaLado("b")] as const,
+              ]
+            ).map(([lado, nombre]) => (
+              <div key={lado} className="flex items-center gap-2">
+                <p className="min-w-0 flex-1 truncate text-right text-xs font-bold text-white">
+                  {nombre}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setGanadorWo(lado)}
+                  className={`h-7 w-24 shrink-0 cursor-pointer rounded-md text-xs font-bold ${
+                    ganadorWo === lado
+                      ? "bg-brand-chartreuse text-brand-black"
+                      : "border border-white/15 text-gray-300"
+                  }`}
+                >
+                  Presente
+                </button>
               </div>
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  aria-label="Set 1 equipo A"
-                  value={s1A}
-                  onChange={(e) =>
-                    setS1A(e.target.value.replace(/[^0-9]/g, ""))
-                  }
-                  className="w-12 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
-                />
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  aria-label="Set 2 equipo A"
-                  value={s2A}
-                  onChange={(e) =>
-                    setS2A(e.target.value.replace(/[^0-9]/g, ""))
-                  }
-                  className="w-12 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
-                />
-                {mostrarTercerSet && (
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    aria-label="Set 3 equipo A"
-                    value={s3A}
-                    disabled={!tercerSetEditable}
-                    onChange={(e) =>
-                      setS3A(e.target.value.replace(/[^0-9]/g, ""))
-                    }
-                    className={`w-12 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border ${
-                      tercerSetEditable
-                        ? "border-brand-chartreuse"
-                        : "border-white/10 opacity-40 cursor-not-allowed"
-                    }`}
-                  />
-                )}
-              </div>
-              <div className="h-px w-full max-w-[8.5rem] bg-white/10 my-0.5" />
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  aria-label="Set 1 equipo B"
-                  value={s1B}
-                  onChange={(e) =>
-                    setS1B(e.target.value.replace(/[^0-9]/g, ""))
-                  }
-                  className="w-12 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
-                />
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  aria-label="Set 2 equipo B"
-                  value={s2B}
-                  onChange={(e) =>
-                    setS2B(e.target.value.replace(/[^0-9]/g, ""))
-                  }
-                  className="w-12 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
-                />
-                {mostrarTercerSet && (
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    aria-label="Set 3 equipo B"
-                    value={s3B}
-                    disabled={!tercerSetEditable}
-                    onChange={(e) =>
-                      setS3B(e.target.value.replace(/[^0-9]/g, ""))
-                    }
-                    className={`w-12 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border ${
-                      tercerSetEditable
-                        ? "border-brand-chartreuse"
-                        : "border-white/10 opacity-40 cursor-not-allowed"
-                    }`}
-                  />
-                )}
-              </div>
-            </div>
-
-            <TeamBox
-              j1={partido.equipo_b_j1}
-              j2={partido.equipo_b_j2}
-              avatarJ1={partido.equipo_b_avatar_j1}
-              avatarJ2={partido.equipo_b_avatar_j2}
-              club={partido.equipo_b_club}
-              provincia={partido.equipo_b_provincia}
-              letra={partido.equipo_b_letra_prioridad}
-              denominacion={partido.equipo_b_denominacion}
-              alcanceNacional={esAlcanceNacional(torneo?.alcance)}
-              align="right"
-              isWinner={setsB >= 2}
-            />
+            ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div
+            className="grid items-center gap-x-1.5 gap-y-0"
+            style={{
+              gridTemplateColumns: `minmax(0,1fr) repeat(${columnas.length}, 3.5rem)`,
+            }}
+          >
+            <span />
+            {columnas.map((columna) => (
+              <span
+                key={`${columna.id}-label`}
+                className="whitespace-nowrap rounded-t-md border border-b-0 border-white/15 bg-white/10 py-1 text-center text-xs font-bold tracking-wide text-brand-ayuda"
+              >
+                {columna.label}
+              </span>
+            ))}
+            <p
+              className={`truncate text-right text-xs font-bold ${
+                setsA >= 2 ? "text-brand-chartreuse" : "text-white"
+              }`}
+            >
+              {etiquetaLado("a")}
+            </p>
+            {columnas.map((columna) => (
+              <span
+                key={`${columna.id}-a`}
+                className="flex justify-center border-x border-b border-white/10 bg-white/[0.03] py-1"
+              >
+                {casilla(
+                  columna.valorA,
+                  columna.setA,
+                  `${columna.label}, ${etiquetaLado("a")}`,
+                  columna.disabled,
+                )}
+              </span>
+            ))}
+            <p
+              className={`truncate text-right text-xs font-bold ${
+                setsB >= 2 ? "text-brand-chartreuse" : "text-white"
+              }`}
+            >
+              {etiquetaLado("b")}
+            </p>
+            {columnas.map((columna) => (
+              <span
+                key={`${columna.id}-b`}
+                className="flex justify-center rounded-b-md border border-t-0 border-white/10 bg-white/[0.03] py-1"
+              >
+                {casilla(
+                  columna.valorB,
+                  columna.setB,
+                  `${columna.label}, ${etiquetaLado("b")}`,
+                  columna.disabled,
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
-      <div className="flex justify-stretch sm:justify-end px-2.5 sm:px-3 pb-2.5 sm:pb-3">
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <div className="flex items-center gap-2">
+          <label className="inline-flex cursor-pointer items-center gap-1 text-xs font-bold text-gray-300">
+            <input
+              type="checkbox"
+              checked={esWo}
+              onChange={(e) => {
+                setEsWo(e.target.checked);
+                if (!e.target.checked) setEsLesion(false);
+              }}
+              className="accent-brand-chartreuse rounded"
+            />
+            W.O.
+          </label>
+          {esWo ? (
+            <label
+              className="inline-flex cursor-pointer items-center gap-1 text-xs font-bold text-red-400"
+              title="Retiro por lesión: cargá lo jugado y los games que se completan."
+            >
+              <input
+                type="checkbox"
+                checked={esLesion}
+                onChange={(e) => setEsLesion(e.target.checked)}
+                className="accent-red-500 rounded"
+              />
+              Lesión
+            </label>
+          ) : null}
+        </div>
         <button
           type="button"
           onClick={handleFinalizar}
           disabled={isSaving}
-          className="w-full sm:w-auto bg-brand-chartreuse text-brand-black hover:opacity-90 px-4 py-2.5 sm:py-2 rounded-xl text-xs font-black transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+          className="inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md bg-brand-chartreuse px-2.5 text-xs font-black text-brand-black hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {isSaving ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <Trophy className="size-3.5" />
-          )}
-          Finalizar partido
+          {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : null}
+          Finalizar
         </button>
       </div>
     </div>
