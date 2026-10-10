@@ -2,6 +2,7 @@
  * Nombres de categoría del ranking, como los pide el documento.
  * El valor guardado no cambia: "7ª" sigue siendo "7ª" y "Sub-12" sigue siendo "Sub-12".
  */
+import { etiquetaCategoria } from "../etiquetaCategoria";
 
 const MENORES: Record<string, string> = {
   "Sub-12": "Pre Cadetes (Hasta 12 Años)",
@@ -17,9 +18,7 @@ const MENORES: Record<string, string> = {
 export function etiquetaCategoriaRanking(categoria: string): string {
   if (!categoria) return "";
   if (MENORES[categoria]) return MENORES[categoria];
-  const ordinal = categoria.match(/^(\d+)ª$/);
-  if (ordinal) return `${ordinal[1]}º`;
-  return categoria;
+  return etiquetaCategoria(categoria) || categoria;
 }
 
 export function tituloRankingNacional(opciones: {

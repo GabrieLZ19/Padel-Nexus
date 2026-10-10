@@ -64,6 +64,16 @@ export const TorneosService = {
     return payload;
   },
 
+  async getResumenTablero(): Promise<{
+    total: number;
+    activos: number;
+    porAlcance: Record<string, number>;
+    ultimos: Torneo[];
+  }> {
+    const response = await api.get("/torneos", { params: { resumen: "tablero" } });
+    return response.data;
+  },
+
   async getById(id: string): Promise<Torneo> {
     const response = await api.get<Torneo>(`/torneos/${id}`);
     return hydrateTorneoRestrictions(response.data);

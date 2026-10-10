@@ -30,6 +30,7 @@ import { formatFechaCalendario } from "@/utils/formatFecha";
 import TorneoVistaFiltros from "@/components/torneos/TorneoVistaFiltros";
 import { MenuPuntos } from "@/components/ui/MenuPuntos";
 import { hrefDetalleTorneo } from "@/components/torneos/wizard/stepLocks";
+import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 import {
   CONTADORES_VISTA_VACIOS,
   type VistaTorneoId,
@@ -58,7 +59,8 @@ const ESTADO_INICIAL: FormTorneoState = {
   hora_inicio_jornada: "08:00",
 };
 
-const PAGE_SIZE = 5;
+const TAMANOS_PAGINA = [10, 25, 50] as const;
+const PAGE_SIZE_INICIAL = 25;
 
 const accionTorneo =
   "inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors";
@@ -93,6 +95,7 @@ export default function TorneosPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE_INICIAL);
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -123,7 +126,7 @@ export default function TorneosPage() {
     const fetchData = async () => {
       try {
         const [torneosData, clubesResponse] = await Promise.all([
-          TorneosService.getByPage(page, PAGE_SIZE, search, undefined, {
+          TorneosService.getByPage(page, pageSize, search, undefined, {
             vista: vista ?? "auto",
             agrupar: true,
           }),
@@ -163,7 +166,7 @@ export default function TorneosPage() {
     return () => {
       isMounted = false;
     };
-  }, [refreshKey, page, search, vista]);
+  }, [refreshKey, page, pageSize, search, vista]);
 
   // --- MANEJADORES DE ACCIONES ---
   const handleOpenCreate = () => {
@@ -439,7 +442,7 @@ export default function TorneosPage() {
         <p className="mt-1 text-sm text-gray-500">
           {t.rama || ""}
           {t.rama ? " · " : ""}
-          {t.nivel || "Sin nivel"} · {t.categoria || "General"}
+          {etiquetaNivelYCategoria(t.nivel, t.categoria) || "Sin nivel"}
         </p>
         <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
           <div>
@@ -650,7 +653,7 @@ export default function TorneosPage() {
                           {t.nombre}
                         </button>
                         <div className="text-[13px] text-gray-500 mt-0.5 font-medium">
-                          {t.rama || ""}{t.rama ? " · " : ""}{t.nivel || "Sin nivel"} · {t.categoria || "General"}
+                          {[t.rama, etiquetaNivelYCategoria(t.nivel, t.categoria) || "Sin nivel"].filter(Boolean).join(" · ")}
                         </div>
                       </td>
 
@@ -739,9 +742,14 @@ export default function TorneosPage() {
       <Pagination
         page={page}
         total={total}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         currentCount={grupos.length || tournaments.length}
         onPageChange={setPage}
+        tamanos={TAMANOS_PAGINA}
+        onPageSizeChange={(tamano) => {
+          setPageSize(tamano);
+          setPage(1);
+        }}
       />
 
       <TorneoModal

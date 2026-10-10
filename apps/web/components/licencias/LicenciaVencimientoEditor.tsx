@@ -115,9 +115,6 @@ export function LicenciaVencimientoEditor({
         </div>
         <Pencil className="size-3.5 text-gray-600 group-hover/vence:text-brand-chartreuse shrink-0 transition-colors" />
       </div>
-      <p className="text-[10px] text-gray-600 group-hover/vence:text-brand-chartreuse/70 mt-1.5 pl-10 transition-colors">
-        Clic para editar vencimiento individual
-      </p>
     </button>
   );
 }

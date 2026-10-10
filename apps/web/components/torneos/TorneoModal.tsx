@@ -103,7 +103,9 @@ export default function TorneoModal({
                 </p>
               </div>
               <button
+                type="button"
                 onClick={onClose}
+                aria-label="Cerrar"
                 className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors shrink-0 cursor-pointer"
               >
                 <X className="size-4" />

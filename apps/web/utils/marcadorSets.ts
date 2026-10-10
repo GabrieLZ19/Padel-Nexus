@@ -4,7 +4,7 @@
  * queda sobre fondo claro y el número desaparece.
  */
 export function clasePuntosSet(jugado: boolean, ganoElSet: boolean): string {
-  if (!jugado) return "text-gray-500";
+  if (!jugado) return "text-brand-ayuda";
   if (ganoElSet) return "text-brand-chartreuse";
   return "text-gray-300";
 }

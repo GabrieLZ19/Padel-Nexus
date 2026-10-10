@@ -19,6 +19,7 @@ import {
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { useProfileStore } from "@/store/useProfileStore";
 import { PROVINCIAS_ARG, NIVELES_PADEL } from "@/utils/constants/padelConfig";
+import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import {
   etiquetaCategoriaRanking,
   tituloRankingEntidad,
@@ -309,8 +310,8 @@ export default function RankingsPage() {
       <div className="flex items-start gap-2 bg-white/5 border border-white/10 rounded-2xl p-3 text-xs text-gray-400">
         <Info className="size-4 text-brand-chartreuse shrink-0 mt-0.5" />
         <span>
-          Ante igualdad de puntos, el orden se resuelve alfabeticamente por
-          apellido y nombre segun reglamento.
+          Ante igualdad de puntos, el orden se resuelve alfabéticamente por
+          apellido y nombre según reglamento.
         </span>
       </div>
 
@@ -401,7 +402,7 @@ export default function RankingsPage() {
                   label: etiquetaCategoriaRanking(c),
                 }))
               : [
-                  { value: "", label: `Todas las categorias (${tipoConfig.label})` },
+                  { value: "", label: `Todas las categorías (${tipoConfig.label})` },
                   ...categoriasDelTipo.map((c) => ({
                     value: c,
                     label: etiquetaCategoriaRanking(c),
@@ -571,7 +572,7 @@ export default function RankingsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-gray-300 font-bold">
-                          {j.categoria_padel || j.categoria || "-"}
+                          {etiquetaCategoria(j.categoria_padel || j.categoria) || "-"}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-gray-400">
@@ -679,7 +680,7 @@ export default function RankingsPage() {
                   Categoría
                 </span>
                 <span className="text-brand-chartreuse font-extrabold block">
-                  {selectedJugador.categoria_padel || selectedJugador.categoria || "-"}
+                  {etiquetaCategoria(selectedJugador.categoria_padel || selectedJugador.categoria) || "-"}
                 </span>
               </div>
 

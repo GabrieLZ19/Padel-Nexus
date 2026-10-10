@@ -51,7 +51,8 @@ const TAB_A_ESTADO: Record<TabInscripcion, string | undefined> = {
   Rechazadas: FAP_ESTADOS_PAGO.RECHAZADO,
 };
 
-const PAGE_SIZE = 5;
+const TAMANOS_PAGINA = [10, 25, 50] as const;
+const PAGE_SIZE_INICIAL = 25;
 const SEARCH_DEBOUNCE_MS = 300;
 
 const cleanName = (name?: string | null) => {
@@ -68,6 +69,7 @@ export default function GestionInscripcionesPage() {
   const [loading, setLoading] = useState<boolean>(true);
 
   const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE_INICIAL);
   const [filterTorneo, setFilterTorneo] = useState<string>("");
   const [searchInput, setSearchInput] = useState<string>("");
   const [search, setSearch] = useState<string>("");
@@ -205,7 +207,7 @@ export default function GestionInscripcionesPage() {
         const res = await InscripcionesService.getByPage(
           filterTorneo,
           page,
-          PAGE_SIZE,
+          pageSize,
           {
             search: search || undefined,
             estadoPago: TAB_A_ESTADO[activeTab],
@@ -228,7 +230,7 @@ export default function GestionInscripcionesPage() {
     };
 
     void loadData();
-  }, [filterTorneo, page, refreshKey, search, activeTab]);
+  }, [filterTorneo, page, pageSize, refreshKey, search, activeTab]);
 
   const [pagoModal, setPagoModal] = useState<{
     isOpen: boolean;
@@ -867,9 +869,14 @@ export default function GestionInscripcionesPage() {
       <Pagination
         page={page}
         total={total}
-        pageSize={PAGE_SIZE}
+        pageSize={pageSize}
         currentCount={inscripciones.length}
         onPageChange={setPage}
+        tamanos={TAMANOS_PAGINA}
+        onPageSizeChange={(tamano) => {
+          setPageSize(tamano);
+          setPage(1);
+        }}
       />
       <div className="relative z-50">
         <FeedbackModal {...feedbackModal} />

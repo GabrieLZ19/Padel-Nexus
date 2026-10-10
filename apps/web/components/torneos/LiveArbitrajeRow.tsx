@@ -314,27 +314,23 @@ export const LiveArbitrajeRow = ({
     <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-md min-w-0">
       <div className="flex flex-col gap-2 px-2.5 sm:px-3 py-2 sm:py-2.5 bg-white/[0.03] border-b border-white/8">
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
-          <span className="text-[10px] font-black text-sky-400 bg-sky-400/10 border border-sky-400/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0 tabular-nums">
+          <span className="text-xs font-black text-sky-400 bg-sky-400/10 border border-sky-400/25 px-2 py-0.5 rounded uppercase tracking-wider shrink-0 tabular-nums">
             #
             {(partido.orden != null
               ? String(partido.orden).padStart(2, "0")
               : partido.id.slice(0, 4)
             ).toUpperCase()}
           </span>
-          <span className="text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-2 py-0.5 rounded-full uppercase shrink-0">
+          <span className="text-xs font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-2 py-0.5 rounded-full uppercase shrink-0">
             {partido.ronda}
           </span>
           {programacionLabel ? (
-            <span className="text-[10px] font-bold text-emerald-400/90 truncate min-w-0 max-w-full sm:max-w-[min(100%,28rem)] basis-full sm:basis-auto">
+            <span className="text-xs font-bold text-emerald-400/90 truncate min-w-0 max-w-full sm:max-w-[min(100%,28rem)] basis-full sm:basis-auto">
               {programacionLabel}
             </span>
-          ) : (
-            <span className="text-[10px] font-semibold text-gray-500 basis-full sm:basis-auto">
-              Sin sede/horario · definí en el programador
-            </span>
-          )}
+          ) : null}
           <div className="flex items-center gap-2 ml-auto shrink-0">
-            <label className="flex items-center gap-1 font-bold text-gray-400 cursor-pointer text-[10px]">
+            <label className="flex items-center gap-1 font-bold text-gray-400 cursor-pointer text-xs">
               <input
                 type="checkbox"
                 checked={esWo}
@@ -347,7 +343,7 @@ export const LiveArbitrajeRow = ({
               W.O.
             </label>
             {esWo && (
-              <label className="flex items-center gap-1 text-red-400 font-bold cursor-pointer text-[10px]">
+              <label className="flex items-center gap-1 text-red-400 font-bold cursor-pointer text-xs">
                 <input
                   type="checkbox"
                   checked={esLesion}
@@ -407,7 +403,7 @@ export const LiveArbitrajeRow = ({
               />
             </button>
           </div>
-          <div className="flex items-center gap-2 text-amber-400 text-[11px] font-semibold">
+          <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold">
             <AlertCircle className="size-3.5 shrink-0" />
             Sin inicio: el marcador queda 6-0 6-0 para la pareja presente.
           </div>
@@ -415,7 +411,7 @@ export const LiveArbitrajeRow = ({
       ) : (
         <div className="p-2.5 sm:p-3 space-y-3">
           {esWo && esLesion ? (
-            <p className="text-[11px] font-semibold text-amber-400">
+            <p className="text-xs font-semibold text-amber-400">
               Retiro por lesión: cargá el marcador final, con lo jugado y los
               games que se completan para la pareja que sigue.
             </p>
@@ -448,10 +444,10 @@ export const LiveArbitrajeRow = ({
                 ).map((label) => (
                   <span
                     key={label}
-                    className={`text-[8px] font-black uppercase w-10 text-center ${
+                    className={`text-xs font-black uppercase w-12 text-center ${
                       (label === "Set 3" || label === "STB") && tercerSetEditable
                         ? "text-brand-chartreuse"
-                        : "text-gray-500"
+                        : "text-brand-ayuda"
                     }`}
                   >
                     {label}
@@ -467,7 +463,7 @@ export const LiveArbitrajeRow = ({
                   onChange={(e) =>
                     setS1A(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
+                  className="w-12 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
                 />
                 <input
                   type="text"
@@ -477,7 +473,7 @@ export const LiveArbitrajeRow = ({
                   onChange={(e) =>
                     setS2A(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
+                  className="w-12 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
                 />
                 {mostrarTercerSet && (
                   <input
@@ -489,7 +485,7 @@ export const LiveArbitrajeRow = ({
                     onChange={(e) =>
                       setS3A(e.target.value.replace(/[^0-9]/g, ""))
                     }
-                    className={`w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border ${
+                    className={`w-12 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border ${
                       tercerSetEditable
                         ? "border-brand-chartreuse"
                         : "border-white/10 opacity-40 cursor-not-allowed"
@@ -507,7 +503,7 @@ export const LiveArbitrajeRow = ({
                   onChange={(e) =>
                     setS1B(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
+                  className="w-12 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
                 />
                 <input
                   type="text"
@@ -517,7 +513,7 @@ export const LiveArbitrajeRow = ({
                   onChange={(e) =>
                     setS2B(e.target.value.replace(/[^0-9]/g, ""))
                   }
-                  className="w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
+                  className="w-12 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border border-white/15 focus:border-brand-chartreuse"
                 />
                 {mostrarTercerSet && (
                   <input
@@ -529,7 +525,7 @@ export const LiveArbitrajeRow = ({
                     onChange={(e) =>
                       setS3B(e.target.value.replace(/[^0-9]/g, ""))
                     }
-                    className={`w-10 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border ${
+                    className={`w-12 h-10 bg-[#161616] rounded-lg text-center text-white font-black text-sm outline-none border ${
                       tercerSetEditable
                         ? "border-brand-chartreuse"
                         : "border-white/10 opacity-40 cursor-not-allowed"
@@ -561,7 +557,7 @@ export const LiveArbitrajeRow = ({
           type="button"
           onClick={handleFinalizar}
           disabled={isSaving}
-          className="w-full sm:w-auto bg-brand-chartreuse text-brand-black hover:opacity-90 px-4 py-2.5 sm:py-2 rounded-xl text-[11px] font-black transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full sm:w-auto bg-brand-chartreuse text-brand-black hover:opacity-90 px-4 py-2.5 sm:py-2 rounded-xl text-xs font-black transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
         >
           {isSaving ? (
             <Loader2 className="size-3.5 animate-spin" />

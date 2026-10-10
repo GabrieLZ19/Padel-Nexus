@@ -6,7 +6,8 @@ import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
 import { FederacionesService, Federacion } from "@/utils/services/federaciones";
 import { Torneo, Club } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
-import { Calendar, Trophy, Settings2, Gift } from "lucide-react";
+import { Calendar, Trophy, Settings2, Gift, Info } from "lucide-react";
+import { sileo } from "sileo";
 import { useProfileStore } from "@/store/useProfileStore";
 import {
   getAlcancesPermitidos,
@@ -21,6 +22,26 @@ import {
 import { esRolFederacionNacional } from "@/utils/auth/roles";
 import type { RolUsuario } from "@/utils/types/user.types";
 import type { OnTorneoUpdated, RegisterSaveHandler } from "./types";
+
+function AyudaCampo({ texto }: { texto: string }) {
+  return (
+    <span className="relative inline-flex group/ayuda">
+      <button
+        type="button"
+        aria-label={texto}
+        className="inline-flex size-5 items-center justify-center rounded-full text-brand-ayuda hover:text-white cursor-help"
+      >
+        <Info className="size-3.5" aria-hidden />
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-64 max-w-[70vw] rounded-lg border border-white/10 bg-brand-card px-2.5 py-2 text-left text-xs font-medium normal-case tracking-normal text-white shadow-lg group-hover/ayuda:block group-focus-within/ayuda:block"
+      >
+        {texto}
+      </span>
+    </span>
+  );
+}
 
 const FED_PREFIX = "fed:";
 const ASO_PREFIX = "aso:";
@@ -109,6 +130,13 @@ export const Paso1Datos = ({
   // Información General
   const [editNombre, setEditNombre] = useState(torneo.nombre || "");
   const [editSede, setEditSede] = useState(torneo.club_id || "");
+  const [erroresCampo, setErroresCampo] = useState<
+    Partial<Record<"nombre" | "inicio" | "fin" | "sede", string>>
+  >({});
+  const nombreRef = useRef<HTMLInputElement>(null);
+  const inicioRef = useRef<HTMLInputElement>(null);
+  const finRef = useRef<HTMLInputElement>(null);
+  const sedeRef = useRef<HTMLDivElement>(null);
   const [editAlcance, setEditAlcance] = useState<string>(() => {
     const inicial = torneo.alcance || "Provincial";
     // Federación nacional no usa Local/Privado
@@ -311,49 +339,39 @@ export const Paso1Datos = ({
     if (readOnly) return true;
 
     // Validación por si lo ingresan a mano saltándose el calendario
-    if (editFecha && editFechaFin) {
-      const startDate = new Date(editFecha);
-      const endDate = new Date(editFechaFin);
-
-      if (endDate < startDate) {
-        // IMPORTANTE: Usamos (prev) => para no borrar la función onClose del modal
-        setFeedbackModal((prev: any) => ({
-          ...prev,
-          isOpen: true,
-          type: "warning",
-          title: "Fechas inválidas",
-          description:
-            "La fecha de finalización no puede ser anterior a la fecha de inicio del torneo.",
-        }));
-        return false;
-      }
+    if (editFecha && editFechaFin && editFechaFin < editFecha) {
+      setErroresCampo({
+        fin: "La fecha de finalización no puede ser anterior a la de inicio.",
+      });
+      finRef.current?.focus();
+      return false;
     }
 
     const nuevosCupos = Number(editCupos);
     const cuposActuales = torneo.cupos_actuales || 0;
 
     if (nuevosCupos < cuposActuales) {
-      setFeedbackModal((prev: any) => ({
-        ...prev,
-        isOpen: true,
-        type: "warning",
+      sileo.warning({
         title: "Cupo no permitido",
         description: `No podés reducir el cupo a ${nuevosCupos} porque ya existen ${cuposActuales} participante(s) / pareja(s) inscripta(s).`,
-      }));
+      });
       return false;
     }
 
-    if (!editNombre || !editFecha || !editFechaFin || !editSede) {
-      setFeedbackModal((prev: any) => ({
-        ...prev,
-        isOpen: true,
-        type: "warning",
-        title: "Campos incompletos",
-        description:
-          "Completá nombre, fecha de inicio, fecha de finalización y centro de cómputos antes de guardar o avanzar de paso.",
-      }));
+    const incompletos: Partial<Record<"nombre" | "inicio" | "fin" | "sede", string>> = {};
+    if (!editNombre.trim()) incompletos.nombre = "Completá el nombre del torneo.";
+    if (!editFecha) incompletos.inicio = "Completá la fecha de inicio.";
+    if (!editFechaFin) incompletos.fin = "Completá la fecha de finalización.";
+    if (!editSede) incompletos.sede = "Elegí el centro de cómputos.";
+    if (Object.keys(incompletos).length > 0) {
+      setErroresCampo(incompletos);
+      if (incompletos.nombre) nombreRef.current?.focus();
+      else if (incompletos.inicio) inicioRef.current?.focus();
+      else if (incompletos.fin) finRef.current?.focus();
+      else sedeRef.current?.querySelector("button")?.focus();
       return false;
     }
+    setErroresCampo({});
 
     try {
       setGuardandoDatos(true);
@@ -412,24 +430,17 @@ export const Paso1Datos = ({
       onTorneoUpdated?.(updated);
       if (!options?.silent) {
         triggerRefresh();
-        setFeedbackModal((prev: any) => ({
-          ...prev,
-          isOpen: true,
-          type: "success",
-          title: "¡Cambios guardados!",
-          description:
-            "La información básica del torneo ha sido actualizada con éxito.",
-        }));
+        sileo.success({
+          title: "Cambios guardados",
+          description: "La información básica del torneo quedó actualizada.",
+        });
       }
       return true;
     } catch (e: any) {
-      setFeedbackModal((prev: any) => ({
-        ...prev,
-        isOpen: true,
-        type: "error",
+      sileo.error({
         title: "Error al guardar",
         description: e.message || "No se pudieron guardar los cambios.",
-      }));
+      });
       return false;
     } finally {
       setGuardandoDatos(false);
@@ -459,24 +470,46 @@ export const Paso1Datos = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
+          <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-2">
             Nombre del Torneo
           </label>
           <input
+            ref={nombreRef}
             type="text"
             value={editNombre}
-            onChange={(e) => setEditNombre(e.target.value)}
-            className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none"
+            onChange={(e) => {
+              setEditNombre(e.target.value);
+              if (e.target.value.trim()) {
+                setErroresCampo((prev) => ({ ...prev, nombre: undefined }));
+              }
+            }}
+            aria-invalid={Boolean(erroresCampo.nombre)}
+            className={`w-full bg-brand-input border text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none ${
+              erroresCampo.nombre ? "border-red-500/70" : "border-white/10"
+            }`}
             placeholder="Ej: Torneo FAP 5ª Categoría"
           />
+          {erroresCampo.nombre ? (
+            <p className="mt-1.5 text-xs text-red-400" role="alert">
+              {erroresCampo.nombre}
+            </p>
+          ) : null}
         </div>
         <div>
-          <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
-            Centro de Cómputos
-          </label>
+          <div className="flex items-center gap-1.5 mb-2">
+            <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider">
+              Centro de Cómputos
+            </label>
+            <AyudaCampo texto="Punto de mando de delegados y fiscal general." />
+          </div>
+          <div ref={sedeRef}>
           <CustomDropdown
             value={editSede}
-            onChange={setEditSede}
+            onChange={(valor) => {
+              setEditSede(valor);
+              if (valor) setErroresCampo((prev) => ({ ...prev, sede: undefined }));
+            }}
+            hasError={Boolean(erroresCampo.sede)}
             options={clubs.map((c) => ({
               value: String(c.id),
               label: c.nombre,
@@ -488,14 +521,28 @@ export const Paso1Datos = ({
             }
             disabled={clubs.length === 0}
           />
-          <p className="text-[10px] text-gray-500 mt-1.5">
-            Punto de mando de delegados y fiscal general
-          </p>
+          {erroresCampo.sede ? (
+            <p className="mt-1.5 text-xs text-red-400" role="alert">
+              {erroresCampo.sede}
+            </p>
+          ) : null}
+          </div>
         </div>
         <div>
-          <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
-            Alcance del Torneo
-          </label>
+          <div className="flex items-center gap-1.5 mb-2">
+            <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider">
+              Alcance del Torneo
+            </label>
+            {(userRole === "admin" || userRole === "admin_club") && (
+              <AyudaCampo texto="Tu perfil de Club solo permite organizar torneos Locales, Privados, Regionales, Provinciales o Clasificatorios." />
+            )}
+            {userRole === "admin_provincial" && (
+              <AyudaCampo texto="Tu perfil Provincial no permite organizar torneos Nacionales." />
+            )}
+            {esRolFederacionNacional(userRole) && (
+              <AyudaCampo texto="La federación nacional no organiza torneos Locales ni Privados." />
+            )}
+          </div>
           <CustomDropdown
             value={editAlcance}
             onChange={setEditAlcance}
@@ -504,25 +551,9 @@ export const Paso1Datos = ({
               .map((a) => ({ value: a.value, label: a.label }))}
             placeholder="Seleccionar Alcance..."
           />
-          {(userRole === "admin" || userRole === "admin_club") && (
-            <p className="text-[10px] text-yellow-500/80 mt-1.5 font-semibold">
-              Tu perfil de Club solo permite organizar torneos Locales, Privados,
-              Regionales, Provinciales o Clasificatorios.
-            </p>
-          )}
-          {userRole === "admin_provincial" && (
-            <p className="text-[10px] text-yellow-500/80 mt-1.5 font-semibold">
-              Tu perfil Provincial no permite organizar torneos Nacionales.
-            </p>
-          )}
-          {esRolFederacionNacional(userRole) && (
-            <p className="text-[10px] text-gray-500 mt-1.5">
-              La federación nacional no organiza torneos Locales ni Privados.
-            </p>
-          )}
         </div>
         <div>
-          <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
+          <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-2">
             Reglamento Oficial de Competencia
           </label>
           <CustomDropdown
@@ -532,17 +563,10 @@ export const Paso1Datos = ({
             placeholder="Seleccionar Reglamento..."
             disabled={forzarFap}
           />
-          <p className="text-[10px] text-gray-500 mt-1.5">
-            {forzarFap
-              ? "Alcance Nacional: se aplica el reglamento FAP."
-              : sinEntidadOrganizadora
-                ? "En Local o Privado podés usar FAP, APA o Amateur / Independiente."
-                : "En Regional, Provincial o Nacional solo aplica reglamento FAP o APA."}
-          </p>
         </div>
 
         <div>
-          <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
+          <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-2">
             Entidad Organizadora
           </label>
           <CustomDropdown
@@ -562,18 +586,9 @@ export const Paso1Datos = ({
             }
             disabled={organizadorDeshabilitado}
           />
-          <p className="text-[10px] text-gray-500 mt-1.5">
-            {sinEntidadOrganizadora
-              ? "Alcance Local o Privado: organiza el club sede (u otra entidad no federativa). No aplica FAP ni asociación provincial."
-              : forzarFap
-                ? "Alcance Nacional: organiza la Federación Argentina de Pádel (FAP)."
-                : editAlcance === "Provincial" || editAlcance === "Regional"
-                  ? "Arranca en la asociación de la provincia del club. Podés cambiarla."
-                  : "Por defecto FAP. Podés elegir una asociación provincial del ecosistema."}
-          </p>
         </div>
         <div>
-          <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
+          <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-2">
             Formato del Torneo
           </label>
           <CustomDropdown
@@ -598,11 +613,6 @@ export const Paso1Datos = ({
             }
             placeholder="Seleccionar Formato..."
           />
-          <p className="text-[10px] text-gray-500 mt-1.5">
-            {editFormato === "Eliminatoria Directa"
-              ? "Los partidos comienzan directamente en llaves (treintaidosavos, dieciseisavos, octavos…). Sin fase de grupos."
-              : "Se juegan primero zonas de grupos y luego los clasificados pasan a la llave de eliminación."}
-          </p>
         </div>
       </div>
 
@@ -613,7 +623,7 @@ export const Paso1Datos = ({
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
-            <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
+            <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-2">
               Cierre de Inscripción
             </label>
             <input
@@ -625,34 +635,59 @@ export const Paso1Datos = ({
             />
           </div>
           <div>
-            <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
+            <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-2">
               Fecha de Inicio
             </label>
             <input
+              ref={inicioRef}
               type="date"
               value={editFecha}
+              aria-invalid={Boolean(erroresCampo.inicio)}
               onChange={(e) => {
                 setEditFecha(e.target.value);
-                // Si la nueva fecha de inicio es mayor que la de fin, reseteamos la de fin
+                if (e.target.value) {
+                  setErroresCampo((prev) => ({ ...prev, inicio: undefined }));
+                }
                 if (editFechaFin && e.target.value > editFechaFin) {
                   setEditFechaFin("");
                 }
               }}
-              className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none cursor-pointer"
+              className={`w-full bg-brand-input border text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none cursor-pointer ${
+                erroresCampo.inicio ? "border-red-500/70" : "border-white/10"
+              }`}
             />
+            {erroresCampo.inicio ? (
+              <p className="mt-1.5 text-xs text-red-400" role="alert">
+                {erroresCampo.inicio}
+              </p>
+            ) : null}
           </div>
           <div>
-            <label className="text-xs text-gray-500 font-bold uppercase tracking-wider block mb-2">
+            <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-2">
               Fecha de Finalización *
             </label>
             <input
+              ref={finRef}
               type="date"
               value={editFechaFin}
-              min={editFecha || undefined} // MAGIA ACÁ: bloquea días anteriores en el calendario
-              disabled={!editFecha} // Deshabilita el input si aún no hay fecha de inicio
-              onChange={(e) => setEditFechaFin(e.target.value)}
-              className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              min={editFecha || undefined}
+              disabled={!editFecha}
+              aria-invalid={Boolean(erroresCampo.fin)}
+              onChange={(e) => {
+                setEditFechaFin(e.target.value);
+                if (e.target.value) {
+                  setErroresCampo((prev) => ({ ...prev, fin: undefined }));
+                }
+              }}
+              className={`w-full bg-brand-input border text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                erroresCampo.fin ? "border-red-500/70" : "border-white/10"
+              }`}
             />
+            {erroresCampo.fin ? (
+              <p className="mt-1.5 text-xs text-red-400" role="alert">
+                {erroresCampo.fin}
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
@@ -672,7 +707,7 @@ export const Paso1Datos = ({
 
             <div className="space-y-5">
               <div>
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">
+                <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-2">
                   Tipo de Torneo
                 </label>
                 <CustomDropdown
@@ -688,7 +723,7 @@ export const Paso1Datos = ({
 
               {!esGratis && (
                 <div>
-                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">
+                  <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-2">
                     Precio por Pareja / Jugador ($)
                   </label>
                   <input
@@ -701,7 +736,7 @@ export const Paso1Datos = ({
                 </div>
               )}
                 <div>
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-2">
+                <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-2">
                   Cupos Máximos (Parejas)
                 </label>
                 <CustomDropdown
@@ -729,7 +764,7 @@ export const Paso1Datos = ({
 
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-1">
                   Premio 1° Puesto (Campeones)
                 </label>
                 <input
@@ -742,7 +777,7 @@ export const Paso1Datos = ({
               </div>
 
               <div>
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-1">
                   Premio 2° Puesto (Subcampeones)
                 </label>
                 <input
@@ -755,7 +790,7 @@ export const Paso1Datos = ({
               </div>
 
               <div>
-                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block mb-1">
+                <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-1">
                   Premio 3° Puesto / Menciones
                 </label>
                 <input

@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { Partido, Torneo } from "@/utils/types/index";
+import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
+import { textoRectora } from "@/utils/textosRectora";
+import { useSiglaRectora } from "@/utils/useSiglaRectora";
 import InscripcionModal from "@/components/torneos/InscripcionModal";
 import { useProfileStore } from "@/store/useProfileStore";
 import { MatchCard } from "@/components/torneos/MatchCard";
@@ -47,6 +50,7 @@ export default function TorneoDetallePage() {
   const params = useParams();
   const router = useRouter();
   const torneoId = params.id as string;
+  const siglaRectora = useSiglaRectora();
 
   const [torneo, setTorneo] = useState<Torneo | null>(null);
   const [partidos, setPartidos] = useState<Partido[]>([]);
@@ -308,8 +312,7 @@ export default function TorneoDetallePage() {
             <div className="min-w-0 space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md bg-brand-chartreuse text-brand-black">
-                  {torneo.nivel || "Cat."}
-                  {torneo.categoria ? ` · ${torneo.categoria}` : ""}
+                  {etiquetaNivelYCategoria(torneo.nivel, torneo.categoria) || "Cat."}
                 </span>
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/5 text-gray-400 border border-white/8">
                   {torneo.estado}
@@ -491,7 +494,7 @@ export default function TorneoDetallePage() {
                           Cuadro principal
                         </h3>
                         <p className="text-[11px] text-gray-500 mt-0.5">
-                          Plantilla FAP
+                          {textoRectora("plantilla", siglaRectora)}
                           {fapPairCount ? ` · ${fapPairCount} parejas` : ""}
                           {isFinalizado
                             ? " · finalizado"

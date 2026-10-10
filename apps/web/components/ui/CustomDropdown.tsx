@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 
@@ -31,7 +31,9 @@ export default function CustomDropdown({
   className = "",
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -46,12 +48,73 @@ export default function CustomDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const selected = options.findIndex((opt) => opt.value === value);
+    setActiveIndex(selected >= 0 ? selected : 0);
+  }, [isOpen, options, value]);
+
+  const elegir = (index: number) => {
+    const opcion = options[index];
+    if (!opcion) return;
+    onChange(opcion.value);
+    setIsOpen(false);
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (disabled) return;
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        return;
+      }
+      setActiveIndex((indice) => {
+        if (options.length === 0) return 0;
+        return event.key === "ArrowDown"
+          ? Math.min(options.length - 1, indice + 1)
+          : Math.max(0, indice - 1);
+      });
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      setActiveIndex(0);
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      setActiveIndex(Math.max(0, options.length - 1));
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (!isOpen) setIsOpen(true);
+      else elegir(activeIndex);
+      return;
+    }
+    if (event.key === "Escape") {
+      setIsOpen(false);
+    }
+  };
+
   const selectedOption = options.find((opt) => opt.value === value);
 
   return (
     <div className="relative" ref={dropdownRef}>
       {/* BOTÓN PRINCIPAL */}
-      <div
+      <button
+        type="button"
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={listId}
+        aria-label={
+          selectedOption
+            ? `${placeholder}: ${selectedOption.label}`
+            : placeholder
+        }
+        onKeyDown={onKeyDown}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`w-full bg-brand-input px-4 py-3.5 rounded-xl border text-sm md:text-base flex justify-between items-center gap-2 transition-all duration-200 select-none min-w-0 ${
           isOpen
@@ -61,7 +124,7 @@ export default function CustomDropdown({
               : "border-brand-white/5 hover:border-brand-white/10"
         } ${
           disabled
-            ? "opacity-40 cursor-not-allowed text-gray-500"
+            ? "opacity-40 cursor-not-allowed text-brand-ayuda"
             : "cursor-pointer text-brand-white"
         } ${className}`}
       >
@@ -69,17 +132,17 @@ export default function CustomDropdown({
           className={
             selectedOption
               ? "text-brand-white font-medium truncate pr-2 min-w-0"
-              : "text-gray-500 truncate pr-2"
+              : "text-brand-ayuda truncate pr-2"
           }
         >
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <ChevronDown
           className={`size-4 shrink-0 transition-transform duration-200 ${
-            isOpen ? "rotate-180 text-brand-chartreuse" : "text-gray-500"
+            isOpen ? "rotate-180 text-brand-chartreuse" : "text-brand-ayuda"
           }`}
         />
-      </div>
+      </button>
 
       {/* MENÚ DESPLEGABLE CON POSICIONAMIENTO CONTROLADO */}
       <AnimatePresence>
@@ -96,30 +159,35 @@ export default function CustomDropdown({
             [&::-webkit-scrollbar-thumb]:rounded-full 
             hover:[&::-webkit-scrollbar-thumb]:bg-brand-white/20 
             ${haciaArriba ? "bottom-full mb-2" : "top-full mt-2"}`}
+            id={listId}
+            role="listbox"
+            aria-label={placeholder}
           >
             {options.length === 0 ? (
-              <div className="p-4 text-sm text-gray-500 text-center">
+              <div className="p-4 text-sm text-brand-ayuda text-center">
                 No hay opciones disponibles
               </div>
             ) : (
               <div className="py-1">
-                {options.map((opt) => {
+                {options.map((opt, index) => {
                   const isSelected = value === opt.value;
+                  const activo = index === activeIndex;
                   return (
-                    <div
+                    <button
                       key={opt.value}
-                      onClick={() => {
-                        onChange(opt.value);
-                        setIsOpen(false);
-                      }}
-                      className={`px-4 py-3 text-sm md:text-base cursor-pointer transition-colors text-left flex items-center ${
-                        isSelected
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      onMouseEnter={() => setActiveIndex(index)}
+                      onClick={() => elegir(index)}
+                      className={`w-full px-4 py-3 text-sm md:text-base cursor-pointer transition-colors text-left flex items-center ${
+                        isSelected || activo
                           ? "text-brand-chartreuse font-bold bg-brand-chartreuse/5 border-l-2 border-brand-chartreuse"
                           : "text-gray-300 border-l-2 border-transparent hover:bg-brand-white/5 hover:text-brand-white"
                       }`}
                     >
                       {opt.label}
-                    </div>
+                    </button>
                   );
                 })}
               </div>

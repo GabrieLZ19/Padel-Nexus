@@ -18,6 +18,7 @@ import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
 import { Paso7Sedes } from "@/components/torneos/wizard/Paso5Sedes";
 import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
 import { TournamentWizardNav } from "@/components/torneos/TournamentWizardNav";
+import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 import { NumeroPasoProvider } from "@/components/torneos/wizard/NumeroPasoContext";
 import type { SaveStepHandler } from "@/components/torneos/wizard/types";
 import {
@@ -162,7 +163,7 @@ export default function ClubTorneoDetallePage() {
             {(torneo as { rama?: string }).rama
               ? `${(torneo as { rama?: string }).rama} · `
               : ""}
-            {torneo.nivel} · {torneo.categoria} ·{" "}
+            {etiquetaNivelYCategoria(torneo.nivel, torneo.categoria)} ·{" "}
             {labelModalidad(torneo.modalidad)}
           </p>
         </div>

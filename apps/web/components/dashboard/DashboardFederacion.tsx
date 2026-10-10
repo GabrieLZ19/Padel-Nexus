@@ -20,18 +20,22 @@ import {
 import { TorneosService } from "@/utils/services/torneos";
 import { hrefDetalleTorneo } from "@/components/torneos/wizard/stepLocks";
 import { LicenciasService, type ResumenLicencias } from "@/utils/services/licencias";
-import { ClubesService } from "@/utils/services/clubes";
 import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
 import { InscripcionesService } from "@/utils/services/inscripciones";
-import { Torneo, Club } from "@/utils/types";
-import { FAP_ESTADOS_TORNEO } from "@/utils/constants/fap";
+import { Torneo } from "@/utils/types";
+import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
+import { textoRectora } from "@/utils/textosRectora";
+import { useSiglaRectora } from "@/utils/useSiglaRectora";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 
 export default function DashboardFederacion() {
   const router = useRouter();
-  const [torneos, setTorneos] = useState<Torneo[]>([]);
-  const [clubes, setClubs] = useState<Club[]>([]);
+  const siglaRectora = useSiglaRectora();
+  const [torneosTotal, setTorneosTotal] = useState(0);
+  const [torneosActivosTotal, setTorneosActivosTotal] = useState(0);
+  const [porAlcance, setPorAlcance] = useState<Record<string, number>>({});
+  const [ultimosTorneos, setUltimosTorneos] = useState<Torneo[]>([]);
   const [asociaciones, setAsociaciones] = useState<Asociacion[]>([]);
   const [licenciasResumen, setLicenciasResumen] = useState<ResumenLicencias | null>(null);
   const [recaudacionConfirmada, setRecaudacionConfirmada] = useState(0);
@@ -50,8 +54,12 @@ export default function DashboardFederacion() {
   useEffect(() => {
     let isMounted = true;
     Promise.all([
-      TorneosService.getAll().catch(() => []),
-      ClubesService.getAll().catch(() => ({ data: [], total: 0 })),
+      TorneosService.getResumenTablero().catch(() => ({
+        total: 0,
+        activos: 0,
+        porAlcance: {},
+        ultimos: [] as Torneo[],
+      })),
       LicenciasService.getByPage(1, 1).catch(() => ({ data: [], total: 0 })),
       InscripcionesService.getResumen().catch(() => ({
         pendientes: 0,
@@ -60,10 +68,12 @@ export default function DashboardFederacion() {
         recaudacion: 0,
       })),
       AsociacionesService.getAll().catch(() => []),
-    ]).then(([torneosData, clubesData, licenciasData, resumenPagos, asociacionesData]) => {
+    ]).then(([resumenTorneos, licenciasData, resumenPagos, asociacionesData]) => {
       if (isMounted) {
-        setTorneos(torneosData || []);
-        setClubs(clubesData?.data || []);
+        setTorneosTotal(resumenTorneos.total || 0);
+        setTorneosActivosTotal(resumenTorneos.activos || 0);
+        setPorAlcance(resumenTorneos.porAlcance || {});
+        setUltimosTorneos(resumenTorneos.ultimos || []);
         setLicenciasResumen(
           "resumen" in licenciasData ? licenciasData.resumen ?? null : null,
         );
@@ -78,19 +88,9 @@ export default function DashboardFederacion() {
   // ==========================================
   // CÁLCULO DE MÉTRICAS NACIONALES
   // ==========================================
-  const torneosNacionales = torneos.filter((t) => t.alcance === "Nacional");
-  const torneosActivos = torneos.filter(
-    (t) =>
-      (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.INSCRIPCION.toLowerCase() ||
-      (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.CERRADO.toLowerCase() ||
-      (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.PROGRAMADO.toLowerCase() ||
-      (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.EN_CURSO.toLowerCase(),
-  );
-
-  const provinciasConAsociacion = new Set(
+  const asociacionesActivas = new Set(
     asociaciones.map((a) => a.provincia).filter(Boolean),
-  );
-  const asociacionesActivas = provinciasConAsociacion.size;
+  ).size;
 
   const formatMoney = (amount: number) => {
     if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1).replace(".0", "")}M`;
@@ -101,8 +101,8 @@ export default function DashboardFederacion() {
   const metrics = [
     {
       title: "Torneos",
-      value: torneos.length.toString(),
-      change: `${torneosActivos.length} activos`,
+      value: torneosTotal.toString(),
+      change: `${torneosActivosTotal} activos`,
       icon: Trophy,
       trendIcon: Activity,
       color: "bg-[#2a3614]",
@@ -163,18 +163,13 @@ export default function DashboardFederacion() {
 
   // Distribución de torneos por alcance
   const torneosPorAlcance = [
-    { label: "Nacionales", count: torneos.filter((t) => t.alcance === "Nacional").length },
-    { label: "Provinciales", count: torneos.filter((t) => t.alcance === "Provincial").length },
-    { label: "Regionales", count: torneos.filter((t) => t.alcance === "Regional").length },
-    { label: "Locales", count: torneos.filter((t) => t.alcance === "Local").length },
-    { label: "Privados", count: torneos.filter((t) => t.alcance === "Privado").length },
+    { label: "Nacionales", count: porAlcance.Nacional || 0 },
+    { label: "Provinciales", count: porAlcance.Provincial || 0 },
+    { label: "Regionales", count: porAlcance.Regional || 0 },
+    { label: "Locales", count: porAlcance.Local || 0 },
+    { label: "Privados", count: porAlcance.Privado || 0 },
   ];
   const maxTorneos = Math.max(...torneosPorAlcance.map((t) => t.count), 1);
-
-  // Últimos torneos (tabla de monitoreo)
-  const ultimosTorneos = [...torneos]
-    .sort((a, b) => new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime())
-    .slice(0, 5);
 
   // --- SKELETON ---
   if (loading) {
@@ -349,7 +344,7 @@ export default function DashboardFederacion() {
                       <td className="py-3.5 px-4">
                         <p className="font-bold text-white text-[13px]">{t.nombre}</p>
                         <p className="text-[11px] text-gray-500 mt-0.5">
-                          {(t as any).rama || ""}{(t as any).rama ? " · " : ""}{t.categoria || "General"} · {t.nivel || "-"}
+                          {[(t as { rama?: string }).rama, etiquetaNivelYCategoria(t.nivel, t.categoria) || "General"].filter(Boolean).join(" · ")}
                         </p>
                       </td>
                       <td className="py-3.5 px-4">
@@ -433,7 +428,7 @@ export default function DashboardFederacion() {
           </div>
           <div className="text-left">
             <p className="text-sm font-bold text-white">Licencias y Jugadores</p>
-            <p className="text-[11px] text-gray-500">Emitir, auditar y gestionar licencias FAP</p>
+            <p className="text-[11px] text-gray-500">Emitir, auditar y gestionar {textoRectora("licencias", siglaRectora)}</p>
           </div>
         </button>
         <button
@@ -445,7 +440,7 @@ export default function DashboardFederacion() {
           </div>
           <div className="text-left">
             <p className="text-sm font-bold text-white">Asociaciones y Agrupaciones</p>
-            <p className="text-[11px] text-gray-500">Supervisar entidades afiliadas a la federación</p>
+            <p className="text-[11px] text-gray-500">Supervisar {textoRectora("afiliadas", siglaRectora).replace(/^Entidades/, "entidades")}</p>
           </div>
         </button>
       </motion.div>

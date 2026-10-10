@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { PerfilService } from "@/utils/services/perfil";
 import { Perfil } from "@/utils/types";
+import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import { useProfileStore } from "@/store/useProfileStore";
 import { puedeVerFichaCompleta } from "@/utils/auth/roles";
 
@@ -156,7 +157,7 @@ export default function FichaJugadorPublicaPage() {
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-gray-400">
                 {perfil.categoria_padel ? (
                   <span className="font-semibold text-gray-300">
-                    Cat. {perfil.categoria_padel}
+                    Cat. {etiquetaCategoria(perfil.categoria_padel)}
                   </span>
                 ) : null}
                 {perfil.lugar_residencia ? (
@@ -192,7 +193,7 @@ export default function FichaJugadorPublicaPage() {
               <FieldRow
                 icon={<Medal className="size-4 text-brand-chartreuse/70" />}
                 label="Categoría"
-                value={perfil.categoria_padel || "—"}
+                value={etiquetaCategoria(perfil.categoria_padel) || "—"}
               />
               <FieldRow
                 icon={<Swords className="size-4 text-brand-chartreuse/70" />}

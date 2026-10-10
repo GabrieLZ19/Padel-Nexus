@@ -18,6 +18,17 @@ export function etiquetaCanchaAsignada(cancha?: string | null): string {
   return canchaAsignadaReal(cancha) || "Pendiente";
 }
 
+/** Sin cancha real ni fecha válida: el aviso va una sola vez en Resultados. */
+export function partidoSinSedeNiHorario(partido: {
+  cancha_asignada?: string | null;
+  fecha_partido?: string | null;
+}): boolean {
+  if (canchaAsignadaReal(partido.cancha_asignada)) return false;
+  if (!partido.fecha_partido) return true;
+  const fecha = new Date(partido.fecha_partido);
+  return Number.isNaN(fecha.getTime());
+}
+
 export function etiquetaCruce(j1?: string | null, j2?: string | null): string {
   const nombres = [j1, j2].filter((n) => n && n !== "-" && n !== "Libre");
   return nombres.length > 0 ? nombres.join(" / ") : "";

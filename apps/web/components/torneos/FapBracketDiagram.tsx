@@ -14,6 +14,8 @@ import type { Partido } from "@/utils/types";
 import { MatchCard } from "./MatchCard";
 import { PairDisplay, esAlcanceNacional } from "@/components/torneos/PairDisplay";
 import { POR_DEFINIR } from "@/utils/etiquetaPareja";
+import { textoRectora } from "@/utils/textosRectora";
+import { useSiglaRectora } from "@/utils/useSiglaRectora";
 import { PlayerAvatar } from "@/components/torneos/MatchTeamBox";
 import {
   codigoRondaPorNumeroFap,
@@ -121,6 +123,8 @@ export function FapBracketDiagram({
   compact = false,
   inicioNumeracion = 1,
 }: Props) {
+  const siglaRectora = useSiglaRectora();
+  const plantilla = textoRectora("plantilla", siglaRectora);
   const scrollRef = useRef<HTMLDivElement>(null);
   const layoutWidthRef = useRef(0);
   const zoomTouchedRef = useRef(false);
@@ -362,7 +366,7 @@ export function FapBracketDiagram({
 
   if (!layout || matches.length === 0) {
     return (
-      <div className="text-center p-10 text-gray-500 text-sm border border-dashed border-white/10 rounded-2xl">
+      <div className="text-center p-10 text-brand-ayuda text-sm border border-dashed border-white/10 rounded-2xl">
         Sin plantilla FAP para este cuadro.
       </div>
     );
@@ -379,7 +383,7 @@ export function FapBracketDiagram({
       }
       role={fullscreen ? "dialog" : undefined}
       aria-modal={fullscreen || undefined}
-      aria-label={fullscreen ? "Cuadro FAP a pantalla completa" : undefined}
+      aria-label={fullscreen ? `${plantilla} a pantalla completa` : undefined}
     >
       <div
         className={`flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-brand-input bg-brand-input/40 ${
@@ -387,8 +391,8 @@ export function FapBracketDiagram({
         }`}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-chartreuse">
-            Plantilla FAP
+          <span className="text-xs font-black uppercase tracking-[0.18em] text-brand-chartreuse">
+            {plantilla}
           </span>
           {pairCount != null && (
             <span className="text-xs font-bold text-gray-400 truncate">
@@ -396,13 +400,13 @@ export function FapBracketDiagram({
             </span>
           )}
           {fullscreen ? (
-            <span className="hidden sm:inline text-[10px] text-gray-500">
+            <span className="hidden sm:inline text-xs text-brand-ayuda">
               Esc para cerrar
             </span>
           ) : null}
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-gray-500 hidden sm:inline mr-1">
+          <span className="text-xs text-brand-ayuda hidden sm:inline mr-1">
             Zoom
           </span>
           <button
@@ -418,7 +422,7 @@ export function FapBracketDiagram({
           <button
             type="button"
             onClick={() => setZoomManual(1)}
-            className="min-w-[3.25rem] h-8 rounded-lg border border-brand-input bg-brand-input/50 px-2 text-[11px] font-black tabular-nums text-brand-chartreuse hover:border-brand-chartreuse/40 transition-colors"
+            className="min-w-[3.25rem] h-8 rounded-lg border border-brand-input bg-brand-input/50 px-2 text-xs font-black tabular-nums text-brand-chartreuse hover:border-brand-chartreuse/40 transition-colors"
             aria-label="Restablecer zoom"
             title="Restablecer (100%)"
           >
@@ -504,7 +508,7 @@ export function FapBracketDiagram({
             {layout.headers.map((header) => (
               <p
                 key={header.key}
-                className="absolute z-[2] text-center text-[10px] font-black uppercase tracking-[0.16em] text-brand-chartreuse/90"
+                className="absolute z-[2] text-center text-xs font-black uppercase tracking-[0.16em] text-brand-chartreuse/90"
                 style={{ left: header.x, top: 8, width: CARD_W }}
               >
                 {header.label}
@@ -622,7 +626,7 @@ export function FapBracketDiagram({
                   className="absolute z-[3] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
                   style={{ left: node.joinX, top: node.yMid }}
                 >
-                  <span className="inline-flex min-w-[1.75rem] items-center justify-center rounded-md border border-brand-chartreuse/40 bg-[#121212] px-1.5 py-0.5 text-[11px] font-black tabular-nums text-brand-chartreuse shadow-sm">
+                  <span className="inline-flex min-w-[1.75rem] items-center justify-center rounded-md border border-brand-chartreuse/40 bg-[#121212] px-1.5 py-0.5 text-xs font-black tabular-nums text-brand-chartreuse shadow-sm">
                     {node.numero}
                   </span>
                 </div>
@@ -671,10 +675,10 @@ export function FapBracketDiagram({
                   title={`Pase directo → partido #${bye.targetNumero}`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                    <span className="text-xs font-black uppercase tracking-wider text-brand-ayuda">
                       Pase directo
                     </span>
-                    <span className="text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
+                    <span className="text-xs font-black text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
                       → #{bye.targetNumero}
                     </span>
                   </div>
@@ -682,11 +686,11 @@ export function FapBracketDiagram({
                   <div className="space-y-3">
                     <div className="min-w-0 space-y-1.5">
                       <div className="flex flex-wrap items-center gap-1">
-                        <span className="text-[9px] font-bold tracking-wide text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
+                        <span className="text-xs font-bold tracking-wide text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
                           {bye.seed}
                         </span>
                         {isCabeza ? (
-                          <span className="text-[9px] font-bold tracking-wide text-amber-500 bg-amber-400/15 border border-amber-400/30 px-1.5 py-0.5 rounded">
+                          <span className="text-xs font-bold tracking-wide text-amber-500 bg-amber-400/15 border border-amber-400/30 px-1.5 py-0.5 rounded">
                             #1
                           </span>
                         ) : null}
@@ -709,7 +713,7 @@ export function FapBracketDiagram({
                       ) : (
                         <div className="flex items-center gap-2 min-h-[2.25rem]">
                           <PlayerAvatar src={null} size="md" />
-                          <p className="text-xs font-medium text-gray-500 italic">
+                          <p className="text-xs font-medium text-brand-ayuda italic">
                             {POR_DEFINIR}
                           </p>
                         </div>
@@ -718,13 +722,13 @@ export function FapBracketDiagram({
 
                     <div className="border-t border-white/5 pt-3">
                       <div className="flex flex-wrap items-center gap-1 mb-1.5">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400/90 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded">
+                        <span className="text-xs font-bold uppercase tracking-wider text-amber-400/90 bg-amber-400/10 border border-amber-400/25 px-1.5 py-0.5 rounded">
                           Libre
                         </span>
                       </div>
                       <div className="flex items-center gap-2 min-h-[2.25rem]">
                         <PlayerAvatar src={null} size="md" />
-                        <p className="text-xs font-medium text-gray-500 italic">
+                        <p className="text-xs font-medium text-brand-ayuda italic">
                           Libre
                         </p>
                       </div>
@@ -739,7 +743,7 @@ export function FapBracketDiagram({
                 return (
                   <div
                     key={node.matchNo}
-                    className="absolute z-[2] rounded-2xl border border-dashed border-white/10 bg-black/20 flex items-center justify-center text-xs text-gray-500"
+                    className="absolute z-[2] rounded-2xl border border-dashed border-white/10 bg-black/20 flex items-center justify-center text-xs text-brand-ayuda"
                     style={{
                       left: node.cardX,
                       top: node.y,
@@ -795,7 +799,7 @@ export function FapBracketDiagram({
         <div
           className={`rounded-2xl border border-dashed border-white/10 bg-black/20 ${
             mobile ? "h-[min(70vh,640px)]" : "h-[min(78vh,420px)]"
-          } flex items-center justify-center text-xs text-gray-500`}
+          } flex items-center justify-center text-xs text-brand-ayuda`}
           aria-hidden
         >
           Cuadro en pantalla completa…

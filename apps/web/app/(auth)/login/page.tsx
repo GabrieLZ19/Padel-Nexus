@@ -76,10 +76,10 @@ function AuthPageContent() {
       if (isAxiosError(err)) {
         setError(
           err.response?.data?.error ||
-            "Credenciales incorrectas. Verifique los datos.",
+            "Credenciales incorrectas. Verificá los datos.",
         );
       } else {
-        setError("Error de red inesperado. Intente nuevamente.");
+        setError("Error de red inesperado. Intentá de nuevo.");
       }
     } finally {
       setLoading(false);

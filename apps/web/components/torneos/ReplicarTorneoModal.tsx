@@ -9,6 +9,7 @@ import {
   RAMAS_PADEL,
   getNivelesParaCategoria,
 } from "@/utils/constants/fapApaRules";
+import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 
 function ramaCorta(rama?: string | null): string {
   const r = String(rama || "").toLowerCase();
@@ -172,7 +173,7 @@ export default function ReplicarTorneoModal({
                   Base: {torneo.nombre}
                 </p>
                 <p className="text-[11px] text-gray-400 mt-0.5">
-                  {torneo.categoria || "Libres"} · {torneo.nivel || "—"} ·{" "}
+                  {etiquetaNivelYCategoria(torneo.nivel, torneo.categoria) || "Libres"} ·{" "}
                   {torneo.rama || "—"}
                 </p>
               </div>

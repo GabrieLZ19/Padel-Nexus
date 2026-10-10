@@ -7,6 +7,7 @@ import {
   PerfilService,
   type PanelJugador,
 } from "@/utils/services/perfil";
+import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 
 function pagoDe(inscripcion: PanelJugador["inscripciones"][number]) {
   if (inscripcion.sinCosto) return "Sin costo";
@@ -66,9 +67,8 @@ export default function MisTorneosPage() {
                   {inscripcion.torneoNombre}
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {[inscripcion.nivel, inscripcion.categoria]
-                    .filter(Boolean)
-                    .join(" · ") || "Sin categoría"}
+                  {etiquetaNivelYCategoria(inscripcion.nivel, inscripcion.categoria) ||
+                    "Sin categoría"}
                   {" · "}
                   {inscripcion.estadoTorneo || "Sin estado"}
                   {" · "}

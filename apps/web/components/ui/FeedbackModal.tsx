@@ -129,7 +129,9 @@ export default function FeedbackModal({
             {/* Botón Cerrar */}
             {!isLoading && (
               <button
+                type="button"
                 onClick={safeOnClose}
+                aria-label="Cerrar"
                 className="absolute top-5 right-5 text-gray-500 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-2 rounded-full cursor-pointer"
               >
                 <X className="size-4" />
@@ -162,7 +164,7 @@ export default function FeedbackModal({
                     <CustomDropdown
                       value={selectValue}
                       onChange={setSelectValue}
-                      placeholder="Selecciona método"
+                      placeholder="Seleccioná el método"
                       options={selectOptions}
                       haciaArriba
                     />

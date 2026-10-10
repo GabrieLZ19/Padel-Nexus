@@ -61,7 +61,7 @@ export function ProgramacionEntryPanel({ torneoId }: Props) {
             Publicar solo hace visibles los horarios y bloquea la edición.
           </p>
           {loading ? (
-            <p className="text-xs text-gray-500">Cargando resumen…</p>
+            <p className="text-xs text-brand-ayuda">Cargando resumen…</p>
           ) : board ? (
             <ul className="mt-3 flex flex-wrap gap-3 text-xs text-gray-300">
               <li className="rounded-full bg-white/5 px-3 py-1">
@@ -84,7 +84,7 @@ export function ProgramacionEntryPanel({ torneoId }: Props) {
               )}
             </ul>
           ) : (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-brand-ayuda">
               Configurá sedes y canchas en Paso 5 si aún no hay grilla.
             </p>
           )}
@@ -100,7 +100,7 @@ export function ProgramacionEntryPanel({ torneoId }: Props) {
           <ExternalLink className="size-4" />
         </Link>
       </div>
-      <p className="mt-4 text-xs text-gray-500">
+      <p className="mt-4 text-xs text-brand-ayuda">
         Para sumar clubes o canchas, usá{" "}
         <Link
           href={`${base}/torneos/${torneoId}?step=times`}

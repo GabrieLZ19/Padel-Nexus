@@ -24,6 +24,7 @@ import LicenciaModal from "@/components/perfil/LicenciaModal";
 import AfiliacionModal from "@/components/perfil/AfiliacionModal";
 import { MinorModeBanner } from "@/components/legal/MinorModeBanner";
 import { fechaLatina } from "@/utils/fechaArgentina";
+import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-white/5 rounded-3xl ${className}`} />
@@ -304,7 +305,7 @@ export default function PlayerDashboard() {
                       Categoría del Circuito
                     </p>
                     <h2 className="text-3xl md:text-5xl font-black tracking-tight text-white">
-                      {profile.categoria_padel || "S/C"}
+                      {etiquetaCategoria(profile.categoria_padel) || "S/C"}
                     </h2>
                   </div>
                 </div>

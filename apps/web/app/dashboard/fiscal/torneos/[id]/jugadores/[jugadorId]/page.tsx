@@ -12,6 +12,7 @@ import {
 } from "@/utils/services/fiscal-panel";
 import { generarInformePreliminarPdf } from "@/utils/informePreliminarPdf";
 import { NIVELES_PADEL } from "@/utils/constants/padelConfig";
+import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal, {
   type FeedbackModalProps,
@@ -170,7 +171,7 @@ export default function FichaJugadorFiscalPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 text-sm">
-          <Dato label="Categoría" value={ficha.categoria_padel || "S/C"} />
+          <Dato label="Categoría" value={etiquetaCategoria(ficha.categoria_padel) || "S/C"} />
           <Dato label="Carnet / licencia" value={licencia?.estado || "Sin carnet"} />
           <Dato label="N° carnet" value={licencia?.nro_licencia || "—"} />
           <Dato

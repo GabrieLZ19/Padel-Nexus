@@ -88,19 +88,11 @@ export function PlayerLine({
     >
       <PlayerAvatar src={avatarUrl} size={size} />
       <div className="min-w-0 leading-tight">
-        <p
-          className={`font-black text-brand-white truncate ${
-            size === "sm" ? "text-[11px]" : "text-xs"
-          }`}
-        >
+        <p className="font-black text-brand-white truncate text-xs">
           {apellido}
         </p>
         {nombre ? (
-          <p
-            className={`text-gray-400 truncate font-medium ${
-              size === "sm" ? "text-[10px]" : "text-[11px]"
-            }`}
-          >
+          <p className="text-gray-400 truncate font-medium text-xs">
             {nombre}
           </p>
         ) : null}
@@ -176,7 +168,7 @@ export function TeamBox({
         {isWinner && (
           <CheckCircle2 className="size-3.5 text-brand-chartreuse shrink-0" />
         )}
-        <p className="text-[9px] font-black tracking-wider text-rose-500 truncate">
+        <p className="text-xs font-black tracking-wider text-rose-500 truncate">
           {institucion}
         </p>
       </div>
@@ -227,7 +219,7 @@ export function FinishedMatchScore({
         <span className="text-lg font-black text-amber-400 tracking-tight">
           W.O.
         </span>
-        <span className="text-[8px] font-bold uppercase text-amber-400/70 tracking-wider mt-0.5">
+        <span className="text-xs font-bold uppercase text-amber-400/70 tracking-wider mt-0.5">
           Walkover
         </span>
       </div>
@@ -253,7 +245,7 @@ export function FinishedMatchScore({
 
   const scoreBox = (value: number | null, won: boolean) => (
     <span
-      className={`inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-lg font-black text-sm sm:text-base tabular-nums border ${clasesResultadoFinalizado(won).puntos}`}
+      className={`inline-flex items-center justify-center w-12 h-10 rounded-lg font-black text-sm tabular-nums border ${clasesResultadoFinalizado(won).puntos}`}
     >
       {value ?? "–"}
     </span>
@@ -265,7 +257,7 @@ export function FinishedMatchScore({
         {sets.map((s) => (
           <span
             key={s.label}
-            className="w-9 sm:w-10 text-center text-[8px] font-black uppercase tracking-wider text-gray-500"
+            className="w-12 text-center text-xs font-black uppercase text-brand-ayuda"
           >
             {s.label}
           </span>

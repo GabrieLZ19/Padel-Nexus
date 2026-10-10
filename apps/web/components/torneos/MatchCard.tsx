@@ -93,12 +93,12 @@ export const MatchCard = ({
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-1 min-h-[1rem]">
           {origen ? (
-            <span className="text-[9px] font-bold tracking-wide text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
+            <span className="text-xs font-bold tracking-wide text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
               {origen}
             </span>
           ) : null}
           {esCabezaSerie ? (
-            <span className="text-[9px] font-bold tracking-wide text-amber-500 bg-amber-400/15 border border-amber-400/30 px-1.5 py-0.5 rounded">
+            <span className="text-xs font-bold tracking-wide text-amber-500 bg-amber-400/15 border border-amber-400/30 px-1.5 py-0.5 rounded">
               #1
             </span>
           ) : null}
@@ -107,7 +107,7 @@ export const MatchCard = ({
         {empty ? (
           <div className="flex items-center gap-2 min-h-[2.25rem]">
             <PlayerAvatar src={null} size="md" />
-            <p className="text-xs font-medium text-gray-500 italic">
+            <p className="text-xs font-medium text-brand-ayuda italic">
               {esBye && !origen ? LIBRE : POR_DEFINIR}
             </p>
           </div>
@@ -154,7 +154,7 @@ export const MatchCard = ({
           return (
             <span
               key={idx}
-              className={`w-7 h-8 sm:w-8 sm:h-9 flex items-center justify-center rounded-md text-[11px] sm:text-xs font-black tabular-nums leading-none ${
+              className={`w-7 h-8 sm:w-8 sm:h-9 flex items-center justify-center rounded-md text-xs font-black tabular-nums leading-none ${
                 !has
                   ? "text-gray-400 bg-transparent"
                   : setWon
@@ -203,28 +203,28 @@ export const MatchCard = ({
       <div className="flex items-center justify-between gap-3 px-3.5 py-2 bg-brand-input/60 border-b border-brand-input min-h-[2rem]">
         <div className="flex items-center gap-2 min-w-0">
           {(numeroVisible ?? partido.orden) != null && (
-            <span className="text-[10px] font-black text-brand-chartreuse/90 tabular-nums">
+            <span className="text-xs font-black text-brand-chartreuse/90 tabular-nums">
               #{numeroVisible ?? partido.orden}
             </span>
           )}
           {partido.es_wo && (
-            <span className="text-[9px] font-black text-amber-500 uppercase">
+            <span className="text-xs font-black text-amber-500 uppercase">
               W.O.
             </span>
           )}
           {finalizado && (
-            <span className="text-[9px] font-black text-gray-500 uppercase tracking-wide">
+            <span className="text-xs font-black text-brand-ayuda uppercase tracking-wide">
               Finalizado
             </span>
           )}
           {!partido.es_wo && !finalizado && (
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-500">
+            <span className="text-xs font-bold uppercase tracking-[0.12em] text-brand-ayuda">
               {isActive ? "En juego" : "Pendiente"}
             </span>
           )}
         </div>
         {isInteractive && !finalizado && (
-          <span className="text-[9px] font-bold text-brand-chartreuse uppercase tracking-wide shrink-0">
+          <span className="text-xs font-bold text-brand-chartreuse uppercase tracking-wide shrink-0">
             Editar
           </span>
         )}
@@ -264,7 +264,7 @@ export const MatchCard = ({
 
       {meta && (
         <div className="px-3.5 py-2 border-t border-brand-input bg-brand-input/40">
-          <p className="text-[10px] font-semibold text-emerald-600 truncate">
+          <p className="text-xs font-semibold text-emerald-600 truncate">
             {meta}
           </p>
         </div>

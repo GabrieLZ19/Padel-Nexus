@@ -54,7 +54,7 @@ export const ALL_STEPS: StepDefinition[] = [
     label: "Categorías",
     desc: "Clases y división",
     group: "config",
-    keywords: ["categorias", "clases", "parejas", "division", "rama", "nivel"],
+    keywords: ["categorías", "clases", "parejas", "división", "rama", "nivel"],
     icon: Layers,
   },
   {
@@ -169,7 +169,7 @@ export function TournamentWizardNav({
               >
                 <span className="flex items-center gap-1">
                   <span
-                    className={`text-[11px] font-black tabular-nums leading-none ${
+                    className={`text-xs font-black tabular-nums leading-none ${
                       isActive ? "text-brand-black" : "text-brand-chartreuse"
                     }`}
                   >
@@ -184,7 +184,7 @@ export function TournamentWizardNav({
                     />
                   ) : null}
                 </span>
-                <span className="text-[11px] font-bold leading-tight">
+                <span className="text-xs font-bold leading-tight">
                   {step.label}
                 </span>
               </button>

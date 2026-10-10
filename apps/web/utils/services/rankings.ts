@@ -2,7 +2,7 @@ import { api } from "../api";
 import { RankingJugador } from "../types";
 
 /**
- * Tipos de ranking segun reglamento FAP.
+ * Tipos de ranking según el reglamento de la entidad rectora.
  * Debe mantenerse alineado con `apps/api/src/constants/rankings.ts`.
  */
 export type TipoRankingFront = "menores" | "veteranos" | "libres";

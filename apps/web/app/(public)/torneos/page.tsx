@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo } from "@/utils/types";
+import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 import { useProfileStore } from "@/store/useProfileStore";
 import {
   esModalidadIndividual,
@@ -686,7 +687,7 @@ function TorneosContent() {
                       <div className="flex items-center justify-between gap-2 ">
                         <div className="flex gap-2">
                           <div className="bg-brand-chartreuse text-brand-black text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide">
-                            {t.nivel || "5ª"} {t.categoria || "Caballeros"}
+                            {etiquetaNivelYCategoria(t.nivel, t.categoria) || "5ª"}
                           </div>
                           <div className="bg-brand-white/10 text-brand-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                             {labelModalidad(t.modalidad)}

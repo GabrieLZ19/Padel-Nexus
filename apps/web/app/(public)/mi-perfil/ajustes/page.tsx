@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { PerfilService } from "@/utils/services/perfil";
 import { Perfil } from "@/utils/types";
+import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import {
   Save,
   User,
@@ -404,7 +405,7 @@ export default function ProfileSettings() {
               <input
                 className={getInputStyles(false, false)}
                 type="text"
-                value={profile.categoria_padel || "Sin categoría"}
+                value={etiquetaCategoria(profile.categoria_padel) || "Sin categoría"}
                 readOnly
                 aria-readonly="true"
                 title="La categoría la cambia la federación"

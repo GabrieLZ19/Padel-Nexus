@@ -21,6 +21,7 @@ import {
 import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { ConfigLicenciasPanel } from "@/components/licencias/ConfigLicenciasPanel";
+import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 
 export default function DetalleAsociacionPage() {
   const params = useParams();
@@ -292,7 +293,7 @@ export default function DetalleAsociacionPage() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-start">
                       <span className="text-xs font-black text-brand-chartreuse uppercase tracking-wider">
-                        {t.categoria || "Libres"}
+                        {etiquetaCategoria(t.categoria) || "Libres"}
                       </span>
                       <span
                         className={`text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-wider ${
@@ -354,7 +355,7 @@ export default function DetalleAsociacionPage() {
                       <td className="px-6 py-4 text-xs text-gray-400">
                         {t.club_nombre || t.clubes?.nombre || clubes.find((c) => c.id === t.club_id)?.nombre || "Sede Oficial"}
                       </td>
-                      <td className="px-6 py-4 text-brand-chartreuse font-extrabold text-xs">{t.categoria || "5ª"}</td>
+                      <td className="px-6 py-4 text-brand-chartreuse font-extrabold text-xs">{etiquetaCategoria(t.categoria) || "5ª"}</td>
                       <td className="px-6 py-4 text-center">
                         <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/5 text-gray-300">
                           {t.estado || "Borrador"}
@@ -403,7 +404,7 @@ export default function DetalleAsociacionPage() {
                         {j.nombre} {j.apellido}
                       </span>
                       <span className="text-[11px] text-gray-400 flex items-center gap-2 mt-0.5">
-                        <span>Categoría: <strong className="text-gray-200">{j.categoria || "5ª"}</strong></span>
+                        <span>Categoría: <strong className="text-gray-200">{etiquetaCategoria(j.categoria) || "5ª"}</strong></span>
                         <span>· Club: <strong className="text-gray-200">{j.club || "Afiliado"}</strong></span>
                       </span>
                     </div>
@@ -470,7 +471,7 @@ export default function DetalleAsociacionPage() {
 
               <div className="bg-black/30 p-3.5 rounded-2xl border border-white/5 space-y-1">
                 <span className="text-gray-500 font-bold uppercase text-[10px] block">Categoría</span>
-                <span className="text-brand-chartreuse font-extrabold block">{selectedJugador.categoria || "5ª Categoría"}</span>
+                <span className="text-brand-chartreuse font-extrabold block">{etiquetaCategoria(selectedJugador.categoria) || "5ª"}</span>
               </div>
 
               <div className="bg-black/30 p-3.5 rounded-2xl border border-white/5 space-y-1">

@@ -5,6 +5,7 @@ import { isAxiosError } from "axios";
 import { Layers, X } from "lucide-react";
 import { Torneo } from "@/utils/types";
 import { TorneosService } from "@/utils/services/torneos";
+import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 
 interface AgruparTorneosModalProps {
   isOpen: boolean;
@@ -153,7 +154,7 @@ export default function AgruparTorneosModal({
                       {candidato.nombre}
                     </span>
                     <span className="text-xs text-gray-500">
-                      {candidato.rama || "Sin rama"} · {candidato.nivel || "Sin nivel"}
+                      {candidato.rama || "Sin rama"} · {etiquetaCategoria(candidato.nivel) || "Sin nivel"}
                     </span>
                   </span>
                 </label>

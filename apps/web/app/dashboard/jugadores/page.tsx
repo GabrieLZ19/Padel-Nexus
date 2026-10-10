@@ -327,7 +327,8 @@ export default function JugadoresLicenciasPage() {
             <p className="text-gray-400 mt-1 text-sm max-w-xl">
               {contextoConfig?.tipo === "asociacion"
                 ? `Licencias de ${contextoConfig.entidad_nombre || "tu asociación"}. Podés aprobar, suspender y registrar pagos mensuales.`
-                : "Configurá el carnet del circuito y gestioná cada jugador. El vencimiento individual se edita haciendo clic en la fecha de cada tarjeta."}
+                : "Configurá el carnet del circuito y gestioná cada jugador."}{" "}
+              El vencimiento individual se edita en la fecha de cada jugador.
             </p>
             {contextoConfig?.tipo === "asociacion" && (
               <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-chartreuse/25 bg-brand-chartreuse/5 text-[11px] font-bold text-brand-chartreuse">

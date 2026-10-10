@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PerfilService } from "@/utils/services/perfil";
+import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import { LicenciasService } from "@/utils/services/licencias";
 import {
   ArrowLeft,
@@ -210,7 +211,7 @@ export default function PerfilJugadorAdminPage() {
                   <Medal className="size-4" /> Categoría
                 </span>
                 <span className="font-bold text-white">
-                  {perfil.categoria_padel || "No asignada"}
+                  {etiquetaCategoria(perfil.categoria_padel) || "No asignada"}
                 </span>
               </div>
 

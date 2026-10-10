@@ -192,7 +192,7 @@ export default function ClubCanchasPage() {
             Gestión de Canchas
           </h1>
           <p className="text-sm text-gray-400 mt-2 font-medium">
-            Configure sus canchas físicas y la plantilla de turnos semanales
+            Configurá tus canchas físicas y la plantilla de turnos semanales
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

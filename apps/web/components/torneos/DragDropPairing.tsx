@@ -141,7 +141,7 @@ export const SortablePareja = ({
       }`}
     >
       {isEditing && (
-        <div className="flex items-center justify-center text-gray-500 hover:text-white px-1 shrink-0">
+        <div className="flex items-center justify-center text-brand-ayuda hover:text-white px-1 shrink-0">
           <GripVertical className="size-4" />
         </div>
       )}
@@ -179,18 +179,18 @@ export const SortablePareja = ({
             />
             {institucionLabel === "Pase directo a Semis" ||
             institucionLabel === "Sin denominación" ? (
-              <div className="text-[10px] font-semibold text-gray-400 mt-1 truncate">
+              <div className="text-xs font-semibold text-gray-400 mt-1 truncate">
                 {institucionLabel}
               </div>
             ) : null}
           </div>
           {pareja.cabezaDeSerie && (
-            <span className="shrink-0 text-[8px] font-black text-[#ccff00] bg-[#ccff00]/10 border border-[#ccff00]/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
+            <span className="shrink-0 text-xs font-black text-[#ccff00] bg-[#ccff00]/10 border border-[#ccff00]/20 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
               Cab. Serie
             </span>
           )}
           {isClassified && (
-            <span className="shrink-0 text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider mt-0.5">
+            <span className="shrink-0 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider mt-0.5">
               Pasa
             </span>
           )}
@@ -201,46 +201,46 @@ export const SortablePareja = ({
       {!isSiembra && !isEditing && (
         <div className="flex items-center gap-2 shrink-0 px-1 text-xs">
           <div className="flex flex-col items-center">
-            <span className="text-[7px] text-gray-500 font-bold uppercase tracking-tight">
+            <span className="text-xs text-brand-ayuda font-bold uppercase tracking-tight">
               PJ
             </span>
-            <div className="flex items-center justify-center size-6 rounded bg-[#111111] text-white font-bold text-[10px]">
+            <div className="flex items-center justify-center min-w-8 h-8 px-1 rounded bg-[#111111] text-white font-bold text-xs">
               {stats.played}
             </div>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-[7px] text-gray-500 font-bold uppercase tracking-tight">
+            <span className="text-xs text-brand-ayuda font-bold uppercase tracking-tight">
               PG
             </span>
-            <div className="flex items-center justify-center size-6 rounded bg-[#111111] text-white font-bold text-[10px]">
+            <div className="flex items-center justify-center min-w-8 h-8 px-1 rounded bg-[#111111] text-white font-bold text-xs">
               {stats.won}
             </div>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-[7px] text-gray-500 font-bold uppercase tracking-tight">
+            <span className="text-xs text-brand-ayuda font-bold uppercase tracking-tight">
               DS
             </span>
             <div
-              className={`flex items-center justify-center size-6 rounded bg-[#111111] font-bold text-[10px] ${stats.diffSets > 0 ? "text-emerald-400" : stats.diffSets < 0 ? "text-red-400" : "text-white"}`}
+              className={`flex items-center justify-center min-w-8 h-8 px-1 rounded bg-[#111111] font-bold text-xs ${stats.diffSets > 0 ? "text-emerald-400" : stats.diffSets < 0 ? "text-red-400" : "text-white"}`}
             >
               {stats.diffSets > 0 ? `+${stats.diffSets}` : stats.diffSets}
             </div>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-[7px] text-gray-500 font-bold uppercase tracking-tight">
+            <span className="text-xs text-brand-ayuda font-bold uppercase tracking-tight">
               DG
             </span>
             <div
-              className={`flex items-center justify-center size-6 rounded bg-[#111111] font-bold text-[10px] ${stats.diffGames > 0 ? "text-emerald-400" : stats.diffGames < 0 ? "text-red-400" : "text-white"}`}
+              className={`flex items-center justify-center min-w-8 h-8 px-1 rounded bg-[#111111] font-bold text-xs ${stats.diffGames > 0 ? "text-emerald-400" : stats.diffGames < 0 ? "text-red-400" : "text-white"}`}
             >
               {stats.diffGames > 0 ? `+${stats.diffGames}` : stats.diffGames}
             </div>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-[7px] text-brand-chartreuse/60 font-bold uppercase tracking-tight">
+            <span className="text-xs text-brand-chartreuse/60 font-bold uppercase tracking-tight">
               PTS
             </span>
-            <div className="flex items-center justify-center size-6 rounded bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/25 font-black text-[10px]">
+            <div className="flex items-center justify-center min-w-8 h-8 px-1 rounded bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/25 font-black text-xs">
               {stats.points}
             </div>
           </div>
@@ -454,7 +454,7 @@ export const DroppableZona = ({
           {zona.nombre}
         </h4>
         {!isSiembra && (
-          <span className="px-3 py-1 bg-black/40 rounded-full text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+          <span className="px-3 py-1 bg-black/40 rounded-full text-xs font-bold text-gray-400 uppercase tracking-wide">
             {getClasificanTexto([zona])}
           </span>
         )}

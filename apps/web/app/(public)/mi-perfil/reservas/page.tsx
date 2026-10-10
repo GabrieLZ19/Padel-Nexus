@@ -453,7 +453,7 @@ export default function MisReservasPage() {
               <CustomDropdown
                 value={nivel}
                 onChange={setNivel}
-                placeholder="Selecciona nivel"
+                placeholder="Seleccioná nivel"
                 options={NIVELES_PARTIDO_ABIERTO.map((n) => ({
                   value: n.value,
                   label: n.label,
@@ -466,7 +466,7 @@ export default function MisReservasPage() {
               <CustomDropdown
                 value={String(cupos)}
                 onChange={(val) => setCupos(Number(val))}
-                placeholder="Selecciona cupos"
+                placeholder="Seleccioná cupos"
                 options={[
                   { value: "1", label: "1 jugador" },
                   { value: "2", label: "2 jugadores" },

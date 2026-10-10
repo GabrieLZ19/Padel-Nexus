@@ -259,7 +259,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="shrink-0 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:border-brand-chartreuse/40 hover:text-brand-chartreuse transition-colors cursor-pointer"
+          className="shrink-0 inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-2.5 py-1.5 rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:border-brand-chartreuse/40 hover:text-brand-chartreuse transition-colors cursor-pointer"
         >
           {expanded ? (
             <>
@@ -276,7 +276,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
       <div className="overflow-x-auto scrollbar-thin">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="border-b border-white/10 text-[10px] font-black text-gray-500 uppercase tracking-wider">
+            <tr className="border-b border-white/10 text-xs font-black text-brand-ayuda uppercase tracking-wider">
               <th className="py-2.5 px-3">Participantes / Pareja</th>
               <th className="py-2.5 px-2 text-center text-brand-chartreuse font-black">
                 Pts
@@ -315,12 +315,12 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
                   <td className="py-3 px-3">
                     <div className="flex items-center gap-2">
                       <span
-                        className={`size-6 rounded-full flex items-center justify-center font-black text-[10px] shrink-0 ${
+                        className={`size-6 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${
                           row.cabezaDeSerie
                             ? "bg-amber-400 text-brand-black"
                             : idx === 0
                               ? "bg-brand-chartreuse text-brand-black"
-                              : "bg-brand-input text-gray-500"
+                              : "bg-brand-input text-brand-ayuda"
                         }`}
                       >
                         {idx + 1}
@@ -340,12 +340,12 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
                           compact
                         />
                         {row.descalificada && (
-                          <span className="inline-flex shrink-0 text-[8px] font-black text-red-300 bg-red-400/10 border border-red-400/30 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
+                          <span className="inline-flex shrink-0 text-xs font-black text-red-300 bg-red-400/10 border border-red-400/30 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
                             Descalificada
                           </span>
                         )}
                         {row.cabezaDeSerie && (
-                          <span className="inline-flex items-center gap-0.5 shrink-0 text-[8px] font-black text-amber-300 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
+                          <span className="inline-flex items-center gap-0.5 shrink-0 text-xs font-black text-amber-300 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
                             <Star className="size-2.5 fill-amber-300" />
                             Cab. Serie
                           </span>
@@ -380,7 +380,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
                       <td className="py-3 px-2 text-center font-extrabold text-brand-chartreuse">
                         {row.dg > 0 ? `+${row.dg}` : row.dg}
                       </td>
-                      <td className="py-3 px-2 text-center text-gray-500">
+                      <td className="py-3 px-2 text-center text-brand-ayuda">
                         {row.stb}
                       </td>
                     </>

@@ -1103,10 +1103,10 @@ export default function ChatInbox({
                 <MessageSquare className="size-8 text-brand-chartreuse/40" />
               </div>
               <h3 className="text-lg font-bold text-brand-white mb-2">
-                Selecciona una conversación
+                Seleccioná una conversación
               </h3>
               <p className="text-sm text-gray-500 text-center max-w-sm">
-                Elige un chat de la lista para comenzar a enviar mensajes en
+                Elegí un chat de la lista para comenzar a enviar mensajes en
                 tiempo real.
               </p>
             </div>

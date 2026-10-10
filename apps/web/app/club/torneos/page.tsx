@@ -27,6 +27,7 @@ import { formatFechaCalendario } from "@/utils/formatFecha";
 import TorneoVistaFiltros from "@/components/torneos/TorneoVistaFiltros";
 import { MenuPuntos } from "@/components/ui/MenuPuntos";
 import { hrefDetalleTorneo } from "@/components/torneos/wizard/stepLocks";
+import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 import {
   CONTADORES_VISTA_VACIOS,
   type VistaTorneoId,
@@ -444,7 +445,7 @@ export default function ClubTorneosPage() {
       <p className="mt-1 text-sm text-gray-500">
         {t.rama || ""}
         {t.rama ? " · " : ""}
-        {t.nivel || "Sin nivel"} · {t.categoria || "General"} · {t.alcance || "Local"}
+        {[etiquetaNivelYCategoria(t.nivel, t.categoria) || "Sin nivel", t.alcance || "Local"].filter(Boolean).join(" · ")}
       </p>
       <p className="mt-2 text-sm font-medium text-brand-white">
         {formatFechaCalendario(t.fecha, {
@@ -576,7 +577,7 @@ export default function ClubTorneosPage() {
                     <td className={enGrupo ? "py-2.5 pl-16 pr-6" : "py-4 px-6"}>
                       <p className="font-bold text-white">{t.nombre}</p>
                       <p className="text-xs text-gray-500 mt-0.5 font-medium">
-                        {(t as any).rama || ""}{(t as any).rama ? " · " : ""}{t.nivel || "Sin nivel"} · {t.categoria || "General"}
+                        {[(t as { rama?: string }).rama, etiquetaNivelYCategoria(t.nivel, t.categoria) || "Sin nivel"].filter(Boolean).join(" · ")}
                       </p>
                     </td>
                     <td className={`text-gray-300 font-medium ${enGrupo ? "py-2.5 px-6" : "py-4 px-6"}`}>

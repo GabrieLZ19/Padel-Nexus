@@ -94,14 +94,14 @@ export function PromoverParejaMenores({
         <h4 className="text-sm font-black uppercase tracking-wide text-brand-white">
           Pasar a categoría superior
         </h4>
-        <p className="text-xs text-gray-500 mt-1 max-w-2xl">
+        <p className="text-xs text-brand-ayuda mt-1 max-w-2xl">
           Sacá una pareja de esta llave: el rival queda con bye. En la
           categoría superior entra en un bye libre o, si no hay, en un partido
           nuevo de la primera ronda. El motivo queda en auditoría.
         </p>
       </div>
       {!opciones.habilitado ? (
-        <p className="text-xs text-gray-500">{opciones.motivo}</p>
+        <p className="text-xs text-brand-ayuda">{opciones.motivo}</p>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           <CustomDropdown
@@ -137,7 +137,7 @@ export function PromoverParejaMenores({
             value={motivo}
             onChange={(event) => setMotivo(event.target.value)}
             placeholder="Motivo del pase"
-            className="w-full rounded-xl border border-white/10 bg-brand-input px-3 py-2.5 text-sm text-brand-white placeholder:text-gray-500"
+            className="w-full rounded-xl border border-white/10 bg-brand-input px-3 py-2.5 text-sm text-brand-white placeholder:text-brand-ayuda"
           />
           <div className="md:col-span-2 flex justify-end">
             <button

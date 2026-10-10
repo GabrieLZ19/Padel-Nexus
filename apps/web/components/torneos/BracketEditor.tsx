@@ -18,6 +18,9 @@ import {
   CalendarClock,
 } from "lucide-react";
 import { ProgramacionEntryPanel } from "./programador/ProgramacionEntryPanel";
+import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
+import { textoRectora } from "@/utils/textosRectora";
+import { useSiglaRectora } from "@/utils/useSiglaRectora";
 import { ZonaCard } from "./ZonaCard";
 import { PromoverParejaMenores } from "./PromoverParejaMenores";
 import FeedbackModal, {
@@ -56,6 +59,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   onRefresh,
   isReadOnly = false,
 }) => {
+  const siglaRectora = useSiglaRectora();
   const formatoLower = torneo?.formato?.toLowerCase() || "";
   // Solo eliminatoria pura. "Zonas + Eliminatoria" NO es directa.
   const isEliminatoriaDirecta =
@@ -202,7 +206,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           type: "success",
           title: "Zonas Generadas",
           description:
-            "Las zonas se han generado automáticamente según el reglamento FAP.",
+            `Las zonas se han generado automáticamente según el ${textoRectora("reglamento", siglaRectora)}.`,
           onClose: () =>
             setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
         });
@@ -924,7 +928,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         <div>
           <h3 className="font-extrabold text-xl sm:text-2xl text-brand-white tracking-tight uppercase">
             EDITOR DE LLAVES — {torneo?.nombre || "TORNEO"} ·{" "}
-            {torneo?.categoria || "CATEGORÍA"}
+            {etiquetaCategoria(torneo?.categoria) || "CATEGORÍA"}
           </h3>
           <p className="text-gray-400 text-sm mt-1">
             {faseZonasCerrada
@@ -1004,7 +1008,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
                 activeView === "siembra"
                   ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
-                  : "border border-transparent text-gray-500 hover:text-gray-300"
+                  : "border border-transparent text-brand-ayuda hover:text-gray-300"
               }`}
             >
               <LayoutGrid className="size-4" /> Zonas
@@ -1015,7 +1019,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
                 activeView === "zonas"
                   ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
-                  : "border border-transparent text-gray-500 hover:text-gray-300"
+                  : "border border-transparent text-brand-ayuda hover:text-gray-300"
               }`}
             >
               <LayoutGrid className="size-4" /> Fase de grupos
@@ -1027,7 +1031,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-all relative shrink-0 ${
               activeView === "llaves"
                 ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
-                : "border border-transparent text-gray-500 hover:text-gray-300"
+                : "border border-transparent text-brand-ayuda hover:text-gray-300"
             }`}
           >
             <Trophy className="size-4" /> Llave campeonato
@@ -1037,7 +1041,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
               activeView === "programacion"
                 ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
-                : "border border-transparent text-gray-500 hover:text-gray-300"
+                : "border border-transparent text-brand-ayuda hover:text-gray-300"
             }`}
           >
             <CalendarClock className="size-4" /> Programación
@@ -1047,7 +1051,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
               activeView === "auditoria"
                 ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
-                : "border border-transparent text-gray-500 hover:text-gray-300"
+                : "border border-transparent text-brand-ayuda hover:text-gray-300"
             }`}
           >
             <History className="size-4" /> Auditoría
@@ -1111,7 +1115,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             )}
           </div>
           {siembraZonas.length === 0 ? (
-            <div className="text-center p-12 text-gray-500 border border-dashed border-white/10 rounded-2xl">
+            <div className="text-center p-12 text-brand-ayuda border border-dashed border-white/10 rounded-2xl">
               No hay partidos de primera ronda cargados. Generá el fixture
               primero.
             </div>
@@ -1204,7 +1208,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     />
                   </button>
                   <span
-                    className={`text-xs font-black w-6 text-center ${validarCabezasSerie ? "text-brand-chartreuse" : "text-gray-500"}`}
+                    className={`text-xs font-black w-6 text-center ${validarCabezasSerie ? "text-brand-chartreuse" : "text-brand-ayuda"}`}
                   >
                     ON
                   </span>
@@ -1234,7 +1238,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     />
                   </button>
                   <span
-                    className={`text-xs font-black w-6 text-center ${modificacionNoDestructiva ? "text-brand-chartreuse" : "text-gray-500"}`}
+                    className={`text-xs font-black w-6 text-center ${modificacionNoDestructiva ? "text-brand-chartreuse" : "text-brand-ayuda"}`}
                   >
                     ON
                   </span>
@@ -1245,7 +1249,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           </div>
 
           {puedeEditarZonas && (
-          <div className="flex items-center gap-2 text-gray-500 text-sm">
+          <div className="flex items-center gap-2 text-brand-ayuda text-sm">
             <Move className="size-3.5" />{" "}
             {isIndividual
               ? "Arrastrá un jugador a un slot para reubicarlo."
@@ -1266,7 +1270,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               </span>
               )}
             </div>
-            <div className="text-gray-500 text-xs sm:text-sm font-medium">
+            <div className="text-brand-ayuda text-xs sm:text-sm font-medium">
               {zonas.length} zonas · {totalParejas}{" "}
               {isIndividual ? "jugadores" : "parejas"} ·{" "}
               {getClasificanTexto(zonas)}
@@ -1293,7 +1297,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 <div className="space-y-4">
                   {zonas.length > 1 && (
                     <div className="flex flex-wrap items-center gap-2 sticky top-2 z-10 py-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 mr-1">
+                      <span className="text-xs font-black uppercase tracking-widest text-brand-ayuda mr-1">
                         Ir a
                       </span>
                       {zonas.map((z) => {
@@ -1314,7 +1318,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                             href={`#zona-${z.id}`}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-brand-card text-xs font-black text-white hover:border-brand-chartreuse/50 hover:text-brand-chartreuse transition-colors"
                           >
-                            <span className="size-5 rounded-md bg-brand-chartreuse/15 text-brand-chartreuse inline-flex items-center justify-center text-[10px]">
+                            <span className="size-5 rounded-md bg-brand-chartreuse/15 text-brand-chartreuse inline-flex items-center justify-center text-xs">
                               {letra}
                             </span>
                             <span className="tabular-nums text-gray-400 font-bold">
@@ -1351,7 +1355,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               )}
             </div>
           ) : (
-            <div className="text-center p-12 text-gray-500 border border-dashed border-white/10 rounded-2xl">
+            <div className="text-center p-12 text-brand-ayuda border border-dashed border-white/10 rounded-2xl">
               Las zonas aún no han sido generadas.
             </div>
           )}
@@ -1384,14 +1388,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                       {labelRondaEnCurso ? (
                         <>
                           {labelRondaEnCurso}
-                          <span className="text-gray-600 mx-1.5">·</span>
+                          <span className="text-brand-ayuda mx-1.5">·</span>
                         </>
                       ) : null}
                       Progreso{" "}
                       <span className="text-brand-chartreuse tabular-nums">
                         {playoffFinalizados}
                       </span>
-                      <span className="text-gray-500">
+                      <span className="text-brand-ayuda">
                         /{playoffTotal} partidos
                       </span>
                     </>
@@ -1399,7 +1403,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 </span>
                 {usaPlantillaFap ? (
                   <span className="rounded-lg bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-3 py-2 text-brand-chartreuse">
-                    Plantilla FAP · {byesFap > 0 ? `${byesFap} bye(s) a semis` : "sin byes"}
+                    {textoRectora("plantilla", siglaRectora)} · {byesFap > 0 ? `${byesFap} bye(s) a semis` : "sin byes"}
                   </span>
                 ) : (
                   puedeEditarLlave &&
@@ -1425,7 +1429,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           <div className="relative rounded-2xl border border-brand-input bg-brand-card overflow-hidden">
             <div className="relative p-4 sm:p-6 overflow-x-hidden">
               {playoffPartidos.length === 0 && partidos.length === 0 ? (
-                <div className="text-center p-12 text-gray-500 border border-dashed border-brand-input rounded-2xl">
+                <div className="text-center p-12 text-brand-ayuda border border-dashed border-brand-input rounded-2xl">
                   Aún no se ha generado el cuadro de eliminatoria para este
                   torneo.
                 </div>
@@ -1453,7 +1457,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 >
                   {rondasToShow.map((ronda, rondaIndex) => (
                     <div key={ronda.id} className="flex min-w-0 flex-col">
-                      <h3 className="text-center text-[10px] font-black text-gray-500 uppercase tracking-[0.22em] mb-6">
+                      <h3 className="text-center text-xs font-black text-brand-ayuda uppercase tracking-[0.22em] mb-6">
                         {ronda.label}
                       </h3>
                       <div className="flex flex-col flex-1 justify-around gap-10">
@@ -1555,7 +1559,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               Cargando registros...
             </div>
           ) : auditoriaLogs.length === 0 ? (
-            <div className="text-center p-12 text-gray-500 border border-dashed border-white/10 rounded-2xl">
+            <div className="text-center p-12 text-brand-ayuda border border-dashed border-white/10 rounded-2xl">
               No se han registrado modificaciones manuales para este torneo.
             </div>
           ) : (
@@ -1573,10 +1577,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-0.5 bg-brand-chartreuse/10 border border-brand-chartreuse/20 text-brand-chartreuse text-[10px] font-bold rounded-full uppercase tracking-wider">
+                        <span className="px-2.5 py-0.5 bg-brand-chartreuse/10 border border-brand-chartreuse/20 text-brand-chartreuse text-xs font-bold rounded-full uppercase tracking-wider">
                           {log.accion.replace(/_/g, " ")}
                         </span>
-                        <span className="text-xs text-gray-500 font-semibold">
+                        <span className="text-xs text-brand-ayuda font-semibold">
                           {fecha}
                         </span>
                       </div>
@@ -1612,7 +1616,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           <div className="fixed inset-0 z-110 flex items-center justify-center pointer-events-none p-4">
             <div className="bg-brand-card border border-brand-chartreuse/30 p-6 rounded-3xl max-w-md w-full shadow-[0_10px_50px_rgba(204,255,0,0.15)] animate-in fade-in zoom-in duration-200 pointer-events-auto">
               <div className="flex justify-between items-center mb-4">
-                <span className="text-[10px] font-black text-brand-chartreuse uppercase tracking-widest bg-brand-chartreuse/10 px-2.5 py-1 rounded-full">
+                <span className="text-xs font-black text-brand-chartreuse uppercase tracking-widest bg-brand-chartreuse/10 px-2.5 py-1 rounded-full">
                   Paso {tourStep + 1} de {TOUR_STEPS.length}
                 </span>
                 <button
@@ -1663,7 +1667,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           <div className="bg-[#121212] border border-white/10 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
             <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-white/8 bg-white/[0.02]">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-chartreuse mb-1">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-chartreuse mb-1">
                   {etiquetaRondaLlave(selectedMatchToEdit.ronda) ||
                     "Llave de campeonato"}
                 </p>
@@ -1681,7 +1685,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   setSelectedMatchToEdit(null);
                   setMatchEditMotivo("");
                 }}
-                className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/5"
+                className="text-brand-ayuda hover:text-white p-1 rounded-lg hover:bg-white/5"
                 aria-label="Cerrar"
               >
                 <X className="size-5" />
@@ -1691,14 +1695,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             <div className="p-5 space-y-4">
               <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-3 space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <label className="text-[10px] font-black uppercase tracking-wider text-sky-400">
+                  <label className="text-xs font-black uppercase tracking-wider text-sky-400">
                     Lado A
                   </label>
                   {selectedMatchToEdit.equipo_a_id && (
                     <button
                       type="button"
                       onClick={() => applyInscripcionToSlot("a", "")}
-                      className="text-[10px] font-bold uppercase tracking-wide text-red-400/90 hover:text-red-300"
+                      className="text-xs font-bold uppercase tracking-wide text-red-400/90 hover:text-red-300"
                     >
                       Quitar
                     </button>
@@ -1720,14 +1724,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
               <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-3 space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <label className="text-[10px] font-black uppercase tracking-wider text-sky-400">
+                  <label className="text-xs font-black uppercase tracking-wider text-sky-400">
                     Lado B
                   </label>
                   {selectedMatchToEdit.equipo_b_id && (
                     <button
                       type="button"
                       onClick={() => applyInscripcionToSlot("b", "")}
-                      className="text-[10px] font-bold uppercase tracking-wide text-red-400/90 hover:text-red-300"
+                      className="text-xs font-bold uppercase tracking-wide text-red-400/90 hover:text-red-300"
                     >
                       Quitar
                     </button>
@@ -1748,7 +1752,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1.5">
+                <label className="text-xs font-black uppercase tracking-wider text-gray-400 block mb-1.5">
                   Motivo (auditoría)
                 </label>
                 <input
@@ -1756,7 +1760,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   value={matchEditMotivo}
                   onChange={(e) => setMatchEditMotivo(e.target.value)}
                   placeholder="Ej: Reasignación por baja / error de categoría"
-                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-chartreuse/40"
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-brand-ayuda focus:outline-none focus:border-brand-chartreuse/40"
                 />
               </div>
             </div>

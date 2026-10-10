@@ -120,7 +120,7 @@ export function PairDisplay({
 
   if (empty) {
     return (
-      <p className="text-xs text-gray-600 italic font-medium">{emptyLabel}</p>
+      <p className="text-xs text-brand-ayuda italic font-medium">{emptyLabel}</p>
     );
   }
 
@@ -140,7 +140,7 @@ export function PairDisplay({
           fullName={j1}
           userId={usuarioId}
           won={won}
-          className={`font-bold truncate ${compact ? "text-[11px]" : "text-xs sm:text-[13px]"}`}
+          className={`font-bold truncate ${compact ? "text-xs" : "text-xs sm:text-[13px]"}`}
         />
       </div>
       {hasJ2 ? (
@@ -156,7 +156,7 @@ export function PairDisplay({
             fullName={j2}
             userId={usuario2Id}
             won={won}
-            className={`font-bold truncate ${compact ? "text-[11px]" : "text-xs sm:text-[13px]"}`}
+            className={`font-bold truncate ${compact ? "text-xs" : "text-xs sm:text-[13px]"}`}
           />
         </div>
       ) : null}
@@ -183,7 +183,7 @@ export function PairDisplay({
           </span>
         ) : null}
         {denomTitulo && (apellido1 || apellido2) ? (
-          <span className="text-gray-500 font-medium">·</span>
+          <span className="text-brand-ayuda font-medium">·</span>
         ) : null}
         {apellido1 ? (
           <PlayerNameLink
@@ -195,7 +195,7 @@ export function PairDisplay({
           />
         ) : null}
         {apellido1 && apellido2 ? (
-          <span className="text-gray-500 font-medium">/</span>
+          <span className="text-brand-ayuda font-medium">/</span>
         ) : null}
         {apellido2 ? (
           <PlayerNameLink
@@ -221,12 +221,12 @@ export function PairDisplay({
           />
           {hasJ2 ? (
             <>
-              <span className="text-gray-500 font-medium">/</span>
+              <span className="text-brand-ayuda font-medium">/</span>
               <PlayerNameLink
                 fullName={j2}
                 userId={usuario2Id}
                 won={won}
-                className="font-bold text-sm text-gray-500"
+                className="font-bold text-sm text-brand-ayuda"
               />
             </>
           ) : null}

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Torneo } from "../../utils/types";
+import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import {
   CheckElegibilidadApi,
   InscripcionesService,
@@ -337,7 +338,7 @@ export default function InscripcionModal({
                             </p>
                           </div>
                           <span className="text-[10px] font-bold uppercase tracking-wide text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-md shrink-0">
-                            {profile?.categoria_padel || "S/C"}
+                            {etiquetaCategoria(profile?.categoria_padel) || "S/C"}
                           </span>
                         </div>
                       </div>

@@ -17,6 +17,7 @@ import {
   Landmark,
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
+import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 import { hrefDetalleTorneo } from "@/components/torneos/wizard/stepLocks";
 import { InscripcionesService } from "@/utils/services/inscripciones";
 import { ClubesService } from "@/utils/services/clubes";
@@ -352,7 +353,7 @@ export default function DashboardProvincial() {
                       <td className="py-3.5 px-4">
                         <p className="font-bold text-white text-[13px]">{t.nombre}</p>
                         <p className="text-[11px] text-gray-500 mt-0.5">
-                          {(t as any).rama || ""}{(t as any).rama ? " · " : ""}{t.categoria || "General"} · {t.nivel || "-"}
+                          {[(t as { rama?: string }).rama, etiquetaNivelYCategoria(t.nivel, t.categoria) || "General"].filter(Boolean).join(" · ")}
                         </p>
                       </td>
                       <td className="py-3.5 px-4 text-gray-300 font-medium text-[13px]">

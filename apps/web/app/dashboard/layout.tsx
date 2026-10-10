@@ -315,7 +315,9 @@ export default function DashboardLayout({
             </div>
           </div>
           <button
+            type="button"
             onClick={closeMobileMenu}
+            aria-label="Cerrar menú"
             className="lg:hidden p-2 rounded-full text-gray-400 hover:text-white"
           >
             <X className="size-5" />
@@ -374,8 +376,10 @@ export default function DashboardLayout({
             </span>
           </div>
           <button
+            type="button"
             onClick={toggleTheme}
             className="p-2 text-gray-500 hover:text-white transition-colors rounded-xl mr-1"
+            aria-label="Cambiar tema"
             title="Cambiar tema"
           >
             {theme === "light" ? (
@@ -385,8 +389,10 @@ export default function DashboardLayout({
             )}
           </button>
           <button
+            type="button"
             onClick={handleLogout}
             className="p-2.5 text-gray-500 hover:text-red-500 transition-colors rounded-xl"
+            aria-label="Cerrar sesión"
             title="Cerrar sesión"
           >
             <LogOut className="size-4" />
@@ -408,7 +414,9 @@ export default function DashboardLayout({
       >
         <div className={`${programadorPantallaCompleta ? "hidden" : "lg:hidden"} sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4 bg-brand-card/80 backdrop-blur-md border-b border-brand-white/5`}>
           <button
+            type="button"
             onClick={toggleMobileMenu}
+            aria-label="Abrir menú"
             className="p-2.5 rounded-xl bg-brand-card text-brand-white border border-brand-white/10 cursor-pointer hover:bg-brand-card/80 transition-colors"
           >
             <Menu className="size-5" />

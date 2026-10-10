@@ -52,6 +52,7 @@ export default function RootLayout({
         {children}
         <Toaster
           position="top-right"
+          theme="dark"
           options={{
             fill: "#0b0b0b",
             roundness: 14,

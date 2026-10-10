@@ -4,7 +4,11 @@ import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Inscripcion } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { Trophy, Settings, Award, CheckCircle, Scale } from "lucide-react";
+import { sileo } from "sileo";
 import type { OnTorneoUpdated, RegisterSaveHandler } from "./types";
+import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
+import { textoRectora } from "@/utils/textosRectora";
+import { useSiglaRectora } from "@/utils/useSiglaRectora";
 
 interface Paso5CierreProps {
   torneo: Torneo;
@@ -30,6 +34,7 @@ export const Paso5Cierre = ({
   readOnly = false,
 }: Paso5CierreProps) => {
   const numeroPaso = useNumeroPaso("cierre");
+  const siglaRectora = useSiglaRectora();
   const confirmadasCount = inscripciones.filter(
     (i) => i.estado_pago === "Confirmado",
   ).length;
@@ -157,14 +162,11 @@ export const Paso5Cierre = ({
       onTorneoUpdated?.(updated);
       if (!options?.silent) {
         triggerRefresh();
-        setFeedbackModal((prev: any) => ({
-          ...prev,
-          isOpen: true,
-          type: "success",
-          title: "¡Configuración guardada!",
+        sileo.success({
+          title: "Configuración guardada",
           description:
-            "Los valores del ranking y las reglas de puntuación han sido actualizados con éxito.",
-        }));
+            "Los valores del ranking y las reglas de puntuación quedaron actualizados.",
+        });
       }
       return true;
     } catch (e: any) {
@@ -200,7 +202,7 @@ export const Paso5Cierre = ({
         Paso {numeroPaso}: Cierre de Inscripción y Puntuación
       </h3>
       <p className="text-sm text-gray-400">
-        Verifique el cupo de inscripciones aprobadas. Configure la asignación de puntos del ranking y el sistema de puntuación de partidos. Las inscripciones se cierran automáticamente al generar los cuadros.
+        Verificá el cupo de inscripciones aprobadas. Configurá la asignación de puntos del ranking y el sistema de puntuación de partidos. Las inscripciones se cierran automáticamente al generar los cuadros.
       </p>
 
       {/* JUGADORES Y ESTADO */}
@@ -254,7 +256,7 @@ export const Paso5Cierre = ({
                       : `${reg} ${torneo.alcance || "Provincial"} Ranking`;
                   })()}
                 </td>
-                <td className="p-4">{torneo.categoria || "General"} {torneo.nivel || ""}</td>
+                <td className="p-4">{etiquetaNivelYCategoria(torneo.nivel, torneo.categoria) || "General"}</td>
                 <td className="p-4">
                   <span
                     className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] border ${
@@ -486,7 +488,7 @@ export const Paso5Cierre = ({
         {esNacional && (
           <div className="space-y-4 bg-brand-input/40 p-5 rounded-2xl border border-white/10 shadow-sm">
             <h5 className="text-[11px] font-black text-white uppercase tracking-wider flex items-center gap-1 border-b border-white/5 pb-2">
-              <Trophy className="size-3.5 text-brand-chartreuse" /> Puntos por provincia
+              <Trophy className="size-3.5 text-brand-chartreuse" /> {textoRectora("puntos", siglaRectora)} por provincia
             </h5>
             <p className="text-[10px] text-gray-500 font-medium">
               En un torneo nacional cada pareja representa a su provincia. Se queda con los puntos de la mejor instancia, desde la ronda que elijas.

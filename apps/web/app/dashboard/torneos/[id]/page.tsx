@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Trophy, Check, Printer } from "lucide-react";
 import { TorneosService } from "../../../../utils/services/torneos";
 import { Torneo, Inscripcion, Partido } from "../../../../utils/types";
+import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "../../../../components/ui/FeedbackModal";
@@ -298,7 +299,7 @@ const HeaderNavegacion = ({ torneo, partidos, onBack }: HeaderProps) => (
         </h1>
         <p className="text-gray-400 mt-1 text-sm sm:text-base font-medium">
           {(torneo as any).rama ? `${(torneo as any).rama} · ` : ""}
-          {torneo.nivel} · {torneo.categoria} · {labelModalidad(torneo.modalidad)}
+          {etiquetaNivelYCategoria(torneo.nivel, torneo.categoria)} · {labelModalidad(torneo.modalidad)}
         </p>
       </div>
     </div>

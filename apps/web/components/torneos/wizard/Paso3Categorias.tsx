@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   PlusCircle,
 } from "lucide-react";
+import { sileo } from "sileo";
 import {
   labelModalidad,
   MODALIDAD_PAREJAS,
@@ -318,14 +319,11 @@ export const Paso3Categorias = ({
       onTorneoUpdated?.(updated);
       if (!options?.silent) {
         triggerRefresh();
-        setFeedbackModal((prev: any) => ({
-          ...prev,
-          isOpen: true,
-          type: "success",
-          title: "¡Cambios guardados!",
+        sileo.success({
+          title: "Cambios guardados",
           description:
-            "La rama, categoría, nivel y días de juego han sido actualizados con éxito.",
-        }));
+            "La rama, categoría, nivel y días de juego quedaron actualizados.",
+        });
       }
       return true;
     } catch (e: any) {

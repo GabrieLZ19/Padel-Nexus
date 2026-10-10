@@ -22,6 +22,7 @@ import {
 import { generarActaFiscalPdf } from "@/utils/actaFiscalPdf";
 import { generarInformePreliminarPdf } from "@/utils/informePreliminarPdf";
 import type { Partido } from "@/utils/types";
+import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import {
   esModalidadIndividual,
   formatFechaCalendario,
@@ -547,7 +548,7 @@ function TablaJugadores({
                         {fila.jugador.nombre_completo || "Jugador"}
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">{fila.jugador.dni || "—"}</td>
-                      <td className="px-4 py-3">{fila.jugador.categoria_padel || "—"}</td>
+                      <td className="px-4 py-3">{etiquetaCategoria(fila.jugador.categoria_padel) || "—"}</td>
                       <td className="px-4 py-3">
                         <span className={estadoLicenciaClass(fila.jugador.licencia?.estado)}>
                           {fila.jugador.licencia?.estado || "Sin carnet"}
@@ -570,7 +571,7 @@ function TablaJugadores({
                         <td className="px-4 py-3 font-mono text-xs">
                           {par.jugador1?.dni || "—"}
                         </td>
-                        <td className="px-4 py-3">{par.jugador1?.categoria_padel || "—"}</td>
+                        <td className="px-4 py-3">{etiquetaCategoria(par.jugador1?.categoria_padel) || "—"}</td>
                         <td className="px-4 py-3">
                           <span className={estadoLicenciaClass(par.jugador1?.licencia?.estado)}>
                             {par.jugador1?.licencia?.estado || "Sin carnet"}

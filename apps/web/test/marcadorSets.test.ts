@@ -11,7 +11,7 @@ describe("puntos del marcador", () => {
     assert.equal(perdedor, "text-gray-300");
     assert.equal(perdedor.includes("text-white"), false);
     assert.equal(clasePuntosSet(true, true), "text-brand-chartreuse");
-    assert.equal(clasePuntosSet(false, false), "text-gray-500");
+    assert.equal(clasePuntosSet(false, false), "text-brand-ayuda");
   });
 
   it("el resultado finalizado no usa fondos negros que el modo claro no aclara", () => {

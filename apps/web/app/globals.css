@@ -10,6 +10,8 @@
   /* Componentes oscuros del CRM */
   --color-brand-card: #121212;
   --color-brand-input: #1c1c1c;
+  /* Rótulos y ayudas: 6,05:1 sobre #121212 */
+  --color-brand-ayuda: #8B93A1;
 
   /* --- PALETA TIPOGRÁFICA OFICIAL --- */
   --font-sans: "Unigeo", "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -36,6 +38,7 @@ html.light {
   --color-brand-input: #e2e8f0; /* Slate 200 - inputs, lines, and borders */
   --color-brand-chartreuse: #6e8901; /* Forest/olive green - premium, high contrast */
   --color-brand-moss: #2b3d14; /* Deep forest green */
+  --color-brand-ayuda: #475569; /* Slate 600: contraste sobre fondo claro */
 }
 
 /* Correcciones de legibilidad y contraste en Modo Claro */

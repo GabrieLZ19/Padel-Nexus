@@ -12,6 +12,7 @@ import { Licencia, Perfil } from "@/utils/types";
 import { LicenciaVencimientoEditor } from "./LicenciaVencimientoEditor";
 import { LicenciaPagosHistorial } from "./LicenciaPagosHistorial";
 import { MenuPuntos } from "@/components/ui/MenuPuntos";
+import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 
 interface LicenciaJugadorCardProps {
   jugador: Perfil;
@@ -112,7 +113,7 @@ export function LicenciaJugadorCard({
                 {jugador.dni || "—"}
               </span>
               <span className="inline-flex items-center gap-1 text-[11px] text-gray-400 bg-black/30 px-2 py-0.5 rounded-md">
-                Cat. {jugador.categoria_padel || "—"}
+                Cat. {etiquetaCategoria(jugador.categoria_padel) || "—"}
               </span>
               <span className="inline-flex items-center gap-1 text-[11px] text-gray-400 font-mono bg-black/30 px-2 py-0.5 rounded-md">
                 <Hash className="size-3" />

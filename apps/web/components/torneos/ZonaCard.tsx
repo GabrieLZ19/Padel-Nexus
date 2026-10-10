@@ -172,8 +172,8 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
       className="scroll-mt-24 rounded-2xl border border-white/10 bg-brand-card overflow-hidden"
     >
       {/* Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-5 py-3.5 border-b border-white/5 bg-brand-input/40">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+      <header className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5 border-b border-white/5 bg-brand-input/40">
+        <div className="flex min-w-0 items-center gap-3 sm:min-w-[12rem] sm:flex-1">
           <span className="inline-flex items-center justify-center size-10 rounded-xl bg-brand-chartreuse text-brand-black font-black text-base shrink-0 shadow-[0_0_18px_rgba(204,255,0,0.25)]">
             {letra || "Z"}
           </span>
@@ -183,12 +183,12 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
                 {zona.nombre}
               </h3>
               {completa && (
-                <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-brand-chartreuse/15 text-brand-chartreuse border border-brand-chartreuse/30">
+                <span className="text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-brand-chartreuse/15 text-brand-chartreuse border border-brand-chartreuse/30">
                   Completa
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs font-bold uppercase tracking-wider text-brand-ayuda">
               <span className="inline-flex items-center gap-1">
                 <Users className="size-3 text-brand-chartreuse/80" />
                 {zona.parejas.length}{" "}
@@ -206,9 +206,9 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 sm:w-44 shrink-0">
-          <div className="flex-1 space-y-1">
-            <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-gray-500">
+        <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:max-w-full sm:shrink-0">
+          <div className="min-w-[7.5rem] flex-1 space-y-1 sm:w-36 sm:flex-none">
+            <div className="flex items-baseline justify-between gap-3 text-xs font-black uppercase tracking-widest text-brand-ayuda">
               <span>Progreso</span>
               <span className="text-brand-chartreuse tabular-nums">
                 {progresoPct}%
@@ -225,7 +225,7 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
             <button
               type="button"
               onClick={() => setShowMatches((v) => !v)}
-              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-white/10 bg-white/5 text-[10px] font-black uppercase tracking-wider text-gray-300 hover:border-brand-chartreuse/40 hover:text-brand-chartreuse transition-colors cursor-pointer"
+              className="shrink-0 whitespace-nowrap inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-white/10 bg-white/5 text-xs font-black uppercase tracking-wider text-gray-300 hover:border-brand-chartreuse/40 hover:text-brand-chartreuse transition-colors cursor-pointer"
               aria-expanded={showMatches}
             >
               {showMatches ? (
@@ -266,7 +266,7 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
 
         {showMatches && partidosOrdenados.length > 0 && (
           <div className="lg:col-span-2 p-4 sm:p-5 bg-black/20 border-t lg:border-t-0 border-white/5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3">
+            <p className="text-xs font-black uppercase tracking-widest text-brand-ayuda mb-3">
               Partidos de la zona
             </p>
             <ul className="space-y-2">
@@ -294,7 +294,7 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
                         : "bg-white/[0.03] border-white/5"
                     }`}
                   >
-                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest w-7 shrink-0 tabular-nums">
+                    <span className="text-xs font-black text-brand-ayuda uppercase tracking-widest w-7 shrink-0 tabular-nums">
                       #{p.orden || "?"}
                     </span>
                     <div className="flex-1 min-w-0 space-y-0.5">
@@ -341,7 +341,7 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
                         tercerSetCompleto={tercerSetCompleto}
                       />
                     ) : (
-                      <span className="shrink-0 text-[9px] font-black uppercase tracking-widest text-gray-500 px-2 py-1 rounded-md bg-brand-card border border-white/10">
+                      <span className="shrink-0 text-xs font-black uppercase tracking-widest text-brand-ayuda px-2 py-1 rounded-md bg-brand-card border border-white/10">
                         Pendiente
                       </span>
                     )}

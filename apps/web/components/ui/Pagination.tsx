@@ -9,6 +9,8 @@ interface PaginationProps {
   currentCount: number;
   onPageChange: (page: number) => void;
   maxButtons?: number;
+  tamanos?: readonly number[];
+  onPageSizeChange?: (size: number) => void;
 }
 
 export default function Pagination({
@@ -18,6 +20,8 @@ export default function Pagination({
   currentCount,
   onPageChange,
   maxButtons = 5,
+  tamanos,
+  onPageSizeChange,
 }: PaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -36,7 +40,24 @@ export default function Pagination({
         Mostrando {currentCount} de {total} resultados
       </div>
 
-      <div className="inline-flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+      {tamanos && onPageSizeChange ? (
+        <label className="inline-flex items-center gap-2 text-sm text-gray-400">
+          Filas
+          <select
+            aria-label="Filas por página"
+            value={pageSize}
+            onChange={(event) => onPageSizeChange(Number(event.target.value))}
+            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white"
+          >
+            {tamanos.map((tamano) => (
+              <option key={tamano} value={tamano}>
+                {tamano}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
         <button
           onClick={() => onPageChange(1)}
           disabled={page === 1}

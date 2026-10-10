@@ -16,6 +16,7 @@ import {
   FileDown,
 } from "lucide-react";
 import { zonaGrupoCompleta } from "@/utils/clasificacionZonas";
+import { partidoSinSedeNiHorario } from "@/utils/fiscalPartidos";
 import {
   etiquetaRondaLlave,
   ordenRondaLlave,
@@ -406,7 +407,7 @@ export const PasoResultados = ({
     return (
       <div
         key={`compact-${p.id}`}
-        className="flex items-center gap-2 py-1.5 border-b border-white/5 last:border-0 text-[10px] min-w-0"
+        className="flex items-center gap-2 py-1.5 border-b border-white/5 last:border-0 text-xs min-w-0"
       >
         <span className="text-sky-400 font-black shrink-0 tabular-nums">
           #{code}
@@ -417,13 +418,13 @@ export const PasoResultados = ({
           </span>
         )}
         <span
-          className={`truncate font-bold min-w-0 ${done ? "text-gray-500" : "text-white"}`}
+          className={`truncate font-bold min-w-0 ${done ? "text-brand-ayuda" : "text-white"}`}
         >
           {etiquetaLado("a")}
         </span>
-        <span className="text-gray-600 shrink-0">vs</span>
+        <span className="text-brand-ayuda shrink-0">vs</span>
         <span
-          className={`truncate font-bold min-w-0 ${done ? "text-gray-500" : "text-white"}`}
+          className={`truncate font-bold min-w-0 ${done ? "text-brand-ayuda" : "text-white"}`}
         >
           {etiquetaLado("b")}
         </span>
@@ -461,7 +462,7 @@ export const PasoResultados = ({
           <button
             type="button"
             onClick={() => setPartidoEnCorreccion(null)}
-            className="text-[11px] font-bold text-gray-400 hover:text-white cursor-pointer"
+            className="text-xs font-bold text-gray-400 hover:text-white cursor-pointer"
           >
             Cancelar corrección
           </button>
@@ -516,17 +517,17 @@ export const PasoResultados = ({
             compact
           />
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-[10px] font-bold border-t border-white/5 pt-2">
+        <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 text-xs font-bold border-t border-white/5 pt-2">
           <span className="text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-1.5 py-0.5 rounded">
             #{code}
           </span>
           {meta && <span className="text-gray-400">{meta}</span>}
-          <span className="text-gray-500 uppercase tracking-wide">{p.ronda}</span>
+          <span className="text-brand-ayuda uppercase tracking-wide">{p.ronda}</span>
           {!isReadOnly && (
             <button
               type="button"
               onClick={() => setPartidoEnCorreccion(p.id)}
-              className="ml-auto text-[10px] font-black uppercase tracking-wide text-brand-chartreuse hover:underline cursor-pointer"
+              className="ml-auto text-xs font-black uppercase tracking-wide text-brand-chartreuse hover:underline cursor-pointer"
             >
               Corregir
             </button>
@@ -675,13 +676,13 @@ export const PasoResultados = ({
               {nombre}
             </h4>
             {zonaCerrada && (
-              <span className="text-[9px] font-black uppercase tracking-wider text-brand-chartreuse/80 bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-full shrink-0">
+              <span className="text-xs font-black uppercase tracking-wider text-brand-chartreuse/80 bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-full shrink-0">
                 Completa
               </span>
             )}
           </div>
           <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-            <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-black uppercase tracking-wider">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs font-black uppercase tracking-wider">
               {porDefinirRaw.length > 0 && (
                 <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/20">
                   {porDefinirRaw.length} por definir
@@ -708,14 +709,14 @@ export const PasoResultados = ({
               <>
                 {resumenPartidos.map((p) => renderCompactMatchLine(p))}
                 {totalVisible > resumenPartidos.length && (
-                  <p className="text-[9px] text-gray-500 font-bold py-1.5 text-center">
+                  <p className="text-xs text-brand-ayuda font-bold py-1.5 text-center">
                     +{totalVisible - resumenPartidos.length} más · tocá el
                     título para expandir
                   </p>
                 )}
               </>
             ) : (
-              <p className="text-[10px] text-gray-500 text-center py-2">
+              <p className="text-xs text-brand-ayuda text-center py-2">
                 Sin partidos en esta vista
               </p>
             )}
@@ -725,10 +726,10 @@ export const PasoResultados = ({
             {finalizados.length > 0 && (
               <section className="space-y-3 rounded-2xl border border-brand-chartreuse/20 bg-brand-chartreuse/[0.04] p-2.5 sm:p-4">
                 <div className="flex items-center gap-2 border-l-2 border-brand-chartreuse pl-3">
-                  <p className="text-[11px] font-black text-brand-chartreuse uppercase tracking-wider">
+                  <p className="text-xs font-black text-brand-chartreuse uppercase tracking-wider">
                     Finalizados
                   </p>
-                  <span className="text-[10px] font-bold text-brand-chartreuse/70">
+                  <span className="text-xs font-bold text-brand-chartreuse/70">
                     ({finalizados.length})
                   </span>
                 </div>
@@ -739,10 +740,10 @@ export const PasoResultados = ({
             {!isReadOnly && pendientes.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center gap-2 border-l-2 border-amber-400/80 pl-3">
-                  <p className="text-[11px] font-black text-amber-300 uppercase tracking-wider">
+                  <p className="text-xs font-black text-amber-300 uppercase tracking-wider">
                     En curso / pendientes
                   </p>
-                  <span className="text-[10px] font-bold text-amber-400/70">
+                  <span className="text-xs font-bold text-amber-400/70">
                     ({pendientes.length})
                   </span>
                 </div>
@@ -753,10 +754,10 @@ export const PasoResultados = ({
             {porDefinir.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center gap-2 border-l-2 border-sky-400/80 pl-3">
-                  <p className="text-[11px] font-black text-sky-300 uppercase tracking-wider">
+                  <p className="text-xs font-black text-sky-300 uppercase tracking-wider">
                     Pendientes de fase 1
                   </p>
-                  <span className="text-[10px] font-bold text-sky-400/70">
+                  <span className="text-xs font-bold text-sky-400/70">
                     ({porDefinir.length})
                   </span>
                 </div>
@@ -777,7 +778,7 @@ export const PasoResultados = ({
             {pendientes.length === 0 &&
               finalizados.length === 0 &&
               porDefinir.length === 0 && (
-                <p className="text-xs text-gray-500 text-center py-4">
+                <p className="text-xs text-brand-ayuda text-center py-4">
                   Sin partidos en esta zona para la vista seleccionada.
                 </p>
               )}
@@ -785,7 +786,7 @@ export const PasoResultados = ({
             {isReadOnly &&
               pendientes.length > 0 &&
               finalizados.length === 0 && (
-                <p className="text-xs text-gray-500 text-center py-2">
+                <p className="text-xs text-brand-ayuda text-center py-2">
                   Modo lectura: no hay resultados cargados aún.
                 </p>
               )}
@@ -809,6 +810,7 @@ export const PasoResultados = ({
     gruposZonasPorDefinir.reduce((acc, g) => acc + g.partidos.length, 0);
   const totalFinalizados = totalFinalizadosZonas + llaveFinalizados.length;
   const totalPartidos = partidos.length;
+  const haySinProgramar = partidos.some(partidoSinSedeNiHorario);
 
   const mostrarZonasActivas =
     vistaRapida !== "finalizados" ||
@@ -834,8 +836,11 @@ export const PasoResultados = ({
               <h3 className="font-extrabold text-white text-base sm:text-lg tracking-tight leading-none">
                 Paso {numeroPaso}: Resultados
               </h3>
-              <p className="text-[11px] text-gray-500 font-medium mt-1 truncate">
+              <p className="text-xs text-brand-ayuda font-medium mt-1">
                 Carga de marcadores · {totalPartidos} partidos
+                {haySinProgramar
+                  ? ". Los que no tienen sede ni horario se definen en el programador."
+                  : ""}
               </p>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -845,7 +850,7 @@ export const PasoResultados = ({
                   const { generarPdfHojaRuta } = await import("@/utils/grillaPdf");
                   generarPdfHojaRuta(torneo, partidos);
                 }}
-                className="inline-flex items-center justify-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-lg bg-white/5 hover:bg-white/10 text-gray-200 font-bold text-[11px] border border-white/10 cursor-pointer transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-lg bg-white/5 hover:bg-white/10 text-gray-200 font-bold text-xs border border-white/10 cursor-pointer transition-colors"
                 title="Grilla de partidos para auxiliares de cancha"
               >
                 <FileDown className="size-3.5 shrink-0" />
@@ -873,7 +878,7 @@ export const PasoResultados = ({
                   className={`relative flex flex-col items-center justify-center gap-0.5 py-3 sm:py-3.5 px-2 transition-colors cursor-pointer ${
                     activo
                       ? "bg-brand-card text-brand-chartreuse"
-                      : "bg-brand-black text-gray-500 hover:text-gray-300 hover:bg-brand-card"
+                      : "bg-brand-black text-brand-ayuda hover:text-gray-300 hover:bg-brand-card"
                   }`}
                 >
                   {activo && (
@@ -883,7 +888,7 @@ export const PasoResultados = ({
                     />
                   )}
                   <span
-                    className={`text-[11px] sm:text-xs font-black uppercase tracking-wide ${
+                    className={`text-xs font-black uppercase tracking-wide ${
                       activo ? "text-brand-chartreuse" : "text-inherit"
                     }`}
                   >
@@ -917,9 +922,6 @@ export const PasoResultados = ({
               <h4 className="text-xs font-black text-brand-chartreuse uppercase tracking-widest">
                 Fase de zonas · en curso
               </h4>
-              <p className="text-[11px] text-gray-500 mt-0.5 hidden sm:block">
-                Tocá el encabezado de cada zona para ver u ocultar sus partidos.
-              </p>
             </div>
             {zonasActivas.length > 1 && (
               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -927,7 +929,7 @@ export const PasoResultados = ({
                   type="button"
                   onClick={comprimirTodasZonas}
                   title="Ocultar el detalle de todas las zonas (solo resumen)"
-                  className="inline-flex items-center gap-1 sm:gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-[10px] sm:text-[11px] border border-white/10 cursor-pointer"
+                  className="inline-flex items-center gap-1 sm:gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-xs border border-white/10 cursor-pointer"
                 >
                   <FoldVertical className="size-3.5" />
                   <span className="hidden xs:inline sm:inline">Comprimir</span>
@@ -936,7 +938,7 @@ export const PasoResultados = ({
                   type="button"
                   onClick={expandirTodasZonas}
                   title="Mostrar el detalle completo de todas las zonas"
-                  className="inline-flex items-center gap-1 sm:gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-[10px] sm:text-[11px] border border-white/10 cursor-pointer"
+                  className="inline-flex items-center gap-1 sm:gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-xs border border-white/10 cursor-pointer"
                 >
                   <UnfoldVertical className="size-3.5" />
                   <span className="hidden xs:inline sm:inline">Expandir</span>
@@ -958,9 +960,6 @@ export const PasoResultados = ({
               <h4 className="text-xs font-black text-brand-chartreuse uppercase tracking-widest">
                 Llave de campeonato
               </h4>
-              <p className="text-[11px] text-gray-500 mt-0.5 hidden sm:block">
-                Tocá el encabezado de cada ronda para comprimir o expandir.
-              </p>
             </div>
             {gruposLlavePorRonda.length > 1 && (
               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -968,7 +967,7 @@ export const PasoResultados = ({
                   type="button"
                   onClick={comprimirTodasLlaves}
                   title="Comprimir todas las rondas de llave"
-                  className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-[10px] sm:text-[11px] border border-white/10 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-xs border border-white/10 cursor-pointer"
                 >
                   <FoldVertical className="size-3.5" />
                   Comprimir
@@ -977,7 +976,7 @@ export const PasoResultados = ({
                   type="button"
                   onClick={expandirTodasLlaves}
                   title="Expandir todas las rondas de llave"
-                  className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-[10px] sm:text-[11px] border border-white/10 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-xs border border-white/10 cursor-pointer"
                 >
                   <UnfoldVertical className="size-3.5" />
                   Expandir
@@ -1039,17 +1038,17 @@ export const PasoResultados = ({
                         {grupo.label}
                       </h5>
                       {rondaCerrada && (
-                        <span className="text-[9px] font-black uppercase tracking-wider text-brand-chartreuse/80 bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-full shrink-0">
+                        <span className="text-xs font-black uppercase tracking-wider text-brand-chartreuse/80 bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-full shrink-0">
                           Completa
                         </span>
                       )}
                     </div>
                     <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                        <span className="px-1.5 py-0.5 rounded text-xs font-black uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20">
                           {pendientesRaw.length} pend.
                         </span>
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20">
+                        <span className="px-1.5 py-0.5 rounded text-xs font-black uppercase bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20">
                           {finalizadosRaw.length} ok
                         </span>
                       </div>
@@ -1069,14 +1068,14 @@ export const PasoResultados = ({
                             renderCompactMatchLine(p),
                           )}
                           {totalVisible > resumenPartidos.length && (
-                            <p className="text-[9px] text-gray-500 font-bold py-1.5 text-center">
+                            <p className="text-xs text-brand-ayuda font-bold py-1.5 text-center">
                               +{totalVisible - resumenPartidos.length} más ·
                               tocá el título para expandir
                             </p>
                           )}
                         </>
                       ) : (
-                        <p className="text-[10px] text-gray-500 text-center py-2">
+                        <p className="text-xs text-brand-ayuda text-center py-2">
                           Sin partidos en esta vista
                         </p>
                       )}
@@ -1086,10 +1085,10 @@ export const PasoResultados = ({
                       {finalizados.length > 0 && (
                         <section className="space-y-3 rounded-2xl border border-brand-chartreuse/20 bg-brand-chartreuse/[0.04] p-2.5 sm:p-4">
                           <div className="flex items-center gap-2 border-l-2 border-brand-chartreuse pl-3">
-                            <p className="text-[11px] font-black text-brand-chartreuse uppercase tracking-wider">
+                            <p className="text-xs font-black text-brand-chartreuse uppercase tracking-wider">
                               Finalizados
                             </p>
-                            <span className="text-[10px] font-bold text-brand-chartreuse/70">
+                            <span className="text-xs font-bold text-brand-chartreuse/70">
                               ({finalizados.length})
                             </span>
                           </div>
@@ -1100,10 +1099,10 @@ export const PasoResultados = ({
                       {!isReadOnly && pendientes.length > 0 && (
                         <section className="space-y-3">
                           <div className="flex items-center gap-2 border-l-2 border-amber-400/80 pl-3">
-                            <p className="text-[11px] font-black text-amber-300 uppercase tracking-wider">
+                            <p className="text-xs font-black text-amber-300 uppercase tracking-wider">
                               En curso / pendientes
                             </p>
-                            <span className="text-[10px] font-bold text-amber-400/70">
+                            <span className="text-xs font-bold text-amber-400/70">
                               ({pendientes.length})
                             </span>
                           </div>
@@ -1114,7 +1113,7 @@ export const PasoResultados = ({
                       {isReadOnly &&
                         pendientes.length > 0 &&
                         finalizados.length === 0 && (
-                          <p className="text-xs text-gray-500 text-center py-2">
+                          <p className="text-xs text-brand-ayuda text-center py-2">
                             Modo lectura: no hay resultados cargados aún en
                             esta ronda.
                           </p>
@@ -1134,12 +1133,9 @@ export const PasoResultados = ({
         <div className="space-y-3 sm:space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
             <div>
-              <h4 className="text-xs font-black text-gray-500 uppercase tracking-widest">
+              <h4 className="text-xs font-black text-brand-ayuda uppercase tracking-widest">
                 Fase de zonas · finalizadas
               </h4>
-              <p className="text-[11px] text-gray-500 mt-0.5 hidden sm:block">
-                Comprimidas por defecto. Expandí para revisar marcadores.
-              </p>
             </div>
             {zonasCompletas.length > 1 && (
               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -1147,7 +1143,7 @@ export const PasoResultados = ({
                   type="button"
                   onClick={comprimirTodasZonas}
                   title="Ocultar el detalle de todas las zonas (solo resumen)"
-                  className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-400 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-[10px] sm:text-[11px] border border-white/10 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-400 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-xs border border-white/10 cursor-pointer"
                 >
                   <FoldVertical className="size-3.5" />
                   Comprimir
@@ -1156,7 +1152,7 @@ export const PasoResultados = ({
                   type="button"
                   onClick={expandirTodasZonas}
                   title="Mostrar el detalle completo de todas las zonas"
-                  className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-400 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-[10px] sm:text-[11px] border border-white/10 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-400 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl font-bold text-xs border border-white/10 cursor-pointer"
                 >
                   <UnfoldVertical className="size-3.5" />
                   Expandir
@@ -1189,7 +1185,7 @@ export const PasoResultados = ({
         >
           Atrás
         </button>
-        <div className="text-[11px] sm:text-xs text-gray-500 font-semibold flex items-center text-center sm:text-left">
+        <div className="text-xs text-brand-ayuda font-semibold flex items-center text-center sm:text-left">
           Al cargar el resultado del último partido de la Final, el torneo pasa
           automáticamente a estado Finalizado.
         </div>
