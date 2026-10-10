@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
 import {
   Shield,
   Search,
@@ -40,6 +41,7 @@ export const Paso6Fiscales = ({
   triggerRefresh,
   readOnly = false,
 }: Paso6FiscalesProps) => {
+  const numeroPaso = useNumeroPaso("fiscales");
   const [fiscalesTorneo, setFiscalesTorneo] = useState<Fiscal[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchDni, setSearchDni] = useState("");
@@ -233,7 +235,7 @@ export const Paso6Fiscales = ({
           <Shield className="size-4" /> Autoridades del Torneo
         </div>
         <h3 className="text-xl font-extrabold text-white">
-          Paso 6: Fiscales y Autoridades
+          Paso {numeroPaso}: Fiscales y Autoridades
         </h3>
         <p className="text-sm text-gray-400 mt-1">
           Designá el fiscal general y los fiscales auxiliares homologados para

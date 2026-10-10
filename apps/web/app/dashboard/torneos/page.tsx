@@ -29,6 +29,7 @@ import { esRolFiscal } from "@/utils/auth/roles";
 import { formatFechaCalendario } from "@/utils/formatFecha";
 import TorneoVistaFiltros from "@/components/torneos/TorneoVistaFiltros";
 import { MenuPuntos } from "@/components/ui/MenuPuntos";
+import { hrefDetalleTorneo } from "@/components/torneos/wizard/stepLocks";
 import {
   CONTADORES_VISTA_VACIOS,
   type VistaTorneoId,
@@ -168,7 +169,7 @@ export default function TorneosPage() {
   };
 
   const handleOpenEdit = (torneo: Torneo) => {
-    router.push(`/dashboard/torneos/${torneo.id}`);
+    router.push(`/dashboard/torneos/${torneo.id}?step=edit`);
   };
 
   const handleSaveTorneo = async () => {
@@ -434,10 +435,14 @@ export default function TorneosPage() {
                           : "hover:bg-white/2"
                       }`}
                     >
-                      <td className={enGrupo ? "py-2.5 pl-12 pr-8" : "py-4 px-8"}>
-                        <div className="font-bold text-white group-hover:text-brand-chartreuse transition-colors text-[15px] wrap-break-word">
+                      <td className={enGrupo ? "py-2.5 pl-16 pr-8" : "py-4 px-8"}>
+                        <button
+                          type="button"
+                          onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
+                          className="cursor-pointer text-left font-bold text-white group-hover:text-brand-chartreuse transition-colors text-[15px] wrap-break-word"
+                        >
                           {t.nombre}
-                        </div>
+                        </button>
                         <div className="text-[13px] text-gray-500 mt-0.5 font-medium">
                           {t.rama || ""}{t.rama ? " · " : ""}{t.nivel || "Sin nivel"} · {t.categoria || "General"}
                         </div>
@@ -510,7 +515,7 @@ export default function TorneosPage() {
                       </td>
 
                       <td className={`text-right ${enGrupo ? "py-2.5 px-8" : "py-4 px-8"}`}>
-                        <div className="flex justify-end gap-2 items-center">
+                        <div className="flex flex-wrap justify-end gap-2 items-center">
                           {/* Botón de Impresión PDF solo para torneos Finalizados */}
                           {t.estado === "Finalizado" && (
                             <button
@@ -530,11 +535,10 @@ export default function TorneosPage() {
                             </button>
                           )}
                           <button
-                            onClick={() =>
-                              router.push(`/dashboard/torneos/${t.id}`)
-                            }
-                            className="p-2 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-transparent hover:border-brand-chartreuse/30 rounded-lg transition-colors"
-                            title="Centro de Control (Cuadros y Llaves)"
+                            type="button"
+                            onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
+                            className="p-2 bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-transparent hover:border-brand-chartreuse/30 rounded-lg transition-colors cursor-pointer"
+                            title="Abrir el paso del estado"
                           >
                             <LayoutDashboard className="size-4" />
                           </button>
@@ -570,19 +574,21 @@ export default function TorneosPage() {
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => setReplicarTorneo(t)}
-                            className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-brand-chartreuse transition-colors"
-                            title="Replicar a otras categorías"
+                            className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-white/5 px-2 py-1.5 text-xs font-bold text-gray-300 hover:bg-white/10 hover:text-brand-chartreuse"
                           >
-                            <Copy className="size-4" />
+                            <Copy className="size-3.5" />
+                            Replicar
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => handleOpenEdit(t)}
-                            className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
-                            title="Editar Torneo"
+                            className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-white/5 px-2 py-1.5 text-xs font-bold text-gray-300 hover:bg-white/10 hover:text-white"
                           >
-                            <Pencil className="size-4" />
+                            <Pencil className="size-3.5" />
+                            Editar
                           </button>
                           <MenuPuntos
                             etiqueta={`Más acciones de ${t.nombre}`}

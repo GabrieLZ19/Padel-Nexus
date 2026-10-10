@@ -14,6 +14,7 @@ import {
   Lock,
 } from "lucide-react";
 import {
+  numeroPasoVisible,
   pasoBloqueadoPorAlcance,
   type WizardPasoId,
 } from "@/components/torneos/wizard/stepLocks";
@@ -137,8 +138,8 @@ export function TournamentWizardNav({
   return (
     <nav aria-label="Pasos del torneo" className="w-full min-w-0">
       <ol className="grid grid-cols-3 gap-1.5 sm:grid-cols-5 xl:grid-cols-9">
-        {visibleSteps.map((step, index) => {
-          const numero = index + 1;
+        {visibleSteps.map((step) => {
+          const numero = numeroPasoVisible(step.id, hiddenStepIds);
           const isActive = activeTab === step.id;
           const bloqueado = pasoBloqueadoPorAlcance(
             {

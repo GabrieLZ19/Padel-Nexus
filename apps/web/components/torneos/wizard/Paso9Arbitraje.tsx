@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
 import { TorneosService } from "@/utils/services/torneos";
 import { Partido } from "@/utils/types";
 import { LiveArbitrajeRow } from "@/components/torneos/LiveArbitrajeRow";
@@ -141,6 +142,7 @@ export const PasoResultados = ({
   triggerRefresh,
   isReadOnly = false,
 }: PasoResultadosProps) => {
+  const numeroPaso = useNumeroPaso("matches");
   const [guardandoPartidoId, setGuardandoPartidoId] = useState<string | null>(
     null,
   );
@@ -810,7 +812,7 @@ export const PasoResultados = ({
           <div className="flex items-center justify-between gap-3 px-3.5 sm:px-4 py-3 border-b border-white/5">
             <div className="min-w-0">
               <h3 className="font-extrabold text-white text-base sm:text-lg tracking-tight leading-none">
-                Resultados
+                Paso {numeroPaso}: Resultados
               </h3>
               <p className="text-[11px] text-gray-500 font-medium mt-1 truncate">
                 Carga de marcadores · {totalPartidos} partidos

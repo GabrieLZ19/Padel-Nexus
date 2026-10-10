@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
 import { TorneosService } from "@/utils/services/torneos";
 import { ClubesService } from "@/utils/services/clubes";
 import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
@@ -101,6 +102,7 @@ export const Paso1Datos = ({
   onTorneoUpdated,
   readOnly = false,
 }: Paso1DatosProps) => {
+  const numeroPaso = useNumeroPaso("edit");
   const profile = useProfileStore((s) => s.profile);
   const userRole = (profile?.rol || "admin") as RolUsuario;
 
@@ -447,7 +449,7 @@ export const Paso1Datos = ({
     <div className={`bg-brand-card border border-white/10 rounded-3xl p-6 space-y-8 shadow-xl ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
       <div>
         <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-          Paso 1: Información General y Configuración
+          Paso {numeroPaso}: Información General y Configuración
         </h3>
         <p className="text-sm text-gray-400 mt-1">
           Completá el nombre del torneo, fechas clave de la competencia y

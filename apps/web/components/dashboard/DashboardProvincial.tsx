@@ -17,10 +17,15 @@ import {
   Landmark,
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
+import { hrefDetalleTorneo } from "@/components/torneos/wizard/stepLocks";
 import { InscripcionesService } from "@/utils/services/inscripciones";
 import { ClubesService } from "@/utils/services/clubes";
 import { Torneo, Inscripcion, Club } from "@/utils/types";
-import { FAP_ESTADOS_TORNEO } from "@/utils/constants/fap";
+import {
+  contarActivosEnConjunto,
+  etiquetaActivos,
+  etiquetaCategoriaInscripcion,
+} from "@/utils/categoriaInscripcion";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 
 export default function DashboardProvincial() {
@@ -76,13 +81,7 @@ export default function DashboardProvincial() {
   const torneosClasificatorios = torneos.filter(
     (t) => t.alcance === "Provincial",
   );
-  const torneosActivos = torneos.filter(
-    (t) =>
-      (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.INSCRIPCION.toLowerCase() ||
-      (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.CERRADO.toLowerCase() ||
-      (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.PROGRAMADO.toLowerCase() ||
-      (t.estado || "").toLowerCase() === FAP_ESTADOS_TORNEO.EN_CURSO.toLowerCase(),
-  );
+  const torneosActivos = contarActivosEnConjunto(torneosProvinciales);
 
   const jugadoresUnicos = new Set<string>();
   inscripciones.forEach((i) => {
@@ -101,7 +100,7 @@ export default function DashboardProvincial() {
     {
       title: "Torneos Provinciales",
       value: torneosProvinciales.length.toString(),
-      change: `${torneosActivos.length} activos`,
+      change: etiquetaActivos(torneosActivos),
       icon: Trophy,
       trendIcon: Activity,
       color: "bg-[#2a3614]",
@@ -161,9 +160,16 @@ export default function DashboardProvincial() {
   ];
 
   // Distribución de inscripciones por categoría
+  const torneoPorId = new Map(torneos.map((torneo) => [torneo.id, torneo]));
   const categoriaCount: Record<string, number> = {};
-  inscripciones.forEach((i) => {
-    const cat = i.categoria || "Sin categoría";
+  inscripciones.forEach((inscripcion) => {
+    const torneo = torneoPorId.get(inscripcion.torneo_id);
+    const cat = etiquetaCategoriaInscripcion({
+      categoria: inscripcion.categoria,
+      nivelTorneo: torneo?.nivel,
+      categoriaTorneo: torneo?.categoria,
+    });
+    if (!cat) return;
     categoriaCount[cat] = (categoriaCount[cat] || 0) + 1;
   });
   const categoriasDistribucion = Object.entries(categoriaCount)
@@ -341,7 +347,7 @@ export default function DashboardProvincial() {
                     <tr
                       key={t.id}
                       className="hover:bg-white/2 transition-colors cursor-pointer"
-                      onClick={() => router.push(`/dashboard/torneos/${t.id}`)}
+                      onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
                     >
                       <td className="py-3.5 px-4">
                         <p className="font-bold text-white text-[13px]">{t.nombre}</p>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
 import {
   Plus,
   Trash2,
@@ -107,6 +108,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   onRefresh,
   readOnly = false,
 }) => {
+  const numeroPaso = useNumeroPaso("times");
   const [clubs, setClubs] = useState<Club[]>([]);
   const [selectedClubs, setSelectedClubs] = useState<Club[]>([]);
   const [canchasDisponibles, setCanchasDisponibles] = useState<
@@ -654,7 +656,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       <div className="bg-brand-card border border-white/10 rounded-3xl p-6 space-y-6 shadow-xl">
         <div>
           <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-            Paso 5: Sedes y cronograma
+            Paso {numeroPaso}: Sedes y cronograma
           </h3>
           <p className="text-sm text-gray-400 mt-1">
             Agregá los clubes donde se juega el torneo y cargá el cronograma por

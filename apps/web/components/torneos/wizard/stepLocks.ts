@@ -1,15 +1,28 @@
 /** Bloqueo de pasos del wizard según estado del torneo (todas las entidades). */
 
-export type WizardPasoId =
-  | "edit"
-  | "logos"
-  | "categories"
-  | "players"
-  | "times"
-  | "fiscales"
-  | "cierre"
-  | "draws"
-  | "matches";
+export const ORDEN_PASOS_WIZARD = [
+  "edit",
+  "logos",
+  "categories",
+  "players",
+  "times",
+  "fiscales",
+  "cierre",
+  "draws",
+  "matches",
+] as const;
+
+export type WizardPasoId = (typeof ORDEN_PASOS_WIZARD)[number];
+
+/** Número que se ve en el índice, según los pasos ocultos de esa pantalla. */
+export function numeroPasoVisible(
+  stepId: string,
+  hiddenStepIds: readonly string[] = [],
+): number {
+  const visibles = ORDEN_PASOS_WIZARD.filter((id) => !hiddenStepIds.includes(id));
+  const index = visibles.indexOf(stepId as WizardPasoId);
+  return index < 0 ? 0 : index + 1;
+}
 
 const ESTADOS_MODO_LECTURA = new Set([
   "Programado",
@@ -21,6 +34,29 @@ export function esEstadoTorneoModoLectura(
   estado?: string | null,
 ): boolean {
   return ESTADOS_MODO_LECTURA.has(String(estado || "").trim());
+}
+
+/** Paso útil al abrir el torneo desde el listado. */
+export function pasoSegunEstadoTorneo(estado?: string | null): WizardPasoId {
+  switch (String(estado || "").trim()) {
+    case "Inscripción":
+      return "players";
+    case "Cerrado":
+    case "Programado":
+      return "draws";
+    case "En curso":
+    case "Finalizado":
+      return "matches";
+    default:
+      return "edit";
+  }
+}
+
+export function hrefDetalleTorneo(
+  base: "/dashboard" | "/club",
+  torneo: { id: string; estado?: string | null },
+): string {
+  return `${base}/torneos/${torneo.id}?step=${pasoSegunEstadoTorneo(torneo.estado)}`;
 }
 
 /**

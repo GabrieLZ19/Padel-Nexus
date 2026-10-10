@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
@@ -60,6 +61,7 @@ export const Paso3Categorias = ({
   readOnly = false,
   modoClub = false,
 }: Paso3CategoriasProps) => {
+  const numeroPaso = useNumeroPaso("categories");
   // Reglamento definido en el Paso 1 (columna `reglamento`)
   const reglamento = reglamentoTorneo(torneo);
 
@@ -360,7 +362,7 @@ export const Paso3Categorias = ({
     >
       <div>
         <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-          Paso 3: Rama, Categoría, Nivel y Programación
+          Paso {numeroPaso}: Rama, Categoría, Nivel y Programación
         </h3>
         <p className="text-sm text-gray-400 mt-1">
           Configurá la rama, categoría y nivel según el reglamento{" "}

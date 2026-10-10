@@ -443,7 +443,7 @@ export default function JugadoresLicenciasPage() {
         </div>
       </div>
 
-      {/* Tabs solo en mobile / tablet angosto */}
+      {contextoConfig?.puede_editar !== false && (
       <div className="flex lg:hidden gap-2 p-1 bg-[#111111] border border-white/5 rounded-xl">
         <button
           type="button"
@@ -470,9 +470,19 @@ export default function JugadoresLicenciasPage() {
           Config carnet
         </button>
       </div>
+      )}
 
       {/* Sidebar: compacta en notebooks/zoom; más ancha solo en monitores grandes */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(240px,280px)_minmax(0,1fr)] min-[1700px]:grid-cols-[minmax(300px,360px)_minmax(0,1fr)] gap-6 items-start">
+      <div
+        className={
+          contextoConfig?.puede_editar === false
+            ? "space-y-4"
+            : "grid grid-cols-1 lg:grid-cols-[minmax(240px,280px)_minmax(0,1fr)] min-[1700px]:grid-cols-[minmax(300px,360px)_minmax(0,1fr)] gap-6 items-start"
+        }
+      >
+        {contextoConfig?.puede_editar === false ? (
+          <ConfigLicenciasPanel scope="contexto" compact puedeEditar={false} />
+        ) : (
         <aside
           className={`lg:sticky lg:top-6 min-w-0 ${
             mobileTab === "config" ? "block" : "hidden lg:block"
@@ -494,13 +504,17 @@ export default function JugadoresLicenciasPage() {
             <ConfigLicenciasPanel
               scope="contexto"
               compact
+              puedeEditar={contextoConfig?.puede_editar !== false}
             />
           </div>
         </aside>
+        )}
 
         <section
           className={`space-y-4 min-w-0 ${
-            mobileTab === "licencias" ? "block" : "hidden lg:block"
+            contextoConfig?.puede_editar === false || mobileTab === "licencias"
+              ? "block"
+              : "hidden lg:block"
           }`}
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

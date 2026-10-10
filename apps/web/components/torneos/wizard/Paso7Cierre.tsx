@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Inscripcion } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
@@ -28,6 +29,7 @@ export const Paso5Cierre = ({
   onTorneoUpdated,
   readOnly = false,
 }: Paso5CierreProps) => {
+  const numeroPaso = useNumeroPaso("cierre");
   const confirmadasCount = inscripciones.filter(
     (i) => i.estado_pago === "Confirmado",
   ).length;
@@ -195,7 +197,7 @@ export const Paso5Cierre = ({
       }`}
     >
       <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-        Paso 6: Cierre de Inscripción y Puntuación
+        Paso {numeroPaso}: Cierre de Inscripción y Puntuación
       </h3>
       <p className="text-sm text-gray-400">
         Verifique el cupo de inscripciones aprobadas. Configure la asignación de puntos del ranking y el sistema de puntuación de partidos. Las inscripciones se cierran automáticamente al generar los cuadros.

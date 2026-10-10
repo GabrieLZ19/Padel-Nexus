@@ -20,6 +20,7 @@ import { Paso5Cierre } from "@/components/torneos/wizard/Paso7Cierre";
 import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
 import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
 import { TournamentWizardNav } from "@/components/torneos/TournamentWizardNav";
+import { NumeroPasoProvider } from "@/components/torneos/wizard/NumeroPasoContext";
 import type { SaveStepHandler } from "@/components/torneos/wizard/types";
 import {
   esEstadoTorneoModoLectura,
@@ -191,6 +192,7 @@ export default function TorneoDetallePage() {
         </div>
       )}
 
+      <NumeroPasoProvider>
       <TournamentWizardNav
         activeTab={activeTab}
         setActiveTab={navigateToTab}
@@ -261,6 +263,7 @@ export default function TorneoDetallePage() {
             />
           )}
       </div>
+      </NumeroPasoProvider>
 
       <FeedbackModal {...feedbackModal} />
     </div>

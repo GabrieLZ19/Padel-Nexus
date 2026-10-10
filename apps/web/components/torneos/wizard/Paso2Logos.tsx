@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
 import { Upload, Info } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo } from "@/utils/types";
@@ -51,6 +52,7 @@ export const Paso2Logos = ({
   triggerRefresh,
   readOnly = false,
 }: Paso2LogosProps) => {
+  const numeroPaso = useNumeroPaso("logos");
   const [subiendoBanner, setSubiendoBanner] = useState(false);
   const [avisoRatio, setAvisoRatio] = useState<string | null>(null);
 
@@ -141,7 +143,7 @@ export const Paso2Logos = ({
   return (
     <div className={`bg-[#111111] border border-white/5 rounded-3xl p-6 space-y-6 ${readOnly ? "pointer-events-none opacity-60 select-none" : ""}`}>
       <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-        Paso 2: Logos y Sponsoreo
+        Paso {numeroPaso}: Logos y Sponsoreo
       </h3>
       <p className="text-sm text-gray-400">
         Personalizá las marcas de los patrocinadores oficiales que se verán en

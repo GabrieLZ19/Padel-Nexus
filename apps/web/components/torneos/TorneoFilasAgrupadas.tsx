@@ -11,8 +11,59 @@ interface TorneoFilasAgrupadasProps {
   onSumar?: (grupo: GrupoTorneoListado) => void;
 }
 
+const PRIORIDAD_ESTADO = [
+  "En curso",
+  "Inscripción",
+  "Programado",
+  "Cerrado",
+  "Borrador",
+  "Finalizado",
+];
+
 function etiquetaCorta(etiqueta: string): string {
   return etiqueta.replace(/^Categorías\s+/i, "");
+}
+
+function tonoEstado(estado: string): string {
+  switch (estado) {
+    case "Inscripción":
+      return "text-[#00ff88]";
+    case "Programado":
+      return "text-violet-400";
+    case "En curso":
+      return "text-[#ffb800]";
+    case "Finalizado":
+      return "text-blue-400";
+    default:
+      return "text-gray-400";
+  }
+}
+
+function puntoEstado(estado: string): string {
+  switch (estado) {
+    case "Inscripción":
+      return "bg-[#00ff88]";
+    case "Programado":
+      return "bg-violet-500";
+    case "En curso":
+      return "bg-[#ffb800]";
+    case "Finalizado":
+      return "bg-blue-500";
+    default:
+      return "bg-gray-500";
+  }
+}
+
+function resumenEstado(torneos: Torneo[]): { etiqueta: string; estado: string } {
+  const estados = [
+    ...new Set(torneos.map((torneo) => torneo.estado || "Borrador")),
+  ];
+  if (estados.length === 1) {
+    return { etiqueta: estados[0], estado: estados[0] };
+  }
+  const principal =
+    PRIORIDAD_ESTADO.find((estado) => estados.includes(estado)) || estados[0];
+  return { etiqueta: "Varios estados", estado: principal };
 }
 
 export default function TorneoFilasAgrupadas({
@@ -21,7 +72,12 @@ export default function TorneoFilasAgrupadas({
   renderFila,
   onSumar,
 }: TorneoFilasAgrupadasProps) {
-  const [abiertos, setAbiertos] = useState<Record<string, boolean>>({});
+  const [competenciasAbiertas, setCompetenciasAbiertas] = useState<
+    Record<string, boolean>
+  >({});
+  const [ramasAbiertas, setRamasAbiertas] = useState<Record<string, boolean>>(
+    {},
+  );
 
   return (
     <>
@@ -40,8 +96,9 @@ export default function TorneoFilasAgrupadas({
         }
 
         const torneos = grupo.ramas.flatMap((rama) => rama.torneos);
-        const abierto = Boolean(abiertos[clave]);
+        const abierta = Boolean(competenciasAbiertas[clave]);
         const categorias = torneos.length;
+        const estado = resumenEstado(torneos);
 
         return (
           <Fragment key={clave}>
@@ -50,29 +107,33 @@ export default function TorneoFilasAgrupadas({
                 <div className="flex items-stretch border-l-[3px] border-brand-chartreuse bg-brand-chartreuse/10">
                   <button
                     type="button"
-                    aria-expanded={abierto}
+                    aria-expanded={abierta}
+                    aria-label={`${abierta ? "Cerrar" : "Abrir"} ${grupo.nombre}`}
                     onClick={() =>
-                      setAbiertos((actual) => ({ ...actual, [clave]: !actual[clave] }))
+                      setCompetenciasAbiertas((actual) => ({
+                        ...actual,
+                        [clave]: !actual[clave],
+                      }))
                     }
-                    className="flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2 text-left hover:bg-brand-chartreuse/10"
+                    className="flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2.5 text-left hover:bg-brand-chartreuse/10"
                   >
                     <ChevronRight
                       className={`size-4 shrink-0 text-brand-chartreuse transition-transform ${
-                        abierto ? "rotate-90" : ""
+                        abierta ? "rotate-90" : ""
                       }`}
                     />
                     <span className="font-bold text-white">{grupo.nombre}</span>
                     <span className="text-xs font-medium text-gray-500">
                       {categorias} {categorias === 1 ? "categoría" : "categorías"}
                     </span>
-                    {grupo.ramas.map((rama) => (
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-xs font-bold ${tonoEstado(estado.estado)}`}
+                    >
                       <span
-                        key={`${clave}-${rama.rama || "sin"}`}
-                        className="rounded-full bg-brand-chartreuse/15 px-2 py-0.5 text-[11px] font-semibold text-brand-chartreuse"
-                      >
-                        {etiquetaCorta(rama.etiqueta)} {rama.torneos.length}
-                      </span>
-                    ))}
+                        className={`size-1.5 rounded-full ${puntoEstado(estado.estado)}`}
+                      />
+                      {estado.etiqueta}
+                    </span>
                   </button>
                   {onSumar && (
                     <button
@@ -87,10 +148,51 @@ export default function TorneoFilasAgrupadas({
                 </div>
               </td>
             </tr>
-            {abierto &&
-              torneos.map((torneo) => (
-                <Fragment key={torneo.id}>{renderFila(torneo, true)}</Fragment>
-              ))}
+            {abierta &&
+              grupo.ramas.map((rama) => {
+                const claveRama = `${clave}:${rama.rama || "sin"}`;
+                const ramaAbierta = Boolean(ramasAbiertas[claveRama]);
+                const nombreRama = etiquetaCorta(rama.etiqueta) || "Sin rama";
+                return (
+                  <Fragment key={claveRama}>
+                    <tr>
+                      <td colSpan={colSpan} className="p-0">
+                        <button
+                          type="button"
+                          aria-expanded={ramaAbierta}
+                          aria-label={`${ramaAbierta ? "Cerrar" : "Abrir"} ${nombreRama} de ${grupo.nombre}`}
+                          onClick={() =>
+                            setRamasAbiertas((actual) => ({
+                              ...actual,
+                              [claveRama]: !actual[claveRama],
+                            }))
+                          }
+                          className="flex w-full cursor-pointer items-center gap-3 border-l-[3px] border-brand-chartreuse/40 bg-white/[0.03] py-2 pr-5 pl-10 text-left hover:bg-white/[0.05]"
+                        >
+                          <ChevronRight
+                            className={`size-3.5 shrink-0 text-gray-400 transition-transform ${
+                              ramaAbierta ? "rotate-90" : ""
+                            }`}
+                          />
+                          <span className="text-sm font-semibold text-white">
+                            {nombreRama}
+                          </span>
+                          <span className="text-xs font-medium text-gray-500">
+                            {rama.torneos.length}{" "}
+                            {rama.torneos.length === 1 ? "categoría" : "categorías"}
+                          </span>
+                        </button>
+                      </td>
+                    </tr>
+                    {ramaAbierta &&
+                      rama.torneos.map((torneo) => (
+                        <Fragment key={torneo.id}>
+                          {renderFila(torneo, true)}
+                        </Fragment>
+                      ))}
+                  </Fragment>
+                );
+              })}
           </Fragment>
         );
       })}

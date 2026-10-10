@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Inscripcion, Partido } from "@/utils/types";
 import { BracketEditor } from "@/components/torneos/BracketEditor";
@@ -40,6 +41,7 @@ export const Paso6Cuadros = ({
   triggerRefresh,
   isReadOnly = false,
 }: Paso6CuadrosProps) => {
+  const numeroPaso = useNumeroPaso("draws");
   const [generando, setGenerando] = useState(false);
   const cantidadInscriptos = inscripciones.length;
   const hayPendientes = inscripciones.some(
@@ -158,6 +160,9 @@ export const Paso6Cuadros = ({
 
   return (
     <div className="space-y-6">
+      <h3 className="text-lg font-bold text-white uppercase tracking-wider">
+        Paso {numeroPaso}: Cuadros
+      </h3>
       {partidos.length === 0 &&
         (torneo as Torneo & { formato?: string }).formato ===
           "Eliminatoria Directa" && (

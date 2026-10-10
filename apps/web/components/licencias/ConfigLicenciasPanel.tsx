@@ -216,6 +216,9 @@ export function ConfigLicenciasPanel({
     titulo || meta.entidad_nombre || "Configuración de carnets federativos";
 
   if (loading) {
+    if (!puedeEditar) {
+      return <p className="text-sm text-gray-500">Cargando carnet…</p>;
+    }
     return (
       <div
         className={`bg-[#151515] border border-white/5 rounded-2xl p-6 text-sm text-gray-500 ${
@@ -232,6 +235,25 @@ export function ConfigLicenciasPanel({
       <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6 text-sm text-red-300">
         {error}
       </div>
+    );
+  }
+
+  if (!editarHabilitado) {
+    const nombre = nombreCarne.trim() || tituloFinal;
+    const monto =
+      frecuencia === "mensual"
+        ? precioMensualInput.trim()
+        : precioAnualInput.trim();
+    const precio = monto
+      ? `$${Number(monto).toLocaleString("es-AR")} ${
+          frecuencia === "mensual" ? "por mes" : "al año"
+        }`
+      : "";
+    const resumen = [nombre, precio, descripcion].filter(Boolean).join(" · ");
+    return (
+      <p className="text-sm text-gray-300 leading-snug">
+        {resumen}. Lo define la federación.
+      </p>
     );
   }
 

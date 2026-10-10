@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
 import {
   CheckCircle2,
   Download,
@@ -61,6 +62,7 @@ export const Paso4Jugadores = ({
   triggerRefresh,
   readOnly = false,
 }: Paso4JugadoresProps) => {
+  const numeroPaso = useNumeroPaso("players");
   const profile = useProfileStore((s) => s.profile);
   const userRole = (profile?.rol || "admin") as RolUsuario;
   const modoFederacion = esTorneoContextoFederacion(
@@ -246,7 +248,7 @@ export const Paso4Jugadores = ({
       <div className="p-6 border-b border-white/5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-black/20">
         <h3 className="font-bold text-white flex items-center gap-2">
           <CheckCircle2 className="size-5 text-[#00ff88]" />
-          Inscripciones (
+          Paso {numeroPaso}: Inscripciones (
           {gratuito
             ? `${inscripciones.length} inscriptas`
             : `${confirmadasCount} confirmadas`}{" "}

@@ -18,6 +18,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
+import { hrefDetalleTorneo } from "@/components/torneos/wizard/stepLocks";
 import { LicenciasService, type ResumenLicencias } from "@/utils/services/licencias";
 import { ClubesService } from "@/utils/services/clubes";
 import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
@@ -343,7 +344,7 @@ export default function DashboardFederacion() {
                     <tr
                       key={t.id}
                       className="hover:bg-white/2 transition-colors cursor-pointer"
-                      onClick={() => router.push(`/dashboard/torneos/${t.id}`)}
+                      onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
                     >
                       <td className="py-3.5 px-4">
                         <p className="font-bold text-white text-[13px]">{t.nombre}</p>

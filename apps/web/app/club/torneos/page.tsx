@@ -26,6 +26,7 @@ import FeedbackModal, { FeedbackModalProps } from "@/components/ui/FeedbackModal
 import { formatFechaCalendario } from "@/utils/formatFecha";
 import TorneoVistaFiltros from "@/components/torneos/TorneoVistaFiltros";
 import { MenuPuntos } from "@/components/ui/MenuPuntos";
+import { hrefDetalleTorneo } from "@/components/torneos/wizard/stepLocks";
 import {
   CONTADORES_VISTA_VACIOS,
   type VistaTorneoId,
@@ -439,9 +440,9 @@ export default function ClubTorneosPage() {
                         ? "bg-brand-chartreuse/[0.04] shadow-[inset_3px_0_0_0_var(--color-brand-chartreuse)]"
                         : "hover:bg-brand-white/2"
                     }`}
-                    onClick={() => router.push(`/club/torneos/${t.id}`)}
+                    onClick={() => router.push(hrefDetalleTorneo("/club", t))}
                   >
-                    <td className={enGrupo ? "py-2.5 pl-12 pr-6" : "py-4 px-6"}>
+                    <td className={enGrupo ? "py-2.5 pl-16 pr-6" : "py-4 px-6"}>
                       <p className="font-bold text-white">{t.nombre}</p>
                       <p className="text-xs text-gray-500 mt-0.5 font-medium">
                         {(t as any).rama || ""}{(t as any).rama ? " · " : ""}{t.nivel || "Sin nivel"} · {t.categoria || "General"}
@@ -482,11 +483,12 @@ export default function ClubTorneosPage() {
                       </span>
                     </td>
                     <td className={`text-right ${enGrupo ? "py-2.5 px-6" : "py-4 px-6"}`} onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                         <button
-                          onClick={() => router.push(`/club/torneos/${t.id}`)}
+                          type="button"
+                          onClick={() => router.push(hrefDetalleTorneo("/club", t))}
                           className="p-2 rounded-xl bg-brand-chartreuse/10 hover:bg-brand-chartreuse/20 text-brand-chartreuse border border-transparent hover:border-brand-chartreuse/30 transition-colors cursor-pointer"
-                          title="Gestionar torneo"
+                          title="Abrir el paso del estado"
                         >
                           <LayoutDashboard className="size-4" />
                         </button>
@@ -520,18 +522,20 @@ export default function ClubTorneosPage() {
                           <Layers className="size-4" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => setReplicarTorneo(t)}
-                          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-brand-chartreuse transition-colors cursor-pointer"
-                          title="Replicar a otras categorías"
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-xl bg-white/5 px-2 py-1.5 text-xs font-bold text-gray-300 hover:bg-white/10 hover:text-brand-chartreuse"
                         >
-                          <Copy className="size-4" />
+                          <Copy className="size-3.5" />
+                          Replicar
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleOpenEditModal(t)}
-                          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors cursor-pointer"
-                          title="Editar torneo"
+                          className="inline-flex cursor-pointer items-center gap-1 rounded-xl bg-white/5 px-2 py-1.5 text-xs font-bold text-gray-300 hover:bg-white/10 hover:text-white"
                         >
-                          <Pencil className="size-4" />
+                          <Pencil className="size-3.5" />
+                          Editar
                         </button>
                         <MenuPuntos
                           etiqueta={`Más acciones de ${t.nombre}`}
