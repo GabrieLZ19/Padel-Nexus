@@ -608,13 +608,16 @@ export default function ChatInbox({
     [deepLinkConvId, router],
   );
 
-  const tabs: { key: ChatInboxTab; label: string }[] = [
+  const tabsBase: { key: ChatInboxTab; label: string }[] = [
     { key: "todos", label: "Todos" },
     { key: "grupos", label: "Grupos" },
     { key: "partidos", label: "Reservas" },
     { key: "marketplace", label: "Ventas" },
     { key: "directos", label: "Directos" },
-  ].filter((tab) => !(esFederacion && tab.key === "partidos"));
+  ];
+  const tabs = tabsBase.filter(
+    (tab) => !(esFederacion && tab.key === "partidos"),
+  );
 
   const productoImagen =
     activeConv?.producto?.thumbnail_url ||
