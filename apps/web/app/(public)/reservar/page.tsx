@@ -11,11 +11,9 @@ import {
   Star,
   ChevronRight,
   Loader2,
-  LogIn,
 } from "lucide-react";
-import { isAxiosError } from "axios";
 import { ClubesService } from "@/utils/services/clubes";
-import { useProfileStore } from "@/store/useProfileStore";
+import { clubesVisiblesEnReserva } from "@/utils/clubesReserva";
 import type { ClubCercano } from "@/utils/types/club.types";
 
 // Leaflet se carga dinámicamente para evitar SSR issues
@@ -31,12 +29,9 @@ const MapaClubs = dynamic(() => import("@/components/reservas/MapaClubs"), {
 
 export default function ReservarPage() {
   const router = useRouter();
-  const { profile, fetchProfile } = useProfileStore();
 
   const [clubes, setClubes] = useState<ClubCercano[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sessionChecked, setSessionChecked] = useState(false);
-  const [requiresAuth, setRequiresAuth] = useState(false);
   const [search, setSearch] = useState("");
   const [userLocation, setUserLocation] = useState<{
     lat: number;
@@ -45,8 +40,6 @@ export default function ReservarPage() {
   const [geoError, setGeoError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-
-  const loginHref = `/login?redirect=${encodeURIComponent("/reservar")}`;
 
   // Solicitar ubicación del usuario
   const requestLocation = useCallback(() => {
@@ -75,34 +68,7 @@ export default function ReservarPage() {
     requestLocation();
   }, [requestLocation]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const checkSession = async () => {
-      if (profile?.id) {
-        if (!cancelled) setSessionChecked(true);
-        return;
-      }
-      await fetchProfile();
-      if (!cancelled) setSessionChecked(true);
-    };
-
-    void checkSession();
-    return () => {
-      cancelled = true;
-    };
-  }, [profile?.id, fetchProfile]);
-
   const fetchClubes = useCallback(async () => {
-    if (!sessionChecked) return;
-
-    if (!profile?.id) {
-      setRequiresAuth(true);
-      setClubes([]);
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     try {
       const params: Record<string, string | number> = {
@@ -120,17 +86,15 @@ export default function ReservarPage() {
       }
 
       const res = await ClubesService.getAll(params);
-      setClubes(res.data || []);
-      setRequiresAuth(false);
-    } catch (err) {
-      if (isAxiosError(err) && err.response?.status === 401) {
-        setRequiresAuth(true);
-      }
+      setClubes(
+        clubesVisiblesEnReserva(res.data || [], userLocation != null),
+      );
+    } catch {
       setClubes([]);
     } finally {
       setLoading(false);
     }
-  }, [sessionChecked, profile?.id, userLocation, search]);
+  }, [userLocation, search]);
 
   useEffect(() => {
     fetchClubes();
@@ -168,17 +132,12 @@ export default function ReservarPage() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
               <input
                 type="text"
-                placeholder={
-                  requiresAuth
-                    ? "Iniciá sesión para buscar clubes..."
-                    : "Buscar club por nombre..."
-                }
+                placeholder="Buscar club por nombre..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onFocus={() => setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                disabled={requiresAuth}
-                className="w-full pl-12 pr-4 py-3.5 bg-brand-card border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-chartreuse/50 focus:border-brand-chartreuse/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full pl-12 pr-4 py-3.5 bg-brand-card border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-chartreuse/50 focus:border-brand-chartreuse/30 transition-all"
               />
 
               {/* Sugerencias de búsqueda */}
@@ -262,8 +221,7 @@ export default function ReservarPage() {
         </div>
 
         {/* ── Mapa ───────────────────────────────────────────── */}
-        {!requiresAuth &&
-          userLocation &&
+        {userLocation &&
           clubes.some(
             (club) => club.latitud != null && club.longitud != null,
           ) && (
@@ -273,40 +231,6 @@ export default function ReservarPage() {
         )}
 
         {/* ── Listado de Clubes ──────────────────────────────── */}
-        {requiresAuth ? (
-          <div className="max-w-xl mx-auto">
-            <div className="relative overflow-hidden rounded-2xl border border-brand-chartreuse/20 bg-brand-card px-6 py-12 sm:px-10 text-center">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(203,254,1,0.08),transparent_55%)]" />
-              <div className="relative">
-                <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-brand-chartreuse/10 border border-brand-chartreuse/20">
-                  <LogIn className="size-6 text-brand-chartreuse" />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                  Iniciá sesión para ver clubes y horarios
-                </h2>
-                <p className="mt-3 text-sm sm:text-base text-gray-400 max-w-md mx-auto">
-                  Para mostrar las canchas cercanas, los turnos disponibles y
-                  reservar, tenés que entrar con tu cuenta.
-                </p>
-                <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                  <Link
-                    href={loginHref}
-                    className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 rounded-xl bg-brand-chartreuse text-brand-black font-bold text-sm hover:opacity-90 transition-opacity"
-                  >
-                    <LogIn className="size-4" />
-                    Iniciar sesión
-                  </Link>
-                  <Link
-                    href="/signup"
-                    className="inline-flex items-center justify-center w-full sm:w-auto px-6 py-3 rounded-xl border border-white/10 text-white text-sm font-semibold hover:bg-white/5 transition-colors"
-                  >
-                    Crear cuenta
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1">
             <h2 className="text-xl font-semibold">
@@ -402,7 +326,6 @@ export default function ReservarPage() {
             </div>
           )}
         </div>
-        )}
       </section>
     </main>
   );

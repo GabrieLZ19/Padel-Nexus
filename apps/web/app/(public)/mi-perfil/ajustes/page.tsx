@@ -437,7 +437,7 @@ export default function ProfileSettings() {
         </section>
 
         {/* ACCIÓN PRINCIPAL */}
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end pt-2 max-sm:pr-20">
           <button
             type="submit"
             disabled={saving}

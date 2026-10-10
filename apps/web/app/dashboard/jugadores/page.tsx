@@ -8,11 +8,6 @@ import {
   XCircle,
   Settings2,
   Users,
-  Clock,
-  AlertTriangle,
-  ChevronDown,
-  ChevronUp,
-  MapPin,
 } from "lucide-react";
 import {
   LicenciasService,
@@ -26,24 +21,15 @@ import Pagination from "@/components/ui/Pagination";
 import { ConfigLicenciasPanel } from "@/components/licencias/ConfigLicenciasPanel";
 import { LicenciaJugadorCard } from "@/components/licencias/LicenciaJugadorCard";
 import { useProfileStore } from "@/store/useProfileStore";
+import { PAGE_SIZE_JUGADORES } from "@/utils/jugadoresListado";
 
-const PAGE_SIZE = 8;
-
-type MobileTab = "licencias" | "config";
+type VistaJugadores = "jugadores" | "configuracion";
 type FiltroLicencia =
   | "Todas"
   | "Pendientes"
   | "Vigentes"
   | "Vencidas"
   | "Rechazadas";
-
-const FILTROS: FiltroLicencia[] = [
-  "Todas",
-  "Pendientes",
-  "Vigentes",
-  "Vencidas",
-  "Rechazadas",
-];
 
 const FILTRO_A_ESTADO: Record<
   FiltroLicencia,
@@ -83,8 +69,7 @@ export default function JugadoresLicenciasPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>("");
   const [filtroActivo, setFiltroActivo] = useState<FiltroLicencia>("Todas");
-  const [mobileTab, setMobileTab] = useState<MobileTab>("licencias");
-  const [configAbierta, setConfigAbierta] = useState(true);
+  const [vista, setVista] = useState<VistaJugadores>("jugadores");
   const [contextoConfig, setContextoConfig] =
     useState<LicenciaConfigData | null>(null);
 
@@ -150,7 +135,7 @@ export default function JugadoresLicenciasPage() {
         const estado = filtro ? FILTRO_A_ESTADO[filtro] : undefined;
         const response = await LicenciasService.getByPage(
           pageNumber,
-          PAGE_SIZE,
+          PAGE_SIZE_JUGADORES,
           query,
           estado,
         );
@@ -311,89 +296,48 @@ export default function JugadoresLicenciasPage() {
   const totalJugadores = resumen?.total ?? total;
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto p-6 lg:p-8 xl:p-10 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-widest text-brand-chartreuse mb-1">
-              {contextoConfig?.tipo === "asociacion"
-                ? "Gestión provincial"
-                : "Gestión federativa"}
-            </p>
-            <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">
-              Jugadores y licencias
-            </h1>
-            <p className="text-gray-400 mt-1 text-sm max-w-xl">
-              {contextoConfig?.tipo === "asociacion"
-                ? `Licencias de ${contextoConfig.entidad_nombre || "tu asociación"}. Podés aprobar, suspender y registrar pagos mensuales.`
-                : "Configurá el carnet del circuito y gestioná cada jugador."}{" "}
-              El vencimiento individual se edita en la fecha de cada jugador.
-            </p>
-            {contextoConfig?.tipo === "asociacion" && (
-              <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-brand-chartreuse/25 bg-brand-chartreuse/5 text-[11px] font-bold text-brand-chartreuse">
-                <MapPin className="size-3.5" />
-                {contextoConfig.subtitulo ||
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 py-3">
+      <div className="flex h-10 items-center justify-between gap-3 max-xl:h-auto max-xl:flex-col max-xl:items-stretch">
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h1 className="shrink-0 text-lg font-bold text-white">
+            Jugadores
+            {contextoConfig?.tipo === "asociacion"
+              ? ` · ${
+                  contextoConfig.subtitulo ||
                   contextoConfig.provincia ||
                   profile?.lugar_residencia ||
-                  "Tu provincia"}
-                {contextoConfig.config?.frecuenciaPago === "mensual" && (
-                  <span className="text-gray-400 font-semibold">
-                    · pago mensual
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="relative w-full lg:w-80 xl:w-96 shrink-0">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 size-4" />
-            <input
-              type="text"
-              placeholder="Buscar jugador, email o N° licencia..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              className="w-full pl-11 pr-4 py-3 bg-brand-input border border-white/5 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors"
-            />
-          </div>
+                  "tu provincia"
+                }`
+              : ""}
+          </h1>
+          <p className="truncate text-xs text-gray-400">
+            El vencimiento individual se edita en la fecha de cada jugador.
+          </p>
         </div>
+        <div className="relative w-full shrink-0 xl:w-72">
+          <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-500" />
+          <input
+            type="text"
+            placeholder="Buscar jugador, email o N° licencia..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            className="h-9 w-full rounded-lg border border-white/5 bg-brand-input pl-9 pr-3 text-xs text-white placeholder-gray-500 focus:border-brand-chartreuse/50 focus:outline-none"
+          />
+        </div>
+      </div>
 
-        {/* Stats rápidas — también actúan como atajo de filtro */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="flex h-9 items-center gap-2 max-xl:h-auto max-xl:flex-wrap">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {(
             [
-              { filtro: "Todas" as FiltroLicencia, label: "Total", value: totalJugadores, icon: Users, color: "text-white" },
-              {
-                filtro: "Pendientes" as FiltroLicencia,
-                label: "Pendientes",
-                value: pendientes,
-                icon: Clock,
-                color: "text-yellow-400",
-              },
-              {
-                filtro: "Vigentes" as FiltroLicencia,
-                label: "Vigentes",
-                value: vigentes,
-                icon: ShieldCheck,
-                color: "text-green-400",
-              },
-              {
-                filtro: "Vencidas" as FiltroLicencia,
-                label: "Vencidas",
-                value: vencidas,
-                icon: AlertTriangle,
-                color: "text-red-400",
-              },
-              {
-                filtro: "Rechazadas" as FiltroLicencia,
-                label: "Rechazadas",
-                value: rechazadas,
-                icon: XCircle,
-                color: "text-red-300",
-              },
+              { filtro: "Todas" as FiltroLicencia, label: "Total", value: totalJugadores, color: "text-white" },
+              { filtro: "Pendientes" as FiltroLicencia, label: "Pendientes", value: pendientes, color: "text-yellow-400" },
+              { filtro: "Vigentes" as FiltroLicencia, label: "Vigentes", value: vigentes, color: "text-green-400" },
+              { filtro: "Vencidas" as FiltroLicencia, label: "Vencidas", value: vencidas, color: "text-red-400" },
+              { filtro: "Rechazadas" as FiltroLicencia, label: "Rechazadas", value: rechazadas, color: "text-red-300" },
             ] as const
           ).map((stat) => (
             <button
@@ -402,160 +346,78 @@ export default function JugadoresLicenciasPage() {
               onClick={() => {
                 setFiltroActivo(stat.filtro);
                 setPage(1);
+                setVista("jugadores");
               }}
-              className={`bg-[#111111] border rounded-xl px-4 py-3 flex items-center gap-3 text-left transition-all ${
-                filtroActivo === stat.filtro
-                  ? "border-brand-chartreuse/50 ring-1 ring-brand-chartreuse/20"
-                  : "border-white/5 hover:border-white/15"
+              className={`inline-flex h-9 min-w-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs ${
+                filtroActivo === stat.filtro && vista === "jugadores"
+                  ? "border-brand-chartreuse/50 bg-brand-chartreuse/10"
+                  : "border-white/5 bg-[#111111] hover:border-white/15"
               }`}
             >
-              <stat.icon className={`size-5 ${stat.color} shrink-0`} />
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  {stat.label}
-                </p>
-                <p className={`text-xl font-black ${stat.color}`}>
-                  {stat.value}
-                </p>
-              </div>
+              <span className="truncate text-gray-400">{stat.label}</span>
+              <span className={`font-black tabular-nums ${stat.color}`}>
+                {stat.value}
+              </span>
             </button>
           ))}
         </div>
-
-        {/* Filtros por estado — el marco abraza el contenido */}
-        <div className="inline-flex flex-wrap items-center bg-[#111111] p-1 rounded-xl border border-white/5 w-fit max-w-full">
-          {FILTROS.map((filtro) => (
-            <button
-              key={filtro}
-              type="button"
-              onClick={() => {
-                setFiltroActivo(filtro);
-                setPage(1);
-              }}
-              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
-                filtroActivo === filtro
-                  ? "bg-brand-chartreuse text-brand-black shadow-[0_0_10px_rgba(204,255,0,0.15)]"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              {filtro}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {contextoConfig?.puede_editar !== false && (
-      <div className="flex lg:hidden gap-2 p-1 bg-[#111111] border border-white/5 rounded-xl">
-        <button
-          type="button"
-          onClick={() => setMobileTab("licencias")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
-            mobileTab === "licencias"
-              ? "bg-brand-chartreuse text-brand-black"
-              : "text-gray-400"
-          }`}
-        >
-          <Users className="size-4" />
-          Jugadores
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobileTab("config")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
-            mobileTab === "config"
-              ? "bg-brand-chartreuse text-brand-black"
-              : "text-gray-400"
-          }`}
-        >
-          <Settings2 className="size-4" />
-          Config carnet
-        </button>
-      </div>
-      )}
-
-      {/* Sidebar: compacta en notebooks/zoom; más ancha solo en monitores grandes */}
-      <div
-        className={
-          contextoConfig?.puede_editar === false
-            ? "space-y-4"
-            : "grid grid-cols-1 lg:grid-cols-[minmax(240px,280px)_minmax(0,1fr)] min-[1700px]:grid-cols-[minmax(300px,360px)_minmax(0,1fr)] gap-6 items-start"
-        }
-      >
-        {contextoConfig?.puede_editar === false ? (
-          <ConfigLicenciasPanel scope="contexto" compact puedeEditar={false} />
-        ) : (
-        <aside
-          className={`lg:sticky lg:top-6 min-w-0 ${
-            mobileTab === "config" ? "block" : "hidden lg:block"
-          }`}
-        >
+        <div className="inline-flex h-8 shrink-0 items-center rounded-lg border border-white/5 bg-[#111111] p-0.5">
           <button
             type="button"
-            onClick={() => setConfigAbierta((v) => !v)}
-            className="hidden lg:flex w-full items-center justify-between mb-3 text-xs font-bold uppercase tracking-wider text-gray-400 hover:text-white transition-colors"
+            onClick={() => setVista("jugadores")}
+            className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold ${
+              vista === "jugadores"
+                ? "bg-brand-chartreuse text-brand-black"
+                : "text-gray-400 hover:text-white"
+            }`}
           >
-            <span>Parámetros del carnet</span>
-            {configAbierta ? (
-              <ChevronUp className="size-4" />
-            ) : (
-              <ChevronDown className="size-4" />
-            )}
+            <Users className="size-3.5" />
+            Jugadores
           </button>
-          <div className={configAbierta ? undefined : "lg:hidden"}>
-            <ConfigLicenciasPanel
-              scope="contexto"
-              compact
-              puedeEditar
-            />
-          </div>
-        </aside>
-        )}
+          <button
+            type="button"
+            onClick={() => setVista("configuracion")}
+            className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold ${
+              vista === "configuracion"
+                ? "bg-brand-chartreuse text-brand-black"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            <Settings2 className="size-3.5" />
+            Configuración
+          </button>
+        </div>
+      </div>
 
-        <section
-          className={`space-y-4 min-w-0 ${
-            contextoConfig?.puede_editar === false || mobileTab === "licencias"
-              ? "block"
-              : "hidden lg:block"
-          }`}
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                Altas y renovaciones
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {licencias.length} de {total}
-                {filtroActivo !== "Todas" ? ` · filtro: ${filtroActivo}` : ""}
-              </p>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="space-y-3">
-              {[...Array(4)].map((_, i) => (
+      {vista === "configuracion" ? (
+        <ConfigLicenciasPanel
+          scope="contexto"
+          variante="seccion"
+          puedeEditar={contextoConfig?.puede_editar !== false}
+        />
+      ) : (
+        <>
+          <div className="flex flex-col gap-2 xl:hidden">
+            {loading ? (
+              [...Array(4)].map((_, i) => (
                 <div
                   key={i}
-                  className="h-28 bg-[#111111] border border-white/5 rounded-2xl animate-pulse"
+                  className="h-24 animate-pulse rounded-2xl border border-white/10 bg-[#141414]"
                 />
-              ))}
-            </div>
-          ) : licencias.length === 0 ? (
-            <div className="bg-[#111111] border border-white/5 rounded-2xl p-16 text-center">
-              <Users className="size-10 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-500 font-medium">
+              ))
+            ) : licencias.length === 0 ? (
+              <p className="rounded-2xl border border-white/10 bg-[#141414] px-4 py-6 text-sm text-gray-400">
                 No se encontraron licencias
                 {filtroActivo !== "Todas" ? ` con estado "${filtroActivo}"` : ""}.
               </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {licencias.map((jugador) => {
+            ) : (
+              licencias.map((jugador) => {
                 const licencia = getDisplayLicencia(jugador.licencias);
                 if (!licencia) return null;
-
                 return (
                   <LicenciaJugadorCard
                     key={jugador.id}
+                    presentacion="tarjeta"
                     jugador={jugador}
                     licencia={licencia}
                     editingLicenciaId={editingLicenciaId}
@@ -575,26 +437,106 @@ export default function JugadoresLicenciasPage() {
                         licenciaId,
                         estado,
                         jugador.nombre
-                          ? `${jugador.apellido || ""}, ${jugador.nombre}`.replace(/^, /, "")
+                          ? `${jugador.apellido || ""}, ${jugador.nombre}`.replace(
+                              /^, /,
+                              "",
+                            )
                           : "este jugador",
                       )
                     }
                     savingFecha={savingFecha}
                   />
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
 
+          <div className="hidden overflow-hidden rounded-2xl border border-white/10 bg-brand-card xl:block">
+            <table className="w-full table-fixed border-collapse text-left">
+              <thead className="bg-black/40">
+                <tr className="h-8 border-b border-white/10 text-xs font-bold uppercase tracking-wider text-gray-400">
+                  <th className="px-3 py-0 font-bold">Jugador</th>
+                  <th className="w-[12%] px-3 py-0 font-bold">DNI</th>
+                  <th className="w-[10%] px-3 py-0 font-bold">Categoría</th>
+                  <th className="w-[14%] px-3 py-0 font-bold">N° licencia</th>
+                  <th className="w-[12%] px-3 py-0 font-bold">Estado</th>
+                  <th className="w-[14%] px-3 py-0 font-bold">Vencimiento</th>
+                  <th className="w-[16%] px-3 py-0 text-right font-bold">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  [...Array(10)].map((_, i) => (
+                    <tr key={i} className="h-9 border-b border-white/5">
+                      <td colSpan={7} className="px-3">
+                        <div className="h-3 animate-pulse rounded bg-white/10" />
+                      </td>
+                    </tr>
+                  ))
+                ) : licencias.length === 0 ? (
+                  <tr className="h-9">
+                    <td colSpan={7} className="px-3 text-xs text-gray-500">
+                      No se encontraron licencias
+                      {filtroActivo !== "Todas"
+                        ? ` con estado "${filtroActivo}"`
+                        : ""}
+                      .
+                    </td>
+                  </tr>
+                ) : (
+                  licencias.map((jugador) => {
+                    const licencia = getDisplayLicencia(jugador.licencias);
+                    if (!licencia) return null;
+                    return (
+                      <LicenciaJugadorCard
+                        key={jugador.id}
+                        presentacion="fila"
+                        jugador={jugador}
+                        licencia={licencia}
+                        editingLicenciaId={editingLicenciaId}
+                        editingFechaInput={editingFechaInput}
+                        onStartEditFecha={(id, fecha) => {
+                          setEditingLicenciaId(id);
+                          setEditingFechaInput(fecha);
+                        }}
+                        onChangeFecha={setEditingFechaInput}
+                        onSaveFecha={handleGuardarFechaRapido}
+                        onCancelEditFecha={() => setEditingLicenciaId(null)}
+                        onValidar={() =>
+                          setLicenciaAVerificar({
+                            ...licencia,
+                            perfiles: jugador,
+                          })
+                        }
+                        onCambiarEstado={(licenciaId, estado) =>
+                          pedirCambioEstado(
+                            licenciaId,
+                            estado,
+                            jugador.nombre
+                              ? `${jugador.apellido || ""}, ${jugador.nombre}`.replace(
+                                  /^, /,
+                                  "",
+                                )
+                              : "este jugador",
+                          )
+                        }
+                        savingFecha={savingFecha}
+                      />
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
           <Pagination
             page={page}
             total={total}
-            pageSize={PAGE_SIZE}
+            pageSize={PAGE_SIZE_JUGADORES}
             currentCount={licencias.length}
             onPageChange={setPage}
           />
-        </section>
-      </div>
+        </>
+      )}
 
       {licenciaAVerificar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">

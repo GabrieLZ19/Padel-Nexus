@@ -24,6 +24,8 @@ interface ConfigLicenciasPanelProps {
   titulo?: string;
   puedeEditar?: boolean;
   compact?: boolean;
+  /** tarjeta = bloque cerrado. seccion = formulario a lo ancho de la página. */
+  variante?: "tarjeta" | "seccion";
 }
 
 const MESES = [
@@ -67,6 +69,7 @@ export function ConfigLicenciasPanel({
   titulo,
   puedeEditar = true,
   compact = false,
+  variante = "tarjeta",
 }: ConfigLicenciasPanelProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -214,9 +217,13 @@ export function ConfigLicenciasPanel({
 
   const tituloFinal =
     titulo || meta.entidad_nombre || "Configuración de carnets federativos";
+  const seccion = variante === "seccion";
+  const grupo = seccion
+    ? "space-y-3 rounded-xl border border-white/10 bg-[#111111] p-4"
+    : "contents";
 
   if (loading) {
-    if (!puedeEditar) {
+    if (!puedeEditar || seccion) {
       return <p className="text-sm text-gray-500">Cargando carnet…</p>;
     }
     return (
@@ -251,35 +258,80 @@ export function ConfigLicenciasPanel({
       : "";
     const resumen = [nombre, precio, descripcion].filter(Boolean).join(" · ");
     return (
-      <p className="text-sm text-gray-300 leading-snug">
-        {resumen}. Lo define la federación.
-      </p>
+      <div
+        className={
+          seccion
+            ? "flex items-start gap-3 rounded-xl border border-white/10 bg-[#111111] px-4 py-3"
+            : ""
+        }
+      >
+        {seccion ? (
+          <IdCard className="mt-0.5 size-4 shrink-0 text-brand-chartreuse" />
+        ) : null}
+        <p className="text-sm text-gray-300 leading-snug">
+          {resumen}. Lo define la federación.
+        </p>
+      </div>
     );
   }
 
   return (
     <div
-      className={`bg-[#151515] border border-white/5 rounded-2xl flex flex-col ${
-        compact ? "p-5 space-y-4" : "p-6 space-y-5 h-full"
-      }`}
+      className={
+        seccion
+          ? "space-y-4"
+          : `bg-[#151515] border border-white/5 rounded-2xl flex flex-col ${
+              compact ? "p-5 space-y-4" : "p-6 space-y-5 h-full"
+            }`
+      }
     >
-      <div className="flex items-start gap-3">
-        <div className="size-10 rounded-xl bg-brand-chartreuse/10 border border-brand-chartreuse/20 flex items-center justify-center shrink-0">
-          <ShieldCheck className="size-5 text-brand-chartreuse" />
-        </div>
-        <div className="min-w-0">
+      <div
+        className={
+          seccion
+            ? "flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-4"
+            : "flex items-start gap-3"
+        }
+      >
+        {seccion ? null : (
+          <div className="size-10 rounded-xl bg-brand-chartreuse/10 border border-brand-chartreuse/20 flex items-center justify-center shrink-0">
+            <ShieldCheck className="size-5 text-brand-chartreuse" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
           <p className="text-[10px] font-black uppercase tracking-widest text-brand-chartreuse mb-0.5">
             Parámetros del circuito
           </p>
-          <h2 className="text-base font-bold text-white leading-tight">
+          <h2
+            className={`font-bold text-white leading-tight ${
+              seccion ? "text-xl" : "text-base"
+            }`}
+          >
             {tituloFinal}
           </h2>
+          {seccion ? (
+            <p className="mt-1 max-w-3xl text-sm text-gray-400">
+              Estos valores se replican al aprobar o renovar licencias. Con pago
+              mensual, la vigencia se extiende con cada pago registrado.
+            </p>
+          ) : null}
           {meta.subtitulo && (
             <p className="text-xs text-gray-400 mt-1">{meta.subtitulo}</p>
           )}
         </div>
+        {seccion && editarHabilitado ? (
+          <button
+            type="button"
+            onClick={guardar}
+            disabled={saving}
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-brand-chartreuse px-4 text-xs font-black uppercase tracking-wider text-brand-black disabled:opacity-60"
+          >
+            <Save className="size-4" />
+            {saving ? "Guardando..." : "Guardar"}
+          </button>
+        ) : null}
       </div>
 
+      {seccion ? null : (
       <div className="rounded-xl bg-black/30 border border-white/5 px-3 py-2.5 flex gap-2 text-[11px] text-gray-400">
         <Info className="size-4 text-brand-chartreuse shrink-0 mt-0.5" />
         <p>
@@ -287,6 +339,7 @@ export function ConfigLicenciasPanel({
           mensual, la vigencia se extiende con cada pago registrado.
         </p>
       </div>
+      )}
 
       {hereda && scope === "asociacion" && (
         <p className="text-[11px] text-amber-400/90">
@@ -294,7 +347,13 @@ export function ConfigLicenciasPanel({
         </p>
       )}
 
-      <div className="space-y-3">
+      <div className={seccion ? "grid grid-cols-1 gap-4 xl:grid-cols-3" : "space-y-3"}>
+        <div className={grupo}>
+          {seccion ? (
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">
+              Identidad
+            </p>
+          ) : null}
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1">
             <IdCard className="size-3" /> Nombre del carné
@@ -308,7 +367,14 @@ export function ConfigLicenciasPanel({
             className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white disabled:opacity-50 placeholder:text-gray-600"
           />
         </label>
+        </div>
 
+        <div className={grupo}>
+          {seccion ? (
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">
+              Pago
+            </p>
+          ) : null}
         <label className="block space-y-1.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
             Frecuencia de pago
@@ -379,7 +445,14 @@ export function ConfigLicenciasPanel({
             />
           </label>
         )}
+        </div>
 
+        <div className={grupo}>
+          {seccion ? (
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">
+              Vigencia
+            </p>
+          ) : null}
         {/* Vigencia anual clásica: solo relevante si frecuencia = anual */}
         {frecuencia === "anual" && (
           <>
@@ -447,6 +520,13 @@ export function ConfigLicenciasPanel({
             )}
           </>
         )}
+        {seccion && frecuencia === "mensual" ? (
+          <p className="text-sm text-gray-400">
+            Cada pago registrado extiende la vigencia. No hay una fecha fija de
+            cierre.
+          </p>
+        ) : null}
+        </div>
       </div>
 
       <div className="flex items-start gap-2 text-xs text-gray-400 bg-black/20 border border-white/5 rounded-xl px-3 py-2.5 mt-auto">
@@ -462,7 +542,7 @@ export function ConfigLicenciasPanel({
       )}
       {error && <p className="text-xs text-red-400">{error}</p>}
 
-      {editarHabilitado ? (
+      {seccion ? null : (
         <button
           type="button"
           onClick={guardar}
@@ -472,10 +552,6 @@ export function ConfigLicenciasPanel({
           <Save className="size-4" />
           {saving ? "Guardando..." : "Guardar configuración"}
         </button>
-      ) : (
-        <p className="text-[11px] text-center text-gray-500 py-2">
-          Solo la federación nacional puede editar estos valores.
-        </p>
       )}
     </div>
   );

@@ -13,7 +13,6 @@ import {
   Loader2,
   Sun,
   CloudRain,
-  LogIn,
 } from "lucide-react";
 import { ClubesService } from "@/utils/services/clubes";
 import { ReservasService } from "@/utils/services/reservas";
@@ -37,7 +36,6 @@ export default function ClubHorariosPage() {
   const clubId = params.id as string;
   const dateInputRef = useRef<HTMLInputElement>(null);
   const { profile, fetchProfile } = useProfileStore();
-  const [sessionChecked, setSessionChecked] = useState(false);
 
   const getLocalIsoDate = (date: Date) => {
     const yyyy = date.getFullYear();
@@ -54,25 +52,11 @@ export default function ClubHorariosPage() {
   const [reservando, setReservando] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    const checkSession = async () => {
-      if (profile?.id) {
-        if (!cancelled) setSessionChecked(true);
-        return;
-      }
-      await fetchProfile();
-      if (!cancelled) setSessionChecked(true);
-    };
-    void checkSession();
-    return () => {
-      cancelled = true;
-    };
-  }, [profile?.id, fetchProfile]);
+    void fetchProfile();
+  }, [fetchProfile]);
 
   // Fetch club data
   useEffect(() => {
-    if (!sessionChecked || !profile?.id) return;
-
     const fetchClub = async () => {
       try {
         const res = await ClubesService.getById(clubId);
@@ -82,15 +66,10 @@ export default function ClubHorariosPage() {
       }
     };
     void fetchClub();
-  }, [clubId, sessionChecked, profile?.id]);
+  }, [clubId]);
 
   // Fetch disponibilidad
   const fetchDisponibilidad = useCallback(async () => {
-    if (!sessionChecked || !profile?.id) {
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setSelectedSlot(null);
     try {
@@ -101,7 +80,7 @@ export default function ClubHorariosPage() {
     } finally {
       setLoading(false);
     }
-  }, [clubId, selectedDate, sessionChecked, profile?.id]);
+  }, [clubId, selectedDate]);
 
   useEffect(() => {
     fetchDisponibilidad();
@@ -176,6 +155,11 @@ export default function ClubHorariosPage() {
   // Reservar
   const handleReservar = () => {
     if (!selectedSlot) return;
+    if (!profile?.id) {
+      const vuelta = `/reservar/club/${clubId}`;
+      router.push(`/login?redirect=${encodeURIComponent(vuelta)}`);
+      return;
+    }
     router.push(`/reservar/checkout/new?turno_id=${selectedSlot.turno_id}&fecha_reserva=${selectedDate}`);
   };
 
@@ -203,7 +187,7 @@ export default function ClubHorariosPage() {
   };
 
   return (
-    <main className="min-h-screen pt-24 pb-16">
+    <main className="min-h-screen pt-24 pb-36 sm:pb-28">
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* ── Breadcrumb y Header Premium ─────────────────── */}
         <div className="mb-6">
@@ -235,42 +219,6 @@ export default function ClubHorariosPage() {
             </div>
           )}
         </div>
-
-        {sessionChecked && !profile?.id ? (
-          <div className="max-w-xl mx-auto">
-            <div className="relative overflow-hidden rounded-2xl border border-brand-chartreuse/20 bg-brand-card px-6 py-12 sm:px-10 text-center">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(203,254,1,0.08),transparent_55%)]" />
-              <div className="relative">
-                <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-brand-chartreuse/10 border border-brand-chartreuse/20">
-                  <LogIn className="size-6 text-brand-chartreuse" />
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                  Iniciá sesión para ver horarios
-                </h2>
-                <p className="mt-3 text-sm sm:text-base text-gray-400 max-w-md mx-auto">
-                  Los turnos disponibles y la reserva de cancha requieren una
-                  cuenta.
-                </p>
-                <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                  <Link
-                    href={`/login?redirect=${encodeURIComponent(`/reservar/club/${clubId}`)}`}
-                    className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 rounded-xl bg-brand-chartreuse text-brand-black font-bold text-sm hover:opacity-90 transition-opacity"
-                  >
-                    <LogIn className="size-4" />
-                    Iniciar sesión
-                  </Link>
-                  <Link
-                    href="/signup"
-                    className="inline-flex items-center justify-center w-full sm:w-auto px-6 py-3 rounded-xl border border-white/10 text-white text-sm font-semibold hover:bg-white/5 transition-colors"
-                  >
-                    Crear cuenta
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
 
         {/* ── Selector de Fecha con Cápsulas Premium ──────── */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -386,7 +334,7 @@ export default function ClubHorariosPage() {
                 </div>
 
                 {/* Grid de slots horarios */}
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 max-sm:pr-20">
                   {cancha.slots.map((slot) => {
                     const isSelected = selectedSlot?.turno_id === slot.turno_id;
                     const isPast = esHorarioReservaPasado(
@@ -441,8 +389,8 @@ export default function ClubHorariosPage() {
 
         {/* ── Barra de Confirmación Fija ─────────────────── */}
         {selectedSlot && (
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-brand-card/95 backdrop-blur-xl border-t border-white/10 p-4">
-            <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="fixed bottom-0 left-0 right-0 z-40 bg-brand-card/95 backdrop-blur-xl border-t border-white/10 p-4 max-sm:pr-24">
+            <div className="max-w-6xl mx-auto flex max-sm:flex-col items-center max-sm:items-stretch justify-between gap-3">
               <div>
                 <p className="text-sm text-gray-400">Turno seleccionado</p>
                 <p className="font-semibold">
@@ -465,15 +413,15 @@ export default function ClubHorariosPage() {
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Reservando...
                     </>
-                  ) : (
+                  ) : profile?.id ? (
                     "Reservar ahora"
+                  ) : (
+                    "Iniciar sesión"
                   )}
                 </button>
               </div>
             </div>
           </div>
-        )}
-          </>
         )}
       </section>
     </main>

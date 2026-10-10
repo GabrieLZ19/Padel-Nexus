@@ -56,8 +56,17 @@ html.light .text-gray-300 {
 html.light .text-amber-300 {
   color: #92400e !important;
 }
+html.light .text-green-300,
 html.light .text-green-400 {
   color: #15803d !important;
+}
+html.light .text-yellow-300,
+html.light .text-yellow-400 {
+  color: #a16207 !important;
+}
+html.light .text-orange-300,
+html.light .text-orange-400 {
+  color: #c2410c !important;
 }
 html.light .text-red-300,
 html.light .text-red-400 {
@@ -94,6 +103,7 @@ html.light button.wizard-step-idle:hover {
   background-color: #f8fafc !important;
 }
 
+html.light .bg-\[\#101010\],
 html.light .bg-\[\#111111\],
 html.light .bg-\[\#111\],
 html.light .bg-\[\#121212\],
@@ -111,6 +121,8 @@ html.light .bg-brand-card {
 }
 
 html.light .bg-black\/20,
+html.light .odd\:bg-black\/20:nth-child(odd),
+html.light .bg-black\/30,
 html.light .bg-black\/35,
 html.light .bg-black\/40,
 html.light .bg-white\/5,

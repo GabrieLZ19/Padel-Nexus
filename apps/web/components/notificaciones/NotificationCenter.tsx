@@ -111,7 +111,7 @@ export default function NotificationCenter() {
         bg: "bg-brand-chartreuse/5",
         badge: "bg-brand-chartreuse/20 text-brand-chartreuse",
         accent: "bg-brand-chartreuse",
-        label: isComunicacionesCampana(notif) ? "Campaña" : "Promo",
+        label: isComunicacionesCampana(notif) ? "Campaña" : "Promoción",
       };
     }
 
@@ -123,7 +123,7 @@ export default function NotificationCenter() {
           bg: "bg-emerald-500/5",
           badge: "bg-emerald-500/20 text-emerald-300",
           accent: "bg-emerald-400",
-          label: tipo,
+          label: "Éxito",
         };
       case "error":
         return {
@@ -131,7 +131,7 @@ export default function NotificationCenter() {
           bg: "bg-rose-500/5",
           badge: "bg-rose-500/20 text-rose-300",
           accent: "bg-rose-400",
-          label: tipo,
+          label: "Error",
         };
       case "warning":
         return {
@@ -139,7 +139,7 @@ export default function NotificationCenter() {
           bg: "bg-amber-500/5",
           badge: "bg-amber-500/20 text-amber-300",
           accent: "bg-amber-400",
-          label: tipo,
+          label: "Aviso",
         };
       default:
         return {
@@ -147,7 +147,7 @@ export default function NotificationCenter() {
           bg: "bg-sky-500/5",
           badge: "bg-sky-500/20 text-sky-300",
           accent: "bg-sky-400",
-          label: tipo,
+          label: "Aviso",
         };
     }
   };

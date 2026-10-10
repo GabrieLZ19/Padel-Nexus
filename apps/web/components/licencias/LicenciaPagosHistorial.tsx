@@ -13,6 +13,8 @@ interface LicenciaPagosHistorialProps {
   licenciaId: string;
   /** Si true, muestra el botón para registrar pago manual. */
   puedeRegistrar?: boolean;
+  /** Abre el listado de una vez, para la fila expandida de la tabla. */
+  siempreAbierto?: boolean;
 }
 
 /**
@@ -22,8 +24,9 @@ interface LicenciaPagosHistorialProps {
 export function LicenciaPagosHistorial({
   licenciaId,
   puedeRegistrar = true,
+  siempreAbierto = false,
 }: LicenciaPagosHistorialProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(siempreAbierto);
   const [pagos, setPagos] = useState<LicenciaPago[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -72,7 +75,12 @@ export function LicenciaPagosHistorial({
   };
 
   return (
-    <div className="mt-3 border-t border-white/5 pt-3">
+    <div className={siempreAbierto ? "px-3 py-2" : "mt-3 border-t border-white/5 pt-3"}>
+      {siempreAbierto ? (
+        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-400">
+          Historial de pagos
+        </p>
+      ) : (
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -89,6 +97,7 @@ export function LicenciaPagosHistorial({
           <ChevronDown className="size-3.5 text-gray-500" />
         )}
       </button>
+      )}
 
       {open && (
         <div className="mt-3 space-y-2">

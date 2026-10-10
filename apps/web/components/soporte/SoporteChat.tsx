@@ -225,7 +225,8 @@ export default function SoporteChat() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
             onClick={handleOpen}
-            className="fixed bottom-6 right-6 z-50 size-14 rounded-full bg-brand-chartreuse text-brand-black flex items-center justify-center shadow-[0_0_25px_rgba(203,254,1,0.3)] hover:shadow-[0_0_35px_rgba(203,254,1,0.5)] hover:scale-105 transition-all cursor-pointer"
+            aria-label="Abrir chat"
+            className="fixed bottom-6 right-4 z-50 size-14 rounded-full bg-brand-chartreuse text-brand-black flex items-center justify-center shadow-[0_0_25px_rgba(203,254,1,0.3)] hover:shadow-[0_0_35px_rgba(203,254,1,0.5)] hover:scale-105 transition-all cursor-pointer"
           >
             <MessageSquare className="size-6" />
             {noLeidos > 0 && (
@@ -245,7 +246,7 @@ export default function SoporteChat() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="fixed bottom-6 right-6 z-50 w-[360px] h-[520px] max-h-[80vh] bg-brand-black border border-brand-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+            className="fixed bottom-6 right-4 z-50 w-[min(360px,calc(100vw-2rem))] h-[520px] max-h-[80vh] bg-brand-black border border-brand-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
           >
             {/* Header */}
             <div className="px-4 py-3.5 bg-brand-card border-b border-brand-white/5 flex items-center gap-3">

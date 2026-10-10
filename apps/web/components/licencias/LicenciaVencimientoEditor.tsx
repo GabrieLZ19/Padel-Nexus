@@ -13,6 +13,8 @@ interface LicenciaVencimientoEditorProps {
   onSave: () => void;
   onCancel: () => void;
   saving?: boolean;
+  /** Una sola línea, para la fila de la tabla de jugadores. */
+  compact?: boolean;
 }
 
 function formatVencimiento(dateString?: string | null) {
@@ -33,6 +35,7 @@ export function LicenciaVencimientoEditor({
   onSave,
   onCancel,
   saving = false,
+  compact = false,
 }: LicenciaVencimientoEditorProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -46,6 +49,55 @@ export function LicenciaVencimientoEditor({
       }
     }
   }, [isEditing]);
+
+  if (compact) {
+    if (!editable) {
+      return <span className="text-xs text-gray-400">Al aprobar</span>;
+    }
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-1">
+          <input
+            ref={inputRef}
+            type="date"
+            value={editingValue}
+            onChange={(e) => onChange(e.target.value)}
+            aria-label="Nuevo vencimiento"
+            className="h-7 w-[9.5rem] rounded-lg border border-brand-chartreuse/40 bg-black/60 px-2 text-xs text-white focus:border-brand-chartreuse focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving || !editingValue}
+            className="inline-flex size-7 items-center justify-center rounded-lg bg-brand-chartreuse text-brand-black disabled:opacity-50"
+            title="Guardar fecha"
+          >
+            <Check className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="inline-flex size-7 items-center justify-center rounded-lg bg-white/5 text-gray-400 hover:text-white"
+            title="Cancelar"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      );
+    }
+    return (
+      <button
+        type="button"
+        onClick={onStartEdit}
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-white hover:text-brand-chartreuse"
+        title="Clic para cambiar el vencimiento de este jugador"
+      >
+        {formatVencimiento(fechaVencimiento)}
+        <Pencil className="size-3 text-gray-500" />
+      </button>
+    );
+  }
 
   if (!editable) {
     return (

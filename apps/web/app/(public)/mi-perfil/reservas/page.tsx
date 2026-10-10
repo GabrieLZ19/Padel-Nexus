@@ -135,6 +135,23 @@ export default function MisReservasPage() {
     return f >= hoy;
   };
 
+  const esTurnoProximo = (fecha: string, horaInicio?: string) => {
+    if (!horaInicio) return esReservaFutura(fecha);
+    const dia = parseFechaCalendarioLocal(fecha);
+    if (!dia) return false;
+    const [hh, mm] = horaInicio.slice(0, 5).split(":").map(Number);
+    dia.setHours(hh || 0, mm || 0, 0, 0);
+    return dia.getTime() >= Date.now();
+  };
+
+  const reservasProximas = reservas.filter((reserva) =>
+    esTurnoProximo(reserva.fecha_reserva, reserva.turnos?.hora_inicio),
+  );
+  const reservasPasadas = reservas.filter(
+    (reserva) =>
+      !esTurnoProximo(reserva.fecha_reserva, reserva.turnos?.hora_inicio),
+  );
+
   const openModal = (reserva: ReservaUsuario) => {
     setModalReserva(reserva);
     setNivel(NIVEL_PARTIDO_DEFAULT);
@@ -214,8 +231,22 @@ export default function MisReservasPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {reservas.map((reserva) => {
+        <div className="space-y-10">
+          {(
+            [
+              { titulo: "Próximas", items: reservasProximas },
+              { titulo: "Pasadas", items: reservasPasadas },
+            ] as const
+          ).map((grupo) => (
+            <section key={grupo.titulo} className="space-y-4">
+              <h2 className="text-lg font-bold text-white">{grupo.titulo}</h2>
+              {grupo.items.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No hay reservas {grupo.titulo === "Próximas" ? "próximas" : "pasadas"}.
+                </p>
+              ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {grupo.items.map((reserva) => {
             const turno = reserva.turnos;
             const cancha = turno?.canchas;
             const club = cancha?.clubes;
@@ -406,6 +437,10 @@ export default function MisReservasPage() {
               </div>
             );
           })}
+        </div>
+              )}
+            </section>
+          ))}
         </div>
       )}
 
