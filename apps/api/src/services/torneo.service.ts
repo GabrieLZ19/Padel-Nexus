@@ -10,6 +10,7 @@ import {
   etiquetaInstitucion,
 } from "../utils/denominacionNacional";
 import { inscripcionAbiertaPorFechas } from "../utils/inscripcionElegibilidad";
+import { esNombreDePrueba, esTorneoDePrueba } from "../utils/datoPrueba";
 import {
   avanzarPartidosInternosZonaCuatro,
   sincronizarClasificadosALlave,
@@ -138,6 +139,8 @@ export interface FiltrosTorneo {
   vista?: string;
   /** Agrupa por competencia y, dentro, por rama. Pagina grupos, no torneos. */
   agrupar?: boolean;
+  /** El sitio público no lista torneos de ensayo. El panel sí. */
+  ocultarPrueba?: boolean;
 }
 
 function esVistaListado(valor: string | undefined): valor is VistaListadoTorneo {
@@ -411,6 +414,10 @@ export class TorneoService {
         tiene_partidos_hoy: false,
       };
     });
+
+    if (filtros?.ocultarPrueba) {
+      formatted = formatted.filter((torneo) => !esTorneoDePrueba(torneo));
+    }
 
     if (!vistaPedida && filtros?.estado) {
       const requestedStates = filtros.estado.split(",").map((s) => s.trim());
@@ -772,6 +779,7 @@ export class TorneoService {
       .insert([
         {
           nombre: payload.nombre,
+          es_prueba: esNombreDePrueba(payload.nombre),
           subtitulo: payload.subtitulo,
           club_id: payload.club_id || null,
           fecha: payload.fecha,

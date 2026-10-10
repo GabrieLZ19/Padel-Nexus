@@ -14,6 +14,7 @@ import {
   puntosInscripcionPorMejorInstancia,
   sumarPuntosPorProvincia,
 } from "../utils/puntosProvincia";
+import { esTorneoDePrueba, esVisibleEnSitioPublico } from "../utils/datoPrueba";
 
 export interface ActualizarPuntosDTO {
   usuarioId: string;
@@ -136,6 +137,9 @@ export class RankingService {
           categoria_padel,
           sexo,
           fecha_nacimiento,
+          email,
+          es_prueba,
+          rol,
           pais,
           club_id,
           clubes (
@@ -166,7 +170,7 @@ export class RankingService {
         ascending: true,
         nullsFirst: false,
       })
-      .limit(limit);
+      .limit(Math.max(limit, 500));
 
     if (categoria && categoria !== "Todas") {
       query = query.eq("categoria", categoria);
@@ -194,12 +198,7 @@ export class RankingService {
     //
     // Se aplica SIEMPRE que venga `provincia`, sin importar el alcance:
     // provincia es un filtro transversal (el usuario lo eligio explicitamente).
-    // Cuando hay filtro provincial, elevamos el limite para tener margen tras
-    // el filtrado en memoria.
     const debeFiltrarProvincia = Boolean(provincia);
-    if (debeFiltrarProvincia) {
-      query = query.limit(Math.max(limit, 500));
-    }
 
     const { data, error } = await query;
     if (error) {
@@ -214,12 +213,18 @@ export class RankingService {
       pg?: number;
       tendencia?: number;
       perfiles?: Record<string, unknown> & {
+        nombre?: string | null;
+        apellido?: string | null;
+        email?: string | null;
+        es_prueba?: boolean | null;
+        rol?: string | null;
         lugar_residencia?: string | null;
         clubes?: { provincia?: string | null } | null;
       };
     };
 
     let filas = (data as RowRanking[]) || [];
+    filas = filas.filter((jugador) => esVisibleEnSitioPublico(jugador.perfiles));
 
     // Filtro provincial insensible a acentos y mayusculas, aplicado en memoria.
     // Se resuelve UNICAMENTE contra `perfiles.lugar_residencia` (la provincia
@@ -233,8 +238,8 @@ export class RankingService {
           normalizarProvincia(jugador.perfiles?.lugar_residencia) === provNorm,
       );
       // Aplicamos el limite original una vez filtrado en memoria.
-      filas = filas.slice(0, limit);
     }
+    filas = filas.slice(0, limit);
 
     // Deduplicar jugadores por usuario_id (tomando su categoria con mayor
     // puntuacion, que viene primera en el ordenamiento).
@@ -282,7 +287,10 @@ export class RankingService {
     }
 
     return uniqueData.map((jugador, index) => {
-      const perfilObj = jugador.perfiles || {};
+      const perfilObj = { ...(jugador.perfiles || {}) };
+      delete perfilObj.email;
+      delete perfilObj.es_prueba;
+      delete perfilObj.rol;
       const clubInfo = afiliacionesMap[jugador.usuario_id] || null;
 
       return {
@@ -474,15 +482,17 @@ export class RankingService {
   }) {
     const { data, error } = await supabaseAdmin
       .from("torneos")
-      .select("id, categoria, nivel, rama, alcance")
+      .select("id, nombre, es_prueba, categoria, nivel, rama, alcance")
       .ilike("alcance", "%nacional%");
 
     if (error) throw new Error(error.message);
 
     const categoriaFiltro = (filtros.categoria || "").trim();
     const ids = (data || [])
-      .filter((torneo) =>
-        torneoNacionalCoincide(torneo, filtros.tipo, categoriaFiltro, filtros.rama),
+      .filter(
+        (torneo) =>
+          !esTorneoDePrueba(torneo) &&
+          torneoNacionalCoincide(torneo, filtros.tipo, categoriaFiltro, filtros.rama),
       )
       .map((torneo) => torneo.id as string);
 

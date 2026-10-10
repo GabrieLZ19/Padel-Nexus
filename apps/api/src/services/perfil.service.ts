@@ -11,6 +11,7 @@ import {
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
 import { randomBytes } from "crypto";
+import { esVisibleEnSitioPublico } from "../utils/datoPrueba";
 import { NotificacionService } from "./notificacion.service";
 import {
   CATEGORIAS_LIBRES,
@@ -128,12 +129,12 @@ export class PerfilService {
     const { data, error } = await supabaseAdmin
       .from("perfiles")
       .select(
-        "id, nombre, apellido, avatar_url, categoria_padel, lado_preferido, lugar_residencia, sexo, es_menor, cuenta_estado, perfil_publico_habilitado, clubes:clubes!perfiles_club_id_fkey(id, nombre)",
+        "id, nombre, apellido, email, es_prueba, rol, avatar_url, categoria_padel, lado_preferido, lugar_residencia, sexo, es_menor, cuenta_estado, perfil_publico_habilitado, clubes:clubes!perfiles_club_id_fkey(id, nombre)",
       )
       .eq("id", userId)
       .single();
 
-    if (error || !data) {
+    if (error || !data || !esVisibleEnSitioPublico(data)) {
       throw new Error("Perfil de usuario no encontrado en la plataforma.");
     }
 

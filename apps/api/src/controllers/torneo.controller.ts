@@ -3,7 +3,8 @@ import { TorneoService } from "../services/torneo.service";
 import { CompetenciaService } from "../services/competencia.service";
 import { supabaseAdmin } from "../config/supabase";
 import sharp from "sharp";
-import { esRolAdministrativo } from "../constants/roles";
+import { esRolAccesoCrm, esRolAdministrativo } from "../constants/roles";
+import { esTorneoDePrueba } from "../utils/datoPrueba";
 import { AlcanceCuentaService } from "../services/alcanceCuenta.service";
 import { decidirAlcanceTorneo, type AccionSobreTorneo } from "../utils/alcanceCuenta";
 
@@ -76,6 +77,7 @@ export const getAllTorneos = async (
       incluirNacionales,
       vista: typeof vista === "string" ? vista : undefined,
       agrupar: agrupar === "true",
+      ocultarPrueba: !esRolAccesoCrm(req.user?.rol),
     });
 
     const marcar = <T extends { alcance?: string | null; club_id?: string | null; clubes?: { provincia?: string | null } | null }>(
@@ -151,6 +153,9 @@ export const getTorneoById = async (
 ): Promise<Response> => {
   try {
     const data = await TorneoService.obtenerPorId(req.params.id);
+    if (!esRolAccesoCrm(req.user?.rol) && esTorneoDePrueba(data)) {
+      return res.status(404).json({ message: "Torneo no encontrado." });
+    }
     const cuenta = await AlcanceCuentaService.resolver(req.user);
     if (cuenta.rol === "admin_provincial" || cuenta.rol === "admin_club") {
       const ver = decidirAlcanceTorneo(
