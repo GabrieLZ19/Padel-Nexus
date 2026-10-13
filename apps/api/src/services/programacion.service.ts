@@ -1,4 +1,6 @@
 import { supabaseAdmin } from "../config/supabase";
+import { estadoAlPublicarProgramacion } from "../utils/estadoCompetencia";
+import { SocketService } from "./socket.service";
 import { getFapBracketForPairCount } from "../utils/fapBracketMatrices";
 import {
   asignarHorariosAPartidos,
@@ -295,7 +297,7 @@ export class ProgramacionService {
   static async publicar(
     torneoId: string,
     opciones: { adminId?: string } = {},
-  ): Promise<{ ok: true; publicada_en: string }> {
+  ): Promise<{ ok: true; publicada_en: string; estado: string | null }> {
     const { data: partidos } = await supabaseAdmin
       .from("partidos")
       .select(
@@ -319,29 +321,60 @@ export class ProgramacionService {
       );
     }
 
-    const publicadaEn = new Date().toISOString();
+    const { data: torneo } = await supabaseAdmin
+      .from("torneos")
+      .select("id, estado")
+      .eq("id", torneoId)
+      .maybeSingle();
+    if (!torneo) throw new Error("Torneo no encontrado");
 
-    // Publicar horarios no cambia el estado de competencia. «Programado»
-    // sigue siendo «listo para iniciar» hasta el primer resultado oficial.
+    const publicadaEn = new Date().toISOString();
+    const estadoCompetencia = estadoAlPublicarProgramacion(torneo.estado);
+    const cambios: {
+      programacion_estado: "publicado";
+      programacion_publicada_en: string;
+      estado?: string;
+    } = {
+      programacion_estado: "publicado",
+      programacion_publicada_en: publicadaEn,
+    };
+    if (estadoCompetencia) cambios.estado = estadoCompetencia;
+
     const { error } = await supabaseAdmin
       .from("torneos")
-      .update({
-        programacion_estado: "publicado",
-        programacion_publicada_en: publicadaEn,
-      })
+      .update(cambios)
       .eq("id", torneoId);
     if (error) throw new Error(error.message);
+
+    if (estadoCompetencia) {
+      try {
+        SocketService.emitirATodos("torneo_actualizado", {
+          torneo_id: torneoId,
+          estado: estadoCompetencia,
+          mensaje: "El torneo pasó a En curso al publicar la programación",
+        });
+      } catch (e) {
+        console.warn("Error al emitir evento websocket de torneo:", e);
+      }
+    }
 
     if (opciones.adminId) {
       await supabaseAdmin.from("logs_auditoria").insert({
         usuario_id_admin: opciones.adminId,
         accion: "publicar_programacion",
         entidad_afectada: torneoId,
-        detalles: { publicada_en: publicadaEn },
+        detalles: {
+          publicada_en: publicadaEn,
+          estado: estadoCompetencia || torneo.estado,
+        },
       });
     }
 
-    return { ok: true, publicada_en: publicadaEn };
+    return {
+      ok: true as const,
+      publicada_en: publicadaEn,
+      estado: estadoCompetencia || torneo.estado,
+    };
   }
 
   private static async contarParejasConfirmadas(
@@ -1027,6 +1060,7 @@ export class ProgramacionService {
 
   /**
    * Publicado → programado para permitir nueva edición manual.
+   * El estado de competencia queda en En curso: publicar ya lo abrió.
    */
   static async abrirNuevaEdicion(
     torneoId: string,

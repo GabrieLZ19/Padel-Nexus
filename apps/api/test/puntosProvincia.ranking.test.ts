@@ -59,7 +59,7 @@ describe("puntos de provincia", () => {
       ["cordoba-a", "cordoba-b", "OCTAVOS"],
       ["buenos-aires-a", "neuquen-b", "OCTAVOS"],
       ["tucuman", "chaco-b", "OCTAVOS"],
-      ["chubut-b", "cordoba-b2", "OCTAVOS"],
+      ["chubut-b", "cordoba-e", "OCTAVOS"],
       ["chubut-a", "cordoba-c", "OCTAVOS"],
       ["rio-negro-a", "neuquen-c", "OCTAVOS"],
       ["chaco-a", "cordoba-d", "OCTAVOS"],
@@ -77,7 +77,7 @@ describe("puntos de provincia", () => {
     const provincia: Record<string, string> = {
       "cordoba-a": "Córdoba",
       "cordoba-b": "Córdoba",
-      "cordoba-b2": "Córdoba",
+      "cordoba-e": "Córdoba",
       "cordoba-c": "Córdoba",
       "cordoba-d": "Córdoba",
       "neuquen-a": "Neuquén",
@@ -99,6 +99,8 @@ describe("puntos de provincia", () => {
       total.set(nombre, (total.get(nombre) || 0) + pts);
     }
 
+    assert.equal(puntos.get("cordoba-b"), 1);
+    assert.equal(puntos.get("cordoba-e"), 1);
     assert.equal(total.get("Córdoba"), 12);
     assert.equal(total.get("Neuquén"), 8);
     assert.equal(total.get("Chaco"), 5);
@@ -119,7 +121,7 @@ describe("ranking nacional, caso general", () => {
     const parejas = [
       "cordoba-a",
       "cordoba-b",
-      "cordoba-b2",
+      "cordoba-e",
       "cordoba-c",
       "cordoba-d",
       "neuquen-a",
@@ -137,7 +139,7 @@ describe("ranking nacional, caso general", () => {
     const provincia: Record<string, string> = {
       "cordoba-a": "Córdoba",
       "cordoba-b": "Córdoba",
-      "cordoba-b2": "Córdoba",
+      "cordoba-e": "Córdoba",
       "cordoba-c": "Córdoba",
       "cordoba-d": "Córdoba",
       "neuquen-a": "Neuquén",
@@ -163,7 +165,7 @@ describe("ranking nacional, caso general", () => {
       ["cordoba-a", "cordoba-b", "OCTAVOS"],
       ["buenos-aires-a", "neuquen-b", "OCTAVOS"],
       ["tucuman", "chaco-b", "OCTAVOS"],
-      ["chubut-b", "cordoba-b2", "OCTAVOS"],
+      ["chubut-b", "cordoba-e", "OCTAVOS"],
       ["chubut-a", "cordoba-c", "OCTAVOS"],
       ["rio-negro-a", "neuquen-c", "OCTAVOS"],
       ["chaco-a", "cordoba-d", "OCTAVOS"],

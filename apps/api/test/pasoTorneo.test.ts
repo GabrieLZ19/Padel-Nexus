@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   hrefDetalleTorneo,
+  normalizarPasoAsistente,
   numeroPasoVisible,
   pasoSegunEstadoTorneo,
 } from "../../web/components/torneos/wizard/stepLocks";
@@ -20,13 +21,17 @@ describe("paso inicial del torneo", () => {
     );
   });
 
-  it("usa el mismo número en el índice y en el título", () => {
-    assert.equal(numeroPasoVisible("cierre"), 7);
-    assert.equal(numeroPasoVisible("draws"), 8);
-    assert.equal(numeroPasoVisible("matches"), 9);
-    assert.equal(numeroPasoVisible("cierre", ["fiscales"]), 6);
-    assert.equal(numeroPasoVisible("draws", ["fiscales"]), 7);
-    assert.equal(numeroPasoVisible("matches", ["fiscales"]), 8);
-    assert.equal(numeroPasoVisible("times", ["fiscales"]), 5);
+  it("numera sin el paso Sedes", () => {
+    assert.equal(numeroPasoVisible("fiscales"), 5);
+    assert.equal(numeroPasoVisible("cierre"), 6);
+    assert.equal(numeroPasoVisible("draws"), 7);
+    assert.equal(numeroPasoVisible("matches"), 8);
+    assert.equal(numeroPasoVisible("cierre", ["fiscales"]), 5);
+    assert.equal(numeroPasoVisible("draws", ["fiscales"]), 6);
+    assert.equal(numeroPasoVisible("matches", ["fiscales"]), 7);
+    assert.equal(numeroPasoVisible("times"), 0);
+    assert.equal(normalizarPasoAsistente("times"), "fiscales");
+    assert.equal(normalizarPasoAsistente("times", ["fiscales"]), "cierre");
+    assert.equal(normalizarPasoAsistente("draws"), "draws");
   });
 });

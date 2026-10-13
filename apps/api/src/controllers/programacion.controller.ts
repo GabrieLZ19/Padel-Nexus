@@ -72,7 +72,7 @@ export const reprogramarProgramacion = async (
 
 /**
  * POST /api/torneos/:id/programacion/publicar
- * Flippea `programacion_estado` de programado -> publicado.
+ * Publica los horarios y, si el torneo estaba Programado, lo pasa a En curso.
  * Valida que todos los partidos programables tengan cancha + horario.
  */
 export const publicarProgramacion = async (

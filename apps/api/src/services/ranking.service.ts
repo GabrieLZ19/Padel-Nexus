@@ -372,8 +372,9 @@ export class RankingService {
   }
 
   /**
-   * Ranking por provincias en torneos nacionales:
-   * 8 campeón · 6 finalista · 4 semis · 2 cuartos · 1 octavos.
+   * Ranking por provincias. Solo un torneo nacional suma: las parejas
+   * representan a su provincia. Los puntos y la instancia inicial salen
+   * del cierre; si no hay tabla, el circuito usa 8, 6, 4, 2 y 1 desde octavos.
    */
   static async rankingProvincialPorTorneo(torneoId: string) {
     const { data: torneo, error: errorTorneo } = await supabaseAdmin

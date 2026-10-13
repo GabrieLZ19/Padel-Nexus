@@ -93,9 +93,9 @@ export function decidirAlcanceTorneo(
       return denegado("Este torneo no se juega en tu club.");
     }
     if (esAlcanceNacional(torneo.alcance)) {
-      if (accion === "ver" || accion === "resultados") return permitido(true, true);
+      if (accion === "ver") return permitido(true, false);
       return denegado(
-        "En un torneo de otra entidad podés cargar resultados, no editarlo ni eliminarlo.",
+        "Este torneo lo organiza otra entidad. Tu club solo aporta las instalaciones.",
       );
     }
     return permitido(false, true);

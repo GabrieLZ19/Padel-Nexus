@@ -1,4 +1,8 @@
 import { supabaseAdmin } from "../config/supabase";
+import {
+  MENSAJE_RESULTADO_SIN_PUBLICAR,
+  puedeCargarResultadoOficial,
+} from "../utils/estadoCompetencia";
 import { SocketService } from "./socket.service";
 import {
   FAP_ESTADOS_PAGO,
@@ -1709,10 +1713,19 @@ export class TorneoService {
   ) {
     const { data: previo } = await supabaseAdmin
       .from("partidos")
-      .select("ganador")
+      .select("ganador, torneos(estado)")
       .eq("id", partidoId)
       .maybeSingle();
     const yaTeniaResultado = Boolean(previo?.ganador);
+    const estadoPrevio = (
+      previo?.torneos as { estado?: string } | { estado?: string }[] | null
+    );
+    const estadoTorneo = Array.isArray(estadoPrevio)
+      ? estadoPrevio[0]?.estado
+      : estadoPrevio?.estado;
+    if (previo && !puedeCargarResultadoOficial(estadoTorneo)) {
+      throw new Error(MENSAJE_RESULTADO_SIN_PUBLICAR);
+    }
 
     const { data: partido, error: updateError } = await supabaseAdmin
       .from("partidos")
@@ -1756,32 +1769,10 @@ export class TorneoService {
     const { data: torneoInfo } = await supabaseAdmin
       .from("torneos")
       .select(
-        "nivel, categoria, modalidad, configuracion_puntos, estado, programacion_estado",
+        "nivel, categoria, modalidad, configuracion_puntos",
       )
       .eq("id", partido.torneo_id)
       .single();
-
-    // El primer resultado pasa a En curso solo si los horarios ya se publicaron.
-    // Una carga durante la revisión deja el torneo en Por iniciar.
-    if (
-      torneoInfo?.estado === FAP_ESTADOS_TORNEO.PROGRAMADO &&
-      torneoInfo.programacion_estado === "publicado"
-    ) {
-      await supabaseAdmin
-        .from("torneos")
-        .update({ estado: FAP_ESTADOS_TORNEO.EN_CURSO })
-        .eq("id", partido.torneo_id);
-
-      try {
-        SocketService.emitirATodos("torneo_actualizado", {
-          torneo_id: partido.torneo_id,
-          estado: FAP_ESTADOS_TORNEO.EN_CURSO,
-          mensaje: "El torneo ha pasado a estado EN CURSO",
-        });
-      } catch (e) {
-        console.warn("Error al emitir evento websocket de torneo:", e);
-      }
-    }
 
     if (torneoInfo && !yaTeniaResultado) {
       let TABLA_PUNTOS: Record<string, { ganador: number; perdedor: number }> =
