@@ -15,7 +15,6 @@ import { Paso1Datos } from "@/components/torneos/wizard/Paso1Datos";
 import { Paso2Logos } from "@/components/torneos/wizard/Paso2Logos";
 import { Paso3Categorias } from "@/components/torneos/wizard/Paso3Categorias";
 import { Paso4Jugadores } from "@/components/torneos/wizard/Paso4Jugadores";
-import { Paso7Sedes } from "@/components/torneos/wizard/Paso5Sedes";
 import { Paso6Fiscales } from "@/components/torneos/wizard/Paso6Fiscales";
 import { Paso5Cierre } from "@/components/torneos/wizard/Paso7Cierre";
 import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
@@ -25,6 +24,7 @@ import { NumeroPasoProvider } from "@/components/torneos/wizard/NumeroPasoContex
 import type { SaveStepHandler } from "@/components/torneos/wizard/types";
 import {
   esEstadoTorneoModoLectura,
+  normalizarPasoAsistente,
   pasoBloqueadoPorAlcance,
   textoBannerModoLectura,
 } from "@/components/torneos/wizard/stepLocks";
@@ -37,11 +37,10 @@ const WIZARD_STEPS = [
   { id: "logos", label: "2. Logos", desc: "Patrocinadores" },
   { id: "categories", label: "3. Categorías", desc: "Clases" },
   { id: "players", label: "4. Jugadores", desc: "Inscripciones" },
-  { id: "times", label: "5. Sedes", desc: "Canchas & Horas" },
-  { id: "fiscales", label: "6. Fiscales", desc: "Autoridades" },
-  { id: "cierre", label: "7. Cierre", desc: "Puntuación" },
-  { id: "draws", label: "8. Cuadros", desc: "Fixture" },
-  { id: "matches", label: "9. Resultados", desc: "Marcadores" },
+  { id: "fiscales", label: "5. Fiscales", desc: "Autoridades" },
+  { id: "cierre", label: "6. Cierre", desc: "Puntuación" },
+  { id: "draws", label: "7. Cuadros", desc: "Fixture" },
+  { id: "matches", label: "8. Resultados", desc: "Marcadores" },
 ];
 
 export default function TorneoDetallePage() {
@@ -65,7 +64,7 @@ export default function TorneoDetallePage() {
   // Estados de UI
   const [activeTab, setActiveTab] = useState<string>(() => {
     const paso = searchParams.get("step");
-    return paso && WIZARD_STEPS.some((item) => item.id === paso) ? paso : "edit";
+    return normalizarPasoAsistente(paso);
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshKey, setRefreshKey] = useState<number>(0);
@@ -178,9 +177,7 @@ export default function TorneoDetallePage() {
               {torneo.solo_lectura ? (
                 <>
                   <strong className="text-white">Modo lectura:</strong>{" "}
-                  {torneo.puede_cargar_resultados
-                    ? "Este torneo es de otra entidad. Podés cargar resultados, no editarlo ni eliminarlo."
-                    : "Este torneo no es de tu entidad. Solo podés consultarlo."}
+                  Este torneo lo organiza otra entidad. Solo podés consultarlo.
                 </>
               ) : (
                 <>
@@ -226,12 +223,6 @@ export default function TorneoDetallePage() {
               {...commonProps}
               inscripciones={inscripciones}
               readOnly={pasoBloqueadoPorAlcance(torneo, "players")}
-            />
-          )}
-          {activeTab === "times" && (
-            <Paso7Sedes
-              {...commonProps}
-              readOnly={pasoBloqueadoPorAlcance(torneo, "times")}
             />
           )}
           {activeTab === "fiscales" && (

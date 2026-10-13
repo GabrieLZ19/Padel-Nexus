@@ -6,7 +6,6 @@ import {
   Image as ImageIcon,
   Layers,
   Users,
-  MapPin,
   ShieldCheck,
   Award,
   GitBranch,
@@ -67,17 +66,8 @@ export const ALL_STEPS: StepDefinition[] = [
     icon: Users,
   },
   {
-    id: "times",
-    number: 5,
-    label: "Sedes",
-    desc: "Clubes y canchas del torneo",
-    group: "logistics",
-    keywords: ["sedes", "canchas", "club", "sede"],
-    icon: MapPin,
-  },
-  {
     id: "fiscales",
-    number: 6,
+    number: 5,
     label: "Fiscales",
     desc: "Autoridades del torneo",
     group: "logistics",
@@ -86,7 +76,7 @@ export const ALL_STEPS: StepDefinition[] = [
   },
   {
     id: "cierre",
-    number: 7,
+    number: 6,
     label: "Cierre",
     desc: "Reglas y puntuación",
     group: "logistics",
@@ -95,7 +85,7 @@ export const ALL_STEPS: StepDefinition[] = [
   },
   {
     id: "draws",
-    number: 8,
+    number: 7,
     label: "Cuadros",
     desc: "Editor de llaves y fixture",
     group: "competition",
@@ -104,7 +94,7 @@ export const ALL_STEPS: StepDefinition[] = [
   },
   {
     id: "matches",
-    number: 9,
+    number: 8,
     label: "Resultados",
     desc: "Carga de marcadores y en vivo",
     group: "competition",
@@ -137,7 +127,11 @@ export function TournamentWizardNav({
 
   return (
     <nav aria-label="Pasos del torneo" className="w-full min-w-0">
-      <ol className="grid grid-cols-3 gap-1.5 sm:grid-cols-5 xl:grid-cols-9">
+      <ol
+        className={`grid grid-cols-2 gap-1.5 sm:grid-cols-4 ${
+          visibleSteps.length >= 8 ? "xl:grid-cols-8" : "xl:grid-cols-7"
+        }`}
+      >
         {visibleSteps.map((step) => {
           const numero = numeroPasoVisible(step.id, hiddenStepIds);
           const isActive = activeTab === step.id;

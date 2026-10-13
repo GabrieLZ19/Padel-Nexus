@@ -1,5 +1,8 @@
 import React, { useState } from "react";
-import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
+import {
+  useNumeroPaso,
+  usePasosOcultos,
+} from "@/components/torneos/wizard/NumeroPasoContext";
 import {
   CheckCircle2,
   Download,
@@ -63,6 +66,10 @@ export const Paso4Jugadores = ({
   readOnly = false,
 }: Paso4JugadoresProps) => {
   const numeroPaso = useNumeroPaso("players");
+  const siguienteId = usePasosOcultos().includes("fiscales")
+    ? "cierre"
+    : "fiscales";
+  const siguienteLabel = siguienteId === "cierre" ? "Cierre" : "Fiscales";
   const profile = useProfileStore((s) => s.profile);
   const userRole = (profile?.rol || "admin") as RolUsuario;
   const modoFederacion = esTorneoContextoFederacion(
@@ -447,10 +454,10 @@ export const Paso4Jugadores = ({
           Atrás
         </button>
         <button
-          onClick={() => setActiveTab("times")}
+          onClick={() => setActiveTab(siguienteId)}
           className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
         >
-          Siguiente Paso: Sedes
+          Siguiente Paso: {siguienteLabel}
         </button>
       </div>
 

@@ -50,7 +50,7 @@ function PendingCard({
       ref={setNodeRef}
       style={style}
       title={titulo}
-      className={`rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-left ${
+      className={`prog-inset rounded-lg px-2 py-0.5 text-left ${
         partido.assigned ? "opacity-60" : ""
       } ${
         !readOnly && !partido.assigned
@@ -65,7 +65,7 @@ function PendingCard({
           <GripVertical className="size-3.5 shrink-0 text-gray-500" aria-hidden />
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold leading-none text-white">
+          <p className="truncate text-xs font-semibold leading-none text-brand-white">
             {partido.label_a}{" "}
             <span className="font-normal text-gray-500">vs</span>{" "}
             {partido.label_b}
@@ -144,7 +144,7 @@ export function PendingMatchesSidebar({ partidos, issues, readOnly }: Props) {
     <aside
       ref={setNodeRef}
       title="Soltá un partido acá para quitarle el horario"
-      className={`flex h-full min-h-0 flex-col rounded-2xl border bg-[#161616] ${
+      className={`prog-surface flex h-full min-h-[280px] flex-col rounded-2xl lg:min-h-0 ${
         isOver
           ? "border-brand-chartreuse/60 ring-1 ring-brand-chartreuse/40"
           : "border-white/10"
@@ -152,13 +152,13 @@ export function PendingMatchesSidebar({ partidos, issues, readOnly }: Props) {
     >
       <div className="shrink-0 border-b border-white/10 px-2 py-1.5">
         <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-sm font-bold text-white">Pendientes</h2>
+          <h2 className="text-sm font-bold text-brand-white">Pendientes</h2>
           <p className="text-xs text-gray-400">
             {pendientes} sin horario
           </p>
         </div>
         <div className="mt-1 flex items-center gap-1.5">
-          <div className="flex min-w-0 flex-1 gap-1 rounded-lg bg-black/30 p-0.5">
+          <div className="prog-inset flex min-w-0 flex-1 gap-1 rounded-lg p-0.5">
             <button
               type="button"
               onClick={() => setTab("zones")}
@@ -210,7 +210,7 @@ export function PendingMatchesSidebar({ partidos, issues, readOnly }: Props) {
             const plegado = plegados[clave] === true;
             const titulo = list[0]?.ronda_etiqueta || ronda;
             return (
-              <section key={clave} className="rounded-lg bg-black/20">
+              <section key={clave} className="prog-inset rounded-lg">
                 <button
                   type="button"
                   onClick={() => toggleGrupo(clave)}

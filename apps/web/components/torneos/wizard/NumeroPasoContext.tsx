@@ -19,6 +19,10 @@ export function NumeroPasoProvider({
   );
 }
 
+export function usePasosOcultos(): readonly string[] {
+  return useContext(HiddenStepsContext);
+}
+
 export function useNumeroPaso(stepId: string): number {
-  return numeroPasoVisible(stepId, useContext(HiddenStepsContext));
+  return numeroPasoVisible(stepId, usePasosOcultos());
 }

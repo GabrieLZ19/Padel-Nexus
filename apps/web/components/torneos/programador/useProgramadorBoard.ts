@@ -404,9 +404,15 @@ export function useProgramadorBoard(torneoId: string) {
     }
     setBusy(true);
     try {
+      const yaEnCurso = boardRef.current?.estado === "En curso";
       await TorneosService.publicarProgramacion(torneoId);
       await load();
-      sileo.success({ title: "Programación publicada" });
+      sileo.success({
+        title: "Programación publicada",
+        description: yaEnCurso
+          ? "Los horarios quedaron visibles."
+          : "El torneo pasó a En curso. Ya se pueden cargar resultados.",
+      });
     } catch (e: unknown) {
       sileo.error({ title: apiErrorMessage(e, "No se pudo publicar") });
     } finally {

@@ -90,18 +90,18 @@ function ParejaCard({
         transform: CSS.Translate.toString(transform),
         opacity: isDragging ? 0.45 : 1,
       }}
-      className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5"
+      className="prog-inset flex items-center gap-1.5 rounded-lg px-2 py-1.5"
     >
       <button
         type="button"
-        className="cursor-grab text-white/40 disabled:cursor-default"
+        className="cursor-grab text-brand-ayuda disabled:cursor-default"
         disabled={readOnly}
         {...listeners}
         {...attributes}
       >
         <GripVertical size={14} />
       </button>
-      <span className="truncate text-[11px] font-medium text-white">
+      <span className="truncate text-[11px] font-medium text-brand-white">
         {pareja.nombre}
       </span>
     </div>
@@ -123,14 +123,14 @@ function ZonaDrop({
       className={`space-y-1.5 rounded-xl border p-2 ${
         isOver
           ? "border-brand-chartreuse bg-brand-chartreuse/10"
-          : "border-white/10 bg-black/20"
+          : "prog-inset"
       }`}
     >
       <p className="text-[10px] font-bold uppercase tracking-wide text-brand-chartreuse">
         {zona.nombre}
       </p>
       {zona.parejas.length === 0 ? (
-        <p className="text-[11px] text-white/40">Sin parejas</p>
+        <p className="text-[11px] text-brand-ayuda">Sin parejas</p>
       ) : (
         zona.parejas.map((pareja) => (
           <ParejaCard
@@ -218,7 +218,7 @@ export default function ZonaParejasPanel({
   if (zonas.length === 0) return null;
 
   return (
-    <section className="shrink-0 rounded-2xl border border-white/10 bg-[#141414]">
+    <section className="prog-surface shrink-0 rounded-2xl">
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
@@ -231,7 +231,7 @@ export default function ZonaParejasPanel({
           }`}
           aria-hidden
         />
-        <h3 className="min-w-0 flex-1 truncate text-xs font-bold text-white">
+        <h3 className="min-w-0 flex-1 truncate text-xs font-bold text-brand-white">
           Parejas por zona
         </h3>
         <span className="text-xs font-medium text-gray-400">{zonas.length}</span>

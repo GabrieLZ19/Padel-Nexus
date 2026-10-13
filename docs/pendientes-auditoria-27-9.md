@@ -17,20 +17,12 @@ No implementar estas partes hasta que respondan.
 
 | Tema | Bloquea | Qué quedó hecho mientras tanto |
 |---|---|---|
-| Qué evento pasa un torneo a En curso | GEN-08, la regla de transición | El programador ya muestra el estado de la competencia y, aparte, el de los horarios |
-| Si el paso Sedes desaparece dentro del programador | ASI-02, quitar el paso 5 | — |
-| Qué puede hacer un club sede en un torneo de otra entidad | ACC-01, si hay que cambiar la regla | Propuesta del documento: carga resultados y no edita ni elimina. Probado con New Center |
-| Tipografía de los textos corridos | GEN-03, el cuerpo del texto | Unigeo sigue sin cargar (el archivo responde 404) |
-| Pareja repetida «Córdoba B» en el ejemplo de puntos | RAN-02, solo ese total | Los puntos 8/6/4/2/1 ya se configuran en el cierre |
 | Cómo interviene un fiscal en un torneo en curso | SEC-02, el flujo | El colegio de Federación es el de FAP, no el de la asociación provincial |
 
 ## Críticos
 
 - [x] **SEC-01 · Estadísticas sin error 404.** (9/10) El ítem no tenía página. Se sacó del menú de federación, asociación y superadmin, igual que Moderación, que caía en el mismo 404. Cuando exista la sección, vuelve al menú.
-- [ ] **GEN-08 · Estados y cifras coherentes.**
-  - [x] Rótulos (9/10): el programador muestra el estado de la competencia y, aparte, el de los horarios.
-  - [x] Cifras (9/10): la recaudación del tablero sale del mismo resumen que Inscripciones. Jugadores cuenta cada licencia una sola vez y Pendientes + Vigentes + Vencidas + Rechazadas suman el total. El tablero de federación usa esas mismas cifras.
-  - [ ] Qué evento pasa un torneo a En curso. Sigue esperando al cliente.
+- [x] **GEN-08 · Estados y cifras coherentes.** (13/10) Publicar la programación pasa un torneo Programado a En curso. Cargar un resultado ya no cambia el estado. En curso, los cuadros y los horarios publicados se siguen editando con motivo y auditoría.
 
 ## Prioridad alta
 
@@ -39,7 +31,7 @@ No implementar estas partes hasta que respondan.
 - [x] **CLU-02 · Reservas que se puedan gestionar.** La lista no confirma, cobra, cancela ni marca ausencia, y no hay agenda del día por cancha. Aceptación: el pago se registra desde la lista, se ven al menos 8 reservas a 1366×641 y la agenda muestra las canchas del día.
 - [x] **GEN-01 · Menú completo a 1366×768.** Comunicaciones queda cortado y Estadísticas y Chat no se ven. Aceptación: los 11 ítems de Federación y el usuario se ven enteros, sin barra en el menú.
 - [x] **GEN-02 · Sin barras horizontales.** A 1366×641 desbordan las pestañas y la tabla de Torneos, el índice del asistente y el chat. La llave y el programador se resuelven en CUA-03 y PRO-05. Aceptación: Torneos, Inscripciones, Jugadores y el asistente no muestran barra horizontal ni scroll dentro de un panel.
-- [ ] **GEN-03 · Unigeo.** `/fonts/Unigeo-Semibold.woff2` responde 404 y los títulos caen en la fuente de reemplazo. Aceptación: el archivo responde 200 y los títulos se ven en Unigeo. La fuente de los textos corridos espera la decisión del cliente.
+- [x] **GEN-03 · Tipografía de la interfaz.** (13/10) Manrope reemplaza a Unigeo, que no está publicado. Los archivos WOFF2 y la OFL viven con la app. Textos 400, menús y etiquetas 500, botones y subtítulos 600, títulos 700. El isologotipo no cambia. La app mobile sigue en MuseoModerno y los PDF en Helvetica.
 - [x] **GEN-09 · Modo lectura real y acciones destructivas.** En modo lectura siguen habilitados «Nueva inscripción», «Subir planilla» y borrar. Eliminar, revocar e inhabilitar están a un clic, y Replicar abre con categorías ya marcadas. Aceptación: un torneo en curso no deja inscribir ni borrar desde el paso 4, ninguna acción destructiva corre sin confirmar, y Replicar abre sin categorías marcadas.
 - [x] **PER-01 · Mis torneos, próximo partido y ranking.** «Mis torneos» abre el listado público. El jugador no ve sus inscripciones, el próximo partido ni su puesto. Aceptación: en el celular, la primera pantalla muestra el próximo partido con hora y cancha, y desde ahí se llega a la llave.
 - [x] **PER-02 · Datos oficiales protegidos.** (9/10) DNI y categoría son de solo lectura y «Solicitar cambio» registra el pedido sin modificar la ficha. La provincia sigue siendo obligatoria al registrarse y al guardar. El aviso de licencia aprobada usa la misma fecha que el carnet (31/12 cuando la federación la tiene fija).
@@ -54,7 +46,7 @@ No implementar estas partes hasta que respondan.
 
 ## Prioridad media
 
-- [x] **ASI-02 · Misma numeración en índice y título.** (10/10) El número del índice y el del título coinciden. En el panel completo Cierre es el 7; en el club, que no muestra Fiscales, es el 6. Quitar el paso Sedes sigue esperando al cliente.
+- [x] **ASI-02 · Misma numeración en índice y título.** (13/10) El paso Sedes salió del asistente. En el panel completo quedan Fiscales 5, Cierre 6, Cuadros 7 y Resultados 8. En el club, que no muestra Fiscales, Cierre es el 5. Los clubes y las canchas se cargan dentro del programador.
 - [x] **ASO-01 · Panel de Asociación coherente.** (10/10) Clubes está en el menú y queda marcado al abrirlo. «Activos» cuenta solo los torneos provinciales o regionales del indicador. Las inscripciones usan la categoría del torneo y no aparece «Sin categoría». Si la asociación no puede editar el carnet, queda en una línea.
 - [x] **CLU-03 · Inicio del club con datos coherentes.** (10/10) Próximas solo trae turnos desde hoy, en orden cronológico. La ocupación cuenta cada plantilla en su día de la semana: con las 9 reservas de septiembre da 1% (antes 0%) y $148.300. Las canchas se ordenan por número y no se puede repetir un nombre.
 - [x] **CUA-03 · Llave al ancho de la pantalla.** (10/10) La llave de 16 abre ajustada al ancho: octavos, cuartos, semifinales y final entran en 1366 sin barra horizontal. El acercamiento manual sigue pudiendo desplazar el lienzo.
@@ -91,14 +83,15 @@ Estos figuraban pendientes el 27/9 y el código ya los cubre. Una pasada visual 
 
 No se vuelve a abrir.
 
-- **ACC-01.** Asociación limitada a su provincia; nacionales en lectura. Club sede carga resultados y no edita, elimina ni reprograma. Probado con Tucumán y New Center.
+- **ACC-01.** (13/10) Asociación limitada a su provincia; nacionales en lectura. El club sede de un nacional solo consulta: no edita, no elimina, no reprograma y no carga resultados. El torneo que el club organiza sigue siendo suyo.
 - **ASI-04.** Alcance, entidad organizadora y reglamento según el tipo. Verificado el 27/9. El detalle de la entidad por defecto en Provincial está en CLU-01.
 - **ASI-05.** Ascenso de menores sin regenerar la llave, con motivo y auditoría.
 - **CUA-01 y CUA-02.** Numeración continua y rondas en español, de octavos a la final.
 - **RES-01 y RES-02.** Corrección de un resultado ya cargado, y W.O. separado de lesión y abandono.
-- **RAN-01, RAN-02 y RAN-03.** Filtros del ranking nacional, puntos de provincia configurables y rankings de asociación y club por rama y categoría.
+- **RAN-01, RAN-02 y RAN-03.** (13/10) Filtros del ranking nacional y rankings de asociación y club por rama y categoría. En el ejemplo de Libres 7ª, la segunda «Córdoba B» de octavos se lee como Córdoba E; Córdoba sigue en 12. Los puntos del jugador salen del cierre. El ranking por provincia, con la ronda desde la que suma, solo se configura en un torneo nacional.
 - **PUB-03.** Login con el texto de marca y la palabra «cuenta».
-- **GEN-08, solo el rótulo del programador.** Estado de la competencia y estado de los horarios, por separado.
+- **GEN-03.** (13/10) La interfaz web usa Manrope, no Unigeo. Archivos WOFF2 y OFL junto a la app.
+- **GEN-08.** Publicar la programación pasa el torneo a En curso. Un resultado no cambia el estado. Los cuadros y los horarios publicados siguen editables con motivo y auditoría.
 
 ## Tarea de datos
 

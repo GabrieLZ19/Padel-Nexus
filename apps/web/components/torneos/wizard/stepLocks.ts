@@ -5,7 +5,6 @@ export const ORDEN_PASOS_WIZARD = [
   "logos",
   "categories",
   "players",
-  "times",
   "fiscales",
   "cierre",
   "draws",
@@ -52,6 +51,20 @@ export function pasoSegunEstadoTorneo(estado?: string | null): WizardPasoId {
   }
 }
 
+/** `times` era el paso Sedes. Ahora las canchas viven en el programador. */
+export function normalizarPasoAsistente(
+  paso: string | null | undefined,
+  ocultos: readonly string[] = [],
+): WizardPasoId {
+  const pedido = paso === "times" ? "fiscales" : paso;
+  const visibles = ORDEN_PASOS_WIZARD.filter((id) => !ocultos.includes(id));
+  if (pedido && visibles.includes(pedido as WizardPasoId)) {
+    return pedido as WizardPasoId;
+  }
+  if (paso === "times" && ocultos.includes("fiscales")) return "cierre";
+  return "edit";
+}
+
 export function hrefDetalleTorneo(
   base: "/dashboard" | "/club",
   torneo: { id: string; estado?: string | null },
@@ -61,9 +74,12 @@ export function hrefDetalleTorneo(
 
 /**
  * Reglas (dashboard + club):
- * - Programado / En curso: bloquea datos, logos, categorías, jugadores, fiscales y cierre.
- *   Sedes (times) siguen editables; cuadros/resultados editables.
- * - Finalizado: bloquea 1–7 (incl. sedes); cuadros y resultados en lectura.
+ * - Programado: bloquea datos, logos, categorías, jugadores, fiscales y cierre.
+ *   Los cuadros siguen editables. Clubes y canchas se cargan en el programador.
+ *   Los resultados se habilitan al publicar.
+ * - En curso: igual, con resultados habilitados. Cuadros y horarios publicados
+ *   se cambian con motivo y quedan en auditoría.
+ * - Finalizado: bloquea la configuración; cuadros y resultados en lectura.
  */
 export function isWizardPasoReadOnly(
   estado: string | null | undefined,
@@ -71,11 +87,11 @@ export function isWizardPasoReadOnly(
 ): boolean {
   if (!esEstadoTorneoModoLectura(estado)) return false;
 
-  if (pasoId === "draws" || pasoId === "matches") {
+  if (pasoId === "draws") {
     return estado === "Finalizado";
   }
-  if (pasoId === "times") {
-    return estado === "Finalizado";
+  if (pasoId === "matches") {
+    return estado !== "En curso";
   }
   return true;
 }
@@ -89,7 +105,12 @@ export function pasoBloqueadoPorAlcance(
   pasoId: WizardPasoId,
 ): boolean {
   if (torneo.solo_lectura) {
-    if (pasoId === "matches") return torneo.puede_cargar_resultados === false;
+    if (pasoId === "matches") {
+      if (torneo.estado !== "En curso" && torneo.estado !== "Finalizado") {
+        return true;
+      }
+      return torneo.puede_cargar_resultados === false;
+    }
     return true;
   }
   return isWizardPasoReadOnly(torneo.estado, pasoId);
@@ -100,7 +121,7 @@ export function textoBannerModoLectura(estado: string): string {
     return "Los pasos de configuración y logística están bloqueados. Los cuadros y la carga de resultados permanecen habilitados en modo lectura.";
   }
   if (estado === "Programado") {
-    return "Fixture generado. Los pasos de datos, logos, categorías, jugadores, fiscales y cierre están bloqueados. Podés ajustar sedes/canchas, cuadros y resultados. Al publicar la programación o cargar un resultado el torneo pasa a En curso.";
+    return "Fixture generado. Los pasos de datos, logos, categorías, jugadores, fiscales y cierre están bloqueados. Podés ajustar cuadros, y los clubes y canchas en el programador. Al publicar la programación el torneo pasa a En curso y se habilita la carga de resultados.";
   }
-  return "Los pasos de datos, logos, categorías, jugadores, fiscales y cierre están bloqueados. Sedes y canchas siguen editables. Los cuadros y resultados permanecen habilitados.";
+  return "El torneo está en curso. Los pasos de datos, logos, categorías, jugadores, fiscales y cierre están bloqueados. Cuadros y resultados siguen habilitados. Clubes y canchas se cargan en el programador. Un cambio de cuadro o de horario ya publicado pide un motivo y queda en auditoría.";
 }

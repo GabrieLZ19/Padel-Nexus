@@ -37,7 +37,7 @@ export function ConflictosPanel({
   return (
     <div
       id="programador-conflictos"
-      className="shrink-0 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2"
+      className="prog-alert shrink-0 rounded-xl px-3 py-2"
     >
       <button
         type="button"
@@ -45,12 +45,12 @@ export function ConflictosPanel({
         aria-expanded={abierto}
         className="flex w-full cursor-pointer items-center gap-2 text-left"
       >
-        <AlertTriangle className="size-4 shrink-0 text-amber-300" />
-        <span className="min-w-0 flex-1 text-xs font-semibold text-amber-100">
+        <AlertTriangle className="size-4 shrink-0" />
+        <span className="min-w-0 flex-1 text-xs font-semibold">
           {activos.length} conflicto(s) o advertencia(s). No bloquean el guardado.
         </span>
         <ChevronDown
-          className={`size-3.5 shrink-0 text-amber-200 transition-transform ${
+          className={`size-3.5 shrink-0 transition-transform ${
             abierto ? "" : "-rotate-90"
           }`}
           aria-hidden
@@ -67,10 +67,8 @@ export function ConflictosPanel({
               <button
                 type="button"
                 onClick={() => onSelect(issue.partido_id)}
-                className={`flex w-full items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors cursor-pointer ${
-                  active
-                    ? "border-amber-400/60 bg-black/40"
-                    : "border-white/10 bg-black/20 hover:border-amber-500/40"
+                className={`prog-inset flex w-full cursor-pointer items-start gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
+                  active ? "border-amber-500" : ""
                 }`}
               >
                 <span
@@ -79,7 +77,7 @@ export function ConflictosPanel({
                   }`}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-bold text-white">
+                  <span className="block text-xs font-bold text-brand-white">
                     {p?.ronda_etiqueta || p?.ronda || "Partido"}
                     {p?.orden != null ? ` · #${p.orden}` : ""}
                   </span>

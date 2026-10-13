@@ -435,10 +435,10 @@ export const Paso6Fiscales = ({
 
       <div className="flex justify-between items-center pt-4 border-t border-white/10">
         <button
-          onClick={() => setActiveTab("times")}
+          onClick={() => setActiveTab("players")}
           className="bg-brand-input border border-white/10 text-white px-6 py-3 rounded-xl text-xs font-bold hover:bg-brand-input/80 transition-all cursor-pointer"
         >
-          Atrás: Sedes
+          Atrás: Jugadores
         </button>
         <button
           onClick={() => setActiveTab("cierre")}

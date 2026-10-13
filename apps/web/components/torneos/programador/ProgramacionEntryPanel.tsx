@@ -85,7 +85,7 @@ export function ProgramacionEntryPanel({ torneoId }: Props) {
             </ul>
           ) : (
             <p className="text-xs text-brand-ayuda">
-              Configurá sedes y canchas en Paso 5 si aún no hay grilla.
+              Abrí el programador y sumá clubes y canchas desde ahí.
             </p>
           )}
         </div>
@@ -101,14 +101,8 @@ export function ProgramacionEntryPanel({ torneoId }: Props) {
         </Link>
       </div>
       <p className="mt-4 text-xs text-brand-ayuda">
-        Para sumar clubes o canchas, usá{" "}
-        <Link
-          href={`${base}/torneos/${torneoId}?step=times`}
-          className="text-brand-chartreuse hover:underline"
-        >
-          Paso 5 · Sedes
-        </Link>
-        . Los partidos ya asignados se conservan.
+        Los clubes y las canchas se cargan dentro del programador, con Agregar
+        club / cancha. Los partidos ya asignados se conservan.
       </p>
     </div>
   );

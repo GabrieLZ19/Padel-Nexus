@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
+import {
+  useNumeroPaso,
+  usePasosOcultos,
+} from "@/components/torneos/wizard/NumeroPasoContext";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Inscripcion } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
@@ -34,6 +37,9 @@ export const Paso5Cierre = ({
   readOnly = false,
 }: Paso5CierreProps) => {
   const numeroPaso = useNumeroPaso("cierre");
+  const pasoAnterior = usePasosOcultos().includes("fiscales")
+    ? "players"
+    : "fiscales";
   const siglaRectora = useSiglaRectora();
   const confirmadasCount = inscripciones.filter(
     (i) => i.estado_pago === "Confirmado",
@@ -491,7 +497,7 @@ export const Paso5Cierre = ({
               <Trophy className="size-3.5 text-brand-chartreuse" /> {textoRectora("puntos", siglaRectora)} por provincia
             </h5>
             <p className="text-[10px] text-gray-500 font-medium">
-              En un torneo nacional cada pareja representa a su provincia. Se queda con los puntos de la mejor instancia, desde la ronda que elijas.
+              Solo en un torneo nacional las parejas representan a su provincia. Cada una se queda con los puntos de la mejor instancia, y empiezan a sumar desde la ronda que elijas. Por defecto: 8, 6, 4, 2 y 1 desde octavos.
             </p>
             <div>
               <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider block mb-1">
@@ -702,7 +708,7 @@ export const Paso5Cierre = ({
         }`}
       >
         <button
-          onClick={() => void setActiveTab("fiscales")}
+          onClick={() => void setActiveTab(pasoAnterior)}
           disabled={guardandoConfig}
           className="bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-xs font-bold cursor-pointer disabled:opacity-40"
         >

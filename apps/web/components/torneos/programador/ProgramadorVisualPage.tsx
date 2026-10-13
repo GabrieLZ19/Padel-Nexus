@@ -137,7 +137,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
   }
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-col gap-1.5 overflow-hidden px-3 py-1.5 md:px-4">
+    <div className="flex h-full min-h-0 w-full flex-col gap-2 overflow-y-auto p-2 sm:p-3 lg:overflow-hidden">
       <ProgramadorTopBar
         board={board}
         busy={busy}
@@ -177,7 +177,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1.4fr)] gap-2 overflow-hidden lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
+        <div className="grid min-h-[70vh] w-full flex-1 grid-cols-1 grid-rows-[minmax(240px,0.85fr)_minmax(320px,1.15fr)] gap-2 lg:min-h-0 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)] lg:grid-rows-1 lg:overflow-hidden">
           <div className="order-2 flex h-full min-h-0 flex-col gap-2 overflow-hidden lg:order-1">
             <ZonaParejasPanel
               torneoId={torneoId}
@@ -192,7 +192,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
               />
             </div>
           </div>
-          <div className="order-1 h-full min-h-0 min-w-0 overflow-auto lg:order-2">
+          <div className="order-1 h-full min-h-[320px] min-w-0 lg:order-2 lg:min-h-0">
             <ScheduleGrid
               board={board}
               day={activeDay}
@@ -207,11 +207,11 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
 
         <DragOverlay>
           {activeDrag ? (
-            <div className="rounded-xl border border-brand-chartreuse/50 bg-[#1a1a1a] px-3 py-2 shadow-xl">
+            <div className="prog-surface rounded-xl border border-brand-chartreuse/50 px-3 py-2 shadow-xl">
               <p className="text-[10px] font-bold text-brand-chartreuse">
                 {activeDrag.ronda_etiqueta || activeDrag.ronda}
               </p>
-              <p className="text-xs font-semibold text-white">
+              <p className="text-xs font-semibold text-brand-white">
                 {activeDrag.label}
               </p>
             </div>
@@ -268,11 +268,11 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
 
       {sedesAbiertas ? (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-3 sm:p-6">
-          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#101010] shadow-2xl">
+          <div className="prog-surface flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl shadow-2xl">
             <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
               <div>
-                <p className="text-sm font-bold text-white">Agregar club o cancha</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-sm font-bold text-brand-white">Agregar club o cancha</p>
+                <p className="text-xs text-brand-ayuda">
                   La grilla se actualiza al cerrar, sin salir del programador.
                 </p>
               </div>
@@ -282,7 +282,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
                   setSedesAbiertas(false);
                   void load();
                 }}
-                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-gray-200 hover:bg-white/10 cursor-pointer"
+                className="prog-ghost cursor-pointer rounded-xl px-3 py-2 text-sm font-semibold"
               >
                 Cerrar
               </button>

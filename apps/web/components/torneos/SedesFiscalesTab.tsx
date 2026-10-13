@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { useNumeroPaso } from "@/components/torneos/wizard/NumeroPasoContext";
 import {
   Plus,
   Trash2,
@@ -108,7 +107,6 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   onRefresh,
   readOnly = false,
 }) => {
-  const numeroPaso = useNumeroPaso("times");
   const [clubs, setClubs] = useState<Club[]>([]);
   const [selectedClubs, setSelectedClubs] = useState<Club[]>([]);
   const [canchasDisponibles, setCanchasDisponibles] = useState<
@@ -656,12 +654,11 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       <div className="bg-brand-card border border-white/10 rounded-3xl p-6 space-y-6 shadow-xl">
         <div>
           <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-            Paso {numeroPaso}: Sedes y cronograma
+            Clubes y canchas
           </h3>
           <p className="text-sm text-gray-400 mt-1">
-            Agregá los clubes donde se juega el torneo y cargá el cronograma por
-            día y cancha. Podés seleccionar varias canchas a la vez para agilizar
-            torneos grandes.
+            Agregá los clubes donde se juega el torneo y las canchas de cada uno.
+            Podés seleccionar varias canchas a la vez para agilizar torneos grandes.
           </p>
         </div>
 
@@ -687,12 +684,8 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
             Horarios
           </h4>
           <p className="text-[11px] text-gray-500 leading-relaxed">
-            En este paso solo elegís sedes y canchas. La grilla de horarios
-            (08:00–21:00), la duración del partido y la asignación se arman en el{" "}
-            <span className="text-brand-chartreuse font-semibold">
-              programador visual
-            </span>
-            .
+            Elegí los clubes y las canchas. La grilla de horarios (08:00–21:00),
+            la duración del partido y la asignación se arman en este programador.
           </p>
         </div>
 

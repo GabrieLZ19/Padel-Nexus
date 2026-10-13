@@ -88,7 +88,7 @@ export function ProgramadorConfigBar({
   ];
 
   return (
-    <div className="flex shrink-0 flex-col gap-1.5 rounded-2xl border border-white/10 bg-[#161616] px-2.5 py-1.5">
+    <div className="prog-surface flex shrink-0 flex-col gap-1.5 rounded-2xl px-2.5 py-1.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {dias.length === 0 ? (
           <p className="text-xs text-amber-200/90">
@@ -104,7 +104,7 @@ export function ProgramadorConfigBar({
                 className={`rounded-lg px-2.5 py-1 text-xs font-semibold capitalize cursor-pointer ${
                   activeDay === d
                     ? "bg-brand-chartreuse text-black"
-                    : "bg-white/5 text-gray-300 hover:bg-white/10"
+                    : "prog-ghost hover:brightness-95"
                 }`}
               >
                 {formatDia(d)}

@@ -15,7 +15,6 @@ import { Paso3Categorias } from "@/components/torneos/wizard/Paso3Categorias";
 import { Paso4Jugadores } from "@/components/torneos/wizard/Paso4Jugadores";
 import { Paso5Cierre } from "@/components/torneos/wizard/Paso7Cierre";
 import { Paso6Cuadros } from "@/components/torneos/wizard/Paso8Cuadros";
-import { Paso7Sedes } from "@/components/torneos/wizard/Paso5Sedes";
 import { Paso8Arbitraje } from "@/components/torneos/wizard/Paso9Arbitraje";
 import { TournamentWizardNav } from "@/components/torneos/TournamentWizardNav";
 import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
@@ -23,6 +22,7 @@ import { NumeroPasoProvider } from "@/components/torneos/wizard/NumeroPasoContex
 import type { SaveStepHandler } from "@/components/torneos/wizard/types";
 import {
   esEstadoTorneoModoLectura,
+  normalizarPasoAsistente,
   pasoBloqueadoPorAlcance,
   textoBannerModoLectura,
 } from "@/components/torneos/wizard/stepLocks";
@@ -40,12 +40,7 @@ export default function ClubTorneoDetallePage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>(() => {
     const paso = searchParams.get("step");
-    return paso &&
-      ["edit", "logos", "categories", "players", "times", "cierre", "draws", "matches"].includes(
-        paso,
-      )
-      ? paso
-      : "edit";
+    return normalizarPasoAsistente(paso, ["fiscales"]);
   });
   const [refreshKey, setRefreshKey] = useState(0);
   const saveHandlerRef = useRef<SaveStepHandler | null>(null);
@@ -179,9 +174,7 @@ export default function ClubTorneoDetallePage() {
             {torneo.solo_lectura ? (
               <>
                 <strong className="text-white">Modo lectura:</strong>{" "}
-                {torneo.puede_cargar_resultados
-                  ? "Este torneo es de otra entidad. Podés cargar resultados, no editarlo ni eliminarlo."
-                  : "Este torneo no es de tu entidad. Solo podés consultarlo."}
+                Este torneo lo organiza otra entidad. Solo podés consultarlo.
               </>
             ) : (
               <>
@@ -228,14 +221,6 @@ export default function ClubTorneoDetallePage() {
               {...commonProps}
               inscripciones={inscripciones}
               readOnly={pasoBloqueadoPorAlcance(torneo, "players")}
-            />
-          )}
-          {activeTab === "times" && (
-            <Paso7Sedes
-              {...commonProps}
-              readOnly={pasoBloqueadoPorAlcance(torneo, "times")}
-              siguienteId="cierre"
-              siguienteLabel="Cierre"
             />
           )}
           {activeTab === "cierre" && (

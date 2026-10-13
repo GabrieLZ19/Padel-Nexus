@@ -70,18 +70,18 @@ export function ProgramadorTopBar({
         <button
           type="button"
           onClick={onBack}
-          className="mt-0.5 shrink-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-gray-300 hover:bg-white/10 cursor-pointer"
+          className="prog-ghost mt-0.5 shrink-0 cursor-pointer rounded-xl px-3 py-2 text-sm font-semibold"
         >
           Volver
         </button>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <CalendarClock className="size-5 text-brand-chartreuse shrink-0" />
-            <h1 className="text-lg font-bold text-white truncate">
+            <h1 className="truncate text-lg font-bold text-brand-white">
               Programador visual
             </h1>
             {estadoTorneo ? (
-              <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-gray-200">
+              <span className="prog-ghost inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
                 {estadoTorneo}
               </span>
             ) : null}
@@ -96,8 +96,8 @@ export function ProgramadorTopBar({
                 estado === "publicado"
                   ? "bg-emerald-500/15 text-emerald-300"
                   : estado === "programado"
-                    ? "bg-amber-500/15 text-amber-200"
-                    : "bg-white/10 text-gray-300"
+                    ? "prog-warn"
+                    : "prog-ghost"
               }`}
             >
               {estado === "publicado" ? (
@@ -139,7 +139,7 @@ export function ProgramadorTopBar({
           type="button"
           onClick={onAgregarSede}
           title="Agregar club o cancha sin salir del programador"
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-semibold text-gray-300 hover:bg-white/10 cursor-pointer"
+          className="prog-ghost inline-flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold"
         >
           Agregar club / cancha
         </button>
@@ -149,7 +149,7 @@ export function ProgramadorTopBar({
             type="button"
             disabled={busy}
             onClick={onNuevaEdicion}
-            className="inline-flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:bg-amber-500/20 disabled:opacity-50 cursor-pointer"
+            className="prog-warn inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Unlock className="size-4" />
             Nueva edición
@@ -161,7 +161,7 @@ export function ProgramadorTopBar({
               disabled={busy || !canLimpiar}
               onClick={onLimpiar}
               title="Quitar todos los horarios y empezar de cero"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-semibold text-gray-300 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-200 disabled:opacity-50 cursor-pointer"
+              className="prog-ghost inline-flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold hover:border-red-500/40 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Eraser className="size-4" />
               Limpiar
@@ -171,7 +171,7 @@ export function ProgramadorTopBar({
               disabled={busy}
               onClick={onGuardarBorrador}
               title="Conservar los horarios como borrador, sin publicarlos"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-semibold text-gray-300 hover:bg-white/10 disabled:opacity-50 cursor-pointer"
+              className="prog-ghost inline-flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Save className="size-4" />
               Guardar borrador
@@ -180,7 +180,7 @@ export function ProgramadorTopBar({
               type="button"
               disabled={busy}
               onClick={onAuto}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-50 cursor-pointer"
+              className="prog-ghost inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Sparkles className="size-4 text-brand-chartreuse" />
               Asignar automáticamente
@@ -189,7 +189,7 @@ export function ProgramadorTopBar({
               type="button"
               disabled={busy || board.summary.pendientes > 0}
               onClick={onPublicar}
-              title="Hacer público y bloquear la grilla"
+              title="Publicar los horarios y pasar el torneo a En curso"
               className="inline-flex flex-col items-start gap-0 rounded-xl bg-brand-chartreuse px-4 py-2 text-left hover:brightness-110 disabled:opacity-50 cursor-pointer"
             >
               <span className="inline-flex items-center gap-2 text-sm font-bold text-black">
@@ -197,7 +197,7 @@ export function ProgramadorTopBar({
                 Publicar
               </span>
               <span className="text-[10px] font-medium text-black/70">
-                Hacer público y bloquear
+                Pasa el torneo a En curso
               </span>
             </button>
           </>

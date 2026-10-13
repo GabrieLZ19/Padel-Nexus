@@ -22,10 +22,11 @@ interface Props {
 }
 
 function severityClass(sev: IssueSeverity | undefined): string {
-  if (sev === "bad") return "border-red-500/70 bg-red-500/20 ring-1 ring-red-500/40";
+  if (sev === "bad")
+    return "prog-booking-bad border-red-500/70 bg-red-500/20 ring-1 ring-red-500/40";
   if (sev === "wait")
-    return "border-amber-400/60 bg-amber-500/15 ring-1 ring-amber-400/30";
-  return "border-emerald-500/40 bg-emerald-500/10";
+    return "prog-booking-wait border-amber-400/60 bg-amber-500/15 ring-1 ring-amber-400/30";
+  return "prog-booking-ok border-emerald-500/40 bg-emerald-500/10";
 }
 
 function BookingCard({
@@ -72,7 +73,7 @@ function BookingCard({
       ref={setRefs}
       id={`booking-card-${partido.id}`}
       style={style}
-      className={`relative h-full min-h-[52px] rounded-lg border p-1.5 text-left ${severityClass(
+      className={`prog-booking relative h-full min-h-[52px] rounded-lg border p-1.5 text-left ${severityClass(
         issue?.severity,
       )} ${highlighted ? "outline outline-2 outline-offset-1 outline-brand-chartreuse" : ""} ${
         !readOnly ? "cursor-grab active:cursor-grabbing" : ""
@@ -104,17 +105,17 @@ function BookingCard({
         </button>
       )}
       <p
-        className={`pr-4 text-[10px] font-bold uppercase text-white/70 ${
+        className={`pr-4 text-[10px] font-bold uppercase opacity-80 ${
           hasIssue ? "pl-4" : ""
         }`}
       >
         {partido.ronda_etiqueta || partido.ronda}
       </p>
-      <p className="text-[11px] font-semibold leading-tight text-white line-clamp-2">
+      <p className="line-clamp-2 text-[11px] font-semibold leading-tight">
         {partido.label_a}
       </p>
-      <p className="text-[10px] text-white/50">vs</p>
-      <p className="text-[11px] font-semibold leading-tight text-white line-clamp-2">
+      <p className="text-[10px] opacity-70">vs</p>
+      <p className="line-clamp-2 text-[11px] font-semibold leading-tight">
         {partido.label_b}
       </p>
       {hasIssue ? (
@@ -154,8 +155,8 @@ function SlotCell({
   return (
     <td
       ref={setNodeRef}
-      className={`min-w-[140px] border border-white/5 p-1 align-top ${
-        isOver ? "bg-brand-chartreuse/15" : "bg-black/20"
+      className={`min-w-[160px] border border-white/5 p-1 align-top sm:min-w-[180px] ${
+        isOver ? "bg-brand-chartreuse/15" : ""
       }`}
     >
       {partido ? (
@@ -167,7 +168,7 @@ function SlotCell({
           onRemove={() => onRemove(partido.id)}
         />
       ) : (
-        <div className="flex h-[52px] items-center justify-center rounded-lg border border-dashed border-white/10 text-[10px] text-gray-600">
+        <div className="prog-slot flex h-full min-h-[52px] items-center justify-center rounded-lg text-[10px] font-semibold">
           Libre
         </div>
       )}
@@ -215,7 +216,7 @@ export function ScheduleGrid({
 
   if (!day) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-[#161616] p-8 text-center text-sm text-gray-400">
+      <div className="prog-surface flex h-full min-h-[240px] items-center justify-center rounded-2xl p-8 text-center text-sm text-brand-ayuda">
         Seleccioná una jornada.
       </div>
     );
@@ -223,19 +224,19 @@ export function ScheduleGrid({
 
   if (hours.length === 0 || courts.length === 0) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-[#161616] p-8 text-center text-sm text-gray-400">
-        No hay canchas para este día. Agregá sedes y canchas en Paso 5 y volvé:
+      <div className="prog-surface flex h-full min-h-[240px] items-center justify-center rounded-2xl p-8 text-center text-sm text-brand-ayuda">
+        No hay canchas para este día. Sumalas con Agregar club / cancha:
         la grilla se arma de 08:00 a 21:00.
       </div>
     );
   }
 
   return (
-    <div className="overflow-auto rounded-2xl border border-white/10 bg-[#161616]">
-      <table className="w-full min-w-[640px] border-collapse text-left">
+    <div className="prog-grid prog-surface h-full min-h-[320px] overflow-auto rounded-2xl lg:min-h-0">
+      <table className="h-full w-full min-w-[640px] border-collapse text-left">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 bg-[#1a1a1a] px-3 py-2 text-xs font-bold text-gray-400">
+            <th className="prog-sticky sticky left-0 z-10 px-3 py-2 text-xs font-bold text-brand-ayuda">
               Hora
             </th>
             {courts.map((c) => {
@@ -243,7 +244,7 @@ export function ScheduleGrid({
               return (
                 <th
                   key={c}
-                  className="min-w-[140px] px-2 py-2 text-xs font-bold text-white"
+                  className="min-w-[160px] px-2 py-2 text-xs font-bold text-brand-white sm:min-w-[180px]"
                 >
                   <span className="block truncate">{meta?.cancha || c}</span>
                   {meta?.club ? (
@@ -258,8 +259,8 @@ export function ScheduleGrid({
         </thead>
         <tbody>
           {hours.map((hora) => (
-            <tr key={hora}>
-              <td className="sticky left-0 z-10 whitespace-nowrap bg-[#1a1a1a] px-3 py-1 text-xs font-semibold text-gray-300">
+            <tr key={hora} className="h-full">
+              <td className="prog-sticky sticky left-0 z-10 whitespace-nowrap px-3 py-1 text-xs font-semibold">
                 {hora}
               </td>
               {courts.map((court) => {
@@ -268,9 +269,9 @@ export function ScheduleGrid({
                   return (
                     <td
                       key={`${hora}-${court}`}
-                      className="border border-white/5 bg-black/40 p-1"
+                      className="border border-white/5 p-1 align-top"
                     >
-                      <div className="h-[52px] rounded-lg bg-black/30" />
+                      <div className="prog-slot h-full min-h-[52px] rounded-lg" />
                     </td>
                   );
                 }

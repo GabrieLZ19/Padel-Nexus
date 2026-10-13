@@ -275,7 +275,7 @@ export default function RankingsPage() {
       return "Ranking del circuito del club. Primero el género y después la categoría, de 8ª a 1ª, más las de menores.";
     }
     if (esFederacion && vistaProvincia) {
-      return "Puntos por provincia en torneos nacionales, desde octavos: 8 campeón, 6 finalista, 4 semifinal, 2 cuartos y 1 octavos.";
+      return "Solo en torneos nacionales las parejas representan a su provincia. Los puntos y la ronda desde la que empiezan a sumar se configuran en el cierre.";
     }
     if (esFederacion) {
       return "Puntos de jugador según la configuración de cada torneo, por categoría y género.";
