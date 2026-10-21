@@ -22,6 +22,16 @@ router.get(
   FiscalPanelController.getPartidos,
 );
 router.get(
+  "/torneos/:id/zonas",
+  requireFiscalAsignadoAlTorneo,
+  FiscalPanelController.getZonas,
+);
+router.get(
+  "/torneos/:id/llave-matriz",
+  requireFiscalAsignadoAlTorneo,
+  FiscalPanelController.getLlaveMatriz,
+);
+router.get(
   "/torneos/:id/jugadores",
   requireFiscalAsignadoAlTorneo,
   FiscalPanelController.getJugadores,

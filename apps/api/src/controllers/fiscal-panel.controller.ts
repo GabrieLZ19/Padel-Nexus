@@ -63,6 +63,24 @@ export const FiscalPanelController = {
     }
   },
 
+  async getZonas(req: Request, res: Response): Promise<Response> {
+    try {
+      const data = await FiscalPanelService.obtenerZonas(req.params.id);
+      return res.status(200).json(data);
+    } catch (error: unknown) {
+      return handleError(res, error, "Error al obtener zonas");
+    }
+  },
+
+  async getLlaveMatriz(req: Request, res: Response): Promise<Response> {
+    try {
+      const data = await FiscalPanelService.obtenerLlaveMatriz(req.params.id);
+      return res.status(200).json(data);
+    } catch (error: unknown) {
+      return handleError(res, error, "Error al obtener la matriz de llave");
+    }
+  },
+
   async getJugadores(req: Request, res: Response): Promise<Response> {
     try {
       const data = await FiscalPanelService.obtenerJugadores(req.params.id);

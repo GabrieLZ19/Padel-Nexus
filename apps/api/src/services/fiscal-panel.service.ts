@@ -1,6 +1,10 @@
 import { supabaseAdmin } from "../config/supabase";
 import { TorneoService } from "./torneo.service";
 import { NotificacionService } from "./notificacion.service";
+import { CompetenciaService } from "./competencia.service";
+import { ChatService } from "./chat.service";
+import { FAP_ESTADOS_PAGO } from "../constants/fap";
+import { getFapBracketForPairCount } from "../utils/fapBracketMatrices";
 import type { FiscalSesion } from "./fiscal-sesion.service";
 
 export type TipoIncidenciaFiscal =
@@ -33,6 +37,7 @@ export interface CrearIncidenciaDTO {
   jugador_id?: string | null;
   inscripcion_id?: string | null;
   categoria_nueva?: string | null;
+  enviar_chat?: boolean;
 }
 
 export interface RevisarInformeDTO {
@@ -82,6 +87,13 @@ const MOTIVOS_INFORME: MotivoInformeFiscal[] = [
   "categorizacion",
   "otro",
 ];
+
+export const MOTIVOS_INFORME_LABELS: Record<MotivoInformeFiscal, string> = {
+  falta_reglamentaria: "Falta reglamentaria",
+  codigo_conducta: "Código de conducta",
+  categorizacion: "Categorización",
+  otro: "Otro",
+};
 
 export class FiscalPanelService {
   static async obtenerContexto(fiscal: FiscalSesion) {
@@ -141,14 +153,58 @@ export class FiscalPanelService {
       throw new Error("No estás asignado a este torneo.");
     }
 
+    const { data: generalRow } = await supabaseAdmin
+      .from("torneo_fiscales")
+      .select("fiscal_id, rol, fiscales(id, usuario_id, nombre, apellido, rango)")
+      .eq("torneo_id", torneoId)
+      .eq("rol", "general")
+      .maybeSingle();
+
+    const generalFiscal = unwrapRelacion<{
+      id: string;
+      usuario_id: string | null;
+      nombre: string;
+      apellido: string;
+      rango: string;
+    }>(generalRow?.fiscales);
+
     return {
       ...(await this.resolverSede(torneo)),
       rol_torneo: data?.rol || "auxiliar",
+      fiscal_general: generalFiscal
+        ? {
+            id: generalFiscal.id,
+            usuario_id: generalFiscal.usuario_id,
+            nombre_completo: `${generalFiscal.apellido}, ${generalFiscal.nombre}`,
+            rango: generalFiscal.rango,
+          }
+        : null,
     };
   }
 
   static async obtenerPartidos(torneoId: string) {
     return TorneoService.obtenerPartidosFormateados(torneoId);
+  }
+
+  static async obtenerZonas(torneoId: string) {
+    return CompetenciaService.obtenerZonas(torneoId);
+  }
+
+  static async obtenerLlaveMatriz(torneoId: string) {
+    const { count } = await supabaseAdmin
+      .from("inscripciones")
+      .select("id", { count: "exact", head: true })
+      .eq("torneo_id", torneoId)
+      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
+
+    const pairCount = count || 0;
+    const matches = getFapBracketForPairCount(pairCount);
+
+    return {
+      pairCount,
+      matches: matches || [],
+      supported: Boolean(matches),
+    };
   }
 
   static async obtenerJugadores(torneoId: string) {
@@ -409,9 +465,21 @@ export class FiscalPanelService {
       },
     ]);
 
-    await this.notificarFiscalGeneral(torneoId, fiscal, incidencia.id, jugador);
+    const notifResult = await this.notificarFiscalGeneral(
+      torneoId,
+      fiscal,
+      incidencia.id,
+      jugador,
+      usuarioId,
+      descripcion,
+      motivoInforme,
+      Boolean(payload.enviar_chat),
+    );
 
-    return incidencia;
+    return {
+      ...incidencia,
+      conversacion_id: notifResult?.conversacion_id || null,
+    };
   }
 
   static async revisarInforme(
@@ -507,7 +575,11 @@ export class FiscalPanelService {
     emisor: FiscalSesion,
     incidenciaId: string,
     jugador: { nombre?: string | null; apellido?: string | null; dni?: string | null },
-  ) {
+    emisorUsuarioId?: string,
+    descripcion?: string,
+    motivoInforme?: MotivoInformeFiscal,
+    enviarChat = false,
+  ): Promise<{ conversacion_id: string | null }> {
     const { data: generales } = await supabaseAdmin
       .from("torneo_fiscales")
       .select("fiscal_id, fiscales(id, usuario_id, nombre, apellido)")
@@ -518,6 +590,8 @@ export class FiscalPanelService {
       [jugador.apellido, jugador.nombre].filter(Boolean).join(", ") ||
       jugador.dni ||
       "jugador";
+
+    let conversacionId: string | null = null;
 
     for (const row of generales || []) {
       const f = unwrapRelacion<{ id?: string; usuario_id?: string | null }>(row.fiscales);
@@ -535,7 +609,30 @@ export class FiscalPanelService {
           deep_link: `/dashboard/fiscal/torneos/${torneoId}?tab=informes`,
         },
       });
+
+      if (enviarChat && emisorUsuarioId) {
+        try {
+          const conv = await ChatService.iniciarConversacion(
+            emisorUsuarioId,
+            f.usuario_id,
+            "directo",
+          );
+          if (conv?.id) {
+            conversacionId = conv.id;
+            const motivoLabel = motivoInforme
+              ? MOTIVOS_INFORME_LABELS[motivoInforme] || motivoInforme
+              : "Informe preliminar";
+            const textoMensaje = `📋 [INFORME PRELIMINAR - TORNEO]\nFiscal: ${emisor.apellido}, ${emisor.nombre}\nJugador: ${jugadorLabel}\nMotivo: ${motivoLabel}\nDetalle: ${descripcion || "Sin detalle"}\n\nPodés revisar el informe en: /dashboard/fiscal/torneos/${torneoId}?tab=informes`;
+
+            await ChatService.enviarMensaje(conv.id, emisorUsuarioId, textoMensaje);
+          }
+        } catch (chatError) {
+          console.warn("No se pudo enviar el informe por mensajería interna:", chatError);
+        }
+      }
     }
+
+    return { conversacion_id: conversacionId };
   }
 
   private static async resolverSede(torneo: Record<string, unknown>) {
