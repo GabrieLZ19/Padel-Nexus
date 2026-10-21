@@ -60,7 +60,7 @@ export default function ColegioFiscalesPage() {
     dni: "",
     direccion: "",
     correo: "",
-    rango: "Provincial" as "Local" | "Regional" | "Provincial" | "Nacional",
+    rango: "Provincial" as "Provincial" | "Nacional",
     asociacion_id: "",
   });
   const [saving, setSaving] = useState(false);
@@ -134,7 +134,7 @@ export default function ColegioFiscalesPage() {
       dni: f.dni || "",
       direccion: f.direccion || "",
       correo: f.correo || "",
-      rango: f.rango || "Provincial",
+      rango: f.rango === "Nacional" ? "Nacional" : "Provincial",
       asociacion_id: f.asociacion_id || colegioId,
     });
     setShowEditModal(true);
@@ -902,8 +902,6 @@ function FormFiscalModal({
               value={form.rango}
               onChange={(val) => setForm({ ...form, rango: val as any })}
               options={[
-                { value: "Local", label: "Local" },
-                { value: "Regional", label: "Regional" },
                 { value: "Provincial", label: "Provincial" },
                 { value: "Nacional", label: "Nacional" },
               ]}

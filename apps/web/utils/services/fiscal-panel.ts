@@ -17,9 +17,17 @@ export type MotivoInformeFiscal =
 
 export type PosicionJuegoFiscal = "drive" | "reves";
 
+export interface FiscalGeneralResumen {
+  id: string;
+  usuario_id: string | null;
+  nombre_completo: string;
+  rango?: string;
+}
+
 export interface FiscalTorneo extends Torneo {
   rol_torneo?: "general" | "auxiliar";
   sede_nombre?: string | null;
+  fiscal_general?: FiscalGeneralResumen | null;
 }
 
 export function nombreSedeFiscal(torneo: Pick<FiscalTorneo, "sede_nombre" | "lugar" | "clubes">): string {
@@ -123,6 +131,7 @@ export interface CrearInformePayload {
   partido_id?: string | null;
   inscripcion_id?: string | null;
   categoria_nueva?: string | null;
+  enviar_chat?: boolean;
 }
 
 export interface RevisarInformePayload {
@@ -155,6 +164,24 @@ export const FiscalPanelService = {
     return res.data || [];
   },
 
+  async getZonas(torneoId: string): Promise<any[]> {
+    const res = await api.get<any[]>(`/fiscal-panel/torneos/${torneoId}/zonas`);
+    return res.data || [];
+  },
+
+  async getLlaveMatriz(torneoId: string): Promise<{
+    pairCount: number;
+    matches: Array<{ matchNo: number; a: string; b: string; winnerTo: number | null }>;
+    supported: boolean;
+  }> {
+    const res = await api.get<{
+      pairCount: number;
+      matches: Array<{ matchNo: number; a: string; b: string; winnerTo: number | null }>;
+      supported: boolean;
+    }>(`/fiscal-panel/torneos/${torneoId}/llave-matriz`);
+    return res.data;
+  },
+
   async getJugadores(torneoId: string): Promise<ParejaFiscal[]> {
     const res = await api.get<ParejaFiscal[]>(`/fiscal-panel/torneos/${torneoId}/jugadores`);
     return res.data || [];
@@ -168,8 +195,8 @@ export const FiscalPanelService = {
   async crearInforme(
     torneoId: string,
     payload: CrearInformePayload,
-  ): Promise<IncidenciaFiscal> {
-    const res = await api.post<IncidenciaFiscal>(
+  ): Promise<IncidenciaFiscal & { conversacion_id?: string | null }> {
+    const res = await api.post<IncidenciaFiscal & { conversacion_id?: string | null }>(
       `/fiscal-panel/torneos/${torneoId}/incidencias`,
       {
         ...payload,

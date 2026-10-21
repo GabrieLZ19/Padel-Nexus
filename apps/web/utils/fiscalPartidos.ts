@@ -72,3 +72,21 @@ export function agruparPartidosPorRonda(partidos: Partido[]): { ronda: string; l
   }
   return grupos;
 }
+
+export function formatearResultadoSets(p: Partido): string | null {
+  const sets: string[] = [];
+  if (p.set1_a != null && p.set1_b != null) {
+    sets.push(`${p.set1_a}-${p.set1_b}`);
+  }
+  if (p.set2_a != null && p.set2_b != null) {
+    sets.push(`${p.set2_a}-${p.set2_b}`);
+  }
+  if (p.set3_a != null && p.set3_b != null) {
+    sets.push(`${p.set3_a}-${p.set3_b}`);
+  }
+  if (sets.length === 0) return null;
+  let res = sets.join(", ");
+  if (p.es_wo) res += " (W.O.)";
+  else if (p.es_lesion) res += " (Ret.)";
+  return res;
+}

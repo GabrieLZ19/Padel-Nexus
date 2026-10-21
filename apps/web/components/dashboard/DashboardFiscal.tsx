@@ -102,13 +102,23 @@ export default function DashboardFiscal() {
             {dateString.charAt(0).toUpperCase() + dateString.slice(1)}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => router.push("/dashboard/fiscal/torneos")}
-          className="flex items-center justify-center gap-2 bg-brand-chartreuse text-brand-black font-bold px-5 py-3 rounded-xl text-sm cursor-pointer"
-        >
-          Ir a mis torneos <ArrowRight className="size-4" />
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.push("/mi-perfil")}
+            className="flex items-center justify-center gap-2 bg-white/10 hover:bg-white/15 text-white font-bold px-4 py-3 rounded-xl text-sm border border-white/10 transition-colors cursor-pointer"
+            title="Acceder a mi perfil y torneos como jugador"
+          >
+            <Users className="size-4" /> Perfil de Jugador
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard/fiscal/torneos")}
+            className="flex items-center justify-center gap-2 bg-brand-chartreuse text-brand-black font-bold px-5 py-3 rounded-xl text-sm cursor-pointer"
+          >
+            Ir a mis torneos <ArrowRight className="size-4" />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

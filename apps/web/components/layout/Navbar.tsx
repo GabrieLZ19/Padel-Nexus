@@ -297,9 +297,19 @@ export default function Navbar() {
                         onClick={() => setIsDropdownOpen(false)}
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-brand-white hover:bg-brand-white/5 transition-colors"
                       >
-                        <LayoutDashboard className="size-4 text-gray-400" /> Mi
-                        Panel
+                        <LayoutDashboard className="size-4 text-gray-400" />{" "}
+                        {profile.rol === "fiscal" ? "Panel de Fiscal" : "Mi Panel"}
                       </Link>
+
+                      {(profile.rol === "fiscal" || profile.es_fiscal) && (
+                        <Link
+                          href="/mi-perfil"
+                          onClick={() => setIsDropdownOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-brand-white hover:bg-brand-white/5 transition-colors"
+                        >
+                          <User className="size-4 text-gray-400" /> Mi Perfil de Jugador
+                        </Link>
+                      )}
 
                       <Link
                         href="/mensajes"
@@ -450,8 +460,18 @@ export default function Navbar() {
                     onClick={() => setIsMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white rounded-2xl transition-colors"
                   >
-                    <LayoutDashboard className="size-4" /> Mi Panel
+                    <LayoutDashboard className="size-4" />{" "}
+                    {profile.rol === "fiscal" ? "Panel de Fiscal" : "Mi Panel"}
                   </Link>
+                  {(profile.rol === "fiscal" || profile.es_fiscal) && (
+                    <Link
+                      href="/mi-perfil"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white rounded-2xl transition-colors"
+                    >
+                      <User className="size-4" /> Mi Perfil de Jugador
+                    </Link>
+                  )}
                   <Link
                     href="/mensajes"
                     onClick={() => setIsMenuOpen(false)}

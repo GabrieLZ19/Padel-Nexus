@@ -35,6 +35,12 @@ export default function FichaJugadorFiscalPage() {
   const [cuerpo, setCuerpo] = useState("");
   const [motivoTraza, setMotivoTraza] = useState("");
   const [saving, setSaving] = useState(false);
+  const [enviarChat, setEnviarChat] = useState(true);
+  const [fiscalGeneral, setFiscalGeneral] = useState<{
+    id: string;
+    usuario_id: string | null;
+    nombre_completo: string;
+  } | null>(null);
 
   const [feedback, setFeedback] = useState<FeedbackModalProps>({
     isOpen: false,
@@ -53,6 +59,9 @@ export default function FichaJugadorFiscalPage() {
     setTorneoNombre(torneo?.nombre || "");
     setAsociacion(data.asociacion_o_club || data.lugar_residencia || "");
     setCategoriaSugerida(data.categoria_padel || "");
+    if (torneo?.fiscal_general) {
+      setFiscalGeneral(torneo.fiscal_general);
+    }
   }, [jugadorId, torneoId]);
 
   useEffect(() => {
@@ -94,6 +103,7 @@ export default function FichaJugadorFiscalPage() {
           motivoInforme === "categorizacion" ? categoriaSugerida || null : null,
         descripcion: cuerpo,
         motivo: motivoTraza || MOTIVOS_INFORME_LABELS[motivoInforme],
+        enviar_chat: enviarChat,
       });
 
       const torneo = await FiscalPanelService.getTorneo(torneoId);
@@ -110,8 +120,9 @@ export default function FichaJugadorFiscalPage() {
       setFeedback({
         isOpen: true,
         title: "Informe preliminar emitido",
-        description:
-          "Quedó registrado como interno y se descargó el PDF. El Fiscal General fue notificado si corresponde.",
+        description: informe.conversacion_id
+          ? "Quedó registrado como interno, se descargó el PDF y se remitió copia por mensajería interna al Fiscal General."
+          : "Quedó registrado como interno y se descargó el PDF oficial de respaldo.",
         type: "success",
         onClose: () => setFeedback((p) => ({ ...p, isOpen: false })),
       });
@@ -245,6 +256,25 @@ export default function FichaJugadorFiscalPage() {
           placeholder="Motivo / traza breve (auditoría)"
           className="w-full bg-[#111] border border-white/10 rounded-xl px-4 py-3 text-sm text-white min-h-16"
         />
+
+        <label className="flex items-start gap-3 p-3.5 rounded-xl bg-[#111] border border-white/5 cursor-pointer hover:border-white/10 transition-colors">
+          <input
+            type="checkbox"
+            checked={enviarChat}
+            onChange={(e) => setEnviarChat(e.target.checked)}
+            className="mt-0.5 rounded bg-[#222] border-white/20 text-brand-chartreuse focus:ring-brand-chartreuse"
+          />
+          <div className="text-xs">
+            <span className="text-white font-bold block">
+              Enviar copia al Fiscal General mediante Mensajería Interna
+            </span>
+            <span className="text-gray-400 block text-[11px] mt-0.5">
+              {fiscalGeneral
+                ? `Destinatario asignado: ${fiscalGeneral.nombre_completo}`
+                : "Se enviará al Fiscal General designado en el torneo según corresponda."}
+            </span>
+          </div>
+        </label>
 
         <button
           type="submit"

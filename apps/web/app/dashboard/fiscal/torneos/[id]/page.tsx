@@ -10,7 +10,9 @@ import {
   Shield,
   Users,
   AlertTriangle,
+  MessageSquare,
 } from "lucide-react";
+import { useIniciarChatDirecto } from "@/hooks/useIniciarChatDirecto";
 import {
   FiscalPanelService,
   MOTIVOS_INFORME_LABELS,
@@ -35,18 +37,39 @@ import {
   etiquetaCanchaAsignada,
   etiquetaCruce,
   partidosDefinidosOrdenados,
+  formatearResultadoSets,
 } from "@/utils/fiscalPartidos";
+import { TablaPosicionesZona } from "@/components/torneos/TablaPosicionesZona";
+import {
+  FapBracketDiagram,
+  type FapMatrixMatch,
+} from "@/components/torneos/FapBracketDiagram";
+import PublicBracketView from "@/components/torneos/PublicBracketView";
+import { esRondaDeZona } from "@/utils/rondasLlave";
 import FeedbackModal, {
   type FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
 
-type TabId = "partidos" | "jugadores" | "informes";
+type TabId = "partidos" | "zonas" | "llaves" | "jugadores" | "informes";
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: "partidos", label: "Partidos" },
+  { id: "partidos", label: "Programación y Resultados" },
+  { id: "zonas", label: "Zonas y Posiciones" },
+  { id: "llaves", label: "Cuadro / Llave" },
   { id: "jugadores", label: "Jugadores" },
   { id: "informes", label: "Informes" },
 ];
+
+const PLAYOFF_RONDAS = new Set([
+  "PRELIMINARES",
+  "32AVOS",
+  "16AVOS",
+  "OCTAVOS",
+  "CUARTOS",
+  "SEMIS",
+  "FINAL",
+  "LLAVE",
+]);
 
 function formatFecha(iso?: string | null) {
   if (!iso) return "Sin horario";
@@ -68,12 +91,16 @@ export default function FiscalTorneoOperativoPage() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
+  const { iniciarChatDirecto } = useIniciarChatDirecto();
 
   const [tab, setTab] = useState<TabId>("partidos");
   const [torneo, setTorneo] = useState<FiscalTorneo | null>(null);
   const [partidos, setPartidos] = useState<Partido[]>([]);
   const [parejas, setParejas] = useState<ParejaFiscal[]>([]);
   const [incidencias, setIncidencias] = useState<IncidenciaFiscal[]>([]);
+  const [zonas, setZonas] = useState<any[]>([]);
+  const [fapMatrixMatches, setFapMatrixMatches] = useState<FapMatrixMatch[]>([]);
+  const [fapPairCount, setFapPairCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [descargando, setDescargando] = useState(false);
@@ -93,14 +120,24 @@ export default function FiscalTorneoOperativoPage() {
     const torneoData = await FiscalPanelService.getTorneo(id);
     setTorneo(torneoData);
 
-    const [p, j, i] = await Promise.all([
+    const [p, j, i, z, m] = await Promise.all([
       FiscalPanelService.getPartidos(id).catch(() => [] as Partido[]),
       FiscalPanelService.getJugadores(id).catch(() => [] as ParejaFiscal[]),
       FiscalPanelService.getIncidencias(id),
+      FiscalPanelService.getZonas(id).catch(() => []),
+      FiscalPanelService.getLlaveMatriz(id).catch(() => null),
     ]);
     setPartidos(p);
     setParejas(j);
     setIncidencias(i);
+    setZonas(z || []);
+    if (m?.supported && m.matches?.length) {
+      setFapMatrixMatches(m.matches as FapMatrixMatch[]);
+      setFapPairCount(m.pairCount ?? null);
+    } else {
+      setFapMatrixMatches([]);
+      setFapPairCount(null);
+    }
   }, [id]);
 
   useEffect(() => {
@@ -260,6 +297,21 @@ export default function FiscalTorneoOperativoPage() {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+          {torneo.rol_torneo !== "general" && torneo.fiscal_general?.usuario_id && (
+            <button
+              type="button"
+              onClick={() => {
+                if (torneo.fiscal_general?.usuario_id) {
+                  iniciarChatDirecto(torneo.fiscal_general.usuario_id);
+                }
+              }}
+              className="inline-flex h-11 items-center justify-center gap-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 font-bold px-4 rounded-xl text-sm cursor-pointer border border-blue-500/30 whitespace-nowrap transition-colors"
+              title={`Iniciar chat directo con el Fiscal General (${torneo.fiscal_general.nombre_completo})`}
+            >
+              <MessageSquare className="size-4 shrink-0" />
+              Chat con Fiscal General
+            </button>
+          )}
           <button
             type="button"
             onClick={handleGrillasCancha}
@@ -293,13 +345,13 @@ export default function FiscalTorneoOperativoPage() {
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-white/10 pb-2">
+      <div className="flex gap-2 border-b border-white/10 pb-2 overflow-x-auto">
         {TABS.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
-            className={`px-4 py-2 rounded-xl text-sm font-bold cursor-pointer ${
+            className={`px-4 py-2 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap transition-colors ${
               tab === item.id
                 ? "bg-brand-chartreuse text-brand-black"
                 : "text-gray-400 hover:text-white"
@@ -309,13 +361,41 @@ export default function FiscalTorneoOperativoPage() {
               ? `${item.label} (${contarJugadoresTab(parejas)})`
               : item.id === "partidos"
                 ? `${item.label} (${partidosDefinidosOrdenados(partidos).length})`
-                : `${item.label} (${incidencias.length})`}
+                : item.id === "zonas"
+                  ? `${item.label} (${zonas.length})`
+                  : item.id === "llaves"
+                    ? `${item.label}`
+                    : `${item.label} (${incidencias.length})`}
           </button>
         ))}
       </div>
 
       {tab === "partidos" && (
-        <TablaPartidos partidos={partidos} modalidad={torneo.modalidad} />
+        <TablaPartidos
+          partidos={partidos}
+          modalidad={torneo.modalidad}
+          onAbrirJugador={(jugadorId) =>
+            router.push(`/dashboard/fiscal/torneos/${id}/jugadores/${jugadorId}`)
+          }
+        />
+      )}
+      {tab === "zonas" && (
+        <SeccionZonas
+          zonas={zonas}
+          partidos={partidos}
+          alcance={torneo.alcance}
+          onAbrirJugador={(jugadorId) =>
+            router.push(`/dashboard/fiscal/torneos/${id}/jugadores/${jugadorId}`)
+          }
+        />
+      )}
+      {tab === "llaves" && (
+        <SeccionLlaves
+          torneo={torneo}
+          partidos={partidos}
+          fapMatrixMatches={fapMatrixMatches}
+          fapPairCount={fapPairCount}
+        />
       )}
       {tab === "jugadores" && (
         <TablaJugadores
@@ -342,12 +422,75 @@ export default function FiscalTorneoOperativoPage() {
   );
 }
 
+function ParejaCruceInteractiva({
+  j1,
+  j2,
+  j1Id,
+  j2Id,
+  onAbrirJugador,
+}: {
+  j1?: string | null;
+  j2?: string | null;
+  j1Id?: string | null;
+  j2Id?: string | null;
+  onAbrirJugador: (id: string) => void;
+}) {
+  const nombre1 = nombreJugadorVisible(j1);
+  const nombre2 = nombreJugadorVisible(j2);
+
+  if (!nombre1 && !nombre2) {
+    return <span className="text-gray-500 italic text-xs">A confirmar</span>;
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1 font-semibold text-white">
+      {nombre1 ? (
+        j1Id ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAbrirJugador(j1Id);
+            }}
+            title="Emitir informe / Ver ficha de fiscal"
+            className="hover:text-brand-chartreuse hover:underline text-left cursor-pointer transition-colors"
+          >
+            {nombre1}
+          </button>
+        ) : (
+          <span>{nombre1}</span>
+        )
+      ) : null}
+      {nombre1 && nombre2 && <span className="text-gray-500 font-normal">/</span>}
+      {nombre2 ? (
+        j2Id ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAbrirJugador(j2Id);
+            }}
+            title="Emitir informe / Ver ficha de fiscal"
+            className="hover:text-brand-chartreuse hover:underline text-left cursor-pointer transition-colors"
+          >
+            {nombre2}
+          </button>
+        ) : (
+          <span>{nombre2}</span>
+        )
+      ) : null}
+    </span>
+  );
+}
+
 function TablaPartidos({
   partidos,
   modalidad,
+  onAbrirJugador,
 }: {
   partidos: Partido[];
   modalidad?: string | null;
+  onAbrirJugador: (id: string) => void;
 }) {
   const grupos = agruparPartidosPorRonda(partidos);
   const individual = esModalidadIndividual(modalidad);
@@ -410,52 +553,310 @@ function TablaPartidos({
                 <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-white/5">
                   <th className="px-4 py-3 w-14">#</th>
                   <th className="px-4 py-3">{cruceLabel}</th>
+                  <th className="px-4 py-3">Resultado</th>
                   <th className="px-4 py-3">Cancha</th>
                   <th className="px-4 py-3">Horario</th>
                   <th className="px-4 py-3">Estado</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-gray-300">
-                {grupo.partidos.map((p) => (
-                  <tr key={p.id} className="hover:bg-white/[0.02]">
-                    <td className="px-4 py-3 text-gray-500 font-mono text-xs">
-                      {p.orden || "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-white font-semibold">
-                        {etiquetaCruce(p.equipo_a_j1, p.equipo_a_j2)}
-                      </span>
-                      <span className="text-gray-600 mx-2 text-xs font-black uppercase">
-                        vs
-                      </span>
-                      <span className="text-white font-semibold">
-                        {etiquetaCruce(p.equipo_b_j1, p.equipo_b_j2)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {canchaAsignadaReal(p.cancha_asignada) ? (
-                        <span className="text-gray-200">
-                          {etiquetaCanchaAsignada(p.cancha_asignada)}
+                {grupo.partidos.map((p) => {
+                  const resultado = formatearResultadoSets(p);
+                  return (
+                    <tr key={p.id} className="hover:bg-white/[0.02]">
+                      <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                        {p.orden || "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ParejaCruceInteractiva
+                            j1={p.equipo_a_j1}
+                            j2={p.equipo_a_j2}
+                            j1Id={p.equipo_a_usuario_id}
+                            j2Id={p.equipo_a_usuario2_id}
+                            onAbrirJugador={onAbrirJugador}
+                          />
+                          <span className="text-gray-600 mx-1 text-xs font-black uppercase">
+                            vs
+                          </span>
+                          <ParejaCruceInteractiva
+                            j1={p.equipo_b_j1}
+                            j2={p.equipo_b_j2}
+                            j1Id={p.equipo_b_usuario_id}
+                            j2Id={p.equipo_b_usuario2_id}
+                            onAbrirJugador={onAbrirJugador}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {resultado ? (
+                          <span className="font-mono font-bold text-white bg-white/5 px-2.5 py-1 rounded-lg border border-white/10 text-xs inline-block">
+                            {resultado}
+                          </span>
+                        ) : (
+                          <span className="text-gray-600 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {canchaAsignadaReal(p.cancha_asignada) ? (
+                          <span className="text-gray-200">
+                            {etiquetaCanchaAsignada(p.cancha_asignada)}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] uppercase tracking-widest font-bold text-amber-400/90">
+                            Pendiente
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">{formatFecha(p.fecha_partido)}</td>
+                      <td className="px-4 py-3">
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400 bg-white/5 border border-white/10 px-2 py-1 rounded-full">
+                          {p.estado_partido || "Programado"}
                         </span>
-                      ) : (
-                        <span className="text-[10px] uppercase tracking-widest font-bold text-amber-400/90">
-                          Pendiente
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">{formatFecha(p.fecha_partido)}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400 bg-white/5 border border-white/10 px-2 py-1 rounded-full">
-                        {p.estado_partido || "Programado"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function SeccionZonas({
+  zonas,
+  partidos,
+  alcance,
+  onAbrirJugador,
+}: {
+  zonas: any[];
+  partidos: Partido[];
+  alcance?: string | null;
+  onAbrirJugador: (id: string) => void;
+}) {
+  if (!zonas || zonas.length === 0) {
+    return (
+      <div className="bg-[#151515] border border-white/5 rounded-2xl p-10 text-center text-gray-500 text-sm">
+        No hay zonas configuradas en este torneo.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-gray-400">
+          <span className="text-white font-bold">{zonas.length}</span>{" "}
+          {zonas.length === 1 ? "zona" : "zonas"} de fase regular
+        </p>
+        <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20">
+          Tablas de Posiciones y Cruces
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        {zonas.map((z) => {
+          const parejasFormatted = (z.grupo_parejas || []).map(
+            (gp: any) => ({
+              id: gp.inscripcion_id,
+              jugador1_nombre: gp.inscripciones?.jugador1_nombre,
+              jugador2_nombre: gp.inscripciones?.jugador2_nombre,
+              club:
+                gp.inscripciones?.perfiles?.clubes?.nombre ||
+                gp.inscripciones?.perfiles?.lugar_residencia ||
+                "Sin club",
+              seed: gp.seed ?? undefined,
+              cabezaDeSerie: gp.seed != null,
+              descalificada: Boolean(gp.descalificada),
+              usuario_id: gp.inscripciones?.usuario_id ?? null,
+              usuario2_id: gp.inscripciones?.usuario2_id ?? null,
+              denominacion_nacional:
+                gp.inscripciones?.denominacion_nacional ?? null,
+              provincia: gp.inscripciones?.provincia ?? null,
+              letra_prioridad: gp.inscripciones?.letra_prioridad ?? null,
+            }),
+          );
+
+          const partidosZona = partidos.filter((p) => {
+            const r = String(p.ronda || "").trim().toLowerCase();
+            const zName = String(z.nombre_grupo || "").trim().toLowerCase();
+            return (
+              r === zName ||
+              r === `zona ${zName}` ||
+              r === `zona_${zName}` ||
+              r.replace(/\s+/g, "") === `zona${zName.replace(/\s+/g, "")}`
+            );
+          });
+
+          return (
+            <div key={z.id} className="space-y-4 bg-[#151515] border border-white/5 rounded-2xl p-5">
+              <TablaPosicionesZona
+                nombreZona={z.nombre_grupo}
+                parejasInscritas={parejasFormatted}
+                partidosZona={partidosZona}
+                alcance={alcance}
+              />
+              {partidosZona.length > 0 && (
+                <div className="pt-2">
+                  <p className="text-xs uppercase tracking-widest text-gray-500 font-bold mb-3">
+                    Partidos de la {z.nombre_grupo}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {partidosZona.map((p) => (
+                      <MatchCardFiscal
+                        key={p.id}
+                        partido={p}
+                        onAbrirJugador={onAbrirJugador}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MatchCardFiscal({
+  partido,
+  onAbrirJugador,
+}: {
+  partido: Partido;
+  onAbrirJugador: (id: string) => void;
+}) {
+  const score = formatearResultadoSets(partido);
+
+  return (
+    <div className="bg-[#111] border border-white/5 rounded-xl p-3.5 space-y-2 hover:border-white/15 transition-colors">
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <span className="font-mono font-bold text-gray-500">#{partido.orden || "—"}</span>
+        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/5 text-gray-300 border border-white/10">
+          {partido.cancha_asignada ? etiquetaCanchaAsignada(partido.cancha_asignada) : "Cancha a definir"}
+        </span>
+      </div>
+
+      <div className="space-y-1.5 text-sm">
+        <div className="flex items-center justify-between gap-2">
+          <ParejaCruceInteractiva
+            j1={partido.equipo_a_j1}
+            j2={partido.equipo_a_j2}
+            j1Id={partido.equipo_a_usuario_id}
+            j2Id={partido.equipo_a_usuario2_id}
+            onAbrirJugador={onAbrirJugador}
+          />
+          {partido.ganador && partido.equipo_a_id && partido.ganador === partido.equipo_a_id && (
+            <span className="text-[10px] font-black uppercase text-brand-chartreuse tracking-widest bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
+              Ganador
+            </span>
+          )}
+        </div>
+        <div className="text-gray-600 text-[10px] uppercase font-black">vs</div>
+        <div className="flex items-center justify-between gap-2">
+          <ParejaCruceInteractiva
+            j1={partido.equipo_b_j1}
+            j2={partido.equipo_b_j2}
+            j1Id={partido.equipo_b_usuario_id}
+            j2Id={partido.equipo_b_usuario2_id}
+            onAbrirJugador={onAbrirJugador}
+          />
+          {partido.ganador && partido.equipo_b_id && partido.ganador === partido.equipo_b_id && (
+            <span className="text-[10px] font-black uppercase text-brand-chartreuse tracking-widest bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
+              Ganador
+            </span>
+          )}
+        </div>
+      </div>
+
+      {score ? (
+        <div className="pt-1.5 border-t border-white/5 flex items-center justify-between">
+          <span className="text-[11px] text-gray-400">Resultado:</span>
+          <span className="font-mono text-xs font-bold text-brand-chartreuse bg-brand-chartreuse/10 px-2 py-0.5 rounded border border-brand-chartreuse/20">
+            {score}
+          </span>
+        </div>
+      ) : (
+        <div className="pt-1.5 border-t border-white/5 text-[11px] text-gray-500">
+          {partido.fecha_partido ? formatFecha(partido.fecha_partido) : "Horario a confirmar"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SeccionLlaves({
+  torneo,
+  partidos,
+  fapMatrixMatches,
+  fapPairCount,
+}: {
+  torneo: FiscalTorneo;
+  partidos: Partido[];
+  fapMatrixMatches: FapMatrixMatch[];
+  fapPairCount: number | null;
+}) {
+  const isEnCurso = (torneo.estado || "").toLowerCase() === "en curso";
+  const isFinalizado = (torneo.estado || "").toLowerCase() === "finalizado";
+
+  const playoffMatches = partidos.filter((p) =>
+    PLAYOFF_RONDAS.has(String(p.ronda || "").toUpperCase().trim()),
+  );
+
+  if (fapMatrixMatches.length === 0 && playoffMatches.length === 0) {
+    return (
+      <div className="bg-[#151515] border border-white/5 rounded-2xl p-10 text-center text-gray-500 text-sm">
+        Todavía no se ha generado la llave o cuadro eliminatorio para este torneo.
+      </div>
+    );
+  }
+
+  if (fapMatrixMatches.length > 0) {
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-black text-white tracking-wide">
+              Cuadro eliminatorio oficial
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Matriz FAP {fapPairCount ? ` · ${fapPairCount} parejas` : ""}
+              {isFinalizado ? " · Finalizado" : isEnCurso ? " · En curso" : " · Programado"}
+            </p>
+          </div>
+        </div>
+        <div className="relative rounded-2xl border border-white/10 bg-[#0f0f0f] overflow-hidden p-4 sm:p-6 overflow-x-auto">
+          <FapBracketDiagram
+            matches={fapMatrixMatches}
+            inicioNumeracion={
+              partidos.filter((p) => esRondaDeZona(p.ronda)).length + 1
+            }
+            partidos={playoffMatches}
+            pairCount={fapPairCount ?? undefined}
+            alcance={torneo.alcance}
+            interactive={false}
+            compact
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-white/10 bg-[#0f0f0f] overflow-hidden p-4 sm:p-6 overflow-x-auto">
+        <PublicBracketView
+          partidos={partidos}
+          torneoId={torneo.id}
+          isLive={isEnCurso}
+          isFinished={isFinalizado}
+          alcance={torneo.alcance}
+        />
+      </div>
     </div>
   );
 }
