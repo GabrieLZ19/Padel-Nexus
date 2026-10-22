@@ -1348,6 +1348,12 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                               | undefined
                           )?.definicion_tercer_set ?? "Completo") === "Completo"
                         }
+                        torneoId={torneo?.id}
+                        puedeResolverSorteo={Boolean(puedeEditarLlave)}
+                        onSorteoResuelto={() => {
+                          loadZonas();
+                          onRefresh?.();
+                        }}
                       />
                     );
                   })}

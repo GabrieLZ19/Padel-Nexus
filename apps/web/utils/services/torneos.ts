@@ -249,6 +249,34 @@ export const TorneosService = {
     return response.data;
   },
 
+  async getPosicionesZona(
+    torneoId: string,
+    nombreZona: string,
+    capacidad?: number,
+  ) {
+    const response = await api.get(
+      `/torneos/${torneoId}/zonas/${encodeURIComponent(nombreZona)}/posiciones`,
+      { params: { capacidad } },
+    );
+    return response.data;
+  },
+
+  async resolverSorteoZona(
+    torneoId: string,
+    nombreZona: string,
+    payload: {
+      resoluciones: Array<{ inscripcionId: string; posicion: number }>;
+      motivo?: string;
+      metodo: "digital" | "manual";
+    },
+  ) {
+    const response = await api.post(
+      `/torneos/${torneoId}/zonas/${encodeURIComponent(nombreZona)}/sorteo`,
+      payload,
+    );
+    return response.data;
+  },
+
   async actualizarEquiposPartido(
     partidoId: string,
     payload: { equipo_a_id: string | null; equipo_b_id: string | null; motivo: string },

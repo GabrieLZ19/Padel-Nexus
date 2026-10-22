@@ -384,6 +384,8 @@ export default function FiscalTorneoOperativoPage() {
           zonas={zonas}
           partidos={partidos}
           alcance={torneo.alcance}
+          torneoId={id}
+          onSorteoResuelto={cargar}
           onAbrirJugador={(jugadorId) =>
             router.push(`/dashboard/fiscal/torneos/${id}/jugadores/${jugadorId}`)
           }
@@ -630,11 +632,15 @@ function SeccionZonas({
   zonas,
   partidos,
   alcance,
+  torneoId,
+  onSorteoResuelto,
   onAbrirJugador,
 }: {
   zonas: any[];
   partidos: Partido[];
   alcance?: string | null;
+  torneoId?: string;
+  onSorteoResuelto?: () => void;
   onAbrirJugador: (id: string) => void;
 }) {
   if (!zonas || zonas.length === 0) {
@@ -677,6 +683,8 @@ function SeccionZonas({
                 gp.inscripciones?.denominacion_nacional ?? null,
               provincia: gp.inscripciones?.provincia ?? null,
               letra_prioridad: gp.inscripciones?.letra_prioridad ?? null,
+              sorteo_posicion: gp.sorteo_posicion ?? null,
+              sorteo_motivo: gp.sorteo_motivo ?? null,
             }),
           );
 
@@ -698,6 +706,9 @@ function SeccionZonas({
                 parejasInscritas={parejasFormatted}
                 partidosZona={partidosZona}
                 alcance={alcance}
+                torneoId={torneoId}
+                puedeResolverSorteo={true}
+                onSorteoResuelto={onSorteoResuelto}
               />
               {partidosZona.length > 0 && (
                 <div className="pt-2">

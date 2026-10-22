@@ -32,6 +32,9 @@ interface ZonaCardProps {
   anchorId?: string;
   /** true = 3er set completo (tradicional); false = STB u otro */
   tercerSetCompleto?: boolean;
+  torneoId?: string;
+  puedeResolverSorteo?: boolean;
+  onSorteoResuelto?: () => void;
 }
 
 function letraZona(nombre: string): string | null {
@@ -138,6 +141,9 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
   alcance,
   anchorId,
   tercerSetCompleto = true,
+  torneoId,
+  puedeResolverSorteo,
+  onSorteoResuelto,
 }) => {
   const [showMatches, setShowMatches] = useState(true);
 
@@ -261,6 +267,9 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
             alcance={alcance || undefined}
             capacidadZona={zona.parejas.length}
             embedded
+            torneoId={torneoId}
+            puedeResolverSorteo={puedeResolverSorteo}
+            onSorteoResuelto={onSorteoResuelto}
           />
         </div>
 

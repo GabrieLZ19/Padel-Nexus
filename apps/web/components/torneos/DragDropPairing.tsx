@@ -55,6 +55,8 @@ export interface ParejaDrag {
   denominacion_nacional?: string | null;
   provincia?: string | null;
   letra_prioridad?: string | null;
+  sorteo_posicion?: number | null;
+  sorteo_motivo?: string | null;
 }
 
 export interface ZonaDrag {

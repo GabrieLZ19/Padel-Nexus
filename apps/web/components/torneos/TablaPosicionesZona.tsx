@@ -8,6 +8,8 @@ import {
   ChevronDown,
   ChevronUp,
   Star,
+  AlertTriangle,
+  Shuffle,
 } from "lucide-react";
 import {
   PairDisplay,
@@ -16,6 +18,7 @@ import {
 import { clasificadosPorZona } from "@/utils/clasificacionZonas";
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import { formatNombrePareja } from "@/utils/nombrePareja";
+import { ModalSorteoZona } from "./ModalSorteoZona";
 
 export interface ParejaStats {
   inscripcionId: string;
@@ -42,6 +45,11 @@ export interface ParejaStats {
   denominacion_nacional?: string | null;
   provincia?: string | null;
   letra_prioridad?: string | null;
+  sorteo_posicion?: number | null;
+  sorteo_motivo?: string | null;
+  requiereSorteo?: boolean;
+  empateConIds?: string[];
+  criterioDesempate?: string;
 }
 
 interface TablaPosicionesZonaProps {
@@ -59,12 +67,175 @@ interface TablaPosicionesZonaProps {
     denominacion_nacional?: string | null;
     provincia?: string | null;
     letra_prioridad?: string | null;
+    sorteo_posicion?: number | null;
+    sorteo_motivo?: string | null;
   }[];
   partidosZona: Partido[];
   alcance?: string | null;
   capacidadZona?: number;
-  /** Sin card externa (cuando vive dentro de ZonaCard). */
   embedded?: boolean;
+  torneoId?: string;
+  puedeResolverSorteo?: boolean;
+  onSorteoResuelto?: () => void;
+}
+
+/**
+ * Desempate de 2 parejas según el reglamento oficial FAP.
+ */
+function desempatarDosEquiposWeb(
+  a: ParejaStats,
+  b: ParejaStats,
+  partidos: Partido[],
+): [ParejaStats, ParejaStats] {
+  // 0. Si ambas tienen sorteo_posicion registrado
+  if (
+    a.sorteo_posicion != null &&
+    b.sorteo_posicion != null &&
+    a.sorteo_posicion !== b.sorteo_posicion
+  ) {
+    const orden = a.sorteo_posicion < b.sorteo_posicion ? [a, b] : [b, a];
+    orden[0].criterioDesempate = "Sorteo reglamentario FAP";
+    orden[1].criterioDesempate = "Sorteo reglamentario FAP";
+    return orden as [ParejaStats, ParejaStats];
+  }
+
+  // 1. Confrontación directa entre sí
+  const partidoDirecto = partidos.find(
+    (p) =>
+      (p.equipo_a_id === a.inscripcionId && p.equipo_b_id === b.inscripcionId) ||
+      (p.equipo_a_id === b.inscripcionId && p.equipo_b_id === a.inscripcionId),
+  );
+  if (partidoDirecto && partidoDirecto.ganador) {
+    const primero = partidoDirecto.ganador === a.inscripcionId ? a : b;
+    const segundo = primero === a ? b : a;
+    primero.criterioDesempate = "Confrontación directa";
+    segundo.criterioDesempate = "Confrontación directa";
+    return [primero, segundo];
+  }
+
+  // 2. Diferencia de sets
+  if (a.ds !== b.ds) {
+    const primero = a.ds > b.ds ? a : b;
+    const segundo = primero === a ? b : a;
+    primero.criterioDesempate = "Diferencia de sets";
+    segundo.criterioDesempate = "Diferencia de sets";
+    return [primero, segundo];
+  }
+
+  // 3. Diferencia de games
+  if (a.dg !== b.dg) {
+    const primero = a.dg > b.dg ? a : b;
+    const segundo = primero === a ? b : a;
+    primero.criterioDesempate = "Diferencia de games";
+    segundo.criterioDesempate = "Diferencia de games";
+    return [primero, segundo];
+  }
+
+  // 4. Games a favor
+  if (a.gf !== b.gf) {
+    const primero = a.gf > b.gf ? a : b;
+    const segundo = primero === a ? b : a;
+    primero.criterioDesempate = "Games a favor";
+    segundo.criterioDesempate = "Games a favor";
+    return [primero, segundo];
+  }
+
+  // 5. Menor cantidad de games en contra
+  if (a.gc !== b.gc) {
+    const primero = a.gc < b.gc ? a : b;
+    const segundo = primero === a ? b : a;
+    primero.criterioDesempate = "Menos games en contra";
+    segundo.criterioDesempate = "Menos games en contra";
+    return [primero, segundo];
+  }
+
+  // 6. Empate absoluto en todos los criterios
+  if (
+    a.sorteo_posicion != null &&
+    b.sorteo_posicion != null &&
+    a.sorteo_posicion !== b.sorteo_posicion
+  ) {
+    const orden = a.sorteo_posicion < b.sorteo_posicion ? [a, b] : [b, a];
+    orden[0].criterioDesempate = "Sorteo reglamentario FAP";
+    orden[1].criterioDesempate = "Sorteo reglamentario FAP";
+    return orden as [ParejaStats, ParejaStats];
+  }
+
+  a.requiereSorteo = true;
+  b.requiereSorteo = true;
+  a.empateConIds = [b.inscripcionId];
+  b.empateConIds = [a.inscripcionId];
+  a.criterioDesempate = "Pendiente sorteo FAP";
+  b.criterioDesempate = "Pendiente sorteo FAP";
+  return [a, b];
+}
+
+/**
+ * Desempate de 3 o más parejas según el reglamento FAP.
+ */
+function desempatarMultiplesEquiposWeb(
+  teams: ParejaStats[],
+  partidos: Partido[],
+): ParejaStats[] {
+  const allHaveSorteo = teams.every((t) => t.sorteo_posicion != null);
+  if (allHaveSorteo) {
+    const sorted = [...teams].sort(
+      (a, b) => (a.sorteo_posicion || 0) - (b.sorteo_posicion || 0),
+    );
+    sorted.forEach((t) => (t.criterioDesempate = "Sorteo reglamentario FAP"));
+    return sorted;
+  }
+
+  const sorted = [...teams].sort((a, b) => {
+    if (b.ds !== a.ds) return b.ds - a.ds;
+    if (b.dg !== a.dg) return b.dg - a.dg;
+    if (b.gf !== a.gf) return b.gf - a.gf;
+    return a.gc - b.gc;
+  });
+
+  const resultado: ParejaStats[] = [];
+  let i = 0;
+
+  while (i < sorted.length) {
+    let j = i + 1;
+    while (
+      j < sorted.length &&
+      sorted[j].ds === sorted[i].ds &&
+      sorted[j].dg === sorted[i].dg &&
+      sorted[j].gf === sorted[i].gf &&
+      sorted[j].gc === sorted[i].gc
+    ) {
+      j++;
+    }
+
+    const subgrupo = sorted.slice(i, j);
+    if (subgrupo.length === 1) {
+      subgrupo[0].criterioDesempate = "Estadística de sets/games";
+      resultado.push(subgrupo[0]);
+    } else if (subgrupo.length === 2) {
+      resultado.push(...desempatarDosEquiposWeb(subgrupo[0], subgrupo[1], partidos));
+    } else {
+      const allSorteo = subgrupo.every((t) => t.sorteo_posicion != null);
+      if (allSorteo) {
+        subgrupo.sort(
+          (a, b) => (a.sorteo_posicion || 0) - (b.sorteo_posicion || 0),
+        );
+        subgrupo.forEach((t) => (t.criterioDesempate = "Sorteo reglamentario FAP"));
+        resultado.push(...subgrupo);
+      } else {
+        const ids = subgrupo.map((t) => t.inscripcionId);
+        subgrupo.forEach((t) => {
+          t.requiereSorteo = true;
+          t.empateConIds = ids.filter((id) => id !== t.inscripcionId);
+          t.criterioDesempate = "Pendiente sorteo FAP";
+        });
+        resultado.push(...subgrupo);
+      }
+    }
+    i = j;
+  }
+
+  return resultado;
 }
 
 export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
@@ -74,8 +245,12 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
   alcance,
   capacidadZona,
   embedded = false,
+  torneoId,
+  puedeResolverSorteo = false,
+  onSorteoResuelto,
 }) => {
   const [expanded, setExpanded] = useState(false);
+  const [modalSorteoOpen, setModalSorteoOpen] = useState(false);
   const nacional = esAlcanceNacional(alcance);
   const cupoClasificacion = clasificadosPorZona(
     capacidadZona ?? parejasInscritas.length,
@@ -117,6 +292,9 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
         denominacion_nacional: p.denominacion_nacional,
         provincia: p.provincia,
         letra_prioridad: p.letra_prioridad,
+        sorteo_posicion: p.sorteo_posicion ?? null,
+        sorteo_motivo: p.sorteo_motivo ?? null,
+        requiereSorteo: false,
       };
     });
 
@@ -226,15 +404,56 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
       dg: st.gf - st.gc,
     }));
 
-    lista.sort((a, b) => {
-      if (a.descalificada !== b.descalificada) return a.descalificada ? 1 : -1;
-      if (b.pts !== a.pts) return b.pts - a.pts;
-      if (b.ds !== a.ds) return b.ds - a.ds;
-      return b.dg - a.dg;
+    // Separar habilitadas de descalificadas
+    const habilitadas = lista.filter((t) => !t.descalificada);
+    const descalificadas = lista.filter((t) => t.descalificada);
+
+    // Agrupar por puntos y aplicar cascada FAP
+    const groups: Record<number, ParejaStats[]> = {};
+    habilitadas.forEach((team) => {
+      const pts = team.pts;
+      if (!groups[pts]) groups[pts] = [];
+      groups[pts].push(team);
     });
 
-    return lista;
+    const sortedPts = Object.keys(groups)
+      .map(Number)
+      .sort((a, b) => b - a);
+
+    const resultado: ParejaStats[] = [];
+
+    for (const pts of sortedPts) {
+      const tiedTeams = groups[pts];
+      if (tiedTeams.length === 1) {
+        tiedTeams[0].criterioDesempate = "Puntos directos";
+        resultado.push(tiedTeams[0]);
+      } else if (tiedTeams.length === 2) {
+        resultado.push(
+          ...desempatarDosEquiposWeb(tiedTeams[0], tiedTeams[1], partidosZona),
+        );
+      } else {
+        resultado.push(
+          ...desempatarMultiplesEquiposWeb(tiedTeams, partidosZona),
+        );
+      }
+    }
+
+    return [...resultado, ...descalificadas];
   }, [parejasInscritas, partidosZona]);
+
+  // Identificar parejas en empate absoluto para sorteo
+  const parejasEnSorteo = useMemo(() => {
+    return stats.filter((s) => s.requiereSorteo);
+  }, [stats]);
+
+  const posicionesEnDisputa = useMemo(() => {
+    if (parejasEnSorteo.length === 0) return [];
+    return stats
+      .map((s, idx) => (s.requiereSorteo ? idx + 1 : null))
+      .filter((pos): pos is number => pos !== null);
+  }, [stats, parejasEnSorteo]);
+
+  const haySorteoPendiente = parejasEnSorteo.length > 0;
 
   return (
     <div
@@ -244,6 +463,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
           : "bg-[#161616] border border-white/5 rounded-3xl p-5 space-y-4 shadow-xl"
       }
     >
+      {/* Header */}
       <div
         className={`flex flex-wrap items-start justify-between gap-x-3 gap-y-2 ${
           embedded ? "" : "border-b border-white/5 pb-3"
@@ -273,6 +493,31 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
         </button>
       </div>
 
+      {/* Banner de Empate Reglamentario / Requiere Sorteo */}
+      {haySorteoPendiente && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-200 text-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AlertTriangle className="size-4 shrink-0 text-amber-400" />
+            <span className="font-semibold">
+              Empate técnico absoluto FAP en {nombreZona}. Requiere sorteo
+              reglamentario para definir puestos{" "}
+              {posicionesEnDisputa.map((p) => `${p}.º`).join(" y ")}.
+            </span>
+          </div>
+          {puedeResolverSorteo && torneoId && (
+            <button
+              type="button"
+              onClick={() => setModalSorteoOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              <Shuffle className="size-3 text-amber-300" />
+              Resolver Sorteo
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Tabla */}
       <div className="overflow-x-auto scrollbar-thin">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
@@ -305,6 +550,8 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
             {stats.map((row, idx) => {
               const isClasificado =
                 idx < cupoClasificacion && row.pj > 0 && !row.descalificada;
+              const tieneSorteoResuelto = row.sorteo_posicion != null;
+
               return (
                 <tr
                   key={row.inscripcionId}
@@ -350,6 +597,21 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
                             Cab. Serie
                           </span>
                         )}
+                        {tieneSorteoResuelto && (
+                          <span
+                            title={row.sorteo_motivo || "Definido por sorteo reglamentario"}
+                            className="inline-flex items-center gap-1 shrink-0 text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5"
+                          >
+                            <Shuffle className="size-2.5" />
+                            Sorteo FAP
+                          </span>
+                        )}
+                        {row.requiereSorteo && (
+                          <span className="inline-flex items-center gap-1 shrink-0 text-[10px] font-black text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
+                            <AlertTriangle className="size-2.5" />
+                            Pendiente sorteo
+                          </span>
+                        )}
                         {isClasificado && (
                           <CheckCircle2 className="size-3.5 text-brand-chartreuse shrink-0 mt-1" />
                         )}
@@ -391,6 +653,26 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
           </tbody>
         </table>
       </div>
+
+      {/* Modal de Resolución de Sorteo */}
+      {modalSorteoOpen && torneoId && (
+        <ModalSorteoZona
+          isOpen={modalSorteoOpen}
+          onClose={() => setModalSorteoOpen(false)}
+          torneoId={torneoId}
+          nombreZona={nombreZona}
+          parejasEmpatadas={parejasEnSorteo.map((p) => ({
+            inscripcionId: p.inscripcionId,
+            nombre: p.nombre,
+            club: p.club,
+            sorteoPosicion: p.sorteo_posicion,
+          }))}
+          posicionesEnDisputa={posicionesEnDisputa}
+          onSuccess={() => {
+            onSorteoResuelto?.();
+          }}
+        />
+      )}
     </div>
   );
 };
