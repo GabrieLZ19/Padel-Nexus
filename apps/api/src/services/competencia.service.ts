@@ -467,6 +467,10 @@ export class CompetenciaService {
           id,
           seed,
           descalificada,
+          sorteo_posicion,
+          sorteo_motivo,
+          sorteo_aplicado_por,
+          sorteo_aplicado_at,
           inscripcion_id,
         inscripciones (
             id,

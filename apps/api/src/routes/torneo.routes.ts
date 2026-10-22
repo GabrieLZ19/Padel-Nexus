@@ -40,7 +40,10 @@ import {
   habilitarAccesoFiscal,
 } from "../controllers/fiscal.controller";
 import { generarZonas } from "../controllers/competencia.controller";
-import { obtenerPosicionesZona } from "../controllers/clasificacion.controller";
+import {
+  obtenerPosicionesZona,
+  resolverSorteoZona,
+} from "../controllers/clasificacion.controller";
 import {
   previewProgramacion,
   reprogramarProgramacion,
@@ -171,6 +174,16 @@ router.put(
   "/:id/guardar-zonas",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   guardarZonasOverride,
+);
+router.get(
+  "/:id/zonas/:nombreZona/posiciones",
+  optionalAuthenticate,
+  obtenerPosicionesZona,
+);
+router.post(
+  "/:id/zonas/:nombreZona/sorteo",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  resolverSorteoZona,
 );
 router.get(
   "/:id/auditoria",

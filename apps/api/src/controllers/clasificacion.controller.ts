@@ -6,30 +6,23 @@ export const obtenerPosicionesZona = async (
   res: Response,
 ): Promise<Response | void> => {
   try {
-    const { id: torneoId } = req.params;
-    const { zona, capacidad } = req.query; // Ej: ?zona=Zona A&capacidad=4
+    const { id: torneoId, nombreZona } = req.params;
+    const zona = nombreZona || (req.query.zona as string);
+    const { capacidad } = req.query;
 
-    if (!torneoId || !zona || !capacidad) {
+    if (!torneoId || !zona) {
       return res.status(400).json({
         exito: false,
         error:
-          "Faltan parámetros obligatorios. Se requiere el ID del torneo, el nombre de la zona y su capacidad.",
+          "Faltan parámetros obligatorios. Se requiere el ID del torneo y el nombre de la zona.",
       });
     }
 
-    const capacidadNum = parseInt(capacidad as string, 10);
+    const capacidadNum = capacidad ? parseInt(capacidad as string, 10) : 4;
 
-    if (isNaN(capacidadNum) || (capacidadNum !== 3 && capacidadNum !== 4)) {
-      return res.status(400).json({
-        exito: false,
-        error: "La capacidad de la zona debe ser un número válido (3 o 4).",
-      });
-    }
-
-    // Llamamos a nuestro motor matemático
     const posiciones = await ClasificacionService.calcularPosicionesZona(
       torneoId,
-      zona as string,
+      zona,
       capacidadNum,
     );
 
@@ -41,8 +34,51 @@ export const obtenerPosicionesZona = async (
     const message =
       error instanceof Error
         ? error.message
-        : "Error matemático al calcular las posiciones.";
+        : "Error al calcular las posiciones de la zona.";
     console.error("[Clasificacion Error]:", message);
+
+    return res.status(500).json({
+      exito: false,
+      error: message,
+    });
+  }
+};
+
+export const resolverSorteoZona = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    const { id: torneoId, nombreZona } = req.params;
+    const zona = nombreZona || (req.body.nombreZona as string) || (req.query.zona as string);
+    const { resoluciones, motivo, metodo } = req.body;
+
+    if (!torneoId || !zona || !resoluciones || !Array.isArray(resoluciones)) {
+      return res.status(400).json({
+        exito: false,
+        error:
+          "Faltan parámetros obligatorios: ID de torneo, nombre de zona y resoluciones de posiciones.",
+      });
+    }
+
+    const posiciones = await ClasificacionService.resolverSorteoZona(
+      torneoId,
+      zona,
+      resoluciones,
+      motivo,
+      metodo || "manual",
+      req.user?.id,
+    );
+
+    return res.status(200).json({
+      exito: true,
+      mensaje: "Sorteo reglamentario FAP registrado y auditado correctamente.",
+      data: posiciones,
+    });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error al registrar sorteo de zona.";
+    console.error("[resolverSorteoZona Error]:", message);
 
     return res.status(500).json({
       exito: false,
