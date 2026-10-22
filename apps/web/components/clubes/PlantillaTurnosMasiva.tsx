@@ -24,8 +24,9 @@ function toMinutes(hhmm: string): number {
 }
 
 function fromMinutes(total: number): string {
-  const hh = Math.floor(total / 60);
-  const mm = total % 60;
+  const normalized = ((total % 1440) + 1440) % 1440;
+  const hh = Math.floor(normalized / 60);
+  const mm = normalized % 60;
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
@@ -36,9 +37,13 @@ function armarJornada(
   precio: number,
 ): TurnoPlantillaSlot[] {
   const start = toMinutes(inicio);
-  const end = toMinutes(cierre);
+  let end = toMinutes(cierre);
   if (!Number.isFinite(start) || !Number.isFinite(end) || duracionMin < 15) {
     return [];
+  }
+  // Si el horario de cierre es menor o igual al inicio (ej. 08:00 o 14:00 a 00:30 hs), cruza medianoche
+  if (end <= start) {
+    end += 1440;
   }
   const slots: TurnoPlantillaSlot[] = [];
   for (let t = start; t + duracionMin <= end; t += duracionMin) {
@@ -81,6 +86,7 @@ export function PlantillaTurnosMasiva({
 
   useEffect(() => {
     if (!isOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDias([1, 2, 3, 4, 5]);
     setSlots([{ hora_inicio: "08:00", hora_fin: "09:30", precio: 8000 }]);
     setAlcance(canchaOrigenId ? "esta" : "todas");
@@ -156,6 +162,68 @@ export function PlantillaTurnosMasiva({
         description: "Seleccioná a qué canchas aplica esta plantilla.",
       });
       return;
+    }
+
+    // Validar duración de cada turno
+    for (let i = 0; i < slots.length; i++) {
+      const s = slots[i];
+      if (!s.hora_inicio || !s.hora_fin) {
+        sileo.error({
+          title: "Horario incompleto",
+          description: `El turno #${i + 1} debe tener hora de inicio y fin.`,
+        });
+        return;
+      }
+      const start = toMinutes(s.hora_inicio);
+      const rawEnd = toMinutes(s.hora_fin);
+      if (!Number.isFinite(start) || !Number.isFinite(rawEnd)) {
+        sileo.error({
+          title: "Horario inválido",
+          description: `El turno #${i + 1} tiene un formato de hora no válido.`,
+        });
+        return;
+      }
+      const end = rawEnd <= start ? rawEnd + 1440 : rawEnd;
+      const duracion = end - start;
+      if (duracion <= 0) {
+        sileo.error({
+          title: "Horario inválido",
+          description: `El turno #${i + 1} (${s.hora_inicio} a ${s.hora_fin}) no puede tener la misma hora de inicio y fin.`,
+        });
+        return;
+      }
+      if (duracion < 15) {
+        sileo.error({
+          title: "Turno muy corto",
+          description: `El turno #${i + 1} (${s.hora_inicio} a ${s.hora_fin}) debe durar al menos 15 minutos.`,
+        });
+        return;
+      }
+      if (duracion > 360) {
+        sileo.error({
+          title: "Turno demasiado largo",
+          description: `El turno #${i + 1} (${s.hora_inicio} a ${s.hora_fin}) no puede superar las 6 horas. Verificá los horarios.`,
+        });
+        return;
+      }
+    }
+
+    // Validar superposiciones entre turnos
+    const slotsCalculados = slots.map((s) => {
+      const start = toMinutes(s.hora_inicio);
+      const rawEnd = toMinutes(s.hora_fin);
+      const end = rawEnd <= start ? rawEnd + 1440 : rawEnd;
+      return { ...s, start, end };
+    });
+    const sortedSlots = [...slotsCalculados].sort((a, b) => a.start - b.start);
+    for (let i = 1; i < sortedSlots.length; i++) {
+      if (sortedSlots[i].start < sortedSlots[i - 1].end) {
+        sileo.error({
+          title: "Horarios superpuestos",
+          description: `Hay superposición entre el turno de ${sortedSlots[i - 1].hora_inicio}–${sortedSlots[i - 1].hora_fin} y el de ${sortedSlots[i].hora_inicio}–${sortedSlots[i].hora_fin}.`,
+        });
+        return;
+      }
     }
 
     try {

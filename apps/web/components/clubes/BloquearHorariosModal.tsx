@@ -11,6 +11,7 @@ import type {
   Cancha,
 } from "@/utils/types";
 import FeedbackModal from "@/components/ui/FeedbackModal";
+import CustomDropdown from "@/components/ui/CustomDropdown";
 
 type Mode = "club-panel" | "admin";
 
@@ -66,6 +67,11 @@ export function BloquearHorariosModal({
     id: string | null;
   }>({ isOpen: false, id: null });
 
+  const canchaOptions = [
+    { value: "todas", label: "Todas las canchas" },
+    ...canchas.map((c) => ({ value: String(c.id), label: c.nombre })),
+  ];
+
   const loadBloqueos = useCallback(async () => {
     setLoadingList(true);
     try {
@@ -84,6 +90,7 @@ export function BloquearHorariosModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadBloqueos();
   }, [isOpen, loadBloqueos]);
 
@@ -98,8 +105,19 @@ export function BloquearHorariosModal({
       sileo.error({ title: "La fecha fin no puede ser anterior al inicio" });
       return;
     }
-    if (horaFin <= horaInicio) {
-      sileo.error({ title: "La hora fin debe ser posterior a la de inicio" });
+    const toMin = (t: string) => {
+      const [h, m] = t.split(":").map(Number);
+      return h * 60 + m;
+    };
+    const sMin = toMin(horaInicio);
+    const rawEMin = toMin(horaFin);
+    const eMin = rawEMin <= sMin ? rawEMin + 1440 : rawEMin;
+    if (eMin - sMin <= 0) {
+      sileo.error({ title: "La hora fin no puede ser igual a la de inicio" });
+      return;
+    }
+    if (eMin - sMin > 720) {
+      sileo.error({ title: "La franja de bloqueo no puede superar las 12 horas" });
       return;
     }
 
@@ -157,98 +175,94 @@ export function BloquearHorariosModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-        <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl border border-brand-input bg-brand-card shadow-2xl">
-          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-brand-input bg-brand-card px-5 py-4">
-            <div className="flex items-center gap-2">
-              <Ban className="size-5 text-brand-chartreuse" />
+      <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div className="w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-3xl border border-white/10 bg-[#1a1a1a] shadow-2xl">
+          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 bg-[#1a1a1a]/95 backdrop-blur-md px-6 py-5">
+            <div className="flex items-center gap-2.5">
+              <div className="size-9 rounded-xl bg-brand-chartreuse/10 border border-brand-chartreuse/20 flex items-center justify-center">
+                <Ban className="size-4 text-brand-chartreuse" />
+              </div>
               <div>
-                <h2 className="text-lg font-black text-brand-white">
+                <h2 className="text-lg font-black text-white">
                   Bloquear horarios
                 </h2>
                 <p className="text-xs text-gray-400">
-                  Sacá franjas del aire para reservas (abonos, torneos, etc.)
+                  Sacá franjas del aire para reservas (abonos, torneos, mantenimiento).
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl p-2 text-gray-400 hover:bg-white/5 hover:text-white"
+              className="rounded-xl p-2 text-gray-400 hover:bg-white/5 hover:text-white cursor-pointer transition-colors"
               aria-label="Cerrar"
             >
               <X className="size-5" />
             </button>
           </div>
 
-          <div className="space-y-5 p-5">
+          <div className="space-y-5 p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block space-y-1.5">
-                <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                   Desde
                 </span>
                 <input
                   type="date"
                   value={fechaInicio}
                   onChange={(e) => setFechaInicio(e.target.value)}
-                  className="w-full rounded-xl border border-brand-input bg-brand-input/40 px-3 py-2.5 text-sm text-white"
+                  className="w-full rounded-xl border border-white/10 bg-brand-input px-3.5 py-2.5 text-sm text-white outline-none focus:border-brand-chartreuse/50 [color-scheme:dark] transition-colors"
                 />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                   Hasta
                 </span>
                 <input
                   type="date"
                   value={fechaFin}
                   onChange={(e) => setFechaFin(e.target.value)}
-                  className="w-full rounded-xl border border-brand-input bg-brand-input/40 px-3 py-2.5 text-sm text-white"
+                  className="w-full rounded-xl border border-white/10 bg-brand-input px-3.5 py-2.5 text-sm text-white outline-none focus:border-brand-chartreuse/50 [color-scheme:dark] transition-colors"
                 />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                   Hora inicio
                 </span>
                 <input
                   type="time"
                   value={horaInicio}
                   onChange={(e) => setHoraInicio(e.target.value)}
-                  className="w-full rounded-xl border border-brand-input bg-brand-input/40 px-3 py-2.5 text-sm text-white"
+                  className="w-full rounded-xl border border-white/10 bg-brand-input px-3.5 py-2.5 text-sm text-white outline-none focus:border-brand-chartreuse/50 [color-scheme:dark] transition-colors"
                 />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                   Hora fin
                 </span>
                 <input
                   type="time"
                   value={horaFin}
                   onChange={(e) => setHoraFin(e.target.value)}
-                  className="w-full rounded-xl border border-brand-input bg-brand-input/40 px-3 py-2.5 text-sm text-white"
+                  className="w-full rounded-xl border border-white/10 bg-brand-input px-3.5 py-2.5 text-sm text-white outline-none focus:border-brand-chartreuse/50 [color-scheme:dark] transition-colors"
                 />
               </label>
             </div>
 
-            <label className="block space-y-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1.5">
                 Cancha
               </span>
-              <select
+              <CustomDropdown
                 value={canchaId}
-                onChange={(e) => setCanchaId(e.target.value)}
-                className="w-full rounded-xl border border-brand-input bg-brand-input/40 px-3 py-2.5 text-sm text-white"
-              >
-                <option value="todas">Todas las canchas</option>
-                {canchas.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </label>
+                onChange={setCanchaId}
+                options={canchaOptions}
+                placeholder="Seleccionar cancha..."
+              />
+            </div>
 
             <div className="space-y-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                 Motivo
               </span>
               <div className="flex flex-wrap gap-2">
@@ -257,10 +271,10 @@ export function BloquearHorariosModal({
                     key={t.id}
                     type="button"
                     onClick={() => setTipo(t.id)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-bold border transition-colors ${
+                    className={`rounded-xl px-3 py-1.5 text-xs font-bold border transition-all cursor-pointer ${
                       tipo === t.id
                         ? "border-brand-chartreuse/50 bg-brand-chartreuse/15 text-brand-chartreuse"
-                        : "border-brand-input bg-brand-input/30 text-gray-400 hover:text-white"
+                        : "border-white/5 bg-brand-input text-gray-400 hover:text-white hover:border-white/10"
                     }`}
                   >
                     {t.label}
@@ -272,7 +286,7 @@ export function BloquearHorariosModal({
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value)}
                 placeholder="Ej. Torneo FAP sábado / Abono matutino"
-                className="w-full rounded-xl border border-brand-input bg-brand-input/40 px-3 py-2.5 text-sm text-white placeholder:text-gray-600"
+                className="w-full rounded-xl border border-white/10 bg-brand-input px-3.5 py-2.5 text-sm text-white placeholder:text-gray-500 outline-none focus:border-brand-chartreuse/50 transition-colors"
               />
             </div>
 
@@ -280,28 +294,28 @@ export function BloquearHorariosModal({
               type="button"
               disabled={saving}
               onClick={() => void handleSave()}
-              className="w-full rounded-xl bg-brand-chartreuse py-3 text-sm font-black text-brand-black hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full rounded-xl bg-brand-chartreuse py-3 text-sm font-black text-brand-black hover:brightness-110 active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer transition-all shadow-lg shadow-brand-chartreuse/10"
             >
               <CalendarRange className="size-4" />
               {saving ? "Guardando…" : "Bloquear franja"}
             </button>
 
-            <div className="border-t border-brand-input pt-4 space-y-3">
-              <h3 className="text-xs font-black uppercase tracking-wider text-gray-500">
+            <div className="border-t border-white/10 pt-4 space-y-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-gray-400">
                 Bloqueos activos
               </h3>
               {loadingList ? (
                 <p className="text-sm text-gray-500">Cargando…</p>
               ) : bloqueos.length === 0 ? (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 py-3 text-center italic border border-dashed border-white/5 rounded-2xl">
                   No hay bloqueos activos en este club.
                 </p>
               ) : (
-                <ul className="space-y-2">
+                <ul className="space-y-2 max-h-56 overflow-y-auto pr-1">
                   {bloqueos.map((b) => (
                     <li
                       key={b.id}
-                      className="flex items-start justify-between gap-3 rounded-2xl border border-brand-input bg-brand-input/20 px-3 py-2.5"
+                      className="flex items-start justify-between gap-3 rounded-2xl border border-white/5 bg-white/[0.03] px-3.5 py-3 hover:border-white/10 transition-colors"
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-bold text-white">
@@ -321,7 +335,7 @@ export function BloquearHorariosModal({
                         onClick={() =>
                           setConfirmDelete({ isOpen: true, id: b.id })
                         }
-                        className="shrink-0 rounded-lg p-2 text-red-400 hover:bg-red-500/10"
+                        className="shrink-0 rounded-lg p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 cursor-pointer transition-colors"
                         title="Desactivar bloqueo"
                       >
                         <Trash2 className="size-4" />
