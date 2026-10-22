@@ -12,11 +12,14 @@ import {
   CalendarCheck,
   ClipboardList,
   Landmark,
+  Network,
   Scale,
+  Shield,
   ShoppingBag,
   Trophy,
   Users,
 } from "lucide-react";
+import CanchaIcon from "@/components/icons/CanchaIcon";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 import {
   CrmDashboardService,
@@ -95,19 +98,19 @@ export default function DashboardSuperadmin() {
       label: "Federaciones",
       value: metricas.federaciones,
       href: "/dashboard/federaciones",
-      icon: Scale,
+      icon: Shield,
     },
     {
       label: "Asociaciones",
       value: metricas.asociaciones,
       href: "/dashboard/asociaciones",
-      icon: Landmark,
+      icon: Network,
     },
     {
       label: "Clubes",
       value: metricas.clubes,
       href: "/dashboard/clubes",
-      icon: Building2,
+      icon: CanchaIcon as unknown as LucideIcon,
     },
     {
       label: "Jugadores",
@@ -187,8 +190,8 @@ export default function DashboardSuperadmin() {
             Panel de la red
           </h1>
           <p className="text-gray-400 text-sm font-medium">
-            Visión consolidada de federaciones, asociaciones, clubes y operación ·{" "}
-            {dateString}
+            Visión consolidada de federaciones, asociaciones, clubes y operación
+            · {dateString}
           </p>
         </div>
         <div className="hidden md:block">

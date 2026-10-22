@@ -29,7 +29,9 @@ import {
   Award,
   Scale,
   Megaphone,
+  Network,
 } from "lucide-react";
+import CanchaIcon from "@/components/icons/CanchaIcon";
 import { useProfileStore } from "@/store/useProfileStore";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 import { useSocket } from "@/hooks/useSocket";
@@ -178,21 +180,21 @@ export default function DashboardLayout({
     },
     {
       name: "Federaciones",
-      icon: Scale,
+      icon: Shield,
       href: "/dashboard/federaciones",
     },
     {
       name: "Asociaciones",
-      icon: Landmark,
+      icon: Network,
       href: "/dashboard/asociaciones",
     },
     {
       name: "Clubes",
-      icon: Building2,
+      icon: CanchaIcon,
       href: "/dashboard/clubes",
     },
     { name: "Jugadores", icon: Users, href: "/dashboard/jugadores" },
-    { name: "Colegio de Fiscales", icon: Shield, href: "/dashboard/fiscales" },
+    { name: "Colegio de Fiscales", icon: Scale, href: "/dashboard/fiscales" },
     {
       name: "Afiliaciones",
       icon: Building2,
