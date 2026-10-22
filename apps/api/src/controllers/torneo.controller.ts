@@ -62,9 +62,11 @@ export const getAllTorneos = async (
     }
 
     let clubIds: string[] | undefined;
+    let asociacionIds: string[] | undefined;
     let incluirNacionales = false;
     if (cuenta.rol === "admin_provincial" && cuenta.provincia) {
       clubIds = await AlcanceCuentaService.idsClubesDeProvincia(cuenta.provincia);
+      asociacionIds = await AlcanceCuentaService.idsAsociacionesDeProvincia(cuenta.provincia);
       incluirNacionales = true;
     }
 
@@ -84,13 +86,14 @@ export const getAllTorneos = async (
       incluirBorradores: incluir_borradores === "true",
       clubId: clubIdFiltro,
       clubIds,
+      asociacionIds,
       incluirNacionales,
       vista: typeof vista === "string" ? vista : undefined,
       agrupar: agrupar === "true",
       ocultarPrueba: !esRolAccesoCrm(req.user?.rol),
     });
 
-    const marcar = <T extends { alcance?: string | null; club_id?: string | null; clubes?: { provincia?: string | null } | null }>(
+    const marcar = <T extends { alcance?: string | null; club_id?: string | null; clubes?: { provincia?: string | null } | null; asociaciones?: { provincia?: string | null } | null }>(
       torneo: T,
     ) => {
       if (cuenta.rol !== "admin_provincial" && cuenta.rol !== "admin_club") return torneo;
@@ -100,6 +103,7 @@ export const getAllTorneos = async (
           alcance: torneo.alcance || null,
           clubId: torneo.club_id || null,
           provinciaClub: torneo.clubes?.provincia || null,
+          provinciaAsociacion: torneo.asociaciones?.provincia || null,
         },
         "editar",
       );
@@ -109,6 +113,7 @@ export const getAllTorneos = async (
           alcance: torneo.alcance || null,
           clubId: torneo.club_id || null,
           provinciaClub: torneo.clubes?.provincia || null,
+          provinciaAsociacion: torneo.asociaciones?.provincia || null,
         },
         "resultados",
       );
@@ -168,12 +173,19 @@ export const getTorneoById = async (
     }
     const cuenta = await AlcanceCuentaService.resolver(req.user);
     if (cuenta.rol === "admin_provincial" || cuenta.rol === "admin_club") {
+      const asoc = data.asociaciones as
+        | { provincia?: string | null }
+        | { provincia?: string | null }[]
+        | null;
+      const provinciaAsoc = Array.isArray(asoc) ? asoc[0]?.provincia : asoc?.provincia;
+
       const ver = decidirAlcanceTorneo(
         cuenta,
         {
           alcance: data.alcance || null,
           clubId: data.club_id || null,
           provinciaClub: data.clubes?.provincia || null,
+          provinciaAsociacion: provinciaAsoc || null,
         },
         "ver",
       );
@@ -186,6 +198,7 @@ export const getTorneoById = async (
           alcance: data.alcance || null,
           clubId: data.club_id || null,
           provinciaClub: data.clubes?.provincia || null,
+          provinciaAsociacion: provinciaAsoc || null,
         },
         "resultados",
       );
@@ -203,7 +216,7 @@ export const createTorneo = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    const torneo = await TorneoService.crearTorneo(req.body);
+    const torneo = await TorneoService.crearTorneo(req.body, req.user);
     return res.status(201).json(torneo);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Error";

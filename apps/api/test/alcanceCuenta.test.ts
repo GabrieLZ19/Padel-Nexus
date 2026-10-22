@@ -33,6 +33,11 @@ describe("alcance de la cuenta", () => {
       { alcance: "Provincial", clubId: "club", provinciaClub: "Tucuman" },
       "editar",
     );
+    const propioBorradorSinClub = decidirAlcanceTorneo(
+      tucuman,
+      { alcance: "Provincial", clubId: null, provinciaClub: null, provinciaAsociacion: "Tucumán" },
+      "editar",
+    );
     const nacional = decidirAlcanceTorneo(
       tucuman,
       { alcance: "Nacional", clubId: "club", provinciaClub: "Buenos Aires" },
@@ -43,10 +48,18 @@ describe("alcance de la cuenta", () => {
       { alcance: "Provincial", clubId: "otro", provinciaClub: "Córdoba" },
       "ver",
     );
+    const ajenoBorrador = decidirAlcanceTorneo(
+      tucuman,
+      { alcance: "Provincial", clubId: null, provinciaClub: null, provinciaAsociacion: "Córdoba" },
+      "ver",
+    );
     assert.equal(propio.permitido, true);
     assert.equal(propio.soloLectura, false);
+    assert.equal(propioBorradorSinClub.permitido, true);
+    assert.equal(propioBorradorSinClub.soloLectura, false);
     assert.equal(nacional.permitido, false);
     assert.equal(ajeno.permitido, false);
+    assert.equal(ajenoBorrador.permitido, false);
   });
 
   it("el club sede de un nacional solo consulta: no edita, no elimina y no carga resultados", () => {

@@ -10,6 +10,7 @@ export interface TorneoAlcance {
   alcance: string | null;
   clubId: string | null;
   provinciaClub: string | null;
+  provinciaAsociacion?: string | null;
 }
 
 export interface DecisionAlcance {
@@ -81,7 +82,8 @@ export function decidirAlcanceTorneo(
       if (accion === "ver") return permitido(true, false);
       return denegado("Un torneo nacional se consulta en modo lectura.");
     }
-    if (mismaProvincia(cuenta.provincia, torneo.provinciaClub)) {
+    const provinciaTorneo = torneo.provinciaClub || torneo.provinciaAsociacion || null;
+    if (mismaProvincia(cuenta.provincia, provinciaTorneo)) {
       return permitido(false, true);
     }
     return denegado("Este torneo no es de tu provincia.");

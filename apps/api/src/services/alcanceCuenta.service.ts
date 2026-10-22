@@ -62,6 +62,14 @@ export class AlcanceCuentaService {
       .map((club) => club.id as string);
   }
 
+  static async idsAsociacionesDeProvincia(provincia: string): Promise<string[]> {
+    const { data, error } = await supabaseAdmin.from("asociaciones").select("id, provincia");
+    if (error) throw new Error(error.message);
+    return (data || [])
+      .filter((asoc) => mismaProvincia(asoc.provincia, provincia))
+      .map((asoc) => asoc.id as string);
+  }
+
   static async consultar(
     user: { id: string; rol?: string | null } | undefined,
     torneoId: string,
@@ -79,7 +87,7 @@ export class AlcanceCuentaService {
 
     const { data, error } = await supabaseAdmin
       .from("torneos")
-      .select("id, alcance, club_id, clubes!club_id(provincia)")
+      .select("id, alcance, club_id, asociacion_id, clubes!club_id(provincia), asociaciones!asociacion_id(provincia)")
       .eq("id", torneoId)
       .maybeSingle();
 
@@ -92,12 +100,19 @@ export class AlcanceCuentaService {
       | null;
     const provinciaClub = Array.isArray(club) ? club[0]?.provincia : club?.provincia;
 
+    const asoc = data.asociaciones as
+      | { provincia?: string | null }
+      | { provincia?: string | null }[]
+      | null;
+    const provinciaAsoc = Array.isArray(asoc) ? asoc[0]?.provincia : asoc?.provincia;
+
     return decidirAlcanceTorneo(
       cuenta,
       {
         alcance: data.alcance,
         clubId: data.club_id,
         provinciaClub: provinciaClub || null,
+        provinciaAsociacion: provinciaAsoc || null,
       },
       accion,
     );

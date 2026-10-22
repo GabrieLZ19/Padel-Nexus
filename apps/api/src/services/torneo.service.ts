@@ -24,6 +24,8 @@ import { resolverReglamentoPersistido } from "../utils/reglamentoTorneo";
 import { debeDescalificarPorWoDeZona } from "../utils/walkoverZona";
 import { normalizarAlcanceTorneo } from "../utils/pasesRepresentacion";
 import { ordenRondaProgramador } from "../utils/programadorReglas";
+import { AlcanceCuentaService } from "./alcanceCuenta.service";
+import { mismaProvincia } from "../utils/alcanceCuenta";
 
 async function marcarDescalificacionesDeZona(
   torneoId: string,
@@ -139,6 +141,8 @@ export interface FiltrosTorneo {
   clubId?: string;
   /** Clubes de la provincia de la cuenta. Vacío significa ninguno. */
   clubIds?: string[];
+  /** Asociaciones de la provincia de la cuenta. */
+  asociacionIds?: string[];
   incluirNacionales?: boolean;
   /** Vista operativa del listado CRM. `auto` elige la más urgente. */
   vista?: string;
@@ -406,7 +410,7 @@ export class TorneoService {
     let query = supabaseAdmin
       .from("torneos")
       .select(
-        `*, clubes!club_id(nombre, provincia)`,
+        `*, clubes!club_id(nombre, provincia), asociaciones!asociacion_id(nombre, sigla, provincia)`,
       )
       .order("created_at", { ascending: false });
 
@@ -414,17 +418,25 @@ export class TorneoService {
       query = query.eq("club_id", filtros.clubId);
     }
 
-    if (filtros?.clubIds) {
-      const ids = filtros.clubIds.filter(Boolean);
+    if (filtros?.clubIds !== undefined || filtros?.asociacionIds !== undefined) {
+      const ids = (filtros.clubIds || []).filter(Boolean);
+      const asocIds = (filtros.asociacionIds || []).filter(Boolean);
+      const orParts: string[] = [];
+
       if (filtros.incluirNacionales) {
-        query =
-          ids.length === 0
-            ? query.eq("alcance", "Nacional")
-            : query.or(`alcance.eq.Nacional,club_id.in.(${ids.join(",")})`);
-      } else if (ids.length === 0) {
-        query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+        orParts.push("alcance.eq.Nacional");
+      }
+      if (ids.length > 0) {
+        orParts.push(`club_id.in.(${ids.join(",")})`);
+      }
+      if (asocIds.length > 0) {
+        orParts.push(`asociacion_id.in.(${asocIds.join(",")})`);
+      }
+
+      if (orParts.length > 0) {
+        query = query.or(orParts.join(","));
       } else {
-        query = query.in("club_id", ids);
+        query = query.eq("id", "00000000-0000-0000-0000-000000000000");
       }
     }
 
@@ -802,7 +814,7 @@ export class TorneoService {
   static async obtenerPorId(id: string) {
     const { data, error } = await supabaseAdmin
       .from("torneos")
-      .select(`*, clubes!club_id(nombre, provincia), inscripciones(usuario_id)`)
+      .select(`*, clubes!club_id(nombre, provincia), asociaciones!asociacion_id(nombre, sigla, provincia), inscripciones(usuario_id)`)
       .eq("id", id)
       .single();
 
@@ -810,14 +822,32 @@ export class TorneoService {
     return TorneoService.evaluateDynamicState(data);
   }
 
-  static async crearTorneo(datos: TorneoPayload) {
+  static async crearTorneo(
+    datos: TorneoPayload,
+    user?: { id: string; rol?: string | null },
+  ) {
+    const cuenta = await AlcanceCuentaService.resolver(user);
     const payload = TorneoService.evaluateDynamicState({ ...datos });
+    if (!payload.club_id && cuenta.rol === "admin_club" && cuenta.clubId) {
+      payload.club_id = cuenta.clubId;
+    }
     const alcanceNormalizado = TorneoService.normalizarAlcance(datos.alcance);
     const forzarFap = alcanceNormalizado === "Nacional";
 
-    // Resolver asociacion_id a partir de asociacion sigla o id; fallback FAP
+    // Resolver asociacion_id a partir de datos, cuenta provincial o nombre de asociacion
     let resolvedAsociacionId = (datos as any).asociacion_id || null;
-    const asociacionNombre = (datos as any).asociacion ?? "FAP";
+    const asociacionNombre = (datos as any).asociacion;
+
+    if (!resolvedAsociacionId && cuenta.rol === "admin_provincial" && cuenta.provincia) {
+      const { data: asocData } = await supabaseAdmin
+        .from("asociaciones")
+        .select("id, provincia")
+        .limit(100);
+      const asoc = (asocData || []).find((a) => mismaProvincia(a.provincia, cuenta.provincia));
+      if (asoc?.id) {
+        resolvedAsociacionId = asoc.id;
+      }
+    }
 
     if (!resolvedAsociacionId && asociacionNombre && !forzarFap) {
       const { data: asocData } = await supabaseAdmin
@@ -830,7 +860,7 @@ export class TorneoService {
       }
     }
 
-    if (!resolvedAsociacionId || forzarFap) {
+    if (!resolvedAsociacionId && forzarFap) {
       const fapId = await TorneoService.resolveFapAsociacionId();
       if (fapId) resolvedAsociacionId = fapId;
     }
