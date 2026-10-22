@@ -23,6 +23,7 @@ import { armarGruposTorneo, nombreBaseTorneo } from "../utils/gruposTorneo";
 import { resolverReglamentoPersistido } from "../utils/reglamentoTorneo";
 import { debeDescalificarPorWoDeZona } from "../utils/walkoverZona";
 import { normalizarAlcanceTorneo } from "../utils/pasesRepresentacion";
+import { ordenRondaProgramador } from "../utils/programadorReglas";
 
 async function marcarDescalificacionesDeZona(
   torneoId: string,
@@ -1269,7 +1270,6 @@ export class TorneoService {
       .from("partidos")
       .select("*")
       .eq("torneo_id", id)
-      .order("ronda", { ascending: true })
       .order("orden", { ascending: true })
       .order("id", { ascending: true });
 
@@ -1306,7 +1306,7 @@ export class TorneoService {
       insMap.set(String(ins.id), mapInscripcionPartido(ins));
     });
 
-    return (partidos || []).map((p) => {
+    const formateados = (partidos || []).map((p) => {
       const equipoA = p.equipo_a_id ? insMap.get(p.equipo_a_id) : null;
       const equipoB = p.equipo_b_id ? insMap.get(p.equipo_b_id) : null;
 
@@ -1334,6 +1334,18 @@ export class TorneoService {
         equipo_b_denominacion: equipoB ? equipoB.denominacion_nacional : null,
       };
     });
+
+    formateados.sort((a, b) => {
+      const rA = ordenRondaProgramador(a.ronda);
+      const rB = ordenRondaProgramador(b.ronda);
+      if (rA !== rB) return rA - rB;
+      const oA = a.orden ?? 0;
+      const oB = b.orden ?? 0;
+      if (oA !== oB) return oA - oB;
+      return (a.id || "").localeCompare(b.id || "");
+    });
+
+    return formateados;
   }
 
   static async generarCuadroEliminatoria(
