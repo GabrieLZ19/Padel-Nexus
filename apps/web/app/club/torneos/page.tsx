@@ -201,10 +201,10 @@ export default function ClubTorneosPage() {
       estado: "Borrador",
       cupos_maximos: 16,
       modalidad: "Parejas",
-      formato: "Eliminatoria Directa",
+      formato: "Americano",
       precio_inscripcion: 0,
-      alcance: "Provincial",
-      asociacion: "FAP",
+      alcance: "Local",
+      asociacion: "Amateur",
       premio_1: "",
       premio_2: "",
       premio_3: "",
@@ -221,16 +221,16 @@ export default function ClubTorneosPage() {
       nombre: t.nombre || "",
       club_id: String(t.club_id || (club ? club.id : "")),
       fecha: t.fecha || "",
-      nivel: t.nivel || "5ª",
+      nivel: t.nivel || "Única",
       rama: (t as any).rama || "Masculina",
-      categoria: t.categoria || "Libres",
+      categoria: t.categoria || "Americano",
       estado: t.estado || "Borrador",
       cupos_maximos: t.cupos_maximos || 16,
       modalidad: t.modalidad || "Parejas",
-      formato: t.formato || "Eliminatoria Directa",
+      formato: t.formato || "Americano",
       precio_inscripcion: t.precio_inscripcion || 0,
-      alcance: t.alcance || "Provincial",
-      asociacion: (t as any).asociacion || "FAP",
+      alcance: t.alcance || "Local",
+      asociacion: (t as any).asociacion || "Amateur",
       premio_1: t.premio_1 || "",
       premio_2: t.premio_2 || "",
       premio_3: t.premio_3 || "",
@@ -268,6 +268,7 @@ export default function ClubTorneosPage() {
 
       if (
         (payload.alcance === "Provincial" || payload.alcance === "Regional") &&
+        payload.asociacion !== "Amateur" &&
         club?.provincia
       ) {
         payload.asociacion_id = await idAsociacionDeProvincia(club.provincia);

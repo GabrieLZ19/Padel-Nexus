@@ -69,18 +69,6 @@ export const Paso3Categorias = ({
   // Rama
   const [editRama, setEditRama] = useState((torneo as any).rama || "Masculina");
 
-  // Categoría
-  const [editCategoria, setEditCategoria] = useState(
-    torneo.categoria || "Libres",
-  );
-  const [customCategoria, setCustomCategoria] = useState("");
-  const [showCustomCategoria, setShowCustomCategoria] = useState(false);
-
-  // Nivel
-  const [editNivel, setEditNivel] = useState(torneo.nivel || "5ª");
-  const [customNivel, setCustomNivel] = useState("");
-  const [showCustomNivel, setShowCustomNivel] = useState(false);
-
   // Otros
   const [editModalidad, setEditModalidad] = useState(
     labelModalidad(torneo.modalidad),
@@ -112,8 +100,8 @@ export const Paso3Categorias = ({
   // Opciones dinámicas de Categoría y Nivel
   // ====================================================================
   const categoriasOficiales = useMemo(
-    () => getCategoriasParaAsociacion(reglamento),
-    [reglamento],
+    () => getCategoriasParaAsociacion(reglamento, modoClub),
+    [reglamento, modoClub],
   );
 
   const categoriasConCustom = useMemo(() => {
@@ -125,18 +113,26 @@ export const Paso3Categorias = ({
     return items;
   }, [categoriasOficiales]);
 
+  const esCustomCatInicial = Boolean(
+    torneo.categoria &&
+      !categoriasOficiales.some((c) => c.value === torneo.categoria),
+  );
+
+  // Categoría
+  const [showCustomCategoria, setShowCustomCategoria] =
+    useState(esCustomCatInicial);
+  const [customCategoria, setCustomCategoria] = useState(
+    esCustomCatInicial ? torneo.categoria || "" : "",
+  );
+  const [editCategoria, setEditCategoria] = useState(
+    esCustomCatInicial
+      ? CUSTOM_OPTION_VALUE
+      : torneo.categoria || categoriasOficiales[0]?.value || "Libres",
+  );
+
   // Categoría efectiva = custom text o selección del dropdown
   const categoriaEfectiva =
     showCustomCategoria && customCategoria ? customCategoria : editCategoria;
-
-  const nivelEfectivo =
-    showCustomNivel && customNivel ? customNivel : editNivel;
-
-  const mostrarValidarEdad = esCategoriaConControlEdad(
-    categoriaEfectiva,
-    nivelEfectivo,
-  );
-  const mostrarValidarCategoria = esCategoriaLibres(categoriaEfectiva);
 
   const nivelesOficiales = useMemo(
     () => getNivelesParaCategoria(reglamento, categoriaEfectiva),
@@ -152,6 +148,30 @@ export const Paso3Categorias = ({
     return items;
   }, [nivelesOficiales]);
 
+  const esCustomNivelInicial = Boolean(
+    torneo.nivel && !nivelesOficiales.some((n) => n.value === torneo.nivel),
+  );
+
+  // Nivel
+  const [showCustomNivel, setShowCustomNivel] = useState(esCustomNivelInicial);
+  const [customNivel, setCustomNivel] = useState(
+    esCustomNivelInicial ? torneo.nivel || "" : "",
+  );
+  const [editNivel, setEditNivel] = useState(
+    esCustomNivelInicial
+      ? CUSTOM_OPTION_VALUE
+      : torneo.nivel || nivelesOficiales[0]?.value || "Única",
+  );
+
+  const nivelEfectivo =
+    showCustomNivel && customNivel ? customNivel : editNivel;
+
+  const mostrarValidarEdad = esCategoriaConControlEdad(
+    categoriaEfectiva,
+    nivelEfectivo,
+  );
+  const mostrarValidarCategoria = esCategoriaLibres(categoriaEfectiva);
+
   // Auto activar / apagar según categoría
   useEffect(() => {
     if (mostrarValidarEdad) {
@@ -166,7 +186,7 @@ export const Paso3Categorias = ({
 
   // Reset nivel cuando cambia la categoría (y hay opciones válidas)
   useEffect(() => {
-    if (!showCustomCategoria && nivelesOficiales.length > 0) {
+    if (!showCustomCategoria && !showCustomNivel && nivelesOficiales.length > 0) {
       const currentValid = nivelesOficiales.some((n) => n.value === editNivel);
       if (!currentValid) {
         setEditNivel(nivelesOficiales[0].value);
@@ -176,15 +196,16 @@ export const Paso3Categorias = ({
     }
   }, [categoriaEfectiva, reglamento]);
 
-  // Reset categoría y nivel cuando cambia el reglamento
+  // Reset categoría y nivel cuando cambia el reglamento sin pisar personalizadas
   useEffect(() => {
+    if (showCustomCategoria) return;
     const valid = categoriasOficiales.some((c) => c.value === editCategoria);
     if (!valid && categoriasOficiales.length > 0) {
       setEditCategoria(categoriasOficiales[0].value);
       setShowCustomCategoria(false);
       setCustomCategoria("");
     }
-  }, [reglamento]);
+  }, [reglamento, categoriasOficiales]);
 
   // Genera el rango de días reales del torneo si existen las fechas
   const getPlayDaysRange = () => {
@@ -412,7 +433,7 @@ export const Paso3Categorias = ({
                 }}
                 className="text-[10px] text-gray-400 hover:text-white transition-colors cursor-pointer underline"
               >
-                ← Volver a la lista oficial
+                ← Volver al listado
               </button>
             </div>
           ) : (
@@ -449,7 +470,7 @@ export const Paso3Categorias = ({
                 }}
                 className="text-[10px] text-gray-400 hover:text-white transition-colors cursor-pointer underline"
               >
-                ← Volver a la lista oficial
+                ← Volver al listado
               </button>
             </div>
           ) : nivelesConCustom.length > 1 ? (

@@ -65,6 +65,70 @@ export const CUPOS_ESTANDAR_FAP = [
 ] as const;
 
 // ============================================================================
+// FORMATOS DE TORNEO
+// ============================================================================
+export const FORMATOS_TORNEO_CLUB = [
+  { value: "Zonas + Llaves", label: "Zonas + Llaves" },
+  { value: "Eliminatoria Directa", label: "Eliminatoria Directa (sin fase de grupos)" },
+  { value: "Todos contra Todos", label: "Todos contra Todos (Round Robin)" },
+  { value: "Super 8", label: "Super 8" },
+  { value: "Super 12", label: "Super 12" },
+  { value: "Americano", label: "Americano" },
+  { value: "Suma 8", label: "Suma 8" },
+  { value: "Suma 12", label: "Suma 12" },
+] as const;
+
+export const FORMATOS_TORNEO_OFICIAL = [
+  { value: "Zonas + Llaves", label: "Zonas + Llaves" },
+  { value: "Eliminatoria Directa", label: "Eliminatoria Directa (sin fase de grupos)" },
+  { value: "Todos contra Todos", label: "Todos contra Todos (Round Robin)" },
+] as const;
+
+// ============================================================================
+// CATEGORÍAS Y NIVELES RECREATIVOS (CLUB)
+// ============================================================================
+export const CATEGORIAS_RECREATIVAS_CLUB = [
+  { value: "Americano", label: "Americano" },
+  { value: "Super 8", label: "Súper 8" },
+  { value: "Super 12", label: "Súper 12" },
+  { value: "Suma 8", label: "Suma 8" },
+  { value: "Suma 10", label: "Suma 10" },
+  { value: "Suma 12", label: "Suma 12" },
+  { value: "Recreativo", label: "Recreativo / Abierto" },
+] as const;
+
+export const NIVELES_RECREATIVOS_ESTANDAR = [
+  { value: "Única", label: "Única / General" },
+  { value: "Principiante", label: "Principiante" },
+  { value: "Intermedio", label: "Intermedio" },
+  { value: "Avanzado", label: "Avanzado" },
+  { value: "4ª", label: "4ª" },
+  { value: "5ª", label: "5ª" },
+  { value: "6ª", label: "6ª" },
+  { value: "7ª", label: "7ª" },
+  { value: "8ª", label: "8ª" },
+];
+
+export function esCategoriaRecreativa(
+  categoria: string | null | undefined,
+): boolean {
+  const cat = String(categoria || "").trim().toLowerCase();
+  return (
+    cat === "americano" ||
+    cat === "super 8" ||
+    cat === "súper 8" ||
+    cat === "super 12" ||
+    cat === "súper 12" ||
+    cat === "suma 8" ||
+    cat === "suma 10" ||
+    cat === "suma 12" ||
+    cat === "recreativo" ||
+    cat.startsWith("suma") ||
+    cat.includes("recreativ")
+  );
+}
+
+// ============================================================================
 // CATEGORÍAS POR ASOCIACIÓN
 // ============================================================================
 export const CATEGORIAS_POR_ASOCIACION: Record<
@@ -82,6 +146,7 @@ export const CATEGORIAS_POR_ASOCIACION: Record<
     { value: "Menores", label: "Menores" },
   ],
   Amateur: [
+    ...CATEGORIAS_RECREATIVAS_CLUB,
     { value: "Libres", label: "Libres" },
     { value: "Ladies & Veteranos", label: "Ladies & Veteranos" },
     { value: "Menores", label: "Menores" },
@@ -165,6 +230,29 @@ export const NIVELES_POR_ASOCIACION_CATEGORIA: Record<
     ],
   },
   Amateur: {
+    Americano: NIVELES_RECREATIVOS_ESTANDAR,
+    "Super 8": NIVELES_RECREATIVOS_ESTANDAR,
+    "Super 12": NIVELES_RECREATIVOS_ESTANDAR,
+    Recreativo: NIVELES_RECREATIVOS_ESTANDAR,
+    "Suma 8": [
+      { value: "Suma 8", label: "Suma 8" },
+      { value: "Suma 7", label: "Suma 7" },
+      { value: "Suma 9", label: "Suma 9" },
+      { value: "Única", label: "Única" },
+    ],
+    "Suma 10": [
+      { value: "Suma 10", label: "Suma 10" },
+      { value: "Suma 9", label: "Suma 9" },
+      { value: "Suma 11", label: "Suma 11" },
+      { value: "Única", label: "Única" },
+    ],
+    "Suma 12": [
+      { value: "Suma 12", label: "Suma 12" },
+      { value: "Suma 11", label: "Suma 11" },
+      { value: "Suma 13", label: "Suma 13" },
+      { value: "Suma 14", label: "Suma 14" },
+      { value: "Única", label: "Única" },
+    ],
     Libres: [
       { value: "1ª", label: "1ª" },
       { value: "2ª", label: "2ª" },
@@ -199,8 +287,14 @@ export function getNivelesParaCategoria(
   categoria: string,
 ): { value: string; label: string }[] {
   const nivelesAsoc = NIVELES_POR_ASOCIACION_CATEGORIA[asociacion];
-  if (!nivelesAsoc) return [];
-  return nivelesAsoc[categoria] || [];
+  if (nivelesAsoc && nivelesAsoc[categoria]) {
+    return nivelesAsoc[categoria];
+  }
+  const nivelesAmateur = NIVELES_POR_ASOCIACION_CATEGORIA.Amateur;
+  if (nivelesAmateur && nivelesAmateur[categoria]) {
+    return nivelesAmateur[categoria];
+  }
+  return NIVELES_RECREATIVOS_ESTANDAR;
 }
 
 // ============================================================================
@@ -208,8 +302,18 @@ export function getNivelesParaCategoria(
 // ============================================================================
 export function getCategoriasParaAsociacion(
   asociacion: string,
+  incluirRecreativas = false,
 ): { value: string; label: string }[] {
-  return CATEGORIAS_POR_ASOCIACION[asociacion] || CATEGORIAS_POR_ASOCIACION.FAP;
+  const base =
+    CATEGORIAS_POR_ASOCIACION[asociacion] || CATEGORIAS_POR_ASOCIACION.FAP;
+  if (incluirRecreativas && asociacion !== "Amateur") {
+    const existentes = new Set(base.map((b) => b.value));
+    const recreativasNoDuplicadas = CATEGORIAS_RECREATIVAS_CLUB.filter(
+      (r) => !existentes.has(r.value),
+    );
+    return [...recreativasNoDuplicadas, ...base];
+  }
+  return base;
 }
 
 // ============================================================================
