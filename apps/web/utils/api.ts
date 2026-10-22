@@ -5,14 +5,18 @@ export const api = axios.create({
   withCredentials: true,
 });
 
+// Helper robusto para extraer cookies sin fallos de espaciado
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 // Interceptor optimizado para leer la cookie de sesión nativa
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    // Helper simple para extraer el valor de la cookie "padel_token"
-    const match = document.cookie.match(new RegExp("(^| )padel_token=([^;]+)"));
-    const token = match ? match[2] : null;
-
-    if (token && config.headers) {
+    const token = getCookie("padel_token");
+    if (token && token !== "undefined" && token !== "null" && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
   }
@@ -28,16 +32,19 @@ api.interceptors.response.use(
         // Limpiar cookies de sesión
         document.cookie = "padel_token=; path=/; max-age=0;";
         document.cookie = "padel_user_role=; path=/; max-age=0;";
-        
+
         // Redirigir a login indicando que la sesión expiró SOLAMENTE si está en un área privada
         const path = window.location.pathname;
-        const isAreaPrivada = path.startsWith("/dashboard") || path.startsWith("/mi-perfil");
-        
+        const isAreaPrivada =
+          path.startsWith("/dashboard") ||
+          path.startsWith("/mi-perfil") ||
+          path.startsWith("/club");
+
         if (isAreaPrivada) {
           window.location.href = "/login?expired=true";
         }
       }
     }
     return Promise.reject(error);
-  }
+  },
 );

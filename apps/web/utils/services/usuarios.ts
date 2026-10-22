@@ -1,6 +1,18 @@
 import { api } from "../api";
 import type { RolUsuario, Perfil } from "../types";
 
+export interface NuevoClubInlineDTO {
+  nombre: string;
+  direccion?: string | null;
+  codigo_postal?: string | null;
+  telefono?: string | null;
+  canchas?: number | null;
+  provincia?: string | null;
+  localidad?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+}
+
 export interface CrearUsuarioDTO {
   email: string;
   password: string;
@@ -9,6 +21,7 @@ export interface CrearUsuarioDTO {
   rol: RolUsuario;
   club_id?: string | null;
   provincia?: string | null;
+  nuevo_club?: NuevoClubInlineDTO | null;
 }
 
 export interface UsuarioAdmin {

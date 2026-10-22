@@ -3,7 +3,9 @@ export interface Club {
   nombre: string;
   provincia: string;
   localidad: string;
-  direccion?: string;
+  direccion?: string | null;
+  codigo_postal?: string | null;
+  telefono?: string | null;
   canchas: number;
   estado: string;
   latitud?: number | null;
@@ -68,6 +70,9 @@ export interface FormClubState {
   nombre: string;
   provincia: string;
   localidad: string;
+  direccion?: string | null;
+  codigo_postal?: string | null;
+  telefono?: string | null;
   canchas: number;
   estado: string;
   latitud?: number | null;

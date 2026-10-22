@@ -13,16 +13,19 @@ import {
   Building2,
   CreditCard,
   Map,
+  Phone,
+  CheckCircle2,
 } from "lucide-react";
 import CustomDropdown from "../ui/CustomDropdown";
 import { FormClubState } from "../../utils/types";
 import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
+import {
+  geocodificarDireccion,
+  reverseGeocodificar,
+} from "@/utils/services/geocoding";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import {
-  leafletTileUrl,
-  LEAFLET_TILE_ATTRIBUTION,
-} from "@/utils/leafletTiles";
+import { leafletTileUrl, LEAFLET_TILE_ATTRIBUTION } from "@/utils/leafletTiles";
 
 interface ClubModalProps {
   isOpen: boolean;
@@ -60,6 +63,11 @@ export default function ClubModal({
   );
   const [isLocalidadOpen, setIsLocalidadOpen] = useState(false);
   const localidadDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [geocodificando, setGeocodificando] = useState(false);
+  const [geocodingFeedback, setGeocodingFeedback] = useState<string | null>(
+    null,
+  );
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -126,36 +134,21 @@ export default function ClubModal({
         }));
 
         try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
-            {
-              headers: {
-                "Accept-Language": "es",
-              },
+          const res = await reverseGeocodificar(lat, lng);
+          if (res) {
+            setFormData((prev) => ({
+              ...prev,
+              localidad: res.localidad || prev.localidad,
+              provincia: res.provincia || prev.provincia,
+              direccion: prev.direccion || res.calle || null,
+              codigo_postal: prev.codigo_postal || res.codigoPostal || null,
+            }));
+            if (res.localidad) {
+              setLocalidadSearch(res.localidad);
             }
-          );
-          const data = await response.json();
-          if (data && data.address) {
-            const road = data.address.road || data.address.pedestrian || "";
-            const houseNumber = data.address.house_number || "";
-            const suburb = data.address.suburb || data.address.neighbourhood || "";
-            const city = data.address.city || data.address.town || data.address.village || "";
-            
-            const parts = [];
-            if (road) {
-              parts.push(houseNumber ? `${road} ${houseNumber}` : road);
-            }
-            if (suburb) parts.push(suburb);
-            if (city) parts.push(city);
-
-            const addressString = parts.join(", ");
-            if (addressString) {
-              setFormData((prev) => ({
-                ...prev,
-                localidad: addressString,
-              }));
-              setLocalidadSearch(addressString);
-            }
+            setGeocodingFeedback(
+              `Ubicación seleccionada: ${res.localidad}, ${res.provincia}`,
+            );
           }
         } catch (err) {
           console.error("Error al reverse geocodificar la coordenada:", err);
@@ -186,51 +179,49 @@ export default function ClubModal({
     };
   }, [isOpen]);
 
-  // Geocodificar la provincia y localidad escritas para posicionar el mapa y marcador
+  // Geocodificar automáticamente a partir de la dirección y código postal
   useEffect(() => {
-    if (!isOpen || !mapInstanceRef.current || !markerInstanceRef.current) return;
+    if (!isOpen || !mapInstanceRef.current || !markerInstanceRef.current)
+      return;
+
+    const dir = formData.direccion?.trim();
+    if (!dir || dir.length < 3) return;
 
     const delayDebounce = setTimeout(async () => {
-      const q = [formData.localidad, formData.provincia, "Argentina"]
-        .filter(Boolean)
-        .join(", ");
-
-      if (!q || q === "Argentina") return;
-
+      setGeocodificando(true);
       try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`,
-          {
-            headers: {
-              "Accept-Language": "es",
-            },
-          }
+        const res = await geocodificarDireccion(
+          dir,
+          formData.codigo_postal || undefined,
         );
-        const data = await response.json();
-        if (data && data.length > 0) {
-          const lat = parseFloat(data[0].lat);
-          const lon = parseFloat(data[0].lon);
-
-          // Guardar coordenadas de fondo
+        if (res) {
           setFormData((prev) => ({
             ...prev,
-            latitud: parseFloat(lat.toFixed(6)),
-            longitud: parseFloat(lon.toFixed(6)),
+            latitud: res.latitud,
+            longitud: res.longitud,
+            provincia: res.provincia,
+            localidad: res.localidad,
+            codigo_postal: prev.codigo_postal || res.codigoPostal || null,
           }));
+          setLocalidadSearch(res.localidad);
+          setGeocodingFeedback(
+            `Ubicación detectada: ${res.localidad}, ${res.provincia}`,
+          );
 
-          // Panning del mapa y marcador
           if (markerInstanceRef.current && mapInstanceRef.current) {
-            markerInstanceRef.current.setLatLng([lat, lon]);
-            mapInstanceRef.current.setView([lat, lon], 14);
+            markerInstanceRef.current.setLatLng([res.latitud, res.longitud]);
+            mapInstanceRef.current.setView([res.latitud, res.longitud], 15);
           }
         }
       } catch (err) {
         console.error("Error al geocodificar dirección:", err);
+      } finally {
+        setGeocodificando(false);
       }
-    }, 1200); // 1.2 segundos de debounce para evitar spam
+    }, 600);
 
     return () => clearTimeout(delayDebounce);
-  }, [formData.provincia, formData.localidad, isOpen]);
+  }, [formData.direccion, formData.codigo_postal, isOpen]);
 
   // Sincronizar localidadSearch con el prop formData
   useEffect(() => {
@@ -366,22 +357,90 @@ export default function ClubModal({
               </div>
 
               <div className="space-y-6 relative z-10">
-                {/* FILA 1: NOMBRE */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    Nombre del Complejo
-                  </label>
-                  <input
-                    placeholder="Ej: Padel Center"
-                    className="w-full bg-brand-black px-4 py-3.5 rounded-xl border border-brand-white/5 focus:border-brand-chartreuse/30 focus:outline-none text-sm text-brand-white transition-colors"
-                    value={formData.nombre}
-                    onChange={(e) =>
-                      setFormData({ ...formData, nombre: e.target.value })
-                    }
-                  />
+                {/* FILA 1: NOMBRE Y TELÉFONO */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      Nombre del Complejo *
+                    </label>
+                    <input
+                      placeholder="Ej: Padel Center La Plata"
+                      className="w-full bg-brand-black px-4 py-3.5 rounded-xl border border-brand-white/5 focus:border-brand-chartreuse/30 focus:outline-none text-sm text-brand-white transition-colors"
+                      value={formData.nombre}
+                      onChange={(e) =>
+                        setFormData({ ...formData, nombre: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      Teléfono
+                    </label>
+                    <input
+                      placeholder="Ej: 221 456-7890"
+                      className="w-full bg-brand-black px-4 py-3.5 rounded-xl border border-brand-white/5 focus:border-brand-chartreuse/30 focus:outline-none text-sm text-brand-white transition-colors"
+                      value={formData.telefono || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, telefono: e.target.value })
+                      }
+                    />
+                  </div>
                 </div>
 
-                {/* FILA 2: PROVINCIA Y LOCALIDAD */}
+                {/* FILA 2: DIRECCIÓN FÍSICA Y CÓDIGO POSTAL */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="md:col-span-2 space-y-1.5">
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      Dirección (Calle y N°) *
+                    </label>
+                    <input
+                      placeholder="Ej: Calle 50 750"
+                      className="w-full bg-brand-black px-4 py-3.5 rounded-xl border border-brand-white/5 focus:border-brand-chartreuse/30 focus:outline-none text-sm text-brand-white transition-colors"
+                      value={formData.direccion || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, direccion: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      Cód. Postal
+                    </label>
+                    <input
+                      placeholder="Ej: 1900"
+                      className="w-full bg-brand-black px-4 py-3.5 rounded-xl border border-brand-white/5 focus:border-brand-chartreuse/30 focus:outline-none text-sm text-brand-white transition-colors"
+                      value={formData.codigo_postal || ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          codigo_postal: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* Feedback de Geolocalización Automática */}
+                <div className="text-xs">
+                  {geocodificando ? (
+                    <div className="flex items-center gap-1.5 text-brand-chartreuse/80 py-1 font-medium">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      <span>Geolocalizando dirección y código postal...</span>
+                    </div>
+                  ) : geocodingFeedback ? (
+                    <div className="flex items-center gap-1.5 text-brand-chartreuse py-1.5 font-medium bg-brand-chartreuse/10 px-3 rounded-lg border border-brand-chartreuse/20">
+                      <CheckCircle2 className="size-3.5 shrink-0" />
+                      <span>{geocodingFeedback}</span>
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-[11px]">
+                      Ingresá la dirección y código postal para geolocalizar y
+                      autocompletar la provincia y localidad.
+                    </p>
+                  )}
+                </div>
+
+                {/* FILA 3: PROVINCIA Y LOCALIDAD (Autocompletadas por geolocalización o manuales) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
@@ -393,12 +452,11 @@ export default function ClubModal({
                         setFormData({
                           ...formData,
                           provincia: val,
-                          localidad: "",
                         });
-                        setLocalidadSearch("");
                       }}
                       options={PROVINCIAS_ARG}
                       placeholder="Seleccionar..."
+                      haciaArriba={true}
                     />
                   </div>
 
@@ -408,17 +466,8 @@ export default function ClubModal({
                     </label>
                     <div className="relative">
                       <input
-                        placeholder={
-                          formData.provincia
-                            ? "Ciudad / Barrio..."
-                            : "Seleccioná provincia primero..."
-                        }
-                        disabled={!formData.provincia}
-                        className={`w-full bg-brand-black px-4 py-3.5 rounded-xl border text-sm text-brand-white transition-colors focus:outline-none ${
-                          !formData.provincia
-                            ? "cursor-not-allowed opacity-40 border-brand-white/5 text-gray-500"
-                            : "focus:border-brand-chartreuse/30 border-brand-white/5"
-                        }`}
+                        placeholder="Ciudad / Barrio / Partido..."
+                        className="w-full bg-brand-black px-4 py-3.5 rounded-xl border border-brand-white/5 focus:border-brand-chartreuse/30 focus:outline-none text-sm text-brand-white transition-colors"
                         value={localidadSearch}
                         onFocus={() =>
                           formData.provincia && setIsLocalidadOpen(true)
@@ -565,7 +614,9 @@ export default function ClubModal({
                 <div className="space-y-4 pt-4 border-t border-brand-white/5">
                   <div className="flex items-center gap-2">
                     <CreditCard className="size-4 text-brand-chartreuse" />
-                    <span className="text-sm font-bold text-brand-white">Datos de Transferencia (para reservas de usuarios)</span>
+                    <span className="text-sm font-bold text-brand-white">
+                      Datos de Transferencia (para reservas de usuarios)
+                    </span>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-1.5">
@@ -591,7 +642,10 @@ export default function ClubModal({
                         className="w-full bg-brand-black px-4 py-3.5 rounded-xl border border-brand-white/5 focus:border-brand-chartreuse/30 focus:outline-none text-sm text-brand-white transition-colors"
                         value={formData.alias || ""}
                         onChange={(e) =>
-                          setFormData((prev) => ({ ...prev, alias: e.target.value }))
+                          setFormData((prev) => ({
+                            ...prev,
+                            alias: e.target.value,
+                          }))
                         }
                       />
                     </div>
@@ -607,9 +661,9 @@ export default function ClubModal({
                     </span>
                   </div>
                   <p className="text-xs text-gray-400 leading-relaxed">
-                    Mercado Pago es la opción recomendada (siempre activa). Transferencia y pago
-                    en club quedan deshabilitados por defecto y se habilitan con la suscripción
-                    sin comisiones.
+                    Mercado Pago es la opción recomendada (siempre activa).
+                    Transferencia y pago en club quedan deshabilitados por
+                    defecto y se habilitan con la suscripción sin comisiones.
                   </p>
 
                   <label className="flex items-start gap-3 p-3.5 rounded-xl border border-brand-white/10 bg-brand-black cursor-pointer">
@@ -636,8 +690,8 @@ export default function ClubModal({
                         Suscripción sin comisiones
                       </span>
                       <span className="block text-xs text-gray-400">
-                        Permite al club ofrecer transferencia y pago en sede sin comisiones de
-                        plataforma.
+                        Permite al club ofrecer transferencia y pago en sede sin
+                        comisiones de plataforma.
                       </span>
                     </span>
                   </label>
@@ -653,7 +707,9 @@ export default function ClubModal({
                       <input
                         type="checkbox"
                         className="mt-0.5 size-4 accent-brand-chartreuse"
-                        checked={Boolean(formData.pago_transferencia_habilitado)}
+                        checked={Boolean(
+                          formData.pago_transferencia_habilitado,
+                        )}
                         disabled={!formData.suscripcion_sin_comisiones}
                         onChange={(e) =>
                           setFormData((prev) => ({
@@ -700,16 +756,22 @@ export default function ClubModal({
                 <div className="space-y-4 pt-4 border-t border-brand-white/5">
                   <div className="flex items-center gap-2">
                     <Map className="size-4 text-brand-chartreuse" />
-                    <span className="text-sm font-bold text-brand-white">Ubicación Geográfica</span>
+                    <span className="text-sm font-bold text-brand-white">
+                      Ubicación Geográfica
+                    </span>
                   </div>
-
 
                   {/* MAPA INTERACTIVO */}
                   <div className="relative w-full h-[220px] rounded-2xl border border-brand-white/10 overflow-hidden bg-brand-black">
-                    <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }} />
+                    <div
+                      ref={mapContainerRef}
+                      className="absolute inset-0 w-full h-full"
+                      style={{ zIndex: 1 }}
+                    />
                   </div>
                   <p className="text-[11px] text-gray-400 text-center">
-                    Hacé clic en el mapa o arrastrá el marcador para definir la ubicación exacta.
+                    Hacé clic en el mapa o arrastrá el marcador para definir la
+                    ubicación exacta.
                   </p>
                 </div>
 

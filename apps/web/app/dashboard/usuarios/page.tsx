@@ -17,12 +17,17 @@ import {
   UserCheck,
   Eye,
   EyeOff,
+  Phone,
+  Navigation,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import {
   UsuariosService,
   UsuarioAdmin,
   CrearUsuarioDTO,
 } from "@/utils/services/usuarios";
+import { geocodificarDireccion } from "@/utils/services/geocoding";
 import { ClubesService } from "@/utils/services/clubes";
 import { Club } from "@/utils/types";
 import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
@@ -84,6 +89,26 @@ export default function GestionUsuariosPage() {
     provincia: null,
   });
 
+  // Estado para creación de nuevo club inline
+  const [tipoAsignacionClub, setTipoAsignacionClub] = useState<
+    "existente" | "nuevo"
+  >("existente");
+  const [nuevoClubForm, setNuevoClubForm] = useState({
+    nombre: "",
+    direccion: "",
+    codigo_postal: "",
+    telefono: "",
+    canchas: 2,
+    provincia: "Buenos Aires",
+    localidad: "",
+    latitud: null as number | null,
+    longitud: null as number | null,
+  });
+  const [geocodificando, setGeocodificando] = useState(false);
+  const [geocodingFeedback, setGeocodingFeedback] = useState<string | null>(
+    null,
+  );
+
   // Form state edición
   const [editForm, setEditForm] = useState<{
     nombre: string;
@@ -120,6 +145,64 @@ export default function GestionUsuariosPage() {
     cargarDatos();
   }, [filtroRol]);
 
+  // Autogeolocalización al escribir dirección y código postal del nuevo club
+  useEffect(() => {
+    if (
+      !modalOpen ||
+      form.rol !== "admin_club" ||
+      tipoAsignacionClub !== "nuevo"
+    ) {
+      return;
+    }
+
+    const dir = nuevoClubForm.direccion.trim();
+    if (dir.length < 3) {
+      setGeocodingFeedback(null);
+      return;
+    }
+
+    let active = true;
+    const timer = setTimeout(async () => {
+      setGeocodificando(true);
+      try {
+        const res = await geocodificarDireccion(
+          dir,
+          nuevoClubForm.codigo_postal.trim() || undefined,
+        );
+        if (active && res) {
+          setNuevoClubForm((prev) => ({
+            ...prev,
+            provincia: res.provincia,
+            localidad: res.localidad,
+            latitud: res.latitud,
+            longitud: res.longitud,
+            codigo_postal: prev.codigo_postal || res.codigoPostal || "",
+          }));
+          setGeocodingFeedback(
+            `Ubicación detectada: ${res.localidad}, ${res.provincia}${res.codigoPostal ? ` (CP ${res.codigoPostal})` : ""}`,
+          );
+        } else if (active) {
+          setGeocodingFeedback(null);
+        }
+      } catch (err) {
+        console.error("Error al geocodificar dirección:", err);
+      } finally {
+        if (active) setGeocodificando(false);
+      }
+    }, 500);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [
+    nuevoClubForm.direccion,
+    nuevoClubForm.codigo_postal,
+    modalOpen,
+    form.rol,
+    tipoAsignacionClub,
+  ]);
+
   const resetForm = () => {
     setForm({
       email: "",
@@ -130,6 +213,19 @@ export default function GestionUsuariosPage() {
       club_id: null,
       provincia: null,
     });
+    setNuevoClubForm({
+      nombre: "",
+      direccion: "",
+      codigo_postal: "",
+      telefono: "",
+      canchas: 2,
+      provincia: "Buenos Aires",
+      localidad: "",
+      latitud: null,
+      longitud: null,
+    });
+    setTipoAsignacionClub("existente");
+    setGeocodingFeedback(null);
   };
 
   const handleCrearUsuario = async () => {
@@ -149,18 +245,52 @@ export default function GestionUsuariosPage() {
       return;
     }
 
-    if (form.rol === "admin_club" && !form.club_id) {
-      sileo.warning({
-        title: "Club requerido",
-        description:
-          "Seleccioná el club al que se asignará este administrador.",
-      });
-      return;
+    if (form.rol === "admin_club") {
+      if (tipoAsignacionClub === "existente" && !form.club_id) {
+        sileo.warning({
+          title: "Club requerido",
+          description:
+            "Seleccioná el club existente al que se asignará este administrador.",
+        });
+        return;
+      }
+
+      if (tipoAsignacionClub === "nuevo") {
+        if (!nuevoClubForm.nombre.trim() || !nuevoClubForm.direccion.trim()) {
+          sileo.warning({
+            title: "Datos del club requeridos",
+            description: "Completá el nombre y la dirección del nuevo club.",
+          });
+          return;
+        }
+      }
     }
 
     try {
       setSaving(true);
-      await UsuariosService.crear(form);
+      const payload: CrearUsuarioDTO = {
+        ...form,
+        club_id:
+          form.rol === "admin_club" && tipoAsignacionClub === "existente"
+            ? form.club_id
+            : null,
+        nuevo_club:
+          form.rol === "admin_club" && tipoAsignacionClub === "nuevo"
+            ? {
+                nombre: nuevoClubForm.nombre.trim(),
+                direccion: nuevoClubForm.direccion.trim(),
+                codigo_postal: nuevoClubForm.codigo_postal.trim() || null,
+                telefono: nuevoClubForm.telefono.trim() || null,
+                canchas: Math.max(1, Number(nuevoClubForm.canchas) || 1),
+                provincia: nuevoClubForm.provincia,
+                localidad: nuevoClubForm.localidad.trim() || "Sin especificar",
+                latitud: nuevoClubForm.latitud,
+                longitud: nuevoClubForm.longitud,
+              }
+            : null,
+      };
+
+      await UsuariosService.crear(payload);
       sileo.success({
         title: "¡Usuario creado!",
         description: `${form.nombre} ${form.apellido} fue registrado como ${ROL_LABELS[form.rol] || form.rol}.`,
@@ -501,7 +631,7 @@ export default function GestionUsuariosPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ duration: 0.2 }}
-              className="bg-[#1a1a1a] p-8 rounded-4xl border border-white/5 w-full max-w-lg shadow-[0_20px_60px_rgba(0,0,0,0.8)] relative"
+              className="bg-[#1a1a1a] p-6 sm:p-8 rounded-4xl border border-white/5 w-full max-w-lg shadow-[0_20px_60px_rgba(0,0,0,0.8)] relative max-h-[calc(100dvh-2rem)] overflow-y-auto"
             >
               <div className="flex justify-between items-start mb-6 border-b border-white/10 pb-4">
                 <div>
@@ -584,7 +714,11 @@ export default function GestionUsuariosPage() {
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors cursor-pointer"
-                      title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                      title={
+                        showPassword
+                          ? "Ocultar contraseña"
+                          : "Mostrar contraseña"
+                      }
                     >
                       {showPassword ? (
                         <EyeOff className="size-4" />
@@ -610,30 +744,219 @@ export default function GestionUsuariosPage() {
                       })
                     }
                     options={ROLES_CREABLES}
+                    haciaArriba={true}
                     placeholder="Seleccionar Rol..."
                   />
                 </div>
 
                 {form.rol === "admin_club" && (
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                      <Building2 className="size-3.5 inline mr-1 -mt-0.5" />
-                      Club Asignado
-                    </label>
-                    <CustomDropdown
-                      value={form.club_id || ""}
-                      onChange={(val) => setForm({ ...form, club_id: val })}
-                      options={clubs.map((c) => ({
-                        value: String(c.id),
-                        label: c.nombre,
-                      }))}
-                      placeholder={
-                        clubs.length === 0
-                          ? "No hay clubes creados"
-                          : "Seleccionar Club..."
-                      }
-                      disabled={clubs.length === 0}
-                    />
+                  <div className="space-y-4 pt-1">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                        <Building2 className="size-3.5 inline mr-1 -mt-0.5" />
+                        Club a Administrar
+                      </label>
+                      <span className="text-[10px] text-gray-400">
+                        {tipoAsignacionClub === "nuevo"
+                          ? "Alta de nuevo club"
+                          : "Club existente"}
+                      </span>
+                    </div>
+
+                    {/* Toggle selector: Existente vs Nuevo */}
+                    <div className="grid grid-cols-2 p-1 rounded-xl bg-white/5 border border-white/10 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setTipoAsignacionClub("existente")}
+                        className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          tipoAsignacionClub === "existente"
+                            ? "bg-brand-chartreuse text-black shadow-md"
+                            : "text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        Club Existente
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTipoAsignacionClub("nuevo")}
+                        className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          tipoAsignacionClub === "nuevo"
+                            ? "bg-brand-chartreuse text-black shadow-md"
+                            : "text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        + Registrar Nuevo Club
+                      </button>
+                    </div>
+
+                    {tipoAsignacionClub === "existente" ? (
+                      <div>
+                        <CustomDropdown
+                          value={form.club_id || ""}
+                          onChange={(val) => setForm({ ...form, club_id: val })}
+                          options={clubs.map((c) => ({
+                            value: String(c.id),
+                            label: c.nombre,
+                          }))}
+                          placeholder={
+                            clubs.length === 0
+                              ? "No hay clubes creados"
+                              : "Seleccionar Club..."
+                          }
+                          disabled={clubs.length === 0}
+                          haciaArriba={true}
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-3 p-4 rounded-2xl bg-white/[0.02] border border-white/10">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                            Nombre del Club *
+                          </label>
+                          <input
+                            value={nuevoClubForm.nombre}
+                            onChange={(e) =>
+                              setNuevoClubForm({
+                                ...nuevoClubForm,
+                                nombre: e.target.value,
+                              })
+                            }
+                            placeholder="Ej. La Plata Padel Center"
+                            className="w-full bg-brand-card p-3 rounded-xl border border-transparent focus:border-brand-chartreuse/40 text-white focus:outline-none text-sm transition-colors"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="col-span-2">
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                              Dirección (Calle y N°)*
+                            </label>
+                            <input
+                              value={nuevoClubForm.direccion}
+                              onChange={(e) =>
+                                setNuevoClubForm({
+                                  ...nuevoClubForm,
+                                  direccion: e.target.value,
+                                })
+                              }
+                              placeholder="Ej. Calle 50 750"
+                              className="w-full bg-brand-card p-3 rounded-xl border border-transparent focus:border-brand-chartreuse/40 text-white focus:outline-none text-sm transition-colors"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                              Cód. Postal
+                            </label>
+                            <input
+                              value={nuevoClubForm.codigo_postal}
+                              onChange={(e) =>
+                                setNuevoClubForm({
+                                  ...nuevoClubForm,
+                                  codigo_postal: e.target.value,
+                                })
+                              }
+                              placeholder="1900"
+                              className="w-full bg-brand-card p-3 rounded-xl border border-transparent focus:border-brand-chartreuse/40 text-white focus:outline-none text-sm transition-colors"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Feedback de Geolocalización */}
+                        <div className="text-xs">
+                          {geocodificando ? (
+                            <div className="flex items-center gap-1.5 text-brand-chartreuse/80 py-1">
+                              <Loader2 className="size-3.5 animate-spin" />
+                              <span>Geolocalizando dirección...</span>
+                            </div>
+                          ) : geocodingFeedback ? (
+                            <div className="flex items-center gap-1.5 text-brand-chartreuse py-1 font-medium bg-brand-chartreuse/10 px-2.5 rounded-lg border border-brand-chartreuse/20">
+                              <CheckCircle2 className="size-3.5 shrink-0" />
+                              <span className="truncate">
+                                {geocodingFeedback}
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                              Canchas
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={50}
+                              value={nuevoClubForm.canchas}
+                              onChange={(e) =>
+                                setNuevoClubForm({
+                                  ...nuevoClubForm,
+                                  canchas: Math.max(
+                                    1,
+                                    parseInt(e.target.value) || 1,
+                                  ),
+                                })
+                              }
+                              className="w-full bg-brand-card p-3 rounded-xl border border-transparent focus:border-brand-chartreuse/40 text-white focus:outline-none text-sm transition-colors"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                              Teléfono Club
+                            </label>
+                            <input
+                              value={nuevoClubForm.telefono}
+                              onChange={(e) =>
+                                setNuevoClubForm({
+                                  ...nuevoClubForm,
+                                  telefono: e.target.value,
+                                })
+                              }
+                              placeholder="221 456-7890"
+                              className="w-full bg-brand-card p-3 rounded-xl border border-transparent focus:border-brand-chartreuse/40 text-white focus:outline-none text-sm transition-colors"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                              Provincia
+                            </label>
+                            <CustomDropdown
+                              value={nuevoClubForm.provincia}
+                              onChange={(val) =>
+                                setNuevoClubForm({
+                                  ...nuevoClubForm,
+                                  provincia: val,
+                                })
+                              }
+                              options={PROVINCIAS_ARG.map((p) => ({
+                                value: p.value,
+                                label: p.label,
+                              }))}
+                              placeholder="Provincia..."
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                              Localidad
+                            </label>
+                            <input
+                              value={nuevoClubForm.localidad}
+                              onChange={(e) =>
+                                setNuevoClubForm({
+                                  ...nuevoClubForm,
+                                  localidad: e.target.value,
+                                })
+                              }
+                              placeholder="Ciudad o Barrio"
+                              className="w-full bg-brand-card p-3 rounded-xl border border-transparent focus:border-brand-chartreuse/40 text-white focus:outline-none text-sm transition-colors"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
