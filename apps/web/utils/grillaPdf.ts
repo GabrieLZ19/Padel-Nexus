@@ -132,6 +132,137 @@ function drawScheduleBlock(
   }
 }
 
+/**
+ * Extrae solo el apellido o la parte representativa de un jugador.
+ * Ej: "TORRES, Pablo" -> "TORRES", "Pablo Torres" -> "Torres".
+ */
+function extraerApellidoJugador(fullName?: string | null): string {
+  const cleaned = cleanJugadorNombre(fullName);
+  if (!cleaned) return "";
+  const commaIdx = cleaned.indexOf(",");
+  if (commaIdx !== -1) {
+    return cleaned.slice(0, commaIdx).trim();
+  }
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0];
+  return parts[parts.length - 1] || cleaned;
+}
+
+/**
+ * Jerarquía deportiva descendente para el Informe de Resultados (post-campeón):
+ * Final (1) -> Semifinales (2) -> Cuartos (3) -> Octavos (4) -> 16avos (5) -> 32avos (6) -> Zonas (100+)
+ */
+function jerarquiaRondaInformeResultados(ronda?: string | null): number {
+  const r = String(ronda || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+
+  if (
+    r.includes("FINAL") &&
+    !r.includes("SEMI") &&
+    !r.includes("CUARTO") &&
+    !r.includes("OCTAVO")
+  ) {
+    return 1;
+  }
+  if (r.includes("SEMI")) return 2;
+  if (r.includes("CUARTO")) return 3;
+  if (r.includes("OCTAVO")) return 4;
+  if (r.includes("16AVO") || r.includes("PRELIMINAR")) return 5;
+  if (r.includes("32AVO")) return 6;
+  if (r.startsWith("ZONA")) {
+    const m = r.match(/ZONA([A-Z0-9]+)/);
+    const code = m ? m[1].charCodeAt(0) : 90;
+    return 100 + code;
+  }
+  return 50;
+}
+
+/**
+ * Formatea el nombre/representación resumida de un equipo para cuadros compactos:
+ * - Torneo Nacional: Provincia y Letra (ej: "NEUQUÉN A")
+ * - Torneo Provincial / Regional / Club: Apellidos (ej: "GÓMEZ / PÉREZ")
+ */
+function etiquetaResumidaEquipo(
+  p: Partido,
+  lado: "a" | "b",
+  torneo: Partial<Torneo>,
+): string {
+  const isNacional =
+    torneo.alcance === "Nacional" ||
+    (torneo.nombre || "").toUpperCase().includes("NACIONAL");
+
+  const denominacion =
+    lado === "a" ? p.equipo_a_denominacion : p.equipo_b_denominacion;
+  const prov = lado === "a" ? p.equipo_a_provincia : p.equipo_b_provincia;
+  const letra =
+    lado === "a" ? p.equipo_a_letra_prioridad : p.equipo_b_letra_prioridad;
+  const club = lado === "a" ? p.equipo_a_club : p.equipo_b_club;
+
+  // Si es nacional o viene denominación provincial/letra cargada:
+  if (isNacional || denominacion || (prov && letra)) {
+    const textoProv = textoInstitucionPdf({
+      denominacion_nacional: denominacion,
+      provincia: prov,
+      letra_prioridad: letra,
+      club,
+    });
+    if (textoProv && textoProv !== "Sin denominación") {
+      return textoProv;
+    }
+  }
+
+  // Torneo provincial / club: apellidos de los jugadores
+  const j1 = lado === "a" ? p.equipo_a_j1 : p.equipo_b_j1;
+  const j2 = lado === "a" ? p.equipo_a_j2 : p.equipo_b_j2;
+
+  const ap1 = extraerApellidoJugador(j1);
+  const ap2 = extraerApellidoJugador(j2);
+
+  if (ap1 && ap2) {
+    return `${ap1.toUpperCase()} / ${ap2.toUpperCase()}`;
+  }
+  if (ap1) {
+    return ap1.toUpperCase();
+  }
+  const clean1 = cleanJugadorNombre(j1);
+  const clean2 = cleanJugadorNombre(j2);
+  const list = [clean1, clean2].filter(Boolean);
+  return list.length > 0 ? list.join(" / ") : "A definir";
+}
+
+const RONDAS_PLAYOFF_PROGRESSION = [
+  { key: "32AVOS", label: "32avos", titulo: "TREINTAIDOSAVOS DE FINAL" },
+  { key: "16AVOS", label: "16avos", titulo: "DIECISÉISAVOS DE FINAL" },
+  { key: "OCTAVOS", label: "Octavos", titulo: "OCTAVOS DE FINAL" },
+  { key: "CUARTOS", label: "Cuartos", titulo: "CUARTOS DE FINAL" },
+  { key: "SEMIS", label: "Semifinales", titulo: "SEMIFINALES" },
+  { key: "FINAL", label: "Final", titulo: "GRAN FINAL" },
+] as const;
+
+function partidosDeRondaPlayoff(lista: Partido[], key: string): Partido[] {
+  return lista
+    .filter((p) => {
+      const r = (p.ronda || "").toUpperCase().replace(/\s+/g, "");
+      if (key === "FINAL") {
+        return (
+          r.includes("FINAL") &&
+          !r.includes("SEMI") &&
+          !r.includes("CUARTO") &&
+          !r.includes("OCTAVO")
+        );
+      }
+      if (key === "SEMIS") return r.includes("SEMI");
+      if (key === "CUARTOS") return r.includes("CUARTO");
+      if (key === "OCTAVOS") return r.includes("OCTAVO");
+      if (key === "16AVOS") return r.includes("16AVO") || r.includes("PRELIMINAR");
+      if (key === "32AVOS") return r.includes("32AVO");
+      return false;
+    })
+    .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+}
+
 export function generarPdfGrillaPartidos(
   torneo: Partial<Torneo>,
   partidos: Partido[],
@@ -267,7 +398,7 @@ export function generarPdfGrillaPartidos(
     currentY += 24;
   }
 
-  // --- SECCIÓN 1: DETALLE INDIVIDUAL DE PARTIDOS (RANKEDIN STYLE) ---
+  // --- SECCIÓN 1: DETALLE INDIVIDUAL DE PARTIDOS (ORDEN JERÁRQUICO DEPORTIVO) ---
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
@@ -279,18 +410,38 @@ export function generarPdfGrillaPartidos(
   const cardWidth = (pageWidth - marginX * 2 - colGap) / 2;
   const cardHeight = 34;
 
-  partidos.forEach((p, idx) => {
-    if (currentY + cardHeight > pageHeight - 20) {
+  const partidosOrdenados = [...partidos].sort((a, b) => {
+    const jA = jerarquiaRondaInformeResultados(a.ronda);
+    const jB = jerarquiaRondaInformeResultados(b.ronda);
+    if (jA !== jB) return jA - jB;
+
+    const esZonaA = (a.ronda || "").toUpperCase().startsWith("ZONA");
+    const esZonaB = (b.ronda || "").toUpperCase().startsWith("ZONA");
+    if (esZonaA && esZonaB) {
+      const tA = a.fecha_partido ? new Date(a.fecha_partido).getTime() : 0;
+      const tB = b.fecha_partido ? new Date(b.fecha_partido).getTime() : 0;
+      if (tA !== tB && !Number.isNaN(tA) && !Number.isNaN(tB)) return tA - tB;
+    }
+
+    const ordA = a.orden ?? 0;
+    const ordB = b.orden ?? 0;
+    if (ordA !== ordB) return ordA - ordB;
+
+    return (a.id || "").localeCompare(b.id || "");
+  });
+
+  let colIndex = 0;
+  partidosOrdenados.forEach((p) => {
+    if (colIndex === 0 && currentY + cardHeight > pageHeight - 20) {
       doc.addPage();
       currentY = 20;
     }
 
-    const colIndex = idx % 2;
     const x = marginX + colIndex * (cardWidth + colGap);
     const y = currentY;
 
-    const isGanadorA = p.ganador && p.ganador === p.equipo_a_id;
-    const isGanadorB = p.ganador && p.ganador === p.equipo_b_id;
+    const isGanadorA = Boolean(p.ganador && p.ganador === p.equipo_a_id);
+    const isGanadorB = Boolean(p.ganador && p.ganador === p.equipo_b_id);
 
     const nameA = formatNames(p.equipo_a_j1, p.equipo_a_j2);
     const nameB = formatNames(p.equipo_b_j1, p.equipo_b_j2);
@@ -386,265 +537,414 @@ export function generarPdfGrillaPartidos(
       doc.text(String(s3B), xScore + 20, yRowB + 7, { align: "center" });
     }
 
-    if (colIndex === 1 || idx === partidos.length - 1) {
+    if (colIndex === 1) {
+      colIndex = 0;
       currentY += cardHeight + 5;
+    } else {
+      colIndex = 1;
     }
   });
 
-  // --- SECCIÓN 2: ESQUEMA VISUAL DE CUADRO Y PROGRESIÓN DE LLAVES ---
-  if (currentY + 80 > pageHeight - 20) {
-    doc.addPage();
-    currentY = 20;
-  } else {
-    currentY += 8;
+  if (colIndex === 1) {
+    currentY += cardHeight + 5;
+    colIndex = 0;
   }
 
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
-  doc.text("ESQUEMA DE CUADRO Y PROGRESIÓN DE LLAVES", 14, currentY);
-  currentY += 8;
-
-  // Rondas en orden cronológico
-  const rondasOrdenadas = ["CUARTOS", "SEMIS", "FINAL"];
-  const rondasDisponibles = rondasOrdenadas.filter((r) =>
-    partidos.some((p) => (p.ronda || "").toUpperCase().includes(r)),
+  // --- SECCIÓN 2: ESQUEMA DE CUADRO Y PROGRESIÓN DE LLAVES ---
+  const rondasPlayoffDisponibles = RONDAS_PLAYOFF_PROGRESSION.filter(
+    (cfg) => partidosDeRondaPlayoff(partidos, cfg.key).length > 0,
   );
 
-  const rondasAMostrar =
-    rondasDisponibles.length > 0
-      ? rondasDisponibles
-      : Array.from(new Set(partidos.map((p) => (p.ronda || "Partidos").toUpperCase())));
-
-  const numCols = rondasAMostrar.length;
-  const bracketGapX = 14; // Espacio para las líneas ortogonales
-  const bColWidth =
-    (pageWidth - marginX * 2 - (numCols - 1) * bracketGapX) / numCols;
-  const boxHeight = 22;
-
-  // Mapa para guardar las posiciones (Y) de cada partido de la llave
-  const roundMatchCoords = new Map<
-    string,
-    { id: string; x: number; y: number; width: number; height: number; midY: number }
-  >();
-
-  // Calculamos la disposición vertical balanceada para cada ronda
-  // 1. Primera ronda (Cuartos / Semis según disponibilidad)
-  const firstRoundName = rondasAMostrar[0];
-  const firstMatches = partidos.filter((p) =>
-    (p.ronda || "").toUpperCase().includes(firstRoundName),
+  const tieneInstanciasPreviasACuartos = rondasPlayoffDisponibles.some((cfg) =>
+    ["32AVOS", "16AVOS", "OCTAVOS"].includes(cfg.key),
   );
 
-  let currentRoundY = currentY + 10;
-  firstMatches.forEach((p, idx) => {
-    const rx = marginX;
-    const ry = currentRoundY + idx * (boxHeight + 14);
-    roundMatchCoords.set(p.id, {
-      id: p.id,
-      x: rx,
-      y: ry,
-      width: bColWidth,
-      height: boxHeight,
-      midY: ry + boxHeight / 2,
-    });
-  });
-
-  // 2. Rondas subsiguientes (Centradas verticalmente entre sus partidos previos)
-  for (let rIdx = 1; rIdx < rondasAMostrar.length; rIdx++) {
-    const prevRoundName = rondasAMostrar[rIdx - 1];
-    const currentRoundName = rondasAMostrar[rIdx];
-
-    const prevMatches = partidos.filter((p) =>
-      (p.ronda || "").toUpperCase().includes(prevRoundName),
-    );
-    const currMatches = partidos.filter((p) =>
-      (p.ronda || "").toUpperCase().includes(currentRoundName),
-    );
-
-    const rx = marginX + rIdx * (bColWidth + bracketGapX);
-
-    currMatches.forEach((p, idx) => {
-      const match1 = prevMatches[idx * 2];
-      const match2 = prevMatches[idx * 2 + 1];
-
-      const c1 = match1 ? roundMatchCoords.get(match1.id) : null;
-      const c2 = match2 ? roundMatchCoords.get(match2.id) : null;
-
-      let ry = currentY + 10 + idx * (boxHeight + 20);
-      if (c1 && c2) {
-        const midPointY = (c1.midY + c2.midY) / 2;
-        ry = midPointY - boxHeight / 2;
-      } else if (c1) {
-        ry = c1.y;
+  if (rondasPlayoffDisponibles.length > 0) {
+    if (tieneInstanciasPreviasACuartos) {
+      // =========================================================================
+      // OPCIÓN A: ESQUEMA CONDENSADO DE PROGRESIÓN DE LLAVES (OCTAVOS, 16AVOS, ETC.)
+      // =========================================================================
+      if (currentY + 50 > pageHeight - 20) {
+        doc.addPage();
+        currentY = 20;
+      } else {
+        currentY += 8;
       }
 
-      roundMatchCoords.set(p.id, {
-        id: p.id,
-        x: rx,
-        y: ry,
-        width: bColWidth,
-        height: boxHeight,
-        midY: ry + boxHeight / 2,
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
+      doc.text("ESQUEMA DE CUADRO Y PROGRESIÓN DE LLAVES", 14, currentY);
+      currentY += 5;
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(PDF_SLATE_500[0], PDF_SLATE_500[1], PDF_SLATE_500[2]);
+      const primeraRondaStr = rondasPlayoffDisponibles[0]?.label || "Eliminatorias";
+      doc.text(
+        `Fase de Eliminatorias Directas · Progresión oficial desde ${primeraRondaStr} hasta la Gran Final`,
+        14,
+        currentY,
+      );
+      currentY += 7;
+
+      const compactCardWidth = (pageWidth - marginX * 2 - colGap) / 2;
+      const compactCardHeight = 22;
+
+      rondasPlayoffDisponibles.forEach((rondaCfg) => {
+        const matchesRonda = partidosDeRondaPlayoff(partidos, rondaCfg.key);
+        if (matchesRonda.length === 0) return;
+
+        // Si no entra el encabezado y al menos una fila de tarjetas
+        if (currentY + 32 > pageHeight - 20) {
+          doc.addPage();
+          currentY = 20;
+        }
+
+        // Barra de cabecera de la ronda
+        doc.setFillColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
+        doc.roundedRect(marginX, currentY, pageWidth - marginX * 2, 6.5, 1.5, 1.5, "F");
+
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
+        doc.text(rondaCfg.titulo, marginX + 4, currentY + 4.5);
+
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(255, 255, 255);
+        doc.text(
+          `${matchesRonda.length} partido${matchesRonda.length > 1 ? "s" : ""}`,
+          pageWidth - marginX - 4,
+          currentY + 4.5,
+          { align: "right" },
+        );
+
+        currentY += 9;
+
+        let subCol = 0;
+        matchesRonda.forEach((p, pIdx) => {
+          if (subCol === 0 && currentY + compactCardHeight > pageHeight - 20) {
+            doc.addPage();
+            currentY = 20;
+          }
+
+          const x = marginX + subCol * (compactCardWidth + colGap);
+          const y = currentY;
+
+          const isGanadorA = Boolean(p.ganador && p.ganador === p.equipo_a_id);
+          const isGanadorB = Boolean(p.ganador && p.ganador === p.equipo_b_id);
+
+          const nombreResumidoA = etiquetaResumidaEquipo(p, "a", torneo);
+          const nombreResumidoB = etiquetaResumidaEquipo(p, "b", torneo);
+
+          const s1A = p.set1_a ?? (p as any).set1_a ?? null;
+          const s1B = p.set1_b ?? (p as any).set1_b ?? null;
+          const s2A = (p as any).set2_a ?? null;
+          const s2B = (p as any).set2_b ?? null;
+          const s3A = (p as any).set3_a ?? null;
+          const s3B = (p as any).set3_b ?? null;
+
+          // Contenedor tarjeta
+          doc.setFillColor(CARD_BG[0], CARD_BG[1], CARD_BG[2]);
+          doc.setDrawColor(CARD_BORDER[0], CARD_BORDER[1], CARD_BORDER[2]);
+          doc.setLineWidth(0.3);
+          doc.roundedRect(x, y, compactCardWidth, compactCardHeight, 1.5, 1.5, "FD");
+
+          // Subheader con número de partido y cancha/horario
+          const matchFechaStr = formatMatchDateTimeStr(p.fecha_partido);
+          const canchaStr = formatCanchaShort(p.cancha_asignada);
+          doc.setFontSize(6);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(PDF_SLATE_500[0], PDF_SLATE_500[1], PDF_SLATE_500[2]);
+          doc.text(`P#${p.orden || pIdx + 1}`, x + 3, y + 3.8);
+
+          doc.setFont("helvetica", "normal");
+          doc.text(`${canchaStr}${matchFechaStr ? ` · ${matchFechaStr}` : ""}`, x + compactCardWidth - 3, y + 3.8, {
+            align: "right",
+          });
+
+          // Fila A
+          const yA = y + 4.8;
+          if (isGanadorA) {
+            doc.setFillColor(WINNER_BG[0], WINNER_BG[1], WINNER_BG[2]);
+            doc.rect(x + 0.5, yA, compactCardWidth - 1, 8, "F");
+          }
+          doc.setFontSize(7.5);
+          doc.setFont("helvetica", isGanadorA ? "bold" : "normal");
+          doc.setTextColor(
+            isGanadorA ? WINNER_TEXT[0] : 30,
+            isGanadorA ? WINNER_TEXT[1] : 30,
+            isGanadorA ? WINNER_TEXT[2] : 30,
+          );
+          doc.text(nombreResumidoA, x + 3, yA + 5.8, { maxWidth: compactCardWidth - 24 });
+
+          // Sets A
+          const xScore = x + compactCardWidth - 20;
+          doc.setFontSize(7.5);
+          doc.setFont("helvetica", "bold");
+          if (s1A !== null) doc.text(String(s1A), xScore, yA + 5.8, { align: "center" });
+          if (s2A !== null) doc.text(String(s2A), xScore + 6, yA + 5.8, { align: "center" });
+          if (s3A !== null) doc.text(String(s3A), xScore + 12, yA + 5.8, { align: "center" });
+
+          // Divider interno
+          doc.setDrawColor(CARD_BORDER[0], CARD_BORDER[1], CARD_BORDER[2]);
+          doc.line(x + 1, y + 13.2, x + compactCardWidth - 1, y + 13.2);
+
+          // Fila B
+          const yB = y + 13.6;
+          if (isGanadorB) {
+            doc.setFillColor(WINNER_BG[0], WINNER_BG[1], WINNER_BG[2]);
+            doc.rect(x + 0.5, yB, compactCardWidth - 1, 8, "F");
+          }
+          doc.setFontSize(7.5);
+          doc.setFont("helvetica", isGanadorB ? "bold" : "normal");
+          doc.setTextColor(
+            isGanadorB ? WINNER_TEXT[0] : 30,
+            isGanadorB ? WINNER_TEXT[1] : 30,
+            isGanadorB ? WINNER_TEXT[2] : 30,
+          );
+          doc.text(nombreResumidoB, x + 3, yB + 5.8, { maxWidth: compactCardWidth - 24 });
+
+          // Sets B
+          if (s1B !== null) doc.text(String(s1B), xScore, yB + 5.8, { align: "center" });
+          if (s2B !== null) doc.text(String(s2B), xScore + 6, yB + 5.8, { align: "center" });
+          if (s3B !== null) doc.text(String(s3B), xScore + 12, yB + 5.8, { align: "center" });
+
+          if (subCol === 1) {
+            subCol = 0;
+            currentY += compactCardHeight + 3;
+          } else {
+            subCol = 1;
+          }
+        });
+
+        if (subCol === 1) {
+          currentY += compactCardHeight + 3;
+          subCol = 0;
+        }
+
+        currentY += 4;
       });
-    });
-  }
+    } else {
+      // =========================================================================
+      // DIBUJO GRÁFICO ESTÁNDAR DE LLAVE (CUARTOS / SEMIS / FINAL - 3 COLUMNAS MÁX)
+      // =========================================================================
+      if (currentY + 80 > pageHeight - 20) {
+        doc.addPage();
+        currentY = 20;
+      } else {
+        currentY += 8;
+      }
 
-  // Renderizado de Cajas y Textos de los Partidos en la Llave
-  rondasAMostrar.forEach((ronda, rIdx) => {
-    const rx = marginX + rIdx * (bColWidth + bracketGapX);
-    const partidosRonda = partidos.filter((p) =>
-      (p.ronda || "").toUpperCase().includes(ronda),
-    );
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
+      doc.text("ESQUEMA DE CUADRO Y PROGRESIÓN DE LLAVES", 14, currentY);
+      currentY += 8;
 
-    // Titulo Ronda
-    doc.setFillColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
-    doc.rect(rx, currentY, bColWidth, 6, "F");
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    doc.text(ronda, rx + bColWidth / 2, currentY + 4.2, { align: "center" });
+      const rondasAMostrar = rondasPlayoffDisponibles.map((r) => r.key);
+      const numCols = rondasAMostrar.length;
+      const bracketGapX = 14;
+      const bColWidth =
+        (pageWidth - marginX * 2 - (numCols - 1) * bracketGapX) / numCols;
+      const boxHeight = 22;
 
-    partidosRonda.forEach((p) => {
-      const coords = roundMatchCoords.get(p.id);
-      if (!coords) return;
+      const roundMatchCoords = new Map<
+        string,
+        { id: string; x: number; y: number; width: number; height: number; midY: number }
+      >();
 
-      const { x: bX, y: bY } = coords;
+      const firstRoundKey = rondasAMostrar[0];
+      const firstMatches = partidosDeRondaPlayoff(partidos, firstRoundKey);
 
-      const isGanadorA = p.ganador && p.ganador === p.equipo_a_id;
-      const isGanadorB = p.ganador && p.ganador === p.equipo_b_id;
+      let currentRoundY = currentY + 10;
+      firstMatches.forEach((p, idx) => {
+        const rx = marginX;
+        const ry = currentRoundY + idx * (boxHeight + 14);
+        roundMatchCoords.set(p.id, {
+          id: p.id,
+          x: rx,
+          y: ry,
+          width: bColWidth,
+          height: boxHeight,
+          midY: ry + boxHeight / 2,
+        });
+      });
 
-      const nameA = formatNames(p.equipo_a_j1, p.equipo_a_j2);
-      const nameB = formatNames(p.equipo_b_j1, p.equipo_b_j2);
+      for (let rIdx = 1; rIdx < rondasAMostrar.length; rIdx++) {
+        const prevRoundKey = rondasAMostrar[rIdx - 1];
+        const currentRoundKey = rondasAMostrar[rIdx];
 
-      const s1A = p.set1_a ?? (p as any).set1_a ?? null;
-      const s1B = p.set1_b ?? (p as any).set1_b ?? null;
-      const s2A = (p as any).set2_a ?? null;
-      const s2B = (p as any).set2_b ?? null;
-      const s3A = (p as any).set3_a ?? null;
-      const s3B = (p as any).set3_b ?? null;
+        const prevMatches = partidosDeRondaPlayoff(partidos, prevRoundKey);
+        const currMatches = partidosDeRondaPlayoff(partidos, currentRoundKey);
 
-      // Caja Partido
-      doc.setFillColor(CARD_BG[0], CARD_BG[1], CARD_BG[2]);
-      doc.setDrawColor(CARD_BORDER[0], CARD_BORDER[1], CARD_BORDER[2]);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(bX, bY, bColWidth, boxHeight, 1.5, 1.5, "FD");
+        const rx = marginX + rIdx * (bColWidth + bracketGapX);
 
-      // Fecha y hora sutil arriba
-      const dtStr = formatMatchDateTimeStr(p.fecha_partido);
-      if (dtStr) {
-        doc.setFontSize(5.5);
+        currMatches.forEach((p, idx) => {
+          const match1 = prevMatches[idx * 2];
+          const match2 = prevMatches[idx * 2 + 1];
+
+          const c1 = match1 ? roundMatchCoords.get(match1.id) : null;
+          const c2 = match2 ? roundMatchCoords.get(match2.id) : null;
+
+          let ry = currentY + 10 + idx * (boxHeight + 20);
+          if (c1 && c2) {
+            const midPointY = (c1.midY + c2.midY) / 2;
+            ry = midPointY - boxHeight / 2;
+          } else if (c1) {
+            ry = c1.y;
+          }
+
+          roundMatchCoords.set(p.id, {
+            id: p.id,
+            x: rx,
+            y: ry,
+            width: bColWidth,
+            height: boxHeight,
+            midY: ry + boxHeight / 2,
+          });
+        });
+      }
+
+      rondasAMostrar.forEach((rondaKey, rIdx) => {
+        const rx = marginX + rIdx * (bColWidth + bracketGapX);
+        const partidosRonda = partidosDeRondaPlayoff(partidos, rondaKey);
+
+        doc.setFillColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
+        doc.rect(rx, currentY, bColWidth, 6, "F");
+        doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(120, 120, 120);
-        doc.text(dtStr, bX + bColWidth - 2, bY + 3.8, { align: "right" });
-      }
+        doc.setTextColor(255, 255, 255);
+        doc.text(rondaKey, rx + bColWidth / 2, currentY + 4.2, { align: "center" });
 
-      // Fila A
-      const yA = bY + 5;
-      if (isGanadorA) {
-        doc.setFillColor(WINNER_BG[0], WINNER_BG[1], WINNER_BG[2]);
-        doc.rect(bX + 0.5, yA, bColWidth - 1, 7.5, "F");
-      }
-      doc.setFontSize(7.5);
-      doc.setFont("helvetica", isGanadorA ? "bold" : "normal");
-      doc.setTextColor(
-        isGanadorA ? WINNER_TEXT[0] : 40,
-        isGanadorA ? WINNER_TEXT[1] : 40,
-        isGanadorA ? WINNER_TEXT[2] : 40,
-      );
-      doc.text(nameA, bX + 3, yA + 5.5, { maxWidth: bColWidth - 18 });
+        partidosRonda.forEach((p) => {
+          const coords = roundMatchCoords.get(p.id);
+          if (!coords) return;
 
-      // Sets A alineados
-      const xSetScore = bX + bColWidth - 16;
-      if (s1A !== null) {
-        doc.setFontSize(7);
-        doc.setFont("helvetica", "bold");
-        doc.text(String(s1A), xSetScore, yA + 5.5, { align: "center" });
-      }
-      if (s2A !== null) {
-        doc.text(String(s2A), xSetScore + 5, yA + 5.5, { align: "center" });
-      }
-      if (s3A !== null) {
-        doc.text(String(s3A), xSetScore + 10, yA + 5.5, { align: "center" });
-      }
+          const { x: bX, y: bY } = coords;
 
-      // Divider interno
-      doc.setDrawColor(CARD_BORDER[0], CARD_BORDER[1], CARD_BORDER[2]);
-      doc.line(bX + 1, bY + 13, bX + bColWidth - 1, bY + 13);
+          const isGanadorA = Boolean(p.ganador && p.ganador === p.equipo_a_id);
+          const isGanadorB = Boolean(p.ganador && p.ganador === p.equipo_b_id);
 
-      // Fila B
-      const yB = bY + 13.5;
-      if (isGanadorB) {
-        doc.setFillColor(WINNER_BG[0], WINNER_BG[1], WINNER_BG[2]);
-        doc.rect(bX + 0.5, yB, bColWidth - 1, 7.5, "F");
-      }
-      doc.setFontSize(7.5);
-      doc.setFont("helvetica", isGanadorB ? "bold" : "normal");
-      doc.setTextColor(
-        isGanadorB ? WINNER_TEXT[0] : 40,
-        isGanadorB ? WINNER_TEXT[1] : 40,
-        isGanadorB ? WINNER_TEXT[2] : 40,
-      );
-      doc.text(nameB, bX + 3, yB + 5.5, { maxWidth: bColWidth - 18 });
+          const nameA = formatNames(p.equipo_a_j1, p.equipo_a_j2);
+          const nameB = formatNames(p.equipo_b_j1, p.equipo_b_j2);
 
-      // Sets B alineados
-      if (s1B !== null) {
-        doc.setFontSize(7);
-        doc.setFont("helvetica", "bold");
-        doc.text(String(s1B), xSetScore, yB + 5.5, { align: "center" });
-      }
-      if (s2B !== null) {
-        doc.text(String(s2B), xSetScore + 5, yB + 5.5, { align: "center" });
-      }
-      if (s3B !== null) {
-        doc.text(String(s3B), xSetScore + 10, yB + 5.5, { align: "center" });
-      }
-    });
-  });
+          const s1A = p.set1_a ?? (p as any).set1_a ?? null;
+          const s1B = p.set1_b ?? (p as any).set1_b ?? null;
+          const s2A = (p as any).set2_a ?? null;
+          const s2B = (p as any).set2_b ?? null;
+          const s3A = (p as any).set3_a ?? null;
+          const s3B = (p as any).set3_b ?? null;
 
-  // --- DIBUJO DE LÍNEAS CONECTORAS DE LA LLAVE (LÍNEAS ORTOGONALES A 90 GRADOS) ---
-  doc.setDrawColor(BRACKET_LINE_COLOR[0], BRACKET_LINE_COLOR[1], BRACKET_LINE_COLOR[2]);
-  doc.setLineWidth(0.4);
+          doc.setFillColor(CARD_BG[0], CARD_BG[1], CARD_BG[2]);
+          doc.setDrawColor(CARD_BORDER[0], CARD_BORDER[1], CARD_BORDER[2]);
+          doc.setLineWidth(0.3);
+          doc.roundedRect(bX, bY, bColWidth, boxHeight, 1.5, 1.5, "FD");
 
-  for (let rIdx = 0; rIdx < rondasAMostrar.length - 1; rIdx++) {
-    const currentRoundName = rondasAMostrar[rIdx];
-    const nextRoundName = rondasAMostrar[rIdx + 1];
+          const dtStr = formatMatchDateTimeStr(p.fecha_partido);
+          if (dtStr) {
+            doc.setFontSize(5.5);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(120, 120, 120);
+            doc.text(dtStr, bX + bColWidth - 2, bY + 3.8, { align: "right" });
+          }
 
-    const currentMatches = partidos.filter((p) =>
-      (p.ronda || "").toUpperCase().includes(currentRoundName),
-    );
-    const nextMatches = partidos.filter((p) =>
-      (p.ronda || "").toUpperCase().includes(nextRoundName),
-    );
+          const yA = bY + 5;
+          if (isGanadorA) {
+            doc.setFillColor(WINNER_BG[0], WINNER_BG[1], WINNER_BG[2]);
+            doc.rect(bX + 0.5, yA, bColWidth - 1, 7.5, "F");
+          }
+          doc.setFontSize(7.5);
+          doc.setFont("helvetica", isGanadorA ? "bold" : "normal");
+          doc.setTextColor(
+            isGanadorA ? WINNER_TEXT[0] : 40,
+            isGanadorA ? WINNER_TEXT[1] : 40,
+            isGanadorA ? WINNER_TEXT[2] : 40,
+          );
+          doc.text(nameA, bX + 3, yA + 5.5, { maxWidth: bColWidth - 18 });
 
-    for (let i = 0; i < currentMatches.length; i += 2) {
-      const match1 = currentMatches[i];
-      const match2 = currentMatches[i + 1];
-      const nextMatch = nextMatches[Math.floor(i / 2)];
+          const xSetScore = bX + bColWidth - 16;
+          if (s1A !== null) {
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "bold");
+            doc.text(String(s1A), xSetScore, yA + 5.5, { align: "center" });
+          }
+          if (s2A !== null) {
+            doc.text(String(s2A), xSetScore + 5, yA + 5.5, { align: "center" });
+          }
+          if (s3A !== null) {
+            doc.text(String(s3A), xSetScore + 10, yA + 5.5, { align: "center" });
+          }
 
-      const c1 = match1 ? roundMatchCoords.get(match1.id) : null;
-      const c2 = match2 ? roundMatchCoords.get(match2.id) : null;
-      const cNext = nextMatch ? roundMatchCoords.get(nextMatch.id) : null;
+          doc.setDrawColor(CARD_BORDER[0], CARD_BORDER[1], CARD_BORDER[2]);
+          doc.line(bX + 1, bY + 13, bX + bColWidth - 1, bY + 13);
 
-      if (c1 && cNext) {
-        const xRight1 = c1.x + c1.width;
-        const midX = xRight1 + bracketGapX / 2;
+          const yB = bY + 13.5;
+          if (isGanadorB) {
+            doc.setFillColor(WINNER_BG[0], WINNER_BG[1], WINNER_BG[2]);
+            doc.rect(bX + 0.5, yB, bColWidth - 1, 7.5, "F");
+          }
+          doc.setFontSize(7.5);
+          doc.setFont("helvetica", isGanadorB ? "bold" : "normal");
+          doc.setTextColor(
+            isGanadorB ? WINNER_TEXT[0] : 40,
+            isGanadorB ? WINNER_TEXT[1] : 40,
+            isGanadorB ? WINNER_TEXT[2] : 40,
+          );
+          doc.text(nameB, bX + 3, yB + 5.5, { maxWidth: bColWidth - 18 });
 
-        if (c2) {
-          const xRight2 = c2.x + c2.width;
-          const y1 = c1.midY;
-          const y2 = c2.midY;
-          const yMidNext = cNext.midY;
+          if (s1B !== null) {
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "bold");
+            doc.text(String(s1B), xSetScore, yB + 5.5, { align: "center" });
+          }
+          if (s2B !== null) {
+            doc.text(String(s2B), xSetScore + 5, yB + 5.5, { align: "center" });
+          }
+          if (s3B !== null) {
+            doc.text(String(s3B), xSetScore + 10, yB + 5.5, { align: "center" });
+          }
+        });
+      });
 
-          // 1. Salidas horizontales desde cada partido previo a la mitad del espacio
-          doc.line(xRight1, y1, midX, y1);
-          doc.line(xRight2, y2, midX, y2);
-          // 2. Línea vertical perfecta uniendo ambas salidas
-          doc.line(midX, y1, midX, y2);
-          // 3. Línea horizontal directa al centro del partido de la siguiente ronda
-          doc.line(midX, yMidNext, cNext.x, cNext.midY);
-        } else {
-          // Salida directa si es partido único o BYE
-          doc.line(xRight1, c1.midY, cNext.x, cNext.midY);
+      doc.setDrawColor(BRACKET_LINE_COLOR[0], BRACKET_LINE_COLOR[1], BRACKET_LINE_COLOR[2]);
+      doc.setLineWidth(0.4);
+
+      for (let rIdx = 0; rIdx < rondasAMostrar.length - 1; rIdx++) {
+        const currentRoundKey = rondasAMostrar[rIdx];
+        const nextRoundKey = rondasAMostrar[rIdx + 1];
+
+        const currentMatches = partidosDeRondaPlayoff(partidos, currentRoundKey);
+        const nextMatches = partidosDeRondaPlayoff(partidos, nextRoundKey);
+
+        for (let i = 0; i < currentMatches.length; i += 2) {
+          const match1 = currentMatches[i];
+          const match2 = currentMatches[i + 1];
+          const nextMatch = nextMatches[Math.floor(i / 2)];
+
+          const c1 = match1 ? roundMatchCoords.get(match1.id) : null;
+          const c2 = match2 ? roundMatchCoords.get(match2.id) : null;
+          const cNext = nextMatch ? roundMatchCoords.get(nextMatch.id) : null;
+
+          if (c1 && cNext) {
+            const xRight1 = c1.x + c1.width;
+            const midX = xRight1 + bracketGapX / 2;
+
+            if (c2) {
+              const xRight2 = c2.x + c2.width;
+              const y1 = c1.midY;
+              const y2 = c2.midY;
+              const yMidNext = cNext.midY;
+
+              doc.line(xRight1, y1, midX, y1);
+              doc.line(xRight2, y2, midX, y2);
+              doc.line(midX, y1, midX, y2);
+              doc.line(midX, yMidNext, cNext.x, cNext.midY);
+            } else {
+              doc.line(xRight1, c1.midY, cNext.x, cNext.midY);
+            }
+          }
         }
       }
     }
