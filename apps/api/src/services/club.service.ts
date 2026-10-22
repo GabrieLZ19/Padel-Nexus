@@ -20,6 +20,9 @@ export interface CrearClubDTO {
   nombre: string;
   provincia: string;
   localidad: string;
+  direccion?: string | null;
+  codigo_postal?: string | null;
+  telefono?: string | null;
   canchas: number;
   estado?: string;
   latitud?: number | null;
@@ -39,6 +42,9 @@ export interface ClubCercano {
   nombre: string;
   provincia: string;
   localidad: string;
+  direccion?: string | null;
+  codigo_postal?: string | null;
+  telefono?: string | null;
   canchas: number;
   estado: string;
   latitud: number | null;
@@ -142,6 +148,9 @@ export class ClubService {
         nombre: String(club.nombre ?? ""),
         provincia: String(club.provincia ?? ""),
         localidad: String(club.localidad ?? ""),
+        direccion: (club.direccion as string) || null,
+        codigo_postal: (club.codigo_postal as string) || null,
+        telefono: (club.telefono as string) || null,
         canchas: Number(club.canchas ?? 0),
         estado: String(club.estado ?? "Activo"),
         latitud,

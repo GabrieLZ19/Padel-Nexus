@@ -16,11 +16,17 @@ export const authenticate = async (
   next: NextFunction,
 ) => {
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
+  if (!authHeader) {
+    return res.status(401).json({ message: "Sesión no iniciada o token no provisto" });
+  }
+  if (!authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ message: "Formato de token inválido" });
   }
 
   const token = authHeader.split(" ")[1];
+  if (!token || token === "undefined" || token === "null") {
+    return res.status(401).json({ message: "Sesión no iniciada o token vacío" });
+  }
 
   // getUser valida la firma criptográfica del token de forma ultra rápida
   const {
@@ -29,7 +35,7 @@ export const authenticate = async (
   } = await supabase.auth.getUser(token);
 
   if (error || !user) {
-    return res.status(401).json({ message: "No autorizado" });
+    return res.status(401).json({ message: "Sesión expirada o no autorizada" });
   }
 
   // 🚀 MEJOR PRÁCTICA: Leemos el rol directo del JWT (app_metadata), ahorrándonos una query a la BD

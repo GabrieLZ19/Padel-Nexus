@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { supabaseAdmin } from "../config/supabase";
+import { ClubService } from "../services/club.service";
 import type { RolUsuario } from "../constants/roles";
 
 // Roles que se pueden crear desde el panel (nunca superadmin)
@@ -10,6 +11,18 @@ const ROLES_CREABLES: RolUsuario[] = [
   "admin_federacion",
 ];
 
+interface NuevoClubInlineDTO {
+  nombre: string;
+  direccion?: string | null;
+  codigo_postal?: string | null;
+  telefono?: string | null;
+  provincia?: string | null;
+  localidad?: string | null;
+  canchas?: number | null;
+  latitud?: number | null;
+  longitud?: number | null;
+}
+
 interface CrearUsuarioDTO {
   email: string;
   password: string;
@@ -18,6 +31,7 @@ interface CrearUsuarioDTO {
   rol: RolUsuario;
   club_id?: string | null;
   provincia?: string | null;
+  nuevo_club?: NuevoClubInlineDTO | null;
 }
 
 export const UsuariosController = {
@@ -28,8 +42,16 @@ export const UsuariosController = {
    */
   async crearUsuario(req: Request, res: Response): Promise<Response> {
     try {
-      const { email, password, nombre, apellido, rol, club_id, provincia } =
-        req.body as CrearUsuarioDTO;
+      const {
+        email,
+        password,
+        nombre,
+        apellido,
+        rol,
+        club_id,
+        provincia,
+        nuevo_club,
+      } = req.body as CrearUsuarioDTO;
 
       // Validaciones
       if (!email || !password || !nombre || !apellido || !rol) {
@@ -53,11 +75,41 @@ export const UsuariosController = {
         });
       }
 
-      if (rol === "admin_club" && !club_id) {
-        return res.status(400).json({
-          exito: false,
-          error: "Para el rol admin_club es obligatorio asignar un club.",
-        });
+      let clubIdFinal = club_id || null;
+
+      if (rol === "admin_club") {
+        if (!clubIdFinal && (!nuevo_club || !nuevo_club.nombre?.trim())) {
+          return res.status(400).json({
+            exito: false,
+            error:
+              "Para el rol admin_club debés seleccionar un club existente o registrar uno nuevo.",
+          });
+        }
+
+        // Si se envió un club nuevo para dar de alta en el mismo paso
+        if (nuevo_club && nuevo_club.nombre?.trim()) {
+          const clubCreado = await ClubService.crearClub({
+            nombre: nuevo_club.nombre.trim(),
+            direccion: nuevo_club.direccion?.trim() || null,
+            codigo_postal: nuevo_club.codigo_postal?.trim() || null,
+            telefono: nuevo_club.telefono?.trim() || null,
+            provincia: nuevo_club.provincia?.trim() || "Buenos Aires",
+            localidad: nuevo_club.localidad?.trim() || "Sin especificar",
+            canchas: Math.max(1, Number(nuevo_club.canchas) || 1),
+            estado: "Activo",
+            latitud: nuevo_club.latitud ?? null,
+            longitud: nuevo_club.longitud ?? null,
+          });
+
+          if (!clubCreado?.id) {
+            return res.status(500).json({
+              exito: false,
+              error: "No se pudo registrar el nuevo club.",
+            });
+          }
+
+          clubIdFinal = String(clubCreado.id);
+        }
       }
 
       // 1. Crear usuario en Supabase Auth con admin API (sin verificación de email)
@@ -89,8 +141,8 @@ export const UsuariosController = {
         rol,
       };
 
-      if (rol === "admin_club" && club_id) {
-        perfilData.club_id = club_id;
+      if (rol === "admin_club" && clubIdFinal) {
+        perfilData.club_id = clubIdFinal;
       }
 
       if (rol === "admin_provincial" && provincia) {
