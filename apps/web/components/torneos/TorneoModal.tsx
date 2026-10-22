@@ -171,6 +171,28 @@ export default function TorneoModal({
                 </div>
               )}
 
+              {!sedeFija && clubs.length > 0 && (
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                    Centro de Cómputos (Sede Club)
+                  </label>
+                  <CustomDropdown
+                    value={formData.club_id || ""}
+                    onChange={(val) =>
+                      setFormData({ ...formData, club_id: val })
+                    }
+                    options={[
+                      { value: "", label: "Definir más adelante (en el Paso 1)" },
+                      ...clubs.map((c) => ({
+                        value: String(c.id),
+                        label: `${c.nombre}${c.provincia ? ` (${c.provincia})` : ""}`,
+                      })),
+                    ]}
+                    placeholder="Seleccionar Club Sede o definir después..."
+                  />
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">

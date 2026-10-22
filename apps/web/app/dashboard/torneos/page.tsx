@@ -208,18 +208,33 @@ export default function TorneosPage() {
       if (!payloadToSave.asociacion_id) {
         try {
           const asocs = await AsociacionesService.getAll();
-          const fap =
-            asocs.find(
-              (a) =>
-                (a.sigla || "").toUpperCase() === "FAP" ||
-                /federaci[oó]n argentina/i.test(a.nombre || ""),
-            ) || null;
-          if (fap?.id) {
-            payloadToSave.asociacion_id = fap.id;
-            payloadToSave.asociacion = "FAP";
+          if (profile?.rol === "admin_provincial" && profile?.lugar_residencia) {
+            const normalizar = (v?: string | null) =>
+              (v || "")
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .trim()
+                .toLowerCase();
+            const asocProv = asocs.find(
+              (a) => normalizar(a.provincia) === normalizar(profile.lugar_residencia),
+            );
+            if (asocProv?.id) {
+              payloadToSave.asociacion_id = asocProv.id;
+            }
+          }
+          if (!payloadToSave.asociacion_id) {
+            const fap =
+              asocs.find(
+                (a) =>
+                  (a.sigla || "").toUpperCase() === "FAP" ||
+                  /federaci[oó]n argentina/i.test(a.nombre || ""),
+              ) || null;
+            if (fap?.id) {
+              payloadToSave.asociacion_id = fap.id;
+            }
           }
         } catch {
-          /* backend también resuelve FAP */
+          /* backend también resuelve FAP / asociación provincial */
         }
       }
 

@@ -67,6 +67,7 @@ export default function TorneoDetallePage() {
     return normalizarPasoAsistente(paso);
   });
   const [loading, setLoading] = useState<boolean>(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const saveHandlerRef = useRef<SaveStepHandler | null>(null);
   const activeTabRef = useRef(activeTab);
@@ -128,8 +129,14 @@ export default function TorneoDetallePage() {
           setInscripciones(dataInscripciones as Inscripcion[]);
           setPartidos(dataPartidos as Partido[]);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error al cargar los datos del torneo:", error);
+        const msg =
+          error?.response?.data?.message ||
+          (error instanceof Error ? error.message : null);
+        if (isMounted) {
+          setErrorMessage(msg);
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -143,7 +150,7 @@ export default function TorneoDetallePage() {
 
   // Manejo de Loading y Errores
   if (loading) return <SkeletonLoader />;
-  if (!torneo) return <TorneoNoEncontrado router={router} />;
+  if (!torneo) return <TorneoNoEncontrado router={router} error={errorMessage} />;
 
   // Props compartidas que los pasos van a necesitar
   const commonProps = {
@@ -397,15 +404,28 @@ const SkeletonLoader = () => (
   </div>
 );
 
-const TorneoNoEncontrado = ({ router }: { router: any }) => (
+const TorneoNoEncontrado = ({
+  router,
+  error,
+}: {
+  router: any;
+  error?: string | null;
+}) => (
   <div className="w-full h-screen flex flex-col items-center justify-center text-center px-4 bg-[#111111]">
     <Trophy className="size-16 text-gray-600 mb-4" />
-    <h2 className="text-2xl font-bold text-white mb-2">Torneo no encontrado</h2>
+    <h2 className="text-2xl font-bold text-white mb-2">
+      {error && /provincia|permiso/i.test(error)
+        ? "Acceso restringido por jurisdicción"
+        : "Torneo no encontrado"}
+    </h2>
+    <p className="text-sm text-gray-400 max-w-md mb-2">
+      {error || "El torneo no existe o no tenés permisos para visualizarlo."}
+    </p>
     <button
       onClick={() => router.push("/dashboard/torneos")}
-      className="bg-white/10 hover:bg-white/20 text-white px-6 py-2.5 rounded-xl font-semibold mt-6 transition-colors cursor-pointer"
+      className="bg-white/10 hover:bg-white/20 text-white px-6 py-2.5 rounded-xl font-semibold mt-4 transition-colors cursor-pointer"
     >
-      Volver
+      Volver al listado
     </button>
   </div>
 );
