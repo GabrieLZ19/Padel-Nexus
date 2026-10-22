@@ -109,8 +109,15 @@ export class ReservaService {
       const [h, m] = String(t).slice(0, 5).split(":").map(Number);
       return h * 60 + m;
     };
-    const overlap = (aStart: string, aEnd: string, bStart: string, bEnd: string) =>
-      toMin(aStart) < toMin(bEnd) && toMin(aEnd) > toMin(bStart);
+    const overlap = (aStart: string, aEnd: string, bStart: string, bEnd: string) => {
+      const aS = toMin(aStart);
+      const aRawE = toMin(aEnd);
+      const aE = aRawE <= aS ? aRawE + 1440 : aRawE;
+      const bS = toMin(bStart);
+      const bRawE = toMin(bEnd);
+      const bE = bRawE <= bS ? bRawE + 1440 : bRawE;
+      return aS < bE && aE > bS;
+    };
 
     const franjaInicio = (franja: string | null | undefined) => {
       if (!franja) return null;

@@ -451,13 +451,45 @@ export class ClubService {
       dia_semana: number;
     },
   ) {
+    const normalizeTime = (raw: string) => {
+      const v = String(raw || "").trim();
+      const m = v.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+      if (!m) throw new Error(`Horario inválido: ${raw}`);
+      const hh = String(Number(m[1])).padStart(2, "0");
+      const mm = m[2];
+      const ss = m[3] || "00";
+      return `${hh}:${mm}:${ss}`;
+    };
+
+    const toMinutes = (t: string) => {
+      const [hh, mm] = t.split(":").map(Number);
+      return hh * 60 + mm;
+    };
+
+    const hora_inicio = normalizeTime(datos.hora_inicio);
+    const hora_fin = normalizeTime(datos.hora_fin);
+    const startMin = toMinutes(hora_inicio);
+    const rawEndMin = toMinutes(hora_fin);
+    const endMin = rawEndMin <= startMin ? rawEndMin + 1440 : rawEndMin;
+    const duracion = endMin - startMin;
+
+    if (duracion <= 0) {
+      throw new Error("El turno no puede tener el mismo horario de inicio y fin.");
+    }
+    if (duracion < 15) {
+      throw new Error("El turno debe durar al menos 15 minutos.");
+    }
+    if (duracion > 360) {
+      throw new Error("El turno no puede superar las 6 horas de duración.");
+    }
+
     const { data, error } = await supabaseAdmin
       .from("turnos")
       .insert([
         {
           cancha_id: canchaId,
-          hora_inicio: datos.hora_inicio,
-          hora_fin: datos.hora_fin,
+          hora_inicio,
+          hora_fin,
           precio: Number(datos.precio),
           dia_semana: Number(datos.dia_semana),
         },
@@ -958,25 +990,45 @@ export class ClubService {
       if (!Number.isFinite(precio) || precio < 0) {
         throw new Error("Cada turno debe tener un precio válido.");
       }
-      if (toMinutes(hora_fin) <= toMinutes(hora_inicio)) {
+      const startMin = toMinutes(hora_inicio);
+      const rawEndMin = toMinutes(hora_fin);
+      // Si la hora de fin es menor o igual a la de inicio (ej. 23:00 a 00:30), cruza medianoche (+1440 min)
+      const endMin = rawEndMin <= startMin ? rawEndMin + 1440 : rawEndMin;
+      const duracion = endMin - startMin;
+
+      if (duracion <= 0) {
         throw new Error(
-          `La hora de fin debe ser posterior al inicio (${hora_inicio.slice(0, 5)}).`,
+          `El turno (${hora_inicio.slice(0, 5)}) no puede tener el mismo horario de inicio y fin.`,
         );
       }
-      return { hora_inicio, hora_fin, precio: Math.round(precio) };
+      if (duracion < 15) {
+        throw new Error(
+          `El turno (${hora_inicio.slice(0, 5)} a ${hora_fin.slice(0, 5)}) debe durar al menos 15 minutos.`,
+        );
+      }
+      if (duracion > 360) {
+        throw new Error(
+          `El turno (${hora_inicio.slice(0, 5)} a ${hora_fin.slice(0, 5)}) no puede superar las 6 horas de duración.`,
+        );
+      }
+      return {
+        hora_inicio,
+        hora_fin,
+        precio: Math.round(precio),
+        startMin,
+        endMin,
+      };
     });
 
     if (slots.length === 0) {
       throw new Error("Agregá al menos un horario (ej. 08:00 a 09:30).");
     }
 
-    const sorted = [...slots].sort(
-      (a, b) => toMinutes(a.hora_inicio) - toMinutes(b.hora_inicio),
-    );
+    const sorted = [...slots].sort((a, b) => a.startMin - b.startMin);
     for (let i = 1; i < sorted.length; i++) {
-      if (toMinutes(sorted[i].hora_inicio) < toMinutes(sorted[i - 1].hora_fin)) {
+      if (sorted[i].startMin < sorted[i - 1].endMin) {
         throw new Error(
-          "Hay horarios superpuestos en la plantilla. Ajustalos antes de aplicar.",
+          `Hay horarios superpuestos en la plantilla: (${sorted[i - 1].hora_inicio.slice(0, 5)}–${sorted[i - 1].hora_fin.slice(0, 5)}) y (${sorted[i].hora_inicio.slice(0, 5)}–${sorted[i].hora_fin.slice(0, 5)}). Ajustalos antes de aplicar.`,
         );
       }
     }
@@ -1127,8 +1179,14 @@ export class ClubService {
       const [hh, mm] = t.split(":").map(Number);
       return hh * 60 + mm;
     };
-    if (toMin(hora_fin) <= toMin(hora_inicio)) {
-      throw new Error("La hora de fin debe ser posterior a la de inicio.");
+    const startMin = toMin(hora_inicio);
+    const rawEndMin = toMin(hora_fin);
+    const endMin = rawEndMin <= startMin ? rawEndMin + 1440 : rawEndMin;
+    if (endMin - startMin <= 0) {
+      throw new Error("El bloqueo no puede tener el mismo horario de inicio y fin.");
+    }
+    if (endMin - startMin > 720) {
+      throw new Error("La franja de bloqueo no puede superar las 12 horas.");
     }
 
     let canchaId: string | null = payload.cancha_id || null;
@@ -1235,7 +1293,13 @@ export class ClubService {
         const [h, m] = t.slice(0, 5).split(":").map(Number);
         return h * 60 + m;
       };
-      return toM(aStart) < toM(bEnd) && toM(aEnd) > toM(bStart);
+      const aS = toM(aStart);
+      const aRawE = toM(aEnd);
+      const aE = aRawE <= aS ? aRawE + 1440 : aRawE;
+      const bS = toM(bStart);
+      const bRawE = toM(bEnd);
+      const bE = bRawE <= bS ? bRawE + 1440 : bRawE;
+      return aS < bE && aE > bS;
     };
 
     const hit = (data || []).find((b) =>
