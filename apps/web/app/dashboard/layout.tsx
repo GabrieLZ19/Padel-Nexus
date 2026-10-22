@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
+import BrandIsotype from "@/components/ui/BrandIsotype";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -277,21 +278,13 @@ export default function DashboardLayout({
       >
         <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-white/5 px-4 md:border-none">
           <div className="flex items-center gap-3">
-            <div className="size-9 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(204,255,0,0.15)] bg-[#cbfe01]">
-              <Image
-                src="/brand/LogoAccessory.svg"
-                alt="Padel Nexus"
-                width={24}
-                height={24}
-                className="object-contain"
-              />
-            </div>
-            <div className="flex flex-col justify-center mt-1">
+            <BrandIsotype size="md" />
+            <div className="flex flex-col justify-center mt-0.5">
               <span className="text-xl tracking-tight text-brand-white">
                 <span className="font-extrabold">padel</span>
                 <span className="font-light">nexus</span>
               </span>
-              <span className={`text-[10px] font-bold tracking-[0.2em] -mt-1 ${
+              <span className={`text-[10px] font-bold tracking-[0.22em] -mt-0.5 ${
                 profile?.rol === "superadmin"
                   ? "text-brand-chartreuse"
                   : profile?.rol === "admin_federacion"
@@ -303,7 +296,7 @@ export default function DashboardLayout({
                         : "text-brand-chartreuse"
               }`}>
                 {profile?.rol === "superadmin"
-                  ? "SUPERADMIN"
+                  ? "SUPER ADMIN"
                   : profile?.rol === "admin_federacion"
                     ? "FEDERACIÓN NACIONAL"
                     : profile?.rol === "admin_provincial"

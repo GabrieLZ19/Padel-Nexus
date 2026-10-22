@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import BrandIsotype from "@/components/ui/BrandIsotype";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
@@ -169,13 +170,18 @@ export default function DashboardSuperadmin() {
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 space-y-10 md:px-10 md:py-10">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="size-10 rounded-xl bg-brand-chartreuse flex items-center justify-center shadow-[0_0_20px_rgba(204,255,0,0.2)]">
-              <Scale className="size-5 text-brand-black" />
+          <div className="flex items-center gap-3.5 mb-2.5">
+            <BrandIsotype size="lg" />
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-brand-card border border-brand-white/10 shadow-xs backdrop-blur-md">
+              <span className="size-2 rounded-full bg-[#cbfe01] shadow-[0_0_8px_rgba(204,255,0,0.8)] shrink-0" />
+              <span className="text-[11px] font-extrabold tracking-wider text-brand-white uppercase">
+                SUPER ADMIN
+              </span>
+              <span className="w-px h-3 bg-brand-white/15 shrink-0" />
+              <span className="text-[10px] font-bold tracking-widest text-brand-ayuda uppercase">
+                CRM
+              </span>
             </div>
-            <span className="text-xs font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-3 py-1.5 rounded-full uppercase tracking-wider">
-              Superadmin · CRM
-            </span>
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight mb-1 md:text-4xl">
             Panel de la red
