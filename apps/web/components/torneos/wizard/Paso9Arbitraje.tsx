@@ -385,6 +385,7 @@ export const PasoResultados = ({
             partido={p}
             torneo={torneo}
             numeroVisible={numerosPartido.get(p.id)}
+            esCorreccion={true}
             onSave={handleGuardarResultadoLive}
             isSaving={guardandoPartidoId === p.id}
             onError={showErrorModal}
@@ -524,6 +525,7 @@ export const PasoResultados = ({
       es_wo?: boolean;
       es_injustificado_wo?: boolean;
       es_lesion?: boolean;
+      motivo?: string;
     },
   ) => {
     try {

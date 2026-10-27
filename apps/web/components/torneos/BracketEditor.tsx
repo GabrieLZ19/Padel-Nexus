@@ -43,6 +43,25 @@ import {
   numerosVisiblesDePartidos,
   numerosVisiblesLlave,
 } from "@/utils/rondasLlave";
+import { formatearFechaHoraArgentina } from "@/utils/fechaArgentina";
+
+function formatearScoreAuditoria(val: any): string {
+  if (!val) return "-";
+  const sets: string[] = [];
+  if (val.set1_a != null && val.set1_b != null) sets.push(`${val.set1_a}-${val.set1_b}`);
+  if (val.set2_a != null && val.set2_b != null) sets.push(`${val.set2_a}-${val.set2_b}`);
+  if (val.set3_a != null && val.set3_b != null) {
+    sets.push(
+      val.es_supertiebreak
+        ? `STB ${val.set3_a}-${val.set3_b}`
+        : `${val.set3_a}-${val.set3_b}`,
+    );
+  }
+  let res = sets.join(" ");
+  if (val.es_wo && !val.es_lesion) res += res ? " (W.O.)" : "W.O.";
+  if (val.es_lesion) res += res ? " (W.O. Lesión)" : "W.O. Lesión";
+  return res || "Sin sets";
+}
 
 interface BracketEditorProps {
   torneoId: string;
@@ -1642,21 +1661,31 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           ) : (
             <div className="space-y-3 max-h-125 overflow-y-auto pr-1">
               {auditoriaLogs.map((log) => {
-                const fecha = new Date(log.created_at).toLocaleString("es-AR");
+                const fecha = formatearFechaHoraArgentina(log.created_at);
                 const adminName = log.perfiles
                   ? `${log.perfiles.nombre} ${log.perfiles.apellido}`
                   : "Administrador";
+
+                const tieneComparacionScore = Boolean(
+                  log.detalles?.valor_anterior && log.detalles?.valor_nuevo,
+                );
 
                 return (
                   <div
                     key={log.id}
                     className="bg-[#1a1a1a] border border-white/5 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3"
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-1.5 w-full">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="px-2.5 py-0.5 bg-brand-chartreuse/10 border border-brand-chartreuse/20 text-brand-chartreuse text-xs font-bold rounded-full uppercase tracking-wider">
                           {log.accion.replace(/_/g, " ")}
                         </span>
+                        {log.detalles?.ronda && (
+                          <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-gray-300 text-xs font-bold rounded-full">
+                            Ronda: {log.detalles.ronda}
+                            {log.detalles?.orden ? ` #${log.detalles.orden}` : ""}
+                          </span>
+                        )}
                         <span className="text-xs text-brand-ayuda font-semibold">
                           {fecha}
                         </span>
@@ -1668,6 +1697,19 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                         <p className="text-xs text-yellow-500 italic mt-1 bg-yellow-500/5 border border-yellow-500/10 px-3 py-1 rounded-lg inline-block">
                           Motivo: &quot;{log.detalles.motivo}&quot;
                         </p>
+                      )}
+                      {tieneComparacionScore && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                          <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-300 font-medium">
+                            <strong className="text-gray-400">Anterior:</strong>{" "}
+                            {formatearScoreAuditoria(log.detalles.valor_anterior)}
+                          </span>
+                          <span className="text-brand-ayuda font-bold">-&gt;</span>
+                          <span className="px-2.5 py-1 rounded-lg bg-brand-chartreuse/10 border border-brand-chartreuse/30 text-brand-chartreuse font-medium">
+                            <strong className="text-white">Nuevo:</strong>{" "}
+                            {formatearScoreAuditoria(log.detalles.valor_nuevo)}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>

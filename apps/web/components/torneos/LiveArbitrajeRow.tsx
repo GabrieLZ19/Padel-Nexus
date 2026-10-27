@@ -13,6 +13,7 @@ export const LiveArbitrajeRow = ({
   partido,
   torneo,
   numeroVisible,
+  esCorreccion,
   onSave,
   isSaving,
   onError,
@@ -20,6 +21,7 @@ export const LiveArbitrajeRow = ({
   partido: Partido;
   torneo?: any;
   numeroVisible?: number | null;
+  esCorreccion?: boolean;
   onSave: (
     partidoId: string,
     ganadorId: string,
@@ -34,6 +36,7 @@ export const LiveArbitrajeRow = ({
       es_wo: boolean;
       es_injustificado_wo: boolean;
       es_lesion: boolean;
+      motivo?: string;
     },
   ) => void;
   isSaving: boolean;
@@ -96,6 +99,13 @@ export const LiveArbitrajeRow = ({
     }
     return null;
   });
+
+  const esModoCorreccion = Boolean(
+    esCorreccion ||
+      partido.ganador ||
+      partido.estado_partido === "finalizado",
+  );
+  const [motivo, setMotivo] = useState<string>("");
 
   const programacionLabel = (() => {
     const parts: string[] = [];
@@ -171,6 +181,11 @@ export const LiveArbitrajeRow = ({
   const { setsA, setsB } = getSetsGanados();
 
   const handleFinalizar = () => {
+    if (esModoCorreccion && !motivo.trim()) {
+      onError("Debes ingresar un motivo para corregir el resultado.");
+      return;
+    }
+
     if (esWo && !esLesion) {
       const ganadorId =
         ganadorWo === "A" ? partido.equipo_a_id : partido.equipo_b_id;
@@ -189,6 +204,7 @@ export const LiveArbitrajeRow = ({
         es_wo: true,
         es_injustificado_wo: false,
         es_lesion: false,
+        motivo: esModoCorreccion ? motivo.trim() : undefined,
       });
       return;
     }
@@ -264,6 +280,7 @@ export const LiveArbitrajeRow = ({
         es_wo: true,
         es_injustificado_wo: false,
         es_lesion: true,
+        motivo: esModoCorreccion ? motivo.trim() : undefined,
       });
       return;
     }
@@ -401,6 +418,7 @@ export const LiveArbitrajeRow = ({
       es_wo: esWo && esLesion,
       es_injustificado_wo: false,
       es_lesion: esWo && esLesion,
+      motivo: esModoCorreccion ? motivo.trim() : undefined,
     });
   };
 
@@ -502,7 +520,8 @@ export const LiveArbitrajeRow = ({
   }
 
   return (
-    <div className="flex items-center gap-4 border-b border-white/8 bg-[#0a0a0a] px-3 py-3">
+    <div className="flex flex-col border-b border-white/8 bg-[#0a0a0a] px-3 py-3 gap-2.5">
+      <div className="flex items-center gap-4">
       <div className="w-44 shrink-0 space-y-1.5">
         <p className="text-xs font-black tabular-nums text-sky-400">#{codigo}</p>
         <p className="flex items-center gap-1.5 text-sm font-black tabular-nums tracking-tight text-white">
@@ -713,6 +732,22 @@ export const LiveArbitrajeRow = ({
           Finalizar
         </button>
       </div>
+      </div>
+
+      {esModoCorreccion && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs">
+          <span className="font-bold text-yellow-400 shrink-0">
+            Motivo de la corrección *:
+          </span>
+          <input
+            type="text"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+            placeholder="Ingresa el motivo obligatorio para auditoría (ej: corrección de marcador)..."
+            className="w-full rounded-lg border border-white/15 bg-black/60 px-2.5 py-1 text-xs text-white placeholder-gray-500 focus:border-brand-chartreuse focus:outline-none"
+          />
+        </div>
+      )}
     </div>
   );
 };

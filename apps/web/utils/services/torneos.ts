@@ -159,6 +159,7 @@ export const TorneosService = {
       es_wo?: boolean;
       es_injustificado_wo?: boolean;
       es_lesion?: boolean;
+      motivo?: string;
     },
   ) {
     const response = await api.put(
