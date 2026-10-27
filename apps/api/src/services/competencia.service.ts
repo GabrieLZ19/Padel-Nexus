@@ -54,6 +54,32 @@ export class CompetenciaService {
       }
     }
 
+    // 1. OBTENER TORNEO Y VALIDAR DÍAS DE COMPETENCIA
+    const { data: torneoMeta, error: errTorneo } = await supabaseAdmin
+      .from("torneos")
+      .select("reglamento, dias_juego")
+      .eq("id", torneoId)
+      .maybeSingle();
+
+    if (errTorneo || !torneoMeta) {
+      throw new Error("Torneo no encontrado.");
+    }
+
+    const diasJuegoRaw = torneoMeta.dias_juego;
+    const diasValidos = Array.isArray(diasJuegoRaw)
+      ? diasJuegoRaw.filter((d: any) => typeof d === "string" && d.trim().length > 0)
+      : [];
+
+    if (diasValidos.length === 0) {
+      throw new Error(
+        "El torneo no tiene días de competencia definidos. Configurá los días de juego en el Paso 3 (Categorías) antes de generar los cuadros.",
+      );
+    }
+
+    const reglamento = String(torneoMeta.reglamento || "FAP").toUpperCase();
+    // FAP/APA: preferir 3; Amateur: preferir 4
+    const preferredSize: 3 | 4 = reglamento === "AMATEUR" ? 4 : 3;
+
     // 0. LIMPIEZA PREVIA PARA EVITAR DUPLICADOS
     await supabaseAdmin.from("partidos").delete().eq("torneo_id", torneoId);
     
@@ -67,16 +93,6 @@ export class CompetenciaService {
       await supabaseAdmin.from("grupo_parejas").delete().in("grupo_id", grupoIds);
     }
     await supabaseAdmin.from("grupos").delete().eq("torneo_id", torneoId);
-
-    // 1. OBTENER TORNEO + INSCRIPCIONES
-    const { data: torneoMeta } = await supabaseAdmin
-      .from("torneos")
-      .select("reglamento")
-      .eq("id", torneoId)
-      .maybeSingle();
-    const reglamento = String(torneoMeta?.reglamento || "FAP").toUpperCase();
-    // FAP/APA: preferir 3; Amateur: preferir 4
-    const preferredSize: 3 | 4 = reglamento === "AMATEUR" ? 4 : 3;
 
     const { data: todasInscripciones, error: errInsc } = await supabaseAdmin
       .from("inscripciones")

@@ -1388,12 +1388,23 @@ export class TorneoService {
     const { data: torneo, error: torneoError } = await supabaseAdmin
       .from("torneos")
       .select(
-        "formato, cupos_maximos, fecha, canchas_disponibles, duracion_partido_minutos, hora_inicio_jornada",
+        "formato, cupos_maximos, fecha, canchas_disponibles, duracion_partido_minutos, hora_inicio_jornada, dias_juego",
       )
       .eq("id", id)
       .single();
 
     if (torneoError || !torneo) throw new Error("Torneo no encontrado");
+
+    const diasJuegoRaw = (torneo as any).dias_juego;
+    const diasValidos = Array.isArray(diasJuegoRaw)
+      ? diasJuegoRaw.filter((d: any) => typeof d === "string" && d.trim().length > 0)
+      : [];
+
+    if (diasValidos.length === 0) {
+      throw new Error(
+        "El torneo no tiene días de competencia definidos. Configurá los días de juego en el Paso 3 (Categorías) antes de generar el cuadro.",
+      );
+    }
 
     if (!forzarDestructivo) {
       const { data: conResultados } = await supabaseAdmin
