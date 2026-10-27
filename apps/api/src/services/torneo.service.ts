@@ -1763,10 +1763,31 @@ export class TorneoService {
     esWo?: boolean,
     esInjustificadoWo?: boolean,
     esLesion?: boolean,
+    motivo?: string,
+    adminId?: string,
   ) {
     const { data: previo } = await supabaseAdmin
       .from("partidos")
-      .select("ganador, torneos(estado)")
+      .select(`
+        id,
+        torneo_id,
+        ronda,
+        orden,
+        equipo_a_id,
+        equipo_b_id,
+        ganador,
+        set1_a,
+        set1_b,
+        set2_a,
+        set2_b,
+        set3_a,
+        set3_b,
+        es_supertiebreak,
+        es_wo,
+        es_injustificado_wo,
+        es_lesion,
+        torneos(estado)
+      `)
       .eq("id", partidoId)
       .maybeSingle();
     const yaTeniaResultado = Boolean(previo?.ganador);
@@ -1779,6 +1800,43 @@ export class TorneoService {
     if (previo && !puedeCargarResultadoOficial(estadoTorneo)) {
       throw new Error(MENSAJE_RESULTADO_SIN_PUBLICAR);
     }
+
+    if (yaTeniaResultado && !motivo?.trim()) {
+      throw new Error(
+        "Debes ingresar un motivo para corregir el resultado de un partido finalizado.",
+      );
+    }
+
+    const valorAnterior =
+      yaTeniaResultado && previo
+        ? {
+            ganador: previo.ganador,
+            set1_a: previo.set1_a,
+            set1_b: previo.set1_b,
+            set2_a: previo.set2_a,
+            set2_b: previo.set2_b,
+            set3_a: previo.set3_a,
+            set3_b: previo.set3_b,
+            es_supertiebreak: Boolean(previo.es_supertiebreak),
+            es_wo: Boolean(previo.es_wo),
+            es_injustificado_wo: Boolean(previo.es_injustificado_wo),
+            es_lesion: Boolean(previo.es_lesion),
+          }
+        : null;
+
+    const valorNuevo = {
+      ganador: ganadorId,
+      set1_a: set1A,
+      set1_b: set1B,
+      set2_a: set2A ?? null,
+      set2_b: set2B ?? null,
+      set3_a: set3A ?? null,
+      set3_b: set3B ?? null,
+      es_supertiebreak: Boolean(esSupertiebreak),
+      es_wo: Boolean(esWo),
+      es_injustificado_wo: Boolean(esInjustificadoWo),
+      es_lesion: Boolean(esLesion),
+    };
 
     const { data: partido, error: updateError } = await supabaseAdmin
       .from("partidos")
@@ -1802,6 +1860,22 @@ export class TorneoService {
 
     if (updateError || !partido)
       throw new Error("Error al cargar el marcador.");
+
+    if (yaTeniaResultado && adminId && valorAnterior) {
+      await supabaseAdmin.from("logs_auditoria").insert({
+        usuario_id_admin: adminId,
+        accion: "corregir_resultado",
+        entidad_afectada: partido.torneo_id,
+        detalles: {
+          partido_id: partido.id,
+          ronda: partido.ronda,
+          orden: partido.orden,
+          motivo: motivo!.trim(),
+          valor_anterior: valorAnterior,
+          valor_nuevo: valorNuevo,
+        },
+      });
+    }
 
     // Emitir WebSocket global de partido actualizado
     try {

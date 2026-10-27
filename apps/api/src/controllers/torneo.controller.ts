@@ -452,6 +452,7 @@ export const actualizarResultado = async (
       es_wo,
       es_injustificado_wo,
       es_lesion,
+      motivo,
     } = req.body;
 
     const user_id = req.user?.id;
@@ -545,13 +546,15 @@ export const actualizarResultado = async (
       Boolean(es_wo),
       Boolean(es_injustificado_wo),
       Boolean(es_lesion),
+      motivo,
+      user_id,
     );
     return res.status(200).json({
       message: "Resultado cargado y estadísticas distribuidas con éxito",
     });
   } catch (error: any) {
     return res
-      .status(500)
+      .status(400)
       .json({ message: "Error al actualizar partido", error: error.message });
   }
 };
