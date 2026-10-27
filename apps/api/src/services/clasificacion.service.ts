@@ -53,6 +53,11 @@ function desempatarDosEquipos(
   b: EstadisticasPareja,
   partidos: PartidoDeZona[],
 ): { ordenados: [EstadisticasPareja, EstadisticasPareja]; requiereSorteo: boolean } {
+  // Si ninguna de las dos parejas jugó partidos aún, no hay empate reglamentario activo
+  if (a.partidosJugados === 0 && b.partidosJugados === 0) {
+    return { ordenados: [a, b], requiereSorteo: false };
+  }
+
   // Si ambos ya tienen sorteo_posicion registrado y diferente
   if (
     a.sorteoPosicion != null &&
@@ -134,6 +139,11 @@ function desempatarDosEquipos(
     };
   }
 
+  // Solo se requiere sorteo si ambas parejas han jugado partidos
+  if (a.partidosJugados === 0 || b.partidosJugados === 0) {
+    return { ordenados: [a, b], requiereSorteo: false };
+  }
+
   a.requiereSorteo = true;
   b.requiereSorteo = true;
   a.empateConIds = [b.inscripcionId];
@@ -150,6 +160,18 @@ function desempatarMultiplesEquipos(
   teams: EstadisticasPareja[],
   partidos: PartidoDeZona[],
 ): { ordenados: EstadisticasPareja[]; requiereSorteo: boolean } {
+  // Si ninguna pareja ha jugado partidos, no hay empate reglamentario activo
+  if (teams.every((t) => t.partidosJugados === 0)) {
+    return {
+      ordenados: teams.map((t) => ({
+        ...t,
+        requiereSorteo: false,
+        criterioDesempate: "Sin partidos jugados",
+      })),
+      requiereSorteo: false,
+    };
+  }
+
   // Si todas tienen sorteo_posicion registrado y son distintos
   const allHaveSorteo = teams.every((t) => t.sorteoPosicion != null);
   if (allHaveSorteo) {
@@ -200,6 +222,12 @@ function desempatarMultiplesEquipos(
           (a, b) => (a.sorteoPosicion || 0) - (b.sorteoPosicion || 0),
         );
         subgrupo.forEach((t) => (t.criterioDesempate = "Sorteo reglamentario FAP"));
+        resultado.push(...subgrupo);
+      } else if (subgrupo.every((t) => t.partidosJugados === 0)) {
+        subgrupo.forEach((t) => {
+          t.requiereSorteo = false;
+          t.criterioDesempate = "Sin partidos jugados";
+        });
         resultado.push(...subgrupo);
       } else {
         algunSorteo = true;

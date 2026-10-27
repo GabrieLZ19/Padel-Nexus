@@ -173,20 +173,20 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
       parejasEnZona,
     );
 
-    // Si dentro del cupo de clasificación hay parejas con empate absoluto no resuelto, no avanzar a llave sin sorteo
-    const haySorteoPendiente = tabla.slice(0, cupo).some((r) => r.requiereSorteo);
-    if (haySorteoPendiente) {
-      console.warn(
-        `[playoffAvance] Zona ${g.nombre_grupo} tiene parejas en cupo de clasificación pendientes de sorteo reglamentario (torneo ${torneoId}). Se posterga siembra hasta resolver sorteo.`,
-      );
-      continue;
-    }
-
     const zoneLetter = g.nombre_grupo.replace(/^Zona\s+/i, "").trim().toUpperCase();
 
     for (let pos = 0; pos < cupo; pos++) {
       const row = tabla[pos];
       if (!row) continue;
+
+      // El sorteo solo afecta a los puestos empatados; el resto pasa a la llave apenas termina la zona
+      if (row.requiereSorteo) {
+        console.warn(
+          `[playoffAvance] Zona ${g.nombre_grupo} puesto ${pos + 1} pendiente de sorteo reglamentario (torneo ${torneoId}). Se posterga este puesto hasta resolver sorteo.`,
+        );
+        continue;
+      }
+
       qualifiedPairs.push({
         pairId: row.inscripcionId,
         zone: zoneLetter,

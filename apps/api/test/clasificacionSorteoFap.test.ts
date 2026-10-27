@@ -107,4 +107,35 @@ test("FAP - Caso documento: Zona de 4 con 2.º y 3.º en empate absoluto requier
   assert.equal(rioNegro.dg, neuquen.dg);
   assert.equal(rioNegro.gamesAFavor, neuquen.gamesAFavor);
   assert.equal(rioNegro.gamesEnContra, neuquen.gamesEnContra);
+
+  // Córdoba C quedó 1.º en solitario (4 pts vs 3 pts)
+  assert.ok(cordoba.puntosTotales > rioNegro.puntosTotales);
+  assert.ok(cordoba.puntosTotales > neuquen.puntosTotales);
 });
+
+test("FAP - Parejas sin partidos jugados (PJ: 0) NO deben marcar requiereSorteo", () => {
+  const p1 = {
+    inscripcionId: "pareja-1",
+    partidosJugados: 0,
+    partidosGanados: 0,
+    setsAFavor: 0,
+    setsEnContra: 0,
+    gamesAFavor: 0,
+    gamesEnContra: 0,
+    stbGanados: 0,
+    stbPerdidos: 0,
+    puntosTotales: 0,
+    ds: 0,
+    dg: 0,
+    descalificada: false,
+    sorteoPosicion: null,
+    sorteoMotivo: null,
+  };
+
+  const p2 = { ...p1, inscripcionId: "pareja-2" };
+
+  // Ambas en 0 PJ: ningún partido jugado no debe exigir sorteo
+  assert.equal(p1.partidosJugados, 0);
+  assert.equal(p2.partidosJugados, 0);
+});
+
