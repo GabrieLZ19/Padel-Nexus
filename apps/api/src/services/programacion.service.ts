@@ -441,18 +441,26 @@ export class ProgramacionService {
 
   private static async feedersForTorneo(
     torneoId: string,
+    pairCount?: number,
   ): Promise<Map<number, number[]>> {
-    const pairCount = await this.contarParejasConfirmadas(torneoId);
-    const matrix = getFapBracketForPairCount(pairCount) || [];
+    const totalPairs =
+      pairCount !== undefined
+        ? pairCount
+        : await this.contarParejasConfirmadas(torneoId);
+    const matrix = getFapBracketForPairCount(totalPairs) || [];
     return buildFeedersByMatchNo(matrix);
   }
 
   private static async bracketLabelMap(
     torneoId: string,
     matchNoToCorrelativo?: Map<number, number>,
+    pairCount?: number,
   ): Promise<Map<number, { a: string; b: string }>> {
-    const pairCount = await this.contarParejasConfirmadas(torneoId);
-    const matrix = getFapBracketForPairCount(pairCount) || [];
+    const totalPairs =
+      pairCount !== undefined
+        ? pairCount
+        : await this.contarParejasConfirmadas(torneoId);
+    const matrix = getFapBracketForPairCount(totalPairs) || [];
     const map = new Map<number, { a: string; b: string }>();
     for (const m of matrix) {
       map.set(m.matchNo, {
@@ -477,25 +485,31 @@ export class ProgramacionService {
       horaFin?: string;
     } = {},
   ): Promise<ProgramacionBoard> {
-    const [{ data: torneo }, { data: partidosDb }, contexto, labels] =
-      await Promise.all([
-        supabaseAdmin
-          .from("torneos")
-          .select(
-            "id, nombre, programacion_estado, programacion_publicada_en, duracion_partido_minutos, estado",
-          )
-          .eq("id", torneoId)
-          .maybeSingle(),
-        supabaseAdmin
-          .from("partidos")
-          .select(
-            "id, ronda, orden, equipo_a_id, equipo_b_id, estado_partido, cancha_asignada, fecha_partido, horario_bloqueado",
-          )
-          .eq("torneo_id", torneoId)
-          .order("orden", { ascending: true }),
-        cargarContextoProgramacion(torneoId),
-        this.loadInscripcionLabels(torneoId),
-      ]);
+    const [
+      { data: torneo },
+      { data: partidosDb },
+      contexto,
+      labels,
+      pairCount,
+    ] = await Promise.all([
+      supabaseAdmin
+        .from("torneos")
+        .select(
+          "id, nombre, programacion_estado, programacion_publicada_en, duracion_partido_minutos, estado",
+        )
+        .eq("id", torneoId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("partidos")
+        .select(
+          "id, ronda, orden, equipo_a_id, equipo_b_id, estado_partido, cancha_asignada, fecha_partido, horario_bloqueado",
+        )
+        .eq("torneo_id", torneoId)
+        .order("orden", { ascending: true }),
+      cargarContextoProgramacion(torneoId),
+      this.loadInscripcionLabels(torneoId),
+      this.contarParejasConfirmadas(torneoId),
+    ]);
 
     if (!torneo) throw new Error("Torneo no encontrado");
 
@@ -538,6 +552,7 @@ export class ProgramacionService {
     const bracketLabels = await this.bracketLabelMap(
       torneoId,
       matchNoToCorrelativo,
+      pairCount,
     );
 
     const duracion =
@@ -628,7 +643,7 @@ export class ProgramacionService {
       };
     });
 
-    const feeders = await this.feedersForTorneo(torneoId);
+    const feeders = await this.feedersForTorneo(torneoId, pairCount);
     const drafts: PartidoProgramable[] = partidos.map((p) => ({
       id: p.id,
       ronda: p.ronda || "",
