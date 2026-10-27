@@ -128,7 +128,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
     }
   };
 
-  if (loading || !board) {
+  if (!board) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-gray-400">
         Cargando programador…
@@ -280,7 +280,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
                 type="button"
                 onClick={() => {
                   setSedesAbiertas(false);
-                  void load();
+                  void load({ silent: true });
                 }}
                 className="prog-ghost cursor-pointer rounded-xl px-3 py-2 text-sm font-semibold"
               >
@@ -290,7 +290,8 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
             <div className="overflow-y-auto p-3 sm:p-4">
               <SedesFiscalesTab
                 torneoId={torneoId}
-                onRefresh={() => void load()}
+                diasIniciales={board.dias}
+                onRefresh={() => void load({ silent: true })}
               />
             </div>
           </div>

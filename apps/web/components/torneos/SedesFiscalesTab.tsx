@@ -8,6 +8,7 @@ import {
   Calendar,
   Clock,
   MapPin,
+  Loader2,
 } from "lucide-react";
 import { Club } from "@/utils/types";
 import type { Torneo } from "@/utils/types";
@@ -44,6 +45,8 @@ interface SedesFiscalesTabProps {
   torneoId: string;
   onRefresh?: () => void;
   readOnly?: boolean;
+  torneoInicial?: Torneo | null;
+  diasIniciales?: string[];
 }
 
 type FechaTorneo = {
@@ -106,6 +109,8 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   torneoId,
   onRefresh,
   readOnly = false,
+  torneoInicial,
+  diasIniciales,
 }) => {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [selectedClubs, setSelectedClubs] = useState<Club[]>([]);
@@ -121,14 +126,35 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   const [activeSedeId, setActiveSedeId] = useState<string>("");
 
   const [torneoMeta, setTorneoMeta] = useState({
-    rama: "",
-    categoria: "",
-    nivel: "",
-    modalidad: "",
+    rama: torneoInicial?.rama || "",
+    categoria: torneoInicial?.categoria || "",
+    nivel: torneoInicial?.nivel || "",
+    modalidad: torneoInicial?.modalidad || "",
   });
-  const [fechaInicioTorneo, setFechaInicioTorneo] = useState<string>("");
-  const [fechaFinTorneo, setFechaFinTorneo] = useState<string>("");
-  const [diasJuego, setDiasJuego] = useState<string[]>([]);
+  const [fechaInicioTorneo, setFechaInicioTorneo] = useState<string>(() => {
+    if (torneoInicial?.fecha) return String(torneoInicial.fecha).split("T")[0];
+    if (diasIniciales && diasIniciales.length > 0) return diasIniciales[0];
+    return "";
+  });
+  const [fechaFinTorneo, setFechaFinTorneo] = useState<string>(() => {
+    if (torneoInicial?.fecha_fin) {
+      return String(torneoInicial.fecha_fin).split("T")[0];
+    }
+    if (diasIniciales && diasIniciales.length > 0) {
+      return diasIniciales[diasIniciales.length - 1];
+    }
+    return "";
+  });
+  const [diasJuego, setDiasJuego] = useState<string[]>(() => {
+    if (Array.isArray(torneoInicial?.dias_juego)) {
+      return torneoInicial.dias_juego as string[];
+    }
+    if (diasIniciales && diasIniciales.length > 0) return diasIniciales;
+    return [];
+  });
+  const [loadingData, setLoadingData] = useState(
+    !torneoInicial?.fecha && (!diasIniciales || diasIniciales.length === 0),
+  );
   const [saving, setSaving] = useState(false);
   const [showAltaClub, setShowAltaClub] = useState(false);
   const [altaClubForm, setAltaClubForm] = useState({
@@ -167,7 +193,18 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
 
   const fechasCompetencia = useMemo(() => {
     if (diasJuego.length === 0) return fechasTorneo;
-    return fechasTorneo.filter((f) => diasJuego.includes(f.diaJuegoValue));
+    const filtradas = fechasTorneo.filter((f) => {
+      return (
+        diasJuego.includes(f.diaJuegoValue) ||
+        diasJuego.includes(f.iso) ||
+        diasJuego.some(
+          (d) =>
+            d.toLowerCase().trim() === f.diaJuegoValue.toLowerCase().trim() ||
+            d.toLowerCase().trim() === f.iso.toLowerCase().trim(),
+        )
+      );
+    });
+    return filtradas.length > 0 ? filtradas : fechasTorneo;
   }, [fechasTorneo, diasJuego]);
 
   const sedesOptions = useMemo(
@@ -218,16 +255,19 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   useEffect(() => {
     const loadData = async () => {
       try {
-        const resClubsAll = await ClubesService.getAll();
-        setClubs((resClubsAll.data as Club[]) || []);
+        const [resClubsAll, sedes, disp, torneo] = await Promise.all([
+          ClubesService.getAll(),
+          TorneosService.getSedes(torneoId),
+          TorneosService.getCanchasDisponibilidad(torneoId),
+          torneoInicial
+            ? Promise.resolve(torneoInicial)
+            : TorneosService.getById(torneoId),
+        ]);
 
-        const sedes = await TorneosService.getSedes(torneoId);
+        setClubs((resClubsAll?.data as Club[]) || []);
         setSelectedClubs((sedes as Club[]) || []);
-
-        const disp = await TorneosService.getCanchasDisponibilidad(torneoId);
         setDispList((disp as typeof dispList) || []);
 
-        const torneo = await TorneosService.getById(torneoId);
         if (torneo) {
           const meta = torneo as Torneo & {
             fecha_fin?: string | null;
@@ -251,10 +291,12 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
         }
       } catch (e) {
         console.error("Error loading tournament configuration", e);
+      } finally {
+        setLoadingData(false);
       }
     };
     void loadData();
-  }, [torneoId]);
+  }, [torneoId, torneoInicial]);
 
   useEffect(() => {
     if (selectedClubs.length === 0) {
@@ -312,12 +354,12 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       await TorneosService.guardarCanchasDisponibilidad(torneoId, newList);
       const disp = await TorneosService.getCanchasDisponibilidad(torneoId);
       setDispList((disp as typeof dispList) || []);
-      if (successMessage) {
-        sileo.success({
-          title: "Canchas actualizadas",
-          description: successMessage,
-        });
-      }
+      sileo.success({
+        title: "Canchas guardadas correctamente",
+        description:
+          successMessage ||
+          "Las canchas de la sede quedaron asociadas y listas para la programación.",
+      });
       onRefresh?.();
     } catch (e) {
       console.error(e);
@@ -334,13 +376,16 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   const buildSeedRows = (
     clubId: string,
     canchaIds: string[],
+    fechasCustom?: string[],
   ): typeof dispList => {
     const dias =
-      fechasCompetencia.length > 0
-        ? fechasCompetencia.map((f) => f.iso)
-        : fechaInicioTorneo
-          ? [fechaInicioTorneo]
-          : [];
+      fechasCustom && fechasCustom.length > 0
+        ? fechasCustom
+        : fechasCompetencia.length > 0
+          ? fechasCompetencia.map((f) => f.iso)
+          : fechaInicioTorneo
+            ? [fechaInicioTorneo]
+            : [];
     const rows: typeof dispList = [];
     for (const fecha of dias) {
       for (const canchaId of canchaIds) {
@@ -599,7 +644,51 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       });
       return;
     }
-    if (fechasCompetencia.length === 0 && !fechaInicioTorneo) {
+    let currentFechaInicio = fechaInicioTorneo;
+    let currentFechas = fechasCompetencia;
+
+    // Si por latencia de red aún no se cargaron las fechas, consultamos directamente
+    if (!currentFechaInicio && currentFechas.length === 0) {
+      setSaving(true);
+      try {
+        const t = await TorneosService.getById(torneoId);
+        if (t) {
+          const meta = t as Torneo & {
+            fecha_fin?: string | null;
+            dias_juego?: string[];
+          };
+          const fInicio = meta.fecha ? String(meta.fecha).split("T")[0] : "";
+          const fFin = meta.fecha_fin ? String(meta.fecha_fin).split("T")[0] : "";
+          const dJuego = Array.isArray(meta.dias_juego) ? meta.dias_juego : [];
+          setFechaInicioTorneo(fInicio);
+          setFechaFinTorneo(fFin);
+          setDiasJuego(dJuego);
+          currentFechaInicio = fInicio;
+          const fTorneo = buildFechasTorneo(fInicio, fFin);
+          const fComp =
+            dJuego.length > 0
+              ? fTorneo.filter(
+                  (f) =>
+                    dJuego.includes(f.diaJuegoValue) ||
+                    dJuego.includes(f.iso) ||
+                    dJuego.some(
+                      (d) =>
+                        d.toLowerCase().trim() ===
+                          f.diaJuegoValue.toLowerCase().trim() ||
+                        d.toLowerCase().trim() === f.iso.toLowerCase().trim(),
+                    ),
+                )
+              : fTorneo;
+          currentFechas = fComp.length > 0 ? fComp : fTorneo;
+        }
+      } catch (e) {
+        console.error("Error al consultar fechas de torneo:", e);
+      } finally {
+        setSaving(false);
+      }
+    }
+
+    if (currentFechas.length === 0 && !currentFechaInicio) {
       sileo.error({
         title: "Sin fechas",
         description:
@@ -622,15 +711,22 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
         });
       }
     }
+    const targetDias =
+      currentFechas.length > 0
+        ? currentFechas.map((f) => f.iso)
+        : currentFechaInicio
+          ? [currentFechaInicio]
+          : [];
+
     const otrasRows: typeof dispList = [];
     for (const c of otrasCanchas.values()) {
-      otrasRows.push(...buildSeedRows(c.club_id, [c.cancha_id]));
+      otrasRows.push(...buildSeedRows(c.club_id, [c.cancha_id], targetDias));
     }
 
-    const nuevas = buildSeedRows(activeSedeId, selectedCanchaIds);
+    const nuevas = buildSeedRows(activeSedeId, selectedCanchaIds, targetDias);
     await persistDisponibilidad(
       [...otrasRows, ...nuevas],
-      `${selectedCanchaIds.length} cancha(s) listas para el programador (08:00–21:00).`,
+      `${selectedCanchaIds.length} cancha(s) listas para la programación.`,
     );
   };
 
@@ -1005,11 +1101,25 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
 
               <button
                 type="button"
-                disabled={readOnly || saving || selectedCanchaIds.length === 0}
+                disabled={
+                  readOnly ||
+                  saving ||
+                  loadingData ||
+                  selectedCanchaIds.length === 0
+                }
                 onClick={() => void handleGuardarCanchasSede()}
-                className="w-full sm:w-auto bg-brand-chartreuse text-brand-black px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider disabled:opacity-40 cursor-pointer"
+                className="w-full sm:w-auto bg-brand-chartreuse text-brand-black px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2"
               >
-                {saving ? "Guardando…" : "Guardar canchas de la sede"}
+                {saving ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    <span>Guardando…</span>
+                  </>
+                ) : loadingData ? (
+                  <span>Cargando datos…</span>
+                ) : (
+                  "Guardar canchas de la sede"
+                )}
               </button>
             </div>
           )}

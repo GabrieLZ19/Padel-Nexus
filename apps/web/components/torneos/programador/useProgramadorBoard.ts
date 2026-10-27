@@ -89,21 +89,29 @@ export function useProgramadorBoard(torneoId: string) {
     });
   }, []);
 
-  const load = useCallback(async () => {
-    if (!torneoId) return;
-    setLoading(true);
-    try {
-      const data = await TorneosService.getProgramacionBoard(
-        torneoId,
-        boardQuery(configRef.current),
-      );
-      applyBoard(data);
-    } catch (e: unknown) {
-      sileo.error({ title: apiErrorMessage(e, "Error al cargar el programador") });
-    } finally {
-      setLoading(false);
-    }
-  }, [torneoId, applyBoard]);
+  const load = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!torneoId) return;
+      if (!options?.silent && !boardRef.current) {
+        setLoading(true);
+      } else {
+        setSyncing(true);
+      }
+      try {
+        const data = await TorneosService.getProgramacionBoard(
+          torneoId,
+          boardQuery(configRef.current),
+        );
+        applyBoard(data);
+      } catch (e: unknown) {
+        sileo.error({ title: apiErrorMessage(e, "Error al cargar el programador") });
+      } finally {
+        setLoading(false);
+        setSyncing(false);
+      }
+    },
+    [torneoId, applyBoard],
+  );
 
   useEffect(() => {
     void load();
