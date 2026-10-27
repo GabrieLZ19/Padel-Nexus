@@ -251,6 +251,7 @@ export default function TorneoDetallePage() {
               inscripciones={inscripciones}
               partidos={partidos}
               isReadOnly={pasoBloqueadoPorAlcance(torneo, "draws")}
+              puedeResolverSorteo={!torneo.solo_lectura}
             />
           )}
           {activeTab === "matches" && (

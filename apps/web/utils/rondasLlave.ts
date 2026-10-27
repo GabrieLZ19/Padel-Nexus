@@ -200,17 +200,77 @@ export function numerosVisiblesDePartidos(
     orden?: number | null;
   }>,
 ): Map<string, number> {
-  const zonas = partidos.filter((p) => esRondaDeZona(p.ronda));
-  const llave = partidos.filter(
-    (p) => !esRondaDeZona(p.ronda) && p.orden != null && !p.id.startsWith("empty-"),
-  );
-  const sorted = [...llave].sort((a, b) =>
-    ordenarPorRonda(a.ronda || "", a.orden ?? 0, b.ronda || "", b.orden ?? 0),
-  );
   const map = new Map<string, number>();
+
+  // 1. Zonas: ordenadas por letra de zona (A..Z) y luego por orden interno del partido
+  const zonas = partidos
+    .filter((p) => esRondaDeZona(p.ronda) && !String(p.id).startsWith("empty-"))
+    .sort((a, b) => {
+      const porRonda = ordenRondaLlave(a.ronda) - ordenRondaLlave(b.ronda);
+      if (porRonda !== 0) return porRonda;
+      return (a.orden ?? 0) - (b.orden ?? 0);
+    });
+
+  zonas.forEach((partido, index) => {
+    map.set(partido.id, index + 1);
+  });
+
+  // 2. Llave: ordenada por ronda (octavos -> cuartos -> semis -> final) y luego por orden
+  const llave = partidos
+    .filter(
+      (p) =>
+        !esRondaDeZona(p.ronda) &&
+        p.orden != null &&
+        !String(p.id).startsWith("empty-"),
+    )
+    .sort((a, b) =>
+      ordenarPorRonda(a.ronda || "", a.orden ?? 0, b.ronda || "", b.orden ?? 0),
+    );
+
   const inicio = zonas.length + 1;
-  sorted.forEach((partido, index) => {
+  llave.forEach((partido, index) => {
     map.set(partido.id, inicio + index);
   });
+
+  return map;
+}
+
+/**
+ * Mapa de número visible por matchNo de matriz FAP (ej: 50 -> 17, 58 -> 21, etc.).
+ * Si se pasa `partidos`, vincula directamente con los partidos reales de la llave.
+ */
+export function mapaNumeroVisiblePorMatchNo(
+  partidos: Array<{
+    id: string;
+    ronda?: string | null;
+    orden?: number | null;
+  }>,
+  matchNos?: number[],
+): Map<number, number> {
+  const numerosPartidos = numerosVisiblesDePartidos(partidos);
+  const map = new Map<number, number>();
+
+  const llave = partidos.filter(
+    (p) => !esRondaDeZona(p.ronda) && p.orden != null && !String(p.id).startsWith("empty-"),
+  );
+  for (const p of llave) {
+    const visible = numerosPartidos.get(p.id);
+    if (visible != null && p.orden != null) {
+      map.set(p.orden, visible);
+    }
+  }
+
+  if (matchNos && matchNos.length > 0) {
+    const zonasCount = partidos.filter(
+      (p) => esRondaDeZona(p.ronda) && !String(p.id).startsWith("empty-"),
+    ).length;
+    const fallbackMap = numerosVisiblesLlave(matchNos, zonasCount + 1);
+    for (const [mNo, num] of fallbackMap.entries()) {
+      if (!map.has(mNo)) {
+        map.set(mNo, num);
+      }
+    }
+  }
+
   return map;
 }

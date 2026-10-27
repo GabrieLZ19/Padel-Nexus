@@ -8,6 +8,7 @@ import { zonaGrupoCompleta } from "@/utils/clasificacionZonas";
 import { canchaAsignadaReal, partidoSinSedeNiHorario } from "@/utils/fiscalPartidos";
 import {
   etiquetaRondaLlave,
+  numerosVisiblesDePartidos,
   ordenRondaLlave,
 } from "@/utils/rondasLlave";
 import {
@@ -152,6 +153,11 @@ export const PasoResultados = ({
   const [filtroGrupo, setFiltroGrupo] = useState("todas");
   const [partidoEnCorreccion, setPartidoEnCorreccion] = useState<string | null>(
     null,
+  );
+
+  const numerosPartido = useMemo(
+    () => numerosVisiblesDePartidos(partidos || []),
+    [partidos],
   );
 
   const partidosJugables = useMemo(
@@ -355,8 +361,9 @@ export const PasoResultados = ({
         hour12: false,
       });
     })();
+    const num = numerosPartido.get(p.id) ?? p.orden;
     const code = (
-      p.orden != null ? String(p.orden).padStart(2, "0") : p.id.slice(0, 4)
+      num != null ? String(num).padStart(2, "0") : p.id.slice(0, 4)
     ).toUpperCase();
     const nacional = esAlcanceNacional(torneo?.alcance);
     const etiquetaLado = (side: "a" | "b") =>
@@ -377,6 +384,7 @@ export const PasoResultados = ({
           <LiveArbitrajeRow
             partido={p}
             torneo={torneo}
+            numeroVisible={numerosPartido.get(p.id)}
             onSave={handleGuardarResultadoLive}
             isSaving={guardandoPartidoId === p.id}
             onError={showErrorModal}
@@ -568,6 +576,7 @@ export const PasoResultados = ({
         key={partido.id}
         partido={partido}
         torneo={torneo}
+        numeroVisible={numerosPartido.get(partido.id)}
         onSave={handleGuardarResultadoLive}
         isSaving={guardandoPartidoId === partido.id}
         onError={showErrorModal}
@@ -657,17 +666,20 @@ export const PasoResultados = ({
           <div className="border-t border-white/5">
             {finalizados.map((p) => renderFinishedRow(p))}
             {!isReadOnly ? renderPartidoRows(pendientes) : null}
-            {porDefinir.map((p) => (
-              <div
-                key={p.id}
-                className="flex min-h-9 items-center border-b border-white/8 px-2 text-xs text-sky-200"
-              >
-                Partido #{String(p.orden || "").padStart(2, "0")} ·{" "}
-                {p.estado_partido === "Pendiente Ganadores"
-                  ? "Ganador vs ganador, se habilita al cerrar los cruces previos"
-                  : "Perdedor vs perdedor, se habilita al cerrar los cruces previos"}
-              </div>
-            ))}
+            {porDefinir.map((p) => {
+              const num = numerosPartido.get(p.id) ?? p.orden;
+              return (
+                <div
+                  key={p.id}
+                  className="flex min-h-9 items-center border-b border-white/8 px-2 text-xs text-sky-200"
+                >
+                  Partido #{String(num || "").padStart(2, "0")} ·{" "}
+                  {p.estado_partido === "Pendiente Ganadores"
+                    ? "Ganador vs ganador, se habilita al cerrar los cruces previos"
+                    : "Perdedor vs perdedor, se habilita al cerrar los cruces previos"}
+                </div>
+              );
+            })}
             {pendientes.length === 0 &&
             finalizados.length === 0 &&
             porDefinir.length === 0 ? (

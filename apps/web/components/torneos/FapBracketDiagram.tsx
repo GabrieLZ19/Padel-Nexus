@@ -21,6 +21,7 @@ import {
   codigoRondaPorNumeroFap,
   columnasRondaLlave,
   etiquetaRondaLlave,
+  mapaNumeroVisiblePorMatchNo,
   numerosVisiblesLlave,
   vincularPartidosAMatriz,
 } from "@/utils/rondasLlave";
@@ -190,9 +191,9 @@ export function FapBracketDiagram({
     const leafIndex = new Map(leaves.map((l, i) => [l, i]));
     const colStride = anchoColumnaLlave();
     const columnas = columnasRondaLlave(matches.map((m) => m.matchNo));
-    const numeros = numerosVisiblesLlave(
+    const numeros = mapaNumeroVisiblePorMatchNo(
+      partidos,
       matches.map((m) => m.matchNo),
-      inicioNumeracion,
     );
     const colDe = (matchNo: number) => columnas.get(matchNo) ?? 0;
     const maxCol = Math.max(0, ...matches.map((m) => colDe(m.matchNo)));

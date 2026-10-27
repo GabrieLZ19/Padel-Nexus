@@ -27,6 +27,7 @@ import {
 interface ZonaCardProps {
   zona: ZonaDrag;
   partidos: Partido[];
+  numerosPartido?: Map<string, number>;
   alcance?: string | null;
   /** id DOM para anclas / chips de navegación */
   anchorId?: string;
@@ -138,6 +139,7 @@ function MarcadorSets({
 export const ZonaCard: React.FC<ZonaCardProps> = ({
   zona,
   partidos,
+  numerosPartido,
   alcance,
   anchorId,
   tercerSetCompleto = true,
@@ -304,7 +306,7 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
                     }`}
                   >
                     <span className="text-xs font-black text-brand-ayuda uppercase tracking-widest w-7 shrink-0 tabular-nums">
-                      #{p.orden || "?"}
+                      #{numerosPartido?.get(p.id) ?? p.orden ?? "?"}
                     </span>
                     <div className="flex-1 min-w-0 space-y-0.5">
                       <p

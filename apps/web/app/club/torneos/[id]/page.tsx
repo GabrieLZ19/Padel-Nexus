@@ -236,6 +236,7 @@ export default function ClubTorneoDetallePage() {
               inscripciones={inscripciones}
               partidos={partidos}
               isReadOnly={pasoBloqueadoPorAlcance(torneo, "draws")}
+              puedeResolverSorteo={!torneo.solo_lectura}
             />
           )}
           {activeTab === "matches" && (

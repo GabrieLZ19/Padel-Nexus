@@ -3,6 +3,7 @@ import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
 import { cleanJugadorNombre } from "@/utils/nombrePareja";
 import { Partido, Torneo } from "@/utils/types";
+import { numerosVisiblesDePartidos } from "@/utils/rondasLlave";
 
 type Rgb = readonly [number, number, number];
 
@@ -284,6 +285,8 @@ export function generarPdfGrillaPartidos(
   const WINNER_BG = [236, 252, 203]; // Lime 100
   const WINNER_TEXT = [77, 124, 15]; // Lime 700
   const BRACKET_LINE_COLOR = [148, 163, 184]; // Slate 400
+
+  const numMap = numerosVisiblesDePartidos(partidos);
 
   // Helper para formatear nombres limpios (sin sufijo extra)
   const formatNames = (j1?: string | null, j2?: string | null) => {
@@ -657,7 +660,8 @@ export function generarPdfGrillaPartidos(
           doc.setFontSize(6);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(PDF_SLATE_500[0], PDF_SLATE_500[1], PDF_SLATE_500[2]);
-          doc.text(`P#${p.orden || pIdx + 1}`, x + 3, y + 3.8);
+          const pNum = numMap.get(p.id) ?? p.orden ?? (pIdx + 1);
+          doc.text(`P#${pNum}`, x + 3, y + 3.8);
 
           doc.setFont("helvetica", "normal");
           doc.text(`${canchaStr}${matchFechaStr ? ` · ${matchFechaStr}` : ""}`, x + compactCardWidth - 3, y + 3.8, {
@@ -978,6 +982,7 @@ export function generarPdfHojaRuta(
   const SLATE_200 = [226, 232, 240] as const;
   const SLATE_500 = [100, 116, 139] as const;
   const isIndividual = esModalidadIndividual(torneo.modalidad);
+  const numMap = numerosVisiblesDePartidos(partidos);
 
   const shortName = (full?: string | null) => {
     const cleaned = cleanJugadorNombre(full);
@@ -1003,12 +1008,14 @@ export function generarPdfHojaRuta(
     return `${a} / ${b}`;
   };
 
-  const matchCode = (p: Partido) =>
-    p.orden != null
-      ? String(p.orden).padStart(2, "0")
+  const matchCode = (p: Partido) => {
+    const num = numMap.get(p.id) ?? p.orden;
+    return num != null
+      ? String(num).padStart(2, "0")
       : p.id && !p.id.startsWith("empty-")
         ? p.id.slice(0, 6).toUpperCase()
         : "—";
+  };
 
   const sorted = [...partidos]
     .filter((p) => p.equipo_a_id || p.equipo_b_id)
@@ -1322,6 +1329,7 @@ export function generarPdfZonas(
   const WINNER_BG = [236, 252, 203] as const;
   const isIndividual = esModalidadIndividual(torneo.modalidad);
   const unidad = isIndividual ? "jugadores" : "parejas";
+  const numMap = numerosVisiblesDePartidos(partidos);
 
   const splitName = (full?: string | null) => {
     if (!full || full === "-" || full === "Libre") {
@@ -1784,9 +1792,10 @@ export function generarPdfZonas(
         const done = m.ganador != null;
         const winnerA = Boolean(done && m.ganador === m.equipo_a_id);
         const winnerB = Boolean(done && m.ganador === m.equipo_b_id);
+        const num = numMap.get(m.id) ?? m.orden;
         const code =
-          m.orden != null
-            ? String(m.orden).padStart(2, "0")
+          num != null
+            ? String(num).padStart(2, "0")
             : m.id.slice(0, 4).toUpperCase();
 
         const setPairs: Array<
@@ -2029,18 +2038,21 @@ export function generarPdfGrillasPorCancha(
   const pageHeight = doc.internal.pageSize.getHeight();
   const PRIMARY_DARK = [15, 23, 42] as const;
   const BRAND_ACCENT = [163, 230, 53] as const;
+  const numMap = numerosVisiblesDePartidos(partidos);
 
   const formatNames = (j1?: string | null, j2?: string | null) => {
     const list = [j1, j2].filter((n) => n && n !== "-" && n !== "Libre");
     return list.length > 0 ? list.join(" / ") : "A definir";
   };
 
-  const matchCode = (p: Partido) =>
-    p.orden != null
-      ? String(p.orden).padStart(2, "0")
+  const matchCode = (p: Partido) => {
+    const num = numMap.get(p.id) ?? p.orden;
+    return num != null
+      ? String(num).padStart(2, "0")
       : p.id && !String(p.id).startsWith("empty-")
         ? String(p.id).slice(0, 8).toUpperCase()
         : "—";
+  };
 
   const canchaKey = (p: Partido) => {
     const raw = String(p.cancha_asignada || "").trim();

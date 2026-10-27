@@ -39,6 +39,7 @@ import { textoClasificacionZonas, zonaGrupoCompleta } from "@/utils/clasificacio
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import {
   etiquetaRondaLlave,
+  mapaNumeroVisiblePorMatchNo,
   numerosVisiblesDePartidos,
   numerosVisiblesLlave,
 } from "@/utils/rondasLlave";
@@ -50,6 +51,7 @@ interface BracketEditorProps {
   inscripciones?: Inscripcion[];
   onRefresh?: () => void;
   isReadOnly?: boolean;
+  puedeResolverSorteo?: boolean;
   setActiveTab?: (tab: string) => void | Promise<void>;
 }
 
@@ -60,6 +62,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   inscripciones = [],
   onRefresh,
   isReadOnly = false,
+  puedeResolverSorteo: puedeResolverSorteoProp,
   setActiveTab,
 }) => {
   const siglaRectora = useSiglaRectora();
@@ -788,6 +791,16 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     return Math.max(0, allLeafRefs.size - firstRoundRefs.size);
   }, [usaPlantillaFap, fapMatrixByOrden, playoffPartidos, firstPlayoffRound]);
 
+  const targetRoundForByes = React.useMemo(() => {
+    if (!firstPlayoffRound) return "semis";
+    const idx = PLAYOFF_ROUND_IDS.indexOf(firstPlayoffRound);
+    if (idx !== -1 && idx + 1 < PLAYOFF_ROUND_IDS.length) {
+      const nextRound = PLAYOFF_ROUND_IDS[idx + 1];
+      return nextRound === "PRELIMINARES" ? "octavos" : nextRound.toLowerCase();
+    }
+    return "semis";
+  }, [firstPlayoffRound]);
+
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -813,11 +826,11 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
   const numerosLlave = React.useMemo(
     () =>
-      numerosVisiblesLlave(
+      mapaNumeroVisiblePorMatchNo(
+        partidos,
         fapMatrixMatches.map((m) => m.matchNo),
-        partidosZona.length + 1,
       ),
-    [fapMatrixMatches, partidosZona.length],
+    [partidos, fapMatrixMatches],
   );
 
   const numerosPartido = React.useMemo(
@@ -1394,6 +1407,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                         key={z.id}
                         zona={z}
                         partidos={partidosZona}
+                        numerosPartido={numerosPartido}
                         alcance={torneo?.alcance}
                         anchorId={`zona-${z.id}`}
                         tercerSetCompleto={
@@ -1404,7 +1418,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                           )?.definicion_tercer_set ?? "Completo") === "Completo"
                         }
                         torneoId={torneo?.id}
-                        puedeResolverSorteo={!isReadOnly}
+                        puedeResolverSorteo={
+                          puedeResolverSorteoProp ?? (!torneo?.solo_lectura)
+                        }
                         onSorteoResuelto={() => {
                           loadZonas();
                           onRefresh?.();
@@ -1464,7 +1480,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 </span>
                 {usaPlantillaFap ? (
                   <span className="rounded-lg bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-3 py-2 text-brand-chartreuse">
-                    {textoRectora("plantilla", siglaRectora)} · {byesFap > 0 ? `${byesFap} bye(s) a semis` : "sin byes"}
+                    {textoRectora("plantilla", siglaRectora)} · {byesFap > 0 ? `${byesFap} bye(s) a ${targetRoundForByes}` : "sin byes"}
                   </span>
                 ) : (
                   puedeEditarLlave &&

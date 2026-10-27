@@ -131,6 +131,7 @@ export default function TorneoEspectadorPage() {
             triggerRefresh={() => {}}
             setActiveTab={() => {}}
             isReadOnly={true}
+            puedeResolverSorteo={false}
           />
         )}
         {activeTab === "partidos" && (

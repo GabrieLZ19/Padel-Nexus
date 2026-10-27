@@ -15,6 +15,7 @@ interface Paso6CuadrosProps {
   setActiveTab: (tab: string) => void | Promise<void>;
   triggerRefresh: () => void;
   isReadOnly?: boolean;
+  puedeResolverSorteo?: boolean;
 }
 
 const CUPOS_VALIDOS = CUPOS_ESTANDAR_FAP.map((c) => Number(c.value));
@@ -41,6 +42,7 @@ export const Paso6Cuadros = ({
   setActiveTab,
   triggerRefresh,
   isReadOnly = false,
+  puedeResolverSorteo,
 }: Paso6CuadrosProps) => {
   const numeroPaso = useNumeroPaso("draws");
   const [generando, setGenerando] = useState(false);
@@ -249,6 +251,7 @@ export const Paso6Cuadros = ({
         inscripciones={inscripciones}
         onRefresh={triggerRefresh}
         isReadOnly={isReadOnly}
+        puedeResolverSorteo={puedeResolverSorteo}
         setActiveTab={setActiveTab}
       />
 

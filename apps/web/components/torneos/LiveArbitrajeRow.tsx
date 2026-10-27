@@ -12,12 +12,14 @@ import {
 export const LiveArbitrajeRow = ({
   partido,
   torneo,
+  numeroVisible,
   onSave,
   isSaving,
   onError,
 }: {
   partido: Partido;
   torneo?: any;
+  numeroVisible?: number | null;
   onSave: (
     partidoId: string,
     ganadorId: string,
@@ -432,9 +434,10 @@ export const LiveArbitrajeRow = ({
       nacional,
     }) || POR_DEFINIR;
 
+  const num = numeroVisible ?? partido.orden;
   const codigo = (
-    partido.orden != null
-      ? String(partido.orden).padStart(2, "0")
+    num != null
+      ? String(num).padStart(2, "0")
       : partido.id.slice(0, 4)
   ).toUpperCase();
 
