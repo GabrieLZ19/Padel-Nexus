@@ -51,10 +51,7 @@ export async function avanzarPartidosInternosZonaCuatro(
 
   if (!groupMatches || groupMatches.length !== 4) return;
 
-  const p1 = groupMatches.find((m) => m.orden === 1);
-  const p2 = groupMatches.find((m) => m.orden === 2);
-  const p3 = groupMatches.find((m) => m.orden === 3);
-  const p4 = groupMatches.find((m) => m.orden === 4);
+  const [p1, p2, p3, p4] = groupMatches;
 
   if (!p1 || !p2 || !p3 || !p4) return;
   if (!p1.ganador || !p2.ganador) return;
@@ -207,7 +204,7 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
 
   const { data: playoffMatches } = await supabaseAdmin
     .from("partidos")
-    .select("id, orden, equipo_a_id, equipo_b_id, ronda")
+    .select("id, orden, equipo_a_id, equipo_b_id, ronda, estado_partido, ganador")
     .eq("torneo_id", torneoId)
     .in("ronda", [...PLAYOFF_RONDAS])
     .order("orden", { ascending: true });
@@ -238,13 +235,17 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
       continue;
     }
 
+    const patch: Record<string, any> = {
+      equipo_a_id,
+      equipo_b_id,
+    };
+    if (!partido.ganador && partido.estado_partido !== "Finalizado") {
+      patch.estado_partido = "Programado";
+    }
+
     await supabaseAdmin
       .from("partidos")
-      .update({
-        equipo_a_id,
-        equipo_b_id,
-        estado_partido: "Programado",
-      })
+      .update(patch)
       .eq("id", partido.id);
   }
 

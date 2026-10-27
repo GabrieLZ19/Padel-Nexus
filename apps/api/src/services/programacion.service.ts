@@ -398,10 +398,17 @@ export class ProgramacionService {
     return a || b || "";
   }
 
-  private static formatBracketSeed(code: string): string {
+  private static formatBracketSeed(
+    code: string,
+    matchNoToCorrelativo?: Map<number, number>,
+  ): string {
     const c = String(code || "").trim();
     const w = c.match(/^W(\d+)$/i);
-    if (w) return `Ganador #${w[1]}`;
+    if (w) {
+      const matchNo = Number(w[1]);
+      const visibleNum = matchNoToCorrelativo?.get(matchNo) ?? matchNo;
+      return `Ganador #${visibleNum}`;
+    }
     const seed = c.match(/^(\d+)([A-Z])$/i);
     if (seed) {
       const pos = Number(seed[1]);
@@ -442,14 +449,15 @@ export class ProgramacionService {
 
   private static async bracketLabelMap(
     torneoId: string,
+    matchNoToCorrelativo?: Map<number, number>,
   ): Promise<Map<number, { a: string; b: string }>> {
     const pairCount = await this.contarParejasConfirmadas(torneoId);
     const matrix = getFapBracketForPairCount(pairCount) || [];
     const map = new Map<number, { a: string; b: string }>();
     for (const m of matrix) {
       map.set(m.matchNo, {
-        a: this.formatBracketSeed(m.a),
-        b: this.formatBracketSeed(m.b),
+        a: this.formatBracketSeed(m.a, matchNoToCorrelativo),
+        b: this.formatBracketSeed(m.b, matchNoToCorrelativo),
       });
     }
     return map;
@@ -469,7 +477,7 @@ export class ProgramacionService {
       horaFin?: string;
     } = {},
   ): Promise<ProgramacionBoard> {
-    const [{ data: torneo }, { data: partidosDb }, contexto, labels, bracketLabels] =
+    const [{ data: torneo }, { data: partidosDb }, contexto, labels] =
       await Promise.all([
         supabaseAdmin
           .from("torneos")
@@ -487,10 +495,50 @@ export class ProgramacionService {
           .order("orden", { ascending: true }),
         cargarContextoProgramacion(torneoId),
         this.loadInscripcionLabels(torneoId),
-        this.bracketLabelMap(torneoId),
       ]);
 
     if (!torneo) throw new Error("Torneo no encontrado");
+
+    // Construimos mapa correlativo continuo para todo el torneo:
+    // Zonas primero (por letra y orden), luego llave (por ronda y orden)
+    const zonasDb = (partidosDb || [])
+      .filter((p) => /^ZONA\s+/i.test(String(p.ronda || "")))
+      .sort((a, b) => {
+        const ra = ordenRondaProgramador(a.ronda);
+        const rb = ordenRondaProgramador(b.ronda);
+        if (ra !== rb) return ra - rb;
+        return (a.orden ?? 0) - (b.orden ?? 0);
+      });
+
+    const llaveDb = (partidosDb || [])
+      .filter((p) => !/^ZONA\s+/i.test(String(p.ronda || "")))
+      .sort((a, b) => {
+        const ra = ordenRondaProgramador(a.ronda);
+        const rb = ordenRondaProgramador(b.ronda);
+        if (ra !== rb) return ra - rb;
+        return (a.orden ?? 0) - (b.orden ?? 0);
+      });
+
+    const correlativoMap = new Map<string, number>();
+    const matchNoToCorrelativo = new Map<number, number>();
+
+    zonasDb.forEach((p, idx) => {
+      correlativoMap.set(p.id, idx + 1);
+    });
+
+    const inicioLlave = zonasDb.length + 1;
+    llaveDb.forEach((p, idx) => {
+      const num = inicioLlave + idx;
+      correlativoMap.set(p.id, num);
+      if (p.orden != null) {
+        matchNoToCorrelativo.set(Number(p.orden), num);
+      }
+    });
+
+    const bracketLabels = await this.bracketLabelMap(
+      torneoId,
+      matchNoToCorrelativo,
+    );
 
     const duracion =
       opciones.duracionMinutos ||
@@ -564,7 +612,7 @@ export class ProgramacionService {
         ronda: p.ronda,
         ronda_etiqueta: etiquetaRondaProgramador(p.ronda),
         ronda_orden: ordenRondaProgramador(p.ronda),
-        orden: p.orden,
+        orden: correlativoMap.get(p.id) ?? p.orden,
         phase: esZona ? "zones" : "bracket",
         equipo_a_id: p.equipo_a_id,
         equipo_b_id: p.equipo_b_id,

@@ -844,17 +844,10 @@ export function asignarHorariosAPartidos(
 
     const tbd = ordenados.filter((i) => esPendienteZona(i.partido));
 
-    // Zona de 4 FAP: ola 1 (orden 1-2) y ola 2 (orden 3-4) simultáneas
-    const ola1 = ordenados.filter(
-      (i) => (i.partido.orden || 0) === 1 || (i.partido.orden || 0) === 2,
-    );
-    const ola2 = ordenados.filter(
-      (i) => (i.partido.orden || 0) === 3 || (i.partido.orden || 0) === 4,
-    );
-    const esZonaCuatro =
-      ola1.length === 2 &&
-      ola2.length === 2 &&
-      ordenados.length === 4;
+    // Zona de 4 FAP: ola 1 (los 2 primeros partidos) y ola 2 (los 2 siguientes) simultáneas
+    const esZonaCuatro = ordenados.length === 4;
+    const ola1 = esZonaCuatro ? ordenados.slice(0, 2) : [];
+    const ola2 = esZonaCuatro ? ordenados.slice(2, 4) : [];
 
     if (esZonaCuatro) {
       const idsOla1 = [

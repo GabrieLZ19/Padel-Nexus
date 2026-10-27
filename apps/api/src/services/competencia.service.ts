@@ -253,6 +253,7 @@ export class CompetenciaService {
 
     // 5. PERSISTENCIA EN BASE DE DATOS
     const partidosZonaFase: PartidoProgramable[] = [];
+    let correlativoZona = 1;
 
     for (const zona of zonas) {
       // Crear el Grupo
@@ -276,14 +277,14 @@ export class CompetenciaService {
         await supabaseAdmin.from("grupo_parejas").insert(grupoParejasData);
       }
 
-      // Generar Partidos según la cantidad de parejas en la zona
+      // Generar Partidos según la cantidad de parejas en la zona con numeración continua
       const partidos: PartidoProgramable[] = [];
 
       if (zona.capacidad === 2 && p.length === 2) {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: 1,
+          orden: correlativoZona++,
           equipo_a_id: p[0].inscripcionId,
           equipo_b_id: p[1].inscripcionId,
           estado_partido: "Programado",
@@ -293,7 +294,7 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: 1,
+          orden: correlativoZona++,
           equipo_a_id: p[0].inscripcionId,
           equipo_b_id: p[1].inscripcionId,
           estado_partido: "Programado",
@@ -301,7 +302,7 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: 2,
+          orden: correlativoZona++,
           equipo_a_id: p[1].inscripcionId,
           equipo_b_id: p[2].inscripcionId,
           estado_partido: "Programado",
@@ -309,7 +310,7 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: 3,
+          orden: correlativoZona++,
           equipo_a_id: p[0].inscripcionId,
           equipo_b_id: p[2].inscripcionId,
           estado_partido: "Programado",
@@ -319,7 +320,7 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: 1,
+          orden: correlativoZona++,
           equipo_a_id: p[0].inscripcionId,
           equipo_b_id: p[3].inscripcionId,
           estado_partido: "Programado",
@@ -327,7 +328,7 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: 2,
+          orden: correlativoZona++,
           equipo_a_id: p[1].inscripcionId,
           equipo_b_id: p[2].inscripcionId,
           estado_partido: "Programado",
@@ -338,24 +339,23 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: 3,
+          orden: correlativoZona++,
           estado_partido: "Pendiente Ganadores",
         }); // G1 vs G2
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: 4,
+          orden: correlativoZona++,
           estado_partido: "Pendiente Perdedores",
         }); // P1 vs P2
       } else {
         // Fallback genérico: Todos contra todos (Round Robin) para cualquier otro tamaño
-        let orden = 1;
         for (let i = 0; i < p.length; i++) {
           for (let j = i + 1; j < p.length; j++) {
             partidos.push({
               torneo_id: torneoId,
               ronda: zona.nombre,
-              orden: orden++,
+              orden: correlativoZona++,
               equipo_a_id: p[i].inscripcionId,
               equipo_b_id: p[j].inscripcionId,
               estado_partido: "Programado",
