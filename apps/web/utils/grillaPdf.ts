@@ -3,7 +3,7 @@ import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
 import { cleanJugadorNombre } from "@/utils/nombrePareja";
 import { Partido, Torneo } from "@/utils/types";
-import { numerosVisiblesDePartidos } from "@/utils/rondasLlave";
+import { etiquetaRondaLlave, numerosVisiblesDePartidos } from "@/utils/rondasLlave";
 
 type Rgb = readonly [number, number, number];
 
@@ -191,8 +191,8 @@ function etiquetaResumidaEquipo(
   torneo: Partial<Torneo>,
 ): string {
   const isNacional =
-    torneo.alcance === "Nacional" ||
-    (torneo.nombre || "").toUpperCase().includes("NACIONAL");
+    /nacional/i.test(String(torneo.alcance || "")) ||
+    /nacional/i.test(String(torneo.nombre || ""));
 
   const denominacion =
     lado === "a" ? p.equipo_a_denominacion : p.equipo_b_denominacion;
@@ -201,8 +201,8 @@ function etiquetaResumidaEquipo(
     lado === "a" ? p.equipo_a_letra_prioridad : p.equipo_b_letra_prioridad;
   const club = lado === "a" ? p.equipo_a_club : p.equipo_b_club;
 
-  // Si es nacional o viene denominación provincial/letra cargada:
-  if (isNacional || denominacion || (prov && letra)) {
+  // Si es nacional: provincia y letra (ej: "NEUQUÉN B", "CÓRDOBA C")
+  if (isNacional) {
     const textoProv = textoInstitucionPdf({
       denominacion_nacional: denominacion,
       provincia: prov,
@@ -214,7 +214,7 @@ function etiquetaResumidaEquipo(
     }
   }
 
-  // Torneo provincial / club: apellidos de los jugadores
+  // Torneo provincial / regional / club: apellidos de los jugadores (ej: "GÓMEZ / PÉREZ")
   const j1 = lado === "a" ? p.equipo_a_j1 : p.equipo_b_j1;
   const j2 = lado === "a" ? p.equipo_a_j2 : p.equipo_b_j2;
 
@@ -286,7 +286,72 @@ export function generarPdfGrillaPartidos(
   const WINNER_TEXT = [77, 124, 15]; // Lime 700
   const BRACKET_LINE_COLOR = [148, 163, 184]; // Slate 400
 
-  const numMap = numerosVisiblesDePartidos(partidos);
+  // Mapa de parejas conocidas por ID para enriquecer partidos que tengan ganador pero falte equipo_a o equipo_b
+  const parejasMap = new Map<
+    string,
+    {
+      j1?: string | null;
+      j2?: string | null;
+      club?: string | null;
+      letra_prioridad?: string | null;
+      provincia?: string | null;
+      denominacion?: string | null;
+    }
+  >();
+
+  partidos.forEach((p) => {
+    if (p.equipo_a_id) {
+      parejasMap.set(p.equipo_a_id, {
+        j1: p.equipo_a_j1,
+        j2: p.equipo_a_j2,
+        club: p.equipo_a_club,
+        letra_prioridad: p.equipo_a_letra_prioridad,
+        provincia: p.equipo_a_provincia,
+        denominacion: p.equipo_a_denominacion,
+      });
+    }
+    if (p.equipo_b_id) {
+      parejasMap.set(p.equipo_b_id, {
+        j1: p.equipo_b_j1,
+        j2: p.equipo_b_j2,
+        club: p.equipo_b_club,
+        letra_prioridad: p.equipo_b_letra_prioridad,
+        provincia: p.equipo_b_provincia,
+        denominacion: p.equipo_b_denominacion,
+      });
+    }
+  });
+
+  const partidosNormalizados = partidos.map((p) => {
+    const copy = { ...p };
+    if (!copy.equipo_a_id && copy.ganador && copy.ganador !== copy.equipo_b_id) {
+      const data = parejasMap.get(copy.ganador);
+      if (data) {
+        copy.equipo_a_id = copy.ganador;
+        copy.equipo_a_j1 = copy.equipo_a_j1 || data.j1;
+        copy.equipo_a_j2 = copy.equipo_a_j2 || data.j2;
+        copy.equipo_a_club = copy.equipo_a_club || data.club;
+        copy.equipo_a_letra_prioridad = copy.equipo_a_letra_prioridad || data.letra_prioridad;
+        copy.equipo_a_provincia = copy.equipo_a_provincia || data.provincia;
+        copy.equipo_a_denominacion = copy.equipo_a_denominacion || data.denominacion;
+      }
+    }
+    if (!copy.equipo_b_id && copy.ganador && copy.ganador !== copy.equipo_a_id) {
+      const data = parejasMap.get(copy.ganador);
+      if (data) {
+        copy.equipo_b_id = copy.ganador;
+        copy.equipo_b_j1 = copy.equipo_b_j1 || data.j1;
+        copy.equipo_b_j2 = copy.equipo_b_j2 || data.j2;
+        copy.equipo_b_club = copy.equipo_b_club || data.club;
+        copy.equipo_b_letra_prioridad = copy.equipo_b_letra_prioridad || data.letra_prioridad;
+        copy.equipo_b_provincia = copy.equipo_b_provincia || data.provincia;
+        copy.equipo_b_denominacion = copy.equipo_b_denominacion || data.denominacion;
+      }
+    }
+    return copy;
+  });
+
+  const numMap = numerosVisiblesDePartidos(partidosNormalizados);
 
   // Helper para formatear nombres limpios (sin sufijo extra)
   const formatNames = (j1?: string | null, j2?: string | null) => {
@@ -314,12 +379,33 @@ export function generarPdfGrillaPartidos(
 
   // Helper para acortar string de cancha y evitar encimado con la ronda
   const formatCanchaShort = (canchaName?: string | null) => {
-    if (!canchaName) return "Cancha Principal";
-    if (canchaName.includes(" - ")) {
-      const parts = canchaName.split(" - ");
-      return parts[parts.length - 1];
+    const raw = String(canchaName || "").trim();
+    if (!raw) return "Sede a definir";
+    if (raw.includes(" - ")) {
+      const parts = raw.split(" - ");
+      return parts[parts.length - 1].trim();
     }
-    return canchaName.length > 18 ? canchaName.slice(0, 18) + "..." : canchaName;
+    return raw.length > 18 ? raw.slice(0, 18) + "..." : raw;
+  };
+
+  // Helper para lugar y horario sincronizado con el programador / panel
+  const formatLugarYHorario = (
+    canchaName?: string | null,
+    fechaIso?: string | null,
+  ) => {
+    const fechaHoraStr = formatMatchDateTimeStr(fechaIso);
+    const canchaStr = formatCanchaShort(canchaName);
+
+    if (canchaStr === "Sede a definir" && !fechaHoraStr) {
+      return "Sede a definir";
+    }
+    if (canchaStr === "Sede a definir" && fechaHoraStr) {
+      return `Sede a definir · ${fechaHoraStr}`;
+    }
+    if (canchaStr !== "Sede a definir" && !fechaHoraStr) {
+      return `${canchaStr} · Horario a definir`;
+    }
+    return `${canchaStr} · ${fechaHoraStr}`;
   };
 
   // --- ENCABEZADO PRINCIPAL DE PADEL NEXUS ---
@@ -347,7 +433,7 @@ export function generarPdfGrillaPartidos(
   let currentY = 34;
 
   // --- TARJETA DE CAMPEÓN DEL TORNEO (SI EL TORNEO FINALIZÓ) ---
-  const finalMatch = partidos.find(
+  const finalMatch = partidosNormalizados.find(
     (p) =>
       (p.ronda || "").toUpperCase().includes("FINAL") &&
       p.ganador !== null &&
@@ -358,11 +444,11 @@ export function generarPdfGrillaPartidos(
   if (finalMatch && finalMatch.ganador) {
     const isGanadorA = finalMatch.ganador === finalMatch.equipo_a_id;
     const championName = isGanadorA
-      ? formatNames(finalMatch.equipo_a_j1, finalMatch.equipo_a_j2)
-      : formatNames(finalMatch.equipo_b_j1, finalMatch.equipo_b_j2);
+      ? etiquetaResumidaEquipo(finalMatch, "a", torneo)
+      : etiquetaResumidaEquipo(finalMatch, "b", torneo);
     const runnerUpName = isGanadorA
-      ? formatNames(finalMatch.equipo_b_j1, finalMatch.equipo_b_j2)
-      : formatNames(finalMatch.equipo_a_j1, finalMatch.equipo_a_j2);
+      ? etiquetaResumidaEquipo(finalMatch, "b", torneo)
+      : etiquetaResumidaEquipo(finalMatch, "a", torneo);
 
     const s1A = finalMatch.set1_a ?? (finalMatch as any).set1_a;
     const s1B = finalMatch.set1_b ?? (finalMatch as any).set1_b;
@@ -413,7 +499,7 @@ export function generarPdfGrillaPartidos(
   const cardWidth = (pageWidth - marginX * 2 - colGap) / 2;
   const cardHeight = 34;
 
-  const partidosOrdenados = [...partidos].sort((a, b) => {
+  const partidosOrdenados = [...partidosNormalizados].sort((a, b) => {
     const jA = jerarquiaRondaInformeResultados(a.ronda);
     const jB = jerarquiaRondaInformeResultados(b.ronda);
     if (jA !== jB) return jA - jB;
@@ -446,8 +532,8 @@ export function generarPdfGrillaPartidos(
     const isGanadorA = Boolean(p.ganador && p.ganador === p.equipo_a_id);
     const isGanadorB = Boolean(p.ganador && p.ganador === p.equipo_b_id);
 
-    const nameA = formatNames(p.equipo_a_j1, p.equipo_a_j2);
-    const nameB = formatNames(p.equipo_b_j1, p.equipo_b_j2);
+    const nameA = etiquetaResumidaEquipo(p, "a", torneo);
+    const nameB = etiquetaResumidaEquipo(p, "b", torneo);
 
     const s1A = p.set1_a ?? (p as any).set1_a ?? null;
     const s1B = p.set1_b ?? (p as any).set1_b ?? null;
@@ -462,19 +548,22 @@ export function generarPdfGrillaPartidos(
     doc.setLineWidth(0.3);
     doc.roundedRect(x, y, cardWidth, cardHeight, 2, 2, "FD");
 
-    // Cabecera Tarjeta (Ronda a la izquierda, Cancha + Fecha/Hora a la derecha sin solaparse)
+    // Cabecera Tarjeta (Número y Ronda completa a la izquierda, Cancha + Fecha/Hora a la derecha)
     doc.setFillColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
     doc.roundedRect(x, y, cardWidth, 6, 2, 2, "F");
 
-    doc.setFontSize(7.5);
+    const pNum = numMap.get(p.id) ?? p.orden;
+    const rondaCompleta = etiquetaRondaLlave(p.ronda).toUpperCase();
+    const tituloIzquierda = pNum ? `P#${pNum} · ${rondaCompleta}` : rondaCompleta;
+
+    doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
-    doc.text((p.ronda || "RONDA").toUpperCase(), x + 3, y + 4.2);
+    doc.text(tituloIzquierda, x + 3, y + 4.2);
 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(255, 255, 255);
-    const fechaHoraStr = formatMatchDateTimeStr(p.fecha_partido);
-    const infoCancha = `${formatCanchaShort(p.cancha_asignada)}${fechaHoraStr ? ` · ${fechaHoraStr}` : ""}`;
+    const infoCancha = formatLugarYHorario(p.cancha_asignada, p.fecha_partido);
     doc.text(infoCancha, x + cardWidth - 3, y + 4.2, { align: "right" });
 
     // Fila Equipo A
@@ -555,7 +644,7 @@ export function generarPdfGrillaPartidos(
 
   // --- SECCIÓN 2: ESQUEMA DE CUADRO Y PROGRESIÓN DE LLAVES ---
   const rondasPlayoffDisponibles = RONDAS_PLAYOFF_PROGRESSION.filter(
-    (cfg) => partidosDeRondaPlayoff(partidos, cfg.key).length > 0,
+    (cfg) => partidosDeRondaPlayoff(partidosNormalizados, cfg.key).length > 0,
   );
 
   const tieneInstanciasPreviasACuartos = rondasPlayoffDisponibles.some((cfg) =>
@@ -595,7 +684,7 @@ export function generarPdfGrillaPartidos(
       const compactCardHeight = 22;
 
       rondasPlayoffDisponibles.forEach((rondaCfg) => {
-        const matchesRonda = partidosDeRondaPlayoff(partidos, rondaCfg.key);
+        const matchesRonda = partidosDeRondaPlayoff(partidosNormalizados, rondaCfg.key);
         if (matchesRonda.length === 0) return;
 
         // Si no entra el encabezado y al menos una fila de tarjetas
@@ -655,16 +744,15 @@ export function generarPdfGrillaPartidos(
           doc.roundedRect(x, y, compactCardWidth, compactCardHeight, 1.5, 1.5, "FD");
 
           // Subheader con número de partido y cancha/horario
-          const matchFechaStr = formatMatchDateTimeStr(p.fecha_partido);
-          const canchaStr = formatCanchaShort(p.cancha_asignada);
+          const pNum = numMap.get(p.id) ?? p.orden ?? (pIdx + 1);
           doc.setFontSize(6);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(PDF_SLATE_500[0], PDF_SLATE_500[1], PDF_SLATE_500[2]);
-          const pNum = numMap.get(p.id) ?? p.orden ?? (pIdx + 1);
           doc.text(`P#${pNum}`, x + 3, y + 3.8);
 
           doc.setFont("helvetica", "normal");
-          doc.text(`${canchaStr}${matchFechaStr ? ` · ${matchFechaStr}` : ""}`, x + compactCardWidth - 3, y + 3.8, {
+          const lugarHorarioStr = formatLugarYHorario(p.cancha_asignada, p.fecha_partido);
+          doc.text(lugarHorarioStr, x + compactCardWidth - 3, y + 3.8, {
             align: "right",
           });
 
@@ -760,7 +848,7 @@ export function generarPdfGrillaPartidos(
       >();
 
       const firstRoundKey = rondasAMostrar[0];
-      const firstMatches = partidosDeRondaPlayoff(partidos, firstRoundKey);
+      const firstMatches = partidosDeRondaPlayoff(partidosNormalizados, firstRoundKey);
 
       let currentRoundY = currentY + 10;
       firstMatches.forEach((p, idx) => {
@@ -780,8 +868,8 @@ export function generarPdfGrillaPartidos(
         const prevRoundKey = rondasAMostrar[rIdx - 1];
         const currentRoundKey = rondasAMostrar[rIdx];
 
-        const prevMatches = partidosDeRondaPlayoff(partidos, prevRoundKey);
-        const currMatches = partidosDeRondaPlayoff(partidos, currentRoundKey);
+        const prevMatches = partidosDeRondaPlayoff(partidosNormalizados, prevRoundKey);
+        const currMatches = partidosDeRondaPlayoff(partidosNormalizados, currentRoundKey);
 
         const rx = marginX + rIdx * (bColWidth + bracketGapX);
 
@@ -813,14 +901,15 @@ export function generarPdfGrillaPartidos(
 
       rondasAMostrar.forEach((rondaKey, rIdx) => {
         const rx = marginX + rIdx * (bColWidth + bracketGapX);
-        const partidosRonda = partidosDeRondaPlayoff(partidos, rondaKey);
+        const partidosRonda = partidosDeRondaPlayoff(partidosNormalizados, rondaKey);
 
         doc.setFillColor(PRIMARY_DARK[0], PRIMARY_DARK[1], PRIMARY_DARK[2]);
         doc.rect(rx, currentY, bColWidth, 6, "F");
         doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(255, 255, 255);
-        doc.text(rondaKey, rx + bColWidth / 2, currentY + 4.2, { align: "center" });
+        const rondaCompleta = etiquetaRondaLlave(rondaKey).toUpperCase();
+        doc.text(rondaCompleta, rx + bColWidth / 2, currentY + 4.2, { align: "center" });
 
         partidosRonda.forEach((p) => {
           const coords = roundMatchCoords.get(p.id);
@@ -831,8 +920,8 @@ export function generarPdfGrillaPartidos(
           const isGanadorA = Boolean(p.ganador && p.ganador === p.equipo_a_id);
           const isGanadorB = Boolean(p.ganador && p.ganador === p.equipo_b_id);
 
-          const nameA = formatNames(p.equipo_a_j1, p.equipo_a_j2);
-          const nameB = formatNames(p.equipo_b_j1, p.equipo_b_j2);
+          const nameA = etiquetaResumidaEquipo(p, "a", torneo);
+          const nameB = etiquetaResumidaEquipo(p, "b", torneo);
 
           const s1A = p.set1_a ?? (p as any).set1_a ?? null;
           const s1B = p.set1_b ?? (p as any).set1_b ?? null;
@@ -846,12 +935,12 @@ export function generarPdfGrillaPartidos(
           doc.setLineWidth(0.3);
           doc.roundedRect(bX, bY, bColWidth, boxHeight, 1.5, 1.5, "FD");
 
-          const dtStr = formatMatchDateTimeStr(p.fecha_partido);
-          if (dtStr) {
+          const lugarHorarioStr = formatLugarYHorario(p.cancha_asignada, p.fecha_partido);
+          if (lugarHorarioStr) {
             doc.setFontSize(5.5);
             doc.setFont("helvetica", "bold");
             doc.setTextColor(120, 120, 120);
-            doc.text(dtStr, bX + bColWidth - 2, bY + 3.8, { align: "right" });
+            doc.text(lugarHorarioStr, bX + bColWidth - 2, bY + 3.8, { align: "right" });
           }
 
           const yA = bY + 5;
