@@ -585,6 +585,74 @@ export const PasoResultados = ({
       />
     ));
 
+  const renderPartidoRowsReadOnly = (lista: Partido[]) =>
+    lista.map((p) => {
+      const num = numerosPartido.get(p.id) ?? p.orden;
+      const code = (
+        num != null ? String(num).padStart(2, "0") : p.id.slice(0, 4)
+      ).toUpperCase();
+      const meta = formatMatchDateTimeInfo(p.cancha_asignada, p.fecha_partido);
+      const sede = canchaAsignadaReal(p.cancha_asignada);
+      const hora = (() => {
+        if (!p.fecha_partido) return null;
+        const d = new Date(p.fecha_partido);
+        if (Number.isNaN(d.getTime())) return null;
+        return d.toLocaleTimeString("es-AR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        });
+      })();
+      const nacional = esAlcanceNacional(torneo?.alcance);
+      const etiquetaLado = (side: "a" | "b") =>
+        etiquetaParejaVisible({
+          j1: side === "a" ? p.equipo_a_j1 : p.equipo_b_j1,
+          j2: side === "a" ? p.equipo_a_j2 : p.equipo_b_j2,
+          provincia: side === "a" ? p.equipo_a_provincia : p.equipo_b_provincia,
+          letra:
+            side === "a" ? p.equipo_a_letra_prioridad : p.equipo_b_letra_prioridad,
+          denominacion:
+            side === "a" ? p.equipo_a_denominacion : p.equipo_b_denominacion,
+          nacional,
+        }) || POR_DEFINIR;
+
+      return (
+        <div
+          key={p.id}
+          className="flex items-center gap-4 border-b border-white/8 px-3 py-3 text-xs"
+        >
+          <div className="w-44 shrink-0 space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="font-black tabular-nums text-sky-400">#{code}</span>
+              <span className="rounded bg-sky-500/10 border border-sky-500/20 px-1.5 py-0.5 text-[10px] font-bold text-sky-300">
+                Por jugar
+              </span>
+            </div>
+            <p className="flex items-center gap-1.5 text-xs font-semibold tabular-nums text-gray-300">
+              <Clock className="size-3.5 shrink-0 text-gray-400" aria-hidden />
+              {hora || "Hora a definir"}
+            </p>
+            <p
+              className="flex items-start gap-1.5 text-xs text-gray-400"
+              title={meta || sede || undefined}
+            >
+              <MapPin className="mt-0.5 size-3.5 shrink-0 text-gray-400" aria-hidden />
+              <span className="line-clamp-1">{sede || "Sede a definir"}</span>
+            </p>
+          </div>
+          <div className="min-w-0 flex-1 flex items-center justify-between gap-3">
+            <p className="truncate font-bold text-white text-right flex-1">
+              {etiquetaLado("a")}
+            </p>
+            <span className="text-gray-500 font-bold text-xs shrink-0">vs</span>
+            <p className="truncate font-bold text-white text-left flex-1">
+              {etiquetaLado("b")}
+            </p>
+          </div>
+        </div>
+      );
+    });
+
   const renderZonaCard = (nombre: string) => {
     if (filtroGrupo !== "todas" && filtroGrupo !== nombre) return null;
 
@@ -667,7 +735,9 @@ export const PasoResultados = ({
         {colapsada ? null : (
           <div className="border-t border-white/5">
             {finalizados.map((p) => renderFinishedRow(p))}
-            {!isReadOnly ? renderPartidoRows(pendientes) : null}
+            {!isReadOnly
+              ? renderPartidoRows(pendientes)
+              : renderPartidoRowsReadOnly(pendientes)}
             {porDefinir.map((p) => {
               const num = numerosPartido.get(p.id) ?? p.orden;
               return (
@@ -691,7 +761,8 @@ export const PasoResultados = ({
             ) : null}
             {isReadOnly &&
             pendientes.length > 0 &&
-            finalizados.length === 0 ? (
+            finalizadosRaw.length === 0 &&
+            vistaRapida !== "pendientes" ? (
               <p className="px-2 py-2 text-center text-xs text-brand-ayuda">
                 Modo lectura: no hay resultados cargados aún.
               </p>
@@ -885,10 +956,13 @@ export const PasoResultados = ({
                 {colapsada ? null : (
                   <div className="border-t border-white/5">
                     {finalizados.map((p) => renderFinishedRow(p))}
-                    {!isReadOnly ? renderPartidoRows(pendientes) : null}
+                    {!isReadOnly
+                      ? renderPartidoRows(pendientes)
+                      : renderPartidoRowsReadOnly(pendientes)}
                     {isReadOnly &&
                     pendientes.length > 0 &&
-                    finalizados.length === 0 ? (
+                    finalizadosRaw.length === 0 &&
+                    vistaRapida !== "pendientes" ? (
                       <p className="px-2 py-2 text-center text-xs text-brand-ayuda">
                         Modo lectura: no hay resultados cargados aún en esta
                         ronda.

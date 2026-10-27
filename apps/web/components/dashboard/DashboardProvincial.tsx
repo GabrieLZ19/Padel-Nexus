@@ -178,9 +178,22 @@ export default function DashboardProvincial() {
     .slice(0, 5);
   const maxCategoria = Math.max(...categoriasDistribucion.map(([, c]) => c), 1);
 
-  // Últimos torneos provinciales
-  const ultimosTorneos = [...torneos]
-    .sort((a, b) => new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime())
+  const [tabTorneos, setTabTorneos] = useState<"provinciales" | "nacionales">(
+    "provinciales",
+  );
+
+  const torneosNacionales = torneos.filter((t) => t.alcance === "Nacional");
+
+  // Competencias para la tabla del dashboard (coincide con los indicadores)
+  const listaParaTabla =
+    tabTorneos === "provinciales" ? torneosProvinciales : torneosNacionales;
+
+  const ultimosTorneos = [...listaParaTabla]
+    .sort(
+      (a, b) =>
+        new Date(b.created_at || "").getTime() -
+        new Date(a.created_at || "").getTime(),
+    )
     .slice(0, 5);
 
   // --- SKELETON ---
@@ -315,22 +328,59 @@ export default function DashboardProvincial() {
           transition={{ delay: 0.5, duration: 0.5 }}
           className="lg:col-span-2 bg-[#151515] p-6 md:p-8 rounded-2xl border border-white/5 flex flex-col"
         >
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-white">
-              Competencias Recientes
-            </h2>
-            <button
-              onClick={() => router.push("/dashboard/torneos")}
-              className="flex items-center gap-1.5 text-xs font-black text-blue-400 hover:opacity-80 transition-opacity cursor-pointer"
-            >
-              Ver todos <ArrowRight className="size-3.5" />
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                Competencias Recientes
+              </h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {tabTorneos === "provinciales"
+                  ? "Torneos provinciales y clasificatorios de tu jurisdicción"
+                  : "Torneos nacionales del circuito (modo lectura)"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex rounded-xl bg-white/5 p-1 border border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setTabTorneos("provinciales")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    tabTorneos === "provinciales"
+                      ? "bg-blue-500 text-white shadow-sm"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Provinciales ({torneosProvinciales.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTabTorneos("nacionales")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    tabTorneos === "nacionales"
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Nacionales ({torneosNacionales.length})
+                </button>
+              </div>
+              <button
+                onClick={() => router.push("/dashboard/torneos")}
+                className="flex items-center gap-1.5 text-xs font-black text-blue-400 hover:opacity-80 transition-opacity cursor-pointer ml-1"
+              >
+                Ver todos <ArrowRight className="size-3.5" />
+              </button>
+            </div>
           </div>
 
           {ultimosTorneos.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-gray-500 py-10">
               <Trophy className="size-10 opacity-30 mb-3" />
-              <p className="text-sm font-medium">No hay torneos creados aún.</p>
+              <p className="text-sm font-medium">
+                {tabTorneos === "provinciales"
+                  ? "No hay torneos provinciales creados aún."
+                  : "No hay torneos nacionales disponibles."}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -351,7 +401,18 @@ export default function DashboardProvincial() {
                       onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
                     >
                       <td className="py-3.5 px-4">
-                        <p className="font-bold text-white text-[13px]">{t.nombre}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-white text-[13px]">{t.nombre}</p>
+                          {t.alcance === "Nacional" ? (
+                            <span className="rounded bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">
+                              Nacional · Lectura
+                            </span>
+                          ) : (
+                            <span className="rounded bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 text-[10px] font-bold text-blue-400">
+                              {t.alcance || "Provincial"}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[11px] text-gray-500 mt-0.5">
                           {[(t as { rama?: string }).rama, etiquetaNivelYCategoria(t.nivel, t.categoria) || "General"].filter(Boolean).join(" · ")}
                         </p>

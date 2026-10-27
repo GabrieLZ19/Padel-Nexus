@@ -417,13 +417,26 @@ export default function TorneosPage() {
         }`}
       >
         <div className="flex items-start justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
-            className="cursor-pointer text-left text-[15px] font-bold text-white"
-          >
-            {t.nombre}
-          </button>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
+                className="cursor-pointer text-left text-[15px] font-bold text-white hover:text-brand-chartreuse transition-colors"
+              >
+                {t.nombre}
+              </button>
+              {t.solo_lectura ? (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                  Nacional · Lectura
+                </span>
+              ) : t.alcance ? (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  {t.alcance}
+                </span>
+              ) : null}
+            </div>
+          </div>
           <span
             className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-bold ${
               t.estado === "Inscripción"
@@ -660,13 +673,24 @@ export default function TorneosPage() {
                       }`}
                     >
                       <td className={enGrupo ? "py-2.5 pl-16 pr-8" : "py-4 px-8"}>
-                        <button
-                          type="button"
-                          onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
-                          className="cursor-pointer text-left font-bold text-white group-hover:text-brand-chartreuse transition-colors text-[15px] wrap-break-word"
-                        >
-                          {t.nombre}
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
+                            className="cursor-pointer text-left font-bold text-white group-hover:text-brand-chartreuse transition-colors text-[15px] wrap-break-word"
+                          >
+                            {t.nombre}
+                          </button>
+                          {t.solo_lectura ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                              Nacional · Lectura
+                            </span>
+                          ) : t.alcance ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              {t.alcance}
+                            </span>
+                          ) : null}
+                        </div>
                         <div className="text-[13px] text-gray-500 mt-0.5 font-medium">
                           {[t.rama, etiquetaNivelYCategoria(t.nivel, t.categoria) || "Sin nivel"].filter(Boolean).join(" · ")}
                         </div>
