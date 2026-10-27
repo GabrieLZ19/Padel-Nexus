@@ -1404,7 +1404,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                           )?.definicion_tercer_set ?? "Completo") === "Completo"
                         }
                         torneoId={torneo?.id}
-                        puedeResolverSorteo={Boolean(puedeEditarLlave)}
+                        puedeResolverSorteo={!isReadOnly}
                         onSorteoResuelto={() => {
                           loadZonas();
                           onRefresh?.();

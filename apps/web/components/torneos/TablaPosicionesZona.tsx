@@ -87,6 +87,11 @@ function desempatarDosEquiposWeb(
   b: ParejaStats,
   partidos: Partido[],
 ): [ParejaStats, ParejaStats] {
+  // Si ninguna de las dos parejas jugó partidos aún, no hay empate reglamentario activo
+  if (a.pj === 0 && b.pj === 0) {
+    return [a, b];
+  }
+
   // 0. Si ambas tienen sorteo_posicion registrado
   if (
     a.sorteo_posicion != null &&
@@ -161,6 +166,11 @@ function desempatarDosEquiposWeb(
     return orden as [ParejaStats, ParejaStats];
   }
 
+  // Solo se requiere sorteo si ambas parejas han jugado partidos
+  if (a.pj === 0 || b.pj === 0) {
+    return [a, b];
+  }
+
   a.requiereSorteo = true;
   b.requiereSorteo = true;
   a.empateConIds = [b.inscripcionId];
@@ -177,6 +187,15 @@ function desempatarMultiplesEquiposWeb(
   teams: ParejaStats[],
   partidos: Partido[],
 ): ParejaStats[] {
+  // Si ninguna pareja ha jugado partidos, no hay empate reglamentario activo
+  if (teams.every((t) => t.pj === 0)) {
+    return teams.map((t) => ({
+      ...t,
+      requiereSorteo: false,
+      criterioDesempate: "Sin partidos jugados",
+    }));
+  }
+
   const allHaveSorteo = teams.every((t) => t.sorteo_posicion != null);
   if (allHaveSorteo) {
     const sorted = [...teams].sort(
@@ -221,6 +240,12 @@ function desempatarMultiplesEquiposWeb(
           (a, b) => (a.sorteo_posicion || 0) - (b.sorteo_posicion || 0),
         );
         subgrupo.forEach((t) => (t.criterioDesempate = "Sorteo reglamentario FAP"));
+        resultado.push(...subgrupo);
+      } else if (subgrupo.every((t) => t.pj === 0)) {
+        subgrupo.forEach((t) => {
+          t.requiereSorteo = false;
+          t.criterioDesempate = "Sin partidos jugados";
+        });
         resultado.push(...subgrupo);
       } else {
         const ids = subgrupo.map((t) => t.inscripcionId);
@@ -453,7 +478,12 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
       .filter((pos): pos is number => pos !== null);
   }, [stats, parejasEnSorteo]);
 
-  const haySorteoPendiente = parejasEnSorteo.length > 0;
+  // El aviso aparece cuando la zona está completa y hay empate real
+  const partidosZonaCompletos =
+    partidosZona.length > 0 &&
+    partidosZona.every((p) => p.ganador != null);
+  const haySorteoPendiente =
+    partidosZonaCompletos && parejasEnSorteo.length > 0;
 
   return (
     <div

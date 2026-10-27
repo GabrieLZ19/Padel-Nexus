@@ -227,7 +227,7 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
             <div className="space-y-3 bg-white/[0.02] border border-white/5 rounded-2xl p-4">
               <p className="text-xs text-gray-300">
                 Para sorteos físicos realizados en mesa de control (moneda o papelitos).
-                Podés intercambiar los puestos según el resultado presencial.
+                Podés seleccionar el puesto de cada pareja o intercambiarlos según el resultado presencial.
               </p>
               {parejasEmpatadas.length === 2 && (
                 <button
@@ -268,9 +268,44 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
                       <span className="text-xs text-gray-400 font-medium">
                         Puesto:
                       </span>
-                      <span className="size-7 rounded-xl bg-brand-chartreuse text-brand-black font-black text-sm flex items-center justify-center">
-                        {pos || "?"}
-                      </span>
+                      {metodo === "manual" ? (
+                        <select
+                          value={pos || ""}
+                          onChange={(e) => {
+                            const nuevaPos = Number(e.target.value);
+                            const prevOwner = Object.entries(asignaciones).find(
+                              ([id, val]) =>
+                                id !== p.inscripcionId && val === nuevaPos,
+                            );
+                            if (prevOwner) {
+                              setAsignaciones({
+                                ...asignaciones,
+                                [p.inscripcionId]: nuevaPos,
+                                [prevOwner[0]]: pos,
+                              });
+                            } else {
+                              setAsignaciones({
+                                ...asignaciones,
+                                [p.inscripcionId]: nuevaPos,
+                              });
+                            }
+                          }}
+                          className="h-8 w-24 rounded-xl border border-brand-chartreuse/40 bg-[#1e1e1e] px-2 text-center text-xs font-black text-brand-chartreuse outline-none focus:border-brand-chartreuse cursor-pointer"
+                        >
+                          {(posicionesEnDisputa.length > 0
+                            ? posicionesEnDisputa
+                            : parejasEmpatadas.map((_, i) => i + 1)
+                          ).map((puesto) => (
+                            <option key={puesto} value={puesto}>
+                              {puesto}.º puesto
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="size-7 rounded-xl bg-brand-chartreuse text-brand-black font-black text-sm flex items-center justify-center">
+                          {pos || "?"}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
