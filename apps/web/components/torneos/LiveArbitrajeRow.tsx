@@ -2,6 +2,7 @@ import { Partido } from "@/utils/types";
 import { Clock, Loader2, MapPin } from "lucide-react";
 import { useState, useEffect } from "react";
 import { canchaAsignadaReal } from "@/utils/fiscalPartidos";
+import { completarScorePorLesion } from "@/utils/scoreLesion";
 import {
   POR_DEFINIR,
   esAlcanceNacional,
@@ -38,7 +39,8 @@ export const LiveArbitrajeRow = ({
 }) => {
   // Extraer configuraciones dinamicas del torneo desde reglas_arbitraje (Paso 7: Cierre)
   const reglasArb = torneo?.reglas_arbitraje || {};
-  const esTercerSetCompleto = reglasArb.definicion_tercer_set === "Completo";
+  const esTercerSetCompleto =
+    (reglasArb.definicion_tercer_set ?? "Completo") === "Completo";
   const stbPuntosTarget = Number(
     reglasArb.supertiebreak_puntos ??
       torneo?.stb_puntos ??
@@ -86,6 +88,12 @@ export const LiveArbitrajeRow = ({
     (partido as any).es_lesion || false,
   );
   const [ganadorWo, setGanadorWo] = useState<"A" | "B">("A");
+  const [parejaAbandona, setParejaAbandona] = useState<"A" | "B" | null>(() => {
+    if ((partido as any).es_lesion && partido.ganador) {
+      return partido.ganador === partido.equipo_a_id ? "B" : "A";
+    }
+    return null;
+  });
 
   const programacionLabel = (() => {
     const parts: string[] = [];
@@ -127,17 +135,23 @@ export const LiveArbitrajeRow = ({
   const setsTrasDos = { a: gA1 + gA2, b: gB1 + gB2 };
   const requiereTercerSet =
     set1Completado && set2Completado && setsTrasDos.a === 1 && setsTrasDos.b === 1;
-  /** Set tradicional (completo): siempre se muestra la columna Set 3. STB: solo si hay 1-1. */
-  const mostrarTercerSet = esTercerSetCompleto || requiereTercerSet;
-  const tercerSetEditable = requiereTercerSet;
+  /** Set tradicional (completo): siempre se muestra la columna Set 3. STB: solo si hay 1-1 o lesión. */
+  const mostrarTercerSet =
+    esTercerSetCompleto || requiereTercerSet || (esWo && esLesion);
+  const tercerSetEditable = esWo && esLesion ? true : requiereTercerSet;
 
   useEffect(() => {
     // En STB, si el partido queda 2-0, limpiar el 3er set. En tradicional se deja la columna visible.
-    if (!esTercerSetCompleto && !requiereTercerSet && (s3A !== "" || s3B !== "")) {
+    if (
+      !esWo &&
+      !esTercerSetCompleto &&
+      !requiereTercerSet &&
+      (s3A !== "" || s3B !== "")
+    ) {
       setS3A("");
       setS3B("");
     }
-  }, [esTercerSetCompleto, requiereTercerSet, s3A, s3B]);
+  }, [esTercerSetCompleto, requiereTercerSet, s3A, s3B, esWo]);
 
   // Determinar total de sets ganados incluyendo el 3er set (para definir el ganador)
   const getSetsGanados = () => {
@@ -173,6 +187,81 @@ export const LiveArbitrajeRow = ({
         es_wo: true,
         es_injustificado_wo: false,
         es_lesion: false,
+      });
+      return;
+    }
+
+    if (esWo && esLesion) {
+      if (!parejaAbandona) {
+        onError("Debe seleccionar la pareja que abandona por lesión.");
+        return;
+      }
+      if (s1A === "" || s1B === "") {
+        onError("Debe ingresar al menos los games jugados en el Set 1 antes del retiro.");
+        return;
+      }
+      if ((s2A !== "" && s2B === "") || (s2A === "" && s2B !== "")) {
+        onError("Si ingresa el Set 2, debe ingresar los games de ambas parejas.");
+        return;
+      }
+      if ((s3A !== "" && s3B === "") || (s3A === "" && s3B !== "")) {
+        onError("Si ingresa el Set 3, debe ingresar los games de ambas parejas.");
+        return;
+      }
+
+      const n1A = Number(s1A);
+      const n1B = Number(s1B);
+      const n2A = s2A !== "" ? Number(s2A) : null;
+      const n2B = s2B !== "" ? Number(s2B) : null;
+      const n3A = s3A !== "" ? Number(s3A) : null;
+      const n3B = s3B !== "" ? Number(s3B) : null;
+
+      if (n1A < 0 || n1B < 0 || n1A > 7 || n1B > 7) {
+        onError("Los games del Set 1 deben estar entre 0 y 7.");
+        return;
+      }
+      if (
+        n2A !== null &&
+        n2B !== null &&
+        (n2A < 0 || n2B < 0 || n2A > 7 || n2B > 7)
+      ) {
+        onError("Los games del Set 2 deben estar entre 0 y 7.");
+        return;
+      }
+
+      const completado = completarScorePorLesion({
+        s1A: n1A,
+        s1B: n1B,
+        s2A: n2A,
+        s2B: n2B,
+        s3A: n3A,
+        s3B: n3B,
+        retiraLado: parejaAbandona,
+        esTercerSetCompleto,
+        stbPuntosTarget,
+      });
+
+      const ganadorId =
+        completado.ganadorLado === "A"
+          ? partido.equipo_a_id
+          : partido.equipo_b_id;
+
+      if (!ganadorId) {
+        onError("No se pudo identificar el equipo ganador.");
+        return;
+      }
+
+      onSave(partido.id, ganadorId, {
+        set1_a: completado.set1_a,
+        set1_b: completado.set1_b,
+        set2_a: completado.set2_a,
+        set2_b: completado.set2_b,
+        set3_a: completado.set3_a,
+        set3_b: completado.set3_b,
+        es_supertiebreak: !esTercerSetCompleto && completado.set3_a !== null,
+        es_wo: true,
+        es_injustificado_wo: false,
+        es_lesion: true,
       });
       return;
     }
@@ -457,61 +546,121 @@ export const LiveArbitrajeRow = ({
             ))}
           </div>
         ) : (
-          <div
-            className="grid items-center gap-x-1.5 gap-y-0"
-            style={{
-              gridTemplateColumns: `minmax(0,1fr) repeat(${columnas.length}, 3.5rem)`,
-            }}
-          >
-            <span />
-            {columnas.map((columna) => (
-              <span
-                key={`${columna.id}-label`}
-                className="whitespace-nowrap rounded-t-md border border-b-0 border-white/15 bg-white/10 py-1 text-center text-xs font-bold tracking-wide text-brand-ayuda"
-              >
-                {columna.label}
-              </span>
-            ))}
-            <p
-              className={`truncate text-right text-xs font-bold ${
-                setsA >= 2 ? "text-brand-chartreuse" : "text-white"
-              }`}
-            >
-              {etiquetaLado("a")}
-            </p>
-            {columnas.map((columna) => (
-              <span
-                key={`${columna.id}-a`}
-                className="flex justify-center border-x border-b border-white/10 bg-white/[0.03] py-1"
-              >
-                {casilla(
-                  columna.valorA,
-                  columna.setA,
-                  `${columna.label}, ${etiquetaLado("a")}`,
-                  columna.disabled,
+          <div className="space-y-1.5">
+            {esWo && esLesion && (
+              <div className="flex items-center justify-between rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[11px] text-red-200">
+                <span>
+                  Retiro por lesión: cargue el marcador parcial y seleccione la pareja que abandona. El sistema completará a favor de la otra.
+                </span>
+                {parejaAbandona ? (
+                  <span className="font-bold text-red-300">
+                    Abandona: {parejaAbandona === "A" ? etiquetaLado("a") : etiquetaLado("b")}
+                  </span>
+                ) : (
+                  <span className="font-semibold text-amber-300">
+                    Seleccione qué pareja abandona
+                  </span>
                 )}
-              </span>
-            ))}
-            <p
-              className={`truncate text-right text-xs font-bold ${
-                setsB >= 2 ? "text-brand-chartreuse" : "text-white"
-              }`}
+              </div>
+            )}
+            <div
+              className="grid items-center gap-x-1.5 gap-y-0"
+              style={{
+                gridTemplateColumns: `minmax(0,1fr) repeat(${columnas.length}, 3.5rem)`,
+              }}
             >
-              {etiquetaLado("b")}
-            </p>
-            {columnas.map((columna) => (
-              <span
-                key={`${columna.id}-b`}
-                className="flex justify-center rounded-b-md border border-t-0 border-white/10 bg-white/[0.03] py-1"
-              >
-                {casilla(
-                  columna.valorB,
-                  columna.setB,
-                  `${columna.label}, ${etiquetaLado("b")}`,
-                  columna.disabled,
+              <span />
+              {columnas.map((columna) => (
+                <span
+                  key={`${columna.id}-label`}
+                  className="whitespace-nowrap rounded-t-md border border-b-0 border-white/15 bg-white/10 py-1 text-center text-xs font-bold tracking-wide text-brand-ayuda"
+                >
+                  {columna.label}
+                </span>
+              ))}
+              <div className="flex items-center justify-end gap-1.5 min-w-0">
+                {esWo && esLesion && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setParejaAbandona((prev) => (prev === "A" ? null : "A"))
+                    }
+                    className={`h-5 shrink-0 cursor-pointer rounded px-2 text-[10px] font-extrabold uppercase transition-all ${
+                      parejaAbandona === "A"
+                        ? "bg-red-600 text-white shadow-sm ring-1 ring-red-400"
+                        : "border border-white/15 bg-white/5 text-gray-300 hover:border-red-400/50 hover:text-red-300"
+                    }`}
+                  >
+                    {parejaAbandona === "A" ? "Abandona" : "Marcar retiro"}
+                  </button>
                 )}
-              </span>
-            ))}
+                <p
+                  className={`truncate text-right text-xs font-bold ${
+                    parejaAbandona === "A"
+                      ? "text-red-400 line-through opacity-80"
+                      : setsA >= 2
+                      ? "text-brand-chartreuse"
+                      : "text-white"
+                  }`}
+                >
+                  {etiquetaLado("a")}
+                </p>
+              </div>
+              {columnas.map((columna) => (
+                <span
+                  key={`${columna.id}-a`}
+                  className="flex justify-center border-x border-b border-white/10 bg-white/[0.03] py-1"
+                >
+                  {casilla(
+                    columna.valorA,
+                    columna.setA,
+                    `${columna.label}, ${etiquetaLado("a")}`,
+                    columna.disabled,
+                  )}
+                </span>
+              ))}
+              <div className="flex items-center justify-end gap-1.5 min-w-0">
+                {esWo && esLesion && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setParejaAbandona((prev) => (prev === "B" ? null : "B"))
+                    }
+                    className={`h-5 shrink-0 cursor-pointer rounded px-2 text-[10px] font-extrabold uppercase transition-all ${
+                      parejaAbandona === "B"
+                        ? "bg-red-600 text-white shadow-sm ring-1 ring-red-400"
+                        : "border border-white/15 bg-white/5 text-gray-300 hover:border-red-400/50 hover:text-red-300"
+                    }`}
+                  >
+                    {parejaAbandona === "B" ? "Abandona" : "Marcar retiro"}
+                  </button>
+                )}
+                <p
+                  className={`truncate text-right text-xs font-bold ${
+                    parejaAbandona === "B"
+                      ? "text-red-400 line-through opacity-80"
+                      : setsB >= 2
+                      ? "text-brand-chartreuse"
+                      : "text-white"
+                  }`}
+                >
+                  {etiquetaLado("b")}
+                </p>
+              </div>
+              {columnas.map((columna) => (
+                <span
+                  key={`${columna.id}-b`}
+                  className="flex justify-center rounded-b-md border border-t-0 border-white/10 bg-white/[0.03] py-1"
+                >
+                  {casilla(
+                    columna.valorB,
+                    columna.setB,
+                    `${columna.label}, ${etiquetaLado("b")}`,
+                    columna.disabled,
+                  )}
+                </span>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -524,7 +673,10 @@ export const LiveArbitrajeRow = ({
               checked={esWo}
               onChange={(e) => {
                 setEsWo(e.target.checked);
-                if (!e.target.checked) setEsLesion(false);
+                if (!e.target.checked) {
+                  setEsLesion(false);
+                  setParejaAbandona(null);
+                }
               }}
               className="accent-brand-chartreuse rounded"
             />
@@ -538,7 +690,10 @@ export const LiveArbitrajeRow = ({
               <input
                 type="checkbox"
                 checked={esLesion}
-                onChange={(e) => setEsLesion(e.target.checked)}
+                onChange={(e) => {
+                  setEsLesion(e.target.checked);
+                  if (!e.target.checked) setParejaAbandona(null);
+                }}
                 className="accent-red-500 rounded"
               />
               Lesión

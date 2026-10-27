@@ -208,8 +208,12 @@ export const MatchCard = ({
             </span>
           )}
           {partido.es_wo && (
-            <span className="text-xs font-black text-amber-500 uppercase">
-              W.O.
+            <span
+              className={`text-xs font-black uppercase ${
+                partido.es_lesion ? "text-red-400" : "text-amber-500"
+              }`}
+            >
+              {partido.es_lesion ? "W.O. Lesión" : "W.O."}
             </span>
           )}
           {finalizado && (

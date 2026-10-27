@@ -408,7 +408,19 @@ export const PasoResultados = ({
         className="flex items-center gap-4 border-b border-white/8 px-3 py-3 text-xs"
       >
         <div className="w-44 shrink-0 space-y-1.5">
-          <p className="font-black tabular-nums text-sky-400">#{code}</p>
+          <div className="flex items-center gap-1.5">
+            <span className="font-black tabular-nums text-sky-400">#{code}</span>
+            {p.es_wo && !p.es_lesion && (
+              <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-amber-300">
+                W.O.
+              </span>
+            )}
+            {p.es_lesion && (
+              <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-red-300">
+                W.O. Lesión
+              </span>
+            )}
+          </div>
           <p className="flex items-center gap-1.5 text-sm font-black tabular-nums tracking-tight text-white">
             <Clock className="size-3.5 shrink-0 text-green-400" aria-hidden />
             {hora || "Hora a definir"}
