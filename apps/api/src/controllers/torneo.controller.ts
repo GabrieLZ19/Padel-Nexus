@@ -7,6 +7,7 @@ import { esRolAccesoCrm, esRolAdministrativo } from "../constants/roles";
 import { esTorneoDePrueba } from "../utils/datoPrueba";
 import { AlcanceCuentaService } from "../services/alcanceCuenta.service";
 import { decidirAlcanceTorneo, type AccionSobreTorneo } from "../utils/alcanceCuenta";
+import { completarScorePorLesion } from "../utils/scoreLesion";
 
 async function negarAlcance(
   req: Request,
@@ -458,7 +459,7 @@ export const actualizarResultado = async (
 
     const { data: partidoData, error: errPartido } = await supabaseAdmin
       .from("partidos")
-      .select("id, torneo_id")
+      .select("id, torneo_id, equipo_a_id, equipo_b_id")
       .eq("id", partido_id)
       .maybeSingle();
 
@@ -496,16 +497,51 @@ export const actualizarResultado = async (
       }
     }
 
+    let finalSet1A = Number(set1_a);
+    let finalSet1B = Number(set1_b);
+    let finalSet2A = set2_a !== undefined && set2_a !== null ? Number(set2_a) : null;
+    let finalSet2B = set2_b !== undefined && set2_b !== null ? Number(set2_b) : null;
+    let finalSet3A = set3_a !== undefined && set3_a !== null ? Number(set3_a) : null;
+    let finalSet3B = set3_b !== undefined && set3_b !== null ? Number(set3_b) : null;
+    let finalGanadorId = ganador_id;
+    let finalEsSupertiebreak = Boolean(es_supertiebreak);
+
+    if (Boolean(es_lesion) && partidoData.equipo_a_id && partidoData.equipo_b_id) {
+      const retiraLado = ganador_id === partidoData.equipo_a_id ? "B" : "A";
+      const completado = completarScorePorLesion({
+        s1A: finalSet1A,
+        s1B: finalSet1B,
+        s2A: finalSet2A,
+        s2B: finalSet2B,
+        s3A: finalSet3A,
+        s3B: finalSet3B,
+        retiraLado,
+      });
+      finalSet1A = completado.set1_a;
+      finalSet1B = completado.set1_b;
+      finalSet2A = completado.set2_a;
+      finalSet2B = completado.set2_b;
+      finalSet3A = completado.set3_a;
+      finalSet3B = completado.set3_b;
+      finalGanadorId =
+        completado.ganadorLado === "A"
+          ? partidoData.equipo_a_id
+          : partidoData.equipo_b_id;
+      if (finalSet3A !== null && finalSet3B !== null) {
+        finalEsSupertiebreak = false;
+      }
+    }
+
     await TorneoService.procesarResultadoYAvance(
       partido_id,
-      ganador_id,
-      Number(set1_a),
-      Number(set1_b),
-      set2_a !== undefined && set2_a !== null ? Number(set2_a) : null,
-      set2_b !== undefined && set2_b !== null ? Number(set2_b) : null,
-      set3_a !== undefined && set3_a !== null ? Number(set3_a) : null,
-      set3_b !== undefined && set3_b !== null ? Number(set3_b) : null,
-      Boolean(es_supertiebreak),
+      finalGanadorId,
+      finalSet1A,
+      finalSet1B,
+      finalSet2A,
+      finalSet2B,
+      finalSet3A,
+      finalSet3B,
+      finalEsSupertiebreak,
       Boolean(es_wo),
       Boolean(es_injustificado_wo),
       Boolean(es_lesion),
