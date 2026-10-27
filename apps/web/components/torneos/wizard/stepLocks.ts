@@ -24,8 +24,6 @@ export function numeroPasoVisible(
 }
 
 const ESTADOS_MODO_LECTURA = new Set([
-  "Programado",
-  "En curso",
   "Finalizado",
 ]);
 
@@ -74,26 +72,34 @@ export function hrefDetalleTorneo(
 
 /**
  * Reglas (dashboard + club):
- * - Programado: bloquea datos, logos, categorías, jugadores, fiscales y cierre.
- *   Los cuadros siguen editables. Clubes y canchas se cargan en el programador.
- *   Los resultados se habilitan al publicar.
- * - En curso: igual, con resultados habilitados. Cuadros y horarios publicados
- *   se cambian con motivo y quedan en auditoría.
- * - Finalizado: bloquea la configuración; cuadros y resultados en lectura.
+ * - Finalizado: bloquea la configuración, cuadros y resultados en modo lectura.
+ * - Programado: fixture generado. Los pasos de datos, logos, categorías, fiscales y cierre
+ *   permanecen editables para corregir datos previos (F1 / R8).
+ *   Altas/bajas directas de parejas en Jugadores quedan bloqueadas para no romper el fixture ya armado.
+ *   Resultados se habilitan recién al publicar la programación (En curso).
+ * - En curso: resultados y cuadros habilitados.
  */
 export function isWizardPasoReadOnly(
   estado: string | null | undefined,
   pasoId: WizardPasoId,
 ): boolean {
-  if (!esEstadoTorneoModoLectura(estado)) return false;
+  const est = String(estado || "").trim();
+  if (est === "Finalizado") return true;
+
+  if (pasoId === "matches") {
+    return est !== "En curso";
+  }
+
+  if (pasoId === "players") {
+    return est === "Programado" || est === "En curso";
+  }
 
   if (pasoId === "draws") {
-    return estado === "Finalizado";
+    return false;
   }
-  if (pasoId === "matches") {
-    return estado !== "En curso";
-  }
-  return true;
+
+  // edit, logos, categories, fiscales, cierre son editables
+  return false;
 }
 
 export function pasoBloqueadoPorAlcance(
@@ -121,7 +127,7 @@ export function textoBannerModoLectura(estado: string): string {
     return "Los pasos de configuración y logística están bloqueados. Los cuadros y la carga de resultados permanecen habilitados en modo lectura.";
   }
   if (estado === "Programado") {
-    return "Fixture generado. Los pasos de datos, logos, categorías, jugadores, fiscales y cierre están bloqueados. Podés ajustar cuadros, y los clubes y canchas en el programador. Al publicar la programación el torneo pasa a En curso y se habilita la carga de resultados.";
+    return "Fixture generado. Podés revisar o ajustar datos, categorías, cuadros y programar horarios en el programador visual. Al publicar la programación el torneo pasa a En curso y se habilita la carga de resultados.";
   }
-  return "El torneo está en curso. Los pasos de datos, logos, categorías, jugadores, fiscales y cierre están bloqueados. Cuadros y resultados siguen habilitados. Clubes y canchas se cargan en el programador. Un cambio de cuadro o de horario ya publicado pide un motivo y queda en auditoría.";
+  return "El torneo está en curso. Podés ajustar cuadros y cargar resultados. Un cambio de cuadro o de horario ya publicado pide un motivo y queda en auditoría.";
 }

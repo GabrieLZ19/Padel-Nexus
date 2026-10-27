@@ -16,6 +16,7 @@ import {
   X,
   Printer,
   CalendarClock,
+  AlertCircle,
 } from "lucide-react";
 import { ProgramacionEntryPanel } from "./programador/ProgramacionEntryPanel";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
@@ -49,6 +50,7 @@ interface BracketEditorProps {
   inscripciones?: Inscripcion[];
   onRefresh?: () => void;
   isReadOnly?: boolean;
+  setActiveTab?: (tab: string) => void | Promise<void>;
 }
 
 export const BracketEditor: React.FC<BracketEditorProps> = ({
@@ -58,8 +60,15 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   inscripciones = [],
   onRefresh,
   isReadOnly = false,
+  setActiveTab,
 }) => {
   const siglaRectora = useSiglaRectora();
+  const diasJuego = Array.isArray(torneo?.dias_juego)
+    ? torneo.dias_juego.filter(
+        (d: any) => typeof d === "string" && d.trim().length > 0,
+      )
+    : [];
+  const tieneDiasCompetencia = diasJuego.length > 0;
   const formatoLower = torneo?.formato?.toLowerCase() || "";
   // Solo eliminatoria pura. "Zonas + Eliminatoria" NO es directa.
   const isEliminatoriaDirecta =
@@ -170,6 +179,26 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   };
 
   const handleRegenerarZonas = async () => {
+    if (!tieneDiasCompetencia) {
+      setFeedbackModal({
+        isOpen: true,
+        type: "warning",
+        title: "Días de competencia requeridos",
+        description:
+          "No se definió ningún día de competencia en el Paso 3 (Categorías). Configurá los días antes de generar los cuadros.",
+        confirmText: setActiveTab ? "Ir al Paso 3" : undefined,
+        cancelText: "Cerrar",
+        onConfirm: setActiveTab
+          ? () => {
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
+              void setActiveTab("categories");
+            }
+          : undefined,
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
+      return;
+    }
+
     const totalInscritos = (inscripciones || []).length;
     if (totalInscritos < 3) {
       setFeedbackModal({
@@ -1140,6 +1169,25 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               Actualmente hay {(inscripciones || []).length}.
             </div>
           )}
+          {puedeRegenerarZonas && !tieneDiasCompetencia && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs px-4 py-3 rounded-xl font-medium w-full">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="size-4 shrink-0 text-amber-400" />
+                <span>
+                  <strong>Días de competencia requeridos:</strong> Debés seleccionar los días de competencia en el Paso 3 (Categorías) antes de generar las zonas.
+                </span>
+              </div>
+              {setActiveTab && (
+                <button
+                  type="button"
+                  onClick={() => void setActiveTab("categories")}
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded-lg transition-colors whitespace-nowrap cursor-pointer shrink-0"
+                >
+                  Ir al Paso 3
+                </button>
+              )}
+            </div>
+          )}
           {(inscripciones || []).length >= 3 &&
             (inscripciones || []).some(
               (ins) => ins.estado_pago !== "Confirmado",
@@ -1159,14 +1207,21 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   (inscripciones || []).length < 3 ||
                   (inscripciones || []).some(
                     (ins) => ins.estado_pago !== "Confirmado",
-                  )
+                  ) ||
+                  !tieneDiasCompetencia
+                }
+                title={
+                  !tieneDiasCompetencia
+                    ? "Definí los días de competencia en el Paso 3 (Categorías) para habilitar la generación de cuadros"
+                    : undefined
                 }
                 className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-all relative disabled:opacity-40 disabled:cursor-not-allowed ${
                   tourStep === 0 &&
                   (inscripciones || []).length >= 3 &&
                   !(inscripciones || []).some(
                     (ins) => ins.estado_pago !== "Confirmado",
-                  )
+                  ) &&
+                  tieneDiasCompetencia
                     ? "ring-4 ring-brand-chartreuse shadow-[0_0_20px_rgba(204,255,0,0.6)] z-101 bg-brand-card text-brand-white border-brand-chartreuse"
                     : ""
                 }`}

@@ -27,6 +27,8 @@ export interface Torneo {
   subtitulo?: string | null;
   club_id?: string | null;
   fecha?: string | null;
+  fecha_fin?: string | null;
+  dias_juego?: string[] | null;
   estado: EstadoTorneo;
   /** Señal operativa del listado: pendiente concreto o horarios sin publicar. */
   pendiente?: string | null;

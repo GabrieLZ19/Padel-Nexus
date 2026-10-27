@@ -4,6 +4,7 @@ import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Inscripcion, Partido } from "@/utils/types";
 import { BracketEditor } from "@/components/torneos/BracketEditor";
 import { CUPOS_ESTANDAR_FAP } from "@/utils/constants/fapApaRules";
+import { AlertCircle } from "lucide-react";
 
 interface Paso6CuadrosProps {
   torneo: Torneo;
@@ -48,10 +49,39 @@ export const Paso6Cuadros = ({
     (ins) => ins.estado_pago !== "Confirmado",
   );
   const cupoValido = CUPOS_VALIDOS.includes(cantidadInscriptos);
+  const diasJuego = Array.isArray(torneo?.dias_juego)
+    ? torneo.dias_juego.filter(
+        (d: any) => typeof d === "string" && d.trim().length > 0,
+      )
+    : [];
+  const tieneDiasCompetencia = diasJuego.length > 0;
   const puedeGenerar =
-    !generando && cantidadInscriptos >= 4 && cupoValido && !hayPendientes;
+    !generando &&
+    cantidadInscriptos >= 4 &&
+    cupoValido &&
+    !hayPendientes &&
+    tieneDiasCompetencia;
 
   const handleGenerarCuadro = async () => {
+    if (!tieneDiasCompetencia) {
+      setFeedbackModal((prev: any) => ({
+        ...prev,
+        isOpen: true,
+        type: "warning",
+        title: "Días de competencia requeridos",
+        description:
+          "No se definió ningún día de competencia en el Paso 3 (Categorías). Configurá los días antes de generar el fixture.",
+        confirmText: "Ir al Paso 3",
+        cancelText: "Cerrar",
+        onConfirm: () => {
+          setFeedbackModal((prev: any) => ({ ...prev, isOpen: false }));
+          void setActiveTab("categories");
+        },
+        onClose: () => setFeedbackModal((prev: any) => ({ ...prev, isOpen: false })),
+      }));
+      return;
+    }
+
     if (cantidadInscriptos < 4) {
       setFeedbackModal((prev: any) => ({
         ...prev,
@@ -179,10 +209,32 @@ export const Paso6Cuadros = ({
                   {CUPOS_VALIDOS.join(", ")}.
                 </p>
               )}
+              {!tieneDiasCompetencia && (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs px-4 py-3 rounded-xl font-medium w-full mt-3">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="size-4 shrink-0 text-amber-400" />
+                    <span>
+                      <strong>Días de competencia requeridos:</strong> Marcá los días en el Paso 3 (Categorías) antes de generar el fixture.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void setActiveTab("categories")}
+                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs rounded-lg transition-colors whitespace-nowrap cursor-pointer shrink-0"
+                  >
+                    Ir al Paso 3
+                  </button>
+                </div>
+              )}
             </div>
             <button
               onClick={handleGenerarCuadro}
               disabled={!puedeGenerar}
+              title={
+                !tieneDiasCompetencia
+                  ? "Definí los días de competencia en el Paso 3 (Categorías) antes de generar el cuadro"
+                  : undefined
+              }
               className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-40 cursor-pointer"
             >
               {generando ? "Generando..." : "Generar Cuadro"}
@@ -197,6 +249,7 @@ export const Paso6Cuadros = ({
         inscripciones={inscripciones}
         onRefresh={triggerRefresh}
         isReadOnly={isReadOnly}
+        setActiveTab={setActiveTab}
       />
 
       {!isReadOnly && (
