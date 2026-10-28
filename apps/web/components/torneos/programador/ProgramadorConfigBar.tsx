@@ -98,10 +98,51 @@ export function ProgramadorConfigBar({
     value: d,
     label: formatDia(d),
   }));
+
+  const currentInicio =
+    (activeDay && config.franjasPorDia?.[activeDay]?.inicio) ||
+    config.horaInicio ||
+    "08:00";
+
+  const currentFin =
+    activeDay && config.franjasPorDia?.[activeDay]?.fin !== undefined
+      ? config.franjasPorDia[activeDay].fin
+      : config.horaFin || "";
+
   const finOpts = [
     { value: "", label: "Por defecto (hasta 00:00)" },
-    ...horasFinOpciones(config.horaInicio),
+    ...horasFinOpciones(currentInicio),
   ];
+
+  const handleInicioChange = (v: string) => {
+    if (activeDay) {
+      const nextFranjas = {
+        ...(config.franjasPorDia || {}),
+        [activeDay]: {
+          ...(config.franjasPorDia?.[activeDay] || {}),
+          inicio: v,
+        },
+      };
+      onChange({ franjasPorDia: nextFranjas });
+    } else {
+      onChange({ horaInicio: v });
+    }
+  };
+
+  const handleFinChange = (v: string) => {
+    if (activeDay) {
+      const nextFranjas = {
+        ...(config.franjasPorDia || {}),
+        [activeDay]: {
+          ...(config.franjasPorDia?.[activeDay] || {}),
+          fin: v,
+        },
+      };
+      onChange({ franjasPorDia: nextFranjas });
+    } else {
+      onChange({ horaFin: v });
+    }
+  };
 
   return (
     <div className="prog-surface flex shrink-0 flex-col gap-1.5 rounded-2xl px-2.5 py-1.5">
@@ -217,11 +258,11 @@ export function ProgramadorConfigBar({
         </div>
         <div>
           <span className="mb-0.5 block text-xs font-bold uppercase tracking-wider text-gray-400">
-            Inicio
+            Inicio {activeDay ? `(${formatDia(activeDay)})` : ""}
           </span>
           <CustomDropdown
-            value={config.horaInicio}
-            onChange={(v) => onChange({ horaInicio: v })}
+            value={currentInicio}
+            onChange={handleInicioChange}
             options={horasInicioOpciones()}
             placeholder="Inicio"
             disabled={disabled}
@@ -230,11 +271,11 @@ export function ProgramadorConfigBar({
         </div>
         <div>
           <span className="mb-0.5 block text-xs font-bold uppercase tracking-wider text-gray-400">
-            Fin
+            Fin {activeDay ? `(${formatDia(activeDay)})` : ""}
           </span>
           <CustomDropdown
-            value={config.horaFin}
-            onChange={(v) => onChange({ horaFin: v })}
+            value={currentFin}
+            onChange={handleFinChange}
             options={finOpts}
             placeholder="Fin"
             disabled={disabled}

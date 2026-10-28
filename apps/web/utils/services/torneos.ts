@@ -400,6 +400,7 @@ export const TorneosService = {
       jornadas?: number;
       horaInicio?: string;
       horaFin?: string;
+      franjasPorDia?: string | Record<string, { inicio?: string; fin?: string }>;
     },
   ): Promise<ProgramacionBoard> {
     const response = await api.get<ProgramacionBoard>(
@@ -458,6 +459,7 @@ export const TorneosService = {
       jornadas?: number;
       horaInicio?: string;
       horaFin?: string;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
       motivo?: string;
     } = {},
   ): Promise<ProgramacionBoard> {
@@ -478,6 +480,7 @@ export const TorneosService = {
       jornadas?: number;
       horaInicio?: string;
       horaFin?: string;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
     } = {},
   ): Promise<ProgramacionBoard> {
     const response = await api.post<ProgramacionBoard>(
@@ -579,6 +582,7 @@ export interface ProgramacionBoard {
     cancha_label: string;
     fecha_iso: string;
   }>;
+  franjas_por_dia?: Record<string, { inicio: string; fin: string }>;
   partidos: BoardPartido[];
   issues: ProgramacionIssue[];
   summary: {

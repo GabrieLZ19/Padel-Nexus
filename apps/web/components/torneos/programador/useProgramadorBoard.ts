@@ -22,6 +22,7 @@ export interface ProgramadorConfig {
   jornadas: 0 | 1 | 2 | 3 | 4;
   horaInicio: string;
   horaFin: string;
+  franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
 }
 
 function boardQuery(config: ProgramadorConfig) {
@@ -31,6 +32,9 @@ function boardQuery(config: ProgramadorConfig) {
     ...(config.jornadas ? { jornadas: config.jornadas } : {}),
     horaInicio: config.horaInicio,
     ...(config.horaFin ? { horaFin: config.horaFin } : {}),
+    ...(config.franjasPorDia && Object.keys(config.franjasPorDia).length > 0
+      ? { franjasPorDia: JSON.stringify(config.franjasPorDia) }
+      : {}),
   };
 }
 
@@ -82,6 +86,10 @@ export function useProgramadorBoard(torneoId: string) {
       duracion: ([60, 75, 90].includes(data.duracion_partido_minutos)
         ? data.duracion_partido_minutos
         : c.duracion) as 60 | 75 | 90,
+      franjasPorDia: {
+        ...(c.franjasPorDia || {}),
+        ...(data.franjas_por_dia || {}),
+      },
     }));
     setActiveDay((prev) => {
       if (prev && data.dias.includes(prev)) return prev;
@@ -367,6 +375,9 @@ export function useProgramadorBoard(torneoId: string) {
         ...(configRef.current.horaFin
           ? { horaFin: configRef.current.horaFin }
           : {}),
+        ...(configRef.current.franjasPorDia
+          ? { franjasPorDia: configRef.current.franjasPorDia }
+          : {}),
       });
       applyBoard(data);
       sileo.success({ title: "Auto-asignación aplicada" });
@@ -389,6 +400,7 @@ export function useProgramadorBoard(torneoId: string) {
         ...(actual.jornadas ? { jornadas: actual.jornadas } : {}),
         horaInicio: actual.horaInicio,
         ...(actual.horaFin ? { horaFin: actual.horaFin } : {}),
+        ...(actual.franjasPorDia ? { franjasPorDia: actual.franjasPorDia } : {}),
       });
       applyBoard(data);
       sileo.success({
