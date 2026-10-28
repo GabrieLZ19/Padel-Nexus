@@ -64,18 +64,19 @@ function slotsDesdeContexto(
 ): SlotProgramacion[] {
   const dias = diasDelContexto(contexto, ventana?.jornadas);
   const horaInicioMin = minutosDesdeHora(ventana?.horaInicio) ?? undefined;
-  const horaFinMin = minutosDesdeHora(ventana?.horaFin) ?? undefined;
+  let horaFinMin = minutosDesdeHora(ventana?.horaFin) ?? undefined;
+  if (horaFinMin != null) {
+    const piso = horaInicioMin ?? 8 * 60;
+    if (horaFinMin <= piso) {
+      horaFinMin += 1440;
+    }
+  }
   return generarSlotsDesdeSedesYVentana({
     canchas: contexto.disponibilidad,
     dias,
     duracionMinutos,
     horaInicioMin,
-    horaFinMin:
-      horaInicioMin != null &&
-      horaFinMin != null &&
-      horaFinMin < horaInicioMin
-        ? undefined
-        : horaFinMin,
+    horaFinMin,
   });
 }
 
@@ -573,9 +574,11 @@ export class ProgramacionService {
       duracionMinutos: duracion,
       horaInicioMin: minutosDesdeHora(opciones.horaInicio) ?? undefined,
       horaFinMin: (() => {
-        const inicio = minutosDesdeHora(opciones.horaInicio);
-        const fin = minutosDesdeHora(opciones.horaFin);
-        if (inicio != null && fin != null && fin < inicio) return undefined;
+        const inicio = minutosDesdeHora(opciones.horaInicio) ?? 8 * 60;
+        let fin = minutosDesdeHora(opciones.horaFin);
+        if (fin != null && fin <= inicio) {
+          fin += 1440;
+        }
         return fin ?? undefined;
       })(),
     });

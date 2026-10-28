@@ -313,4 +313,39 @@ describe("programador paso 5", () => {
       false,
     );
   });
+
+  it("R1 - genera slots nocturnos hasta medianoche (00:00) y cubre rango ampliado", () => {
+    const cancha: DisponibilidadTorneo = {
+      club_id: "club-1",
+      cancha_id: "cancha-1",
+      fecha: "2026-10-10",
+      hora_inicio: "08:00:00",
+      clubes: { nombre: "Club" },
+      canchas: { nombre: "1" },
+    };
+
+    // Caso 1: Por defecto, la grilla supera 21:00 y llega hasta turnos de las 23:00
+    const slotsDefault = generarSlotsDesdeSedesYVentana({
+      canchas: [cancha],
+      dias: ["2026-10-10"],
+      duracionMinutos: 90,
+    });
+    const horasDefault = slotsDefault.map((s) => s.hora.slice(0, 5));
+    assert.equal(horasDefault.includes("21:30"), true);
+    assert.equal(horasDefault.includes("23:00"), true);
+
+    // Caso 2: Especificando horaFinMin hasta medianoche (1440 min) con turnos de 60 min
+    const slotsMedianoche = generarSlotsDesdeSedesYVentana({
+      canchas: [cancha],
+      dias: ["2026-10-10"],
+      duracionMinutos: 60,
+      horaInicioMin: 22 * 60,
+      horaFinMin: 24 * 60,
+    });
+    const horasMedianoche = slotsMedianoche.map((s) => s.hora.slice(0, 5));
+    assert.deepEqual(horasMedianoche, ["22:00", "23:00", "00:00"]);
+    // Verificar que nunca formatee como '24:00:00'
+    assert.equal(slotsMedianoche.some((s) => s.hora.startsWith("24:")), false);
+  });
 });
+

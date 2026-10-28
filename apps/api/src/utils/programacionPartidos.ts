@@ -40,12 +40,12 @@ export interface SlotProgramacion {
 export const FAP_HORA_INICIO_MIN = 9 * 60;
 export const FAP_HORA_INICIO_MAX = 22 * 60;
 
-/** Grilla del programador visual: inicios de partido 08:00–21:00. */
+/** Grilla del programador visual: inicios de partido 08:00 hasta la medianoche (00:00). */
 export const PROGRAMADOR_HORA_INICIO_MIN = 8 * 60;
-export const PROGRAMADOR_HORA_INICIO_MAX = 21 * 60;
+export const PROGRAMADOR_HORA_INICIO_MAX = 23 * 60 + 30;
 
-/** Hora fin de bloque al seedear disponibilidad (cubre último inicio 21:00 + 90′). */
-export const PROGRAMADOR_HORA_FIN_BLOQUE = "22:30:00";
+/** Hora fin de bloque al seedear disponibilidad (cubre turnos que finalizan a medianoche o madrugada). */
+export const PROGRAMADOR_HORA_FIN_BLOQUE = "23:59:59";
 export const PROGRAMADOR_HORA_INICIO_BLOQUE = "08:00:00";
 
 /**
@@ -119,7 +119,8 @@ function parseHoraAMinutos(hora: string): number {
 }
 
 function minutosAHoraStr(totalMin: number): string {
-  const h = Math.floor(totalMin / 60);
+  const normalized = ((totalMin % 1440) + 1440) % 1440;
+  const h = Math.floor(normalized / 60);
   const m = totalMin % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
 }
@@ -364,6 +365,9 @@ export function generarSlotsDesdeSedesYVentana(params: {
 
   return slots.sort((a, b) => {
     if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha);
+    if (a.fechaIso && b.fechaIso && a.fechaIso !== b.fechaIso) {
+      return a.fechaIso.localeCompare(b.fechaIso);
+    }
     if (a.hora !== b.hora) return a.hora.localeCompare(b.hora);
     return a.canchaLabel.localeCompare(b.canchaLabel);
   });

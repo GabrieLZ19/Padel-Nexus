@@ -199,8 +199,8 @@ export function sugerirCanchasYHoras(input: {
   }
   const ocupacion = partidos * duracion;
   // Primera jornada: 08:00 hasta las 11:00 del día siguiente (27 h).
-  // Cada jornada extra suma la grilla de 08:00 a 21:00 (13 h).
-  const ventana = 27 * 60 + (jornadas - 1) * 13 * 60;
+  // Cada jornada extra suma la grilla de 08:00 a 00:00 (16 h).
+  const ventana = 27 * 60 + (jornadas - 1) * 16 * 60;
   const canchas = Math.max(1, Math.ceil(ocupacion / ventana));
   const horas = Math.max(1, Math.ceil(ocupacion / canchas / 60));
   const mensaje = `Con ${partidos} partidos y turnos de ${duracion} min, necesitás como mínimo ${canchas} cancha${canchas === 1 ? "" : "s"} y ${horas} hora${horas === 1 ? "" : "s"}.`;
