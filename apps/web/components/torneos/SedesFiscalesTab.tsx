@@ -372,7 +372,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
     }
   };
 
-  /** Semilla 08:00–22:30 por día × cancha para el programador. */
+  /** Semilla 08:00–00:00 por día × cancha para el programador. */
   const buildSeedRows = (
     clubId: string,
     canchaIds: string[],
@@ -394,7 +394,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
           cancha_id: canchaId,
           fecha,
           hora_inicio: "08:00:00",
-          hora_fin: "22:30:00",
+          hora_fin: "23:59:59",
           categoria: categoriaLabel,
         });
       }
@@ -780,7 +780,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
             Horarios
           </h4>
           <p className="text-[11px] text-gray-500 leading-relaxed">
-            Elegí los clubes y las canchas. La grilla de horarios (08:00–21:00),
+            Elegí los clubes y las canchas. La grilla de horarios (08:00 a 00:00),
             la duración del partido y la asignación se arman en este programador.
           </p>
         </div>
@@ -1015,7 +1015,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
           </h4>
           <p className="text-[11px] text-gray-500">
             Marcá qué canchas de la sede entran al torneo. El programador arma la
-            grilla 08:00–21:00 en los días de competencia
+            grilla de 08:00 a 00:00 en los días de competencia
             {fechasCompetencia.length > 0
               ? ` (${fechasCompetencia.length} jornada${fechasCompetencia.length === 1 ? "" : "s"})`
               : ""}

@@ -57,7 +57,7 @@ export function ProgramacionEntryPanel({ torneoId }: Props) {
             </h3>
           </div>
           <p className="max-w-xl text-sm text-gray-400">
-            Arrastrá partidos a la grilla (08:00–21:00). Cada drop se guarda;
+            Arrastrá partidos a la grilla (08:00 a 00:00). Cada drop se guarda;
             Publicar solo hace visibles los horarios y bloquea la edición.
           </p>
           {loading ? (

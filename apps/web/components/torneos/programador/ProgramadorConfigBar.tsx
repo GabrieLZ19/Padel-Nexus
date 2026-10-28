@@ -56,14 +56,30 @@ const JORNADA_OPTS = [
   { value: "4", label: "4 días" },
 ] as const;
 
-function horasOpciones(desde?: string): { value: string; label: string }[] {
-  const piso = desde ? Number(desde.slice(0, 2)) * 60 + Number(desde.slice(3, 5)) : 8 * 60;
+function horasInicioOpciones(): { value: string; label: string }[] {
   const opts: { value: string; label: string }[] = [];
-  for (let min = 8 * 60; min <= 21 * 60; min += 30) {
-    if (desde && min < piso) continue;
+  for (let min = 7 * 60; min <= 23 * 60; min += 30) {
     const h = String(Math.floor(min / 60)).padStart(2, "0");
     const m = String(min % 60).padStart(2, "0");
     opts.push({ value: `${h}:${m}`, label: `${h}:${m}` });
+  }
+  return opts;
+}
+
+function horasFinOpciones(desde?: string): { value: string; label: string }[] {
+  const piso = desde
+    ? Number(desde.slice(0, 2)) * 60 + Number(desde.slice(3, 5)) + 30
+    : 8 * 60 + 30;
+  const opts: { value: string; label: string }[] = [];
+  for (let min = 8 * 60; min <= 24 * 60; min += 30) {
+    if (min < piso) continue;
+    if (min === 24 * 60) {
+      opts.push({ value: "00:00", label: "00:00 (medianoche)" });
+    } else {
+      const h = String(Math.floor(min / 60)).padStart(2, "0");
+      const m = String(min % 60).padStart(2, "0");
+      opts.push({ value: `${h}:${m}`, label: `${h}:${m}` });
+    }
   }
   return opts;
 }
@@ -83,8 +99,8 @@ export function ProgramadorConfigBar({
     label: formatDia(d),
   }));
   const finOpts = [
-    { value: "", label: "Sin hora de fin" },
-    ...horasOpciones(config.horaInicio),
+    { value: "", label: "Por defecto (hasta 00:00)" },
+    ...horasFinOpciones(config.horaInicio),
   ];
 
   return (
@@ -206,7 +222,7 @@ export function ProgramadorConfigBar({
           <CustomDropdown
             value={config.horaInicio}
             onChange={(v) => onChange({ horaInicio: v })}
-            options={horasOpciones()}
+            options={horasInicioOpciones()}
             placeholder="Inicio"
             disabled={disabled}
             className="!px-2.5 !py-1.5 !text-xs"

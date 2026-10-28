@@ -192,7 +192,12 @@ export function ScheduleGrid({
 
   const hours = useMemo(() => {
     const set = new Set(daySlots.map((s) => s.hora));
-    return [...set].sort();
+    const hourToMin = (h: string) => {
+      const [hh, mm] = h.slice(0, 5).split(":").map(Number);
+      const mins = (hh || 0) * 60 + (mm || 0);
+      return mins < 360 ? mins + 1440 : mins;
+    };
+    return [...set].sort((a, b) => hourToMin(a) - hourToMin(b));
   }, [daySlots]);
 
   const courts = useMemo(() => {
@@ -226,7 +231,7 @@ export function ScheduleGrid({
     return (
       <div className="prog-surface flex h-full min-h-[240px] items-center justify-center rounded-2xl p-8 text-center text-sm text-brand-ayuda">
         No hay canchas para este día. Sumalas con Agregar club / cancha:
-        la grilla se arma de 08:00 a 21:00.
+        la grilla se arma de 08:00 a 00:00.
       </div>
     );
   }
