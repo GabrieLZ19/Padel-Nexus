@@ -329,7 +329,7 @@ export default function ClubConfiguracionPage() {
                     </span>
                   </div>
                   <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-brand-chartreuse bg-brand-chartreuse/10 px-2 py-0.5 rounded-full border border-brand-chartreuse/20">
-                    Afiliado FAP
+                    Club Afiliado
                   </span>
                 </div>
               </div>

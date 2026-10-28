@@ -392,7 +392,7 @@ export default function SignUpPage() {
                     Ficha Deportiva
                   </span>
                   <h4 className="text-sm font-bold text-brand-white">
-                    FEDERADO OFICIAL FAP
+                    CARNET FEDERATIVO OFICIAL
                   </h4>
                 </div>
                 <Award className="size-8 text-brand-chartreuse animate-pulse" />
@@ -413,7 +413,7 @@ export default function SignUpPage() {
                 </div>
                 <div className="flex-1 space-y-1">
                   <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">
-                    Jugador FAP
+                    Jugador Federado
                   </p>
                   <h3 className="text-base font-bold text-brand-white leading-none">
                     {apellido
@@ -462,7 +462,7 @@ export default function SignUpPage() {
                   <div className="w-0.5 h-full bg-brand-white" />
                 </div>
                 <span className="text-[10px] font-mono text-gray-500">
-                  LIC-FAP-{dni ? dni.replace(/\./g, "") : "40234567"}
+                  LIC-{dni ? dni.replace(/\./g, "") : "40234567"}
                 </span>
               </div>
             </div>
@@ -474,8 +474,7 @@ export default function SignUpPage() {
               Sumate a la red
             </h2>
             <p className="text-gray-400 text-sm leading-relaxed max-w-sm">
-              Fichaje federativo y control de licencias unificado de la
-              Federación Argentina de Pádel.
+              Fichaje federativo y control de licencias unificado.
             </p>
           </div>
         </div>
@@ -504,7 +503,7 @@ export default function SignUpPage() {
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="size-5 text-brand-chartreuse animate-bounce" />
             <span className="text-brand-chartreuse text-xs font-bold uppercase tracking-wider">
-              Circuito oficial FAP
+              Circuito oficial federativo
             </span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-brand-white mb-1.5 tracking-tight">
@@ -675,7 +674,7 @@ export default function SignUpPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">
-                    DNI (Obligatorio FAP) *
+                    DNI (Obligatorio) *
                   </label>
                   <div className="relative group">
                     <Fingerprint

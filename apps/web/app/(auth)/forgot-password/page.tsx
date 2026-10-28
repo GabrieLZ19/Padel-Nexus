@@ -91,7 +91,7 @@ export default function ForgotPasswordPage() {
                 Enlace despachado
               </h3>
               <p className="text-sm text-gray-300">
-                Si el correo existe en el circuito FAP, recibirás un link de
+                Si el correo existe en la plataforma, recibirás un link de
                 actualización.
               </p>
             </div>

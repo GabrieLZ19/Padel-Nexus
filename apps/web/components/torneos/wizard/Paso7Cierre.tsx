@@ -257,9 +257,13 @@ export const Paso5Cierre = ({
                 <td className="p-4">
                   {(() => {
                     const reg = (torneo as any).reglamento || (torneo as any).asociacion || "FAP";
-                    return reg === "Amateur"
-                      ? "Ranking Amateur / Independiente"
-                      : `${reg} ${torneo.alcance || "Provincial"} Ranking`;
+                    if (torneo.alcance === "Local" || torneo.alcance === "Privado") {
+                      return "Ranking Local";
+                    }
+                    if (reg === "Amateur") {
+                      return "Ranking Amateur / Independiente";
+                    }
+                    return `${reg} ${torneo.alcance || "Provincial"} Ranking`;
                   })()}
                 </td>
                 <td className="p-4">{etiquetaNivelYCategoria(torneo.nivel, torneo.categoria) || "General"}</td>

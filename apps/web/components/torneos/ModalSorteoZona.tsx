@@ -156,7 +156,7 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-chartreuse/10 text-brand-chartreuse text-xs font-black uppercase tracking-wider border border-brand-chartreuse/20">
                 <ShieldCheck className="size-3.5" />
-                Reglamento FAP
+                Reglamento Oficial
               </div>
               <h3 className="text-lg font-extrabold text-white">
                 Sorteo Reglamentario · {nombreZona}

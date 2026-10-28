@@ -125,7 +125,7 @@ export default function DetalleAsociacionPage() {
           </div>
 
           <span className="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5 shrink-0">
-            <ShieldCheck className="size-4" /> Entidad Afiliada FAP
+            <ShieldCheck className="size-4" /> Entidad Afiliada
           </span>
         </div>
 

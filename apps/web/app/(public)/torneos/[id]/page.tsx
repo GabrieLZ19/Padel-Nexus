@@ -282,7 +282,7 @@ export default function TorneoDetallePage() {
       firstFailedCheck?.code === "rama" ||
       firstFailedCheck?.actionHref === "/mi-perfil/ajustes";
     btnText = needsCarnet
-      ? "Requiere carnet FAP"
+      ? "Requiere carnet federativo"
       : needsProfile
         ? "Completar perfil"
         : "Ver requisitos";

@@ -529,7 +529,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
           <div className="flex items-center gap-2.5 min-w-0">
             <AlertTriangle className="size-4 shrink-0 text-amber-400" />
             <span className="font-semibold">
-              Empate técnico absoluto FAP en {nombreZona}. Requiere sorteo
+              Empate técnico absoluto en {nombreZona}. Requiere sorteo
               reglamentario para definir puestos{" "}
               {posicionesEnDisputa.map((p) => `${p}.º`).join(" y ")}.
             </span>

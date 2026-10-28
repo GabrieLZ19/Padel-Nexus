@@ -467,9 +467,9 @@ export function findFapAsociacion<
   return list.find((a) => esAsociacionFap(a));
 }
 
-/** Alcance Nacional siempre organiza FAP. */
-export function debeForzarOrganizadorFap(alcance: string | null | undefined): boolean {
-  return /nacional/i.test(String(alcance || "").trim());
+/** Plataforma genérica: ningún alcance fuerza FAP fijo; las federaciones eligen su reglamento. */
+export function debeForzarOrganizadorFap(_alcance: string | null | undefined): boolean {
+  return false;
 }
 
 /** Amateur / Independiente: todos los roles excepto federación nacional. */
@@ -583,10 +583,11 @@ export function usarPlanillaInscripcionFap(torneo: {
   reglamento?: string | null;
   asociacion?: string | null;
 }): boolean {
-  if (/nacional/i.test(String(torneo.alcance || ""))) return true;
   const regl = String(torneo.reglamento || torneo.asociacion || "")
     .trim()
     .toUpperCase();
+  if (regl === "APA" || regl === "AMATEUR") return false;
+  if (/nacional/i.test(String(torneo.alcance || ""))) return true;
   return regl === "FAP";
 }
 

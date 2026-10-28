@@ -275,7 +275,7 @@ export default function PadrónAsociacionesPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-white/10 pb-6">
         <div>
           <div className="flex items-center gap-2 text-brand-chartreuse text-xs font-bold uppercase tracking-widest mb-1">
-            <Building2 className="size-4" /> Entidades Afiliadas FAP
+            <Building2 className="size-4" /> Entidades Afiliadas
           </div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">
             Padrón de Asociaciones y Agrupaciones

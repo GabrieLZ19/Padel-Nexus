@@ -13,7 +13,6 @@ import {
   getAlcancesPermitidos,
   getReglamentosPermitidos,
   filtrarAsociacionesOrganizadorasFap,
-  debeForzarOrganizadorFap,
   esAlcanceSinEntidadOrganizadora,
   puedeUsarReglamentoAmateur,
   reglamentoTorneo,
@@ -161,9 +160,8 @@ export const Paso1Datos = ({
     (torneo as { formato?: string }).formato || "Zonas + Llaves",
   );
 
-  const forzarFap = debeForzarOrganizadorFap(editAlcance);
   const sinEntidadOrganizadora = esAlcanceSinEntidadOrganizadora(editAlcance);
-  const organizadorDeshabilitado = forzarFap || sinEntidadOrganizadora;
+  const organizadorDeshabilitado = sinEntidadOrganizadora;
   const reglamentosDisponibles = getReglamentosPermitidos(
     userRole,
     editAlcance,
@@ -290,16 +288,6 @@ export const Paso1Datos = ({
     userRole,
   ]);
 
-  // Alcance Nacional ⇒ organizadora FAP + reglamento FAP
-  useEffect(() => {
-    if (!forzarFap) return;
-    if (fapFederacionId) {
-      setEditOrganizador(organizadorValue("fed", fapFederacionId));
-    }
-    if (editAsociacion !== "FAP") {
-      setEditAsociacion("FAP");
-    }
-  }, [forzarFap, fapFederacionId, editAsociacion]);
 
   // Amateur solo en Local/Privado (y roles permitidos)
   useEffect(() => {
@@ -377,15 +365,10 @@ export const Paso1Datos = ({
       setGuardandoDatos(true);
       const precioFinal = esGratis ? 0 : Math.max(0, Number(editPrecio) || 0);
       const orgParsed = parseOrganizador(
-        sinEntidadOrganizadora
-          ? ""
-          : forzarFap && fapFederacionId
-            ? organizadorValue("fed", fapFederacionId)
-            : editOrganizador,
+        sinEntidadOrganizadora ? "" : editOrganizador,
       );
-      const reglamentoFinal = forzarFap
-        ? "FAP"
-        : editAsociacion === "Amateur" && !sinEntidadOrganizadora
+      const reglamentoFinal =
+        editAsociacion === "Amateur" && !sinEntidadOrganizadora
           ? "FAP"
           : (editAsociacion as ReglamentoTorneo);
 
@@ -487,7 +470,7 @@ export const Paso1Datos = ({
             className={`w-full bg-brand-input border text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none ${
               erroresCampo.nombre ? "border-red-500/70" : "border-white/10"
             }`}
-            placeholder="Ej: Torneo FAP 5ª Categoría"
+            placeholder="Ej: Torneo Oficial 5ª Categoría"
           />
           {erroresCampo.nombre ? (
             <p className="mt-1.5 text-xs text-red-400" role="alert">
@@ -561,7 +544,6 @@ export const Paso1Datos = ({
             onChange={(val) => setEditAsociacion(val as ReglamentoTorneo)}
             options={reglamentosDisponibles}
             placeholder="Seleccionar Reglamento..."
-            disabled={forzarFap}
           />
         </div>
 
@@ -570,19 +552,13 @@ export const Paso1Datos = ({
             Entidad Organizadora
           </label>
           <CustomDropdown
-            value={
-              sinEntidadOrganizadora
-                ? ""
-                : forzarFap && fapFederacionId
-                  ? organizadorValue("fed", fapFederacionId)
-                  : editOrganizador
-            }
+            value={sinEntidadOrganizadora ? "" : editOrganizador}
             onChange={setEditOrganizador}
             options={organizadorOptions}
             placeholder={
               sinEntidadOrganizadora
                 ? "Club sede / organizador del torneo"
-                : "-- FAP o asociación del ecosistema --"
+                : "-- Seleccionar entidad organizadora --"
             }
             disabled={organizadorDeshabilitado}
           />

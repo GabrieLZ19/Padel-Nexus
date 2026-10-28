@@ -221,7 +221,7 @@ export default function ClubHorariosPage() {
                   </span>
                   <span className="w-1.5 h-1.5 rounded-full bg-white/10 hidden sm:inline" />
                   <span className="px-2.5 py-0.5 rounded-full bg-brand-chartreuse/10 text-brand-chartreuse text-xs font-semibold">
-                    Club Afiliado FAP
+                    Club Afiliado
                     {club.asociaciones?.sigla
                       ? ` • ${club.asociaciones.sigla}`
                       : club.asociaciones?.nombre

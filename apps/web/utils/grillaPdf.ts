@@ -1638,8 +1638,8 @@ export function generarPdfZonas(
   doc.rect(0, 30, pageWidth, 1.2, "F");
   doc.setFontSize(7);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
-  doc.text("PADEL NEXUS  ·  REGLAMENTO FAP", 14, 8);
+  const regDoc = String(torneo.reglamento || torneo.asociacion || "OFICIAL").toUpperCase();
+  doc.text(`PADEL NEXUS  ·  REGLAMENTO ${regDoc}`, 14, 8);
   doc.setFontSize(13);
   doc.setTextColor(255, 255, 255);
   doc.text("Publicación de zonas de competencia", 14, 15);

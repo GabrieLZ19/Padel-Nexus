@@ -551,8 +551,8 @@ export const Paso3Categorias = ({
                   key: "carnet",
                   checked: requiereCarnet,
                   onToggle: () => setRequiereCarnet((v) => !v),
-                  title: "Exigir carnet FAP",
-                  desc: "Ambos jugadores deben tener licencia FAP activa para inscribirse.",
+                  title: "Exigir carnet federativo",
+                  desc: "Ambos jugadores deben tener carnet federativo o asociativo activo para inscribirse.",
                 },
               ]
                 .filter(
@@ -646,11 +646,11 @@ export const Paso3Categorias = ({
               >
                 <div>
                   <p className="font-extrabold text-xs text-white">
-                    Exige carnet federativo FAP vigente
+                    Exige carnet federativo o asociativo vigente
                   </p>
                   <p className="text-[10px] text-gray-400 mt-0.5">
-                    Si está activo, ambos jugadores deben tener licencia FAP en
-                    estado Activa para inscribirse. Sin precio adicional.
+                    Si está activo, ambos jugadores deben tener carnet federativo o
+                    asociativo en estado Activa para inscribirse. Sin precio adicional.
                   </p>
                 </div>
                 <input

@@ -438,18 +438,18 @@ export function buildChecksElegibilidadJ1(
     const carnetOk = tieneLicenciaFapActiva(perfil);
     checks.push({
       code: "carnet",
-      label: "Carnet FAP activo",
+      label: "Carnet federativo activo",
       passed: carnetOk,
       message: carnetOk
         ? undefined
-        : "Este torneo exige licencia FAP vigente y activa.",
+        : "Este torneo exige carnet federativo o asociativo vigente y activo.",
       actionHref: !carnetOk ? "/mi-perfil" : undefined,
       actionLabel: !carnetOk ? "Solicitar carnet" : undefined,
     });
   } else {
     checks.push({
       code: "carnet",
-      label: "Carnet FAP",
+      label: "Carnet federativo",
       passed: true,
       message: "No requerido para este torneo",
     });
