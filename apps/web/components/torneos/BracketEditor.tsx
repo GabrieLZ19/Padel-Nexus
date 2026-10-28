@@ -101,7 +101,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
   const [activeView, setActiveView] = useState<
     "zonas" | "siembra" | "llaves" | "auditoria" | "programacion"
-  >(isEliminatoriaDirecta ? "siembra" : "zonas");
+  >("programacion");
   // Si el formato llega async, asegurar la vista correcta (zonas vs siembra)
   useEffect(() => {
     if (isEliminatoriaDirecta && activeView === "zonas") {
@@ -1063,6 +1063,16 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
       <div className="flex justify-between items-center bg-transparent border-b border-white/5 mb-6 gap-2 overflow-x-auto scrollbar-none">
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveView("programacion")}
+            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
+              activeView === "programacion"
+                ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
+                : "border border-transparent text-brand-ayuda hover:text-gray-300"
+            }`}
+          >
+            <CalendarClock className="size-4" /> Programación
+          </button>
           {isEliminatoriaDirecta ? (
             <button
               onClick={() => setActiveView("siembra")}
@@ -1096,16 +1106,6 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             }`}
           >
             <Trophy className="size-4" /> Llave campeonato
-          </button>
-          <button
-            onClick={() => setActiveView("programacion")}
-            className={`flex items-center gap-2 px-5 py-3 rounded-t-xl text-sm font-bold transition-colors shrink-0 ${
-              activeView === "programacion"
-                ? "border border-b-0 border-brand-chartreuse/50 text-brand-chartreuse bg-brand-chartreuse/5"
-                : "border border-transparent text-brand-ayuda hover:text-gray-300"
-            }`}
-          >
-            <CalendarClock className="size-4" /> Programación
           </button>
           <button
             onClick={() => setActiveView("auditoria")}
