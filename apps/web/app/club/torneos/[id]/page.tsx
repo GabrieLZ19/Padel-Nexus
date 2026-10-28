@@ -40,13 +40,38 @@ export default function ClubTorneoDetallePage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>(() => {
     const paso = searchParams.get("step");
-    return normalizarPasoAsistente(paso, ["fiscales"]);
+    if (paso) return normalizarPasoAsistente(paso, ["fiscales"]);
+    if (typeof window !== "undefined") {
+      try {
+        const guardado = sessionStorage.getItem(`club_torneo_paso_${id}`);
+        if (guardado) return normalizarPasoAsistente(guardado, ["fiscales"]);
+      } catch {
+        /* ignore */
+      }
+    }
+    return normalizarPasoAsistente(null, ["fiscales"]);
   });
   const [refreshKey, setRefreshKey] = useState(0);
   const saveHandlerRef = useRef<SaveStepHandler | null>(null);
   const activeTabRef = useRef(activeTab);
   const navigatingRef = useRef(false);
   activeTabRef.current = activeTab;
+
+  useEffect(() => {
+    if (!id || !activeTab) return;
+    try {
+      sessionStorage.setItem(`club_torneo_paso_${id}`, activeTab);
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get("step") !== activeTab) {
+          url.searchParams.set("step", activeTab);
+          window.history.replaceState(null, "", url.toString());
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [id, activeTab]);
 
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
     isOpen: false,

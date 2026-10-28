@@ -16,6 +16,7 @@ import {
   Camera,
   Sparkles,
   Award,
+  CheckCircle2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { isAxiosError } from "axios";
@@ -534,7 +535,7 @@ export default function SignUpPage() {
               className="bg-brand-chartreuse/10 border border-brand-chartreuse/20 text-brand-chartreuse p-8 rounded-2xl flex flex-col items-center text-center gap-4"
             >
               <div className="size-16 rounded-full bg-brand-chartreuse/20 flex items-center justify-center mb-2">
-                <Mail className="size-8 text-brand-chartreuse" />
+                <CheckCircle2 className="size-8 text-brand-chartreuse" />
               </div>
               <h3 className="text-2xl font-bold text-brand-white">
                 ¡Registro completado!
@@ -565,8 +566,8 @@ export default function SignUpPage() {
                 </>
               ) : (
                 <p className="text-sm text-gray-300 max-w-md">
-                  Enviamos un enlace de activación a tu correo electrónico. Por
-                  favor, verificalo para activar tu ficha deportiva.
+                  Tu cuenta fue creada con éxito. Ya podés iniciar sesión con
+                  tu correo y contraseña para acceder a la plataforma.
                 </p>
               )}
               <Link

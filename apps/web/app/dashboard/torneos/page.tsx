@@ -153,6 +153,29 @@ export default function TorneosPage() {
             aplicarVistaServidor.current = true;
             setVista(torneosData.vista);
           }
+
+          // Si el usuario está buscando y la pestaña actual no tiene resultados,
+          // saltar automáticamente a la pestaña que tenga resultados o a "todos".
+          if (
+            search.trim() !== "" &&
+            (torneosData.data || []).length === 0 &&
+            torneosData.contadores
+          ) {
+            const tabsConResultados = (
+              Object.entries(torneosData.contadores) as [VistaTorneoId, number][]
+            ).filter(([, v]) => v > 0);
+
+            if (
+              tabsConResultados.length === 1 &&
+              vista !== tabsConResultados[0][0]
+            ) {
+              setVista(tabsConResultados[0][0]);
+              setPage(1);
+            } else if (tabsConResultados.length > 1 && vista !== "todos") {
+              setVista("todos");
+              setPage(1);
+            }
+          }
         }
       } catch (error: unknown) {
         console.error("Error al conectar con la API:", error);

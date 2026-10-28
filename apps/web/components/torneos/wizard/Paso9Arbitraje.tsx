@@ -16,6 +16,7 @@ import {
   esAlcanceNacional,
   etiquetaParejaVisible,
 } from "@/utils/etiquetaPareja";
+import { sileo } from "sileo";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 
 type VistaRapida = "pendientes" | "finalizados" | "todo";
@@ -538,13 +539,10 @@ export const PasoResultados = ({
       setPartidoEnCorreccion(null);
       triggerRefresh();
 
-      setFeedbackModal((prev: any) => ({
-        ...prev,
-        isOpen: true,
-        type: "success",
-        title: "¡Marcador guardado!",
+      sileo.success({
+        title: "Marcador guardado",
         description: "El marcador quedó guardado.",
-      }));
+      });
     } catch (error: any) {
       const apiMsg =
         error?.response?.data?.message ||

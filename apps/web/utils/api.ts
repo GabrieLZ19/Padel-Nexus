@@ -5,6 +5,13 @@ export const api = axios.create({
   withCredentials: true,
 });
 
+// Warmup ping no bloqueante para mitigar el arranque en frío (cold start) en Render
+if (typeof window !== "undefined") {
+  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  const healthUrl = base.replace(/\/api\/?$/, "") + "/health";
+  fetch(healthUrl, { mode: "no-cors" }).catch(() => {});
+}
+
 // Helper robusto para extraer cookies sin fallos de espaciado
 function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;

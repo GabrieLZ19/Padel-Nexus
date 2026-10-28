@@ -162,7 +162,22 @@ export default function LandingPage() {
         <div className="lg:col-span-2 space-y-6">
           <h2 className="text-2xl font-bold">Próximos Torneos</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {!listo ? null : tournaments.length > 0 ? (
+            {!listo ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-brand-card p-5 rounded-2xl border border-brand-white/5 animate-pulse"
+                >
+                  <div className="flex gap-4">
+                    <div className="size-12 rounded-xl bg-white/5 shrink-0" />
+                    <div className="space-y-2 flex-1">
+                      <div className="h-4 bg-white/10 rounded w-3/4" />
+                      <div className="h-3 bg-brand-chartreuse/20 rounded w-1/3" />
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : tournaments.length > 0 ? (
               tournaments.map((t) => (
                 <div
                   key={t.id}
@@ -200,7 +215,20 @@ export default function LandingPage() {
             </h2>
           </div>
           <div className="space-y-4">
-            {!listo ? null : rankings.length > 0 ? (
+            {!listo ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between border-b border-brand-white/5 pb-3 animate-pulse"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-black text-gray-700">0{i + 1}</span>
+                    <div className="h-4 bg-white/10 rounded w-36" />
+                  </div>
+                  <div className="h-4 bg-brand-chartreuse/20 rounded w-12" />
+                </div>
+              ))
+            ) : rankings.length > 0 ? (
               rankings.map((r, i) => (
                 <div
                   key={r.usuario_id || i}

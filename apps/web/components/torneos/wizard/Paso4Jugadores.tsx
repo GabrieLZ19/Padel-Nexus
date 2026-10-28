@@ -411,7 +411,7 @@ export const Paso4Jugadores = ({
                       </span>
                     </td>
                     <td className="px-8 py-5 text-right font-semibold text-sm">
-                      ${Number(ins.monto || 0).toLocaleString("es-AR")}
+                      {gratuito ? "N/A" : `$${Number(ins.monto || 0).toLocaleString("es-AR")}`}
                     </td>
                     <td className="px-8 py-5 text-center">
                       <button

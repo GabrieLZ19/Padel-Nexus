@@ -64,7 +64,16 @@ export default function TorneoDetallePage() {
   // Estados de UI
   const [activeTab, setActiveTab] = useState<string>(() => {
     const paso = searchParams.get("step");
-    return normalizarPasoAsistente(paso);
+    if (paso) return normalizarPasoAsistente(paso);
+    if (typeof window !== "undefined") {
+      try {
+        const guardado = sessionStorage.getItem(`torneo_paso_${id}`);
+        if (guardado) return normalizarPasoAsistente(guardado);
+      } catch {
+        /* ignore */
+      }
+    }
+    return normalizarPasoAsistente(null);
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -73,6 +82,22 @@ export default function TorneoDetallePage() {
   const activeTabRef = useRef(activeTab);
   const navigatingRef = useRef(false);
   activeTabRef.current = activeTab;
+
+  useEffect(() => {
+    if (!id || !activeTab) return;
+    try {
+      sessionStorage.setItem(`torneo_paso_${id}`, activeTab);
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get("step") !== activeTab) {
+          url.searchParams.set("step", activeTab);
+          window.history.replaceState(null, "", url.toString());
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [id, activeTab]);
 
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
     isOpen: false,

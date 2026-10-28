@@ -435,6 +435,9 @@ export default function GestionInscripcionesPage() {
   const tarjetaDe = (ins: Inscripcion) => {
     const segundo = ins.jugador2_nombre?.trim() ?? "";
     const esPareja = segundo !== "" && segundo !== "-";
+    const esGratuito =
+      ins.tipo !== "Reserva cancha" && Number(ins.monto || 0) === 0;
+
     return (
       <article
         key={ins.id}
@@ -458,14 +461,16 @@ export default function GestionInscripcionesPage() {
           <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-semibold text-gray-300">
             <span
               className={`size-1.5 rounded-full ${
-                ins.estado_pago === "Confirmado"
-                  ? "bg-[#00ff88]"
-                  : ins.estado_pago === "Pendiente"
-                    ? "bg-[#ffb800]"
-                    : "bg-[#ff4444]"
+                esGratuito
+                  ? "bg-gray-400"
+                  : ins.estado_pago === "Confirmado"
+                    ? "bg-[#00ff88]"
+                    : ins.estado_pago === "Pendiente"
+                      ? "bg-[#ffb800]"
+                      : "bg-[#ff4444]"
               }`}
             />
-            {ins.estado_pago}
+            {esGratuito ? "N/A" : ins.estado_pago}
           </span>
         </div>
         <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
@@ -491,7 +496,7 @@ export default function GestionInscripcionesPage() {
               Monto
             </dt>
             <dd className="font-black text-white">
-              ${Number(ins.monto || 0).toLocaleString("es-AR")}
+              {esGratuito ? "N/A" : `$${Number(ins.monto || 0).toLocaleString("es-AR")}`}
             </dd>
           </div>
         </dl>
@@ -783,6 +788,8 @@ export default function GestionInscripcionesPage() {
                     ins.jugador2_nombre &&
                     ins.jugador2_nombre.trim() !== "" &&
                     ins.jugador2_nombre !== "-";
+                  const esGratuito =
+                    ins.tipo !== "Reserva cancha" && Number(ins.monto || 0) === 0;
 
                   return (
                     <tr
@@ -843,22 +850,28 @@ export default function GestionInscripcionesPage() {
                         <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-gray-300">
                           <span
                             className={`h-2 w-2 rounded-full ${
-                              ins.estado_pago === "Confirmado"
-                                ? "bg-[#00ff88]"
-                                : ins.estado_pago === "Pendiente"
-                                  ? "bg-[#ffb800]"
-                                  : "bg-[#ff4444]"
+                              esGratuito
+                                ? "bg-gray-400"
+                                : ins.estado_pago === "Confirmado"
+                                  ? "bg-[#00ff88]"
+                                  : ins.estado_pago === "Pendiente"
+                                    ? "bg-[#ffb800]"
+                                    : "bg-[#ff4444]"
                             }`}
                           />
-                          {ins.estado_pago}
+                          {esGratuito ? "N/A" : ins.estado_pago}
                         </div>
                       </td>
 
                       <td className="py-4 px-6 text-[14px] font-bold text-brand-white">
-                        <span className="inline-flex items-center gap-1.5">
-                          <CreditCard className="size-4 text-gray-500" />$
-                          {Number(ins.monto || 0).toLocaleString("es-AR")}
-                        </span>
+                        {esGratuito ? (
+                          <span className="text-gray-400 font-semibold">N/A</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5">
+                            <CreditCard className="size-4 text-gray-500" />$
+                            {Number(ins.monto || 0).toLocaleString("es-AR")}
+                          </span>
+                        )}
                       </td>
 
                       <td className="whitespace-nowrap py-4 px-8 text-right">
