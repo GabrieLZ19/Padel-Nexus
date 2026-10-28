@@ -60,6 +60,7 @@ function slotsDesdeContexto(
     jornadas?: number;
     horaInicio?: string;
     horaFin?: string;
+    franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
   },
 ): SlotProgramacion[] {
   const dias = diasDelContexto(contexto, ventana?.jornadas);
@@ -77,6 +78,7 @@ function slotsDesdeContexto(
     duracionMinutos,
     horaInicioMin,
     horaFinMin,
+    franjasPorDia: ventana?.franjasPorDia,
   });
 }
 
@@ -484,6 +486,7 @@ export class ProgramacionService {
       jornadas?: number;
       horaInicio?: string;
       horaFin?: string;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
     } = {},
   ): Promise<ProgramacionBoard> {
     const [
@@ -581,6 +584,7 @@ export class ProgramacionService {
         }
         return fin ?? undefined;
       })(),
+      franjasPorDia: opciones.franjasPorDia,
     });
 
     const canchasMap = new Map<
@@ -669,6 +673,25 @@ export class ProgramacionService {
     const pendientes = partidos.length - asignados;
     const advertencias = issues.filter((i) => i.severity !== "ok").length;
 
+    const franjasPorDiaMap: Record<string, { inicio: string; fin: string }> = {};
+    for (const f of dias) {
+      const franjaOpt = opciones.franjasPorDia?.[f];
+      if (franjaOpt?.inicio || franjaOpt?.fin !== undefined) {
+        franjasPorDiaMap[f] = {
+          inicio: franjaOpt.inicio || opciones.horaInicio || "08:00",
+          fin: franjaOpt.fin !== undefined ? franjaOpt.fin : (opciones.horaFin || ""),
+        };
+      } else {
+        const d = contexto.disponibilidad.find((c) => c.fecha === f);
+        if (d?.hora_inicio || d?.hora_fin) {
+          franjasPorDiaMap[f] = {
+            inicio: d.hora_inicio ? d.hora_inicio.slice(0, 5) : (opciones.horaInicio || "08:00"),
+            fin: d.hora_fin ? (d.hora_fin.startsWith("23:59") || d.hora_fin.startsWith("00:00") ? "00:00" : d.hora_fin.slice(0, 5)) : (opciones.horaFin || ""),
+          };
+        }
+      }
+    }
+
     return {
       torneo_id: torneoId,
       nombre: torneo.nombre || "",
@@ -693,6 +716,7 @@ export class ProgramacionService {
         cancha_label: s.canchaLabel,
         fecha_iso: s.fechaIso,
       })),
+      franjas_por_dia: franjasPorDiaMap,
       partidos,
       issues,
       summary: { total: partidos.length, asignados, pendientes, advertencias },
@@ -899,6 +923,7 @@ export class ProgramacionService {
       jornadas?: number;
       horaInicio?: string;
       horaFin?: string;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
       motivo?: string;
       adminId?: string;
     } = {},
@@ -963,6 +988,26 @@ export class ProgramacionService {
       (d) => !/^ZONA\s+/i.test(String(d.ronda || "")),
     );
 
+    if (opciones.franjasPorDia) {
+      for (const [fecha, franja] of Object.entries(opciones.franjasPorDia)) {
+        if (!fecha) continue;
+        const updates: { hora_inicio?: string; hora_fin?: string } = {};
+        if (franja.inicio) {
+          updates.hora_inicio = `${franja.inicio.slice(0, 5)}:00`;
+        }
+        if (franja.fin !== undefined && franja.fin !== "") {
+          updates.hora_fin = franja.fin === "00:00" ? "23:59:59" : `${franja.fin.slice(0, 5)}:00`;
+        }
+        if (Object.keys(updates).length > 0) {
+          await supabaseAdmin
+            .from("torneo_canchas_disponibilidad")
+            .update(updates)
+            .eq("torneo_id", torneoId)
+            .eq("fecha", fecha);
+        }
+      }
+    }
+
     const distribucion: DistribucionProgramacion = esDistribucionProgramacion(
       opciones.distribucion,
     )
@@ -974,6 +1019,7 @@ export class ProgramacionService {
       jornadas: opciones.jornadas,
       horaInicio: opciones.horaInicio,
       horaFin: opciones.horaFin,
+      franjasPorDia: opciones.franjasPorDia,
     };
 
     if (distribucion === "continua") {
@@ -1066,6 +1112,7 @@ export class ProgramacionService {
       jornadas: opciones.jornadas,
       horaInicio: opciones.horaInicio,
       horaFin: opciones.horaFin,
+      franjasPorDia: opciones.franjasPorDia,
     });
   }
 
@@ -1083,6 +1130,7 @@ export class ProgramacionService {
       jornadas?: number;
       horaInicio?: string;
       horaFin?: string;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
     } = {},
   ): Promise<ProgramacionBoard> {
     const { data: torneo } = await supabaseAdmin
@@ -1095,6 +1143,26 @@ export class ProgramacionService {
       throw new Error(
         "La programación está publicada. Creá una nueva edición para editar.",
       );
+    }
+
+    if (opciones.franjasPorDia) {
+      for (const [fecha, franja] of Object.entries(opciones.franjasPorDia)) {
+        if (!fecha) continue;
+        const updates: { hora_inicio?: string; hora_fin?: string } = {};
+        if (franja.inicio) {
+          updates.hora_inicio = `${franja.inicio.slice(0, 5)}:00`;
+        }
+        if (franja.fin !== undefined && franja.fin !== "") {
+          updates.hora_fin = franja.fin === "00:00" ? "23:59:59" : `${franja.fin.slice(0, 5)}:00`;
+        }
+        if (Object.keys(updates).length > 0) {
+          await supabaseAdmin
+            .from("torneo_canchas_disponibilidad")
+            .update(updates)
+            .eq("torneo_id", torneoId)
+            .eq("fecha", fecha);
+        }
+      }
     }
 
     const { error } = await supabaseAdmin
@@ -1121,6 +1189,7 @@ export class ProgramacionService {
       jornadas: opciones.jornadas,
       horaInicio: opciones.horaInicio,
       horaFin: opciones.horaFin,
+      franjasPorDia: opciones.franjasPorDia,
     });
   }
 
@@ -1207,6 +1276,7 @@ export interface ProgramacionBoard {
     cancha_label: string;
     fecha_iso: string;
   }>;
+  franjas_por_dia?: Record<string, { inicio: string; fin: string }>;
   partidos: BoardPartido[];
   issues: ProgramacionIssue[];
   summary: {

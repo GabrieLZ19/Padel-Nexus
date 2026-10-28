@@ -347,5 +347,53 @@ describe("programador paso 5", () => {
     // Verificar que nunca formatee como '24:00:00'
     assert.equal(slotsMedianoche.some((s) => s.hora.startsWith("24:")), false);
   });
+
+  it("R2 - genera franjas horarias de inicio y fin independientes por jornada", () => {
+    const cancha: DisponibilidadTorneo = {
+      club_id: "club-1",
+      cancha_id: "cancha-1",
+      fecha: "2026-10-09",
+      hora_inicio: "08:00:00",
+      clubes: { nombre: "Club" },
+      canchas: { nombre: "1" },
+    };
+
+    // Ejemplo de la reunión:
+    // Viernes: 18:00 a 00:00
+    // Sábado: 10:00 a 00:00
+    // Domingo: 11:00 a 20:00
+    const slots = generarSlotsDesdeSedesYVentana({
+      canchas: [cancha],
+      dias: ["2026-10-09", "2026-10-10", "2026-10-11"],
+      duracionMinutos: 60,
+      franjasPorDia: {
+        "2026-10-09": { inicio: "18:00", fin: "00:00" },
+        "2026-10-10": { inicio: "10:00", fin: "00:00" },
+        "2026-10-11": { inicio: "11:00", fin: "20:00" },
+      },
+    });
+
+    const viernes = slots.filter((s) => s.fecha === "2026-10-09").map((s) => s.hora.slice(0, 5));
+    const sabado = slots.filter((s) => s.fecha === "2026-10-10").map((s) => s.hora.slice(0, 5));
+    const domingo = slots.filter((s) => s.fecha === "2026-10-11").map((s) => s.hora.slice(0, 5));
+
+    // Viernes arranca a las 18:00 y llega a 00:00
+    assert.equal(viernes[0], "18:00");
+    assert.equal(viernes[viernes.length - 1], "00:00");
+    assert.equal(viernes.includes("08:00"), false);
+    assert.equal(viernes.includes("10:00"), false);
+
+    // Sábado arranca a las 10:00 y llega a 00:00
+    assert.equal(sabado[0], "10:00");
+    assert.equal(sabado[sabado.length - 1], "00:00");
+    assert.equal(sabado.includes("08:00"), false);
+
+    // Domingo arranca a las 11:00 y termina a las 20:00
+    assert.equal(domingo[0], "11:00");
+    assert.equal(domingo[domingo.length - 1], "20:00");
+    assert.equal(domingo.includes("21:00"), false);
+    assert.equal(domingo.includes("00:00"), false);
+  });
 });
+
 

@@ -3,6 +3,7 @@ import {
   clasificacionSuperaLimiteLocal,
   esRondaDeZona,
   evaluarDescansoInsuficiente,
+  minutosDesdeHora,
   ordenRondaProgramador,
   type DistribucionProgramacion,
   type ModoDescanso,
@@ -328,10 +329,11 @@ export function generarSlotsDesdeSedesYVentana(params: {
   duracionMinutos: number;
   horaInicioMin?: number;
   horaFinMin?: number;
+  franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
 }): SlotProgramacion[] {
   const duracion = Math.max(30, params.duracionMinutos || 90);
-  const horaInicio = params.horaInicioMin ?? PROGRAMADOR_HORA_INICIO_MIN;
-  const horaFin = params.horaFinMin ?? PROGRAMADOR_HORA_INICIO_MAX;
+  const horaInicioDefault = params.horaInicioMin ?? PROGRAMADOR_HORA_INICIO_MIN;
+  const horaFinDefault = params.horaFinMin ?? PROGRAMADOR_HORA_INICIO_MAX;
   const slots: SlotProgramacion[] = [];
   const canchas = extraerCanchasUnicas(params.canchas);
   const dias = [
@@ -341,12 +343,44 @@ export function generarSlotsDesdeSedesYVentana(params: {
   ].sort();
 
   for (const fecha of dias) {
+    const franja = params.franjasPorDia?.[fecha];
+
+    let fechaHoraInicio = horaInicioDefault;
+    if (franja?.inicio) {
+      const min = minutosDesdeHora(franja.inicio);
+      if (min != null) fechaHoraInicio = min;
+    } else if (params.horaInicioMin == null) {
+      const dispFecha = params.canchas.find((c) => c.fecha === fecha && c.hora_inicio);
+      if (dispFecha?.hora_inicio) {
+        const min = minutosDesdeHora(dispFecha.hora_inicio);
+        if (min != null) fechaHoraInicio = min;
+      }
+    }
+
+    let fechaHoraFin = horaFinDefault;
+    if (franja?.fin !== undefined && franja?.fin !== "") {
+      let min = minutosDesdeHora(franja.fin);
+      if (min != null) {
+        if (min <= fechaHoraInicio) min += 1440;
+        fechaHoraFin = min;
+      }
+    } else if (params.horaFinMin == null) {
+      const dispFecha = params.canchas.find((c) => c.fecha === fecha && c.hora_fin);
+      if (dispFecha?.hora_fin) {
+        let min = minutosDesdeHora(dispFecha.hora_fin);
+        if (min != null) {
+          if (min <= fechaHoraInicio) min += 1440;
+          fechaHoraFin = min;
+        }
+      }
+    }
+
     for (const cancha of canchas) {
       const canchaLabel = buildCanchaLabel(cancha);
       if (!canchaLabel) continue;
       for (
-        let minuto = horaInicio;
-        minuto <= horaFin;
+        let minuto = fechaHoraInicio;
+        minuto <= fechaHoraFin;
         minuto += duracion
       ) {
         try {

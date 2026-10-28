@@ -146,6 +146,19 @@ export const getProgramacionBoard = async (
           : undefined,
       horaFin:
         typeof req.query.horaFin === "string" ? req.query.horaFin : undefined,
+      franjasPorDia: (() => {
+        if (typeof req.query.franjasPorDia === "string") {
+          try {
+            return JSON.parse(req.query.franjasPorDia);
+          } catch {
+            return undefined;
+          }
+        }
+        if (typeof req.query.franjasPorDia === "object" && req.query.franjasPorDia !== null) {
+          return req.query.franjasPorDia as Record<string, { inicio?: string; fin?: string }>;
+        }
+        return undefined;
+      })(),
     });
     return res.status(200).json({
       ...data,
@@ -262,6 +275,16 @@ export const autoAsignarProgramacion = async (
       jornadas,
       horaInicio,
       horaFin,
+      franjasPorDia:
+        typeof req.body?.franjasPorDia === "string"
+          ? (() => {
+              try {
+                return JSON.parse(req.body.franjasPorDia);
+              } catch {
+                return undefined;
+              }
+            })()
+          : req.body?.franjasPorDia,
       motivo,
       adminId: req.user?.id,
     });
@@ -300,6 +323,16 @@ export const guardarBorradorProgramacion = async (
       jornadas,
       horaInicio,
       horaFin,
+      franjasPorDia:
+        typeof req.body?.franjasPorDia === "string"
+          ? (() => {
+              try {
+                return JSON.parse(req.body.franjasPorDia);
+              } catch {
+                return undefined;
+              }
+            })()
+          : req.body?.franjasPorDia,
       adminId: req.user?.id,
     });
     return res.status(200).json(data);
