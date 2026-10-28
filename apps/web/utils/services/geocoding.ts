@@ -66,68 +66,107 @@ export function normalizarProvinciaArgentinas(raw: string): string {
 export async function geocodificarDireccion(
   direccion: string,
   codigoPostal?: string | null,
+  localidad?: string | null,
+  provincia?: string | null,
 ): Promise<GeocodingResult | null> {
-  const queryParts = [direccion.trim()];
-  if (codigoPostal?.trim()) {
-    queryParts.push(codigoPostal.trim());
+  const dir = direccion?.trim() || "";
+  const cp = codigoPostal?.trim() || "";
+  const loc = localidad?.trim() || "";
+  const prov = provincia?.trim() || "";
+
+  const queriesToTry: string[] = [];
+
+  if (dir) {
+    queriesToTry.push(
+      [dir, loc, prov, cp, "Argentina"].filter(Boolean).join(", "),
+    );
+    queriesToTry.push(
+      [dir, prov, cp, "Argentina"].filter(Boolean).join(", "),
+    );
+    queriesToTry.push(
+      [dir, cp, "Argentina"].filter(Boolean).join(", "),
+    );
+    queriesToTry.push(
+      [dir, prov, "Argentina"].filter(Boolean).join(", "),
+    );
   }
-  queryParts.push("Argentina");
 
-  const query = queryParts.filter(Boolean).join(", ");
-  if (!query || query === "Argentina") return null;
-
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-      query,
-    )}&countrycodes=ar&addressdetails=1&limit=1`;
-
-    const res = await fetch(url, {
-      headers: {
-        "Accept-Language": "es",
-        "User-Agent": "PadelNexus-App/1.0",
-      },
-    });
-
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) return null;
-
-    const first = data[0];
-    const addr = first.address || {};
-
-    const provincia = normalizarProvinciaArgentinas(addr.state || addr.province || "");
-    const localidad =
-      addr.city ||
-      addr.town ||
-      addr.village ||
-      addr.municipality ||
-      addr.suburb ||
-      addr.county ||
-      first.name ||
-      "Localidad";
-
-    const road = addr.road || addr.pedestrian || "";
-    const houseNumber = addr.house_number || "";
-    const calle = road ? (houseNumber ? `${road} ${houseNumber}` : road) : direccion;
-    const cp = addr.postcode || codigoPostal || "";
-
-    const lat = parseFloat(Number(first.lat).toFixed(6));
-    const lon = parseFloat(Number(first.lon).toFixed(6));
-
-    return {
-      direccionCompleta: [calle, localidad, provincia].filter(Boolean).join(", "),
-      calle,
-      localidad,
-      provincia,
-      codigoPostal: cp,
-      latitud: lat,
-      longitud: lon,
-      displayName: first.display_name || "",
-    };
-  } catch (error) {
-    console.error("Error geocodificando dirección:", error);
-    return null;
+  if (loc && loc.toLowerCase() !== "sin especificar") {
+    queriesToTry.push(
+      [loc, prov, "Argentina"].filter(Boolean).join(", "),
+    );
   }
+
+  if (prov) {
+    queriesToTry.push([prov, "Argentina"].filter(Boolean).join(", "));
+  }
+
+  // Quitar duplicados
+  const uniqueQueries = Array.from(new Set(queriesToTry.filter((q) => q && q !== "Argentina")));
+  if (uniqueQueries.length === 0) return null;
+
+  for (const query of uniqueQueries) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+        query,
+      )}&countrycodes=ar&addressdetails=1&limit=1`;
+
+      const res = await fetch(url, {
+        headers: {
+          "Accept-Language": "es",
+          "User-Agent": "PadelNexus-App/1.0",
+        },
+      });
+
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) continue;
+
+      const first = data[0];
+      const addr = first.address || {};
+
+      const detectedProvincia = normalizarProvinciaArgentinas(
+        addr.state || addr.province || prov,
+      );
+      const detectedLocalidad =
+        addr.city ||
+        addr.town ||
+        addr.village ||
+        addr.municipality ||
+        addr.suburb ||
+        addr.county ||
+        loc ||
+        first.name ||
+        "Localidad";
+
+      const road = addr.road || addr.pedestrian || "";
+      const houseNumber = addr.house_number || "";
+      const calle = road ? (houseNumber ? `${road} ${houseNumber}` : road) : dir;
+      const postalCode = addr.postcode || cp || "";
+
+      const lat = parseFloat(Number(first.lat).toFixed(6));
+      const lon = parseFloat(Number(first.lon).toFixed(6));
+
+      if (isNaN(lat) || isNaN(lon)) continue;
+
+      return {
+        direccionCompleta: [calle, detectedLocalidad, detectedProvincia]
+          .filter(Boolean)
+          .join(", "),
+        calle,
+        localidad: detectedLocalidad,
+        provincia: detectedProvincia,
+        codigoPostal: postalCode,
+        latitud: lat,
+        longitud: lon,
+        displayName: first.display_name || "",
+      };
+    } catch {
+      // Intentar la siguiente consulta de respaldo
+    }
+  }
+
+  return null;
 }
 
 /**

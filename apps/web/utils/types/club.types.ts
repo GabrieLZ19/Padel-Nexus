@@ -12,6 +12,13 @@ export interface Club {
   longitud?: number | null;
   cbu?: string | null;
   alias?: string | null;
+  asociacion_id?: string | null;
+  asociaciones?: {
+    id: string;
+    nombre: string;
+    sigla?: string | null;
+    provincia?: string | null;
+  } | null;
   /** Plan sin comisiones: desbloquea transferencia y pago en club */
   suscripcion_sin_comisiones?: boolean;
   pago_transferencia_habilitado?: boolean;

@@ -28,6 +28,13 @@ interface ClubDetalle {
   nombre: string;
   provincia: string;
   localidad: string;
+  direccion?: string | null;
+  codigo_postal?: string | null;
+  asociaciones?: {
+    id: string;
+    nombre: string;
+    sigla?: string | null;
+  } | null;
 }
 
 export default function ClubHorariosPage() {
@@ -208,11 +215,18 @@ export default function ClubHorariosPage() {
                 <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-sm text-gray-400">
                   <span className="flex items-center gap-1.5">
                     <MapPin className="w-4 h-4 text-brand-chartreuse" />
+                    {club.direccion ? `${club.direccion}, ` : ""}
                     {club.localidad}, {club.provincia}
+                    {club.codigo_postal ? ` (CP ${club.codigo_postal})` : ""}
                   </span>
                   <span className="w-1.5 h-1.5 rounded-full bg-white/10 hidden sm:inline" />
                   <span className="px-2.5 py-0.5 rounded-full bg-brand-chartreuse/10 text-brand-chartreuse text-xs font-semibold">
                     Club Afiliado FAP
+                    {club.asociaciones?.sigla
+                      ? ` • ${club.asociaciones.sigla}`
+                      : club.asociaciones?.nombre
+                        ? ` • ${club.asociaciones.nombre}`
+                        : ""}
                   </span>
                 </div>
               </div>

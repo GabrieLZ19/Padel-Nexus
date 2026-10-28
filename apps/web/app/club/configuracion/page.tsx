@@ -11,6 +11,7 @@ import {
   leafletTileUrl,
   LEAFLET_TILE_ATTRIBUTION,
 } from "@/utils/leafletTiles";
+import { geocodificarDireccion } from "@/utils/services/geocoding";
 
 export default function ClubConfiguracionPage() {
   const [club, setClub] = useState<Club | null>(null);
@@ -20,6 +21,9 @@ export default function ClubConfiguracionPage() {
   const [formData, setFormData] = useState({
     nombre: "",
     localidad: "",
+    direccion: "",
+    codigo_postal: "",
+    telefono: "",
     cbu: "",
     alias: "",
     latitud: null as number | null,
@@ -31,6 +35,7 @@ export default function ClubConfiguracionPage() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markerInstanceRef = useRef<L.Marker | null>(null);
+  const userEditedLocationRef = useRef(false);
 
   useEffect(() => {
     async function cargarClub() {
@@ -38,8 +43,11 @@ export default function ClubConfiguracionPage() {
         const data = await ClubPanelService.getMiClub();
         setClub(data);
         setFormData({
-          nombre: data.nombre,
+          nombre: data.nombre || "",
           localidad: data.localidad || "",
+          direccion: data.direccion || "",
+          codigo_postal: data.codigo_postal || "",
+          telefono: data.telefono || "",
           cbu: data.cbu || "",
           alias: data.alias || "",
           latitud: data.latitud !== undefined ? data.latitud : null,
@@ -102,47 +110,12 @@ export default function ClubConfiguracionPage() {
       markerInstanceRef.current = marker;
       mapInstanceRef.current = map;
 
-      const updateCoords = async (lat: number, lng: number) => {
+      const updateCoords = (lat: number, lng: number) => {
         setFormData((prev) => ({
           ...prev,
           latitud: parseFloat(lat.toFixed(6)),
           longitud: parseFloat(lng.toFixed(6)),
         }));
-
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
-            {
-              headers: {
-                "Accept-Language": "es",
-              },
-            }
-          );
-          const data = await response.json();
-          if (data && data.address) {
-            const road = data.address.road || data.address.pedestrian || "";
-            const houseNumber = data.address.house_number || "";
-            const suburb = data.address.suburb || data.address.neighbourhood || "";
-            const city = data.address.city || data.address.town || data.address.village || "";
-            
-            const parts = [];
-            if (road) {
-              parts.push(houseNumber ? `${road} ${houseNumber}` : road);
-            }
-            if (suburb) parts.push(suburb);
-            if (city) parts.push(city);
-
-            const addressString = parts.join(", ");
-            if (addressString) {
-              setFormData((prev) => ({
-                ...prev,
-                localidad: addressString,
-              }));
-            }
-          }
-        } catch (err) {
-          console.error("Error al reverse geocodificar la coordenada:", err);
-        }
       };
 
       marker.on("dragend", () => {
@@ -169,49 +142,38 @@ export default function ClubConfiguracionPage() {
     };
   }, [loading, club]);
 
-  // Geocodificar la localidad para centrar el mapa
+  // Geocodificar la dirección y localidad cuando el usuario edita la ubicación
   useEffect(() => {
     if (loading || !mapInstanceRef.current || !markerInstanceRef.current) return;
+    if (!userEditedLocationRef.current) return;
 
     const delayDebounce = setTimeout(async () => {
-      const q = [formData.localidad, club?.provincia, "Argentina"]
-        .filter(Boolean)
-        .join(", ");
-
-      if (!q || q === "Argentina") return;
-
       try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`,
-          {
-            headers: {
-              "Accept-Language": "es",
-            },
-          }
+        const res = await geocodificarDireccion(
+          formData.direccion,
+          formData.codigo_postal,
+          formData.localidad,
+          club?.provincia,
         );
-        const data = await response.json();
-        if (data && data.length > 0) {
-          const lat = parseFloat(data[0].lat);
-          const lon = parseFloat(data[0].lon);
-
+        if (res) {
           setFormData((prev) => ({
             ...prev,
-            latitud: parseFloat(lat.toFixed(6)),
-            longitud: parseFloat(lon.toFixed(6)),
+            latitud: res.latitud,
+            longitud: res.longitud,
           }));
 
           if (markerInstanceRef.current && mapInstanceRef.current) {
-            markerInstanceRef.current.setLatLng([lat, lon]);
-            mapInstanceRef.current.setView([lat, lon], 15);
+            markerInstanceRef.current.setLatLng([res.latitud, res.longitud]);
+            mapInstanceRef.current.setView([res.latitud, res.longitud], 15);
           }
         }
       } catch (err) {
-        console.error("Error al geocodificar dirección:", err);
+        console.error("Error al geocodificar dirección en configuración:", err);
       }
     }, 1200);
 
     return () => clearTimeout(delayDebounce);
-  }, [formData.localidad, loading]);
+  }, [formData.direccion, formData.codigo_postal, formData.localidad, loading, club?.provincia]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -278,17 +240,67 @@ export default function ClubConfiguracionPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
-                  Localidad
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.localidad}
-                  onChange={(e) => setFormData({ ...formData, localidad: e.target.value })}
-                  className="w-full px-4 py-3 bg-brand-black border border-brand-white/5 rounded-xl text-sm text-brand-white focus:outline-none focus:border-brand-chartreuse/50"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                    Dirección (Calle y N°)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.direccion}
+                    onChange={(e) => {
+                      userEditedLocationRef.current = true;
+                      setFormData({ ...formData, direccion: e.target.value });
+                    }}
+                    placeholder="Ej. Av. Argentina 100"
+                    className="w-full px-4 py-3 bg-brand-black border border-brand-white/5 rounded-xl text-sm text-brand-white focus:outline-none focus:border-brand-chartreuse/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                    Código Postal
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.codigo_postal}
+                    onChange={(e) => {
+                      userEditedLocationRef.current = true;
+                      setFormData({ ...formData, codigo_postal: e.target.value });
+                    }}
+                    placeholder="Ej. 8300"
+                    className="w-full px-4 py-3 bg-brand-black border border-brand-white/5 rounded-xl text-sm text-brand-white focus:outline-none focus:border-brand-chartreuse/50"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                    Localidad
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.localidad}
+                    onChange={(e) => {
+                      userEditedLocationRef.current = true;
+                      setFormData({ ...formData, localidad: e.target.value });
+                    }}
+                    className="w-full px-4 py-3 bg-brand-black border border-brand-white/5 rounded-xl text-sm text-brand-white focus:outline-none focus:border-brand-chartreuse/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                    Teléfono del Club
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.telefono}
+                    onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                    placeholder="Ej. 299 456-7890"
+                    className="w-full px-4 py-3 bg-brand-black border border-brand-white/5 rounded-xl text-sm text-brand-white focus:outline-none focus:border-brand-chartreuse/50"
+                  />
+                </div>
               </div>
 
               <div>
@@ -301,6 +313,25 @@ export default function ClubConfiguracionPage() {
                   value={club.provincia}
                   className="w-full px-4 py-3 bg-brand-black/40 border border-brand-white/5 rounded-xl text-sm text-gray-500 focus:outline-none cursor-not-allowed"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                  Asociación Vinculada (Solo lectura)
+                </label>
+                <div className="flex items-center justify-between gap-3 px-4 py-3 bg-brand-black/40 border border-brand-white/5 rounded-xl text-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-brand-chartreuse shrink-0" />
+                    <span className="text-brand-white font-medium truncate">
+                      {club.asociaciones?.nombre
+                        ? `${club.asociaciones.nombre}${club.asociaciones.sigla ? ` (${club.asociaciones.sigla})` : ""}`
+                        : `Asociación Provincial de ${club.provincia}`}
+                    </span>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-brand-chartreuse bg-brand-chartreuse/10 px-2 py-0.5 rounded-full border border-brand-chartreuse/20">
+                    Afiliado FAP
+                  </span>
+                </div>
               </div>
             </div>
           </div>

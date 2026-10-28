@@ -168,6 +168,8 @@ export default function GestionUsuariosPage() {
         const res = await geocodificarDireccion(
           dir,
           nuevoClubForm.codigo_postal.trim() || undefined,
+          nuevoClubForm.localidad.trim() || undefined,
+          nuevoClubForm.provincia || undefined,
         );
         if (active && res) {
           setNuevoClubForm((prev) => ({
@@ -198,6 +200,8 @@ export default function GestionUsuariosPage() {
   }, [
     nuevoClubForm.direccion,
     nuevoClubForm.codigo_postal,
+    nuevoClubForm.localidad,
+    nuevoClubForm.provincia,
     modalOpen,
     form.rol,
     tipoAsignacionClub,
@@ -268,6 +272,29 @@ export default function GestionUsuariosPage() {
 
     try {
       setSaving(true);
+
+      let latitudFinal = nuevoClubForm.latitud;
+      let longitudFinal = nuevoClubForm.longitud;
+
+      if (form.rol === "admin_club" && tipoAsignacionClub === "nuevo") {
+        if (latitudFinal == null || longitudFinal == null) {
+          try {
+            const res = await geocodificarDireccion(
+              nuevoClubForm.direccion.trim(),
+              nuevoClubForm.codigo_postal.trim() || undefined,
+              nuevoClubForm.localidad.trim() || undefined,
+              nuevoClubForm.provincia || undefined,
+            );
+            if (res) {
+              latitudFinal = res.latitud;
+              longitudFinal = res.longitud;
+            }
+          } catch (eGeo) {
+            console.error("Geocoding pre-submit fallback failed:", eGeo);
+          }
+        }
+      }
+
       const payload: CrearUsuarioDTO = {
         ...form,
         club_id:
@@ -284,8 +311,8 @@ export default function GestionUsuariosPage() {
                 canchas: Math.max(1, Number(nuevoClubForm.canchas) || 1),
                 provincia: nuevoClubForm.provincia,
                 localidad: nuevoClubForm.localidad.trim() || "Sin especificar",
-                latitud: nuevoClubForm.latitud,
-                longitud: nuevoClubForm.longitud,
+                latitud: latitudFinal,
+                longitud: longitudFinal,
               }
             : null,
       };
