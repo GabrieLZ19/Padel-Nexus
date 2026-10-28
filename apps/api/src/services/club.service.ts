@@ -15,6 +15,7 @@ import {
   nombreCanchaNormalizado,
   nombreCanchaVisible,
 } from "../utils/ordenCanchas";
+import { mismaProvincia } from "../utils/alcanceCuenta";
 
 export interface CrearClubDTO {
   nombre: string;
@@ -29,6 +30,7 @@ export interface CrearClubDTO {
   longitud?: number | null;
   cbu?: string | null;
   alias?: string | null;
+  asociacion_id?: string | null;
   /** Plan sin comisiones: desbloquea transferencia y pago en club */
   suscripcion_sin_comisiones?: boolean;
   pago_transferencia_habilitado?: boolean;
@@ -82,6 +84,63 @@ function formatearClubConCanchas(
       : Number(club.canchas) || 0,
   };
 }
+
+async function resolverCoordenadas(
+  direccion?: string | null,
+  codigoPostal?: string | null,
+  localidad?: string | null,
+  provincia?: string | null,
+): Promise<{ latitud: number; longitud: number } | null> {
+  const intentos: string[] = [];
+
+  const dir = direccion?.trim();
+  const cp = codigoPostal?.trim();
+  const loc = localidad?.trim();
+  const prov = provincia?.trim();
+
+  // Intento 1: Dirección completa con localidad, provincia y CP
+  if (dir) {
+    intentos.push([dir, loc, prov, cp, "Argentina"].filter(Boolean).join(", "));
+    intentos.push([dir, prov, "Argentina"].filter(Boolean).join(", "));
+  }
+  // Intento 2: Localidad y provincia
+  if (loc && loc.toLowerCase() !== "sin especificar") {
+    intentos.push([loc, prov, "Argentina"].filter(Boolean).join(", "));
+  }
+  // Intento 3: Provincia
+  if (prov) {
+    intentos.push([prov, "Argentina"].filter(Boolean).join(", "));
+  }
+
+  for (const q of intentos) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+        q,
+      )}&countrycodes=ar&limit=1`;
+      const res = await fetch(url, {
+        headers: {
+          "Accept-Language": "es",
+          "User-Agent": "PadelNexus-API/1.0",
+        },
+      });
+      if (res.ok) {
+        const data = (await res.json()) as Array<{ lat: string; lon: string }>;
+        if (Array.isArray(data) && data.length > 0) {
+          const lat = parseFloat(Number(data[0].lat).toFixed(6));
+          const lon = parseFloat(Number(data[0].lon).toFixed(6));
+          if (!isNaN(lat) && !isNaN(lon)) {
+            return { latitud: lat, longitud: lon };
+          }
+        }
+      }
+    } catch {
+      // Continuar al siguiente intento si falla el fetch
+    }
+  }
+
+  return null;
+}
+
 
 export class ClubService {
   /**
@@ -227,7 +286,9 @@ export class ClubService {
   static async obtenerClubPorId(id: string) {
     const { data, error } = await supabaseAdmin
       .from("clubes")
-      .select(`*, torneos!club_id(*), canchas(count)`)
+      .select(
+        `*, asociaciones!asociacion_id(id, nombre, sigla, provincia), torneos!club_id(*), canchas(count)`,
+      )
       .eq("id", id)
       .single();
 
@@ -252,11 +313,61 @@ export class ClubService {
   static async crearClub(datos: CrearClubDTO) {
     const cantidadCanchas = Math.max(0, Number(datos.canchas) || 0);
     const suscripcion = Boolean(datos.suscripcion_sin_comisiones);
+
+    // Auto-vincular asociación de la provincia si no vino especificada
+    let asociacionId = datos.asociacion_id || null;
+    if (!asociacionId && datos.provincia) {
+      try {
+        const { data: asociaciones } = await supabaseAdmin
+          .from("asociaciones")
+          .select("id, provincia");
+        if (asociaciones && asociaciones.length > 0) {
+          const match = asociaciones.find((a) =>
+            mismaProvincia(a.provincia, datos.provincia),
+          );
+          if (match) {
+            asociacionId = match.id;
+          }
+        }
+      } catch (errAsoc) {
+        console.error(
+          "Error al vincular asociación automática del club:",
+          errAsoc,
+        );
+      }
+    }
+
+    // Auto-geolocalizar si no vinieron coordenadas
+    let latitudFinal =
+      datos.latitud != null && !isNaN(Number(datos.latitud))
+        ? Number(datos.latitud)
+        : null;
+    let longitudFinal =
+      datos.longitud != null && !isNaN(Number(datos.longitud))
+        ? Number(datos.longitud)
+        : null;
+
+    if (latitudFinal == null || longitudFinal == null) {
+      const coords = await resolverCoordenadas(
+        datos.direccion,
+        datos.codigo_postal,
+        datos.localidad,
+        datos.provincia,
+      );
+      if (coords) {
+        latitudFinal = coords.latitud;
+        longitudFinal = coords.longitud;
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from("clubes")
       .insert([
         {
           ...datos,
+          asociacion_id: asociacionId,
+          latitud: latitudFinal,
+          longitud: longitudFinal,
           canchas: cantidadCanchas,
           estado: datos.estado || "Activo",
           suscripcion_sin_comisiones: suscripcion,
