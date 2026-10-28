@@ -15,14 +15,14 @@ import {
 const valores = (items: { value: string }[]) => items.map((item) => item.value);
 
 describe("reglamentos FAP y APA se aplican", () => {
-  it("un torneo provincial conserva APA y uno nacional queda en FAP", () => {
+  it("un torneo provincial o nacional conserva APA y default es FAP", () => {
     assert.equal(
       resolverReglamentoPersistido({ alcance: "Provincial", reglamento: "APA" }),
       "APA",
     );
     assert.equal(
       resolverReglamentoPersistido({ alcance: "Nacional", reglamento: "APA" }),
-      "FAP",
+      "APA",
     );
     assert.equal(reglamentoTorneo({ reglamento: "APA" }), "APA");
     assert.equal(reglamentoTorneo({}), "FAP");
