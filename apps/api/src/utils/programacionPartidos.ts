@@ -1,8 +1,10 @@
 import { supabaseAdmin } from "../config/supabase";
 import {
   clasificacionSuperaLimiteLocal,
+  esRondaCampeonato,
   esRondaDeZona,
   evaluarDescansoInsuficiente,
+  minutosDeModoDescanso,
   minutosDesdeHora,
   ordenRondaProgramador,
   type DistribucionProgramacion,
@@ -461,9 +463,18 @@ export function parejaPuedeJugarEnSlot(
   fecha: string,
   startMin: number,
   duracionMinutos: number,
+  descansoMinutos?: number,
+  descansoModo?: ModoDescanso,
 ): boolean {
   const endMin = startMin + duracionMinutos;
   const fechaN = normalizarFecha(fecha);
+  const descansoMin =
+    descansoModo === "entre_inicios_240"
+      ? 240
+      : (descansoMinutos ??
+        (descansoModo
+          ? minutosDeModoDescanso(descansoModo)
+          : FAP_DESCANSO_MINUTOS_TRAS_FIN));
 
   for (const prev of historial) {
     if (prev.fecha !== fechaN) continue;
@@ -471,11 +482,15 @@ export function parejaPuedeJugarEnSlot(
     // Solape de intervalo de juego
     if (startMin < prev.endMin && endMin > prev.startMin) return false;
 
-    // Descanso mínimo: 1 h tras el fin estimado del partido anterior
-    if (startMin >= prev.startMin) {
-      if (startMin < prev.endMin + FAP_DESCANSO_MINUTOS_TRAS_FIN) return false;
-    } else if (prev.startMin < endMin + FAP_DESCANSO_MINUTOS_TRAS_FIN) {
-      return false;
+    // Descanso según modo o minutos
+    if (descansoModo === "entre_inicios_240") {
+      if (Math.abs(startMin - prev.startMin) < 240) return false;
+    } else {
+      if (startMin >= prev.startMin) {
+        if (startMin < prev.endMin + descansoMin) return false;
+      } else if (prev.startMin < endMin + descansoMin) {
+        return false;
+      }
     }
   }
 
@@ -547,6 +562,8 @@ function parejasPueden(
   fecha: string,
   startMin: number,
   duracionMinutos: number,
+  descansoMinutos?: number,
+  descansoModo?: ModoDescanso,
 ): boolean {
   return parejaIds.every((id) =>
     parejaPuedeJugarEnSlot(
@@ -554,6 +571,8 @@ function parejasPueden(
       fecha,
       startMin,
       duracionMinutos,
+      descansoMinutos,
+      descansoModo,
     ),
   );
 }
@@ -617,6 +636,8 @@ function buscarOlaSimultanea(
   historial: Map<string, PartidoParejaHistorial[]>,
   parejaIds: string[],
   duracionMinutos: number,
+  descansoMinutos?: number,
+  descansoModo?: ModoDescanso,
 ): SlotProgramacion[] | null {
   const momentos = agruparSlotsPorMomento(slots);
 
@@ -628,6 +649,8 @@ function buscarOlaSimultanea(
         momento.fecha,
         momento.startMin,
         duracionMinutos,
+        descansoMinutos,
+        descansoModo,
       )
     ) {
       continue;
@@ -650,6 +673,8 @@ function buscarSlotIndividual(
   parejaIds: string[],
   duracionMinutos: number,
   notBefore: { fecha: string; startMin: number }[] = [],
+  descansoMinutos?: number,
+  descansoModo?: ModoDescanso,
 ): SlotProgramacion | null {
   for (const slot of slots) {
     const key = slotKey(slot.canchaLabel, slot.fecha, slot.hora);
@@ -674,6 +699,8 @@ function buscarSlotIndividual(
         slot.fecha,
         startMin,
         duracionMinutos,
+        descansoMinutos,
+        descansoModo,
       )
     ) {
       continue;
@@ -702,11 +729,21 @@ function notBeforeDesdeFeeders(
   todos: PartidoProgramable[],
   feedersByMatchNo: Map<number, number[]>,
   duracionMinutos: number,
+  descansoMinutos?: number,
+  descansoModo?: ModoDescanso,
 ): { fecha: string; startMin: number }[] {
   const orden = Number(partido.orden);
   if (!Number.isFinite(orden) || orden <= 0) return [];
   const feeders = feedersByMatchNo.get(orden) || [];
   const out: { fecha: string; startMin: number }[] = [];
+  const descansoMin =
+    descansoModo === "entre_inicios_240"
+      ? 240
+      : (descansoMinutos ??
+        (descansoModo
+          ? minutosDeModoDescanso(descansoModo)
+          : FAP_DESCANSO_MINUTOS_TRAS_FIN));
+
   for (const fOrden of feeders) {
     const feeder = todos.find(
       (p) => Number(p.orden) === fOrden && p.fecha_partido,
@@ -714,8 +751,14 @@ function notBeforeDesdeFeeders(
     if (!feeder?.fecha_partido) continue;
     const parsed = parseFechaPartidoIso(String(feeder.fecha_partido));
     if (!parsed) continue;
-    let startMin =
-      parsed.startMin + duracionMinutos + FAP_DESCANSO_MINUTOS_TRAS_FIN;
+
+    let startMin: number;
+    if (descansoModo === "entre_inicios_240") {
+      startMin = parsed.startMin + 240;
+    } else {
+      startMin = parsed.startMin + duracionMinutos + descansoMin;
+    }
+
     let fecha = parsed.fecha;
     if (startMin >= 24 * 60) {
       startMin -= 24 * 60;
@@ -791,6 +834,8 @@ export function asignarHorariosAPartidos(
   ocupadosIniciales?: Set<string>,
   opciones?: {
     duracionMinutos?: number;
+    descansoMinutos?: number;
+    descansoModo?: ModoDescanso;
     /** matchNo destino → matchNos que lo alimentan (llave FAP). */
     feedersByMatchNo?: Map<number, number[]>;
     /**
@@ -804,6 +849,8 @@ export function asignarHorariosAPartidos(
   if (!slots.length || !partidos.length) return;
 
   const duracionMinutos = Math.max(30, opciones?.duracionMinutos || 75);
+  const descansoMinutos = opciones?.descansoMinutos;
+  const descansoModo = opciones?.descansoModo;
   const feedersByMatchNo = opciones?.feedersByMatchNo || new Map();
   const permitirSinEquipos = opciones?.permitirSinEquipos === true;
   const ocupados = new Set(ocupadosIniciales || []);
@@ -831,6 +878,8 @@ export function asignarHorariosAPartidos(
         partidos,
         feedersByMatchNo,
         duracionMinutos,
+        descansoMinutos,
+        descansoModo,
       );
       const slot = buscarSlotIndividual(
         slots,
@@ -839,6 +888,8 @@ export function asignarHorariosAPartidos(
         ids,
         duracionMinutos,
         notBefore,
+        descansoMinutos,
+        descansoModo,
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -898,6 +949,8 @@ export function asignarHorariosAPartidos(
         historial,
         idsOla1.length ? idsOla1 : parejasZona,
         duracionMinutos,
+        descansoMinutos,
+        descansoModo,
       );
       if (slotsOla1) {
         ola1.forEach((item, idx) => {
@@ -920,6 +973,8 @@ export function asignarHorariosAPartidos(
         historial,
         idsOla2,
         duracionMinutos,
+        descansoMinutos,
+        descansoModo,
       );
       if (slotsOla2) {
         ola2.forEach((item, idx) => {
@@ -946,6 +1001,9 @@ export function asignarHorariosAPartidos(
         historial,
         ids,
         duracionMinutos,
+        [],
+        descansoMinutos,
+        descansoModo,
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -966,6 +1024,9 @@ export function asignarHorariosAPartidos(
         historial,
         parejasZona,
         duracionMinutos,
+        [],
+        descansoMinutos,
+        descansoModo,
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -993,6 +1054,8 @@ export function asignarHorariosAPartidos(
       partidos,
       feedersByMatchNo,
       duracionMinutos,
+      descansoMinutos,
+      descansoModo,
     );
     const slot = buscarSlotIndividual(
       slots,
@@ -1001,6 +1064,8 @@ export function asignarHorariosAPartidos(
       ids,
       duracionMinutos,
       notBefore,
+      descansoMinutos,
+      descansoModo,
     );
     if (!slot) continue;
     asignarSlotAPartido(
@@ -1361,7 +1426,10 @@ export function evaluateProgramacionIssues(
 ): ProgramacionIssue[] {
   const duracion = Math.max(30, opciones.duracionMinutos || 90);
   const descanso =
-    opciones.descansoMinutos ?? FAP_DESCANSO_MINUTOS_TRAS_FIN;
+    opciones.descansoMinutos ??
+    (opciones.descansoModo
+      ? minutosDeModoDescanso(opciones.descansoModo)
+      : FAP_DESCANSO_MINUTOS_TRAS_FIN);
   const feeders = opciones.feedersByMatchNo || new Map<number, number[]>();
   const issues: ProgramacionIssue[] = [];
 

@@ -53,7 +53,19 @@ export function esRondaDeZona(ronda?: string | null): boolean {
   return /^ZONA\s+/i.test(String(ronda || "").trim());
 }
 
-function compactarRonda(ronda?: string | null): string {
+export function esRondaCampeonato(ronda?: string | null): boolean {
+  const c = compactarRonda(ronda);
+  return (
+    c === "SEMIS" ||
+    c === "SEMIFINAL" ||
+    c === "SEMIFINALES" ||
+    c === "FINAL" ||
+    c === "TERCERPUESTO" ||
+    c === "3ERPUESTO"
+  );
+}
+
+export function compactarRonda(ronda?: string | null): string {
   return String(ronda || "")
     .trim()
     .toUpperCase()
