@@ -199,6 +199,32 @@ export const asignarProgramacion = async (
   }
 };
 
+/** PUT /api/torneos/:id/programacion/asignar-lote */
+export const asignarLoteProgramacion = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const bloqueo = await rechazarSiNoEdita(req, id, res);
+    if (bloqueo) return bloqueo;
+    const { asignaciones, partido_ids, dia, motivo } = req.body || {};
+    const data = await ProgramacionService.asignarLote(id, {
+      asignaciones,
+      partido_ids,
+      dia,
+      motivo,
+      adminId: req.user?.id,
+    });
+    return res.status(200).json(data);
+  } catch (err: any) {
+    return res.status(400).json({
+      message: "No se pudieron asignar los partidos en lote",
+      error: err.message,
+    });
+  }
+};
+
 /** PUT /api/torneos/:id/programacion/desasignar */
 export const desasignarProgramacion = async (
   req: Request,

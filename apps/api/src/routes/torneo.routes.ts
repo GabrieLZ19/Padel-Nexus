@@ -50,6 +50,7 @@ import {
   publicarProgramacion,
   getProgramacionBoard,
   asignarProgramacion,
+  asignarLoteProgramacion,
   desasignarProgramacion,
   limpiarProgramacion,
   autoAsignarProgramacion,
@@ -216,6 +217,11 @@ router.put(
   "/:id/programacion/asignar",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   asignarProgramacion,
+);
+router.put(
+  "/:id/programacion/asignar-lote",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  asignarLoteProgramacion,
 );
 router.put(
   "/:id/programacion/desasignar",

@@ -805,6 +805,158 @@ export class ProgramacionService {
     return this.getBoard(torneoId);
   }
 
+  static async asignarLote(
+    torneoId: string,
+    payload: {
+      asignaciones?: Array<{
+        partido_id: string;
+        cancha_label: string;
+        fecha_iso: string;
+      }>;
+      partido_ids?: string[];
+      dia?: string;
+      motivo?: string;
+      adminId?: string;
+    },
+  ): Promise<ProgramacionBoard> {
+    const { data: torneo } = await supabaseAdmin
+      .from("torneos")
+      .select("id, programacion_estado, duracion_partido_minutos")
+      .eq("id", torneoId)
+      .maybeSingle();
+    if (!torneo) throw new Error("Torneo no encontrado");
+
+    const estado = (torneo.programacion_estado ||
+      "borrador") as ProgramacionEstado;
+    if (estado === "publicado") {
+      throw new Error(
+        "La programación está publicada. Creá una nueva edición para editar.",
+      );
+    }
+
+    let asignacionesFinales: Array<{
+      partido_id: string;
+      cancha_label: string;
+      fecha_iso: string;
+    }> = [];
+
+    if (Array.isArray(payload.asignaciones) && payload.asignaciones.length > 0) {
+      asignacionesFinales = payload.asignaciones;
+    } else if (
+      Array.isArray(payload.partido_ids) &&
+      payload.partido_ids.length > 0
+    ) {
+      const contexto = await cargarContextoProgramacion(torneoId);
+      const duracion = Number(torneo.duracion_partido_minutos || 90);
+      const { data: todosPartidosDb } = await supabaseAdmin
+        .from("partidos")
+        .select(
+          "id, ronda, orden, equipo_a_id, equipo_b_id, estado_partido, cancha_asignada, fecha_partido, horario_bloqueado",
+        )
+        .eq("torneo_id", torneoId);
+
+      const todosPartidos = todosPartidosDb || [];
+      const partidosAAsignar: PartidoProgramable[] = [];
+      const ocupados = buildOcupadosDesdePartidos(
+        todosPartidos.filter(
+          (p) =>
+            p.cancha_asignada &&
+            p.fecha_partido &&
+            !payload.partido_ids?.includes(p.id),
+        ),
+      );
+
+      for (const p of todosPartidos) {
+        if (payload.partido_ids.includes(p.id)) {
+          partidosAAsignar.push({
+            id: p.id,
+            ronda: p.ronda || "",
+            orden: p.orden || undefined,
+            equipo_a_id: p.equipo_a_id,
+            equipo_b_id: p.equipo_b_id,
+            estado_partido: p.estado_partido || "Programado",
+            cancha_asignada: null,
+            fecha_partido: null,
+          });
+        }
+      }
+
+      const ordenMap = new Map(payload.partido_ids.map((id, idx) => [id, idx]));
+      partidosAAsignar.sort(
+        (a, b) => (ordenMap.get(a.id) ?? 0) - (ordenMap.get(b.id) ?? 0),
+      );
+
+      const allSlots = slotsDesdeContexto(contexto, duracion);
+      let slots = allSlots;
+      if (payload.dia) {
+        const diaTarget = payload.dia.trim();
+        const slotsDelDia = allSlots.filter((s) => s.fecha === diaTarget);
+        const slotsOtros = allSlots.filter((s) => s.fecha !== diaTarget);
+        slots = [...slotsDelDia, ...slotsOtros];
+      }
+
+      asignarHorariosAPartidos(partidosAAsignar, slots, ocupados, {
+        duracionMinutos: duracion,
+        descansoMinutos: 60,
+        distribucion: "continua",
+      });
+
+      for (const p of partidosAAsignar) {
+        if (p.cancha_asignada && p.fecha_partido) {
+          asignacionesFinales.push({
+            partido_id: p.id,
+            cancha_label: p.cancha_asignada,
+            fecha_iso: p.fecha_partido,
+          });
+        }
+      }
+    } else {
+      throw new Error("Se requieren asignaciones o una lista de partido_ids");
+    }
+
+    const motivo = payload.motivo?.trim() || "";
+    for (const asig of asignacionesFinales) {
+      const cancha = String(asig.cancha_label || "").trim();
+      const fechaIso = String(asig.fecha_iso || "").trim();
+      if (!cancha || !fechaIso || !asig.partido_id) continue;
+
+      const update: Record<string, unknown> = {
+        cancha_asignada: cancha,
+        fecha_partido: fechaIso,
+        horario_bloqueado: true,
+      };
+      if (motivo) update.horario_motivo_cambio = motivo;
+
+      await supabaseAdmin
+        .from("partidos")
+        .update(update)
+        .eq("id", asig.partido_id)
+        .eq("torneo_id", torneoId);
+    }
+
+    if (estado === "borrador" && asignacionesFinales.length > 0) {
+      await supabaseAdmin
+        .from("torneos")
+        .update({ programacion_estado: "programado" })
+        .eq("id", torneoId);
+    }
+
+    if (payload.adminId && motivo && asignacionesFinales.length > 0) {
+      await supabaseAdmin.from("logs_auditoria").insert({
+        usuario_id_admin: payload.adminId,
+        accion: "asignar_lote_horarios_partidos",
+        entidad_afectada: torneoId,
+        detalles: {
+          total_asignados: asignacionesFinales.length,
+          partidos_ids: asignacionesFinales.map((a) => a.partido_id),
+          motivo,
+        },
+      });
+    }
+
+    return this.getBoard(torneoId);
+  }
+
   static async desasignar(
     torneoId: string,
     payload: {
