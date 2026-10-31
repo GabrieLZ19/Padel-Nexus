@@ -6,6 +6,17 @@ import { useParams } from "next/navigation";
 import { sileo } from "sileo";
 import { MenoresService } from "@/utils/services/menores";
 
+function renderMarkdownLite(md: string): string {
+  return md
+    .replace(/^### (.*$)/gm, "<h3 class='text-base font-bold text-brand-white mt-4 mb-1'>$1</h3>")
+    .replace(/^## (.*$)/gm, "<h2 class='text-lg font-bold text-brand-white mt-5 mb-2'>$1</h2>")
+    .replace(/^# (.*$)/gm, "<h1 class='text-xl font-black text-brand-white mt-2 mb-2'>$1</h1>")
+    .replace(/\*\*(.*?)\*\*/g, "<strong class='font-bold text-white'>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/\n\n/g, "</p><p class='mt-2'>")
+    .replace(/\n/g, "<br/>");
+}
+
 export default function ConsentimientoParentalPage() {
   const params = useParams();
   const token = String(params.token || "");
@@ -20,6 +31,7 @@ export default function ConsentimientoParentalPage() {
   const [esencial, setEsencial] = useState(false);
   const [privacidad, setPrivacidad] = useState(false);
   const [perfilPublico, setPerfilPublico] = useState(false);
+  const [comercial, setComercial] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +73,7 @@ export default function ConsentimientoParentalPage() {
         consentimiento_esencial: esencial,
         leyo_privacidad_menores: privacidad,
         autoriza_perfil_publico: perfilPublico,
+        autoriza_comunicaciones_comerciales: comercial,
       });
       setDone(true);
       sileo.success({ title: "Consentimiento registrado." });
@@ -134,10 +147,12 @@ export default function ConsentimientoParentalPage() {
         {jugador?.edad_aprox != null ? ` · ${jugador.edad_aprox} años` : ""}
       </p>
 
-      <div className="mb-8 max-h-64 overflow-y-auto rounded-xl border border-brand-white/10 bg-brand-input/40 p-4 text-sm leading-relaxed text-gray-300 whitespace-pre-wrap">
-        {docs?.consentimiento_parental?.contenido_md ||
-          "Texto de consentimiento no disponible."}
-      </div>
+      <div
+        className="mb-8 max-h-72 overflow-y-auto rounded-xl border border-brand-white/10 bg-brand-input/40 p-5 text-sm leading-relaxed text-gray-300"
+        dangerouslySetInnerHTML={{
+          __html: `<p>${renderMarkdownLite(docs?.consentimiento_parental?.contenido_md || "Texto de consentimiento no disponible.")}</p>`,
+        }}
+      />
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="flex items-start gap-3 text-sm text-gray-300">
@@ -196,6 +211,17 @@ export default function ConsentimientoParentalPage() {
             [Opcional] Autorizo el perfil deportivo público (nombre, apellido,
             categoría, ranking, resultados y estadísticas). No incluye
             fotografía ni datos de contacto.
+          </span>
+        </label>
+        <label className="flex items-start gap-3 text-sm text-gray-300">
+          <input
+            type="checkbox"
+            checked={comercial}
+            onChange={(e) => setComercial(e.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            [Opcional] Autorizo el envío de comunicaciones comerciales (promociones, novedades sobre sponsors o marketplace de Padel Nexus).
           </span>
         </label>
 

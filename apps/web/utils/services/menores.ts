@@ -46,6 +46,7 @@ export const MenoresService = {
       consentimiento_esencial: boolean;
       leyo_privacidad_menores: boolean;
       autoriza_perfil_publico?: boolean;
+      autoriza_comunicaciones_comerciales?: boolean;
     },
   ) {
     const response = await api.post<ApiResponse<Record<string, unknown>>>(

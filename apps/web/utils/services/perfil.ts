@@ -119,7 +119,7 @@ export const PerfilService = {
    * Actualiza los datos de la ficha personal del jugador
    */
   async solicitarCambio(
-    campo: "dni" | "categoria",
+    campo: "dni" | "categoria" | "fecha_nacimiento",
     valorPedido: string,
   ): Promise<{ id: string; campo: string; valor_pedido: string; estado: string }> {
     const response = await api.post<

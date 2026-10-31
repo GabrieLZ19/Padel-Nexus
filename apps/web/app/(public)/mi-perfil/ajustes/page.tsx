@@ -12,6 +12,7 @@ import {
   Loader2,
   Mail,
   Fingerprint,
+  Calendar,
   Phone,
   Camera,
 } from "lucide-react";
@@ -153,7 +154,7 @@ export default function ProfileSettings() {
   };
 
   const enviarPedido = async (valor?: string, campo?: string) => {
-    if (!valor?.trim() || (campo !== "dni" && campo !== "categoria")) return;
+    if (!valor?.trim() || (campo !== "dni" && campo !== "categoria" && campo !== "fecha_nacimiento")) return;
     setPedidoEnviando(true);
     try {
       await PerfilService.solicitarCambio(campo, valor.trim());
@@ -347,13 +348,19 @@ export default function ProfileSettings() {
 
             {/* Fecha de Nacimiento & Sexo */}
             <div className="space-y-1">
-              <label className={labelStyles}>Fecha de Nacimiento</label>
-              <input
-                className="w-full bg-brand-input px-4 py-3.5 rounded-xl border border-white/10 text-white text-sm outline-none cursor-pointer focus:border-brand-chartreuse transition-colors"
-                type="date"
-                value={toDateInputValue(profile.fecha_nacimiento)}
-                onChange={(e) => setProfile({ ...profile, fecha_nacimiento: e.target.value })}
-              />
+              <label className={labelStyles}>Fecha de Nacimiento (Ficha Oficial)</label>
+              <div className="relative group">
+                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-gray-500" />
+                <input
+                  className={getInputStyles(false, true)}
+                  type="date"
+                  value={toDateInputValue(profile.fecha_nacimiento)}
+                  readOnly
+                  aria-readonly="true"
+                  title="La fecha de nacimiento la modifica la federación"
+                />
+              </div>
+              <p className="text-xs text-gray-500 ml-1">Dato oficial. No se edita desde acá.</p>
             </div>
 
             <div className="space-y-1">
@@ -459,7 +466,7 @@ export default function ProfileSettings() {
           if (!pedidoEnviando) setPedidoAbierto(false);
         }}
         title="Solicitar cambio"
-        description="El DNI y la categoría oficial los cambia la federación. El pedido queda registrado y tu ficha no se modifica."
+        description="El DNI, la fecha de nacimiento y la categoría oficial los cambia la federación. El pedido queda registrado y tu ficha no se modifica."
         type="info"
         confirmText="Enviar pedido"
         cancelText="Cancelar"
@@ -468,11 +475,12 @@ export default function ProfileSettings() {
         selectLabel="Dato"
         selectOptions={[
           { value: "dni", label: "DNI" },
+          { value: "fecha_nacimiento", label: "Fecha de Nacimiento (AAAA-MM-DD)" },
           { value: "categoria", label: "Categoría" },
         ]}
         showInput
         inputLabel="Valor pedido"
-        inputPlaceholder="Nuevo DNI o categoría, por ejemplo 6ª"
+        inputPlaceholder="Nuevo DNI, fecha (AAAA-MM-DD) o categoría (ej: 6ª)"
         onConfirm={enviarPedido}
       />
 
