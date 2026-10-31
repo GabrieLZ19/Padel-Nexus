@@ -213,7 +213,7 @@ export default function ClubConfiguracionPage() {
       <div>
         <h1 className="text-3xl font-black text-brand-white">Configuración del Club</h1>
         <p className="text-sm text-gray-400 mt-2 font-medium">
-          Gestione los datos institucionales, información geográfica y credenciales de facturación de su club
+          Gestioná los datos institucionales, información geográfica y credenciales de facturación de tu club
         </p>
       </div>
 
@@ -464,7 +464,7 @@ export default function ClubConfiguracionPage() {
               <MapPin className="size-4" /> Geolocalización (Ubicación)
             </h3>
             <p className="text-xs text-gray-500 mt-1">
-              Haga clic en el mapa o arrastre el marcador para marcar la ubicación geográfica de su club.
+              Hacé clic en el mapa o arrastrá el marcador para marcar la ubicación geográfica de tu club.
             </p>
           </div>
 

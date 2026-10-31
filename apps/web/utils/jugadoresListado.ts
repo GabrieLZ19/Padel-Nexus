@@ -16,7 +16,7 @@
  *                        ——
  *                        260
  */
-export const PAGE_SIZE_JUGADORES = 15;
+export const PAGE_SIZE_JUGADORES = 25;
 export const ALTO_FILA_JUGADOR_PX = 36;
 export const ALTO_CROMO_JUGADORES_PX = 260;
 

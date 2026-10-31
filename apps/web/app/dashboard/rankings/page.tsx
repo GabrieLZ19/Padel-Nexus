@@ -129,7 +129,7 @@ export default function RankingsPage() {
   // Estado de filtros
   const [tipo, setTipo] = useState<TipoRankingFront>("libres");
   const [rama, setRama] = useState<string>("");
-  const [categoria, setCategoria] = useState<string>("");
+  const [categoria, setCategoria] = useState<string>("8ª");
   const [provincia, setProvincia] = useState<string>(provinciaForzada);
   const [scope, setScope] = useState<string>(scopePorRol);
   const [search, setSearch] = useState<string>("");
@@ -203,14 +203,16 @@ export default function RankingsPage() {
     };
   }, [tipo, ramaEfectiva, categoria, provincia, scope, vistaProvincia, esEntidadLocal]);
 
-  // Reset de categoria al cambiar de tipo (evita valores invalidos entre grupos).
+  // Sincronizar categoría obligatoria al cambiar de tipo (RAN-01).
   useEffect(() => {
     if (esEntidadLocal) {
       setCategoria((actual) => actual || "8ª");
       setRama((actual) => actual || "masculino");
       return;
     }
-    setCategoria("");
+    const cats = CATEGORIAS_POR_TIPO[tipo];
+    const catDefault = cats && cats.length > 0 ? (tipo === "libres" ? "8ª" : cats[0]) : "8ª";
+    setCategoria((actual) => (cats && cats.includes(actual) ? actual : catDefault));
     if (tipo === "menores") setRama("");
   }, [tipo, esEntidadLocal]);
 
@@ -401,13 +403,10 @@ export default function RankingsPage() {
                   value: c,
                   label: etiquetaCategoriaRanking(c),
                 }))
-              : [
-                  { value: "", label: `Todas las categorías (${tipoConfig.label})` },
-                  ...categoriasDelTipo.map((c) => ({
-                    value: c,
-                    label: etiquetaCategoriaRanking(c),
-                  })),
-                ]
+              : categoriasDelTipo.map((c) => ({
+                  value: c,
+                  label: etiquetaCategoriaRanking(c),
+                }))
           }
           placeholder="Categoría"
         />

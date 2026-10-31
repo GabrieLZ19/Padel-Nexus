@@ -13,6 +13,7 @@ import {
 import { Torneo, RankingJugador } from "@/utils/types";
 import { formatFechaCalendario } from "@/utils/formatFecha";
 import { CATEGORIA_RANKING_PUBLICO } from "@/utils/rankings/orden";
+import { formatNombreJugador } from "@/utils/formatoNombreJugador";
 
 function formatoCifra(valor: number): string {
   return new Intl.NumberFormat("es-AR").format(valor);
@@ -237,9 +238,7 @@ export default function LandingPage() {
                   <div className="flex items-center gap-3">
                     <span className="font-black text-gray-600">0{i + 1}</span>
                     <span className="text-sm font-medium">
-                      {r.perfiles?.nombre
-                        ? `${r.perfiles.apellido?.toUpperCase()}, ${r.perfiles.nombre}`
-                        : "Jugador anónimo"}
+                      {formatNombreJugador(r.perfiles?.nombre, r.perfiles?.apellido)}
                     </span>
                   </div>
                   <span className="text-brand-chartreuse font-bold">

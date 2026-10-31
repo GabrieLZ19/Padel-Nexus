@@ -12,7 +12,11 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  Shield,
+  Network,
+  Users,
 } from "lucide-react";
+import CanchaIcon from "@/components/icons/CanchaIcon";
 import { isAxiosError } from "axios";
 import { PerfilService } from "@/utils/services/perfil";
 import { useProfileStore } from "@/store/useProfileStore";
@@ -136,14 +140,30 @@ function AuthPageContent() {
         </p>
         <ul className="mt-10 space-y-4 text-gray-300">
           {[
-            ["Federaciones nacionales", "La visión nacional. Una red conectada."],
-            ["Asociaciones provinciales", "Cada provincia, parte de la misma red."],
-            ["Clubes", "Tu club tiene su lugar."],
-            ["Jugadores", "Un perfil. Todo tu mundo de pádel."],
-          ].map(([titulo, frase]) => (
+            {
+              titulo: "Federaciones nacionales",
+              frase: "La visión nacional. Una red conectada.",
+              icon: Shield,
+            },
+            {
+              titulo: "Asociaciones provinciales",
+              frase: "Cada provincia, parte de la misma red.",
+              icon: Network,
+            },
+            {
+              titulo: "Clubes",
+              frase: "Tu club tiene su lugar.",
+              icon: CanchaIcon,
+            },
+            {
+              titulo: "Jugadores",
+              frase: "Un perfil. Todo tu mundo de pádel.",
+              icon: Users,
+            },
+          ].map(({ titulo, frase, icon: IconComponent }) => (
             <li key={titulo} className="flex items-start gap-4">
               <div className="mt-0.5 size-8 shrink-0 rounded-full bg-brand-chartreuse flex items-center justify-center border border-brand-white/10 shadow-lg">
-                <Check className="text-brand-black size-5 stroke-3" />
+                <IconComponent className="text-brand-black size-4.5 stroke-2.5" />
               </div>
               <div>
                 <p className="text-base font-semibold text-brand-white">{titulo}</p>

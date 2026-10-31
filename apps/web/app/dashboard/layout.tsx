@@ -218,8 +218,19 @@ export default function DashboardLayout({
     apellido?: string | null,
     nombre?: string | null,
   ) => {
-    const ap = (apellido || "").trim();
-    const nom = (nombre || "").trim();
+    let ap = (apellido || "").trim();
+    let nom = (nombre || "").trim();
+
+    // Normalizar tilde y formato de cuenta federativa
+    if (nom.toLowerCase() === "federacion") nom = "Federación";
+    if (ap.toLowerCase() === "federacion") ap = "Federación";
+    if (
+      (ap.toUpperCase() === "N" || ap.toUpperCase() === "NACIONAL") &&
+      nom.toLowerCase().startsWith("federaci")
+    ) {
+      return "Federación Nacional";
+    }
+
     if (ap && nom) return `${ap.toUpperCase()}, ${nom}`;
     if (ap) return ap.toUpperCase();
     if (nom) return nom;

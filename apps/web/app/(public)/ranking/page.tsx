@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { formatNombreJugador } from "@/utils/formatoNombreJugador";
 import {
   User,
   Trophy,
@@ -258,7 +259,7 @@ export default function RankingPublicPage() {
                   </div>
                   <Medal className="text-gray-400 size-6 mb-2 mt-4 md:mt-0" />
                   <div className="font-black text-xl text-brand-white truncate w-full px-2 mb-1">
-                    {top2.perfiles?.nombre ? `${top2.perfiles.apellido?.toUpperCase()}, ${top2.perfiles.nombre}` : "A confirmar"}
+                    {formatNombreJugador(top2?.perfiles?.nombre, top2?.perfiles?.apellido, "A confirmar")}
                   </div>
                   <div className="text-gray-400 text-sm font-semibold mb-3">
                     {top2.perfiles?.clubes?.nombre || "Particular"}
@@ -293,7 +294,7 @@ export default function RankingPublicPage() {
                   1.º
                 </div>
                 <div className="font-black text-2xl md:text-3xl text-brand-white truncate w-full px-2 mb-1">
-                  {top1?.perfiles?.nombre ? `${top1.perfiles.apellido?.toUpperCase()}, ${top1.perfiles.nombre}` : "A confirmar"}
+                  {formatNombreJugador(top1?.perfiles?.nombre, top1?.perfiles?.apellido, "A confirmar")}
                 </div>
                 <div className="text-gray-400 text-sm font-semibold mb-4">
                   {top1?.perfiles?.clubes?.nombre || "Particular"}
@@ -323,7 +324,7 @@ export default function RankingPublicPage() {
                   </div>
                   <Medal className="text-amber-600 size-6 mb-2 mt-4 md:mt-0" />
                   <div className="font-black text-xl text-brand-white truncate w-full px-2 mb-1">
-                    {top3.perfiles?.nombre ? `${top3.perfiles.apellido?.toUpperCase()}, ${top3.perfiles.nombre}` : "A confirmar"}
+                    {formatNombreJugador(top3?.perfiles?.nombre, top3?.perfiles?.apellido, "A confirmar")}
                   </div>
                   <div className="text-gray-400 text-sm font-semibold mb-3">
                     {top3.perfiles?.clubes?.nombre || "Particular"}
@@ -358,7 +359,7 @@ export default function RankingPublicPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-bold text-white truncate">
-                          {player.perfiles?.nombre ? `${player.perfiles.apellido?.toUpperCase()}, ${player.perfiles.nombre}` : "Desconocido"}
+                          {formatNombreJugador(player.perfiles?.nombre, player.perfiles?.apellido, "Desconocido")}
                         </span>
                         <span className="bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-2 py-0.5 rounded-md text-xs font-black text-brand-chartreuse uppercase shrink-0">
                           {activeCategory}
@@ -449,7 +450,7 @@ export default function RankingPublicPage() {
                               )}
                             </div>
                             <span className="font-bold text-sm text-white group-hover:opacity-95 transition-all">
-                              {player.perfiles?.nombre ? `${player.perfiles.apellido?.toUpperCase()}, ${player.perfiles.nombre}` : "Jugador Desconocido"}
+                              {formatNombreJugador(player.perfiles?.nombre, player.perfiles?.apellido, "Jugador Desconocido")}
                             </span>
                           </td>
                           <td className="py-5 px-6">

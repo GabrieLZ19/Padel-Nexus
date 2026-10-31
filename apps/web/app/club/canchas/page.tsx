@@ -149,7 +149,7 @@ export default function ClubCanchasPage() {
       isOpen: true,
       title: "Eliminar Turno",
       description:
-        "¿Está seguro de que desea eliminar este turno semanal de la plantilla?",
+        "¿Estás seguro de que querés eliminar este turno semanal de la plantilla?",
       type: "warning",
       confirmText: "Eliminar",
       cancelText: "Cancelar",
@@ -331,7 +331,7 @@ export default function ClubCanchasPage() {
                             Horarios Semanales
                           </h4>
                           <p className="text-[11px] text-gray-500 mt-0.5">
-                            Seleccione un día para administrar su plantilla de
+                            Seleccioná un día para administrar tu plantilla de
                             turnos.
                           </p>
                         </div>

@@ -213,13 +213,23 @@ export default function SignUpPage() {
       return;
     }
 
-    // Capitalización automática
+    // Capitalización automática respetando acrónimos intencionales (ej: "QA Prueba")
+    const capitalizarPalabra = (word: string) => {
+      if (!word) return "";
+      if (word === word.toUpperCase() && word.length <= 4 && !/^\d+$/.test(word)) {
+        return word;
+      }
+      if (word === word.toUpperCase()) {
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    };
+
     const capitalizeWords = (str: string) =>
       str
         .trim()
-        .toLowerCase()
         .split(/\s+/)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .map(capitalizarPalabra)
         .join(" ");
 
     try {

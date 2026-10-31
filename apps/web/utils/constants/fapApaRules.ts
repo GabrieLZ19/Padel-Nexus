@@ -89,8 +89,8 @@ export const FORMATOS_TORNEO_OFICIAL = [
 // ============================================================================
 export const CATEGORIAS_RECREATIVAS_CLUB = [
   { value: "Americano", label: "Americano" },
-  { value: "Super 8", label: "Súper 8" },
-  { value: "Super 12", label: "Súper 12" },
+  { value: "Super 8", label: "Super 8" },
+  { value: "Super 12", label: "Super 12" },
   { value: "Suma 8", label: "Suma 8" },
   { value: "Suma 10", label: "Suma 10" },
   { value: "Suma 12", label: "Suma 12" },
