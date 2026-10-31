@@ -281,36 +281,58 @@ export class ComunicacionesAudienciaService {
       next.provincias = [provincia];
 
       if (next.asociacion_ids?.length) {
-        const { data: asocs } = await supabaseAdmin
-          .from("asociaciones")
-          .select("id, provincia")
-          .in("id", next.asociacion_ids);
+        const idsToCheck = next.asociacion_ids.filter((id) => id !== "todas");
+        if (idsToCheck.length > 0) {
+          const { data: asocs } = await supabaseAdmin
+            .from("asociaciones")
+            .select("id, provincia")
+            .in("id", idsToCheck);
 
-        const invalidas = (asocs || []).filter(
-          (a) =>
-            (a.provincia || "").toLowerCase().trim() !==
-            provincia.toLowerCase().trim(),
-        );
-        if (invalidas.length > 0 || (asocs || []).length !== next.asociacion_ids.length) {
-          throw new Error(
-            "Solo podés apuntar a asociaciones de tu provincia.",
+          const invalidas = (asocs || []).filter(
+            (a) =>
+              (a.provincia || "").toLowerCase().trim() !==
+              provincia.toLowerCase().trim(),
           );
+          if (invalidas.length > 0 || (asocs || []).length !== idsToCheck.length) {
+            throw new Error(
+              "Solo podés apuntar a asociaciones de tu provincia.",
+            );
+          }
         }
       }
 
       if (next.club_ids?.length) {
-        const { data: clubes } = await supabaseAdmin
-          .from("clubes")
-          .select("id, provincia")
-          .in("id", next.club_ids);
+        const idsToCheck = next.club_ids.filter((id) => id !== "todos");
+        if (idsToCheck.length > 0) {
+          const { data: clubes } = await supabaseAdmin
+            .from("clubes")
+            .select("id, provincia")
+            .in("id", idsToCheck);
 
-        const invalidos = (clubes || []).filter(
-          (c) =>
-            (c.provincia || "").toLowerCase().trim() !==
-            provincia.toLowerCase().trim(),
-        );
-        if (invalidos.length > 0 || (clubes || []).length !== next.club_ids.length) {
-          throw new Error("Solo podés apuntar a clubes de tu provincia.");
+          const invalidos = (clubes || []).filter(
+            (c) =>
+              (c.provincia || "").toLowerCase().trim() !==
+              provincia.toLowerCase().trim(),
+          );
+          if (invalidos.length > 0 || (clubes || []).length !== idsToCheck.length) {
+            throw new Error("Solo podés apuntar a clubes de tu provincia.");
+          }
+        }
+      }
+
+      if (next.torneo_id) {
+        const { data: torneo } = await supabaseAdmin
+          .from("torneos")
+          .select("id, asociacion_id, federacion_id, asociaciones:asociacion_id(provincia)")
+          .eq("id", next.torneo_id)
+          .maybeSingle();
+
+        const asocProv = (torneo?.asociaciones as { provincia?: string } | null)?.provincia;
+        if (
+          asocProv &&
+          asocProv.toLowerCase().trim() !== provincia.toLowerCase().trim()
+        ) {
+          throw new Error("Solo podés apuntar a torneos organizados por asociaciones de tu provincia.");
         }
       }
 
@@ -376,10 +398,8 @@ export class ComunicacionesAudienciaService {
         );
 
       case "inscritos_torneo":
-        return this.aplicarFiltroLicencia(
-          await this.resolverInscritosTorneo(filtros),
-          filtros,
-        );
+        // El jugador ya está inscripto según la condición del torneo; no se filtra por licencia.
+        return this.resolverInscritosTorneo(filtros);
 
       case "lista":
         // La resolucion de listas se hace en resolver() antes de llegar aca.
@@ -530,8 +550,25 @@ export class ComunicacionesAudienciaService {
   private static async resolverJugadoresAsociacion(
     filtros: ComunicacionesFiltros,
   ): Promise<string[]> {
-    if (!filtros.asociacion_ids?.length) {
-      throw new Error("Se requiere asociacion_ids para jugadores por asociación.");
+    let targetAsocIds = (filtros.asociacion_ids || []).filter(
+      (id) => id && id !== "todas",
+    );
+
+    // Si no se pasaron o se seleccionó "todas", resolver todas las asociaciones dentro del alcance
+    if (targetAsocIds.length === 0) {
+      let asocQuery = supabaseAdmin.from("asociaciones").select("id");
+      if (filtros.provincias?.length) {
+        asocQuery = asocQuery.in("provincia", filtros.provincias);
+      }
+      const { data: asocs, error: errAsocs } = await asocQuery;
+      if (errAsocs) {
+        throw new Error(`Error al resolver asociaciones: ${errAsocs.message}`);
+      }
+      targetAsocIds = (asocs || []).map((a) => a.id);
+    }
+
+    if (targetAsocIds.length === 0) {
+      return [];
     }
 
     const ids = new Set<string>();
@@ -540,7 +577,7 @@ export class ComunicacionesAudienciaService {
     const { data: afiliados, error: afilError } = await supabaseAdmin
       .from("afiliaciones")
       .select("usuario_id")
-      .in("asociacion_id", filtros.asociacion_ids)
+      .in("asociacion_id", targetAsocIds)
       .eq("estado", AFILIACION_ESTADOS.ACTIVO);
 
     if (afilError) {
@@ -555,7 +592,7 @@ export class ComunicacionesAudienciaService {
     const { data: clubes } = await supabaseAdmin
       .from("clubes")
       .select("id")
-      .in("asociacion_id", filtros.asociacion_ids);
+      .in("asociacion_id", targetAsocIds);
 
     const clubIds = (clubes || []).map((c) => c.id);
     if (clubIds.length > 0) {
@@ -594,8 +631,31 @@ export class ComunicacionesAudienciaService {
   private static async resolverJugadoresClub(
     filtros: ComunicacionesFiltros,
   ): Promise<string[]> {
-    if (!filtros.club_ids?.length) {
-      throw new Error("Se requiere club_ids para jugadores por club.");
+    let targetClubIds = (filtros.club_ids || []).filter(
+      (id) => id && id !== "todos",
+    );
+
+    // Si no se pasaron o se seleccionó "todos", resolver todos los clubes dentro del alcance
+    if (targetClubIds.length === 0) {
+      let clubQuery = supabaseAdmin.from("clubes").select("id");
+      if (filtros.asociacion_ids?.length) {
+        const asocIds = filtros.asociacion_ids.filter((id) => id !== "todas");
+        if (asocIds.length > 0) {
+          clubQuery = clubQuery.in("asociacion_id", asocIds);
+        }
+      }
+      if (filtros.provincias?.length) {
+        clubQuery = clubQuery.in("provincia", filtros.provincias);
+      }
+      const { data: clubes, error: errClubes } = await clubQuery;
+      if (errClubes) {
+        throw new Error(`Error al resolver clubes: ${errClubes.message}`);
+      }
+      targetClubIds = (clubes || []).map((c) => c.id);
+    }
+
+    if (targetClubIds.length === 0) {
+      return [];
     }
 
     const ids = new Set<string>();
@@ -604,7 +664,7 @@ export class ComunicacionesAudienciaService {
       .from("perfiles")
       .select("id")
       .eq("rol", "usuario")
-      .in("club_id", filtros.club_ids);
+      .in("club_id", targetClubIds);
 
     if (filtros.provincias?.length) {
       perfilesQuery = perfilesQuery.in("lugar_residencia", filtros.provincias);
@@ -620,7 +680,7 @@ export class ComunicacionesAudienciaService {
     const { data: afiliados } = await supabaseAdmin
       .from("afiliaciones")
       .select("usuario_id")
-      .in("club_id", filtros.club_ids)
+      .in("club_id", targetClubIds)
       .eq("estado", AFILIACION_ESTADOS.ACTIVO);
 
     for (const a of afiliados || []) {
@@ -636,6 +696,22 @@ export class ComunicacionesAudienciaService {
     const torneoId = filtros.torneo_id;
     if (!torneoId) {
       throw new Error("Se requiere torneo_id para inscritos de torneo.");
+    }
+
+    const { data: torneo, error: errTorneo } = await supabaseAdmin
+      .from("torneos")
+      .select("id, asociacion_id, federacion_id")
+      .eq("id", torneoId)
+      .maybeSingle();
+
+    if (errTorneo || !torneo) {
+      throw new Error("Torneo no encontrado.");
+    }
+
+    if (!torneo.asociacion_id && !torneo.federacion_id) {
+      throw new Error(
+        "Esta audiencia solo debe enviar a inscriptos de torneos organizados por asociaciones o agrupaciones afiliadas a la entidad superior.",
+      );
     }
 
     const { data, error } = await supabaseAdmin
@@ -659,7 +735,12 @@ export class ComunicacionesAudienciaService {
 
     if (filtros.club_ids?.length || filtros.provincias?.length) {
       let q = supabaseAdmin.from("perfiles").select("id").in("id", ids);
-      if (filtros.club_ids?.length) q = q.in("club_id", filtros.club_ids);
+      if (filtros.club_ids?.length) {
+        const clubIdsValidos = filtros.club_ids.filter((c) => c !== "todos");
+        if (clubIdsValidos.length > 0) {
+          q = q.in("club_id", clubIdsValidos);
+        }
+      }
       if (filtros.provincias?.length) {
         q = q.in("lugar_residencia", filtros.provincias);
       }
