@@ -9,6 +9,7 @@ import { FiscalSesionService } from "./fiscal-sesion.service";
 
 import { MenoresService } from "./menores.service";
 import { LegalService } from "./legal.service";
+import { capitalizarNombre } from "../utils/formatoTexto";
 import type { ResponsableInput } from "./menores.service";
 
 // DTO para el registro unificado FAP
@@ -101,15 +102,7 @@ export class AuthService {
     const tycVersion = versiones.tyc?.version;
     const privVersion = versiones.privacidad?.version;
 
-    const capitalizarTexto = (texto: string) => {
-      if (!texto) return "";
-      return texto
-        .trim()
-        .toLowerCase()
-        .split(/\s+/)
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
-    };
+    const capitalizarTexto = (texto: string) => capitalizarNombre(texto);
 
     const nombreCapitalizado = capitalizarTexto(datos.nombre);
     const apellidoCapitalizado = capitalizarTexto(datos.apellido);

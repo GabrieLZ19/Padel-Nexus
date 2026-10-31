@@ -12,6 +12,7 @@ import {
 } from "../utils/inscripcionPlanilla";
 import { randomBytes } from "crypto";
 import { esVisibleEnSitioPublico } from "../utils/datoPrueba";
+import { capitalizarNombre } from "../utils/formatoTexto";
 import { NotificacionService } from "./notificacion.service";
 import {
   CATEGORIAS_LIBRES,
@@ -53,6 +54,14 @@ export class PerfilService {
     if (error || !data) {
       console.error("🔴 ERROR EN OBTENER_PERFIL_COMPLETO:", error);
       throw new Error("Perfil de usuario no encontrado en la plataforma.");
+    }
+
+        if (data.nombre?.toLowerCase() === "federacion") {
+      data.nombre = "Federación";
+    }
+    if (data.apellido === "N" && data.nombre?.toLowerCase().startsWith("federaci")) {
+      data.nombre = "Federación Nacional";
+      data.apellido = "";
     }
 
     const perfilSincronizado = await PerfilService.sincronizarMetadataFaltante(
@@ -172,15 +181,7 @@ export class PerfilService {
     userId: string,
     datos: ActualizarPerfilDTO,
   ) {
-    const capitalizarTexto = (texto?: string) => {
-      if (!texto) return undefined;
-      return texto
-        .trim()
-        .toLowerCase()
-        .split(/\s+/)
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
-    };
+    const capitalizarTexto = (texto?: string) => texto ? capitalizarNombre(texto) : undefined;
 
     const nombreCapitalizado = capitalizarTexto(datos.nombre);
     const apellidoCapitalizado = capitalizarTexto(datos.apellido);
@@ -329,13 +330,7 @@ export class PerfilService {
   }
 
   private static capitalizarTexto(texto?: string): string {
-    if (!texto) return "";
-    return texto
-      .trim()
-      .toLowerCase()
-      .split(/\s+/)
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ");
+    return capitalizarNombre(texto);
   }
 
   private static emailPlaceholderDesdeDni(dni: string): string {
