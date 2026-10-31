@@ -41,6 +41,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
     bloqueadoPorAlcance,
     reloadWithConfig,
     asignar,
+    asignarLote,
     desasignar,
     limpiar,
     autoAsignar,
@@ -189,6 +190,10 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
                 partidos={board.partidos}
                 issues={board.issues}
                 readOnly={isReadOnly}
+                activeDay={activeDay}
+                diasDisponibles={board.dias}
+                onAsignarLote={asignarLote}
+                busy={busy}
               />
             </div>
           </div>

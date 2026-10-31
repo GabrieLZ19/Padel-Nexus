@@ -426,6 +426,26 @@ export const TorneosService = {
     return response.data;
   },
 
+  async asignarLoteProgramacion(
+    torneoId: string,
+    payload: {
+      asignaciones?: Array<{
+        partido_id: string;
+        cancha_label: string;
+        fecha_iso: string;
+      }>;
+      partido_ids?: string[];
+      dia?: string;
+      motivo?: string;
+    },
+  ): Promise<ProgramacionBoard> {
+    const response = await api.put<ProgramacionBoard>(
+      `/torneos/${torneoId}/programacion/asignar-lote`,
+      payload,
+    );
+    return response.data;
+  },
+
   async desasignarProgramacion(
     torneoId: string,
     payload: { partido_id: string; motivo?: string },

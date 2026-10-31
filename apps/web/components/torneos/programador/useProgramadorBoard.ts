@@ -280,6 +280,56 @@ export function useProgramadorBoard(torneoId: string) {
     [isReadOnly, torneoId, scheduleBoardSync],
   );
 
+  const asignarLote = useCallback(
+    async (
+      partidoIds: string[],
+      diaTarget?: string,
+      motivo?: string,
+    ) => {
+      if (boardRef.current?.solo_lectura) {
+        sileo.error({
+          title: "Solo lectura",
+          description:
+            boardRef.current.aviso_alcance ||
+            "No podés cambiar los horarios de este torneo.",
+        });
+        return;
+      }
+      if (isReadOnly) {
+        sileo.error({
+          title: "Programación publicada",
+          description: "Creá una nueva edición para editar.",
+        });
+        return;
+      }
+      if (!partidoIds.length) return;
+
+      setBusy(true);
+      const prev = boardRef.current;
+
+      try {
+        const data = await TorneosService.asignarLoteProgramacion(torneoId, {
+          partido_ids: partidoIds,
+          dia: diaTarget || activeDay,
+          motivo,
+        });
+        applyBoard(data);
+        sileo.success({
+          title: "Partidos asignados",
+          description: `Se asignaron los partidos seleccionados a la grilla.`,
+        });
+      } catch (e: unknown) {
+        if (prev) setBoard(prev);
+        sileo.error({
+          title: apiErrorMessage(e, "Error al asignar partidos en lote"),
+        });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [isReadOnly, torneoId, activeDay, applyBoard],
+  );
+
   const desasignar = useCallback(
     async (
       partidoId: string,
@@ -495,6 +545,7 @@ export function useProgramadorBoard(torneoId: string) {
     reloadWithConfig,
     load,
     asignar,
+    asignarLote,
     desasignar,
     limpiar,
     autoAsignar,
