@@ -22,6 +22,7 @@ import {
 import { isAxiosError } from "axios";
 import { sileo } from "sileo";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import ComunicacionesMultiSelect from "./ComunicacionesMultiSelect";
 import FeedbackModal, {
   type FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
@@ -29,6 +30,7 @@ import { ComunicacionesService } from "@/utils/services/comunicaciones";
 import { AsociacionesService } from "@/utils/services/asociaciones";
 import { ClubesService } from "@/utils/services/clubes";
 import { TorneosService } from "@/utils/services/torneos";
+import type { Torneo } from "@/utils/types/torneo.types";
 import { PROVINCIAS_ARG, NIVELES_PADEL } from "@/utils/constants/padelConfig";
 import { useProfileStore } from "@/store/useProfileStore";
 import type {
@@ -174,9 +176,10 @@ export default function ComunicacionesPanel() {
   const [audienciaTipo, setAudienciaTipo] =
     useState<ComunicacionesAudienciaTipo>("jugadores_provincia");
   const [provincia, setProvincia] = useState("");
-  const [asociacionId, setAsociacionId] = useState("");
-  const [clubId, setClubId] = useState("");
+  const [asociacionIds, setAsociacionIds] = useState<string[]>(["todas"]);
+  const [clubIds, setClubIds] = useState<string[]>(["todos"]);
   const [torneoId, setTorneoId] = useState("");
+  const [rawTorneos, setRawTorneos] = useState<Torneo[]>([]);
   const [listaId, setListaId] = useState("");
   const [categoriaPadel, setCategoriaPadel] = useState("");
   const [licenciaEstado, setLicenciaEstado] =
@@ -259,9 +262,35 @@ export default function ComunicacionesPanel() {
   const buildFiltros = useCallback((): ComunicacionesFiltros => {
     const filtros: ComunicacionesFiltros = {};
     if (provincia) filtros.provincias = [provincia];
-    if (asociacionId) filtros.asociacion_ids = [asociacionId];
-    if (clubId) filtros.club_ids = [clubId];
-    if (torneoId) filtros.torneo_id = torneoId;
+
+    if (audienciaTipo === "jugadores_asociacion") {
+      filtros.asociacion_ids =
+        asociacionIds.length === 0 || asociacionIds.includes("todas")
+          ? ["todas"]
+          : asociacionIds;
+    }
+
+    if (audienciaTipo === "jugadores_club") {
+      if (rol === "admin_club" && profile?.club_id) {
+        filtros.club_ids = [profile.club_id];
+      } else {
+        filtros.club_ids =
+          clubIds.length === 0 || clubIds.includes("todos")
+            ? ["todos"]
+            : clubIds;
+      }
+    }
+
+    if (audienciaTipo === "admins_clubes") {
+      if (clubIds.length > 0 && !clubIds.includes("todos")) {
+        filtros.club_ids = clubIds;
+      }
+    }
+
+    if (torneoId && audienciaTipo === "inscritos_torneo") {
+      filtros.torneo_id = torneoId;
+    }
+
     if (
       categoriaPadel &&
       (audienciaTipo === "jugadores_provincia" ||
@@ -273,13 +302,13 @@ export default function ComunicacionesPanel() {
     if (audienciaTipo === "jugadores_provincia" || audienciaTipo === "plataforma") {
       filtros.solo_rol_usuario = true;
     }
-    // Filtro por estado de licencia: aplica a audiencias de jugadores.
+    // Filtro por estado de licencia: aplica a audiencias de jugadores (no aplica a inscritos de torneo).
     if (
       licenciaEstado &&
+      audienciaTipo !== "inscritos_torneo" &&
       (audienciaTipo === "jugadores_provincia" ||
         audienciaTipo === "jugadores_asociacion" ||
         audienciaTipo === "jugadores_club" ||
-        audienciaTipo === "inscritos_torneo" ||
         audienciaTipo === "plataforma")
     ) {
       filtros.licencia_estado = licenciaEstado;
@@ -287,12 +316,14 @@ export default function ComunicacionesPanel() {
     return filtros;
   }, [
     provincia,
-    asociacionId,
-    clubId,
+    asociacionIds,
+    clubIds,
     torneoId,
     categoriaPadel,
     audienciaTipo,
     licenciaEstado,
+    rol,
+    profile?.club_id,
   ]);
 
   const cargarListas = useCallback(async () => {
@@ -358,6 +389,7 @@ export default function ComunicacionesPanel() {
         })),
       );
 
+      setRawTorneos(tors);
       setTorneos(
         tors.map((t) => ({
           value: t.id,
@@ -378,7 +410,7 @@ export default function ComunicacionesPanel() {
   // seleccionar otros clubes en el dropdown de audiencia.
   useEffect(() => {
     if (rol === "admin_club" && profile?.club_id) {
-      setClubId(profile.club_id);
+      setClubIds([profile.club_id]);
     }
   }, [rol, profile?.club_id]);
 
@@ -432,6 +464,28 @@ export default function ComunicacionesPanel() {
     return clubes.filter((c) => normalizarTexto(c.provincia) === target);
   }, [clubes, provinciaForzada]);
 
+  const torneosDisponibles = useMemo(() => {
+    // Solo torneos organizados por asociaciones o agrupaciones afiliadas a la entidad superior
+    let filtered = rawTorneos.filter(
+      (t) => Boolean(t.asociacion_id || t.federacion_id),
+    );
+    if (rol === "admin_provincial" && provinciaForzada) {
+      const targetProv = normalizarTexto(provinciaForzada);
+      const asocIdsProv = new Set(
+        asociaciones
+          .filter((a) => normalizarTexto(a.provincia) === targetProv)
+          .map((a) => a.value),
+      );
+      filtered = filtered.filter(
+        (t) => t.asociacion_id && asocIdsProv.has(t.asociacion_id),
+      );
+    }
+    return filtered.map((t) => ({
+      value: t.id,
+      label: t.nombre || t.id,
+    }));
+  }, [rawTorneos, rol, provinciaForzada, asociaciones]);
+
   /**
    * Resumen textual de filtros aplicados. Se muestra en la preview antes de
    * enviar (requerido por observaciones: "los usuarios deben poder ver los
@@ -456,26 +510,56 @@ export default function ComunicacionesPanel() {
       });
     }
 
-    if (asociacionId) {
-      const nombre =
-        asociaciones.find((a) => a.value === asociacionId)?.label ||
-        asociacionId;
-      items.push({ label: "Asociación", value: nombre });
+    if (audienciaTipo === "jugadores_asociacion") {
+      if (asociacionIds.includes("todas") || asociacionIds.length === 0) {
+        items.push({
+          label: "Asociaciones",
+          value: provinciaForzada
+            ? `Todas las asociaciones de ${provinciaForzada}`
+            : "Todas las asociaciones",
+        });
+      } else {
+        const nombres = asociacionIds
+          .map(
+            (id) => asociaciones.find((a) => a.value === id)?.label || id,
+          )
+          .join(", ");
+        items.push({ label: "Asociaciones", value: nombres });
+      }
     }
 
-    if (clubId) {
-      const nombre =
-        clubes.find((c) => c.value === clubId)?.label || clubId;
-      items.push({
-        label: "Club",
-        value:
-          rol === "admin_club" ? `${nombre} (forzado por rol)` : nombre,
-      });
+    if (audienciaTipo === "jugadores_club" || audienciaTipo === "admins_clubes") {
+      if (rol === "admin_club") {
+        const nombre =
+          clubes.find((c) => c.value === profile?.club_id)?.label ||
+          profile?.club_id ||
+          "Tu club";
+        items.push({
+          label: "Club",
+          value: `${nombre} (forzado por rol)`,
+        });
+      } else if (clubIds.includes("todos") || clubIds.length === 0) {
+        if (audienciaTipo === "jugadores_club") {
+          items.push({
+            label: "Clubes",
+            value: provinciaForzada
+              ? `Todos los clubes de ${provinciaForzada}`
+              : "Todos los clubes del alcance",
+          });
+        }
+      } else {
+        const nombres = clubIds
+          .map((id) => clubes.find((c) => c.value === id)?.label || id)
+          .join(", ");
+        items.push({ label: "Clubes", value: nombres });
+      }
     }
 
     if (torneoId && audienciaTipo === "inscritos_torneo") {
       const nombre =
-        torneos.find((t) => t.value === torneoId)?.label || torneoId;
+        torneosDisponibles.find((t) => t.value === torneoId)?.label ||
+        torneos.find((t) => t.value === torneoId)?.label ||
+        torneoId;
       items.push({ label: "Torneo", value: nombre });
     }
 
@@ -491,10 +575,10 @@ export default function ComunicacionesPanel() {
 
     if (
       licenciaEstado !== "" &&
+      audienciaTipo !== "inscritos_torneo" &&
       (audienciaTipo === "jugadores_provincia" ||
         audienciaTipo === "jugadores_asociacion" ||
         audienciaTipo === "jugadores_club" ||
-        audienciaTipo === "inscritos_torneo" ||
         audienciaTipo === "plataforma")
     ) {
       items.push({
@@ -511,17 +595,19 @@ export default function ComunicacionesPanel() {
     audienciaTipo,
     provincia,
     provinciaForzada,
-    asociacionId,
+    asociacionIds,
     asociaciones,
-    clubId,
+    clubIds,
     clubes,
     torneoId,
     torneos,
+    torneosDisponibles,
     categoriaPadel,
     licenciaEstado,
     listaId,
     listas,
     rol,
+    profile?.club_id,
   ]);
 
   // Al cambiar de categoria, elegimos el primer tipo disponible por defecto.
@@ -604,6 +690,13 @@ export default function ComunicacionesPanel() {
       sileo.warning({
         title: "Elegí una lista",
         description: "Seleccioná una lista guardada para enviar.",
+      });
+      return;
+    }
+    if (audienciaTipo === "inscritos_torneo" && !torneoId) {
+      sileo.warning({
+        title: "Elegí un torneo",
+        description: "Seleccioná un torneo para enviar a sus inscriptos.",
       });
       return;
     }
@@ -954,8 +1047,8 @@ export default function ComunicacionesPanel() {
                           setCategoriaDest(cat.id);
                           setPreview(null);
                           setProvincia("");
-                          setAsociacionId("");
-                          setClubId("");
+                          setAsociacionIds(["todas"]);
+                          setClubIds(["todos"]);
                           setTorneoId("");
                           setLicenciaEstado("");
                           setCategoriaPadel("");
@@ -1079,41 +1172,37 @@ export default function ComunicacionesPanel() {
             )}
 
             {audienciaTipo === "admins_clubes" && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase">
-                  Filtrar por club (opcional)
-                </label>
-                <CustomDropdown
-                  value={clubId}
-                  onChange={(v) => {
-                    setClubId(v);
-                    setPreview(null);
-                  }}
-                  options={[
-                    { value: "", label: "Todos los clubes del alcance" },
-                    ...clubesDisponibles,
-                  ]}
-                  placeholder="Club"
-                />
-              </div>
+              <ComunicacionesMultiSelect
+                label="Filtrar por clubes (opcional)"
+                selectedValues={clubIds}
+                onChange={(ids) => {
+                  setClubIds(ids);
+                  setPreview(null);
+                }}
+                options={clubesDisponibles}
+                placeholder="Clubes"
+                allOptionLabel="Todos los clubes del alcance"
+                allOptionValue="todos"
+              />
             )}
 
             {audienciaTipo === "jugadores_asociacion" && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase">
-                  Asociación
-                </label>
-                <CustomDropdown
-                  value={asociacionId}
-                  onChange={(v) => {
-                    setAsociacionId(v);
+              <div className="space-y-1">
+                <ComunicacionesMultiSelect
+                  label="Asociaciones"
+                  selectedValues={asociacionIds}
+                  onChange={(ids) => {
+                    setAsociacionIds(ids);
                     setPreview(null);
                   }}
-                  options={[
-                    { value: "", label: "Seleccioná asociación" },
-                    ...asociacionesDisponibles,
-                  ]}
-                  placeholder="Asociación"
+                  options={asociacionesDisponibles}
+                  placeholder="Asociaciones"
+                  allOptionLabel={
+                    provinciaForzada
+                      ? `Todas las asociaciones de ${provinciaForzada}`
+                      : "Todas las asociaciones"
+                  }
+                  allOptionValue="todas"
                 />
                 {provinciaForzada && (
                   <p className="text-[11px] text-gray-500">
@@ -1125,37 +1214,42 @@ export default function ComunicacionesPanel() {
 
             {audienciaTipo === "jugadores_club" && (
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase">
-                  Club
-                </label>
                 {rol === "admin_club" ? (
-                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-brand-black/60 border border-brand-white/10 text-sm text-brand-white">
-                    <Building2 className="size-4 text-brand-chartreuse shrink-0" />
-                    <span className="font-semibold">
-                      {clubForzadoLabel || "Tu club"}
-                    </span>
-                  
-                  </div>
-                ) : (
                   <>
-                    <CustomDropdown
-                      value={clubId}
-                      onChange={(v) => {
-                        setClubId(v);
+                    <label className="text-xs font-bold text-gray-500 uppercase">
+                      Club
+                    </label>
+                    <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-brand-black/60 border border-brand-white/10 text-sm text-brand-white">
+                      <Building2 className="size-4 text-brand-chartreuse shrink-0" />
+                      <span className="font-semibold">
+                        {clubForzadoLabel || "Tu club"}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-1">
+                    <ComunicacionesMultiSelect
+                      label="Clubes"
+                      selectedValues={clubIds}
+                      onChange={(ids) => {
+                        setClubIds(ids);
                         setPreview(null);
                       }}
-                      options={[
-                        { value: "", label: "Seleccioná club" },
-                        ...clubesDisponibles,
-                      ]}
-                      placeholder="Club"
+                      options={clubesDisponibles}
+                      placeholder="Clubes"
+                      allOptionLabel={
+                        provinciaForzada
+                          ? `Todos los clubes de ${provinciaForzada}`
+                          : "Todos los clubes del alcance"
+                      }
+                      allOptionValue="todos"
                     />
                     {provinciaForzada && (
                       <p className="text-[11px] text-gray-500">
                         Solo podés apuntar a clubes de {provinciaForzada}.
                       </p>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             )}
@@ -1173,10 +1267,13 @@ export default function ComunicacionesPanel() {
                   }}
                   options={[
                     { value: "", label: "Seleccioná torneo" },
-                    ...torneos,
+                    ...torneosDisponibles,
                   ]}
                   placeholder="Torneo"
                 />
+                <p className="text-[11px] text-gray-500">
+                  Solo se listan torneos organizados por asociaciones o agrupaciones afiliadas a la entidad superior.
+                </p>
               </div>
             )}
 
@@ -1203,7 +1300,7 @@ export default function ComunicacionesPanel() {
               </div>
             )}
 
-            {esAudienciaJugadores && (
+            {esAudienciaJugadores && audienciaTipo !== "inscritos_torneo" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {(audienciaTipo === "jugadores_provincia" ||
                   audienciaTipo === "jugadores_asociacion" ||
