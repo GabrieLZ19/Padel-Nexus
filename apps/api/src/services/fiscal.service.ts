@@ -346,7 +346,12 @@ export class FiscalService {
 
       const { error: errAuth } = await supabaseAdmin.auth.admin.updateUserById(
         perfilExistente.id,
-        { email: correo, password: passwordFinal, email_confirm: true },
+        {
+          email: correo,
+          password: passwordFinal,
+          email_confirm: true,
+          app_metadata: { rol: "fiscal" },
+        },
       );
       if (errAuth) {
         throw new Error(`No se pudo actualizar el usuario existente: ${errAuth.message}`);
@@ -354,7 +359,7 @@ export class FiscalService {
 
       await supabaseAdmin
         .from("perfiles")
-        .update({ email: correo, dni: fiscal.dni })
+        .update({ email: correo, dni: fiscal.dni, rol: "fiscal" })
         .eq("id", perfilExistente.id);
       await supabaseAdmin
         .from("fiscales")
@@ -375,7 +380,7 @@ export class FiscalService {
         email: correo,
         password: passwordFinal,
         email_confirm: true,
-        app_metadata: { rol: "usuario" },
+        app_metadata: { rol: "fiscal" },
         user_metadata: {
           nombre: fiscal.nombre,
           apellido: fiscal.apellido,
@@ -395,7 +400,7 @@ export class FiscalService {
         nombre: fiscal.nombre,
         apellido: fiscal.apellido,
         dni: fiscal.dni,
-        rol: "usuario",
+        rol: "fiscal",
       },
       { onConflict: "id" },
     );

@@ -1,14 +1,15 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import { supabaseAdmin } from "../config/supabase";
 import { ClubService } from "../services/club.service";
 import type { RolUsuario } from "../constants/roles";
 
 // Roles que se pueden crear desde el panel (nunca superadmin)
-const ROLES_CREABLES: RolUsuario[] = [
+export const ROLES_CREABLES: RolUsuario[] = [
   "admin",
   "admin_club",
   "admin_provincial",
   "admin_federacion",
+  "fiscal",
 ];
 
 interface NuevoClubInlineDTO {
@@ -154,8 +155,28 @@ export const UsuariosController = {
         .upsert(perfilData, { onConflict: "id" });
 
       if (perfilError) {
-        console.error("⚠️ Error al crear perfil (usuario Auth ya creado):", perfilError);
+        console.error("[WARN] Error al crear perfil (usuario Auth ya creado):", perfilError);
         // No devolvemos error porque el usuario Auth ya se creó exitosamente
+      }
+
+      if (rol === "fiscal") {
+        // Si ya existía un fiscal registrado con este correo en el Colegio, vincular su usuario_id
+        try {
+          const { data: fiscalExistente } = await supabaseAdmin
+            .from("fiscales")
+            .select("id, usuario_id")
+            .ilike("correo", email.trim())
+            .maybeSingle();
+
+          if (fiscalExistente && !fiscalExistente.usuario_id) {
+            await supabaseAdmin
+              .from("fiscales")
+              .update({ usuario_id: userId })
+              .eq("id", fiscalExistente.id);
+          }
+        } catch (errVinculo) {
+          console.warn("[WARN] No se pudo vincular automaticamente la ficha de fiscal:", errVinculo);
+        }
       }
 
       return res.status(201).json({
@@ -314,7 +335,29 @@ export const UsuariosController = {
           .eq("id", id);
 
         if (perfilError) {
-          console.error("⚠️ Error al sincronizar perfil:", perfilError);
+          console.error("[WARN] Error al sincronizar perfil:", perfilError);
+        }
+      }
+
+      if (rol === "fiscal") {
+        try {
+          const correoBuscado = email ? email.trim() : null;
+          if (correoBuscado) {
+            const { data: fiscalExistente } = await supabaseAdmin
+              .from("fiscales")
+              .select("id, usuario_id")
+              .ilike("correo", correoBuscado)
+              .maybeSingle();
+
+            if (fiscalExistente && !fiscalExistente.usuario_id) {
+              await supabaseAdmin
+                .from("fiscales")
+                .update({ usuario_id: id })
+                .eq("id", fiscalExistente.id);
+            }
+          }
+        } catch (errVinculo) {
+          console.warn("[WARN] No se pudo vincular automaticamente la ficha de fiscal:", errVinculo);
         }
       }
 
