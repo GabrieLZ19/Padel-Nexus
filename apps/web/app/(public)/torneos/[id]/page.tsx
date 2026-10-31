@@ -329,7 +329,10 @@ export default function TorneoDetallePage() {
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-400">
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="size-3.5 text-brand-chartreuse/80" />
-                  {torneo.clubes?.nombre || torneo.lugar || "Sede a confirmar"}
+                  {torneo.clubes?.nombre ||
+                    (torneo.reglas_arbitraje as any)?.centro_computos_manual ||
+                    torneo.lugar ||
+                    "Sede a confirmar"}
                 </span>
                 <span className="inline-flex items-center gap-1.5 capitalize">
                   <Calendar className="size-3.5 text-brand-chartreuse/80" />
@@ -397,6 +400,7 @@ export default function TorneoDetallePage() {
                     </p>
                     <p className="text-sm text-white font-medium truncate">
                       {torneo.clubes?.nombre ||
+                        (torneo.reglas_arbitraje as any)?.centro_computos_manual ||
                         torneo.lugar ||
                         "Sede a confirmar"}
                     </p>

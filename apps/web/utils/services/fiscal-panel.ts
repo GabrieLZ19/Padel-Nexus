@@ -34,6 +34,7 @@ export function nombreSedeFiscal(torneo: Pick<FiscalTorneo, "sede_nombre" | "lug
   return (
     torneo.sede_nombre ||
     torneo.clubes?.nombre ||
+    ((torneo as any).reglas_arbitraje?.centro_computos_manual as string | undefined) ||
     torneo.lugar ||
     "Sede a confirmar"
   );

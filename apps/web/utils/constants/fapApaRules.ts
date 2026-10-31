@@ -1,5 +1,5 @@
 import type { RolUsuario } from "../types/user.types";
-import { esRolFederacionNacional } from "../auth/roles";
+import { esRolFederacionNacional } from "../auth/roles.ts";
 
 // ============================================================================
 // RAMAS (División por sexo)

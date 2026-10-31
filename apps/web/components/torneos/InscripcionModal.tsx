@@ -269,11 +269,15 @@ export default function InscripcionModal({
                         <Users className="size-3 text-brand-chartreuse/80" />
                         {labelModalidad(torneo.modalidad)}
                       </span>
-                      {(torneo.lugar || torneo.clubes?.nombre) && (
+                      {(torneo.lugar ||
+                        torneo.clubes?.nombre ||
+                        (torneo.reglas_arbitraje as any)?.centro_computos_manual) && (
                         <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/8 px-2 py-1 text-[11px] text-gray-300 max-w-full">
                           <MapPin className="size-3 text-brand-chartreuse/80 shrink-0" />
                           <span className="truncate">
-                            {torneo.lugar || torneo.clubes?.nombre}
+                            {torneo.clubes?.nombre ||
+                              (torneo.reglas_arbitraje as any)?.centro_computos_manual ||
+                              torneo.lugar}
                           </span>
                         </span>
                       )}

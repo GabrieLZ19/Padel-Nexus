@@ -6,9 +6,10 @@ import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
 import { FederacionesService, Federacion } from "@/utils/services/federaciones";
 import { Torneo, Club } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
-import { Calendar, Trophy, Settings2, Gift, Info } from "lucide-react";
+import { Calendar, Trophy, Settings2, Gift, Info, Building2, Plus, Pencil, X } from "lucide-react";
 import { sileo } from "sileo";
 import { useProfileStore } from "@/store/useProfileStore";
+import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
 import {
   getAlcancesPermitidos,
   getReglamentosPermitidos,
@@ -129,6 +130,25 @@ export const Paso1Datos = ({
   // Información General
   const [editNombre, setEditNombre] = useState(torneo.nombre || "");
   const [editSede, setEditSede] = useState(torneo.club_id || "");
+  const rawReglas = ((torneo as any).reglas_arbitraje || {}) as Record<string, any>;
+  const [modoManualSede, setModoManualSede] = useState<boolean>(() => {
+    return Boolean(!torneo.club_id && rawReglas.centro_computos_manual);
+  });
+  const [manualSede, setManualSede] = useState<string>(() => {
+    return rawReglas.centro_computos_manual || "";
+  });
+  const [showAltaClub, setShowAltaClub] = useState(false);
+  const [creandoClub, setCreandoClub] = useState(false);
+  const [altaClubForm, setAltaClubForm] = useState(() => ({
+    nombre: "",
+    provincia:
+      torneo.clubes?.provincia ||
+      profile?.lugar_residencia ||
+      "Tucumán",
+    localidad: "",
+    direccion: "",
+    canchas: 2,
+  }));
   const [erroresCampo, setErroresCampo] = useState<
     Partial<Record<"nombre" | "inicio" | "fin" | "sede", string>>
   >({});
@@ -275,6 +295,15 @@ export const Paso1Datos = ({
     } else if (fapFederacionId) {
       setEditOrganizador(organizadorValue("fed", fapFederacionId));
     }
+
+    if (torneo.club_id) {
+      setEditSede(torneo.club_id);
+      setModoManualSede(false);
+    } else if ((torneo as any).reglas_arbitraje?.centro_computos_manual) {
+      setEditSede("");
+      setManualSede((torneo as any).reglas_arbitraje.centro_computos_manual);
+      setModoManualSede(true);
+    }
   }, [
     torneo.id,
     torneo.reglamento,
@@ -283,10 +312,66 @@ export const Paso1Datos = ({
     torneo.federacion_id,
     torneo.alcance,
     torneo.clubes?.provincia,
+    torneo.club_id,
+    (torneo as any).reglas_arbitraje?.centro_computos_manual,
     asociacionesList,
     fapFederacionId,
     userRole,
   ]);
+
+  const handleCrearClubRapido = async () => {
+    if (readOnly) return;
+    const nombre = altaClubForm.nombre.trim();
+    if (!nombre) {
+      sileo.warning({
+        title: "Nombre obligatorio",
+        description: "Ingresá el nombre del club para darlo de alta.",
+      });
+      return;
+    }
+    try {
+      setCreandoClub(true);
+      const cantidadCanchas = Math.max(1, Number(altaClubForm.canchas) || 1);
+      const prov = altaClubForm.provincia || "Tucumán";
+      const nuevoClub = await ClubesService.create({
+        nombre,
+        provincia: prov,
+        localidad: altaClubForm.localidad.trim() || prov,
+        direccion: altaClubForm.direccion.trim() || null,
+        canchas: cantidadCanchas,
+        estado: "Activo",
+      });
+
+      if (!nuevoClub?.id) {
+        throw new Error("El club se creó sin ID válido.");
+      }
+
+      setClubs((prev) => [...prev, nuevoClub]);
+      setEditSede(String(nuevoClub.id));
+      setModoManualSede(false);
+      setManualSede("");
+      setShowAltaClub(false);
+      setAltaClubForm({
+        nombre: "",
+        provincia: prov,
+        localidad: "",
+        direccion: "",
+        canchas: 2,
+      });
+      setErroresCampo((prev) => ({ ...prev, sede: undefined }));
+      sileo.success({
+        title: "Club creado y asignado",
+        description: `${nuevoClub.nombre} fue registrado y seleccionado como centro de cómputos.`,
+      });
+    } catch (err: any) {
+      sileo.error({
+        title: "Error al crear club",
+        description: err?.message || "No se pudo registrar el club.",
+      });
+    } finally {
+      setCreandoClub(false);
+    }
+  };
 
 
   // Amateur solo en Local/Privado (y roles permitidos)
@@ -346,17 +431,15 @@ export const Paso1Datos = ({
       return false;
     }
 
-    const incompletos: Partial<Record<"nombre" | "inicio" | "fin" | "sede", string>> = {};
+    const incompletos: Partial<Record<"nombre" | "inicio" | "fin", string>> = {};
     if (!editNombre.trim()) incompletos.nombre = "Completá el nombre del torneo.";
     if (!editFecha) incompletos.inicio = "Completá la fecha de inicio.";
     if (!editFechaFin) incompletos.fin = "Completá la fecha de finalización.";
-    if (!editSede) incompletos.sede = "Elegí el centro de cómputos.";
     if (Object.keys(incompletos).length > 0) {
       setErroresCampo(incompletos);
       if (incompletos.nombre) nombreRef.current?.focus();
       else if (incompletos.inicio) inicioRef.current?.focus();
       else if (incompletos.fin) finRef.current?.focus();
-      else sedeRef.current?.querySelector("button")?.focus();
       return false;
     }
     setErroresCampo({});
@@ -381,6 +464,11 @@ export const Paso1Datos = ({
           ? null
           : orgParsed.asociacionId;
 
+      const rawReglasPrev = ((torneo as any).reglas_arbitraje || {}) as Record<string, any>;
+      const centroComputosManual =
+        modoManualSede && manualSede.trim() ? manualSede.trim() : null;
+      const clubIdFinal = modoManualSede || !editSede ? null : editSede;
+
       const updated = await TorneosService.update(torneoId, {
         nombre: editNombre,
         fecha: editFecha ? editFecha : null,
@@ -393,7 +481,11 @@ export const Paso1Datos = ({
         premio_1: premioPrimero || null,
         premio_2: premioSegundo || null,
         premio_3: premioTercero || null,
-        club_id: editSede === "" ? null : editSede,
+        club_id: clubIdFinal,
+        reglas_arbitraje: {
+          ...rawReglasPrev,
+          centro_computos_manual: centroComputosManual,
+        },
         cupos_maximos: Number(editCupos),
         canchas_disponibles: selectedCanchas.length,
         alcance: editAlcance,
@@ -479,36 +571,203 @@ export const Paso1Datos = ({
           ) : null}
         </div>
         <div>
-          <div className="flex items-center gap-1.5 mb-2">
-            <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider">
-              Centro de Cómputos
-            </label>
-            <AyudaCampo texto="Punto de mando de delegados y fiscal general." />
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider">
+                Centro de Cómputos
+              </label>
+              <AyudaCampo texto="Punto de mando de delegados y fiscal general. Podés elegir un club, crearlo o ingresarlo manualmente." />
+            </div>
+            {!readOnly && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAltaClub((v) => !v)}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-brand-chartreuse hover:underline cursor-pointer"
+                >
+                  <Plus className="size-3" />
+                  {showAltaClub ? "Cerrar alta" : "Alta club"}
+                </button>
+                <span className="text-white/20">·</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoManualSede((v) => !v);
+                    setShowAltaClub(false);
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-gray-300 hover:text-white cursor-pointer"
+                >
+                  <Pencil className="size-3" />
+                  {modoManualSede ? "Elegir club" : "Ingreso manual"}
+                </button>
+              </div>
+            )}
           </div>
-          <div ref={sedeRef}>
-          <CustomDropdown
-            value={editSede}
-            onChange={(valor) => {
-              setEditSede(valor);
-              if (valor) setErroresCampo((prev) => ({ ...prev, sede: undefined }));
-            }}
-            hasError={Boolean(erroresCampo.sede)}
-            options={clubs.map((c) => ({
-              value: String(c.id),
-              label: c.nombre,
-            }))}
-            placeholder={
-              clubs.length === 0
-                ? "No hay clubes disponibles"
-                : "Seleccionar centro de cómputos..."
-            }
-            disabled={clubs.length === 0}
-          />
-          {erroresCampo.sede ? (
-            <p className="mt-1.5 text-xs text-red-400" role="alert">
-              {erroresCampo.sede}
-            </p>
-          ) : null}
+          <div ref={sedeRef} className="space-y-3">
+            {modoManualSede ? (
+              <div className="space-y-1.5">
+                <input
+                  type="text"
+                  value={manualSede}
+                  onChange={(e) => {
+                    setManualSede(e.target.value);
+                    if (e.target.value) {
+                      setEditSede("");
+                    }
+                  }}
+                  placeholder="Ej: Sede Central / Club Central Tucumán"
+                  className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none text-sm"
+                />
+                <p className="text-xs text-brand-ayuda">
+                  Ingreso manual del centro de cómputos (dato informativo para delegados y fiscales).
+                </p>
+              </div>
+            ) : (
+              <CustomDropdown
+                value={editSede}
+                onChange={(valor) => {
+                  if (valor === "__alta_club__") {
+                    setShowAltaClub(true);
+                    return;
+                  }
+                  if (valor === "__manual__") {
+                    setModoManualSede(true);
+                    return;
+                  }
+                  setEditSede(valor);
+                  setManualSede("");
+                  if (valor) setErroresCampo((prev) => ({ ...prev, sede: undefined }));
+                }}
+                hasError={Boolean(erroresCampo.sede)}
+                options={[
+                  ...(clubs.length > 0
+                    ? [{ value: "", label: "-- Sin centro de cómputos asignado --" }]
+                    : []),
+                  ...clubs.map((c) => ({
+                    value: String(c.id),
+                    label: `${c.nombre}${c.provincia ? ` (${c.provincia})` : ""}`,
+                  })),
+                  {
+                    value: "__alta_club__",
+                    label: "+ Dar de alta nuevo club...",
+                  },
+                  {
+                    value: "__manual__",
+                    label: "✎ Ingresar nombre manualmente...",
+                  },
+                ]}
+                placeholder={
+                  clubs.length === 0
+                    ? "Sin clubes cargados (podés crear uno o ingresar manual)"
+                    : "Seleccionar centro de cómputos (opcional)..."
+                }
+              />
+            )}
+            {erroresCampo.sede ? (
+              <p className="mt-1.5 text-xs text-red-400" role="alert">
+                {erroresCampo.sede}
+              </p>
+            ) : null}
+
+            {showAltaClub && !readOnly && (
+              <div className="p-4 rounded-2xl bg-black/40 border border-brand-chartreuse/30 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-brand-chartreuse flex items-center gap-1.5">
+                    <Building2 className="size-3.5" /> Alta Rápida de Club
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowAltaClub(false)}
+                    className="text-gray-400 hover:text-white text-xs cursor-pointer"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-1">
+                      Nombre del Club *
+                    </label>
+                    <input
+                      type="text"
+                      value={altaClubForm.nombre}
+                      onChange={(e) =>
+                        setAltaClubForm((prev) => ({ ...prev, nombre: e.target.value }))
+                      }
+                      placeholder="Ej: Club Pádel Tucumán"
+                      className="w-full bg-brand-input border border-white/10 text-white p-2.5 rounded-xl text-xs font-bold outline-none focus:border-brand-chartreuse/50"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-1">
+                      Provincia *
+                    </label>
+                    <CustomDropdown
+                      value={altaClubForm.provincia}
+                      onChange={(val) =>
+                        setAltaClubForm((prev) => ({ ...prev, provincia: val }))
+                      }
+                      options={PROVINCIAS_ARG.map((p) => ({
+                        value: p.value,
+                        label: p.label,
+                      }))}
+                      placeholder="Seleccionar provincia..."
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-1">
+                      Ciudad / Localidad
+                    </label>
+                    <input
+                      type="text"
+                      value={altaClubForm.localidad}
+                      onChange={(e) =>
+                        setAltaClubForm((prev) => ({ ...prev, localidad: e.target.value }))
+                      }
+                      placeholder="Ej: San Miguel de Tucumán"
+                      className="w-full bg-brand-input border border-white/10 text-white p-2.5 rounded-xl text-xs font-bold outline-none focus:border-brand-chartreuse/50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-1">
+                      Cantidad de Canchas
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={altaClubForm.canchas}
+                      onChange={(e) =>
+                        setAltaClubForm((prev) => ({
+                          ...prev,
+                          canchas: Math.max(1, Number(e.target.value) || 1),
+                        }))
+                      }
+                      className="w-full bg-brand-input border border-white/10 text-white p-2.5 rounded-xl text-xs font-bold outline-none focus:border-brand-chartreuse/50"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setShowAltaClub(false)}
+                    disabled={creandoClub}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCrearClubRapido()}
+                    disabled={creandoClub || !altaClubForm.nombre.trim()}
+                    className="px-4 py-1.5 rounded-xl text-xs font-black bg-brand-chartreuse text-brand-black hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 cursor-pointer"
+                  >
+                    {creandoClub ? "Creando..." : "Crear y asignar club"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div>
@@ -785,7 +1044,7 @@ export const Paso1Datos = ({
       <div className="flex justify-between items-center pt-4 border-t border-white/5">
         <button
           onClick={() => void handleSaveStep1()}
-          disabled={readOnly || guardandoDatos || !editNombre || !editFecha || !editSede}
+          disabled={readOnly || guardandoDatos || !editNombre.trim() || !editFecha}
           className="bg-brand-chartreuse text-brand-black px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
         >
           {readOnly ? "Modo Lectura" : guardandoDatos ? "Guardando..." : "Guardar Cambios"}
