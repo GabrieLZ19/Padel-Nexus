@@ -10,6 +10,8 @@ import {
   Star,
   AlertTriangle,
   Shuffle,
+  Pencil,
+  ShieldCheck,
 } from "lucide-react";
 import {
   PairDisplay,
@@ -466,24 +468,46 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
     return [...resultado, ...descalificadas];
   }, [parejasInscritas, partidosZona]);
 
-  // Identificar parejas en empate absoluto para sorteo
-  const parejasEnSorteo = useMemo(() => {
+  // Identificar parejas en empate absoluto para sorteo pendiente
+  const parejasPendientesSorteo = useMemo(() => {
     return stats.filter((s) => s.requiereSorteo);
   }, [stats]);
 
+  // Identificar parejas que ya tienen sorteo asignado
+  const parejasConSorteoResuelto = useMemo(() => {
+    return stats.filter((s) => s.sorteo_posicion != null);
+  }, [stats]);
+
+  // Parejas para abrir en el modal (pendientes de resolución o ya resueltas para corregir a mano)
+  const parejasParaModal = useMemo(() => {
+    if (parejasPendientesSorteo.length > 0) return parejasPendientesSorteo;
+    if (parejasConSorteoResuelto.length > 0) return parejasConSorteoResuelto;
+    return [];
+  }, [parejasPendientesSorteo, parejasConSorteoResuelto]);
+
   const posicionesEnDisputa = useMemo(() => {
-    if (parejasEnSorteo.length === 0) return [];
-    return stats
+    if (parejasParaModal.length === 0) return [];
+    const pendientes = stats
       .map((s, idx) => (s.requiereSorteo ? idx + 1 : null))
       .filter((pos): pos is number => pos !== null);
-  }, [stats, parejasEnSorteo]);
+    if (pendientes.length > 0) return pendientes;
+
+    const resueltas = parejasConSorteoResuelto
+      .map((p) => p.sorteo_posicion)
+      .filter((pos): pos is number => pos != null)
+      .sort((a, b) => a - b);
+    if (resueltas.length > 0) return resueltas;
+
+    return parejasParaModal.map((_, idx) => idx + 1);
+  }, [stats, parejasParaModal, parejasConSorteoResuelto]);
 
   // El aviso aparece cuando la zona está completa y hay empate real
   const partidosZonaCompletos =
     partidosZona.length > 0 &&
     partidosZona.every((p) => p.ganador != null);
   const haySorteoPendiente =
-    partidosZonaCompletos && parejasEnSorteo.length > 0;
+    partidosZonaCompletos && parejasPendientesSorteo.length > 0;
+  const haySorteoResuelto = parejasConSorteoResuelto.length >= 2;
 
   return (
     <div
@@ -506,21 +530,46 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
             {!embedded && nombreZona ? <> · {nombreZona}</> : null}
           </h4>
         </div>
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="shrink-0 inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-2.5 py-1.5 rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:border-brand-chartreuse/40 hover:text-brand-chartreuse transition-colors cursor-pointer"
-        >
-          {expanded ? (
-            <>
-              <ChevronUp className="size-3.5" /> Compactar
-            </>
-          ) : (
-            <>
-              <ChevronDown className="size-3.5" /> Ver detalle
-            </>
+        <div className="flex items-center gap-2">
+          {puedeResolverSorteo && torneoId && haySorteoPendiente && (
+            <button
+              type="button"
+              onClick={() => setModalSorteoOpen(true)}
+              className="shrink-0 inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-2.5 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors cursor-pointer"
+            >
+              <Shuffle className="size-3 text-amber-300" />
+              Resolver Sorteo
+            </button>
           )}
-        </button>
+          {puedeResolverSorteo &&
+            torneoId &&
+            haySorteoResuelto &&
+            !haySorteoPendiente && (
+              <button
+                type="button"
+                onClick={() => setModalSorteoOpen(true)}
+                className="shrink-0 inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-2.5 py-1.5 rounded-xl border border-brand-chartreuse/30 bg-brand-chartreuse/10 text-brand-chartreuse hover:bg-brand-chartreuse/20 transition-colors cursor-pointer"
+              >
+                <Pencil className="size-3" />
+                Corregir sorteo
+              </button>
+            )}
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="shrink-0 inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-2.5 py-1.5 rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:border-brand-chartreuse/40 hover:text-brand-chartreuse transition-colors cursor-pointer"
+          >
+            {expanded ? (
+              <>
+                <ChevronUp className="size-3.5" /> Compactar
+              </>
+            ) : (
+              <>
+                <ChevronDown className="size-3.5" /> Ver detalle
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Banner de Empate Reglamentario / Requiere Sorteo */}
@@ -542,6 +591,32 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
             >
               <Shuffle className="size-3 text-amber-300" />
               Resolver Sorteo
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Banner de Sorteo Reglamentario Aplicado (permite corregir a mano después) */}
+      {haySorteoResuelto && !haySorteoPendiente && (
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-brand-chartreuse/5 border border-brand-chartreuse/20 text-gray-300 text-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <ShieldCheck className="size-4 shrink-0 text-brand-chartreuse" />
+            <span className="font-semibold text-gray-200">
+              Sorteo reglamentario aplicado en {nombreZona} (
+              {parejasConSorteoResuelto
+                .map((p) => `${p.sorteo_posicion}.º ${p.nombre}`)
+                .join(" · ")}
+              ).
+            </span>
+          </div>
+          {puedeResolverSorteo && torneoId && (
+            <button
+              type="button"
+              onClick={() => setModalSorteoOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-chartreuse text-brand-black font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-opacity cursor-pointer shadow"
+            >
+              <Pencil className="size-3" />
+              Corregir puestos a mano
             </button>
           )}
         </div>
@@ -628,13 +703,33 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
                           </span>
                         )}
                         {tieneSorteoResuelto && (
-                          <span
-                            title={row.sorteo_motivo || "Definido por sorteo reglamentario"}
-                            className="inline-flex items-center gap-1 shrink-0 text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5"
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (puedeResolverSorteo && torneoId)
+                                setModalSorteoOpen(true);
+                            }}
+                            disabled={!puedeResolverSorteo || !torneoId}
+                            title={
+                              row.sorteo_motivo
+                                ? `${row.sorteo_motivo}. Clic para corregir puestos a mano.`
+                                : "Definido por sorteo reglamentario. Clic para corregir puestos a mano."
+                            }
+                            className={`inline-flex items-center gap-1 shrink-0 text-[10px] font-black text-brand-chartreuse bg-brand-chartreuse/10 border border-brand-chartreuse/25 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5 ${
+                              puedeResolverSorteo && torneoId
+                                ? "hover:bg-brand-chartreuse/20 hover:border-brand-chartreuse cursor-pointer"
+                                : ""
+                            }`}
                           >
                             <Shuffle className="size-2.5" />
-                            Sorteo FAP
-                          </span>
+                            Sorteo{" "}
+                            {row.sorteo_posicion
+                              ? `${row.sorteo_posicion}.º`
+                              : ""}
+                            {puedeResolverSorteo && torneoId && (
+                              <Pencil className="size-2 text-brand-chartreuse ml-0.5" />
+                            )}
+                          </button>
                         )}
                         {row.requiereSorteo && (
                           <span className="inline-flex items-center gap-1 shrink-0 text-[10px] font-black text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md uppercase tracking-wider mt-0.5">
@@ -691,11 +786,12 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
           onClose={() => setModalSorteoOpen(false)}
           torneoId={torneoId}
           nombreZona={nombreZona}
-          parejasEmpatadas={parejasEnSorteo.map((p) => ({
+          parejasEmpatadas={parejasParaModal.map((p) => ({
             inscripcionId: p.inscripcionId,
             nombre: p.nombre,
             club: p.club,
             sorteoPosicion: p.sorteo_posicion,
+            sorteoMotivo: p.sorteo_motivo,
           }))}
           posicionesEnDisputa={posicionesEnDisputa}
           onSuccess={() => {

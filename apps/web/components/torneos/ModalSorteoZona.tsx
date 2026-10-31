@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Shuffle, AlertTriangle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { X, Shuffle, AlertTriangle, CheckCircle2, ShieldCheck, ArrowUpDown, ChevronUp, ChevronDown, Pencil } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { sileo } from "sileo";
 
@@ -11,6 +11,7 @@ export interface ParejaEnSorteo {
   nombre: string;
   club?: string;
   sorteoPosicion?: number | null;
+  sorteoMotivo?: string | null;
 }
 
 interface ModalSorteoZonaProps {
@@ -32,7 +33,13 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
   posicionesEnDisputa,
   onSuccess,
 }) => {
-  const [metodo, setMetodo] = useState<"digital" | "manual">("digital");
+  const esEdicionExistente = parejasEmpatadas.some(
+    (p) => p.sorteoPosicion != null,
+  );
+
+  const [metodo, setMetodo] = useState<"digital" | "manual">(
+    esEdicionExistente ? "manual" : "digital",
+  );
   const [asignaciones, setAsignaciones] = useState<Record<string, number>>({});
   const [motivo, setMotivo] = useState("");
   const [loading, setLoading] = useState(false);
@@ -47,20 +54,50 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
           p.sorteoPosicion ?? posicionesEnDisputa[idx] ?? idx + 1;
       });
       setAsignaciones(initial);
-      setMotivo("");
+      const motivoPrev =
+        parejasEmpatadas.find((p) => p.sorteoMotivo)?.sorteoMotivo || "";
+      setMotivo(motivoPrev);
       setAnimandoSorteo(false);
+      setMetodo(esEdicionExistente ? "manual" : "digital");
     }
-  }, [isOpen, parejasEmpatadas, posicionesEnDisputa]);
+  }, [isOpen, parejasEmpatadas, posicionesEnDisputa, esEdicionExistente]);
+
+  // Lista de posiciones disponibles para asignar a mano o sortear
+  const opcionesPuestos = React.useMemo(() => {
+    const set = new Set<number>();
+    posicionesEnDisputa.forEach((p) => set.add(p));
+    parejasEmpatadas.forEach((p, idx) => {
+      if (p.sorteoPosicion != null) set.add(p.sorteoPosicion);
+      set.add(idx + 1);
+    });
+    // Si hay 3 parejas o si alguna tiene asignado 3, incluir [1, 2, 3] para permitir mover al 3.°
+    if (
+      parejasEmpatadas.length >= 3 ||
+      set.has(3) ||
+      Math.max(...Array.from(set), 0) >= 3
+    ) {
+      set.add(1);
+      set.add(2);
+      set.add(3);
+    }
+    return Array.from(set).sort((a, b) => a - b);
+  }, [posicionesEnDisputa, parejasEmpatadas]);
 
   if (!isOpen) return null;
 
   const ejecutarSorteoDigital = () => {
     setAnimandoSorteo(true);
     // Barajar aleatoriamente las posiciones entre las parejas empatadas
-    const posicionesDisponibles = [...posicionesEnDisputa].sort(() => Math.random() - 0.5);
+    const posicionesDisponibles = (
+      posicionesEnDisputa.length === parejasEmpatadas.length
+        ? [...posicionesEnDisputa]
+        : [...opcionesPuestos].slice(0, parejasEmpatadas.length)
+    ).sort(() => Math.random() - 0.5);
+
     const nuevasAsignaciones: Record<string, number> = {};
     parejasEmpatadas.forEach((p, idx) => {
-      nuevasAsignaciones[p.inscripcionId] = posicionesDisponibles[idx];
+      nuevasAsignaciones[p.inscripcionId] =
+        posicionesDisponibles[idx] ?? idx + 1;
     });
 
     setTimeout(() => {
@@ -68,6 +105,29 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
       setAnimandoSorteo(false);
       setMotivo("Sorteo digital reglamentario ejecutado en plataforma");
     }, 450);
+  };
+
+  const handleCambiarPuesto = (inscripcionId: string, nuevaPos: number) => {
+    const actualPos = asignaciones[inscripcionId];
+    if (actualPos === nuevaPos) return;
+
+    const prevOwner = Object.entries(asignaciones).find(
+      ([id, val]) => id !== inscripcionId && val === nuevaPos,
+    );
+
+    if (prevOwner) {
+      // Intercambiar de forma directa entre ambas parejas
+      setAsignaciones((prev) => ({
+        ...prev,
+        [inscripcionId]: nuevaPos,
+        [prevOwner[0]]: actualPos,
+      }));
+    } else {
+      setAsignaciones((prev) => ({
+        ...prev,
+        [inscripcionId]: nuevaPos,
+      }));
+    }
   };
 
   const handleIntercambiarManual = () => {
@@ -103,18 +163,24 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
         posicion: asignaciones[p.inscripcionId],
       }));
 
+      const motivoFinal =
+        motivo.trim() ||
+        (esEdicionExistente
+          ? "Corrección manual de sorteo de zona"
+          : metodo === "digital"
+            ? "Sorteo digital reglamentario FAP"
+            : "Sorteo presencial en mesa de control");
+
       await TorneosService.resolverSorteoZona(torneoId, nombreZona, {
         resoluciones,
-        motivo:
-          motivo.trim() ||
-          (metodo === "digital"
-            ? "Sorteo digital reglamentario FAP"
-            : "Sorteo presencial en mesa de control"),
+        motivo: motivoFinal,
         metodo,
       });
 
       sileo.success({
-        title: "Sorteo registrado con éxito",
+        title: esEdicionExistente
+          ? "Sorteo corregido con éxito"
+          : "Sorteo registrado con éxito",
         description: `Posiciones reglamentarias aplicadas y auditadas para ${nombreZona}.`,
       });
 
@@ -156,14 +222,20 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-chartreuse/10 text-brand-chartreuse text-xs font-black uppercase tracking-wider border border-brand-chartreuse/20">
                 <ShieldCheck className="size-3.5" />
-                Reglamento Oficial
+                {esEdicionExistente ? "Modificación Manual" : "Reglamento Oficial"}
               </div>
               <h3 className="text-lg font-extrabold text-white">
-                Sorteo Reglamentario · {nombreZona}
+                {esEdicionExistente
+                  ? "Corregir Puestos de Sorteo"
+                  : "Sorteo Reglamentario"}{" "}
+                · {nombreZona}
               </h3>
               <p className="text-xs text-gray-400">
-                Resolución de empate técnico absoluto para definir puestos{" "}
-                {posicionesEnDisputa.map((p) => `${p}.º`).join(" y ")}.
+                {esEdicionExistente
+                  ? "Asignación manual de puestos según el resultado de la mesa presencial o corrección."
+                  : `Resolución de empate técnico absoluto para definir puestos ${opcionesPuestos
+                      .map((p) => `${p}.º`)
+                      .join(", ")}.`}
               </p>
             </div>
             <button
@@ -227,7 +299,7 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
             <div className="space-y-3 bg-white/[0.02] border border-white/5 rounded-2xl p-4">
               <p className="text-xs text-gray-300">
                 Para sorteos físicos realizados en mesa de control (moneda o papelitos).
-                Podés seleccionar el puesto de cada pareja o intercambiarlos según el resultado presencial.
+                Podés asignar manualmente el puesto de cada pareja (por ejemplo, si salió 3.º podés asignarle 3.º puesto) o intercambiarlas.
               </p>
               {parejasEmpatadas.length === 2 && (
                 <button
@@ -269,42 +341,81 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
                         Puesto:
                       </span>
                       {metodo === "manual" ? (
-                        <select
-                          value={pos || ""}
-                          onChange={(e) => {
-                            const nuevaPos = Number(e.target.value);
-                            const prevOwner = Object.entries(asignaciones).find(
-                              ([id, val]) =>
-                                id !== p.inscripcionId && val === nuevaPos,
-                            );
-                            if (prevOwner) {
-                              setAsignaciones({
-                                ...asignaciones,
-                                [p.inscripcionId]: nuevaPos,
-                                [prevOwner[0]]: pos,
-                              });
-                            } else {
-                              setAsignaciones({
-                                ...asignaciones,
-                                [p.inscripcionId]: nuevaPos,
-                              });
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            value={pos || ""}
+                            onChange={(e) =>
+                              handleCambiarPuesto(
+                                p.inscripcionId,
+                                Number(e.target.value),
+                              )
                             }
-                          }}
-                          className="h-8 w-24 rounded-xl border border-brand-chartreuse/40 bg-[#1e1e1e] px-2 text-center text-xs font-black text-brand-chartreuse outline-none focus:border-brand-chartreuse cursor-pointer"
-                        >
-                          {(posicionesEnDisputa.length > 0
-                            ? posicionesEnDisputa
-                            : parejasEmpatadas.map((_, i) => i + 1)
-                          ).map((puesto) => (
-                            <option key={puesto} value={puesto}>
-                              {puesto}.º puesto
-                            </option>
-                          ))}
-                        </select>
+                            className="h-8 min-w-24 rounded-xl border border-brand-chartreuse/40 bg-[#1e1e1e] px-2 text-center text-xs font-black text-brand-chartreuse outline-none focus:border-brand-chartreuse cursor-pointer"
+                          >
+                            {opcionesPuestos.map((puesto) => (
+                              <option key={puesto} value={puesto}>
+                                {puesto}.º puesto
+                              </option>
+                            ))}
+                          </select>
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              type="button"
+                              title="Subir puesto (mejor posición)"
+                              onClick={() => {
+                                const idx = opcionesPuestos.indexOf(pos);
+                                if (idx > 0)
+                                  handleCambiarPuesto(
+                                    p.inscripcionId,
+                                    opcionesPuestos[idx - 1],
+                                  );
+                              }}
+                              disabled={loading || opcionesPuestos.indexOf(pos) <= 0}
+                              className="size-4 flex items-center justify-center rounded bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white disabled:opacity-20 cursor-pointer"
+                            >
+                              <ChevronUp className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Bajar puesto"
+                              onClick={() => {
+                                const idx = opcionesPuestos.indexOf(pos);
+                                if (
+                                  idx >= 0 &&
+                                  idx < opcionesPuestos.length - 1
+                                ) {
+                                  handleCambiarPuesto(
+                                    p.inscripcionId,
+                                    opcionesPuestos[idx + 1],
+                                  );
+                                }
+                              }}
+                              disabled={
+                                loading ||
+                                opcionesPuestos.indexOf(pos) === -1 ||
+                                opcionesPuestos.indexOf(pos) >=
+                                  opcionesPuestos.length - 1
+                              }
+                              className="size-4 flex items-center justify-center rounded bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white disabled:opacity-20 cursor-pointer"
+                            >
+                              <ChevronDown className="size-3" />
+                            </button>
+                          </div>
+                        </div>
                       ) : (
-                        <span className="size-7 rounded-xl bg-brand-chartreuse text-brand-black font-black text-sm flex items-center justify-center">
-                          {pos || "?"}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="size-7 rounded-xl bg-brand-chartreuse text-brand-black font-black text-sm flex items-center justify-center shadow">
+                            {pos || "?"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setMetodo("manual")}
+                            title="Ajustar puesto a mano"
+                            className="p-1 rounded-lg text-gray-400 hover:text-brand-chartreuse hover:bg-white/5 transition-colors cursor-pointer"
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -322,7 +433,11 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
               type="text"
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
-              placeholder="Ej: Sorteo presencial con moneda en presencia de fiscales"
+              placeholder={
+                esEdicionExistente
+                  ? "Ej: Corrección manual de puestos tras sorteo en mesa"
+                  : "Ej: Sorteo presencial con moneda en presencia de fiscales"
+              }
               className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 text-xs focus:outline-none focus:border-brand-chartreuse transition-colors"
             />
           </div>
@@ -343,7 +458,11 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
               disabled={loading}
               className="px-5 py-2.5 rounded-xl bg-brand-chartreuse text-brand-black text-xs font-black uppercase tracking-wider hover:opacity-90 transition-opacity disabled:opacity-50 cursor-pointer shadow-lg"
             >
-              {loading ? "Registrando..." : "Confirmar y Aplicar"}
+              {loading
+                ? "Registrando..."
+                : esEdicionExistente
+                  ? "Guardar Corrección"
+                  : "Confirmar y Aplicar"}
             </button>
           </div>
         </motion.div>
