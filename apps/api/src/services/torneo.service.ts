@@ -823,6 +823,36 @@ export class TorneoService {
     return TorneoService.evaluateDynamicState(data);
   }
 
+
+  static generarDiasJuegoDefault(
+    fechaInicio?: string | null,
+    fechaFin?: string | null,
+  ): string[] {
+    if (!fechaInicio) {
+      return ["Viernes", "Sábado", "Domingo"];
+    }
+    const startStr = fechaInicio.split("T")[0];
+    const endStr = fechaFin ? fechaFin.split("T")[0] : startStr;
+    const start = new Date(startStr + "T12:00:00Z");
+    const end = new Date(endStr + "T12:00:00Z");
+
+    const dias: string[] = [];
+    const current = new Date(start);
+    let limit = 0;
+
+    const nombresDias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
+    while (current <= end && limit < 15) {
+      const dayName = nombresDias[current.getUTCDay()];
+      const dayNum = current.getUTCDate();
+      dias.push(`${dayName} ${dayNum}`);
+      current.setUTCDate(current.getUTCDate() + 1);
+      limit++;
+    }
+
+    return dias.length > 0 ? dias : ["Viernes", "Sábado", "Domingo"];
+  }
+
   static async crearTorneo(
     datos: TorneoPayload,
     user?: { id: string; rol?: string | null },
@@ -872,6 +902,10 @@ export class TorneoService {
       asociacion: (datos as any).asociacion,
     });
 
+    const diasJuego = Array.isArray((datos as any).dias_juego) && (datos as any).dias_juego.length > 0
+      ? (datos as any).dias_juego
+      : TorneoService.generarDiasJuegoDefault(payload.fecha, (payload as any).fecha_fin);
+
     const { data: torneo, error: torneoError } = await supabaseAdmin
       .from("torneos")
       .insert([
@@ -900,6 +934,7 @@ export class TorneoService {
           duracion_partido_minutos: datos.duracion_partido_minutos || 90,
           hora_inicio_jornada: datos.hora_inicio_jornada || "08:00",
           reglas_arbitraje: (datos as any).reglas_arbitraje || null,
+          dias_juego: diasJuego,
         },
       ])
       .select()

@@ -119,3 +119,4 @@ describe("R10 - Notificar a las parejas del sorteo reglamentario", () => {
     assert.ok(validarFechaHora("2026-11-01 18:00"));
   });
 });
+
