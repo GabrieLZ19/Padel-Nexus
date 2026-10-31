@@ -13,6 +13,7 @@ import {
   ShoppingBag,
   MessageSquare,
   MapPin,
+  Info,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import { PerfilService, type PanelJugador } from "@/utils/services/perfil";
@@ -279,9 +280,21 @@ export default function PlayerDashboard() {
                     </div>
                   </>
                 ) : (
-                  <p className="text-xs text-gray-500 italic mb-3">
-                    Sin asociación activa. No hace falta afiliarte a un club para jugar.
-                  </p>
+                  <div className="flex items-center gap-1.5 mb-3 text-xs text-gray-500">
+                    <span className="italic">Sin asociación activa</span>
+                    <div className="relative group inline-flex items-center">
+                      <button
+                        type="button"
+                        className="text-gray-400 hover:text-white transition-colors cursor-pointer"
+                        aria-label="Información sobre afiliación"
+                      >
+                        <Info className="size-3.5" />
+                      </button>
+                      <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full z-30 mb-1 hidden w-60 rounded-xl border border-white/10 bg-[#161616] p-2 text-[11px] text-gray-300 shadow-2xl group-hover:block group-focus-within:block">
+                        No hace falta afiliarte a un club para jugar. El pase cambia la asociación que te representa.
+                      </div>
+                    </div>
+                  </div>
                 )}
                 <button
                   onClick={() => setIsAfiliacionOpen(true)}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRightLeft, X, Loader2 } from "lucide-react";
+import { ArrowRightLeft, X, Loader2, Info } from "lucide-react";
 import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
 import { PasesService } from "@/utils/services/pases";
 import { Perfil } from "@/utils/types";
@@ -140,12 +140,22 @@ export default function AfiliacionModal({
               <ArrowRightLeft className="size-3" />
               Pase de provincia
             </div>
-            <h2 className="text-2xl font-bold text-white">Cambiar de asociación</h2>
-            <p className="text-sm text-gray-400 mt-1">
-              No hace falta afiliarte a un club para jugar. El pase cambia la
-              asociación que te representa.
-            </p>
-            <p className="text-xs text-gray-500 mt-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-bold text-white">Cambiar de asociación</h2>
+              <div className="relative group inline-flex items-center">
+                <button
+                  type="button"
+                  className="p-1 text-gray-400 hover:text-brand-chartreuse transition-colors cursor-pointer"
+                  aria-label="Información sobre el pase"
+                >
+                  <Info className="size-4" />
+                </button>
+                <div className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-64 rounded-xl border border-white/10 bg-[#161616] p-2.5 text-xs text-gray-300 shadow-2xl group-hover:block group-focus-within:block">
+                  No hace falta afiliarte a un club para jugar. El pase cambia la asociación que te representa.
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
               Origen: {origen?.entidad || "sin asociación activa"}
             </p>
           </div>

@@ -8,6 +8,7 @@ import {
   XCircle,
   Settings2,
   Users,
+  Info,
 } from "lucide-react";
 import {
   LicenciasService,
@@ -298,7 +299,7 @@ export default function JugadoresLicenciasPage() {
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-2 px-4 py-3">
       <div className="flex h-10 items-center justify-between gap-3 max-xl:h-auto max-xl:flex-col max-xl:items-stretch">
-        <div className="flex min-w-0 items-baseline gap-3">
+        <div className="flex min-w-0 items-center gap-2">
           <h1 className="shrink-0 text-lg font-bold text-white">
             Jugadores
             {contextoConfig?.tipo === "asociacion"
@@ -310,9 +311,18 @@ export default function JugadoresLicenciasPage() {
                 }`
               : ""}
           </h1>
-          <p className="truncate text-xs text-gray-400">
-            El vencimiento individual se edita en la fecha de cada jugador.
-          </p>
+          <div className="relative group inline-flex items-center">
+            <button
+              type="button"
+              className="p-1 text-gray-400 hover:text-brand-chartreuse transition-colors cursor-pointer"
+              aria-label="Información de vencimiento"
+            >
+              <Info className="size-4" />
+            </button>
+            <div className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-64 rounded-xl border border-white/10 bg-[#161616] p-2.5 text-xs text-gray-300 shadow-2xl group-hover:block group-focus-within:block">
+              El vencimiento individual se edita en la fecha de cada jugador.
+            </div>
+          </div>
         </div>
         <div className="relative w-full shrink-0 xl:w-72">
           <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-500" />
@@ -329,8 +339,8 @@ export default function JugadoresLicenciasPage() {
         </div>
       </div>
 
-      <div className="flex h-9 items-center gap-2 max-xl:h-auto max-xl:flex-wrap">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      <div className="flex flex-col gap-2.5 xl:h-9 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 xl:pb-0 scrollbar-none w-full xl:w-auto xl:flex-1">
           {(
             [
               { filtro: "Todas" as FiltroLicencia, label: "Total", value: totalJugadores, color: "text-white" },
@@ -348,24 +358,24 @@ export default function JugadoresLicenciasPage() {
                 setPage(1);
                 setVista("jugadores");
               }}
-              className={`inline-flex h-9 min-w-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs ${
+              className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs whitespace-nowrap transition-colors cursor-pointer ${
                 filtroActivo === stat.filtro && vista === "jugadores"
-                  ? "border-brand-chartreuse/50 bg-brand-chartreuse/10"
-                  : "border-white/5 bg-[#111111] hover:border-white/15"
+                  ? "border-brand-chartreuse/50 bg-brand-chartreuse/10 text-white"
+                  : "border-white/5 bg-[#111111] hover:border-white/15 text-gray-400"
               }`}
             >
-              <span className="truncate text-gray-400">{stat.label}</span>
+              <span>{stat.label}</span>
               <span className={`font-black tabular-nums ${stat.color}`}>
                 {stat.value}
               </span>
             </button>
           ))}
         </div>
-        <div className="inline-flex h-8 shrink-0 items-center rounded-lg border border-white/5 bg-[#111111] p-0.5">
+        <div className="inline-flex h-8 shrink-0 items-center rounded-lg border border-white/5 bg-[#111111] p-0.5 self-start xl:self-auto">
           <button
             type="button"
             onClick={() => setVista("jugadores")}
-            className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold ${
+            className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold transition-colors cursor-pointer ${
               vista === "jugadores"
                 ? "bg-brand-chartreuse text-brand-black"
                 : "text-gray-400 hover:text-white"
@@ -377,7 +387,7 @@ export default function JugadoresLicenciasPage() {
           <button
             type="button"
             onClick={() => setVista("configuracion")}
-            className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold ${
+            className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold transition-colors cursor-pointer ${
               vista === "configuracion"
                 ? "bg-brand-chartreuse text-brand-black"
                 : "text-gray-400 hover:text-white"
