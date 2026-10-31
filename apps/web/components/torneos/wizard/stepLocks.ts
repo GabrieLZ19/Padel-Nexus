@@ -73,11 +73,11 @@ export function hrefDetalleTorneo(
 /**
  * Reglas (dashboard + club):
  * - Finalizado: bloquea la configuración, cuadros y resultados en modo lectura.
- * - Programado: fixture generado. Los pasos de datos, logos, categorías, fiscales y cierre
+ * - Programado: fixture generado. Los pasos de datos, logos, categorías, jugadores, fiscales y cierre
  *   permanecen editables para corregir datos previos (F1 / R8).
- *   Altas/bajas directas de parejas en Jugadores quedan bloqueadas para no romper el fixture ya armado.
+ *   En Jugadores se pueden revisar parejas y confirmar pagos pendientes.
  *   Resultados se habilitan recién al publicar la programación (En curso).
- * - En curso: resultados y cuadros habilitados.
+ * - En curso: resultados y cuadros habilitados. Pasos de configuración siguen editables.
  */
 export function isWizardPasoReadOnly(
   estado: string | null | undefined,
@@ -90,15 +90,7 @@ export function isWizardPasoReadOnly(
     return est !== "En curso";
   }
 
-  if (pasoId === "players") {
-    return est === "Programado" || est === "En curso";
-  }
-
-  if (pasoId === "draws") {
-    return false;
-  }
-
-  // edit, logos, categories, fiscales, cierre son editables
+  // edit, logos, categories, players, fiscales, cierre, draws son editables
   return false;
 }
 

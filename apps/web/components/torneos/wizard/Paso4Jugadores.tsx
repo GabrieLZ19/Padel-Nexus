@@ -101,15 +101,16 @@ export const Paso4Jugadores = ({
     (i) => i.estado_pago === "Confirmado",
   ).length;
 
-  const motivoLectura = !readOnly
-    ? null
-    : torneo.solo_lectura
+  const fixtureActivo =
+    torneo.estado === "Programado" || torneo.estado === "En curso";
+  const bloqueoAltasBajas = readOnly || fixtureActivo;
+  const motivoAltasBajas = readOnly
+    ? torneo.solo_lectura
       ? "Este torneo es de otra entidad. No se pueden inscribir ni borrar parejas."
-      : torneo.estado === "Finalizado"
-        ? "El torneo está finalizado. No se pueden inscribir ni borrar parejas."
-        : torneo.estado === "Programado"
-          ? "El fixture ya está generado. No se pueden inscribir ni borrar parejas."
-          : "El torneo está en curso. No se pueden inscribir ni borrar parejas.";
+      : "El torneo está finalizado. No se pueden inscribir ni borrar parejas."
+    : fixtureActivo
+      ? "El fixture ya está generado. Podés revisar parejas y confirmar pagos pendientes. Para agregar o dar de baja parejas se debe regenerar el cuadro."
+      : null;
 
   const handleDescargarPlantilla = () => {
     descargarPlantillaInscripcion({
@@ -200,7 +201,7 @@ export const Paso4Jugadores = ({
     inscripcionId: string | number,
     nombre: string,
   ) => {
-    if (readOnly) return;
+    if (bloqueoAltasBajas) return;
     setFeedbackModal((prev: any) => ({
       ...prev,
       isOpen: true,
@@ -270,18 +271,18 @@ export const Paso4Jugadores = ({
           </button>
           <div
             className="relative flex-1 lg:flex-none"
-            title={motivoLectura || "Subir planilla"}
+            title={motivoAltasBajas || "Subir planilla"}
           >
             <input
               type="file"
               accept=".xls,.xlsx"
               onChange={handleSubirPlanilla}
-              disabled={importingCSV || readOnly}
+              disabled={importingCSV || bloqueoAltasBajas}
               className="absolute inset-0 opacity-0 cursor-pointer disabled:pointer-events-none disabled:cursor-not-allowed"
             />
             <button
               type="button"
-              disabled={importingCSV || readOnly}
+              disabled={importingCSV || bloqueoAltasBajas}
               className="w-full flex justify-center items-center gap-1.5 bg-white/5 hover:bg-white/10 text-gray-300 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Upload className="size-3.5" />{" "}
@@ -290,8 +291,8 @@ export const Paso4Jugadores = ({
           </div>
           <button
             type="button"
-            disabled={readOnly}
-            title={motivoLectura || "Nueva inscripción"}
+            disabled={bloqueoAltasBajas}
+            title={motivoAltasBajas || "Nueva inscripción"}
             onClick={() => setIsManualModalOpen(true)}
             className="w-full lg:w-auto flex justify-center items-center gap-1.5 bg-brand-chartreuse hover:bg-[#b3e600] text-brand-black px-4 py-2.5 rounded-xl font-bold text-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
@@ -299,9 +300,9 @@ export const Paso4Jugadores = ({
           </button>
         </div>
       </div>
-      {motivoLectura ? (
+      {motivoAltasBajas ? (
         <p className="px-6 py-2 text-xs text-gray-400 border-b border-white/5">
-          {motivoLectura}
+          {motivoAltasBajas}
         </p>
       ) : null}
 
@@ -344,7 +345,7 @@ export const Paso4Jugadores = ({
                           type="checkbox"
                           checked={isConfirmed}
                           disabled={isConfirmed || readOnly}
-                          title={motivoLectura || undefined}
+                          title={readOnly ? (torneo.solo_lectura ? "Modo lectura" : "Torneo finalizado") : undefined}
                           onChange={() => {
                             if (!isConfirmed) {
                               setPagoModal({
@@ -416,13 +417,13 @@ export const Paso4Jugadores = ({
                     <td className="px-8 py-5 text-center">
                       <button
                         type="button"
-                        disabled={readOnly}
+                        disabled={bloqueoAltasBajas}
                         title={
-                          motivoLectura ||
+                          motivoAltasBajas ||
                           `Eliminar inscripción de ${ins.jugador1_nombre || "esta pareja"}`
                         }
                         aria-label={
-                          motivoLectura ||
+                          motivoAltasBajas ||
                           `Eliminar inscripción de ${ins.jugador1_nombre || "esta pareja"}`
                         }
                         onClick={() =>
