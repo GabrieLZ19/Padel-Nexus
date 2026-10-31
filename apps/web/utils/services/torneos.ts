@@ -278,6 +278,22 @@ export const TorneosService = {
     return response.data;
   },
 
+  async notificarSorteoZona(
+    torneoId: string,
+    nombreZona: string,
+    payload: {
+      fechaHora: string;
+      mensaje?: string;
+      inscripcionIds?: string[];
+    },
+  ) {
+    const response = await api.post(
+      `/torneos/${torneoId}/zonas/${encodeURIComponent(nombreZona)}/sorteo/notificar`,
+      payload,
+    );
+    return response.data;
+  },
+
   async actualizarEquiposPartido(
     partidoId: string,
     payload: { equipo_a_id: string | null; equipo_b_id: string | null; motivo: string },

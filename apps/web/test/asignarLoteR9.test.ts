@@ -93,3 +93,4 @@ describe("R9 - Asignar varios partidos a la vez en el programador", () => {
     assert.deepEqual(payload.partido_ids, ["p-za-1", "p-za-2", "p-zb-1", "p-zc-1", "p-zc-2"]);
   });
 });
+

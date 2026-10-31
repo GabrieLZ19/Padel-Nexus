@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Shuffle, AlertTriangle, CheckCircle2, ShieldCheck, ArrowUpDown, ChevronUp, ChevronDown, Pencil } from "lucide-react";
+import { X, Shuffle, AlertTriangle, CheckCircle2, ShieldCheck, ArrowUpDown, ChevronUp, ChevronDown, Pencil, Bell, Video, Calendar, Clock } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { sileo } from "sileo";
 
@@ -12,6 +12,8 @@ export interface ParejaEnSorteo {
   club?: string;
   sorteoPosicion?: number | null;
   sorteoMotivo?: string | null;
+  usuario_id?: string | null;
+  usuario2_id?: string | null;
 }
 
 interface ModalSorteoZonaProps {
@@ -22,6 +24,7 @@ interface ModalSorteoZonaProps {
   parejasEmpatadas: ParejaEnSorteo[];
   posicionesEnDisputa: number[];
   onSuccess: () => void;
+  modoInicial?: "sortear" | "notificar";
 }
 
 export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
@@ -32,6 +35,7 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
   parejasEmpatadas,
   posicionesEnDisputa,
   onSuccess,
+  modoInicial = "sortear",
 }) => {
   const esEdicionExistente = parejasEmpatadas.some(
     (p) => p.sorteoPosicion != null,
@@ -44,6 +48,14 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
   const [motivo, setMotivo] = useState("");
   const [loading, setLoading] = useState(false);
   const [animandoSorteo, setAnimandoSorteo] = useState(false);
+  const [fechaHoraSorteo, setFechaHoraSorteo] = useState("");
+  const [detalleTransmision, setDetalleTransmision] = useState("");
+  const [notificando, setNotificando] = useState(false);
+  const [avisoEnviado, setAvisoEnviado] = useState<{
+    fechaHora: string;
+    total: number;
+  } | null>(null);
+  const [mostrarNotificador, setMostrarNotificador] = useState(false);
 
   // Inicializar asignaciones si es manual o si ya existen
   React.useEffect(() => {
@@ -59,6 +71,19 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
       setMotivo(motivoPrev);
       setAnimandoSorteo(false);
       setMetodo(esEdicionExistente ? "manual" : "digital");
+
+      // Inicializar fecha y hora sugerida (próxima hora en punto)
+      const now = new Date();
+      now.setHours(now.getHours() + 2);
+      now.setMinutes(0);
+      const yr = now.getFullYear();
+      const mo = String(now.getMonth() + 1).padStart(2, "0");
+      const da = String(now.getDate()).padStart(2, "0");
+      const hr = String(now.getHours()).padStart(2, "0");
+      const mi = String(now.getMinutes()).padStart(2, "0");
+      setFechaHoraSorteo(`${yr}-${mo}-${da}T${hr}:${mi}`);
+      setMostrarNotificador(modoInicial === "notificar" || !esEdicionExistente);
+      setAvisoEnviado(null);
     }
   }, [isOpen, parejasEmpatadas, posicionesEnDisputa, esEdicionExistente]);
 
@@ -141,6 +166,51 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
         [p1]: pos2,
         [p2]: pos1,
       });
+    }
+  };
+
+
+  const handleEnviarNotificacion = async () => {
+    if (!fechaHoraSorteo.trim()) {
+      sileo.error({
+        title: "Fecha y hora requeridas",
+        description: "Indicá el día y horario en que se realizará el sorteo.",
+      });
+      return;
+    }
+
+    setNotificando(true);
+    try {
+      const formattedFechaHora = fechaHoraSorteo.replace("T", " ");
+      const res = await TorneosService.notificarSorteoZona(
+        torneoId,
+        nombreZona,
+        {
+          fechaHora: formattedFechaHora,
+          mensaje: detalleTransmision.trim() || undefined,
+          inscripcionIds: parejasEmpatadas.map((p) => p.inscripcionId),
+        },
+      );
+
+      const totalNotif = res?.data?.totalNotificados ?? 0;
+      setAvisoEnviado({
+        fechaHora: formattedFechaHora,
+        total: totalNotif,
+      });
+
+      sileo.success({
+        title: "Aviso de sorteo enviado",
+        description: `Se notificó a los jugadores de ${nombreZona} para el ${formattedFechaHora}.`,
+      });
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Error al enviar la notificación.";
+      sileo.error({
+        title: "No se pudo enviar el aviso",
+        description: msg,
+      });
+    } finally {
+      setNotificando(false);
     }
   };
 
@@ -248,6 +318,93 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
             </button>
           </div>
 
+
+          {/* R10: Notificar a las parejas del sorteo */}
+          {!esEdicionExistente && (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Bell className="size-4 text-amber-300 shrink-0" />
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-200">
+                    Aviso previo a las parejas
+                  </span>
+                </div>
+                {avisoEnviado ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">
+                    <CheckCircle2 className="size-3" />
+                    Aviso Enviado
+                  </span>
+                ) : (
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    Requerido FAP
+                  </span>
+                )}
+              </div>
+
+              {avisoEnviado ? (
+                <div className="p-2.5 rounded-xl bg-green-950/30 border border-green-500/30 flex items-center justify-between gap-3 text-xs text-green-200">
+                  <span>
+                    Aviso enviado para el <strong>{avisoEnviado.fechaHora}</strong> ({avisoEnviado.total} jugador(es) notificados).
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAvisoEnviado(null)}
+                    className="text-[11px] underline text-green-300 hover:text-white shrink-0 cursor-pointer"
+                  >
+                    Reenviar o editar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    Antes de resolver el empate, los jugadores tienen que enterarse. Enviá un aviso con día y hora del sorteo.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">
+                        Día y Hora del Sorteo
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={fechaHoraSorteo}
+                        onChange={(e) => setFechaHoraSorteo(e.target.value)}
+                        className="w-full h-9 rounded-xl bg-black/40 border border-white/10 px-2.5 text-xs text-white outline-none focus:border-amber-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">
+                        Transmisión o lugar (opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={detalleTransmision}
+                        onChange={(e) => setDetalleTransmision(e.target.value)}
+                        placeholder="Ej: Google Meet, Zoom o mesa de control"
+                        className="w-full h-9 rounded-xl bg-black/40 border border-white/10 px-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-amber-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] text-gray-400">
+                      Manda notificación in-app y push a los jugadores empatados.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleEnviarNotificacion}
+                      disabled={notificando || !fechaHoraSorteo}
+                      className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider transition-colors disabled:opacity-50 cursor-pointer shadow"
+                    >
+                      <Bell className="size-3.5" />
+                      {notificando ? "Enviando..." : "Notificar"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Selector de Método */}
           <div className="grid grid-cols-2 gap-2 p-1 bg-white/5 rounded-2xl border border-white/5">
             <button
@@ -281,6 +438,12 @@ export const ModalSorteoZona: React.FC<ModalSorteoZonaProps> = ({
                 El sistema ejecuta un sorteo aleatorio equiprobable para determinar
                 el orden definitivo de clasificación.
               </p>
+              <div className="flex items-start gap-2 p-2.5 rounded-xl bg-white/[0.04] border border-white/5 text-gray-300 text-xs">
+                <Video className="size-4 text-brand-chartreuse shrink-0 mt-0.5" />
+                <span>
+                  El sorteo digital se puede mostrar en vivo a los jugadores por videollamada compartiendo pantalla, o grabando la pantalla al tocar <strong>«Realizar Sorteo»</strong> para enviarlo a los capitanes.
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={ejecutarSorteoDigital}

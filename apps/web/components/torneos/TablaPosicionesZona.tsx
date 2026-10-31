@@ -12,6 +12,7 @@ import {
   Shuffle,
   Pencil,
   ShieldCheck,
+  Bell,
 } from "lucide-react";
 import {
   PairDisplay,
@@ -278,6 +279,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [modalSorteoOpen, setModalSorteoOpen] = useState(false);
+  const [modoInicialModal, setModoInicialModal] = useState<"sortear" | "notificar">("sortear");
   const nacional = esAlcanceNacional(alcance);
   const cupoClasificacion = clasificadosPorZona(
     capacidadZona ?? parejasInscritas.length,
@@ -534,11 +536,14 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
           {puedeResolverSorteo && torneoId && haySorteoPendiente && (
             <button
               type="button"
-              onClick={() => setModalSorteoOpen(true)}
+              onClick={() => {
+                setModoInicialModal("notificar");
+                setModalSorteoOpen(true);
+              }}
               className="shrink-0 inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-2.5 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 transition-colors cursor-pointer"
             >
-              <Shuffle className="size-3 text-amber-300" />
-              Resolver Sorteo
+              <Bell className="size-3 text-amber-300" />
+              Notificar / Sortear
             </button>
           )}
           {puedeResolverSorteo &&
@@ -584,14 +589,30 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
             </span>
           </div>
           {puedeResolverSorteo && torneoId && (
-            <button
-              type="button"
-              onClick={() => setModalSorteoOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
-            >
-              <Shuffle className="size-3 text-amber-300" />
-              Resolver Sorteo
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setModoInicialModal("notificar");
+                  setModalSorteoOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                <Bell className="size-3 text-amber-300" />
+                Notificar Sorteo
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setModoInicialModal("sortear");
+                  setModalSorteoOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/30 hover:bg-amber-500/40 text-amber-100 border border-amber-500/50 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                <Shuffle className="size-3 text-amber-300" />
+                Resolver Sorteo
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -786,12 +807,15 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
           onClose={() => setModalSorteoOpen(false)}
           torneoId={torneoId}
           nombreZona={nombreZona}
+          modoInicial={modoInicialModal}
           parejasEmpatadas={parejasParaModal.map((p) => ({
             inscripcionId: p.inscripcionId,
             nombre: p.nombre,
             club: p.club,
             sorteoPosicion: p.sorteo_posicion,
             sorteoMotivo: p.sorteo_motivo,
+            usuario_id: p.usuario_id,
+            usuario2_id: p.usuario2_id,
           }))}
           posicionesEnDisputa={posicionesEnDisputa}
           onSuccess={() => {
