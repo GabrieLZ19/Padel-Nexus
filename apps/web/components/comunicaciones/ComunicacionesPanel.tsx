@@ -152,6 +152,8 @@ function nombrePersona(u: {
 export default function ComunicacionesPanel() {
   const { profile } = useProfileStore();
   const rol = profile?.rol || "";
+  const profileClubId = profile?.club_id || "";
+  const profileLugarResidencia = profile?.lugar_residencia || "";
 
   const [tab, setTab] = useState<TabId>("enviar");
   const [listas, setListas] = useState<ComunicacionesLista[]>([]);
@@ -271,8 +273,8 @@ export default function ComunicacionesPanel() {
     }
 
     if (audienciaTipo === "jugadores_club") {
-      if (rol === "admin_club" && profile?.club_id) {
-        filtros.club_ids = [profile.club_id];
+      if (rol === "admin_club" && profileClubId) {
+        filtros.club_ids = [profileClubId];
       } else {
         filtros.club_ids =
           clubIds.length === 0 || clubIds.includes("todos")
@@ -323,11 +325,10 @@ export default function ComunicacionesPanel() {
     audienciaTipo,
     licenciaEstado,
     rol,
-    profile?.club_id,
+    profileClubId,
   ]);
 
   const cargarListas = useCallback(async () => {
-    setLoadingListas(true);
     try {
       const data = await ComunicacionesService.listarListas();
       setListas(data);
@@ -342,7 +343,6 @@ export default function ComunicacionesPanel() {
   }, []);
 
   const cargarCampanas = useCallback(async () => {
-    setLoadingCampanas(true);
     try {
       const res = await ComunicacionesService.listarCampanas({ limit: 50 });
       setCampanas(res.data);
@@ -357,12 +357,49 @@ export default function ComunicacionesPanel() {
   }, []);
 
   useEffect(() => {
-    void cargarListas();
-  }, [cargarListas]);
+    let ignore = false;
+    void (async () => {
+      try {
+        const data = await ComunicacionesService.listarListas();
+        if (!ignore) setListas(data);
+      } catch (err) {
+        if (!ignore) {
+          sileo.error({
+            title: "Error",
+            description: errorMessage(err, "No se pudieron cargar las listas."),
+          });
+        }
+      } finally {
+        if (!ignore) setLoadingListas(false);
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   useEffect(() => {
-    if (tab === "historial") void cargarCampanas();
-  }, [tab, cargarCampanas]);
+    if (tab !== "historial") return;
+    let ignore = false;
+    void (async () => {
+      try {
+        const res = await ComunicacionesService.listarCampanas({ limit: 50 });
+        if (!ignore) setCampanas(res.data);
+      } catch (err) {
+        if (!ignore) {
+          sileo.error({
+            title: "Error",
+            description: errorMessage(err, "No se pudo cargar el historial."),
+          });
+        }
+      } finally {
+        if (!ignore) setLoadingCampanas(false);
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, [tab]);
 
   useEffect(() => {
     void (async () => {
@@ -399,27 +436,12 @@ export default function ComunicacionesPanel() {
     })();
   }, []);
 
-  // Al cambiar de rol o categoria, aseguramos que la categoria activa sea valida.
-  useEffect(() => {
-    if (!categoriasDisponibles.includes(categoriaDest)) {
-      setCategoriaDest(categoriasDisponibles[0]);
-    }
-  }, [categoriasDisponibles, categoriaDest]);
-
-  // Admin de club: forzamos el filtro al club del perfil. No debe poder
-  // seleccionar otros clubes en el dropdown de audiencia.
-  useEffect(() => {
-    if (rol === "admin_club" && profile?.club_id) {
-      setClubIds([profile.club_id]);
-    }
-  }, [rol, profile?.club_id]);
-
   // Etiqueta del club forzado para admin_club (mostrada en modo read-only).
   const clubForzadoLabel = useMemo(() => {
-    if (rol !== "admin_club" || !profile?.club_id) return "";
-    const found = clubes.find((c) => c.value === profile.club_id);
+    if (rol !== "admin_club" || !profileClubId) return "";
+    const found = clubes.find((c) => c.value === profileClubId);
     return found?.label || "Tu club";
-  }, [rol, profile?.club_id, clubes]);
+  }, [rol, profileClubId, clubes]);
 
   /**
    * Provincia forzada por rol. El admin provincial NO debe poder cambiarla:
@@ -428,15 +450,10 @@ export default function ComunicacionesPanel() {
    */
   const provinciaForzada = useMemo(() => {
     if (rol === "admin_provincial") {
-      return (profile?.lugar_residencia || "").trim();
+      return profileLugarResidencia.trim();
     }
     return "";
-  }, [rol, profile?.lugar_residencia]);
-
-  // Sincronizamos el filtro `provincia` con la provincia forzada del rol.
-  useEffect(() => {
-    if (provinciaForzada) setProvincia(provinciaForzada);
-  }, [provinciaForzada]);
+  }, [rol, profileLugarResidencia]);
 
   /** Normaliza texto (sin acentos, minusculas) para comparar provincias. */
   const normalizarTexto = (v?: string | null) =>
@@ -531,8 +548,8 @@ export default function ComunicacionesPanel() {
     if (audienciaTipo === "jugadores_club" || audienciaTipo === "admins_clubes") {
       if (rol === "admin_club") {
         const nombre =
-          clubes.find((c) => c.value === profile?.club_id)?.label ||
-          profile?.club_id ||
+          clubes.find((c) => c.value === profileClubId)?.label ||
+          profileClubId ||
           "Tu club";
         items.push({
           label: "Club",
@@ -607,32 +624,23 @@ export default function ComunicacionesPanel() {
     listaId,
     listas,
     rol,
-    profile?.club_id,
+    profileClubId,
   ]);
-
-  // Al cambiar de categoria, elegimos el primer tipo disponible por defecto.
-  useEffect(() => {
-    if (!audienciasDisponibles.includes(audienciaTipo)) {
-      setAudienciaTipo(
-        audienciasDisponibles[0] || ("jugadores_provincia" as const),
-      );
-      setPreview(null);
-    }
-  }, [audienciasDisponibles, audienciaTipo]);
-
 
   useEffect(() => {
     const q = busquedaMiembro.trim();
     if (listaTipo !== "manual") return;
 
     if (q.length < 2) {
-      setResultadosBusqueda([]);
-      setBuscandoContactos(false);
-      return;
+      const handle = setTimeout(() => {
+        setResultadosBusqueda([]);
+        setBuscandoContactos(false);
+      }, 0);
+      return () => clearTimeout(handle);
     }
 
-    setBuscandoContactos(true);
     const handle = window.setTimeout(() => {
+      setBuscandoContactos(true);
       void (async () => {
         try {
           const data = await ComunicacionesService.buscarContactos(q);
@@ -1045,6 +1053,12 @@ export default function ComunicacionesPanel() {
                         type="button"
                         onClick={() => {
                           setCategoriaDest(cat.id);
+                          const nextTipos = TIPOS_POR_CATEGORIA[cat.id] || [];
+                          const nextAudience =
+                            rol === "admin_club"
+                              ? "jugadores_club"
+                              : (nextTipos[0] || "jugadores_provincia");
+                          setAudienciaTipo(nextAudience);
                           setPreview(null);
                           setProvincia("");
                           setAsociacionIds(["todas"]);
