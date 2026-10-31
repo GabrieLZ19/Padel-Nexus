@@ -139,3 +139,52 @@ test("FAP - Parejas sin partidos jugados (PJ: 0) NO deben marcar requiereSorteo"
   assert.equal(p2.partidosJugados, 0);
 });
 
+test("R7 - Asignación manual de puestos de sorteo (p.ej. pasa de 1.º a 3.º)", () => {
+  const p1 = {
+    inscripcionId: "pareja-fuentes",
+    partidosJugados: 2,
+    partidosGanados: 1,
+    setsAFavor: 2,
+    setsEnContra: 2,
+    gamesAFavor: 16,
+    gamesEnContra: 16,
+    stbGanados: 0,
+    stbPerdidos: 0,
+    puntosTotales: 3,
+    ds: 0,
+    dg: 0,
+    descalificada: false,
+    sorteoPosicion: 3, // Asignado a mano como 3.º
+    sorteoMotivo: "Sorteo presencial en mesa de control",
+  };
+
+  const p2 = {
+    inscripcionId: "pareja-rival",
+    partidosJugados: 2,
+    partidosGanados: 1,
+    setsAFavor: 2,
+    setsEnContra: 2,
+    gamesAFavor: 16,
+    gamesEnContra: 16,
+    stbGanados: 0,
+    stbPerdidos: 0,
+    puntosTotales: 3,
+    ds: 0,
+    dg: 0,
+    descalificada: false,
+    sorteoPosicion: 1, // Asignado a mano como 1.º
+    sorteoMotivo: "Sorteo presencial en mesa de control",
+  };
+
+  const partidos: any[] = [];
+  const equipos = [p1, p2];
+  const { ordenados } = ClasificacionService.desempatarMultiplesEquipos(equipos as any, partidos);
+
+  // La pareja con sorteoPosicion: 1 debe quedar primera, y la con 3 debe quedar segunda
+  assert.equal(ordenados[0].inscripcionId, "pareja-rival");
+  assert.equal(ordenados[0].sorteoPosicion, 1);
+  assert.equal(ordenados[1].inscripcionId, "pareja-fuentes");
+  assert.equal(ordenados[1].sorteoPosicion, 3);
+  assert.equal(ordenados[0].criterioDesempate, "Sorteo reglamentario FAP");
+});
+

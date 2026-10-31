@@ -247,6 +247,9 @@ function desempatarMultiplesEquipos(
 }
 
 export class ClasificacionService {
+  static desempatarDosEquipos = desempatarDosEquipos;
+  static desempatarMultiplesEquipos = desempatarMultiplesEquipos;
+
   /**
    * Calcula la tabla de posiciones de una zona específica aplicando el reglamento oficial FAP
    */
@@ -503,6 +506,13 @@ export class ClasificacionService {
     if (!resoluciones || resoluciones.length < 2) {
       throw new Error(
         "Se requieren al menos 2 parejas para resolver un sorteo reglamentario.",
+      );
+    }
+
+    const posicionesAsignadas = resoluciones.map((r) => r.posicion);
+    if (new Set(posicionesAsignadas).size !== resoluciones.length) {
+      throw new Error(
+        "Cada pareja debe tener una posición reglamentaria distinta.",
       );
     }
 
