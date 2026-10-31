@@ -8,6 +8,7 @@ import {
   Calendar,
   ShieldCheck,
   PlusCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { sileo } from "sileo";
 import {
@@ -92,7 +93,9 @@ export const Paso3Categorias = ({
   );
   const [selectedDias, setSelectedDias] = useState<string[]>(() => {
     const raw = (torneo as any).dias_juego;
-    return Array.isArray(raw) ? raw : [];
+    if (Array.isArray(raw) && raw.length > 0) return raw;
+    // Si no estaban definidos, preseleccionar todos los días de competencia del torneo
+    return getPlayDaysRange().map((d) => d.value);
   });
   const [guardandoCategorias, setGuardandoCategorias] = useState(false);
 
@@ -249,6 +252,47 @@ export const Paso3Categorias = ({
 
   const playDays = getPlayDaysRange();
 
+  // R11: Mantener sincronizados categoría, nivel, rama y días cuando se carga el torneo
+  useEffect(() => {
+    if (torneo.categoria) {
+      const isCustom = !categoriasOficiales.some((c) => c.value === torneo.categoria);
+      if (isCustom) {
+        setShowCustomCategoria(true);
+        setCustomCategoria(torneo.categoria);
+        setEditCategoria(CUSTOM_OPTION_VALUE);
+      } else {
+        setShowCustomCategoria(false);
+        setCustomCategoria("");
+        setEditCategoria(torneo.categoria);
+      }
+    }
+    if (torneo.nivel) {
+      const isCustomNiv = !nivelesOficiales.some((n) => n.value === torneo.nivel);
+      if (isCustomNiv) {
+        setShowCustomNivel(true);
+        setCustomNivel(torneo.nivel);
+        setEditNivel(CUSTOM_OPTION_VALUE);
+      } else {
+        setShowCustomNivel(false);
+        setCustomNivel("");
+        setEditNivel(torneo.nivel);
+      }
+    }
+    if ((torneo as any).rama) {
+      setEditRama((torneo as any).rama);
+    }
+    if ((torneo as any).modalidad) {
+      setEditModalidad(labelModalidad((torneo as any).modalidad));
+    }
+    const raw = (torneo as any).dias_juego;
+    if (Array.isArray(raw) && raw.length > 0) {
+      setSelectedDias(raw);
+    } else {
+      setSelectedDias(getPlayDaysRange().map((d) => d.value));
+    }
+  }, [torneo.id, torneo.categoria, torneo.nivel, (torneo as any).rama, torneo.fecha, (torneo as any).fecha_fin]);
+
+
   const handleToggleDia = (value: string) => {
     setSelectedDias((prev) =>
       prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value],
@@ -392,6 +436,20 @@ export const Paso3Categorias = ({
           Marcá los días de competencia (obligatorio).
         </p>
       </div>
+
+      {/* R11: Información precargada desde la creación del torneo */}
+      <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-brand-chartreuse/10 border border-brand-chartreuse/25 text-xs text-gray-200">
+        <CheckCircle2 className="size-4 shrink-0 text-brand-chartreuse" />
+        <div className="min-w-0">
+          <p className="font-bold text-white">
+            Paso completado con los datos de creación
+          </p>
+          <p className="text-gray-400 text-[11px] mt-0.5">
+            Categoría <strong>{categoriaEfectiva}</strong> · Nivel <strong>{nivelEfectivo}</strong> · Rama <strong>{editRama}</strong> · Días de competencia preseleccionados. Podés ajustar cualquier valor si lo necesitás o continuar directamente.
+          </p>
+        </div>
+      </div>
+
 
       {/* RAMA, CATEGORÍA, NIVEL */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
