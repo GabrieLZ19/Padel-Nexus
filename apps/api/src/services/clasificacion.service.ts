@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase";
+import { NotificacionService } from "./notificacion.service";
 
 export interface EstadisticasPareja {
   inscripcionId: string;
@@ -572,5 +573,138 @@ export class ClasificacionService {
     }
 
     return this.calcularPosicionesZona(torneoId, nombreZona);
+  }
+
+  /**
+   * Notifica a los jugadores de las parejas en empate técnico de una zona sobre el día y hora del sorteo reglamentario.
+   */
+  static async notificarSorteoZona(
+    torneoId: string,
+    nombreZona: string,
+    payload: {
+      fechaHora: string;
+      mensaje?: string;
+      inscripcionIds?: string[];
+    },
+    usuarioIdAdmin?: string,
+  ): Promise<{
+    exito: boolean;
+    totalNotificados: number;
+    mensaje: string;
+    jugadoresNotificados: Array<{ id: string; nombre: string }>;
+  }> {
+    const { data: torneo } = await supabaseAdmin
+      .from("torneos")
+      .select("id, nombre")
+      .eq("id", torneoId)
+      .maybeSingle();
+
+    const { data: grupo, error: errGrupo } = await supabaseAdmin
+      .from("grupos")
+      .select("id, nombre_grupo")
+      .eq("torneo_id", torneoId)
+      .eq("nombre_grupo", nombreZona)
+      .maybeSingle();
+
+    if (errGrupo || !grupo) {
+      throw new Error(`Zona "${nombreZona}" no encontrada en el torneo.`);
+    }
+
+    let inscripcionIds = payload.inscripcionIds;
+    if (!inscripcionIds || inscripcionIds.length === 0) {
+      const { data: gps } = await supabaseAdmin
+        .from("grupo_parejas")
+        .select("inscripcion_id")
+        .eq("grupo_id", grupo.id);
+      inscripcionIds = (gps || []).map((gp: { inscripcion_id: string }) => gp.inscripcion_id);
+    }
+
+    if (!inscripcionIds || inscripcionIds.length === 0) {
+      throw new Error(`No se encontraron inscripciones registradas en la zona "${nombreZona}".`);
+    }
+
+    const { data: inscripciones, error: errInscripciones } = await supabaseAdmin
+      .from("inscripciones")
+      .select("id, usuario_id, usuario2_id, jugador1_nombre, jugador2_nombre")
+      .in("id", inscripcionIds);
+
+    if (errInscripciones) {
+      throw new Error(`Error al consultar datos de inscripciones: ${errInscripciones.message}`);
+    }
+
+    const destinatarios: Array<{ usuarioId: string; nombre: string }> = [];
+    const seen = new Set<string>();
+
+    for (const inc of inscripciones || []) {
+      if (inc.usuario_id && !seen.has(inc.usuario_id)) {
+        seen.add(inc.usuario_id);
+        destinatarios.push({
+          usuarioId: inc.usuario_id,
+          nombre: inc.jugador1_nombre || "Jugador 1",
+        });
+      }
+      if (inc.usuario2_id && !seen.has(inc.usuario2_id)) {
+        seen.add(inc.usuario2_id);
+        destinatarios.push({
+          usuarioId: inc.usuario2_id,
+          nombre: inc.jugador2_nombre || "Jugador 2",
+        });
+      }
+    }
+
+    const nombreTorneo = torneo?.nombre || "Torneo";
+    const titulo = `Sorteo Reglamentario · ${nombreTorneo} (${nombreZona})`;
+    const mensajeBase = `Aviso de sorteo: Se ha detectado un empate técnico absoluto en ${nombreZona}. El sorteo reglamentario para definir los puestos de clasificación se llevará a cabo el ${payload.fechaHora}.`;
+    const mensajeFinal = payload.mensaje?.trim()
+      ? `${mensajeBase} Detalle: ${payload.mensaje.trim()}`
+      : mensajeBase;
+
+    // Notificar individualmente a cada jugador
+    const promesas = destinatarios.map((dest) =>
+      NotificacionService.crearNotificacion({
+        usuario_id: dest.usuarioId,
+        titulo,
+        mensaje: mensajeFinal,
+        tipo: "warning",
+        metadata: {
+          tipo: "sorteo_zona",
+          torneo_id: torneoId,
+          nombre_zona: nombreZona,
+          fecha_hora: payload.fechaHora,
+        },
+      }),
+    );
+
+    await Promise.allSettled(promesas);
+
+    // Registro de auditoría
+    await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: usuarioIdAdmin || null,
+      accion: "NOTIFICAR_SORTEO_ZONA",
+      entidad_afectada: "grupo_parejas",
+      detalles: {
+        torneo_id: torneoId,
+        nombre_grupo: nombreZona,
+        grupo_id: grupo.id,
+        fecha_hora: payload.fechaHora,
+        mensaje: payload.mensaje,
+        total_destinatarios: destinatarios.length,
+        destinatarios: destinatarios.map((d) => d.usuarioId),
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return {
+      exito: true,
+      totalNotificados: destinatarios.length,
+      mensaje:
+        destinatarios.length > 0
+          ? `Aviso de sorteo enviado exitosamente a ${destinatarios.length} jugador(es) de ${nombreZona}.`
+          : `Aviso de sorteo registrado. No se detectaron usuarios vinculados con cuenta activa en las parejas de ${nombreZona}.`,
+      jugadoresNotificados: destinatarios.map((d) => ({
+        id: d.usuarioId,
+        nombre: d.nombre,
+      })),
+    };
   }
 }

@@ -43,6 +43,7 @@ import { generarZonas } from "../controllers/competencia.controller";
 import {
   obtenerPosicionesZona,
   resolverSorteoZona,
+  notificarSorteoZona,
 } from "../controllers/clasificacion.controller";
 import {
   previewProgramacion,
@@ -185,6 +186,11 @@ router.post(
   "/:id/zonas/:nombreZona/sorteo",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   resolverSorteoZona,
+);
+router.post(
+  "/:id/zonas/:nombreZona/sorteo/notificar",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  notificarSorteoZona,
 );
 router.get(
   "/:id/auditoria",

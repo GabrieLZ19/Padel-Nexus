@@ -883,7 +883,7 @@ export class ProgramacionService {
 
       const ordenMap = new Map(payload.partido_ids.map((id, idx) => [id, idx]));
       partidosAAsignar.sort(
-        (a, b) => (ordenMap.get(a.id) ?? 0) - (ordenMap.get(b.id) ?? 0),
+        (a, b) => (ordenMap.get(String(a.id)) ?? 0) - (ordenMap.get(String(b.id)) ?? 0),
       );
 
       const allSlots = slotsDesdeContexto(contexto, duracion);
@@ -904,7 +904,7 @@ export class ProgramacionService {
       for (const p of partidosAAsignar) {
         if (p.cancha_asignada && p.fecha_partido) {
           asignacionesFinales.push({
-            partido_id: p.id,
+            partido_id: String(p.id),
             cancha_label: p.cancha_asignada,
             fecha_iso: p.fecha_partido,
           });

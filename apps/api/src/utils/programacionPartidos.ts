@@ -12,6 +12,7 @@ import {
 } from "./programadorReglas";
 
 export interface PartidoProgramable {
+  id?: string;
   ronda?: string;
   orden?: number;
   equipo_a_id?: string | null;

@@ -83,17 +83,29 @@ describe("R9 - Asignación de varios partidos a la vez a la grilla", () => {
 
     // Los primeros 3 partidos de zonas distintas deben ocupar las 3 canchas a las 09:00
     assert.equal(partidosSeleccionados[0].cancha_asignada, "Cancha 1");
-    assert.equal(partidosSeleccionados[0].fecha_partido, "2026-10-24T09:00:00-03:00");
+    assert.equal(
+      partidosSeleccionados[0].fecha_partido,
+      "2026-10-24T09:00:00-03:00",
+    );
 
     assert.equal(partidosSeleccionados[1].cancha_asignada, "Cancha 2");
-    assert.equal(partidosSeleccionados[1].fecha_partido, "2026-10-24T09:00:00-03:00");
+    assert.equal(
+      partidosSeleccionados[1].fecha_partido,
+      "2026-10-24T09:00:00-03:00",
+    );
 
     assert.equal(partidosSeleccionados[2].cancha_asignada, "Cancha 3");
-    assert.equal(partidosSeleccionados[2].fecha_partido, "2026-10-24T09:00:00-03:00");
+    assert.equal(
+      partidosSeleccionados[2].fecha_partido,
+      "2026-10-24T09:00:00-03:00",
+    );
 
     // El 4to partido (Zona A p2 con eq1) respeta descanso de eq1 (9:00+90m+60m descanso = 11:30) y se agenda a las 12:00
     assert.equal(partidosSeleccionados[3].cancha_asignada, "Cancha 1");
-    assert.equal(partidosSeleccionados[3].fecha_partido, "2026-10-24T12:00:00-03:00");
+    assert.equal(
+      partidosSeleccionados[3].fecha_partido,
+      "2026-10-24T12:00:00-03:00",
+    );
   });
 
   it("respeta slots ya ocupados previamente en la grilla y no los sobreescribe", () => {

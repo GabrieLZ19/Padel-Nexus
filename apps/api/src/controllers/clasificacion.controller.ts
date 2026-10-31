@@ -86,3 +86,54 @@ export const resolverSorteoZona = async (
     });
   }
 };
+
+export const notificarSorteoZona = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    const { id: torneoId, nombreZona } = req.params;
+    const zona = nombreZona || (req.body.nombreZona as string) || (req.query.zona as string);
+    const { fechaHora, mensaje, inscripcionIds } = req.body;
+
+    if (!torneoId || !zona) {
+      return res.status(400).json({
+        exito: false,
+        error: "Faltan parámetros obligatorios: ID de torneo y nombre de zona.",
+      });
+    }
+
+    if (!fechaHora || typeof fechaHora !== "string" || !fechaHora.trim()) {
+      return res.status(400).json({
+        exito: false,
+        error: "Debe indicar el día y hora programados para el sorteo.",
+      });
+    }
+
+    const resultado = await ClasificacionService.notificarSorteoZona(
+      torneoId,
+      zona,
+      {
+        fechaHora: fechaHora.trim(),
+        mensaje: typeof mensaje === "string" ? mensaje.trim() : undefined,
+        inscripcionIds: Array.isArray(inscripcionIds) ? inscripcionIds : undefined,
+      },
+      req.user?.id,
+    );
+
+    return res.status(200).json({
+      exito: true,
+      mensaje: resultado.mensaje,
+      data: resultado,
+    });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error al notificar sorteo de zona.";
+    console.error("[notificarSorteoZona Error]:", message);
+
+    return res.status(500).json({
+      exito: false,
+      error: message,
+    });
+  }
+};
