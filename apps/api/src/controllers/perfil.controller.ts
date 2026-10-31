@@ -102,7 +102,7 @@ export const PerfilController = {
 
   /**
    * POST /api/perfil/me/solicitar-cambio
-   * Registra un pedido de cambio de DNI o categoría. No modifica la ficha.
+   * Registra un pedido de cambio de DNI, fecha de nacimiento o categoría. No modifica la ficha.
    */
   async solicitarCambioFicha(req: Request, res: Response): Promise<Response> {
     try {

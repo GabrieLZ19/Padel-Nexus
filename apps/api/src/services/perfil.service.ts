@@ -193,6 +193,22 @@ export class PerfilService {
       throw new Error("La provincia de residencia es obligatoria.");
     }
 
+    const { data: perfilExistente } = await supabaseAdmin
+      .from("perfiles")
+      .select("fecha_nacimiento, dni, es_menor, cuenta_estado")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (
+      perfilExistente?.fecha_nacimiento &&
+      datos.fecha_nacimiento !== undefined &&
+      normalizeFechaNacimiento(datos.fecha_nacimiento) !== perfilExistente.fecha_nacimiento
+    ) {
+      throw new Error(
+        "La fecha de nacimiento es un dato oficial y no puede modificarse desde el perfil. Debés solicitar el cambio a la entidad.",
+      );
+    }
+
     const { data, error } = await supabaseAdmin
       .from("perfiles")
       .update(
@@ -203,7 +219,7 @@ export class PerfilService {
           lado_preferido: datos.lado_preferido,
           lugar_residencia: datos.lugar_residencia,
           sexo: datos.sexo,
-          fecha_nacimiento: normalizeFechaNacimiento(datos.fecha_nacimiento),
+          fecha_nacimiento: perfilExistente?.fecha_nacimiento ? undefined : normalizeFechaNacimiento(datos.fecha_nacimiento),
           avatar_url: datos.avatar_url,
           preferencias_notificacion: datos.preferencias_notificacion
             ? {
@@ -548,8 +564,8 @@ export class PerfilService {
     campo: string,
     valorPedido: string,
   ) {
-    if (campo !== "dni" && campo !== "categoria") {
-      throw new Error("Solo se puede pedir cambio de DNI o de categoría.");
+    if (campo !== "dni" && campo !== "categoria" && campo !== "fecha_nacimiento") {
+      throw new Error("Solo se puede pedir cambio de DNI, fecha de nacimiento o categoría.");
     }
 
     const pedido = valorPedido.trim();
@@ -557,16 +573,20 @@ export class PerfilService {
 
     const { data: perfil, error: readError } = await supabaseAdmin
       .from("perfiles")
-      .select("id, nombre, apellido, dni, categoria_padel")
+      .select("id, nombre, apellido, dni, categoria_padel, fecha_nacimiento")
       .eq("id", userId)
       .maybeSingle();
 
     if (readError || !perfil) throw new Error("Perfil no encontrado.");
 
-    const actual =
-      campo === "dni"
-        ? String(perfil.dni || "").replace(/\./g, "")
-        : String(perfil.categoria_padel || "");
+    let actual = "";
+    if (campo === "dni") {
+      actual = String(perfil.dni || "").replace(/\./g, "");
+    } else if (campo === "fecha_nacimiento") {
+      actual = String(perfil.fecha_nacimiento || "");
+    } else {
+      actual = String(perfil.categoria_padel || "");
+    }
 
     let normalizado = pedido;
     if (campo === "dni") {
@@ -574,6 +594,12 @@ export class PerfilService {
       if (!/^\d{7,8}$/.test(normalizado)) {
         throw new Error("El DNI debe tener 7 u 8 dígitos.");
       }
+    } else if (campo === "fecha_nacimiento") {
+      const fechaNorm = normalizeFechaNacimiento(pedido);
+      if (!fechaNorm) {
+        throw new Error("Fecha de nacimiento inválida (formato AAAA-MM-DD).");
+      }
+      normalizado = fechaNorm;
     } else {
       const permitidas = new Set<string>([
         ...CATEGORIAS_LIBRES,

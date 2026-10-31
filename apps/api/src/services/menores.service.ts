@@ -25,6 +25,7 @@ export interface ConfirmarConsentimientoInput {
   consentimiento_esencial: boolean;
   leyo_privacidad_menores: boolean;
   autoriza_perfil_publico?: boolean;
+  autoriza_comunicaciones_comerciales?: boolean;
 }
 
 export interface AsentimientoInput {
@@ -381,12 +382,13 @@ export class MenoresService {
       metadata: { motivo: "mvp_foto_deshabilitada" },
     });
 
-    // MARKETING denegado por defecto
+    // MARKETING: opcional por defecto, solo granted si el responsable lo autoriza
+    const autorizaComercial = Boolean(input.autoriza_comunicaciones_comerciales);
     await MenoresService.insertConsentEvent({
       player_id: link.player_id,
       guardian_id: link.guardian_id,
       tipo: "MARKETING",
-      status: "DENIED",
+      status: autorizaComercial ? "GRANTED" : "DENIED",
       policy_version: consentVersion,
       verification_method: "token_link",
     });
@@ -416,7 +418,7 @@ export class MenoresService {
         public_profile: autorizaPublico,
         public_photo: false,
         future_schedule_public: false,
-        marketing: false,
+        marketing: autorizaComercial,
         updated_at: now,
       },
       { onConflict: "player_id" },
@@ -428,7 +430,7 @@ export class MenoresService {
         es_menor: true,
         cuenta_estado: "ACTIVE_MINOR_RESTRICTED",
         perfil_publico_habilitado: autorizaPublico,
-        marketing_opt_in: false,
+        marketing_opt_in: autorizaComercial,
       })
       .eq("id", link.player_id);
 

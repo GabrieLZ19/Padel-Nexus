@@ -74,6 +74,15 @@ export class AuthService {
       cuenta_estado: perfilSync?.cuenta_estado ?? perfil.cuenta_estado,
     };
 
+    if (
+      usuarioBase.es_menor &&
+      usuarioBase.cuenta_estado === "PENDING_PARENTAL_CONSENT"
+    ) {
+      throw new Error(
+        "Tu cuenta está pendiente de consentimiento parental. Tu madre, padre o tutor/a debe completar la autorización a través del enlace enviado por correo para habilitar el acceso.",
+      );
+    }
+
     return {
       usuario: await FiscalSesionService.enriquecerPerfil(usuarioBase),
       token: authData.session?.access_token,
