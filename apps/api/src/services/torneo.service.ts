@@ -289,6 +289,7 @@ export interface TorneoPayload {
   canchas_disponibles?: number;
   duracion_partido_minutos?: number;
   hora_inicio_jornada?: string;
+  reglas_arbitraje?: Record<string, any> | null;
 }
 
 export class TorneoService {
@@ -898,6 +899,7 @@ export class TorneoService {
           canchas_disponibles: datos.canchas_disponibles || 1,
           duracion_partido_minutos: datos.duracion_partido_minutos || 90,
           hora_inicio_jornada: datos.hora_inicio_jornada || "08:00",
+          reglas_arbitraje: (datos as any).reglas_arbitraje || null,
         },
       ])
       .select()
