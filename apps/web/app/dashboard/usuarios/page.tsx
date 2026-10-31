@@ -43,6 +43,7 @@ const ROLES_CREABLES = [
   { value: "admin_club", label: "Administrador de Club" },
   { value: "admin_provincial", label: "Asociación Provincial" },
   { value: "admin_federacion", label: "Federación Nacional" },
+  { value: "fiscal", label: "Fiscal" },
 ];
 
 const ROL_LABELS: Record<string, string> = {
@@ -51,6 +52,7 @@ const ROL_LABELS: Record<string, string> = {
   admin_provincial: "Asociación Provincial",
   admin_club: "Admin Club",
   admin: "Admin Genérico",
+  fiscal: "Fiscal",
   usuario: "Usuario",
 };
 
@@ -61,6 +63,7 @@ const ROL_COLORS: Record<string, string> = {
   admin_provincial: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   admin_club: "bg-amber-500/10 text-amber-400 border-amber-500/20",
   admin: "bg-white/5 text-gray-400 border-white/10",
+  fiscal: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
 };
 
 export default function GestionUsuariosPage() {

@@ -18,6 +18,7 @@ import {
   KeyRound,
   Copy,
   Check,
+  CheckCircle2,
 } from "lucide-react";
 import { FiscalesService, Fiscal, AccesoFiscal } from "@/utils/services/fiscales";
 import { FederacionesService, type Federacion } from "@/utils/services/federaciones";
@@ -54,14 +55,24 @@ export default function ColegioFiscalesPage() {
     onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
   });
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    nombre: string;
+    apellido: string;
+    dni: string;
+    direccion: string;
+    correo: string;
+    rango: "Provincial" | "Nacional";
+    asociacion_id: string;
+    crearAccesoInmediato?: boolean;
+  }>({
     nombre: "",
     apellido: "",
     dni: "",
     direccion: "",
     correo: "",
-    rango: "Provincial" as "Provincial" | "Nacional",
+    rango: "Provincial",
     asociacion_id: "",
+    crearAccesoInmediato: false,
   });
   const [saving, setSaving] = useState(false);
   const [accesoEmail, setAccesoEmail] = useState("");
@@ -122,6 +133,7 @@ export default function ColegioFiscalesPage() {
       correo: "",
       rango: "Provincial",
       asociacion_id: colegioId,
+      crearAccesoInmediato: false,
     });
     setShowCreateModal(true);
   };
@@ -241,9 +253,17 @@ export default function ColegioFiscalesPage() {
       return;
     }
 
+    if (form.crearAccesoInmediato && !form.correo?.trim()) {
+      sileo.error({
+        title: "Correo requerido",
+        description: "Ingresá un correo electrónico para generar las credenciales de acceso al panel.",
+      });
+      return;
+    }
+
     try {
       setSaving(true);
-      await FiscalesService.create({
+      const nuevoFiscal = await FiscalesService.create({
         ...form,
         asociacion_id: form.asociacion_id || colegioId,
       });
@@ -252,6 +272,29 @@ export default function ColegioFiscalesPage() {
         description: `${form.nombre} ${form.apellido} ha sido añadido al Colegio de ${colegioLabel}.`,
       });
       setShowCreateModal(false);
+
+      if (form.crearAccesoInmediato && form.correo?.trim() && nuevoFiscal?.id) {
+        try {
+          const acceso = await FiscalesService.habilitarAcceso(nuevoFiscal.id, {
+            email: form.correo.trim(),
+          });
+          setSelectedFiscal(nuevoFiscal);
+          setAccesoEmail(acceso.email);
+          setCredenciales(acceso);
+          setShowDetailModal(true);
+          sileo.success({
+            title: "Acceso generado",
+            description: acceso.mensaje,
+          });
+        } catch (errAcceso: unknown) {
+          const axiosErr = errAcceso as { response?: { data?: { message?: string } }; message?: string };
+          sileo.error({
+            title: "Fiscal registrado pero acceso pendiente",
+            description: axiosErr.response?.data?.message || axiosErr.message || "No se pudo generar el acceso inmediato.",
+          });
+        }
+      }
+
       fetchFiscales();
     } catch (err: any) {
       sileo.error({
@@ -462,11 +505,23 @@ export default function ColegioFiscalesPage() {
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between text-gray-400">
+                  <div className="flex justify-between items-center text-gray-400">
                     <span>Acceso al panel:</span>
-                    <span className={f.usuario_id ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}>
-                      {f.usuario_id ? "Habilitado" : "Sin usuario"}
-                    </span>
+                    {f.usuario_id ? (
+                      <span className="text-emerald-400 font-bold inline-flex items-center gap-1">
+                        <CheckCircle2 className="size-3.5" /> Habilitado
+                      </span>
+                    ) : puedeGestionarColegio ? (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDetail(f)}
+                        className="text-xs font-semibold text-amber-300 hover:text-amber-200 underline cursor-pointer inline-flex items-center gap-1"
+                      >
+                        <KeyRound className="size-3" /> Crear acceso
+                      </button>
+                    ) : (
+                      <span className="text-amber-400 font-bold">Sin usuario</span>
+                    )}
                   </div>
                 </div>
 
@@ -490,6 +545,15 @@ export default function ColegioFiscalesPage() {
                   )}
 
                   <div className="flex items-center gap-2">
+                    {puedeGestionarColegio && (
+                      <button
+                        onClick={() => handleOpenDetail(f)}
+                        className="p-2 bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 rounded-xl transition-colors cursor-pointer"
+                        title={f.usuario_id ? "Restablecer acceso / clave" : "Crear acceso al panel"}
+                      >
+                        <KeyRound className="size-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => handleOpenDetail(f)}
                       className="p-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl transition-colors cursor-pointer"
@@ -560,7 +624,19 @@ export default function ColegioFiscalesPage() {
                       </td>
                       <td className="px-6 py-4 text-xs font-bold">
                         {f.usuario_id ? (
-                          <span className="text-emerald-400">Con usuario</span>
+                          <span className="text-emerald-400 inline-flex items-center gap-1.5">
+                            <CheckCircle2 className="size-3.5" /> Con usuario
+                          </span>
+                        ) : puedeGestionarColegio ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDetail(f)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-400/15 border border-amber-400/30 text-amber-300 hover:bg-amber-400/25 transition-colors cursor-pointer text-xs font-semibold"
+                            title="Crear credenciales de acceso para este fiscal"
+                          >
+                            <KeyRound className="size-3 shrink-0" />
+                            <span>Crear acceso</span>
+                          </button>
                         ) : (
                           <span className="text-amber-400">Sin usuario</span>
                         )}
@@ -592,6 +668,15 @@ export default function ColegioFiscalesPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2 items-center">
+                          {puedeGestionarColegio && (
+                            <button
+                              onClick={() => handleOpenDetail(f)}
+                              className="p-2 bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 rounded-xl transition-colors cursor-pointer"
+                              title={f.usuario_id ? "Restablecer acceso / clave" : "Crear acceso al panel"}
+                            >
+                              <KeyRound className="size-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleOpenDetail(f)}
                             className="p-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl transition-colors cursor-pointer"
@@ -628,6 +713,7 @@ export default function ColegioFiscalesPage() {
           saving={saving}
           onSubmit={handleCreate}
           onClose={() => setShowCreateModal(false)}
+          esCreacion={true}
         />
       )}
 
@@ -805,6 +891,7 @@ interface FormFiscalModalProps {
   saving: boolean;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
+  esCreacion?: boolean;
 }
 
 function FormFiscalModal({
@@ -814,6 +901,7 @@ function FormFiscalModal({
   saving,
   onSubmit,
   onClose,
+  esCreacion,
 }: FormFiscalModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -909,6 +997,28 @@ function FormFiscalModal({
               haciaArriba
             />
           </div>
+
+          {esCreacion && (
+            <div className="bg-black/40 border border-white/10 rounded-2xl p-3.5 space-y-2 mt-2">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.crearAccesoInmediato)}
+                  onChange={(e) =>
+                    setForm({ ...form, crearAccesoInmediato: e.target.checked })
+                  }
+                  className="size-4 rounded accent-brand-chartreuse cursor-pointer"
+                />
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <KeyRound className="size-3.5 text-brand-chartreuse" />
+                  Generar credenciales de acceso de inmediato
+                </span>
+              </label>
+              <p className="text-[11px] text-gray-400 pl-6.5 leading-relaxed">
+                Crea el usuario Auth con rol Fiscal y genera una contraseña temporal para entregarle al fiscal. Requiere correo electrónico.
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-4">
             <button
