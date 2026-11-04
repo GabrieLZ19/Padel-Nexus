@@ -846,7 +846,7 @@ function SeccionLlaves({
             inicioNumeracion={
               partidos.filter((p) => esRondaDeZona(p.ronda)).length + 1
             }
-            partidos={playoffMatches}
+            partidos={partidos}
             pairCount={fapPairCount ?? undefined}
             alcance={torneo.alcance}
             interactive={false}

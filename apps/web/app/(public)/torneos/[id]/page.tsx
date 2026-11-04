@@ -35,17 +35,6 @@ import {
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import { esRondaDeZona } from "@/utils/rondasLlave";
 
-const PLAYOFF_RONDAS = new Set([
-  "PRELIMINARES",
-  "32AVOS",
-  "16AVOS",
-  "OCTAVOS",
-  "CUARTOS",
-  "SEMIS",
-  "FINAL",
-  "LLAVE",
-]);
-
 export default function TorneoDetallePage() {
   const params = useParams();
   const router = useRouter();
@@ -329,8 +318,8 @@ export default function TorneoDetallePage() {
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-400">
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="size-3.5 text-brand-chartreuse/80" />
-                  {torneo.clubes?.nombre ||
-                    (torneo.reglas_arbitraje as any)?.centro_computos_manual ||
+                  {(torneo.reglas_arbitraje as any)?.centro_computos_manual ||
+                    torneo.clubes?.nombre ||
                     torneo.lugar ||
                     "Sede a confirmar"}
                 </span>
@@ -399,8 +388,8 @@ export default function TorneoDetallePage() {
                       Sede
                     </p>
                     <p className="text-sm text-white font-medium truncate">
-                      {torneo.clubes?.nombre ||
-                        (torneo.reglas_arbitraje as any)?.centro_computos_manual ||
+                      {(torneo.reglas_arbitraje as any)?.centro_computos_manual ||
+                        torneo.clubes?.nombre ||
                         torneo.lugar ||
                         "Sede a confirmar"}
                     </p>
@@ -464,6 +453,8 @@ export default function TorneoDetallePage() {
                           provincia: gp.inscripciones?.provincia ?? null,
                           letra_prioridad:
                             gp.inscripciones?.letra_prioridad ?? null,
+                          sorteo_posicion: gp.sorteo_posicion ?? null,
+                          sorteo_motivo: gp.sorteo_motivo ?? null,
                         }),
                       );
 
@@ -518,11 +509,7 @@ export default function TorneoDetallePage() {
                             partidos.filter((p) => esRondaDeZona(p.ronda))
                               .length + 1
                           }
-                          partidos={partidos.filter((p) =>
-                            PLAYOFF_RONDAS.has(
-                              String(p.ronda || "").toUpperCase().trim(),
-                            ),
-                          )}
+                          partidos={partidos}
                           pairCount={fapPairCount ?? undefined}
                           alcance={torneo.alcance}
                           interactive={false}

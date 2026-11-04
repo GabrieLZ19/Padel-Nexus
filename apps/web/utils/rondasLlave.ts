@@ -199,6 +199,11 @@ export function numerosVisiblesDePartidos(
     ronda?: string | null;
     orden?: number | null;
   }>,
+  /**
+   * Inicio de numeración de la llave cuando el array no incluye partidos de zona
+   * (p. ej. diagrama FAP solo con playoff). Con zonas presentes gana `zonas.length + 1`.
+   */
+  inicioLlave?: number,
 ): Map<string, number> {
   const map = new Map<string, number>();
 
@@ -227,7 +232,11 @@ export function numerosVisiblesDePartidos(
       ordenarPorRonda(a.ronda || "", a.orden ?? 0, b.ronda || "", b.orden ?? 0),
     );
 
-  const inicio = zonas.length + 1;
+  // CUA-01 / P4: numeración única continua (zonas 1..N, llave N+1…).
+  const inicio =
+    zonas.length > 0
+      ? zonas.length + 1
+      : Math.max(1, Number(inicioLlave) || 1);
   llave.forEach((partido, index) => {
     map.set(partido.id, inicio + index);
   });
@@ -238,6 +247,7 @@ export function numerosVisiblesDePartidos(
 /**
  * Mapa de número visible por matchNo de matriz FAP (ej: 50 -> 17, 58 -> 21, etc.).
  * Si se pasa `partidos`, vincula directamente con los partidos reales de la llave.
+ * `inicioLlave` cubre el caso del diagrama que solo recibe partidos de playoff.
  */
 export function mapaNumeroVisiblePorMatchNo(
   partidos: Array<{
@@ -246,8 +256,17 @@ export function mapaNumeroVisiblePorMatchNo(
     orden?: number | null;
   }>,
   matchNos?: number[],
+  inicioLlave?: number,
 ): Map<number, number> {
-  const numerosPartidos = numerosVisiblesDePartidos(partidos);
+  const zonasCount = partidos.filter(
+    (p) => esRondaDeZona(p.ronda) && !String(p.id).startsWith("empty-"),
+  ).length;
+  const inicio =
+    zonasCount > 0
+      ? zonasCount + 1
+      : Math.max(1, Number(inicioLlave) || 1);
+
+  const numerosPartidos = numerosVisiblesDePartidos(partidos, inicio);
   const map = new Map<number, number>();
 
   const llave = partidos.filter(
@@ -261,10 +280,7 @@ export function mapaNumeroVisiblePorMatchNo(
   }
 
   if (matchNos && matchNos.length > 0) {
-    const zonasCount = partidos.filter(
-      (p) => esRondaDeZona(p.ronda) && !String(p.id).startsWith("empty-"),
-    ).length;
-    const fallbackMap = numerosVisiblesLlave(matchNos, zonasCount + 1);
+    const fallbackMap = numerosVisiblesLlave(matchNos, inicio);
     for (const [mNo, num] of fallbackMap.entries()) {
       if (!map.has(mNo)) {
         map.set(mNo, num);

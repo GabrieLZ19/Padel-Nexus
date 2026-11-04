@@ -275,8 +275,8 @@ export default function InscripcionModal({
                         <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/8 px-2 py-1 text-[11px] text-gray-300 max-w-full">
                           <MapPin className="size-3 text-brand-chartreuse/80 shrink-0" />
                           <span className="truncate">
-                            {torneo.clubes?.nombre ||
-                              (torneo.reglas_arbitraje as any)?.centro_computos_manual ||
+                            {(torneo.reglas_arbitraje as any)?.centro_computos_manual ||
+                              torneo.clubes?.nombre ||
                               torneo.lugar}
                           </span>
                         </span>

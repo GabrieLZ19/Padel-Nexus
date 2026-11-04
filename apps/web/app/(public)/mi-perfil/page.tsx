@@ -96,7 +96,7 @@ export default function PlayerDashboard() {
             </span>
           </h1>
           <p className="text-sm md:text-lg text-gray-400 mt-1 md:mt-2">
-            Gestioná tu ficha unificada FAP, torneos oficiales y reservas.
+            Gestioná tu ficha unificada, torneos oficiales y reservas.
           </p>
         </div>
         <Link

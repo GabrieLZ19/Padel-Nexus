@@ -19,7 +19,7 @@ import {
   reglamentoTorneo,
   type ReglamentoTorneo,
 } from "@/utils/constants/fapApaRules";
-import { esRolFederacionNacional } from "@/utils/auth/roles";
+import { esRolClub, esRolFederacionNacional } from "@/utils/auth/roles";
 import type { RolUsuario } from "@/utils/types/user.types";
 import type { OnTorneoUpdated, RegisterSaveHandler } from "./types";
 
@@ -132,7 +132,8 @@ export const Paso1Datos = ({
   const [editSede, setEditSede] = useState(torneo.club_id || "");
   const rawReglas = ((torneo as any).reglas_arbitraje || {}) as Record<string, any>;
   const [modoManualSede, setModoManualSede] = useState<boolean>(() => {
-    return Boolean(!torneo.club_id && rawReglas.centro_computos_manual);
+    // El centro manual es informativo y puede coexistir con club_id (organizador/sede).
+    return Boolean(rawReglas.centro_computos_manual);
   });
   const [manualSede, setManualSede] = useState<string>(() => {
     return rawReglas.centro_computos_manual || "";
@@ -283,26 +284,30 @@ export const Paso1Datos = ({
     const org = organizadorFromTorneo(torneo);
     if (org) {
       setEditOrganizador(org);
-      return;
-    }
-    const provincial =
-      torneo.alcance === "Provincial" || torneo.alcance === "Regional";
-    const deProvincia = provincial
-      ? asociacionDeLaProvincia(asociacionesList, torneo.clubes?.provincia)
-      : undefined;
-    if (deProvincia) {
-      setEditOrganizador(organizadorValue("aso", deProvincia.id));
-    } else if (fapFederacionId) {
-      setEditOrganizador(organizadorValue("fed", fapFederacionId));
+    } else {
+      const provincial =
+        torneo.alcance === "Provincial" || torneo.alcance === "Regional";
+      const deProvincia = provincial
+        ? asociacionDeLaProvincia(asociacionesList, torneo.clubes?.provincia)
+        : undefined;
+      if (deProvincia) {
+        setEditOrganizador(organizadorValue("aso", deProvincia.id));
+      } else if (fapFederacionId) {
+        setEditOrganizador(organizadorValue("fed", fapFederacionId));
+      }
     }
 
-    if (torneo.club_id) {
-      setEditSede(torneo.club_id);
-      setModoManualSede(false);
-    } else if ((torneo as any).reglas_arbitraje?.centro_computos_manual) {
-      setEditSede("");
-      setManualSede((torneo as any).reglas_arbitraje.centro_computos_manual);
+    const centroManual = (torneo as any).reglas_arbitraje
+      ?.centro_computos_manual as string | undefined;
+    if (centroManual) {
+      // Priorizar el texto informativo aunque el torneo conserve club_id.
+      setEditSede(torneo.club_id || "");
+      setManualSede(centroManual);
       setModoManualSede(true);
+    } else if (torneo.club_id) {
+      setEditSede(torneo.club_id);
+      setManualSede("");
+      setModoManualSede(false);
     }
   }, [
     torneo.id,
@@ -467,7 +472,20 @@ export const Paso1Datos = ({
       const rawReglasPrev = ((torneo as any).reglas_arbitraje || {}) as Record<string, any>;
       const centroComputosManual =
         modoManualSede && manualSede.trim() ? manualSede.trim() : null;
-      const clubIdFinal = modoManualSede || !editSede ? null : editSede;
+      // club_id ancla ownership/sede del organizador; el centro manual es solo informativo.
+      const clubIdPreservado =
+        torneo.club_id ||
+        (esRolClub(userRole) ? profile?.club_id || null : null);
+      let clubIdFinal: string | null;
+      if (modoManualSede) {
+        clubIdFinal = clubIdPreservado;
+      } else if (editSede) {
+        clubIdFinal = editSede;
+      } else if (esRolClub(userRole)) {
+        clubIdFinal = clubIdPreservado;
+      } else {
+        clubIdFinal = null;
+      }
 
       const updated = await TorneosService.update(torneoId, {
         nombre: editNombre,
@@ -611,9 +629,6 @@ export const Paso1Datos = ({
                   value={manualSede}
                   onChange={(e) => {
                     setManualSede(e.target.value);
-                    if (e.target.value) {
-                      setEditSede("");
-                    }
                   }}
                   placeholder="Ej: Sede Central / Club Central Tucumán"
                   className="w-full bg-brand-input border border-white/10 text-white p-3 rounded-xl font-bold focus:border-brand-chartreuse/50 outline-none text-sm"

@@ -45,21 +45,49 @@ import {
 } from "@/utils/rondasLlave";
 import { formatearFechaHoraArgentina } from "@/utils/fechaArgentina";
 
-function formatearScoreAuditoria(val: any): string {
-  if (!val) return "-";
+function formatearValorAuditoria(val: unknown): string {
+  if (val == null) return "-";
+  if (Array.isArray(val)) {
+    const puestos = val
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const row = item as {
+          posicion?: number | null;
+          inscripcionId?: string;
+        };
+        if (row.posicion == null) return null;
+        return `${row.posicion}.º`;
+      })
+      .filter(Boolean);
+    if (puestos.length > 0) return puestos.join(" · ");
+    return `${val.length} cambio(s)`;
+  }
+  if (typeof val !== "object") return String(val);
+  const obj = val as Record<string, unknown>;
+  if (typeof obj.fecha_hora === "string") {
+    const total =
+      typeof obj.total_destinatarios === "number"
+        ? ` · ${obj.total_destinatarios} dest.`
+        : "";
+    return `${obj.fecha_hora}${total}`;
+  }
   const sets: string[] = [];
-  if (val.set1_a != null && val.set1_b != null) sets.push(`${val.set1_a}-${val.set1_b}`);
-  if (val.set2_a != null && val.set2_b != null) sets.push(`${val.set2_a}-${val.set2_b}`);
-  if (val.set3_a != null && val.set3_b != null) {
+  if (obj.set1_a != null && obj.set1_b != null) {
+    sets.push(`${obj.set1_a}-${obj.set1_b}`);
+  }
+  if (obj.set2_a != null && obj.set2_b != null) {
+    sets.push(`${obj.set2_a}-${obj.set2_b}`);
+  }
+  if (obj.set3_a != null && obj.set3_b != null) {
     sets.push(
-      val.es_supertiebreak
-        ? `STB ${val.set3_a}-${val.set3_b}`
-        : `${val.set3_a}-${val.set3_b}`,
+      obj.es_supertiebreak
+        ? `STB ${obj.set3_a}-${obj.set3_b}`
+        : `${obj.set3_a}-${obj.set3_b}`,
     );
   }
   let res = sets.join(" ");
-  if (val.es_wo && !val.es_lesion) res += res ? " (W.O.)" : "W.O.";
-  if (val.es_lesion) res += res ? " (W.O. Lesión)" : "W.O. Lesión";
+  if (obj.es_wo && !obj.es_lesion) res += res ? " (W.O.)" : "W.O.";
+  if (obj.es_lesion) res += res ? " (W.O. Lesión)" : "W.O. Lesión";
   return res || "Sin sets";
 }
 
@@ -190,6 +218,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             gp.inscripciones?.denominacion_nacional ?? null,
           provincia: gp.inscripciones?.provincia ?? null,
           letra_prioridad: gp.inscripciones?.letra_prioridad ?? null,
+          // P3: sin estos campos la zona sigue en «Pendiente sorteo» aunque la llave ya esté resuelta.
+          sorteo_posicion: gp.sorteo_posicion ?? null,
+          sorteo_motivo: gp.sorteo_motivo ?? null,
         })),
       }));
       setZonas(formattedZonas);
@@ -1532,7 +1563,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               ) : usaPlantillaFap && fapMatrixMatches.length > 0 ? (
                 <FapBracketDiagram
                   matches={fapMatrixMatches}
-                  partidos={playoffPartidos}
+                  // Lista completa: la numeración visible cuenta zonas + llave (CUA-01 / P4).
+                  partidos={partidos}
                   inicioNumeracion={partidosZona.length + 1}
                   pairCount={fapPairCount ?? undefined}
                   alcance={torneo?.alcance}
@@ -1666,8 +1698,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   ? `${log.perfiles.nombre} ${log.perfiles.apellido}`
                   : "Administrador";
 
-                const tieneComparacionScore = Boolean(
-                  log.detalles?.valor_anterior && log.detalles?.valor_nuevo,
+                const tieneComparacion = Boolean(
+                  log.detalles?.valor_anterior != null ||
+                    log.detalles?.valor_nuevo != null,
                 );
 
                 return (
@@ -1680,6 +1713,11 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                         <span className="px-2.5 py-0.5 bg-brand-chartreuse/10 border border-brand-chartreuse/20 text-brand-chartreuse text-xs font-bold rounded-full uppercase tracking-wider">
                           {log.accion.replace(/_/g, " ")}
                         </span>
+                        {log.detalles?.nombre_grupo && (
+                          <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-gray-300 text-xs font-bold rounded-full">
+                            {String(log.detalles.nombre_grupo)}
+                          </span>
+                        )}
                         {log.detalles?.ronda && (
                           <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-gray-300 text-xs font-bold rounded-full">
                             Ronda: {log.detalles.ronda}
@@ -1698,16 +1736,16 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                           Motivo: &quot;{log.detalles.motivo}&quot;
                         </p>
                       )}
-                      {tieneComparacionScore && (
+                      {tieneComparacion && (
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                           <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-300 font-medium">
                             <strong className="text-gray-400">Anterior:</strong>{" "}
-                            {formatearScoreAuditoria(log.detalles.valor_anterior)}
+                            {formatearValorAuditoria(log.detalles.valor_anterior)}
                           </span>
                           <span className="text-brand-ayuda font-bold">-&gt;</span>
                           <span className="px-2.5 py-1 rounded-lg bg-brand-chartreuse/10 border border-brand-chartreuse/30 text-brand-chartreuse font-medium">
                             <strong className="text-white">Nuevo:</strong>{" "}
-                            {formatearScoreAuditoria(log.detalles.valor_nuevo)}
+                            {formatearValorAuditoria(log.detalles.valor_nuevo)}
                           </span>
                         </div>
                       )}

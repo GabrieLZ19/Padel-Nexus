@@ -14,6 +14,16 @@ const PDF_SLATE_300: Rgb = [203, 213, 225];
 const PDF_SLATE_500: Rgb = [100, 116, 139];
 const PDF_MUTED: Rgb = [186, 198, 214];
 
+/** Etiqueta de abandono / W.O. para el informe PDF (P5). */
+function etiquetaAbandonoPdf(p: {
+  es_wo?: boolean | null;
+  es_lesion?: boolean | null;
+}): string | null {
+  if (p.es_lesion) return "Lesión";
+  if (p.es_wo) return "Ret.";
+  return null;
+}
+
 /** PDF: Institución / Club = provincia + letra en mayúsculas (ej. NEUQUÉN A). */
 function textoInstitucionPdf(p: {
   denominacion_nacional?: string | null;
@@ -554,12 +564,20 @@ export function generarPdfGrillaPartidos(
 
     const pNum = numMap.get(p.id) ?? p.orden;
     const rondaCompleta = etiquetaRondaLlave(p.ronda).toUpperCase();
+    const abandono = etiquetaAbandonoPdf(p);
     const tituloIzquierda = pNum ? `P#${pNum} · ${rondaCompleta}` : rondaCompleta;
 
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(BRAND_ACCENT[0], BRAND_ACCENT[1], BRAND_ACCENT[2]);
     doc.text(tituloIzquierda, x + 3, y + 4.2);
+
+    if (abandono) {
+      const tituloW = doc.getTextWidth(tituloIzquierda);
+      doc.setFontSize(6.5);
+      doc.setTextColor(248, 113, 113);
+      doc.text(abandono, x + 3 + tituloW + 2.5, y + 4.2);
+    }
 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(255, 255, 255);
@@ -1925,6 +1943,13 @@ export function generarPdfZonas(
         doc.setFontSize(6);
         doc.setTextColor(15, 23, 42);
         doc.text(`#${code}`, marginX + 8, y + 3.3, { align: "center" });
+
+        const abandonoZona = etiquetaAbandonoPdf(m);
+        if (abandonoZona) {
+          doc.setFontSize(5.5);
+          doc.setTextColor(185, 28, 28);
+          doc.text(abandonoZona, marginX + 16, y + 3.3);
+        }
 
         doc.setFontSize(5.5);
         doc.setTextColor(SLATE_500[0], SLATE_500[1], SLATE_500[2]);

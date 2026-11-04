@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Inscripcion, Partido } from "@/utils/types";
 import FeedbackModal, {
@@ -163,30 +163,49 @@ export default function ClubTorneoDetallePage() {
   return (
     <div className="w-full max-w-[1600px] mx-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6">
       {/* HEADER NAVEGACIÓN */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => router.push("/club/torneos")}
-          className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors cursor-pointer"
-        >
-          <ArrowLeft className="size-5" />
-        </button>
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black text-brand-white">
-              {torneo.nombre}
-            </h1>
-            <span className="bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20 px-3 py-1 rounded-full text-xs font-black uppercase">
-              {torneo.estado}
-            </span>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4 min-w-0">
+          <button
+            onClick={() => router.push("/club/torneos")}
+            className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors cursor-pointer shrink-0"
+          >
+            <ArrowLeft className="size-5" />
+          </button>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-black text-brand-white">
+                {torneo.nombre}
+              </h1>
+              <span className="bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20 px-3 py-1 rounded-full text-xs font-black uppercase">
+                {torneo.estado}
+              </span>
+            </div>
+            <p className="text-gray-400 mt-1 text-xs sm:text-sm font-medium">
+              {(torneo as { rama?: string }).rama
+                ? `${(torneo as { rama?: string }).rama} · `
+                : ""}
+              {etiquetaNivelYCategoria(torneo.nivel, torneo.categoria)} ·{" "}
+              {labelModalidad(torneo.modalidad)}
+            </p>
           </div>
-          <p className="text-gray-400 mt-1 text-xs sm:text-sm font-medium">
-            {(torneo as { rama?: string }).rama
-              ? `${(torneo as { rama?: string }).rama} · `
-              : ""}
-            {etiquetaNivelYCategoria(torneo.nivel, torneo.categoria)} ·{" "}
-            {labelModalidad(torneo.modalidad)}
-          </p>
         </div>
+
+        {torneo.estado === "Finalizado" && (
+          <button
+            type="button"
+            onClick={async () => {
+              const { generarPdfGrillaPartidos } = await import(
+                "@/utils/grillaPdf"
+              );
+              generarPdfGrillaPartidos(torneo, partidos || []);
+            }}
+            className="inline-flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white px-4 py-2.5 rounded-xl font-bold text-xs border border-white/10 cursor-pointer shrink-0 self-start sm:self-center"
+            title="Descargar informe de resultados (PDF)"
+          >
+            <Printer className="size-4" />
+            Informe de resultados
+          </button>
+        )}
       </div>
 
       {(torneo.solo_lectura || esEstadoTorneoModoLectura(torneo.estado)) && (

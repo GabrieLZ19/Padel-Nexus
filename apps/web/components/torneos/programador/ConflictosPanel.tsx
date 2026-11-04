@@ -6,6 +6,7 @@ import type {
   BoardPartido,
   ProgramacionIssue,
 } from "@/utils/services/torneos";
+import { formatearFechaHoraArgentina } from "@/utils/fechaArgentina";
 
 interface Props {
   issues: ProgramacionIssue[];
@@ -17,7 +18,7 @@ interface Props {
 function formatPartidoSlot(p: BoardPartido | undefined): string | null {
   if (!p?.fecha_partido && !p?.cancha_asignada) return null;
   const fecha = p.fecha_partido
-    ? String(p.fecha_partido).replace("T", " ").slice(0, 16)
+    ? formatearFechaHoraArgentina(p.fecha_partido)
     : null;
   return [fecha, p.cancha_asignada].filter(Boolean).join(" · ");
 }

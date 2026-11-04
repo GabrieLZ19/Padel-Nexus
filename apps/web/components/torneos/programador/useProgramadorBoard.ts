@@ -30,7 +30,8 @@ function boardQuery(config: ProgramadorConfig) {
     duracion: config.duracion,
     descansoModo: config.descansoModo,
     ...(config.jornadas ? { jornadas: config.jornadas } : {}),
-    horaInicio: config.horaInicio,
+    // No forzar 08:00: si está vacío, el backend usa la franja/disponibilidad de cada día.
+    ...(config.horaInicio ? { horaInicio: config.horaInicio } : {}),
     ...(config.horaFin ? { horaFin: config.horaFin } : {}),
     ...(config.franjasPorDia && Object.keys(config.franjasPorDia).length > 0
       ? { franjasPorDia: JSON.stringify(config.franjasPorDia) }
@@ -61,7 +62,7 @@ export function useProgramadorBoard(torneoId: string) {
     descansoModo: "tras_fin_60",
     distribucion: "zonas_primero",
     jornadas: 0,
-    horaInicio: "08:00",
+    horaInicio: "",
     horaFin: "",
   });
   const [activeDay, setActiveDay] = useState<string>("");
@@ -81,16 +82,27 @@ export function useProgramadorBoard(torneoId: string) {
 
   const applyBoard = useCallback((data: ProgramacionBoard) => {
     setBoard(data);
-    setConfig((c) => ({
-      ...c,
-      duracion: ([60, 75, 90].includes(data.duracion_partido_minutos)
-        ? data.duracion_partido_minutos
-        : c.duracion) as 60 | 75 | 90,
-      franjasPorDia: {
-        ...(c.franjasPorDia || {}),
-        ...(data.franjas_por_dia || {}),
-      },
-    }));
+    setConfig((c) => {
+      const descansoBoard = data.descanso_modo;
+      const descansoValido =
+        descansoBoard === "tras_fin_60" ||
+        descansoBoard === "tras_fin_120" ||
+        descansoBoard === "entre_inicios_240"
+          ? descansoBoard
+          : c.descansoModo;
+      return {
+        ...c,
+        duracion: ([60, 75, 90].includes(data.duracion_partido_minutos)
+          ? data.duracion_partido_minutos
+          : c.duracion) as 60 | 75 | 90,
+        // El backend es la fuente de verdad del descanso persistido.
+        descansoModo: descansoValido,
+        franjasPorDia: {
+          ...(c.franjasPorDia || {}),
+          ...(data.franjas_por_dia || {}),
+        },
+      };
+    });
     setActiveDay((prev) => {
       if (prev && data.dias.includes(prev)) return prev;
       return data.dias[0] || "";
@@ -169,9 +181,14 @@ export function useProgramadorBoard(torneoId: string) {
       configTimerRef.current = setTimeout(async () => {
         setBusy(true);
         try {
-          if (next?.duracion != null) {
+          if (next?.duracion != null || next?.descansoModo != null) {
             await TorneosService.update(torneoId, {
-              duracion_partido_minutos: merged.duracion,
+              ...(next?.duracion != null
+                ? { duracion_partido_minutos: merged.duracion }
+                : {}),
+              ...(next?.descansoModo != null
+                ? { descanso_modo: merged.descansoModo }
+                : {}),
             } as Parameters<typeof TorneosService.update>[1]);
           }
           const data = await TorneosService.getProgramacionBoard(
@@ -421,7 +438,9 @@ export function useProgramadorBoard(torneoId: string) {
         ...(configRef.current.jornadas
           ? { jornadas: configRef.current.jornadas }
           : {}),
-        horaInicio: configRef.current.horaInicio,
+        ...(configRef.current.horaInicio
+          ? { horaInicio: configRef.current.horaInicio }
+          : {}),
         ...(configRef.current.horaFin
           ? { horaFin: configRef.current.horaFin }
           : {}),
@@ -448,7 +467,7 @@ export function useProgramadorBoard(torneoId: string) {
         duracionMinutos: actual.duracion,
         descansoModo: actual.descansoModo,
         ...(actual.jornadas ? { jornadas: actual.jornadas } : {}),
-        horaInicio: actual.horaInicio,
+        ...(actual.horaInicio ? { horaInicio: actual.horaInicio } : {}),
         ...(actual.horaFin ? { horaFin: actual.horaFin } : {}),
         ...(actual.franjasPorDia ? { franjasPorDia: actual.franjasPorDia } : {}),
       });

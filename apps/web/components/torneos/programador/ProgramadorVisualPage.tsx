@@ -78,8 +78,13 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
       const partido = board.partidos.find((p) => p.id === partidoId);
       setHighlightedPartidoId(partidoId);
       if (partido?.fecha_partido) {
-        const m = String(partido.fecha_partido).match(/^(\d{4}-\d{2}-\d{2})/);
-        const day = m?.[1];
+        // fecha_partido está en UTC; el día de la grilla es wall-clock Argentina.
+        const day = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "America/Argentina/Buenos_Aires",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date(partido.fecha_partido));
         if (day && board.dias.includes(day)) {
           setActiveDay(day);
         }

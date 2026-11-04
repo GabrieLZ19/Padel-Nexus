@@ -61,17 +61,41 @@ describe("R6: Centro de cómputos con ingreso manual y alta rápida", () => {
     assert.match(fuente, /centro_computos_manual:\s*centroComputosManual/);
   });
 
-  it("nombreSedeFiscal y las vistas públicas consideran centro_computos_manual", () => {
+  it("P1: ingreso manual no anula club_id del organizador", () => {
+    const fuente = readFileSync(
+      path.join(RAIZ, "components/torneos/wizard/Paso1Datos.tsx"),
+      "utf8",
+    );
+    assert.equal(
+      fuente.includes("const clubIdFinal = modoManualSede || !editSede ? null : editSede"),
+      false,
+      "no debe nullificar club_id solo por modo manual",
+    );
+    assert.match(fuente, /clubIdPreservado/);
+    assert.match(fuente, /esRolClub\(userRole\)/);
+    assert.match(
+      fuente,
+      /if \(modoManualSede\) \{\s*clubIdFinal = clubIdPreservado;/s,
+    );
+  });
+
+  it("nombreSedeFiscal y las vistas públicas priorizan centro_computos_manual", () => {
     const fiscalFuente = readFileSync(
       path.join(RAIZ, "utils/services/fiscal-panel.ts"),
       "utf8",
     );
-    assert.match(fiscalFuente, /centro_computos_manual/);
+    assert.match(
+      fiscalFuente,
+      /centro_computos_manual[\s\S]*?clubes\?\.nombre/,
+    );
 
     const publicoFuente = readFileSync(
       path.join(RAIZ, "app/(public)/torneos/[id]/page.tsx"),
       "utf8",
     );
-    assert.match(publicoFuente, /centro_computos_manual/);
+    assert.match(
+      publicoFuente,
+      /centro_computos_manual[\s\S]*?clubes\?\.nombre/,
+    );
   });
 });

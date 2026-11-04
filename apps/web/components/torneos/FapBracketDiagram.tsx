@@ -194,6 +194,7 @@ export function FapBracketDiagram({
     const numeros = mapaNumeroVisiblePorMatchNo(
       partidos,
       matches.map((m) => m.matchNo),
+      inicioNumeracion,
     );
     const colDe = (matchNo: number) => columnas.get(matchNo) ?? 0;
     const maxCol = Math.max(0, ...matches.map((m) => colDe(m.matchNo)));
