@@ -2,5 +2,9 @@
   command = "npm run build"
   publish = ".next"
 
+[build.environment]
+  # Parches de seguridad Oct 2026 (CVE Brotli/DNS/TLS): usar LTS Lithium
+  NODE_VERSION = "26.13.0"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
