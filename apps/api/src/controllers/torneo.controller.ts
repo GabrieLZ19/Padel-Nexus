@@ -311,7 +311,11 @@ export const updateTorneo = async (
   try {
     const negado = await negarAlcance(req, req.params.id, "editar");
     if (negado) return res.status(403).json({ message: negado });
-    const data = await TorneoService.actualizarTorneo(req.params.id, req.body);
+    const data = await TorneoService.actualizarTorneo(
+      req.params.id,
+      req.body,
+      req.user,
+    );
     return res.status(200).json(data);
   } catch (error: any) {
     console.error("🚨 ERROR EN updateTorneo:", error);
@@ -778,20 +782,47 @@ export const getAuditoriaByTorneo = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    const { data: logs, error } = await supabaseAdmin
-      .from("logs_auditoria")
-      .select(`
+    const torneoId = req.params.id;
+    const selectCols = `
         id,
         accion,
         detalles,
         created_at,
         perfiles!fk_logs_admin(nombre, apellido)
-      `)
-      .eq("entidad_afectada", req.params.id)
-      .order("created_at", { ascending: false });
+      `;
 
-    if (error) throw new Error(error.message);
-    return res.status(200).json(logs);
+    // 1) Logs anclados al torneo (programación, correcciones, sorteos nuevos).
+    const { data: porEntidad, error: errEntidad } = await supabaseAdmin
+      .from("logs_auditoria")
+      .select(selectCols)
+      .eq("entidad_afectada", torneoId)
+      .order("created_at", { ascending: false });
+    if (errEntidad) throw new Error(errEntidad.message);
+
+    // 2) Logs históricos de sorteo/aviso que guardaban entidad_afectada="grupo_parejas"
+    //    y el torneo_id solo en detalles.
+    const { data: porDetalle, error: errDetalle } = await supabaseAdmin
+      .from("logs_auditoria")
+      .select(selectCols)
+      .filter("detalles->>torneo_id", "eq", torneoId)
+      .order("created_at", { ascending: false });
+    if (errDetalle) throw new Error(errDetalle.message);
+
+    const seen = new Set<string>();
+    const merged = [...(porEntidad || []), ...(porDetalle || [])]
+      .filter((log) => {
+        const id = String(log.id);
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          new Date(String(b.created_at)).getTime() -
+          new Date(String(a.created_at)).getTime(),
+      );
+
+    return res.status(200).json(merged);
   } catch (error: any) {
     return res.status(400).json({ message: "Error al obtener auditoría", error: error.message });
   }

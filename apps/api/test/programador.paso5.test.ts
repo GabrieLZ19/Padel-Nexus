@@ -325,28 +325,32 @@ describe("programador paso 5", () => {
       canchas: { nombre: "1" },
     };
 
-    // Caso 1: Por defecto, la grilla supera 21:00 y llega hasta turnos de las 23:00
+    // Caso 1: desde 08:00 con turno 90, el último inicio que termina a medianoche es 21:30
+    // (22:30 no cae en la grilla 08:00+90n; 23:00 terminaría 00:30).
     const slotsDefault = generarSlotsDesdeSedesYVentana({
       canchas: [cancha],
       dias: ["2026-10-10"],
       duracionMinutos: 90,
     });
     const horasDefault = slotsDefault.map((s) => s.hora.slice(0, 5));
+    assert.equal(horasDefault[0], "08:00");
     assert.equal(horasDefault.includes("21:30"), true);
-    assert.equal(horasDefault.includes("23:00"), true);
+    assert.equal(horasDefault.includes("23:00"), false);
+    assert.equal(horasDefault.includes("00:00"), false);
 
-    // Caso 2: Especificando horaFinMin hasta medianoche (1440 min) con turnos de 60 min
+    // Caso 2: franja 22:00–00:00 con turnos de 60 min → 22:00 y 23:00 (no arranca a las 00:00)
     const slotsMedianoche = generarSlotsDesdeSedesYVentana({
       canchas: [cancha],
       dias: ["2026-10-10"],
       duracionMinutos: 60,
-      horaInicioMin: 22 * 60,
-      horaFinMin: 24 * 60,
+      franjasPorDia: {
+        "2026-10-10": { inicio: "22:00", fin: "00:00" },
+      },
     });
     const horasMedianoche = slotsMedianoche.map((s) => s.hora.slice(0, 5));
-    assert.deepEqual(horasMedianoche, ["22:00", "23:00", "00:00"]);
-    // Verificar que nunca formatee como '24:00:00'
+    assert.deepEqual(horasMedianoche, ["22:00", "23:00"]);
     assert.equal(slotsMedianoche.some((s) => s.hora.startsWith("24:")), false);
+    assert.equal(horasMedianoche.includes("00:00"), false);
   });
 
   it("R2 - genera franjas horarias de inicio y fin independientes por jornada", () => {
@@ -366,7 +370,7 @@ describe("programador paso 5", () => {
     const slots = generarSlotsDesdeSedesYVentana({
       canchas: [cancha],
       dias: ["2026-10-09", "2026-10-10", "2026-10-11"],
-      duracionMinutos: 60,
+      duracionMinutos: 90,
       franjasPorDia: {
         "2026-10-09": { inicio: "18:00", fin: "00:00" },
         "2026-10-10": { inicio: "10:00", fin: "00:00" },
@@ -378,22 +382,46 @@ describe("programador paso 5", () => {
     const sabado = slots.filter((s) => s.fecha === "2026-10-10").map((s) => s.hora.slice(0, 5));
     const domingo = slots.filter((s) => s.fecha === "2026-10-11").map((s) => s.hora.slice(0, 5));
 
-    // Viernes arranca a las 18:00 y llega a 00:00
+    // Viernes arranca a las 18:00; con 90 min el último inicio es 22:30 (no 00:00)
     assert.equal(viernes[0], "18:00");
-    assert.equal(viernes[viernes.length - 1], "00:00");
+    assert.deepEqual(viernes, ["18:00", "19:30", "21:00", "22:30"]);
     assert.equal(viernes.includes("08:00"), false);
     assert.equal(viernes.includes("10:00"), false);
 
-    // Sábado arranca a las 10:00 y llega a 00:00
+    // Sábado arranca a las 10:00 y no incluye 08:00 ni 00:00
     assert.equal(sabado[0], "10:00");
-    assert.equal(sabado[sabado.length - 1], "00:00");
     assert.equal(sabado.includes("08:00"), false);
+    assert.equal(sabado.includes("00:00"), false);
 
-    // Domingo arranca a las 11:00 y termina a las 20:00
+    // Domingo arranca a las 11:00; último inicio que termina a las 20:00 es 18:30
     assert.equal(domingo[0], "11:00");
-    assert.equal(domingo[domingo.length - 1], "20:00");
-    assert.equal(domingo.includes("21:00"), false);
+    assert.equal(domingo[domingo.length - 1], "18:30");
+    assert.equal(domingo.includes("20:00"), false);
     assert.equal(domingo.includes("00:00"), false);
+  });
+
+  it("P2 - la disponibilidad por día gana sobre horaInicio global 08:00", () => {
+    const canchas: DisponibilidadTorneo[] = [
+      {
+        club_id: "club-1",
+        cancha_id: "cancha-1",
+        fecha: "2026-11-27",
+        hora_inicio: "18:00:00",
+        hora_fin: "23:59:59",
+        clubes: { nombre: "Club" },
+        canchas: { nombre: "1" },
+      },
+    ];
+    const slots = generarSlotsDesdeSedesYVentana({
+      canchas,
+      dias: ["2026-11-27"],
+      duracionMinutos: 90,
+      horaInicioMin: 8 * 60,
+    });
+    const horas = slots.map((s) => s.hora.slice(0, 5));
+    assert.equal(horas[0], "18:00");
+    assert.equal(horas.includes("08:00"), false);
+    assert.deepEqual(horas, ["18:00", "19:30", "21:00", "22:30"]);
   });
 
   it("R3 - respeta descanso configurado de 120 min (tras fin) sin asignar en slots con descanso insuficiente", () => {
@@ -565,6 +593,105 @@ describe("programador paso 5", () => {
     assert.equal(esRondaCampeonato("CUARTOS"), false);
     assert.equal(esRondaCampeonato("OCTAVOS"), false);
     assert.equal(esRondaCampeonato("ZONA A"), false);
+  });
+
+  it("P2 - zona de 4 agenda #1/#2 antes que ganadores/perdedores y la llave después", () => {
+    const cancha1: DisponibilidadTorneo = {
+      club_id: "club-1",
+      cancha_id: "c1",
+      fecha: "2026-11-27",
+      hora_inicio: "18:00:00",
+      hora_fin: "23:59:59",
+      clubes: { nombre: "Club" },
+      canchas: { nombre: "1" },
+    };
+    const cancha2: DisponibilidadTorneo = {
+      ...cancha1,
+      cancha_id: "c2",
+      canchas: { nombre: "2" },
+    };
+    const slots = generarSlotsDesdeSedesYVentana({
+      canchas: [cancha1, cancha2],
+      dias: ["2026-11-27", "2026-11-28"],
+      duracionMinutos: 90,
+      franjasPorDia: {
+        "2026-11-27": { inicio: "18:00", fin: "00:00" },
+        "2026-11-28": { inicio: "10:00", fin: "00:00" },
+      },
+    });
+
+    const partidos: PartidoProgramable[] = [
+      {
+        id: "z1",
+        ronda: "ZONA A",
+        orden: 1,
+        equipo_a_id: "a",
+        equipo_b_id: "d",
+        estado_partido: "Programado",
+      },
+      {
+        id: "z2",
+        ronda: "ZONA A",
+        orden: 2,
+        equipo_a_id: "b",
+        equipo_b_id: "c",
+        estado_partido: "Programado",
+      },
+      {
+        id: "z3",
+        ronda: "ZONA A",
+        orden: 3,
+        estado_partido: "Pendiente Ganadores",
+      },
+      {
+        id: "z4",
+        ronda: "ZONA A",
+        orden: 4,
+        estado_partido: "Pendiente Perdedores",
+      },
+      {
+        id: "oct",
+        ronda: "OCTAVOS",
+        orden: 17,
+        estado_partido: "Programado",
+      },
+    ];
+
+    asignarHorariosAPartidos(partidos, slots, new Set(), {
+      duracionMinutos: 90,
+      descansoModo: "tras_fin_120",
+      permitirSinEquipos: true,
+    });
+
+    const t1 = parseFechaPartidoIsoPublic(String(partidos[0].fecha_partido));
+    const t2 = parseFechaPartidoIsoPublic(String(partidos[1].fecha_partido));
+    const t3 = parseFechaPartidoIsoPublic(String(partidos[2].fecha_partido));
+    const t4 = parseFechaPartidoIsoPublic(String(partidos[3].fecha_partido));
+    const to = parseFechaPartidoIsoPublic(String(partidos[4].fecha_partido));
+
+    assert.ok(t1 && t2 && t3 && t4 && to);
+    assert.equal(t1.fecha, "2026-11-27");
+    assert.equal(t1.startMin, 18 * 60);
+    assert.equal(t2.startMin, 18 * 60);
+    // Ola 2 después de la ola 1
+    assert.ok(
+      t3.fecha > t1.fecha ||
+        (t3.fecha === t1.fecha && t3.startMin > t1.startMin),
+    );
+    assert.ok(
+      t4.fecha > t1.fecha ||
+        (t4.fecha === t1.fecha && t4.startMin > t1.startMin),
+    );
+    // Llave después de terminar las zonas
+    const finZonas = Math.max(
+      t3.startMin + (t3.fecha === t4.fecha ? 0 : 0),
+      t4.startMin,
+    );
+    if (to.fecha === t3.fecha && to.fecha === t4.fecha) {
+      assert.ok(to.startMin >= finZonas + 90);
+    } else {
+      assert.ok(to.fecha >= t3.fecha);
+    }
   });
 });
 

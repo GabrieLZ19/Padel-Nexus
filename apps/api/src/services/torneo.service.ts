@@ -288,6 +288,7 @@ export interface TorneoPayload {
   premios?: { uno?: string; dos?: string; tres?: string };
   canchas_disponibles?: number;
   duracion_partido_minutos?: number;
+  descanso_modo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240" | null;
   hora_inicio_jornada?: string;
   reglas_arbitraje?: Record<string, any> | null;
 }
@@ -1159,6 +1160,7 @@ export class TorneoService {
     "premio_3",
     "canchas_disponibles",
     "duracion_partido_minutos",
+    "descanso_modo",
     "hora_inicio_jornada",
     "alcance",
     "reglas_arbitraje",
@@ -1204,15 +1206,42 @@ export class TorneoService {
     return clean;
   }
 
-  static async actualizarTorneo(id: string, datos: any) {
+  static async actualizarTorneo(
+    id: string,
+    datos: any,
+    user?: { id: string; rol?: string | null },
+  ) {
     const { data: torneoActual } = await supabaseAdmin
       .from("torneos")
-      .select("estado, fecha, fecha_cierre_inscripcion")
+      .select("estado, fecha, fecha_cierre_inscripcion, club_id")
       .eq("id", id)
       .single();
 
     // Sanitizar: solo columnas válidas de la tabla `torneos`
     const updateData = TorneoService.sanitizeTorneoData(datos);
+
+    // admin_club: club_id es el ancla de ownership. Un centro de cómputos
+    // manual (informativo) no debe desvincular ni reasignar el torneo.
+    if (user) {
+      const cuenta = await AlcanceCuentaService.resolver(user);
+      if (cuenta.rol === "admin_club" && cuenta.clubId) {
+        const clubSolicitado =
+          updateData.club_id !== undefined ? updateData.club_id : undefined;
+        if (
+          clubSolicitado === null ||
+          clubSolicitado === "" ||
+          (typeof clubSolicitado === "string" &&
+            clubSolicitado !== cuenta.clubId)
+        ) {
+          updateData.club_id = cuenta.clubId;
+        } else if (
+          clubSolicitado === undefined &&
+          !torneoActual?.club_id
+        ) {
+          updateData.club_id = cuenta.clubId;
+        }
+      }
+    }
 
     if (updateData.asociacion && !updateData.asociacion_id) {
       const { data: asocData } = await supabaseAdmin
@@ -1898,12 +1927,13 @@ export class TorneoService {
     if (updateError || !partido)
       throw new Error("Error al cargar el marcador.");
 
-    if (yaTeniaResultado && adminId && valorAnterior) {
-      await supabaseAdmin.from("logs_auditoria").insert({
-        usuario_id_admin: adminId,
+    if (yaTeniaResultado && valorAnterior) {
+      const { error: errAudit } = await supabaseAdmin.from("logs_auditoria").insert({
+        usuario_id_admin: adminId || null,
         accion: "corregir_resultado",
         entidad_afectada: partido.torneo_id,
         detalles: {
+          torneo_id: partido.torneo_id,
           partido_id: partido.id,
           ronda: partido.ronda,
           orden: partido.orden,
@@ -1912,6 +1942,12 @@ export class TorneoService {
           valor_nuevo: valorNuevo,
         },
       });
+      if (errAudit) {
+        console.error(
+          "[TorneoService] No se pudo auditar corrección de resultado:",
+          errAudit.message,
+        );
+      }
     }
 
     // Emitir WebSocket global de partido actualizado

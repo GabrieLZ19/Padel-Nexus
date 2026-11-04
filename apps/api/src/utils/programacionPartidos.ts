@@ -44,9 +44,10 @@ export interface SlotProgramacion {
 export const FAP_HORA_INICIO_MIN = 9 * 60;
 export const FAP_HORA_INICIO_MAX = 22 * 60;
 
-/** Grilla del programador visual: inicios de partido 08:00 hasta la medianoche (00:00). */
+/** Grilla del programador visual: inicios de partido desde 08:00. */
 export const PROGRAMADOR_HORA_INICIO_MIN = 8 * 60;
-export const PROGRAMADOR_HORA_INICIO_MAX = 23 * 60 + 30;
+/** Fin de ventana por defecto (medianoche). El último inicio respeta la duración del turno. */
+export const PROGRAMADOR_HORA_INICIO_MAX = 24 * 60;
 
 /** Hora fin de bloque al seedear disponibilidad (cubre turnos que finalizan a medianoche o madrugada). */
 export const PROGRAMADOR_HORA_FIN_BLOQUE = "23:59:59";
@@ -185,7 +186,9 @@ export function slotKey(
   fecha: string,
   hora: string,
 ): string {
-  return `${canchaLabel}|${normalizarFecha(fecha)}|${hora.slice(0, 8)}`;
+  // Normalizar siempre a HH:MM:00 para que "09:00" y "09:00:00" colisionen.
+  const horaNorm = minutosAHoraStr(parseHoraAMinutos(hora));
+  return `${canchaLabel}|${normalizarFecha(fecha)}|${horaNorm}`;
 }
 
 export function expandirSlotsDisponibilidad(
@@ -347,17 +350,18 @@ export function generarSlotsDesdeSedesYVentana(params: {
 
   for (const fecha of dias) {
     const franja = params.franjasPorDia?.[fecha];
+    const dispFecha = params.canchas.find((c) => c.fecha === fecha);
 
+    // Prioridad por día: franja explícita → disponibilidad guardada → override global → default.
     let fechaHoraInicio = horaInicioDefault;
     if (franja?.inicio) {
       const min = minutosDesdeHora(franja.inicio);
       if (min != null) fechaHoraInicio = min;
-    } else if (params.horaInicioMin == null) {
-      const dispFecha = params.canchas.find((c) => c.fecha === fecha && c.hora_inicio);
-      if (dispFecha?.hora_inicio) {
-        const min = minutosDesdeHora(dispFecha.hora_inicio);
-        if (min != null) fechaHoraInicio = min;
-      }
+    } else if (dispFecha?.hora_inicio) {
+      const min = minutosDesdeHora(dispFecha.hora_inicio);
+      if (min != null) fechaHoraInicio = min;
+    } else if (params.horaInicioMin != null) {
+      fechaHoraInicio = params.horaInicioMin;
     }
 
     let fechaHoraFin = horaFinDefault;
@@ -367,31 +371,41 @@ export function generarSlotsDesdeSedesYVentana(params: {
         if (min <= fechaHoraInicio) min += 1440;
         fechaHoraFin = min;
       }
-    } else if (params.horaFinMin == null) {
-      const dispFecha = params.canchas.find((c) => c.fecha === fecha && c.hora_fin);
-      if (dispFecha?.hora_fin) {
-        let min = minutosDesdeHora(dispFecha.hora_fin);
+    } else if (dispFecha?.hora_fin) {
+      const rawFin = String(dispFecha.hora_fin);
+      // 23:59:59 (seed del programador) equivale a fin de jornada a medianoche.
+      if (rawFin.startsWith("23:59") || rawFin.startsWith("00:00")) {
+        fechaHoraFin = 24 * 60;
+      } else {
+        let min = minutosDesdeHora(rawFin);
         if (min != null) {
           if (min <= fechaHoraInicio) min += 1440;
           fechaHoraFin = min;
         }
       }
+    } else if (params.horaFinMin != null) {
+      fechaHoraFin = params.horaFinMin;
+      if (fechaHoraFin <= fechaHoraInicio) fechaHoraFin += 1440;
     }
 
     for (const cancha of canchas) {
       const canchaLabel = buildCanchaLabel(cancha);
       if (!canchaLabel) continue;
+      // Fin exclusivo: con fin 00:00 y turno 90, el último inicio es 22:30.
       for (
         let minuto = fechaHoraInicio;
-        minuto <= fechaHoraFin;
+        minuto + duracion <= fechaHoraFin;
         minuto += duracion
       ) {
         try {
+          const fechaIso = buildFechaIso(fecha, minuto);
+          const wall = parseFechaPartidoIso(fechaIso);
           slots.push({
             canchaLabel,
-            fecha,
-            hora: minutosAHoraStr(minuto),
-            fechaIso: buildFechaIso(fecha, minuto),
+            // Usar fecha wall-clock del instante para alinear ocupación y grilla.
+            fecha: wall?.fecha || fecha,
+            hora: minutosAHoraStr(wall?.startMin ?? minuto),
+            fechaIso,
           });
         } catch {
           // Fecha inválida: se omite el slot
@@ -615,16 +629,21 @@ function asignarSlotAPartido(
   duracionMinutos: number,
   parejaIdsExtra?: string[],
 ): void {
-  const key = slotKey(slot.canchaLabel, slot.fecha, slot.hora);
+  const wall =
+    parseFechaPartidoIso(slot.fechaIso) || {
+      fecha: slot.fecha,
+      startMin: parseHoraAMinutos(slot.hora),
+    };
+  const hora = minutosAHoraStr(wall.startMin);
+  const key = slotKey(slot.canchaLabel, wall.fecha, hora);
   ocupados.add(key);
   partido.cancha_asignada = slot.canchaLabel;
   partido.fecha_partido = slot.fechaIso;
 
-  const startMin = parseHoraAMinutos(slot.hora);
   const ids = [
     ...new Set([...equiposDePartido(partido), ...(parejaIdsExtra || [])]),
   ];
-  registrarBusyParejas(historial, ids, slot.fecha, startMin, duracionMinutos);
+  registrarBusyParejas(historial, ids, wall.fecha, wall.startMin, duracionMinutos);
 }
 
 /**
@@ -639,10 +658,24 @@ function buscarOlaSimultanea(
   duracionMinutos: number,
   descansoMinutos?: number,
   descansoModo?: ModoDescanso,
+  notBefore: { fecha: string; startMin: number }[] = [],
 ): SlotProgramacion[] | null {
   const momentos = agruparSlotsPorMomento(slots);
 
   for (const momento of momentos) {
+    let tooEarly = false;
+    for (const nb of notBefore) {
+      if (momento.fecha < nb.fecha) {
+        tooEarly = true;
+        break;
+      }
+      if (momento.fecha === nb.fecha && momento.startMin < nb.startMin) {
+        tooEarly = true;
+        break;
+      }
+    }
+    if (tooEarly) continue;
+
     if (
       !parejasPueden(
         historial,
@@ -657,9 +690,16 @@ function buscarOlaSimultanea(
       continue;
     }
 
-    const libres = momento.slots.filter(
-      (s) => !ocupados.has(slotKey(s.canchaLabel, s.fecha, s.hora)),
-    );
+    const libres = momento.slots.filter((s) => {
+      const wall =
+        parseFechaPartidoIso(s.fechaIso) || {
+          fecha: s.fecha,
+          startMin: parseHoraAMinutos(s.hora),
+        };
+      return !ocupados.has(
+        slotKey(s.canchaLabel, wall.fecha, minutosAHoraStr(wall.startMin)),
+      );
+    });
     if (libres.length < cantidad) continue;
     return libres.slice(0, cantidad);
   }
@@ -678,16 +718,25 @@ function buscarSlotIndividual(
   descansoModo?: ModoDescanso,
 ): SlotProgramacion | null {
   for (const slot of slots) {
-    const key = slotKey(slot.canchaLabel, slot.fecha, slot.hora);
+    const wall =
+      parseFechaPartidoIso(slot.fechaIso) || {
+        fecha: slot.fecha,
+        startMin: parseHoraAMinutos(slot.hora),
+      };
+    const key = slotKey(
+      slot.canchaLabel,
+      wall.fecha,
+      minutosAHoraStr(wall.startMin),
+    );
     if (ocupados.has(key)) continue;
-    const startMin = parseHoraAMinutos(slot.hora);
+    const startMin = wall.startMin;
     let tooEarly = false;
     for (const nb of notBefore) {
-      if (slot.fecha < nb.fecha) {
+      if (wall.fecha < nb.fecha) {
         tooEarly = true;
         break;
       }
-      if (slot.fecha === nb.fecha && startMin < nb.startMin) {
+      if (wall.fecha === nb.fecha && startMin < nb.startMin) {
         tooEarly = true;
         break;
       }
@@ -697,7 +746,7 @@ function buscarSlotIndividual(
       !parejasPueden(
         historial,
         parejaIds,
-        slot.fecha,
+        wall.fecha,
         startMin,
         duracionMinutos,
         descansoMinutos,
@@ -829,6 +878,25 @@ export function buildOcupadosDesdePartidos(
  * - descanso FAP (1 h tras fin estimado; 4 h / 6 h si 3 partidos el mismo día)
  * - zona de 4: oleadas simultáneas (1vs4+2vs3, luego GvsG+PvsP)
  */
+/** Fin estimado (wall-clock) de partidos ya asignados, para notBefore de fases posteriores. */
+export function finWallClockTrasPartidos(
+  partidos: PartidoProgramable[],
+  duracionMinutos: number,
+): { fecha: string; startMin: number }[] {
+  const duracion = Math.max(30, duracionMinutos || 75);
+  const out: { fecha: string; startMin: number }[] = [];
+  for (const p of partidos) {
+    if (!p.fecha_partido) continue;
+    const parsed = parseFechaPartidoIso(String(p.fecha_partido));
+    if (!parsed) continue;
+    out.push({
+      fecha: parsed.fecha,
+      startMin: parsed.startMin + duracion,
+    });
+  }
+  return out;
+}
+
 export function asignarHorariosAPartidos(
   partidos: PartidoProgramable[],
   slots: SlotProgramacion[],
@@ -845,6 +913,8 @@ export function asignarHorariosAPartidos(
      */
     permitirSinEquipos?: boolean;
     distribucion?: DistribucionProgramacion;
+    /** No asignar antes de estos instantes (p. ej. fin de todas las zonas). */
+    notBeforeExtra?: { fecha: string; startMin: number }[];
   },
 ): void {
   if (!slots.length || !partidos.length) return;
@@ -854,6 +924,7 @@ export function asignarHorariosAPartidos(
   const descansoModo = opciones?.descansoModo;
   const feedersByMatchNo = opciones?.feedersByMatchNo || new Map();
   const permitirSinEquipos = opciones?.permitirSinEquipos === true;
+  const notBeforeExtra = opciones?.notBeforeExtra || [];
   const ocupados = new Set(ocupadosIniciales || []);
   const historial = new Map<string, PartidoParejaHistorial[]>();
 
@@ -933,11 +1004,21 @@ export function asignarHorariosAPartidos(
     );
 
     const tbd = ordenados.filter((i) => esPendienteZona(i.partido));
+    const definidos = ordenados.filter((i) => !esPendienteZona(i.partido));
 
-    // Zona de 4 FAP: ola 1 (los 2 primeros partidos) y ola 2 (los 2 siguientes) simultáneas
+    // Zona de 4 FAP: ola 1 = partidos base; ola 2 = ganadores/perdedores (TBD).
+    // Si ya no quedan pendientes, se usa el orden correlativo (#1/#2 luego #3/#4).
     const esZonaCuatro = ordenados.length === 4;
-    const ola1 = esZonaCuatro ? ordenados.slice(0, 2) : [];
-    const ola2 = esZonaCuatro ? ordenados.slice(2, 4) : [];
+    const ola1 = esZonaCuatro
+      ? tbd.length >= 2 && definidos.length >= 2
+        ? definidos.slice(0, 2)
+        : ordenados.slice(0, 2)
+      : [];
+    const ola2 = esZonaCuatro
+      ? tbd.length >= 2 && definidos.length >= 2
+        ? tbd.slice(0, 2)
+        : ordenados.slice(2, 4)
+      : [];
 
     if (esZonaCuatro) {
       const idsOla1 = [
@@ -953,6 +1034,7 @@ export function asignarHorariosAPartidos(
         descansoMinutos,
         descansoModo,
       );
+      const notBeforeOla2: { fecha: string; startMin: number }[] = [];
       if (slotsOla1) {
         ola1.forEach((item, idx) => {
           asignarSlotAPartido(
@@ -963,9 +1045,21 @@ export function asignarHorariosAPartidos(
             duracionMinutos,
           );
         });
+        for (const s of slotsOla1) {
+          const wall =
+            parseFechaPartidoIso(s.fechaIso) || {
+              fecha: s.fecha,
+              startMin: parseHoraAMinutos(s.hora),
+            };
+          const finOla = wall.startMin + duracionMinutos;
+          notBeforeOla2.push({
+            fecha: wall.fecha,
+            startMin: finOla,
+          });
+        }
       }
 
-      // Ola 2: todas las parejas de la zona juegan (G vs G y P vs P)
+      // Ola 2: todas las parejas de la zona juegan (G vs G y P vs P), después de la ola 1.
       const idsOla2 = parejasZona.length ? parejasZona : idsOla1;
       const slotsOla2 = buscarOlaSimultanea(
         2,
@@ -976,6 +1070,7 @@ export function asignarHorariosAPartidos(
         duracionMinutos,
         descansoMinutos,
         descansoModo,
+        notBeforeOla2,
       );
       if (slotsOla2) {
         ola2.forEach((item, idx) => {
@@ -1047,17 +1142,29 @@ export function asignarHorariosAPartidos(
     return (a.partido.orden || 0) - (b.partido.orden || 0);
   });
 
+  // La llave no puede empezar antes de que terminen las zonas del mismo lote.
+  const notBeforeTrasZonas = [
+    ...notBeforeExtra,
+    ...finWallClockTrasPartidos(
+      partidos.filter((p) => esRondaZona(p.ronda)),
+      duracionMinutos,
+    ),
+  ];
+
   for (const item of restoOrdenado) {
     if (partidos[item.index].fecha_partido) continue;
     const ids = equiposDePartido(item.partido);
-    const notBefore = notBeforeDesdeFeeders(
-      item.partido,
-      partidos,
-      feedersByMatchNo,
-      duracionMinutos,
-      descansoMinutos,
-      descansoModo,
-    );
+    const notBefore = [
+      ...notBeforeTrasZonas,
+      ...notBeforeDesdeFeeders(
+        item.partido,
+        partidos,
+        feedersByMatchNo,
+        duracionMinutos,
+        descansoMinutos,
+        descansoModo,
+      ),
+    ];
     const slot = buscarSlotIndividual(
       slots,
       ocupados,
@@ -1506,7 +1613,8 @@ export function evaluateProgramacionIssues(
       if (
         String(other.cancha_asignada) === String(p.cancha_asignada) &&
         op.fecha === parsed.fecha &&
-        op.startMin === parsed.startMin
+        op.startMin < parsed.startMin + duracion &&
+        parsed.startMin < op.startMin + duracion
       ) {
         issues.push({
           partido_id: id,

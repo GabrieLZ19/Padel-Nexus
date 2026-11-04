@@ -10,6 +10,7 @@ import {
   cargarContextoProgramacion,
   duracionParaFase,
   evaluateProgramacionIssues,
+  finWallClockTrasPartidos,
   generarSlotsDesdeSedesYVentana,
   minutosAHoraStrPublic,
   parseFechaPartidoIsoPublic,
@@ -500,7 +501,7 @@ export class ProgramacionService {
       supabaseAdmin
         .from("torneos")
         .select(
-          "id, nombre, programacion_estado, programacion_publicada_en, duracion_partido_minutos, estado",
+          "id, nombre, programacion_estado, programacion_publicada_en, duracion_partido_minutos, descanso_modo, estado",
         )
         .eq("id", torneoId)
         .maybeSingle(),
@@ -565,7 +566,9 @@ export class ProgramacionService {
       Number(torneo.duracion_partido_minutos || contexto.duracionMinutos || 90);
     const descansoModo = esModoDescanso(opciones.descansoModo)
       ? opciones.descansoModo
-      : undefined;
+      : esModoDescanso(torneo.descanso_modo)
+        ? torneo.descanso_modo
+        : undefined;
     const descanso = descansoModo
       ? minutosDeModoDescanso(descansoModo)
       : (opciones.descansoMinutos ?? 60);
@@ -576,14 +579,14 @@ export class ProgramacionService {
       canchas: contexto.disponibilidad,
       dias,
       duracionMinutos: duracion,
+      // Solo override global si el cliente lo manda explícito; si no, cada día usa su franja/disponibilidad.
       horaInicioMin: minutosDesdeHora(opciones.horaInicio) ?? undefined,
       horaFinMin: (() => {
-        const inicio = minutosDesdeHora(opciones.horaInicio) ?? 8 * 60;
         let fin = minutosDesdeHora(opciones.horaFin);
-        if (fin != null && fin <= inicio) {
-          fin += 1440;
-        }
-        return fin ?? undefined;
+        if (fin == null) return undefined;
+        const inicio = minutosDesdeHora(opciones.horaInicio) ?? 8 * 60;
+        if (fin <= inicio) fin += 1440;
+        return fin;
       })(),
       franjasPorDia: opciones.franjasPorDia,
     });
@@ -677,20 +680,24 @@ export class ProgramacionService {
     const franjasPorDiaMap: Record<string, { inicio: string; fin: string }> = {};
     for (const f of dias) {
       const franjaOpt = opciones.franjasPorDia?.[f];
-      if (franjaOpt?.inicio || franjaOpt?.fin !== undefined) {
-        franjasPorDiaMap[f] = {
-          inicio: franjaOpt.inicio || opciones.horaInicio || "08:00",
-          fin: franjaOpt.fin !== undefined ? franjaOpt.fin : (opciones.horaFin || ""),
-        };
-      } else {
-        const d = contexto.disponibilidad.find((c) => c.fecha === f);
-        if (d?.hora_inicio || d?.hora_fin) {
-          franjasPorDiaMap[f] = {
-            inicio: d.hora_inicio ? d.hora_inicio.slice(0, 5) : (opciones.horaInicio || "08:00"),
-            fin: d.hora_fin ? (d.hora_fin.startsWith("23:59") || d.hora_fin.startsWith("00:00") ? "00:00" : d.hora_fin.slice(0, 5)) : (opciones.horaFin || ""),
-          };
-        }
-      }
+      const d = contexto.disponibilidad.find((c) => c.fecha === f);
+      const inicioDisp = d?.hora_inicio ? d.hora_inicio.slice(0, 5) : "";
+      const finDisp = d?.hora_fin
+        ? d.hora_fin.startsWith("23:59") || d.hora_fin.startsWith("00:00")
+          ? "00:00"
+          : d.hora_fin.slice(0, 5)
+        : "";
+      franjasPorDiaMap[f] = {
+        inicio:
+          franjaOpt?.inicio ||
+          inicioDisp ||
+          opciones.horaInicio ||
+          "08:00",
+        fin:
+          franjaOpt?.fin !== undefined && franjaOpt?.fin !== ""
+            ? franjaOpt.fin
+            : finDisp || opciones.horaFin || "",
+      };
     }
 
     return {
@@ -702,7 +709,9 @@ export class ProgramacionService {
       programacion_publicada_en: torneo.programacion_publicada_en || null,
       duracion_partido_minutos: duracion,
       descanso_minutos: descanso,
-      descanso_modo: descansoModo || "tras_fin_60",
+      descanso_modo: (descansoModo ||
+        (esModoDescanso(torneo.descanso_modo) ? torneo.descanso_modo : null) ||
+        "tras_fin_60") as ModoDescanso,
       sugerencia: sugerirCanchasYHoras({
         partidos: partidos.length,
         duracionMinutos: duracion,
@@ -1083,7 +1092,7 @@ export class ProgramacionService {
   ): Promise<ProgramacionBoard> {
     const { data: torneo } = await supabaseAdmin
       .from("torneos")
-      .select("id, programacion_estado, duracion_partido_minutos")
+      .select("id, programacion_estado, duracion_partido_minutos, descanso_modo")
       .eq("id", torneoId)
       .maybeSingle();
     if (!torneo) throw new Error("Torneo no encontrado");
@@ -1100,11 +1109,21 @@ export class ProgramacionService {
     const duracion =
       opciones.duracionMinutos ||
       Number(torneo.duracion_partido_minutos || 90);
+    const descansoPersistido = esModoDescanso(opciones.descansoModo)
+      ? opciones.descansoModo
+      : undefined;
 
+    const torneoUpdate: Record<string, unknown> = {};
     if (opciones.duracionMinutos) {
+      torneoUpdate.duracion_partido_minutos = duracion;
+    }
+    if (descansoPersistido) {
+      torneoUpdate.descanso_modo = descansoPersistido;
+    }
+    if (Object.keys(torneoUpdate).length > 0) {
       await supabaseAdmin
         .from("torneos")
-        .update({ duracion_partido_minutos: duracion })
+        .update(torneoUpdate)
         .eq("id", torneoId);
     }
 
@@ -1163,7 +1182,9 @@ export class ProgramacionService {
 
     const descansoModo = esModoDescanso(opciones.descansoModo)
       ? opciones.descansoModo
-      : undefined;
+      : esModoDescanso(torneo.descanso_modo)
+        ? torneo.descanso_modo
+        : undefined;
     const descansoMinutos = descansoModo
       ? minutosDeModoDescanso(descansoModo)
       : (opciones.descansoMinutos ?? 60);
@@ -1323,6 +1344,11 @@ export class ProgramacionService {
             (d) => esRondaCampeonato(d.ronda),
           );
 
+          const notBeforeTrasZonas = finWallClockTrasPartidos(
+            zonasDrafts,
+            dur,
+          );
+
           // 1. Rondas previas de llave (16avos, Octavos, Cuartos) en días previos (ej. Sábado)
           if (rondasPrevias.length) {
             const slotsPrevios = allSlotsLlave.filter(
@@ -1338,6 +1364,7 @@ export class ProgramacionService {
                 descansoModo,
                 feedersByMatchNo: feeders,
                 permitirSinEquipos: true,
+                notBeforeExtra: notBeforeTrasZonas,
               },
             );
 
@@ -1364,6 +1391,7 @@ export class ProgramacionService {
                 descansoModo,
                 feedersByMatchNo: feeders,
                 permitirSinEquipos: true,
+                notBeforeExtra: notBeforeTrasZonas,
               },
             );
 
@@ -1386,6 +1414,7 @@ export class ProgramacionService {
                   descansoModo,
                   feedersByMatchNo: feeders,
                   permitirSinEquipos: true,
+                  notBeforeExtra: notBeforeTrasZonas,
                 },
               );
             }
@@ -1401,6 +1430,7 @@ export class ProgramacionService {
               descansoModo,
               feedersByMatchNo: feeders,
               permitirSinEquipos: true,
+              notBeforeExtra: finWallClockTrasPartidos(zonasDrafts, dur),
             },
           );
         }
@@ -1502,9 +1532,18 @@ export class ProgramacionService {
       }
     }
 
+    const borradorUpdate: Record<string, unknown> = {
+      programacion_estado: "borrador",
+    };
+    if (opciones.duracionMinutos) {
+      borradorUpdate.duracion_partido_minutos = opciones.duracionMinutos;
+    }
+    if (esModoDescanso(opciones.descansoModo)) {
+      borradorUpdate.descanso_modo = opciones.descansoModo;
+    }
     const { error } = await supabaseAdmin
       .from("torneos")
-      .update({ programacion_estado: "borrador" })
+      .update(borradorUpdate)
       .eq("id", torneoId);
     if (error) throw new Error(error.message);
 
@@ -1515,6 +1554,7 @@ export class ProgramacionService {
         entidad_afectada: torneoId,
         detalles: {
           motivo: opciones.motivo?.trim() || "Guardar borrador de programación",
+          descanso_modo: opciones.descansoModo || null,
         },
       });
     }

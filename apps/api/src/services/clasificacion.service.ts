@@ -524,6 +524,18 @@ export class ClasificacionService {
         ? "Sorteo digital reglamentario en sistema FAP"
         : "Sorteo presencial en mesa de control");
 
+    const { data: prevRows } = await supabaseAdmin
+      .from("grupo_parejas")
+      .select("inscripcion_id, sorteo_posicion, sorteo_motivo")
+      .eq("grupo_id", grupo.id)
+      .in(
+        "inscripcion_id",
+        resoluciones.map((r) => r.inscripcionId),
+      );
+    const prevById = new Map(
+      (prevRows || []).map((row) => [String(row.inscripcion_id), row]),
+    );
+
     for (const res of resoluciones) {
       const { error: errUpd } = await supabaseAdmin
         .from("grupo_parejas")
@@ -543,11 +555,25 @@ export class ClasificacionService {
       }
     }
 
-    // Registrar en logs_auditoria para trazabilidad estricta
-    await supabaseAdmin.from("logs_auditoria").insert({
+    const valorAnterior = resoluciones.map((r) => {
+      const prev = prevById.get(String(r.inscripcionId));
+      return {
+        inscripcionId: r.inscripcionId,
+        posicion: prev?.sorteo_posicion ?? null,
+        motivo: prev?.sorteo_motivo ?? null,
+      };
+    });
+    const valorNuevo = resoluciones.map((r) => ({
+      inscripcionId: r.inscripcionId,
+      posicion: r.posicion,
+      motivo: motivoFinal,
+    }));
+
+    // entidad_afectada = torneoId para que el tab Auditoría del torneo lo liste.
+    const { error: errAudit } = await supabaseAdmin.from("logs_auditoria").insert({
       usuario_id_admin: usuarioId || null,
       accion: "RESOLUCION_SORTEO_ZONA",
-      entidad_afectada: "grupo_parejas",
+      entidad_afectada: torneoId,
       detalles: {
         torneo_id: torneoId,
         nombre_grupo: nombreZona,
@@ -555,9 +581,17 @@ export class ClasificacionService {
         metodo,
         motivo: motivoFinal,
         resoluciones,
+        valor_anterior: valorAnterior,
+        valor_nuevo: valorNuevo,
         timestamp: appliedAt,
       },
     });
+    if (errAudit) {
+      console.error(
+        "[ClasificacionService] No se pudo auditar resolución de sorteo:",
+        errAudit.message,
+      );
+    }
 
     // Intentar sincronizar clasificados a llave de playoff
     try {
@@ -677,11 +711,11 @@ export class ClasificacionService {
 
     await Promise.allSettled(promesas);
 
-    // Registro de auditoría
-    await supabaseAdmin.from("logs_auditoria").insert({
+    // entidad_afectada = torneoId para que aparezca en el tab Auditoría del torneo.
+    const { error: errAudit } = await supabaseAdmin.from("logs_auditoria").insert({
       usuario_id_admin: usuarioIdAdmin || null,
       accion: "NOTIFICAR_SORTEO_ZONA",
-      entidad_afectada: "grupo_parejas",
+      entidad_afectada: torneoId,
       detalles: {
         torneo_id: torneoId,
         nombre_grupo: nombreZona,
@@ -690,9 +724,22 @@ export class ClasificacionService {
         mensaje: payload.mensaje,
         total_destinatarios: destinatarios.length,
         destinatarios: destinatarios.map((d) => d.usuarioId),
+        valor_anterior: null,
+        valor_nuevo: {
+          fecha_hora: payload.fechaHora,
+          mensaje: payload.mensaje || null,
+          total_destinatarios: destinatarios.length,
+        },
+        motivo: "Aviso de sorteo reglamentario a parejas empatadas",
         timestamp: new Date().toISOString(),
       },
     });
+    if (errAudit) {
+      console.error(
+        "[ClasificacionService] No se pudo auditar notificación de sorteo:",
+        errAudit.message,
+      );
+    }
 
     return {
       exito: true,
