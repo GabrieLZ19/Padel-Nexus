@@ -35,6 +35,7 @@ interface ReservaUsuario {
   fecha_reserva: string;
   estado_pago: string;
   estado_reserva: string;
+  motivo_cancelacion?: string | null;
   created_at: string;
   turnos: {
     id: string;
@@ -144,11 +145,14 @@ export default function MisReservasPage() {
     return dia.getTime() >= Date.now();
   };
 
-  const reservasProximas = reservas.filter((reserva) =>
-    esTurnoProximo(reserva.fecha_reserva, reserva.turnos?.hora_inicio),
+  const reservasProximas = reservas.filter(
+    (reserva) =>
+      reserva.estado_reserva !== "cancelada" &&
+      esTurnoProximo(reserva.fecha_reserva, reserva.turnos?.hora_inicio),
   );
   const reservasPasadas = reservas.filter(
     (reserva) =>
+      reserva.estado_reserva === "cancelada" ||
       !esTurnoProximo(reserva.fecha_reserva, reserva.turnos?.hora_inicio),
   );
 
@@ -235,7 +239,7 @@ export default function MisReservasPage() {
           {(
             [
               { titulo: "Próximas", items: reservasProximas },
-              { titulo: "Pasadas", items: reservasPasadas },
+              { titulo: "Pasadas / Canceladas", items: reservasPasadas },
             ] as const
           ).map((grupo) => (
             <section key={grupo.titulo} className="space-y-4">
@@ -256,7 +260,8 @@ export default function MisReservasPage() {
             const isCancelled = reserva.estado_reserva === "cancelada";
 
             const isPaid = reserva.estado_pago === "completado";
-            const isPayPending = reserva.estado_pago === "pendiente";
+            const isPayPending =
+              !isCancelled && reserva.estado_pago === "pendiente";
 
             const activePayment =
               reserva.pagos && reserva.pagos.length > 0
@@ -264,6 +269,7 @@ export default function MisReservasPage() {
                 : null;
 
             const isWaitingValidation =
+              !isCancelled &&
               activePayment &&
               activePayment.metodo_pago === "transferencia" &&
               activePayment.estado === "pendiente";
@@ -335,6 +341,15 @@ export default function MisReservasPage() {
                       {reserva.estado_reserva}
                     </span>
                   </div>
+
+                  {isCancelled && reserva.motivo_cancelacion?.trim() && (
+                    <p className="text-xs text-gray-400 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+                      Motivo del club:{" "}
+                      <span className="text-white font-medium">
+                        {reserva.motivo_cancelacion.trim()}
+                      </span>
+                    </p>
+                  )}
 
                   <div className="border-t border-white/5 pt-3.5 grid grid-cols-2 gap-4 text-xs text-gray-300">
                     <div className="space-y-1">

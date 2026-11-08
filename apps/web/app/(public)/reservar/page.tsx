@@ -15,6 +15,8 @@ import {
 import { ClubesService } from "@/utils/services/clubes";
 import { clubesVisiblesEnReserva } from "@/utils/clubesReserva";
 import type { ClubCercano } from "@/utils/types/club.types";
+import CustomDropdown from "@/components/ui/CustomDropdown";
+import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
 
 // Leaflet se carga dinámicamente para evitar SSR issues
 import dynamic from "next/dynamic";
@@ -40,6 +42,12 @@ export default function ReservarPage() {
   const [geoError, setGeoError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filtroProvincia, setFiltroProvincia] = useState("");
+  const [filtroDistanciaKm, setFiltroDistanciaKm] = useState("");
+  const [filtroTipoSuelo, setFiltroTipoSuelo] = useState("");
+  const [filtroTechada, setFiltroTechada] = useState("");
+  const [filtroFecha, setFiltroFecha] = useState("");
+  const [filtroHora, setFiltroHora] = useState("");
 
   // Solicitar ubicación del usuario
   const requestLocation = useCallback(() => {
@@ -79,11 +87,20 @@ export default function ReservarPage() {
       if (userLocation) {
         params.lat = userLocation.lat;
         params.lng = userLocation.lng;
+      } else {
+        params.ordenar = "distancia";
       }
 
       if (search.trim()) {
         params.search = search.trim();
       }
+      if (filtroProvincia) params.provincia = filtroProvincia;
+      if (filtroDistanciaKm) params.max_distancia_km = filtroDistanciaKm;
+      if (filtroTipoSuelo) params.tipo_suelo = filtroTipoSuelo;
+      if (filtroTechada === "techada") params.techada = "1";
+      if (filtroTechada === "aire") params.techada = "0";
+      if (filtroFecha) params.fecha = filtroFecha;
+      if (filtroHora) params.hora = filtroHora;
 
       const res = await ClubesService.getAll(params);
       setClubes(
@@ -94,7 +111,16 @@ export default function ReservarPage() {
     } finally {
       setLoading(false);
     }
-  }, [userLocation, search]);
+  }, [
+    userLocation,
+    search,
+    filtroProvincia,
+    filtroDistanciaKm,
+    filtroTipoSuelo,
+    filtroTechada,
+    filtroFecha,
+    filtroHora,
+  ]);
 
   useEffect(() => {
     fetchClubes();
@@ -204,18 +230,109 @@ export default function ReservarPage() {
                     {userLocation.lng.toFixed(4)}
                   </div>
                   <p className="text-xs text-gray-400">
-                    Mostramos todos los clubes ordenados del más cercano al más
-                    lejano según tu ubicación.
+                    Ordenamos por distancia (km en cada tarjeta). Sin coordenadas
+                    del club usamos localidad y provincia.
                   </p>
                 </div>
               ) : (
                 <p className="text-xs text-gray-400">
-                  Activá tu ubicación para ordenar los clubes por cercanía.
+                  Activá tu ubicación para ver kilómetros y orden por cercanía.
                 </p>
               )}
               {geoError && (
                 <p className="text-xs text-yellow-400">{geoError}</p>
               )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-white/10">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                    Provincia
+                  </label>
+                  <CustomDropdown
+                    value={filtroProvincia}
+                    onChange={setFiltroProvincia}
+                    options={[
+                      { value: "", label: "Todas" },
+                      ...PROVINCIAS_ARG.map((p) => ({
+                        value: p.value,
+                        label: p.label,
+                      })),
+                    ]}
+                    placeholder="Provincia"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                    Distancia máxima (km)
+                  </label>
+                  <CustomDropdown
+                    value={filtroDistanciaKm}
+                    onChange={setFiltroDistanciaKm}
+                    options={[
+                      { value: "", label: "Sin límite" },
+                      { value: "10", label: "Hasta 10 km" },
+                      { value: "25", label: "Hasta 25 km" },
+                      { value: "50", label: "Hasta 50 km" },
+                      { value: "100", label: "Hasta 100 km" },
+                    ]}
+                    placeholder="Radio"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                    Tipo de cancha
+                  </label>
+                  <CustomDropdown
+                    value={filtroTipoSuelo}
+                    onChange={setFiltroTipoSuelo}
+                    options={[
+                      { value: "", label: "Cualquier piso" },
+                      { value: "Blindex", label: "Blindex" },
+                      { value: "Sintético", label: "Sintético" },
+                      { value: "Cemento", label: "Cemento" },
+                    ]}
+                    placeholder="Tipo de suelo"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                    Cobertura
+                  </label>
+                  <CustomDropdown
+                    value={filtroTechada}
+                    onChange={setFiltroTechada}
+                    options={[
+                      { value: "", label: "Techada o al aire libre" },
+                      { value: "techada", label: "Solo techada" },
+                      { value: "aire", label: "Solo al aire libre" },
+                    ]}
+                    placeholder="Techada"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                    Disponibilidad (fecha)
+                  </label>
+                  <input
+                    type="date"
+                    value={filtroFecha}
+                    onChange={(e) => setFiltroFecha(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[#111] border border-white/10 rounded-xl text-sm text-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                    Disponibilidad (hora)
+                  </label>
+                  <input
+                    type="time"
+                    value={filtroHora}
+                    onChange={(e) => setFiltroHora(e.target.value)}
+                    disabled={!filtroFecha}
+                    className="w-full px-3 py-2.5 bg-[#111] border border-white/10 rounded-xl text-sm text-white disabled:opacity-40"
+                  />
+                </div>
+              </div>
             </div>
           )}
         </div>

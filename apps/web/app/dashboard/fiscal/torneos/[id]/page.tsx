@@ -30,6 +30,7 @@ import {
   formatFechaCalendario,
   labelModalidad,
   nombreJugadorVisible,
+  textoJugadorVisible,
 } from "@/utils/formatFecha";
 import {
   agruparPartidosPorRonda,
@@ -437,8 +438,8 @@ function ParejaCruceInteractiva({
   j2Id?: string | null;
   onAbrirJugador: (id: string) => void;
 }) {
-  const nombre1 = nombreJugadorVisible(j1);
-  const nombre2 = nombreJugadorVisible(j2);
+  const nombre1 = textoJugadorVisible(j1);
+  const nombre2 = textoJugadorVisible(j2);
 
   if (!nombre1 && !nombre2) {
     return <span className="text-gray-500 italic text-xs">A confirmar</span>;

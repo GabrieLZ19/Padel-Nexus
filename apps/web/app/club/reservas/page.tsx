@@ -59,6 +59,7 @@ const ETIQUETA_PAGO: Record<string, string> = {
   pendiente: "Pago pendiente",
   completado: "Pagado",
   rechazado: "Pago rechazado",
+  cancelado: "Sin cobro",
 };
 
 export default function ClubReservasPage() {
@@ -129,10 +130,14 @@ export default function ClubReservasPage() {
       .catch(() => {});
   }, []);
 
-  const ejecutar = async (reservaId: string, accion: AccionReservaClub) => {
+  const ejecutar = async (
+    reservaId: string,
+    accion: AccionReservaClub,
+    motivo?: string,
+  ) => {
     setModal((prev) => ({ ...prev, isLoading: true }));
     try {
-      await ClubPanelService.gestionarReserva(reservaId, accion);
+      await ClubPanelService.gestionarReserva(reservaId, accion, motivo);
       setModal((prev) => ({ ...prev, isOpen: false, isLoading: false }));
       const titulos: Record<AccionReservaClub, string> = {
         confirmar: "Reserva confirmada",
@@ -188,8 +193,11 @@ export default function ClubReservasPage() {
       type: texto.type,
       confirmText: texto.confirmText,
       cancelText: "Volver",
+      showInput: accion === "cancelar",
+      inputLabel: "Motivo para el jugador",
+      inputPlaceholder: "Ej.: lluvia, mantenimiento de cancha, doble reserva…",
       onClose: () => setModal((prev) => ({ ...prev, isOpen: false })),
-      onConfirm: () => void ejecutar(reserva.id, accion),
+      onConfirm: (motivo) => void ejecutar(reserva.id, accion, motivo),
     });
   };
 

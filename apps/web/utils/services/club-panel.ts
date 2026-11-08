@@ -160,8 +160,14 @@ export class ClubPanelService {
   static async gestionarReserva(
     reservaId: string,
     accion: AccionReservaClub,
+    motivo?: string,
   ): Promise<void> {
-    await api.post(`/club/mi-club/reservas/${reservaId}/gestionar`, { accion });
+    await api.post(`/club/mi-club/reservas/${reservaId}/gestionar`, {
+      accion,
+      ...(accion === "cancelar" && motivo?.trim()
+        ? { motivo: motivo.trim() }
+        : {}),
+    });
   }
 
   static async getBloqueos(params?: {

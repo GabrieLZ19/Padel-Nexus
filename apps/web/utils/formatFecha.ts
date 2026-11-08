@@ -67,3 +67,9 @@ export function nombreJugadorVisible(nombre?: string | null): boolean {
   if (!n || n === "-") return false;
   return n.toLowerCase() !== "libre";
 }
+
+/** Texto a mostrar en UI/PDF; null si el nombre no debe mostrarse (libre, guión, vacío). */
+export function textoJugadorVisible(nombre?: string | null): string | null {
+  if (!nombreJugadorVisible(nombre)) return null;
+  return String(nombre).trim();
+}
