@@ -222,7 +222,9 @@ export class PartidoService {
   static async publicarPartidoAbierto(datos: PublicarPartidoDTO) {
     const faltantes = Number(datos.jugadoresFaltantes);
     if (!Number.isInteger(faltantes) || faltantes < 1 || faltantes > 3) {
-      throw new Error("jugadores_faltantes debe ser un entero entre 1 y 3.");
+      throw new Error(
+        "jugadores_faltantes debe ser un entero entre 1 y 3 (partido de 4 jugadores).",
+      );
     }
 
     if (!datos.nivelRequerido?.trim()) {

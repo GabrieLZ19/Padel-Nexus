@@ -43,6 +43,7 @@ import {
   type ConfigPuntosTorneo,
 } from "../utils/rankingTorneo";
 import { partidoYaTeniaResultado } from "../utils/auditoriaTorneo";
+import { registrarAuditoriaCambioParejaPartido } from "../utils/auditoriaOverridePareja";
 
 async function marcarDescalificacionesDeZona(
   torneoId: string,
@@ -2386,6 +2387,11 @@ export class TorneoService {
 
     if (error || !partido) throw new Error("Partido no encontrado");
 
+    const prevA = partido.equipo_a_id;
+    const prevB = partido.equipo_b_id;
+    let nextA: string | null = equipoAId;
+    let nextB: string | null = equipoBId;
+
     const { PromocionMenoresService } = await import(
       "./promocionMenores.service"
     );
@@ -2408,6 +2414,8 @@ export class TorneoService {
         })
         .eq("id", partidoId);
       if (updateZona) throw new Error(updateZona.message);
+      nextA = equipoAId;
+      nextB = equipoBId;
     } else {
     const parche = await PromocionMenoresService.editarLados(
       partido.torneo_id,
@@ -2438,20 +2446,25 @@ export class TorneoService {
       .eq("id", partidoId);
 
     if (updateError) throw new Error(updateError.message);
+    nextA = parche.equipoAId;
+    nextB = parche.equipoBId;
     }
 
-    // 3. Registrar en auditoría
-    await supabaseAdmin.from("logs_auditoria").insert({
-      usuario_id_admin: adminId,
-      accion: "override_rival_partido",
-      entidad_afectada: partido.torneo_id,
-      detalles: {
-        partido_id: partidoId,
+    await registrarAuditoriaCambioParejaPartido({
+      partido: {
+        id: partido.id,
+        torneo_id: partido.torneo_id,
         ronda: partido.ronda,
-        equipo_a_id: equipoAId,
-        equipo_b_id: equipoBId,
-        motivo: motivo,
+        orden: partido.orden,
+        equipo_a_id: prevA,
+        equipo_b_id: prevB,
       },
+      prevA,
+      prevB,
+      nextA,
+      nextB,
+      motivo,
+      adminId,
     });
   }
 

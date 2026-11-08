@@ -361,7 +361,7 @@ export class ReservaService {
           id, hora_inicio, hora_fin, precio, dia_semana,
           canchas (
             id, nombre, tipo_suelo, techada,
-            clubes ( id, nombre, provincia, localidad, cbu, alias, suscripcion_sin_comisiones, pago_transferencia_habilitado, pago_efectivo_habilitado )
+            clubes ( id, nombre, provincia, localidad, direccion, latitud, longitud, cbu, alias, suscripcion_sin_comisiones, pago_transferencia_habilitado, pago_efectivo_habilitado )
           )
         ),
         pagos (
@@ -396,7 +396,7 @@ export class ReservaService {
         id, usuario_id, estado_pago,
         turnos (
           canchas (
-            clubes ( id, nombre, provincia, localidad, cbu, alias, suscripcion_sin_comisiones, pago_transferencia_habilitado, pago_efectivo_habilitado )
+            clubes ( id, nombre, provincia, localidad, direccion, latitud, longitud, cbu, alias, suscripcion_sin_comisiones, pago_transferencia_habilitado, pago_efectivo_habilitado )
           )
         )
       `,
@@ -945,6 +945,9 @@ export class ReservaService {
               nombre,
               localidad,
               provincia,
+              direccion,
+              latitud,
+              longitud,
               horas_antelacion_cancelacion_jugador
             )
           )

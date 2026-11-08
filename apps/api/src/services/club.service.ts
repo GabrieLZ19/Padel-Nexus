@@ -1048,6 +1048,16 @@ export class ClubService {
 
     if (errorReservas) throw new Error(errorReservas.message);
 
+    const { data: bloqueos, error: errorBloqueos } = await supabaseAdmin
+      .from("bloqueos_disponibilidad")
+      .select("cancha_id, hora_inicio, hora_fin, motivo, tipo")
+      .eq("club_id", clubId)
+      .eq("activo", true)
+      .lte("fecha_inicio", fecha)
+      .gte("fecha_fin", fecha);
+
+    if (errorBloqueos) throw new Error(errorBloqueos.message);
+
     const precioPorTurno = new Map(
       (turnos || []).map((turno) => [turno.id, Number(turno.precio) || 0]),
     );
@@ -1070,7 +1080,12 @@ export class ClubService {
     return {
       fecha,
       canchas: listaCanchas,
-      filas: armarFilasAgenda(canchaIds, turnos || [], reservasAgenda),
+      filas: armarFilasAgenda(
+        canchaIds,
+        turnos || [],
+        reservasAgenda,
+        bloqueos || [],
+      ),
     };
   }
 

@@ -58,7 +58,7 @@ function formatNombreCompleto(
 }
 
 export class InscripcionService {
-  /** Licencia FAP en estado Activa (al menos una). */
+  /** Carnet federativo en estado Activa (al menos una licencia). */
   private static async assertLicenciaFapActiva(
     usuarioId: string,
     etiqueta: string,
@@ -72,7 +72,7 @@ export class InscripcionService {
 
     if (licError || !licencias || licencias.length === 0) {
       throw new Error(
-        `${etiqueta}: se requiere licencia FAP vigente y activa para este torneo.`,
+        `${etiqueta}: se requiere carnet federativo vigente para este torneo.`,
       );
     }
   }

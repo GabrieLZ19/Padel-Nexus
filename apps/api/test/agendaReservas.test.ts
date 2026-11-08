@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   armarFilasAgenda,
+  bloqueoQueAfectaTurno,
   esReservaAtrasada,
+  horariosSeSolapan,
 } from "../src/utils/agendaReservas.ts";
 
 describe("agenda de reservas del club", () => {
@@ -32,6 +34,53 @@ describe("agenda de reservas del club", () => {
     assert.equal(filas[0]?.celdas[1]?.turno_id, null);
     assert.equal(filas[1]?.hora_inicio, "18:00");
     assert.equal(filas[1]?.celdas[1]?.reserva?.jugador, "Pérez, Ana");
+  });
+
+  it("marca celda bloqueada cuando el turno cae en un bloqueo", () => {
+    const filas = armarFilasAgenda(
+      ["c1"],
+      [
+        { id: "t1", cancha_id: "c1", hora_inicio: "09:30:00", hora_fin: "11:00:00" },
+        { id: "t2", cancha_id: "c1", hora_inicio: "11:00:00", hora_fin: "12:30:00" },
+      ],
+      [],
+      [
+        {
+          cancha_id: "c1",
+          hora_inicio: "09:30:00",
+          hora_fin: "12:30:00",
+          motivo: "Mantenimiento",
+          tipo: "mantenimiento",
+        },
+      ],
+    );
+
+    assert.equal(filas[0]?.celdas[0]?.bloqueo?.motivo, "Mantenimiento");
+    assert.equal(filas[0]?.celdas[0]?.reserva, null);
+    assert.equal(filas[1]?.celdas[0]?.bloqueo?.motivo, "Mantenimiento");
+  });
+
+  it("horariosSeSolapan coincide con la lógica de disponibilidad", () => {
+    assert.equal(
+      horariosSeSolapan("09:30", "11:00", "09:30", "12:30"),
+      true,
+    );
+    assert.equal(
+      bloqueoQueAfectaTurno(
+        [
+          {
+            cancha_id: "c1",
+            hora_inicio: "09:30:00",
+            hora_fin: "12:30:00",
+            motivo: "Mantenimiento",
+          },
+        ],
+        "c1",
+        "11:00:00",
+        "12:30:00",
+      )?.motivo,
+      "Mantenimiento",
+    );
   });
 
   it("marca como atrasada una pendiente de un día anterior", () => {
