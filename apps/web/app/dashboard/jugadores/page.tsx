@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Search,
   ShieldCheck,
@@ -23,8 +24,13 @@ import { ConfigLicenciasPanel } from "@/components/licencias/ConfigLicenciasPane
 import { LicenciaJugadorCard } from "@/components/licencias/LicenciaJugadorCard";
 import { useProfileStore } from "@/store/useProfileStore";
 import { PAGE_SIZE_JUGADORES } from "@/utils/jugadoresListado";
+import JugadoresContactosPanel from "@/components/crm/JugadoresContactosPanel";
+import {
+  licenciaPreferidaListado,
+  licenciasComoArray,
+} from "@/utils/licenciasArray";
 
-type VistaJugadores = "jugadores" | "configuracion";
+type VistaJugadores = "jugadores" | "contactos" | "configuracion";
 type FiltroLicencia =
   | "Todas"
   | "Pendientes"
@@ -43,20 +49,9 @@ const FILTRO_A_ESTADO: Record<
   Suspendidas: "Suspendida",
 };
 
-const getDisplayLicencia = (licList?: Licencia[]) => {
-  if (!licList || licList.length === 0) return null;
-  const pending = licList.find((l) => l.estado === "Pendiente");
-  if (pending) return pending;
-  const active = licList.find((l) => l.estado === "Activa");
-  if (active) return active;
-  const vencida = licList.find((l) => l.estado === "Vencida");
-  if (vencida) return vencida;
-  return licList[0];
-};
-
 function contarPorEstado(items: Perfil[], estado: Licencia["estado"]) {
   return items.filter((j) =>
-    j.licencias?.some((l) => l.estado === estado),
+    licenciasComoArray(j.licencias).some((l) => l.estado === estado),
   ).length;
 }
 
@@ -67,7 +62,9 @@ function nombreJugadorListado(jugador: Perfil): string {
 }
 
 export default function JugadoresLicenciasPage() {
+  const searchParams = useSearchParams();
   const { profile } = useProfileStore();
+  const esSuperadmin = profile?.rol === "superadmin";
   const [licencias, setLicencias] = useState<Perfil[]>([]);
   const [clubes, setClubes] = useState<{ [id: string]: string }>({});
   const [total, setTotal] = useState<number>(0);
@@ -77,6 +74,12 @@ export default function JugadoresLicenciasPage() {
   const [search, setSearch] = useState<string>("");
   const [filtroActivo, setFiltroActivo] = useState<FiltroLicencia>("Todas");
   const [vista, setVista] = useState<VistaJugadores>("jugadores");
+
+  useEffect(() => {
+    if (searchParams.get("vista") === "contactos" && esSuperadmin) {
+      setVista("contactos");
+    }
+  }, [searchParams, esSuperadmin]);
   const [contextoConfig, setContextoConfig] =
     useState<LicenciaConfigData | null>(null);
 
@@ -369,54 +372,74 @@ export default function JugadoresLicenciasPage() {
             </div>
           </div>
         </div>
-        <div className="relative w-full shrink-0 xl:w-72">
-          <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-500" />
-          <input
-            type="text"
-            placeholder="Buscar por nombre, apellido, DNI, email o N° licencia..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            className="h-9 w-full rounded-lg border border-white/5 bg-brand-input pl-9 pr-3 text-xs text-white placeholder-gray-500 focus:border-brand-chartreuse/50 focus:outline-none"
-          />
-        </div>
+        {vista !== "contactos" ? (
+          <div className="relative w-full shrink-0 xl:w-72">
+            <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre, apellido, DNI, email o N° licencia..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="h-9 w-full rounded-lg border border-white/5 bg-brand-input pl-9 pr-3 text-xs text-white placeholder-gray-500 focus:border-brand-chartreuse/50 focus:outline-none"
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2.5 xl:h-9 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 xl:pb-0 scrollbar-none w-full xl:w-auto xl:flex-1">
-          {(
-            [
-              { filtro: "Todas" as FiltroLicencia, label: "Total", value: totalJugadores, color: "text-white" },
-              { filtro: "Pendientes" as FiltroLicencia, label: "Pendientes", value: pendientes, color: "text-yellow-400" },
-              { filtro: "Vigentes" as FiltroLicencia, label: "Vigentes", value: vigentes, color: "text-green-400" },
-              { filtro: "Vencidas" as FiltroLicencia, label: "Vencidas", value: vencidas, color: "text-red-400" },
-              { filtro: "Suspendidas" as FiltroLicencia, label: "Suspendidas", value: suspendidas, color: "text-orange-300" },
-            ] as const
-          ).map((stat) => (
+        {vista === "jugadores" ? (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 xl:pb-0 scrollbar-none w-full xl:w-auto xl:flex-1">
+            {(
+              [
+                { filtro: "Todas" as FiltroLicencia, label: "Total", value: totalJugadores, color: "text-white" },
+                { filtro: "Pendientes" as FiltroLicencia, label: "Pendientes", value: pendientes, color: "text-yellow-400" },
+                { filtro: "Vigentes" as FiltroLicencia, label: "Vigentes", value: vigentes, color: "text-green-400" },
+                { filtro: "Vencidas" as FiltroLicencia, label: "Vencidas", value: vencidas, color: "text-red-400" },
+                { filtro: "Suspendidas" as FiltroLicencia, label: "Suspendidas", value: suspendidas, color: "text-orange-300" },
+              ] as const
+            ).map((stat) => (
+              <button
+                key={stat.filtro}
+                type="button"
+                onClick={() => {
+                  setFiltroActivo(stat.filtro);
+                  setPage(1);
+                  setVista("jugadores");
+                }}
+                className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs whitespace-nowrap transition-colors cursor-pointer ${
+                  filtroActivo === stat.filtro && vista === "jugadores"
+                    ? "border-brand-chartreuse/50 bg-brand-chartreuse/10 text-white"
+                    : "border-white/5 bg-[#111111] hover:border-white/15 text-gray-400"
+                }`}
+              >
+                <span>{stat.label}</span>
+                <span className={`font-black tabular-nums ${stat.color}`}>
+                  {stat.value}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex-1" />
+        )}
+        <div className="inline-flex h-8 shrink-0 items-center rounded-lg border border-white/5 bg-[#111111] p-0.5 self-start xl:self-auto">
+          {esSuperadmin ? (
             <button
-              key={stat.filtro}
               type="button"
-              onClick={() => {
-                setFiltroActivo(stat.filtro);
-                setPage(1);
-                setVista("jugadores");
-              }}
-              className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs whitespace-nowrap transition-colors cursor-pointer ${
-                filtroActivo === stat.filtro && vista === "jugadores"
-                  ? "border-brand-chartreuse/50 bg-brand-chartreuse/10 text-white"
-                  : "border-white/5 bg-[#111111] hover:border-white/15 text-gray-400"
+              onClick={() => setVista("contactos")}
+              className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold transition-colors cursor-pointer ${
+                vista === "contactos"
+                  ? "bg-brand-chartreuse text-brand-black"
+                  : "text-gray-400 hover:text-white"
               }`}
             >
-              <span>{stat.label}</span>
-              <span className={`font-black tabular-nums ${stat.color}`}>
-                {stat.value}
-              </span>
+              <Users className="size-3.5" />
+              Base de contactos
             </button>
-          ))}
-        </div>
-        <div className="inline-flex h-8 shrink-0 items-center rounded-lg border border-white/5 bg-[#111111] p-0.5 self-start xl:self-auto">
+          ) : null}
           <button
             type="button"
             onClick={() => setVista("jugadores")}
@@ -427,7 +450,7 @@ export default function JugadoresLicenciasPage() {
             }`}
           >
             <Users className="size-3.5" />
-            Jugadores
+            {esSuperadmin ? "Licencias" : "Jugadores"}
           </button>
           <button
             type="button"
@@ -444,7 +467,9 @@ export default function JugadoresLicenciasPage() {
         </div>
       </div>
 
-      {vista === "configuracion" ? (
+      {vista === "contactos" && esSuperadmin ? (
+        <JugadoresContactosPanel />
+      ) : vista === "configuracion" ? (
         <ConfigLicenciasPanel
           scope="contexto"
           variante="seccion"
@@ -467,7 +492,7 @@ export default function JugadoresLicenciasPage() {
               </p>
             ) : (
               licencias.map((jugador) => {
-                const licencia = getDisplayLicencia(jugador.licencias);
+                const licencia = licenciaPreferidaListado(jugador.licencias);
                 if (!licencia) return null;
                 return (
                   <LicenciaJugadorCard
@@ -538,7 +563,7 @@ export default function JugadoresLicenciasPage() {
                   </tr>
                 ) : (
                   licencias.map((jugador) => {
-                    const licencia = getDisplayLicencia(jugador.licencias);
+                    const licencia = licenciaPreferidaListado(jugador.licencias);
                     if (!licencia) return null;
                     return (
                       <LicenciaJugadorCard

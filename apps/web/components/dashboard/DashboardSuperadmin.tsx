@@ -31,12 +31,15 @@ const METRICAS_VACIAS: CrmMetricas = {
   asociaciones: 0,
   clubes: 0,
   jugadores: 0,
+  jugadores_con_licencia: 0,
   torneos_activos: 0,
   torneos_finalizados: 0,
   torneos_borrador: 0,
   inscripciones_total: 0,
+  inscripciones_confirmadas: 0,
   inscripciones_pagadas: 0,
   inscripciones_pendientes: 0,
+  inscripciones_rechazadas: 0,
   reservas_mes: 0,
   ventas_marketplace: 0,
   ventas_marketplace_count: 0,
@@ -62,6 +65,7 @@ interface RedItem {
   value: number;
   href: string;
   icon: LucideIcon;
+  hint?: string;
 }
 
 export default function DashboardSuperadmin() {
@@ -113,10 +117,11 @@ export default function DashboardSuperadmin() {
       icon: CanchaIcon as unknown as LucideIcon,
     },
     {
-      label: "Jugadores",
+      label: "Jugadores registrados",
       value: metricas.jugadores,
-      href: "/dashboard/jugadores",
+      href: "/dashboard/jugadores?vista=contactos",
       icon: Users,
+      hint: `${metricas.jugadores_con_licencia} con licencia`,
     },
   ];
 
@@ -147,8 +152,10 @@ export default function DashboardSuperadmin() {
   ];
 
   const inscripcionesDenominador = Math.max(metricas.inscripciones_total, 1);
-  const pctPagadas = percent(
-    metricas.inscripciones_pagadas,
+  const inscripcionesConfirmadas =
+    metricas.inscripciones_confirmadas || metricas.inscripciones_pagadas;
+  const pctConfirmadas = percent(
+    inscripcionesConfirmadas,
     inscripcionesDenominador,
   );
   const pctPendientes = percent(
@@ -228,6 +235,9 @@ export default function DashboardSuperadmin() {
                 {item.value}
               </p>
               <p className="text-sm text-gray-400 mt-1">{item.label}</p>
+              {item.hint ? (
+                <p className="text-[11px] text-gray-500 mt-1">{item.hint}</p>
+              ) : null}
             </button>
           ))}
         </div>
@@ -310,9 +320,11 @@ export default function DashboardSuperadmin() {
                   Inscripciones
                 </p>
                 <p className="text-5xl font-bold text-white tracking-tight">
-                  {metricas.inscripciones_total}
+                  {inscripcionesConfirmadas}
                 </p>
-                <p className="text-sm text-gray-400 mt-1">a torneos</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  confirmadas · {metricas.inscripciones_total} en total
+                </p>
               </div>
               <div className="size-12 rounded-xl bg-[#2a3614] border border-brand-chartreuse/15 flex items-center justify-center">
                 <ClipboardList className="size-6 text-brand-chartreuse stroke-[1.5]" />
@@ -323,20 +335,20 @@ export default function DashboardSuperadmin() {
               <div className="h-2.5 rounded-full bg-white/5 overflow-hidden flex">
                 <div
                   className="h-full bg-brand-chartreuse"
-                  style={{ width: `${pctPagadas}%` }}
+                  style={{ width: `${pctConfirmadas}%` }}
                 />
                 <div
                   className="h-full bg-amber-400"
                   style={{ width: `${pctPendientes}%` }}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-2xl bg-black/30 border border-white/5 px-3 py-3">
                   <p className="text-xl font-bold text-brand-chartreuse">
-                    {metricas.inscripciones_pagadas}
+                    {inscripcionesConfirmadas}
                   </p>
                   <p className="text-[11px] text-gray-400 font-medium mt-0.5">
-                    Pagadas
+                    Confirmadas
                   </p>
                 </div>
                 <div className="rounded-2xl bg-black/30 border border-white/5 px-3 py-3">
@@ -345,6 +357,14 @@ export default function DashboardSuperadmin() {
                   </p>
                   <p className="text-[11px] text-gray-400 font-medium mt-0.5">
                     Pendientes
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-black/30 border border-white/5 px-3 py-3">
+                  <p className="text-xl font-bold text-red-400">
+                    {metricas.inscripciones_rechazadas}
+                  </p>
+                  <p className="text-[11px] text-gray-400 font-medium mt-0.5">
+                    Rechazadas
                   </p>
                 </div>
               </div>

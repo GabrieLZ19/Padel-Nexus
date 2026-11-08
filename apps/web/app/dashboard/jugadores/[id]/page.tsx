@@ -22,10 +22,16 @@ import {
 import { Perfil } from "@/utils/types";
 import CredencialDigital from "@/components/perfil/CredencialDigital";
 import FeedbackModal from "@/components/ui/FeedbackModal";
+import { useProfileStore } from "@/store/useProfileStore";
+import { CrmContactosService } from "@/utils/services/crm-contactos";
+import { ContactoEtiquetasEditor } from "@/components/crm/ContactoEtiquetasEditor";
+import type { ComunicacionesEtiqueta } from "@/utils/types/comunicaciones.types";
+import { sileo } from "sileo";
 
 export default function PerfilJugadorAdminPage() {
   const { id } = useParams();
   const router = useRouter();
+  const esSuperadmin = useProfileStore((s) => s.profile?.rol === "superadmin");
 
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,6 +41,10 @@ export default function PerfilJugadorAdminPage() {
   const [activeLicenciaIndex, setActiveLicenciaIndex] = useState(0);
   const [confirmarSuspender, setConfirmarSuspender] = useState(false);
   const [confirmarBaja, setConfirmarBaja] = useState(false);
+  const [etiquetasCrm, setEtiquetasCrm] = useState<ComunicacionesEtiqueta[]>(
+    [],
+  );
+  const [guardandoEtiquetas, setGuardandoEtiquetas] = useState(false);
 
   const licenciasList = perfil?.licencias || [];
   const currentLicencia =
@@ -70,6 +80,7 @@ export default function PerfilJugadorAdminPage() {
         const data = await PerfilService.getById(id as string);
         if (isMounted) {
           setPerfil(data);
+          setEtiquetasCrm(data?.etiquetas_contacto ?? []);
         }
       } catch (error) {
         console.error("Error al cargar perfil:", error);
@@ -103,6 +114,33 @@ export default function PerfilJugadorAdminPage() {
       clearTimeout(defer);
     };
   }, [fetchPerfil]);
+
+  const guardarEtiquetasCrm = async (siguiente: ComunicacionesEtiqueta[]) => {
+    if (!perfil?.id) return;
+    const previo = etiquetasCrm;
+    setEtiquetasCrm(siguiente);
+    setGuardandoEtiquetas(true);
+    try {
+      const guardadas = await CrmContactosService.actualizarEtiquetas(
+        perfil.id,
+        siguiente,
+      );
+      setEtiquetasCrm(guardadas);
+      setPerfil((p) => (p ? { ...p, etiquetas_contacto: guardadas } : p));
+      sileo.success({
+        title: "Etiquetas guardadas",
+        description: "El segmento del contacto quedó actualizado.",
+      });
+    } catch {
+      setEtiquetasCrm(previo);
+      sileo.error({
+        title: "No se guardaron las etiquetas",
+        description: "Intentá de nuevo en unos segundos.",
+      });
+    } finally {
+      setGuardandoEtiquetas(false);
+    }
+  };
 
   // --- SKELETON LOADER ---
   if (loading) {
@@ -230,6 +268,18 @@ export default function PerfilJugadorAdminPage() {
           {/* Contacto y Licencia  */}
           <div className="bg-[#111111] p-5 rounded-2xl border border-white/5 shadow-inner h-full">
             <div className="space-y-4">
+              {esSuperadmin ? (
+                <div className="rounded-xl border border-white/5 bg-brand-black/40 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">
+                    Etiquetas CRM
+                  </p>
+                  <ContactoEtiquetasEditor
+                    valor={etiquetasCrm}
+                    disabled={guardandoEtiquetas}
+                    onChange={guardarEtiquetasCrm}
+                  />
+                </div>
+              ) : null}
               <div className="flex items-center justify-between">
                 <span className="text-gray-400 flex items-center gap-2 text-sm">
                   <User className="size-4" /> DNI

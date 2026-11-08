@@ -26,6 +26,7 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { leafletTileUrl, LEAFLET_TILE_ATTRIBUTION } from "@/utils/leafletTiles";
+import LicenciaClubPanel from "./LicenciaClubPanel";
 
 interface ClubModalProps {
   isOpen: boolean;
@@ -596,7 +597,7 @@ export default function ClubModal({
 
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
-                      Estado
+                      Estado operativo
                     </label>
                     <CustomDropdown
                       value={formData.estado}
@@ -608,6 +609,12 @@ export default function ClubModal({
                       haciaArriba={true}
                     />
                   </div>
+
+                  {editingId ? (
+                    <div className="md:col-span-2">
+                      <LicenciaClubPanel clubId={editingId} />
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* SECCIÓN: DATOS DE TRANSFERENCIA */}

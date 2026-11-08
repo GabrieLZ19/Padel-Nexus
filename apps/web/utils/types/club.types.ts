@@ -1,3 +1,9 @@
+export interface LicenciaClubResumenListado {
+  nro_licencia: string;
+  estado: string;
+  fecha_vencimiento?: string | null;
+}
+
 export interface Club {
   id: string;
   nombre: string;
@@ -27,6 +33,7 @@ export interface Club {
   horas_antelacion_cancelacion_jugador?: number;
   created_at?: string;
   torneos_count?: number; // Virtual
+  licencia_federativa?: LicenciaClubResumenListado | null;
 }
 
 export interface ClubCercano extends Club {

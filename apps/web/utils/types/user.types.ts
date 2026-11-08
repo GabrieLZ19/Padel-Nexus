@@ -71,6 +71,8 @@ export interface Perfil {
   cuenta_estado?: string | null;
   perfil_publico_habilitado?: boolean;
   marketing_opt_in?: boolean;
+  /** Segmentos CRM (superadmin): marketing | institucional */
+  etiquetas_contacto?: ("marketing" | "institucional")[];
 }
 
 export interface LogAuditoria {

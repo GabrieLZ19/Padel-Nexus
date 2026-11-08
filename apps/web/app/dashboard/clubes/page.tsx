@@ -284,17 +284,25 @@ export default function GestionClubesPage() {
                             : "bg-green-500"
                       }`}
                     ></span>
-                    <span
-                      className={`text-sm font-bold ${
-                        club.estado === "Pendiente"
-                          ? "text-orange-500"
-                          : club.estado === "Inactivo"
-                            ? "text-red-500"
-                            : "text-green-500"
-                      }`}
-                    >
-                      {club.estado || "Activo"}
-                    </span>
+                    <div className="text-right">
+                      <span
+                        className={`text-sm font-bold block ${
+                          club.estado === "Pendiente"
+                            ? "text-orange-500"
+                            : club.estado === "Inactivo"
+                              ? "text-red-500"
+                              : "text-green-500"
+                        }`}
+                      >
+                        {club.estado || "Activo"}
+                      </span>
+                      {club.licencia_federativa ? (
+                        <span className="text-[10px] text-gray-500 block mt-0.5">
+                          Lic. {club.licencia_federativa.nro_licencia} ·{" "}
+                          {club.licencia_federativa.estado}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                   <button
                     onClick={() => handleOpenEdit(club)}

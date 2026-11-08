@@ -12,6 +12,7 @@ import {
   LEAFLET_TILE_ATTRIBUTION,
 } from "@/utils/leafletTiles";
 import { geocodificarDireccion } from "@/utils/services/geocoding";
+import LicenciaClubPanel from "@/components/clubes/LicenciaClubPanel";
 
 export default function ClubConfiguracionPage() {
   const [club, setClub] = useState<Club | null>(null);
@@ -216,6 +217,8 @@ export default function ClubConfiguracionPage() {
           Gestioná los datos institucionales, información geográfica y credenciales de facturación de tu club
         </p>
       </div>
+
+      <LicenciaClubPanel clubId={club.id} puedeEditar={false} />
 
       <form onSubmit={handleSave} className="flex flex-col lg:flex-row gap-6 items-stretch">
         {/* Columna Izquierda — Datos y Facturación */}

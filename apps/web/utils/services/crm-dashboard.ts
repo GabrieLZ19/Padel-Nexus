@@ -5,12 +5,15 @@ export interface CrmMetricas {
   asociaciones: number;
   clubes: number;
   jugadores: number;
+  jugadores_con_licencia: number;
   torneos_activos: number;
   torneos_finalizados: number;
   torneos_borrador: number;
   inscripciones_total: number;
+  inscripciones_confirmadas: number;
   inscripciones_pagadas: number;
   inscripciones_pendientes: number;
+  inscripciones_rechazadas: number;
   reservas_mes: number;
   ventas_marketplace: number;
   ventas_marketplace_count: number;
