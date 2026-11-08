@@ -123,22 +123,39 @@ export function variantesCategoria(categoria: string): string[] {
   return [...new Set([categoria, ...conocidas])];
 }
 
+/** Apellido mínimo para figurar en ranking público (PUB-9). */
+export function apellidoValidoParaRanking(apellido?: string | null): boolean {
+  const ape = (apellido || "").trim();
+  if (ape.length < 2) return false;
+  return !/\d/.test(ape);
+}
+
 /**
  * Orden del ranking publicado:
  * 1. Puntos, de mayor a menor.
  * 2. Ante igualdad, apellido (A-Z, sin distinguir mayúsculas ni tildes).
  * 3. Si el apellido coincide, nombre con el mismo criterio.
+ * Quienes no tienen apellido cargado quedan detrás en el desempate (PUB-9).
  */
 export function compararPosicionRanking(
   a: { puntos: number; apellido?: string | null; nombre?: string | null },
   b: { puntos: number; apellido?: string | null; nombre?: string | null },
 ): number {
   if (a.puntos !== b.puntos) return b.puntos - a.puntos;
-  const apellido = (a.apellido || "").localeCompare(b.apellido || "", "es", {
-    sensitivity: "base",
-  });
+
+  const aTieneApellido = apellidoValidoParaRanking(a.apellido);
+  const bTieneApellido = apellidoValidoParaRanking(b.apellido);
+  if (aTieneApellido !== bTieneApellido) {
+    return aTieneApellido ? -1 : 1;
+  }
+
+  const apellido = (a.apellido || "").trim().localeCompare(
+    (b.apellido || "").trim(),
+    "es",
+    { sensitivity: "base" },
+  );
   if (apellido !== 0) return apellido;
-  return (a.nombre || "").localeCompare(b.nombre || "", "es", {
+  return (a.nombre || "").trim().localeCompare((b.nombre || "").trim(), "es", {
     sensitivity: "base",
   });
 }

@@ -4,6 +4,7 @@ import {
   CATEGORIAS_MENORES,
   CATEGORIAS_VETERANOS,
   categoriasPorTipoRanking,
+  apellidoValidoParaRanking,
   compararPosicionRanking,
   normalizarProvincia,
   normalizarRama,
@@ -222,7 +223,11 @@ export class RankingService {
     };
 
     let filas = (data as RowRanking[]) || [];
-    filas = filas.filter((jugador) => esVisibleEnSitioPublico(jugador.perfiles));
+    filas = filas.filter(
+      (jugador) =>
+        esVisibleEnSitioPublico(jugador.perfiles) &&
+        apellidoValidoParaRanking(jugador.perfiles?.apellido),
+    );
 
     // Filtro provincial insensible a acentos y mayusculas, aplicado en memoria.
     // Se resuelve UNICAMENTE contra `perfiles.lugar_residencia` (la provincia

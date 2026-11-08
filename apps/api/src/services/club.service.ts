@@ -334,6 +334,18 @@ export class ClubService {
     });
   }
 
+  /** Alineado con el listado público de /reservar (club activo, cancha activa). */
+  static async contadoresListadoReservaPublico(): Promise<{
+    clubes: number;
+    canchas: number;
+  }> {
+    const lista = await ClubService.listarTodosConDistancia();
+    return {
+      clubes: lista.length,
+      canchas: lista.reduce((sum, club) => sum + club.canchas, 0),
+    };
+  }
+
   static async filtrarClubesConDisponibilidad(
     clubes: ClubCercano[],
     filtros: FiltrosListadoClubesReserva,

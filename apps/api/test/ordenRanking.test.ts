@@ -31,6 +31,13 @@ describe("desempate del ranking", () => {
     assert.ok(compararPosicionRanking(arriba, abajo) < 0);
   });
 
+  it("sin apellido queda detrás en empate (PUB-9)", () => {
+    const lazo = { puntos: 45, apellido: "Lazo", nombre: "Gabriel" };
+    const sinApellido = { puntos: 45, apellido: "", nombre: "Gabriel" };
+    assert.ok(compararPosicionRanking(lazo, sinApellido) < 0);
+    assert.ok(compararPosicionRanking(sinApellido, lazo) > 0);
+  });
+
   it("trata 6ª y 6ta como la misma categoría", () => {
     assert.equal(claveCategoria("6ª"), claveCategoria("6ta"));
     assert.equal(claveCategoria("7ma"), claveCategoria("7ª"));

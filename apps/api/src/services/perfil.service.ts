@@ -184,6 +184,15 @@ export class PerfilService {
   ) {
     const capitalizarTexto = (texto?: string) => texto ? capitalizarNombre(texto) : undefined;
 
+    if (datos.apellido !== undefined) {
+      const apellidoTrim = datos.apellido.trim();
+      if (apellidoTrim.length < 2 || /\d/.test(apellidoTrim)) {
+        throw new Error(
+          "El apellido es obligatorio (mínimo 2 letras, sin números).",
+        );
+      }
+    }
+
     const nombreCapitalizado = capitalizarTexto(datos.nombre);
     const apellidoCapitalizado = capitalizarTexto(datos.apellido);
 

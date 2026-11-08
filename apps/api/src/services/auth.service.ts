@@ -83,7 +83,7 @@ export class AuthService {
       usuarioBase.cuenta_estado === "PENDING_PARENTAL_CONSENT"
     ) {
       throw new Error(
-        "Tu cuenta está pendiente de consentimiento parental. Tu madre, padre o tutor/a debe completar la autorización a través del enlace enviado por correo para habilitar el acceso.",
+        "Tu cuenta está pendiente de consentimiento parental. Pedile a tu madre, padre o tutor/a que abra el enlace que compartiste al registrarte y confirme el consentimiento. Hasta entonces no podés iniciar sesión.",
       );
     }
 
@@ -115,10 +115,19 @@ export class AuthService {
     const tycVersion = versiones.tyc?.version;
     const privVersion = versiones.privacidad?.version;
 
+    const apellidoTrim = (datos.apellido || "").trim();
+    if (apellidoTrim.length < 2 || /\d/.test(apellidoTrim)) {
+      throw new Error("El apellido es obligatorio (mínimo 2 letras, sin números).");
+    }
+    const nombreTrim = (datos.nombre || "").trim();
+    if (nombreTrim.length < 2) {
+      throw new Error("El nombre es obligatorio.");
+    }
+
     const capitalizarTexto = (texto: string) => capitalizarNombre(texto);
 
     const nombreCapitalizado = capitalizarTexto(datos.nombre);
-    const apellidoCapitalizado = capitalizarTexto(datos.apellido);
+    const apellidoCapitalizado = capitalizarTexto(apellidoTrim);
     const dniLimpio = String(datos.dni || "").replace(/[^\d]/g, "");
 
     const finalizarPostRegistro = async (userId: string) => {
@@ -312,7 +321,7 @@ export class AuthService {
     return {
       exito: true,
       mensaje: post.flags.es_menor
-        ? "Usuario registrado. Compartí el enlace de consentimiento parental con el responsable."
+        ? "Usuario registrado. Compartí el enlace de consentimiento parental con el responsable (no se envía solo por correo)."
         : "Usuario registrado. Verifique su correo electrónico para confirmar la cuenta.",
       data: {
         es_menor: post.flags.es_menor,
