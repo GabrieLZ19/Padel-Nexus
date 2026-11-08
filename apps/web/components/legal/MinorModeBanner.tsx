@@ -22,7 +22,7 @@ export function MinorModeBanner() {
           </p>
           <p className="mt-1 text-amber-100/80">
             {pendiente
-              ? "Tu cuenta está pendiente de consentimiento parental. Algunas funciones permanecen bloqueadas hasta que el responsable complete el enlace."
+              ? "Tu cuenta está pendiente de consentimiento parental. El responsable debe abrir el enlace que compartiste al registrarte (no se envía automáticamente por correo)."
               : "Esta cuenta tiene privacidad reforzada. Los datos identificatorios privados, la ubicación futura y la fotografía no se muestran públicamente."}
           </p>
           {pendiente ? null : (

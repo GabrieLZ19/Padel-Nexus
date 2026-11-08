@@ -8,6 +8,20 @@ Fuente: plan `qa_testeo_06-11_1f832d0d.plan.md` y PDF del informe.
 | PUB-4 | Hecho | Enlaces ranking -> /jugadores/:id; bloque ranking en ficha publica |
 | PUB-5 | Hecho | Club/asoc. sin promo marketplace a plataforma; backend + UI |
 
+## Fase D — detalles PUB
+
+| Código | Estado | Notas |
+|--------|--------|-------|
+| PUB-6 | Hecho | Servicio en checkout: sin Envío ni dirección; solo nombre y teléfono |
+| PUB-7 | Hecho | Alta servicio: lugar de prestación validado en paso 2 (form CRM) |
+| PUB-8 | Hecho | Chat flotante: margen inferior/derecho móvil; FAB compacto al scroll |
+| PUB-9 | Hecho | Ranking sin jugadores sin apellido; desempate; validación API registro/perfil |
+| PUB-10 | Hecho | Copy consentimiento: autorizaciones en cuenta menor; enlace no auto-mail |
+| PUB-11 | Hecho | notificaciones (ortografía); toasts sileo sin Title Case global |
+| PUB-12 | Hecho | metadata por ruta; plantilla «%s · Padel Nexus»; portada server shell |
+| PUB-13 | Hecho | Cifras portada: torneos = listado publico; clubes/canchas = listado reservar |
+| PUB-14 | Hecho | Visitante: sin GET /perfil/me; sin favoritos ni no-leídos sin cookie |
+
 ## Fase D — detalles TOR
 
 | Código | Estado | Notas |

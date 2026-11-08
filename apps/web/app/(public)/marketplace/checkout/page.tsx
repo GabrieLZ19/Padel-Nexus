@@ -18,6 +18,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { sileo } from "sileo";
+import { carritoRequiereEnvio } from "@/utils/marketplace/checkoutEnvio";
 
 function CheckoutContent() {
   const router = useRouter();
@@ -26,6 +27,7 @@ function CheckoutContent() {
   const ordenIdParams = searchParams.get("orden_id");
 
   const { items, totalPrecio, vaciarCarrito } = useCartStore();
+  const requiereEnvio = carritoRequiereEnvio(items);
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -50,10 +52,17 @@ function CheckoutContent() {
       return;
     }
 
-    if (!nombre || !direccion || !telefono) {
+    if (!nombre.trim() || !telefono.trim()) {
       sileo.error({
         title: "Error",
-        description: "Por favor completa los campos requeridos.",
+        description: "Completá nombre y teléfono de contacto.",
+      });
+      return;
+    }
+    if (requiereEnvio && !direccion.trim()) {
+      sileo.error({
+        title: "Error",
+        description: "Completá la dirección de entrega.",
       });
       return;
     }
@@ -68,7 +77,12 @@ function CheckoutContent() {
 
       const orden = await MarketplaceService.crearOrden({
         items: ordenItems,
-        datos_envio: { nombre, direccion, telefono, notas },
+        datos_envio: {
+          nombre: nombre.trim(),
+          telefono: telefono.trim(),
+          notas: notas.trim() || undefined,
+          ...(requiereEnvio ? { direccion: direccion.trim() } : {}),
+        },
       });
 
       // 2. Generar preferencia de MercadoPago
@@ -216,8 +230,16 @@ function CheckoutContent() {
           <div className="lg:col-span-7 space-y-6">
             <div className="bg-brand-card border border-brand-white/5 rounded-3xl p-6 md:p-8 space-y-6">
               <h2 className="text-lg font-bold flex items-center gap-2 border-b border-brand-white/5 pb-4">
-                <MapPin className="size-5 text-brand-chartreuse" />
-                <span>Datos del Destinatario y Envío</span>
+                {requiereEnvio ? (
+                  <MapPin className="size-5 text-brand-chartreuse" />
+                ) : (
+                  <User className="size-5 text-brand-chartreuse" />
+                )}
+                <span>
+                  {requiereEnvio
+                    ? "Datos del Destinatario y Envío"
+                    : "Datos de contacto"}
+                </span>
               </h2>
 
               <form onSubmit={handleProcederAlPago} className="space-y-4">
@@ -238,27 +260,33 @@ function CheckoutContent() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase">
-                      Dirección de Entrega *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        required
-                        placeholder="Av. Rivadavia 1234, 4to B"
-                        value={direccion}
-                        onChange={(e) => setDireccion(e.target.value)}
-                        className="w-full bg-brand-input border border-brand-white/10 rounded-xl pl-11 pr-4 py-3 text-sm focus:border-brand-chartreuse focus:outline-none transition-colors"
-                      />
-                      <MapPin className="absolute left-4 top-3.5 size-4 text-gray-500" />
+                <div
+                  className={`grid grid-cols-1 gap-4 ${
+                    requiereEnvio ? "sm:grid-cols-2" : ""
+                  }`}
+                >
+                  {requiereEnvio && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-400 uppercase">
+                        Dirección de entrega *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          placeholder="Av. Rivadavia 1234, 4to B"
+                          value={direccion}
+                          onChange={(e) => setDireccion(e.target.value)}
+                          className="w-full bg-brand-input border border-brand-white/10 rounded-xl pl-11 pr-4 py-3 text-sm focus:border-brand-chartreuse focus:outline-none transition-colors"
+                        />
+                        <MapPin className="absolute left-4 top-3.5 size-4 text-gray-500" />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase">
-                      Teléfono de Contacto *
+                      Teléfono de contacto *
                     </label>
                     <div className="relative">
                       <input
@@ -280,7 +308,11 @@ function CheckoutContent() {
                   </label>
                   <div className="relative">
                     <textarea
-                      placeholder="Indicaciones para el repartidor o detalles de reserva de clases..."
+                      placeholder={
+                        requiereEnvio
+                          ? "Indicaciones para el repartidor..."
+                          : "Detalles para coordinar la clase o el servicio..."
+                      }
                       rows={3}
                       value={notas}
                       onChange={(e) => setNotas(e.target.value)}
@@ -355,12 +387,14 @@ function CheckoutContent() {
                     ${totalPrecio().toLocaleString("es-AR")}
                   </span>
                 </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Envío</span>
-                  <span className="text-brand-chartreuse font-bold">
-                    Gratis
-                  </span>
-                </div>
+                {requiereEnvio && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Envío</span>
+                    <span className="text-brand-chartreuse font-bold">
+                      Gratis
+                    </span>
+                  </div>
+                )}
                 <div className="h-px bg-brand-white/5 my-2" />
                 <div className="flex justify-between text-base font-black">
                   <span>Total</span>

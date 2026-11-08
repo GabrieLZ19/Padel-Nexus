@@ -39,6 +39,51 @@
 
 :root {
   color-scheme: dark;
+  --soporte-fab-size: 3.5rem;
+  --soporte-fab-inset-x: 1rem;
+  --soporte-fab-inset-bottom: 1.5rem;
+  --soporte-fab-clearance-bottom: calc(
+    var(--soporte-fab-inset-bottom) + var(--soporte-fab-size) + 1.25rem +
+      env(safe-area-inset-bottom, 0px)
+  );
+  --soporte-fab-clearance-right: calc(
+    var(--soporte-fab-inset-x) + var(--soporte-fab-size) + 0.5rem
+  );
+}
+
+@media (max-width: 639px) {
+  :root {
+    --soporte-fab-size: 3rem;
+    --soporte-fab-inset-bottom: 1rem;
+  }
+}
+
+/** Margen en sitio público para no tapar contenido con el chat flotante (PUB-8). */
+.public-content-soporte-fab-safe {
+  padding-bottom: var(--soporte-fab-clearance-bottom);
+  padding-right: var(--soporte-fab-clearance-right);
+}
+
+@media (min-width: 640px) {
+  .public-content-soporte-fab-safe {
+    padding-right: 0;
+  }
+}
+
+.soporte-fab-anchor {
+  bottom: max(var(--soporte-fab-inset-bottom), env(safe-area-inset-bottom, 0px));
+  right: max(var(--soporte-fab-inset-x), env(safe-area-inset-right, 0px));
+}
+
+.soporte-fab-anchor--compact {
+  transform: scale(0.88) translate(6px, 4px);
+  opacity: 0.88;
+}
+
+/* PUB-11: sileo no debe capitalizar cada palabra del título del toast */
+[data-sileo-toast] [data-sileo-title],
+[data-sileo-toast] [data-sileo-description] {
+  text-transform: none;
 }
 
 html.light {

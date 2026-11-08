@@ -184,6 +184,7 @@ export default function MarketplaceProductoForm({
   const [ubicacionServicio, setUbicacionServicio] = useState(
     initial?.ubicacion_servicio || "",
   );
+  const [errorUbicacionServicio, setErrorUbicacionServicio] = useState(false);
 
   const [imagenesExistentes, setImagenesExistentes] = useState<string[]>(
     initial?.imagenes || [],
@@ -276,20 +277,31 @@ export default function MarketplaceProductoForm({
     return { nuevas, existentes };
   };
 
-  const handleSubmit = async () => {
+  const validarPasoDetalles = (): boolean => {
+    let ok = true;
+    setErrorUbicacionServicio(false);
+
     if (!categoriaId || !nombre.trim() || !precioBase) {
       sileo.error({
         title: "Faltan datos",
         description: "Completá categoría, título y precio.",
       });
-      return;
+      ok = false;
+    }
+    if (tipo === "producto" && (!stock || stock < 1)) {
+      sileo.error({
+        title: "Stock requerido",
+        description: "Indicá al menos una unidad disponible.",
+      });
+      ok = false;
     }
     if (tipo === "servicio" && !ubicacionServicio.trim()) {
+      setErrorUbicacionServicio(true);
       sileo.error({
         title: "Ubicación requerida",
         description: "Indicá dónde se presta el servicio.",
       });
-      return;
+      ok = false;
     }
     if (descuentoActivo && !precioFinal) {
       sileo.error({
@@ -299,6 +311,26 @@ export default function MarketplaceProductoForm({
             ? "Ingresá un porcentaje entre 1 y 99."
             : "El monto de descuento debe ser menor al precio ingresado.",
       });
+      ok = false;
+    }
+    return ok;
+  };
+
+  const intentarIrAPaso = (destino: 1 | 2 | 3) => {
+    if (destino === step) return;
+    if (destino > 2 && step < 2) {
+      setStep(2);
+      return;
+    }
+    if (destino > 2 && step === 2 && !validarPasoDetalles()) {
+      return;
+    }
+    setStep(destino);
+  };
+
+  const handleSubmit = async () => {
+    if (!validarPasoDetalles()) {
+      if (step !== 2) setStep(2);
       return;
     }
 
@@ -367,7 +399,7 @@ export default function MarketplaceProductoForm({
             <button
               key={n}
               type="button"
-              onClick={() => setStep(n)}
+              onClick={() => intentarIrAPaso(n)}
               className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 step === n
                   ? "bg-brand-chartreuse text-brand-black"
@@ -504,7 +536,10 @@ export default function MarketplaceProductoForm({
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setTipo("producto")}
+                    onClick={() => {
+                      setTipo("producto");
+                      setErrorUbicacionServicio(false);
+                    }}
                     className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition-all ${
                       tipo === "producto"
                         ? "border-brand-chartreuse bg-brand-chartreuse/10"
@@ -696,25 +731,48 @@ export default function MarketplaceProductoForm({
                 </div>
 
                 {tipo === "servicio" && (
-                  <div className="grid grid-cols-2 gap-4 p-4 rounded-2xl bg-brand-black/30 border border-brand-white/5">
-                    <CustomDropdown
-                      value={modalidadServicio}
-                      onChange={(v) =>
-                        setModalidadServicio(v as "presencial" | "online" | "ambas")
-                      }
-                      placeholder="Modalidad"
-                      options={[
-                        { value: "presencial", label: "Presencial" },
-                        { value: "online", label: "Online" },
-                        { value: "ambas", label: "Ambas" },
-                      ]}
-                    />
-                    <input
-                      value={ubicacionServicio}
-                      onChange={(e) => setUbicacionServicio(e.target.value)}
-                      placeholder="Lugar de prestación *"
-                      className="bg-brand-input border border-brand-white/10 rounded-xl px-4 py-3 text-sm"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-brand-black/30 border border-brand-white/5">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase">
+                        Modalidad
+                      </label>
+                      <CustomDropdown
+                        value={modalidadServicio}
+                        onChange={(v) =>
+                          setModalidadServicio(v as "presencial" | "online" | "ambas")
+                        }
+                        placeholder="Modalidad"
+                        options={[
+                          { value: "presencial", label: "Presencial" },
+                          { value: "online", label: "Online" },
+                          { value: "ambas", label: "Ambas" },
+                        ]}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase">
+                        Lugar de prestación *
+                      </label>
+                      <input
+                        value={ubicacionServicio}
+                        onChange={(e) => {
+                          setUbicacionServicio(e.target.value);
+                          if (errorUbicacionServicio) setErrorUbicacionServicio(false);
+                        }}
+                        placeholder="Ej: canchas del club, sede o zona"
+                        aria-invalid={errorUbicacionServicio}
+                        className={`w-full bg-brand-input border rounded-xl px-4 py-3 text-sm focus:outline-none ${
+                          errorUbicacionServicio
+                            ? "border-red-500 focus:border-red-400"
+                            : "border-brand-white/10 focus:border-brand-chartreuse"
+                        }`}
+                      />
+                      {errorUbicacionServicio && (
+                        <p className="text-xs text-red-400 font-medium">
+                          Completá dónde se presta el servicio para continuar.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -789,7 +847,10 @@ export default function MarketplaceProductoForm({
               {step < 3 ? (
                 <button
                   type="button"
-                  onClick={() => setStep((s) => (s + 1) as 1 | 2 | 3)}
+                  onClick={() => {
+                    if (step === 2 && !validarPasoDetalles()) return;
+                    setStep((s) => (s + 1) as 1 | 2 | 3);
+                  }}
                   className="flex-1 py-3 rounded-xl bg-brand-white/10 hover:bg-brand-white/15 text-sm font-bold cursor-pointer"
                 >
                   Continuar

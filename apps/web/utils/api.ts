@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getSessionToken } from "./session";
 
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api",
@@ -12,18 +13,11 @@ if (typeof window !== "undefined") {
   fetch(healthUrl, { mode: "no-cors" }).catch(() => {});
 }
 
-// Helper robusto para extraer cookies sin fallos de espaciado
-function getCookie(name: string): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
 // Interceptor optimizado para leer la cookie de sesión nativa
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token = getCookie("padel_token");
-    if (token && token !== "undefined" && token !== "null" && config.headers) {
+    const token = getSessionToken();
+    if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
   }

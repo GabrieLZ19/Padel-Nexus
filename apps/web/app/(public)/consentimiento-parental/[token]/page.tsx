@@ -117,9 +117,11 @@ export default function ConsentimientoParentalPage() {
     return (
       <div className="mx-auto max-w-2xl px-6 py-16 text-brand-white">
         <h1 className="mb-4 text-3xl font-extrabold">Cuenta protegida activada</h1>
-        <p className="mb-6 text-gray-300">
-          El modo de protección para menores quedó activo. Las autorizaciones
-          pueden revisarse o revocarse desde la cuenta del responsable.
+        <p className="mb-6 text-sm leading-relaxed text-gray-300">
+          El modo de protección para menores quedó activo. El o la jugador/a
+          menor puede revisar o revocar autorizaciones opcionales desde su
+          cuenta, en Mi panel → Ver autorizaciones. El responsable no necesita
+          una cuenta propia en Padel Nexus.
         </p>
         <Link
           href="/login"

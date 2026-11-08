@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { tieneSesionCliente } from "../session";
 import {
   ChatContactoBusqueda,
   ChatConversacion,
@@ -88,6 +89,9 @@ export class ChatService {
   static async getNoLeidos(
     tipo?: "directo" | "soporte" | "marketplace" | "partido" | "grupo",
   ): Promise<number> {
+    if (!tieneSesionCliente()) {
+      return 0;
+    }
     const { data } = await api.get("/mensajes/no-leidos", {
       params: tipo ? { tipo } : undefined,
     });

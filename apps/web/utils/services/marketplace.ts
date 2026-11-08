@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { tieneSesionCliente } from "../session";
 
 export type EntidadMarketplaceTipo = "club" | "asociacion" | "federacion";
 
@@ -272,11 +273,17 @@ export const MarketplaceService = {
   },
 
   async getFavoritos(): Promise<any[]> {
+    if (!tieneSesionCliente()) {
+      return [];
+    }
     const response = await api.get<any[]>("/marketplace/favoritos");
     return response.data;
   },
 
   async checkFavorito(productoId: string): Promise<{ es_favorito: boolean }> {
+    if (!tieneSesionCliente()) {
+      return { es_favorito: false };
+    }
     const response = await api.get<{ es_favorito: boolean }>(`/marketplace/favoritos/${productoId}/check`);
     return response.data;
   },

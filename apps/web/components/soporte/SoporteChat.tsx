@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChatService } from "@/utils/services/chat";
 import { useChat } from "@/hooks/useChat";
 import { useProfileStore } from "@/store/useProfileStore";
+import { tieneSesionCliente } from "@/utils/session";
 import type { ChatMensaje } from "@/utils/types";
 
 export default function SoporteChat() {
@@ -37,6 +38,7 @@ export default function SoporteChat() {
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [noLeidos, setNoLeidos] = useState(0);
+  const [fabCompacto, setFabCompacto] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -160,11 +162,34 @@ export default function SoporteChat() {
     return () => window.removeEventListener("chat_notification", handler);
   }, [conversacionId, isOpen]);
 
-  // ── Cargar no leídos de soporte al montar ───────────────────────────
+  // ── Cargar no leídos de soporte al montar (solo con sesión, PUB-14) ─
   useEffect(() => {
+    if (!tieneSesionCliente()) {
+      setNoLeidos(0);
+      return;
+    }
     ChatService.getNoLeidos("soporte")
       .then((total) => setNoLeidos(total))
-      .catch(() => {});
+      .catch(() => setNoLeidos(0));
+  }, [profile?.id]);
+
+  // En móvil, achicar la burbuja mientras se hace scroll para liberar lectura (PUB-8).
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 639px)");
+    const onScroll = () => {
+      if (!media.matches) {
+        setFabCompacto(false);
+        return;
+      }
+      setFabCompacto(window.scrollY > 32);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    media.addEventListener("change", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      media.removeEventListener("change", onScroll);
+    };
   }, []);
 
   // ── Enviar mensaje ──────────────────────────────────────────────────
@@ -226,7 +251,9 @@ export default function SoporteChat() {
             exit={{ scale: 0, opacity: 0 }}
             onClick={handleOpen}
             aria-label="Abrir chat"
-            className="fixed bottom-6 right-4 z-50 size-14 rounded-full bg-brand-chartreuse text-brand-black flex items-center justify-center shadow-[0_0_25px_rgba(203,254,1,0.3)] hover:shadow-[0_0_35px_rgba(203,254,1,0.5)] hover:scale-105 transition-all cursor-pointer"
+            className={`soporte-fab-anchor fixed z-50 size-14 max-sm:size-12 rounded-full bg-brand-chartreuse text-brand-black flex items-center justify-center shadow-[0_0_25px_rgba(203,254,1,0.3)] hover:shadow-[0_0_35px_rgba(203,254,1,0.5)] hover:scale-105 transition-all cursor-pointer ${
+              fabCompacto ? "soporte-fab-anchor--compact max-sm:hover:scale-100" : ""
+            }`}
           >
             <MessageSquare className="size-6" />
             {noLeidos > 0 && (
@@ -246,7 +273,7 @@ export default function SoporteChat() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="fixed bottom-6 right-4 z-50 w-[min(360px,calc(100vw-2rem))] h-[520px] max-h-[80vh] bg-brand-black border border-brand-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+            className="soporte-fab-anchor fixed z-50 w-[min(360px,calc(100vw-2rem))] h-[min(520px,calc(100vh-6rem))] max-h-[80vh] bg-brand-black border border-brand-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
           >
             {/* Header */}
             <div className="px-4 py-3.5 bg-brand-card border-b border-brand-white/5 flex items-center gap-3">
@@ -287,7 +314,7 @@ export default function SoporteChat() {
                     <Headset className="size-6 text-brand-chartreuse/50" />
                   </div>
                   <h4 className="text-sm font-bold text-brand-white mb-1">
-                    ¡Hola! 👋
+                    ¡Hola!
                   </h4>
                   <p className="text-xs text-gray-500 leading-relaxed">
                     ¿Tenés alguna duda o problema? Escribinos y te ayudamos lo

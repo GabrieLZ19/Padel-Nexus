@@ -551,10 +551,15 @@ export default function SignUpPage() {
               </h3>
               {parentalUrl ? (
                 <>
-                  <p className="text-sm text-gray-300 max-w-md">
-                    Detectamos que la cuenta es de un menor. Compartí este
-                    enlace con el responsable parental para completar el
-                    consentimiento (también podés copiarlo):
+                  <p className="text-sm text-gray-300 max-w-md leading-relaxed">
+                    Detectamos que la cuenta es de un menor. El enlace de
+                    consentimiento{" "}
+                    <strong className="text-brand-white">
+                      no se envía automáticamente por correo
+                    </strong>
+                    : compartilo vos con el responsable parental (WhatsApp,
+                    correo u otro medio) para que complete la autorización.
+                    También podés copiarlo acá:
                   </p>
                   <div className="w-full rounded-xl border border-brand-white/10 bg-brand-black/40 p-3 text-left text-xs text-gray-200 break-all">
                     {parentalUrl}

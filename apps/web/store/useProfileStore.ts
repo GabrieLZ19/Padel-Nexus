@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { PerfilService } from "@/utils/services/perfil";
+import { tieneSesionCliente } from "@/utils/session";
 import { Perfil } from "@/utils/types";
 
 interface ProfileStore {
@@ -15,6 +16,11 @@ export const useProfileStore = create<ProfileStore>((set) => ({
   clearProfile: () => set({ profile: null }),
 
   fetchProfile: async () => {
+    if (!tieneSesionCliente()) {
+      set({ profile: null });
+      return false;
+    }
+
     try {
       const perfil = await PerfilService.getMe();
 

@@ -231,14 +231,14 @@ export default function ColegioFiscalesPage() {
     if (!form.nombre.trim() || !form.apellido.trim() || !form.dni.trim()) {
       sileo.error({
         title: "Campos incompletos",
-        description: "Completá Nombre, Apellido y DNI del fiscal.",
+        description: "Completá nombre, apellido y DNI del fiscal.",
       });
       return;
     }
 
     if (!/^\d+$/.test(form.dni.trim())) {
       sileo.error({
-        title: "DNI Inválido",
+        title: "DNI inválido",
         description:
           "El campo DNI debe contener únicamente números sin puntos ni letras.",
       });
@@ -247,7 +247,7 @@ export default function ColegioFiscalesPage() {
 
     if (form.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo.trim())) {
       sileo.error({
-        title: "Correo Inválido",
+        title: "Correo inválido",
         description: "Ingresá una dirección de correo electrónico válida.",
       });
       return;
@@ -268,7 +268,7 @@ export default function ColegioFiscalesPage() {
         asociacion_id: form.asociacion_id || colegioId,
       });
       sileo.success({
-        title: "Fiscal Registrado",
+        title: "Fiscal registrado",
         description: `${form.nombre} ${form.apellido} ha sido añadido al Colegio de ${colegioLabel}.`,
       });
       setShowCreateModal(false);
@@ -312,7 +312,7 @@ export default function ColegioFiscalesPage() {
     if (!form.nombre.trim() || !form.apellido.trim() || !form.dni.trim()) {
       sileo.error({
         title: "Campos incompletos",
-        description: "Completá Nombre, Apellido y DNI.",
+        description: "Completá nombre, apellido y DNI.",
       });
       return;
     }
@@ -321,7 +321,7 @@ export default function ColegioFiscalesPage() {
       setSaving(true);
       await FiscalesService.update(selectedFiscal.id, form);
       sileo.success({
-        title: "Fiscal Actualizado",
+        title: "Fiscal actualizado",
         description: "Los datos del fiscal han sido modificados con éxito.",
       });
       setShowEditModal(false);

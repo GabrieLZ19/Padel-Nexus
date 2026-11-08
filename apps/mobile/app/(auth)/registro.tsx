@@ -188,8 +188,8 @@ export default function RegistroScreen() {
             Consentimiento parental
           </Text>
           <Text className="mt-3 font-sans text-base text-brand-muted">
-            Compartí este enlace con el responsable parental. También podés
-            abrirlo en el navegador.
+            El enlace no se envía solo por correo: compartilo con el
+            responsable parental. También podés abrirlo en el navegador.
           </Text>
           <Text className="mt-4 font-sans text-xs text-white">{parentalUrl}</Text>
           <View className="mt-6 gap-3">

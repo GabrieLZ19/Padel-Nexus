@@ -3,6 +3,7 @@
 import { Megaphone } from "lucide-react";
 import { sileo } from "sileo";
 import type { Notificacion } from "@/utils/types";
+import { sileoToastStyles } from "@/utils/sileoStyles";
 
 export function mostrarToastNotificacion(notif: Notificacion) {
   const promo = notif.metadata?.origen === "marketplace_promo";
@@ -22,8 +23,7 @@ export function mostrarToastNotificacion(notif: Notificacion) {
       fill: "#0b0b0b",
       roundness: 14,
       styles: {
-        title: "!text-white !font-bold",
-        description: "!text-gray-300",
+        ...sileoToastStyles,
         badge: "!bg-brand-chartreuse/20 !text-brand-chartreuse",
       },
     });

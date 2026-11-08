@@ -1,6 +1,7 @@
 "use client";
 
 import { useCartStore } from "@/store/useCartStore";
+import { carritoRequiereEnvio } from "@/utils/marketplace/checkoutEnvio";
 import { X, Trash2, ShoppingBag, Plus, Minus } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -15,6 +16,7 @@ interface CartDrawerProps {
 export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const { items, eliminarItem, actualizarCantidad, totalPrecio, totalItems } =
     useCartStore();
+  const requiereEnvio = carritoRequiereEnvio(items);
   const [mounted, setMounted] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
@@ -206,10 +208,12 @@ export default function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 ${totalPrecio().toLocaleString("es-AR")}
               </span>
             </div>
-            <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>Envío</span>
-              <span className="text-brand-chartreuse font-bold">Gratis</span>
-            </div>
+            {requiereEnvio && (
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>Envío</span>
+                <span className="text-brand-chartreuse font-bold">Gratis</span>
+              </div>
+            )}
             <div className="h-px bg-brand-white/5 my-2"></div>
             <div className="flex items-center justify-between text-base font-bold">
               <span>Total</span>

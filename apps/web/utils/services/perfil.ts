@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { tieneSesionCliente } from "../session";
 import { Perfil } from "../types";
 import { isAxiosError } from "axios";
 
@@ -102,6 +103,10 @@ export const PerfilService = {
   },
 
   async getMe(): Promise<Perfil | null> {
+    if (!tieneSesionCliente()) {
+      return null;
+    }
+
     try {
       // Indicamos que Axios recibirá la estructura ApiResponse wrapping el Perfil
       const response = await api.get<ApiResponse<Perfil>>("/perfil/me");

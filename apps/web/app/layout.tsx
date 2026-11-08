@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { Toaster } from "sileo";
+import { sileoToastStyles } from "@/utils/sileoStyles";
 import "./globals.css";
 
-// Modificamos el título y la descripción para el SEO y la pestaña del navegador
 export const metadata: Metadata = {
-  title: "Padel Nexus",
+  title: {
+    default: "Padel Nexus",
+    template: "%s · Padel Nexus",
+  },
   description:
-    "Sistema integral para gestión de torneos, rankings y reservas de pádel.",
+    "Torneos, ranking oficial, reservas de canchas y marketplace de pádel en un solo lugar.",
 };
 
 export default function RootLayout({
@@ -45,11 +48,7 @@ export default function RootLayout({
           options={{
             fill: "#0b0b0b",
             roundness: 14,
-            styles: {
-              title: "!text-white !font-bold",
-              description: "!text-gray-300",
-              badge: "!bg-[#cbfe01] !text-black",
-            },
+            styles: sileoToastStyles,
           }}
         />
       </body>
