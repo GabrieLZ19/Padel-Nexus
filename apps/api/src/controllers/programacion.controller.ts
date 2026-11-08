@@ -370,6 +370,45 @@ export const guardarBorradorProgramacion = async (
   }
 };
 
+/** POST /api/torneos/:id/programacion/config — descanso y franjas por día sin tocar partidos */
+export const persistirConfigProgramacion = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const bloqueo = await rechazarSiNoEdita(req, id, res);
+    if (bloqueo) return bloqueo;
+    const { duracionMinutos, descansoModo } = req.body || {};
+    const data = await ProgramacionService.persistirConfigProgramacion(id, {
+      duracionMinutos,
+      descansoModo:
+        descansoModo === "tras_fin_60" ||
+        descansoModo === "tras_fin_120" ||
+        descansoModo === "entre_inicios_240"
+          ? descansoModo
+          : undefined,
+      franjasPorDia:
+        typeof req.body?.franjasPorDia === "string"
+          ? (() => {
+              try {
+                return JSON.parse(req.body.franjasPorDia);
+              } catch {
+                return undefined;
+              }
+            })()
+          : req.body?.franjasPorDia,
+      adminId: req.user?.id,
+    });
+    return res.status(200).json(data);
+  } catch (err: any) {
+    return res.status(400).json({
+      message: "No se pudo guardar la configuración del programador",
+      error: err.message,
+    });
+  }
+};
+
 /** POST /api/torneos/:id/programacion/nueva-edicion */
 export const nuevaEdicionProgramacion = async (
   req: Request,

@@ -6,6 +6,7 @@ import { ChatService } from "./chat.service";
 import { FAP_ESTADOS_PAGO } from "../constants/fap";
 import { getFapBracketForPairCount } from "../utils/fapBracketMatrices";
 import type { FiscalSesion } from "./fiscal-sesion.service";
+import { filtrarIncidenciasVisiblesPorFiscal } from "../utils/fiscalIncidenciasVisibilidad";
 
 export type TipoIncidenciaFiscal =
   | "incidencia"
@@ -93,6 +94,11 @@ export const MOTIVOS_INFORME_LABELS: Record<MotivoInformeFiscal, string> = {
   codigo_conducta: "Código de conducta",
   categorizacion: "Categorización",
   otro: "Otro",
+};
+
+export type VisibilidadIncidenciasFiscal = {
+  rolTorneo?: "general" | "auxiliar";
+  fiscalId?: string;
 };
 
 export class FiscalPanelService {
@@ -337,15 +343,28 @@ export class FiscalPanelService {
       .eq("jugador_id", jugadorId)
       .order("created_at", { ascending: false });
 
+    const { data: asignaciones } = await supabaseAdmin
+      .from("torneo_fiscales")
+      .select("torneo_id, rol")
+      .eq("fiscal_id", fiscalId);
+    const historialVisible = filtrarIncidenciasVisiblesPorFiscal(
+      historial || [],
+      fiscalId,
+      asignaciones || [],
+    );
+
     return {
       ...data,
       asociacion_o_club: clubNombre || data.lugar_residencia || null,
-      incidencias: historial || [],
+      incidencias: historialVisible,
     };
   }
 
-  static async listarIncidencias(torneoId: string) {
-    const { data, error } = await supabaseAdmin
+  static async listarIncidencias(
+    torneoId: string,
+    opts?: VisibilidadIncidenciasFiscal,
+  ) {
+    let query = supabaseAdmin
       .from("fiscal_incidencias")
       .select(
         `
@@ -354,8 +373,13 @@ export class FiscalPanelService {
         perfiles:jugador_id (id, nombre, apellido, dni)
       `,
       )
-      .eq("torneo_id", torneoId)
-      .order("created_at", { ascending: false });
+      .eq("torneo_id", torneoId);
+
+    if (opts?.rolTorneo !== "general" && opts?.fiscalId) {
+      query = query.eq("fiscal_id", opts.fiscalId);
+    }
+
+    const { data, error } = await query.order("created_at", { ascending: false });
 
     if (error) throw new Error(error.message);
     return data || [];
@@ -547,12 +571,16 @@ export class FiscalPanelService {
     return actualizada;
   }
 
-  static async obtenerReporte(torneoId: string, fiscalId: string) {
+  static async obtenerReporte(
+    torneoId: string,
+    fiscalId: string,
+    opts?: VisibilidadIncidenciasFiscal,
+  ) {
     const [torneo, partidos, jugadores, incidencias, fiscal] = await Promise.all([
       this.obtenerTorneoAsignado(torneoId, fiscalId),
       this.obtenerPartidos(torneoId),
       this.obtenerJugadores(torneoId),
-      this.listarIncidencias(torneoId),
+      this.listarIncidencias(torneoId, opts),
       supabaseAdmin
         .from("fiscales")
         .select("id, nombre, apellido, dni, rango")

@@ -71,7 +71,7 @@ interface PartidoParejaHistorial {
   endMin: number;
 }
 
-function normalizarFecha(fecha: string): string {
+export function normalizarFechaProgramacionDia(fecha: string): string {
   const raw = String(fecha || "").trim();
   const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
   if (iso) return iso[1];
@@ -79,6 +79,10 @@ function normalizarFecha(fecha: string): string {
   const space = raw.match(/^(\d{4}-\d{2}-\d{2})\s/);
   if (space) return space[1];
   return raw.split("T")[0];
+}
+
+function normalizarFecha(fecha: string): string {
+  return normalizarFechaProgramacionDia(fecha);
 }
 
 function esFechaIso(valor: string): boolean {
@@ -349,8 +353,12 @@ export function generarSlotsDesdeSedesYVentana(params: {
   ].sort();
 
   for (const fecha of dias) {
-    const franja = params.franjasPorDia?.[fecha];
-    const dispFecha = params.canchas.find((c) => c.fecha === fecha);
+    const franja =
+      params.franjasPorDia?.[fecha] ??
+      params.franjasPorDia?.[normalizarFechaProgramacionDia(fecha)];
+    const dispFecha = params.canchas.find(
+      (c) => normalizarFechaProgramacionDia(c.fecha) === fecha,
+    );
 
     // Prioridad por día: franja explícita → disponibilidad guardada → override global → default.
     let fechaHoraInicio = horaInicioDefault;

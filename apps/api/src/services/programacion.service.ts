@@ -22,6 +22,11 @@ import {
   type SlotProgramacion,
 } from "../utils/programacionPartidos";
 import {
+  construirFranjasPorDiaBoard,
+  persistirDescansoYDuracionTorneo,
+  persistirFranjasPorDiaTorneo,
+} from "../utils/persistirFranjasProgramacion";
+import {
   esDistribucionProgramacion,
   esModoDescanso,
   esRondaCampeonato,
@@ -677,28 +682,15 @@ export class ProgramacionService {
     const pendientes = partidos.length - asignados;
     const advertencias = issues.filter((i) => i.severity !== "ok").length;
 
-    const franjasPorDiaMap: Record<string, { inicio: string; fin: string }> = {};
-    for (const f of dias) {
-      const franjaOpt = opciones.franjasPorDia?.[f];
-      const d = contexto.disponibilidad.find((c) => c.fecha === f);
-      const inicioDisp = d?.hora_inicio ? d.hora_inicio.slice(0, 5) : "";
-      const finDisp = d?.hora_fin
-        ? d.hora_fin.startsWith("23:59") || d.hora_fin.startsWith("00:00")
-          ? "00:00"
-          : d.hora_fin.slice(0, 5)
-        : "";
-      franjasPorDiaMap[f] = {
-        inicio:
-          franjaOpt?.inicio ||
-          inicioDisp ||
-          opciones.horaInicio ||
-          "08:00",
-        fin:
-          franjaOpt?.fin !== undefined && franjaOpt?.fin !== ""
-            ? franjaOpt.fin
-            : finDisp || opciones.horaFin || "",
-      };
-    }
+    const franjasPorDiaMap = construirFranjasPorDiaBoard(
+      dias,
+      contexto.disponibilidad,
+      {
+        franjasPorDia: opciones.franjasPorDia,
+        horaInicio: opciones.horaInicio,
+        horaFin: opciones.horaFin,
+      },
+    );
 
     return {
       torneo_id: torneoId,
@@ -1109,23 +1101,12 @@ export class ProgramacionService {
     const duracion =
       opciones.duracionMinutos ||
       Number(torneo.duracion_partido_minutos || 90);
-    const descansoPersistido = esModoDescanso(opciones.descansoModo)
-      ? opciones.descansoModo
-      : undefined;
-
-    const torneoUpdate: Record<string, unknown> = {};
-    if (opciones.duracionMinutos) {
-      torneoUpdate.duracion_partido_minutos = duracion;
-    }
-    if (descansoPersistido) {
-      torneoUpdate.descanso_modo = descansoPersistido;
-    }
-    if (Object.keys(torneoUpdate).length > 0) {
-      await supabaseAdmin
-        .from("torneos")
-        .update(torneoUpdate)
-        .eq("id", torneoId);
-    }
+    await persistirDescansoYDuracionTorneo(torneoId, {
+      duracionMinutos: opciones.duracionMinutos ? duracion : undefined,
+      descansoModo: esModoDescanso(opciones.descansoModo)
+        ? opciones.descansoModo
+        : undefined,
+    });
 
     const contexto = await cargarContextoProgramacion(torneoId);
     const { data: partidosDb } = await supabaseAdmin
@@ -1161,23 +1142,10 @@ export class ProgramacionService {
     );
 
     if (opciones.franjasPorDia) {
-      for (const [fecha, franja] of Object.entries(opciones.franjasPorDia)) {
-        if (!fecha) continue;
-        const updates: { hora_inicio?: string; hora_fin?: string } = {};
-        if (franja.inicio) {
-          updates.hora_inicio = `${franja.inicio.slice(0, 5)}:00`;
-        }
-        if (franja.fin !== undefined && franja.fin !== "") {
-          updates.hora_fin = franja.fin === "00:00" ? "23:59:59" : `${franja.fin.slice(0, 5)}:00`;
-        }
-        if (Object.keys(updates).length > 0) {
-          await supabaseAdmin
-            .from("torneo_canchas_disponibilidad")
-            .update(updates)
-            .eq("torneo_id", torneoId)
-            .eq("fecha", fecha);
-        }
-      }
+      await persistirFranjasPorDiaTorneo(torneoId, opciones.franjasPorDia);
+      contexto.disponibilidad = (
+        await cargarContextoProgramacion(torneoId)
+      ).disponibilidad;
     }
 
     const descansoModo = esModoDescanso(opciones.descansoModo)
@@ -1484,6 +1452,61 @@ export class ProgramacionService {
   }
 
   /**
+   * Guarda descanso, duración y franjas por día sin cambiar partidos ni programacion_estado.
+   */
+  static async persistirConfigProgramacion(
+    torneoId: string,
+    opciones: {
+      duracionMinutos?: number;
+      descansoModo?: ModoDescanso;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+      adminId?: string;
+    } = {},
+  ): Promise<ProgramacionBoard> {
+    const { data: torneo } = await supabaseAdmin
+      .from("torneos")
+      .select("id, programacion_estado")
+      .eq("id", torneoId)
+      .maybeSingle();
+    if (!torneo) throw new Error("Torneo no encontrado");
+    if (torneo.programacion_estado === "publicado") {
+      throw new Error(
+        "La programación está publicada. Creá una nueva edición para editar.",
+      );
+    }
+
+    if (opciones.franjasPorDia) {
+      await persistirFranjasPorDiaTorneo(torneoId, opciones.franjasPorDia);
+    }
+    await persistirDescansoYDuracionTorneo(torneoId, {
+      duracionMinutos: opciones.duracionMinutos,
+      descansoModo: esModoDescanso(opciones.descansoModo)
+        ? opciones.descansoModo
+        : undefined,
+    });
+
+    if (opciones.adminId) {
+      await supabaseAdmin.from("logs_auditoria").insert({
+        usuario_id_admin: opciones.adminId,
+        accion: "persistir_config_programacion",
+        entidad_afectada: torneoId,
+        detalles: {
+          descanso_modo: opciones.descansoModo || null,
+          franjas: opciones.franjasPorDia
+            ? Object.keys(opciones.franjasPorDia)
+            : [],
+        },
+      });
+    }
+
+    return this.getBoard(torneoId, {
+      duracionMinutos: opciones.duracionMinutos,
+      descansoModo: opciones.descansoModo,
+      franjasPorDia: opciones.franjasPorDia,
+    });
+  }
+
+  /**
    * Deja los horarios cargados y el estado en borrador, sin publicarlos.
    */
   static async guardarBorrador(
@@ -1513,34 +1536,19 @@ export class ProgramacionService {
     }
 
     if (opciones.franjasPorDia) {
-      for (const [fecha, franja] of Object.entries(opciones.franjasPorDia)) {
-        if (!fecha) continue;
-        const updates: { hora_inicio?: string; hora_fin?: string } = {};
-        if (franja.inicio) {
-          updates.hora_inicio = `${franja.inicio.slice(0, 5)}:00`;
-        }
-        if (franja.fin !== undefined && franja.fin !== "") {
-          updates.hora_fin = franja.fin === "00:00" ? "23:59:59" : `${franja.fin.slice(0, 5)}:00`;
-        }
-        if (Object.keys(updates).length > 0) {
-          await supabaseAdmin
-            .from("torneo_canchas_disponibilidad")
-            .update(updates)
-            .eq("torneo_id", torneoId)
-            .eq("fecha", fecha);
-        }
-      }
+      await persistirFranjasPorDiaTorneo(torneoId, opciones.franjasPorDia);
     }
+
+    await persistirDescansoYDuracionTorneo(torneoId, {
+      duracionMinutos: opciones.duracionMinutos,
+      descansoModo: esModoDescanso(opciones.descansoModo)
+        ? opciones.descansoModo
+        : undefined,
+    });
 
     const borradorUpdate: Record<string, unknown> = {
       programacion_estado: "borrador",
     };
-    if (opciones.duracionMinutos) {
-      borradorUpdate.duracion_partido_minutos = opciones.duracionMinutos;
-    }
-    if (esModoDescanso(opciones.descansoModo)) {
-      borradorUpdate.descanso_modo = opciones.descansoModo;
-    }
     const { error } = await supabaseAdmin
       .from("torneos")
       .update(borradorUpdate)

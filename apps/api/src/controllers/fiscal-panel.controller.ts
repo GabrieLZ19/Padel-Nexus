@@ -107,7 +107,10 @@ export const FiscalPanelController = {
 
   async getIncidencias(req: Request, res: Response): Promise<Response> {
     try {
-      const data = await FiscalPanelService.listarIncidencias(req.params.id);
+      const data = await FiscalPanelService.listarIncidencias(req.params.id, {
+        rolTorneo: req.fiscalRolTorneo,
+        fiscalId: req.fiscal?.id,
+      });
       return res.status(200).json(data);
     } catch (error: unknown) {
       return handleError(res, error, "Error al listar incidencias");
@@ -156,7 +159,10 @@ export const FiscalPanelController = {
       if (!req.fiscal) {
         return res.status(403).json({ message: "Ficha de fiscal no resuelta." });
       }
-      const data = await FiscalPanelService.obtenerReporte(req.params.id, req.fiscal.id);
+      const data = await FiscalPanelService.obtenerReporte(req.params.id, req.fiscal.id, {
+        rolTorneo: req.fiscalRolTorneo,
+        fiscalId: req.fiscal.id,
+      });
       return res.status(200).json(data);
     } catch (error: unknown) {
       return handleError(res, error, "Error al armar el reporte");

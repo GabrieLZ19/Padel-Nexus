@@ -37,7 +37,8 @@ describe("P3: auditoría de sorteo, aviso y corrección", () => {
       "utf8",
     );
     assert.match(fuente, /detalles->>torneo_id/);
-    assert.match(fuente, /\.eq\("entidad_afectada", torneoId\)/);
+    assert.match(fuente, /referenciasEntidadTorneoEnAuditoria/);
+    assert.match(fuente, /\.in\("entidad_afectada", entidades\)/);
   });
 
   it("corregir_resultado audita aunque falte adminId y guarda torneo_id en detalles", () => {

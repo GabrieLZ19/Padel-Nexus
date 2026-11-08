@@ -179,7 +179,9 @@ describe("F6: Auditoría y motivo obligatorio al corregir resultado", () => {
         },
         error: null,
       },
-      // 2. update partido
+      // 2. insert logs_auditoria (antes de actualizar el partido)
+      { data: null, error: null },
+      // 3. update partido
       {
         data: {
           id: PARTIDO,
@@ -191,8 +193,6 @@ describe("F6: Auditoría y motivo obligatorio al corregir resultado", () => {
         },
         error: null,
       },
-      // 3. insert logs_auditoria
-      { data: null, error: null },
       // 4. select torneoInfo (ranking)
       { data: null, error: null },
       // 5. inscripciones count (fap bracket)

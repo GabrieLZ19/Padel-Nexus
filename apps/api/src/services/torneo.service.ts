@@ -38,6 +38,7 @@ import {
   tablaPuntosDesdeConfig,
   type ConfigPuntosTorneo,
 } from "../utils/rankingTorneo";
+import { partidoYaTeniaResultado } from "../utils/auditoriaTorneo";
 
 async function marcarDescalificacionesDeZona(
   torneoId: string,
@@ -1909,11 +1910,12 @@ export class TorneoService {
         es_wo,
         es_injustificado_wo,
         es_lesion,
+        estado_partido,
         torneos(estado)
       `)
       .eq("id", partidoId)
       .maybeSingle();
-    const yaTeniaResultado = Boolean(previo?.ganador);
+    const yaTeniaResultado = partidoYaTeniaResultado(previo);
     const estadoPrevio = (
       previo?.torneos as { estado?: string } | { estado?: string }[] | null
     );
@@ -1927,6 +1929,11 @@ export class TorneoService {
     if (yaTeniaResultado && !motivo?.trim()) {
       throw new Error(
         "Debes ingresar un motivo para corregir el resultado de un partido finalizado.",
+      );
+    }
+    if (yaTeniaResultado && !adminId?.trim()) {
+      throw new Error(
+        "Se requiere un usuario autenticado para corregir resultados auditables.",
       );
     }
 
@@ -1961,6 +1968,29 @@ export class TorneoService {
       es_lesion: Boolean(esLesion),
     };
 
+    const torneoIdPartido = previo?.torneo_id;
+    if (yaTeniaResultado && valorAnterior && torneoIdPartido) {
+      const { error: errAudit } = await supabaseAdmin.from("logs_auditoria").insert({
+        usuario_id_admin: adminId!,
+        accion: "corregir_resultado",
+        entidad_afectada: torneoIdPartido,
+        detalles: {
+          torneo_id: torneoIdPartido,
+          partido_id: partidoId,
+          ronda: previo.ronda,
+          orden: previo.orden,
+          motivo: motivo!.trim(),
+          valor_anterior: valorAnterior,
+          valor_nuevo: valorNuevo,
+        },
+      });
+      if (errAudit) {
+        throw new Error(
+          `No se pudo registrar la corrección en auditoría: ${errAudit.message}`,
+        );
+      }
+    }
+
     const { data: partido, error: updateError } = await supabaseAdmin
       .from("partidos")
       .update({
@@ -1983,29 +2013,6 @@ export class TorneoService {
 
     if (updateError || !partido)
       throw new Error("Error al cargar el marcador.");
-
-    if (yaTeniaResultado && valorAnterior) {
-      const { error: errAudit } = await supabaseAdmin.from("logs_auditoria").insert({
-        usuario_id_admin: adminId || null,
-        accion: "corregir_resultado",
-        entidad_afectada: partido.torneo_id,
-        detalles: {
-          torneo_id: partido.torneo_id,
-          partido_id: partido.id,
-          ronda: partido.ronda,
-          orden: partido.orden,
-          motivo: motivo!.trim(),
-          valor_anterior: valorAnterior,
-          valor_nuevo: valorNuevo,
-        },
-      });
-      if (errAudit) {
-        console.error(
-          "[TorneoService] No se pudo auditar corrección de resultado:",
-          errAudit.message,
-        );
-      }
-    }
 
     // Emitir WebSocket global de partido actualizado
     try {

@@ -1,5 +1,9 @@
 import { Request, Response } from "express";
 import { TorneoService } from "../services/torneo.service";
+import {
+  dedupeAuditoriaPorId,
+  referenciasEntidadTorneoEnAuditoria,
+} from "../utils/auditoriaTorneo";
 import { CompetenciaService } from "../services/competencia.service";
 import { supabaseAdmin } from "../config/supabase";
 import sharp from "sharp";
@@ -791,16 +795,18 @@ export const getAuditoriaByTorneo = async (
         perfiles!fk_logs_admin(nombre, apellido)
       `;
 
+    const entidades = referenciasEntidadTorneoEnAuditoria(torneoId);
+
     // 1) Logs anclados al torneo (programación, correcciones, sorteos nuevos).
     const { data: porEntidad, error: errEntidad } = await supabaseAdmin
       .from("logs_auditoria")
       .select(selectCols)
-      .eq("entidad_afectada", torneoId)
+      .in("entidad_afectada", entidades)
       .order("created_at", { ascending: false });
     if (errEntidad) throw new Error(errEntidad.message);
 
     // 2) Logs históricos de sorteo/aviso que guardaban entidad_afectada="grupo_parejas"
-    //    y el torneo_id solo en detalles.
+    //    y el torneo_id solo en detalles (p. ej. correcciones legacy).
     const { data: porDetalle, error: errDetalle } = await supabaseAdmin
       .from("logs_auditoria")
       .select(selectCols)
@@ -808,19 +814,14 @@ export const getAuditoriaByTorneo = async (
       .order("created_at", { ascending: false });
     if (errDetalle) throw new Error(errDetalle.message);
 
-    const seen = new Set<string>();
-    const merged = [...(porEntidad || []), ...(porDetalle || [])]
-      .filter((log) => {
-        const id = String(log.id);
-        if (seen.has(id)) return false;
-        seen.add(id);
-        return true;
-      })
-      .sort(
-        (a, b) =>
-          new Date(String(b.created_at)).getTime() -
-          new Date(String(a.created_at)).getTime(),
-      );
+    const merged = dedupeAuditoriaPorId([
+      ...(porEntidad || []),
+      ...(porDetalle || []),
+    ]).sort(
+      (a, b) =>
+        new Date(String(b.created_at)).getTime() -
+        new Date(String(a.created_at)).getTime(),
+    );
 
     return res.status(200).json(merged);
   } catch (error: any) {
