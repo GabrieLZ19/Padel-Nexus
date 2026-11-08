@@ -44,6 +44,7 @@ import {
   numerosVisiblesLlave,
 } from "@/utils/rondasLlave";
 import { formatearFechaHoraArgentina } from "@/utils/fechaArgentina";
+import { esEliminatoriaDirecta } from "@/utils/formatoTorneo";
 
 function formatearValorAuditoria(val: unknown): string {
   if (val == null) return "-";
@@ -119,13 +120,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       )
     : [];
   const tieneDiasCompetencia = diasJuego.length > 0;
-  const formatoLower = torneo?.formato?.toLowerCase() || "";
-  // Solo eliminatoria pura. "Zonas + Eliminatoria" NO es directa.
-  const isEliminatoriaDirecta =
-    formatoLower === "eliminatoria directa" ||
-    (formatoLower.includes("eliminatoria") &&
-      !formatoLower.includes("zona") &&
-      !formatoLower.includes("grupo"));
+  const isEliminatoriaDirecta = esEliminatoriaDirecta(torneo?.formato);
 
   const [activeView, setActiveView] = useState<
     "zonas" | "siembra" | "llaves" | "auditoria" | "programacion"
@@ -350,7 +345,15 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   useEffect(() => {
     if (!isEliminatoriaDirecta || partidos.length === 0) return;
 
-    const ROUNDS_ORDER = ["OCTAVOS", "CUARTOS", "SEMIS", "FINAL"];
+    const ROUNDS_ORDER = [
+      "32AVOS",
+      "16AVOS",
+      "PRELIMINARES",
+      "OCTAVOS",
+      "CUARTOS",
+      "SEMIS",
+      "FINAL",
+    ];
     const rondas = [...new Set(partidos.map((p) => p.ronda))];
     const primeraRonda =
       rondas
@@ -646,13 +649,12 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
   const totalZonas =
     zonas.length || Math.floor((torneo?.cupos_maximos || 8) / 3);
-  const rawPlayerCount =
-    torneo?.formato === "Eliminatoria Directa"
-      ? inscripciones?.length ||
-        torneo?.cupos_actuales ||
-        torneo?.cupos_maximos ||
-        16
-      : getPlayoffSize(totalZonas);
+  const rawPlayerCount = isEliminatoriaDirecta
+    ? inscripciones?.length ||
+      torneo?.cupos_actuales ||
+      torneo?.cupos_maximos ||
+      16
+    : getPlayoffSize(totalZonas);
 
   const bracketCapacity = Math.max(
     4,
@@ -1023,16 +1025,16 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             {etiquetaCategoria(torneo?.categoria) || "CATEGORÍA"}
           </h3>
           <p className="text-gray-400 text-sm mt-1">
-            {faseZonasCerrada
-              ? "Fase de grupos finalizada. La competencia continúa en la llave de campeonato."
-              : "El sistema armó zonas y siembra automáticamente. Podés ajustar manualmente sin borrar resultados."}
+            {isEliminatoriaDirecta
+              ? "Llave eliminatoria: ajustá la siembra de primera ronda y programá horarios desde la pestaña Programación."
+              : faseZonasCerrada
+                ? "Fase de grupos finalizada. La competencia continúa en la llave de campeonato."
+                : "El sistema armó zonas y siembra automáticamente. Podés ajustar manualmente sin borrar resultados."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {/* Tutorial y Editar solo si la fase de grupos aún admite cambios */}
-          {torneo?.formato !== "Eliminatoria Directa" &&
-            activeView === "zonas" &&
-            puedeEditarZonas && (
+          {!isEliminatoriaDirecta && activeView === "zonas" && puedeEditarZonas && (
               <>
                 <button
                   onClick={() => {
@@ -1113,7 +1115,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   : "border border-transparent text-brand-ayuda hover:text-gray-300"
               }`}
             >
-              <LayoutGrid className="size-4" /> Zonas
+              <LayoutGrid className="size-4" /> Siembra
             </button>
           ) : (
             <button
@@ -1560,7 +1562,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   Aún no se ha generado el cuadro de eliminatoria para este
                   torneo.
                 </div>
-              ) : usaPlantillaFap && fapMatrixMatches.length > 0 ? (
+              ) : usaPlantillaFap &&
+                fapMatrixMatches.length > 0 &&
+                !isEliminatoriaDirecta ? (
                 <FapBracketDiagram
                   matches={fapMatrixMatches}
                   // Lista completa: la numeración visible cuenta zonas + llave (CUA-01 / P4).

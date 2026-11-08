@@ -4,6 +4,7 @@ import { TorneosService } from "@/utils/services/torneos";
 import { Torneo, Inscripcion, Partido } from "@/utils/types";
 import { BracketEditor } from "@/components/torneos/BracketEditor";
 import { CUPOS_ESTANDAR_FAP } from "@/utils/constants/fapApaRules";
+import { esEliminatoriaDirecta } from "@/utils/formatoTorneo";
 import { AlertCircle } from "lucide-react";
 
 interface Paso6CuadrosProps {
@@ -50,7 +51,10 @@ export const Paso6Cuadros = ({
   const hayPendientes = inscripciones.some(
     (ins) => ins.estado_pago !== "Confirmado",
   );
-  const cupoValido = CUPOS_VALIDOS.includes(cantidadInscriptos);
+  const formatoEsEliminatoriaDirecta = esEliminatoriaDirecta(torneo?.formato);
+  const cupoValido =
+    !formatoEsEliminatoriaDirecta ||
+    CUPOS_VALIDOS.includes(cantidadInscriptos);
   const diasJuego = Array.isArray(torneo?.dias_juego)
     ? torneo.dias_juego.filter(
         (d: any) => typeof d === "string" && d.trim().length > 0,
@@ -111,7 +115,7 @@ export const Paso6Cuadros = ({
       return;
     }
 
-    if (!cupoValido) {
+    if (formatoEsEliminatoriaDirecta && !cupoValido) {
       setFeedbackModal((prev: any) => ({
         ...prev,
         isOpen: true,
@@ -195,9 +199,7 @@ export const Paso6Cuadros = ({
       <h3 className="text-lg font-bold text-white uppercase tracking-wider">
         Paso {numeroPaso}: Cuadros
       </h3>
-      {partidos.length === 0 &&
-        (torneo as Torneo & { formato?: string }).formato ===
-          "Eliminatoria Directa" && (
+      {partidos.length === 0 && formatoEsEliminatoriaDirecta && (
           <div className="bg-black/20 p-6 rounded-3xl border border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
               <h4 className="font-bold text-white">Generar Fixture Oficial</h4>
@@ -205,7 +207,9 @@ export const Paso6Cuadros = ({
                 Estructure las llaves eliminatorias basándose en las parejas
                 aprobadas.
               </p>
-              {!cupoValido && cantidadInscriptos > 0 && (
+              {formatoEsEliminatoriaDirecta &&
+                !cupoValido &&
+                cantidadInscriptos > 0 && (
                 <p className="text-xs text-amber-400 mt-2 font-medium">
                   Hay {cantidadInscriptos} confirmados. Cupos válidos:{" "}
                   {CUPOS_VALIDOS.join(", ")}.

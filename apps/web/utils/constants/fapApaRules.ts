@@ -84,6 +84,27 @@ export const FORMATOS_TORNEO_OFICIAL = [
   { value: "Todos contra Todos", label: "Todos contra Todos (Round Robin)" },
 ] as const;
 
+/** Motor de cuadros disponible en Fase 1 (TOR-1). El resto queda oculto hasta implementar fixture propio. */
+export const FORMATOS_TORNEO_CUADRO_FASE1 = [
+  "Zonas + Llaves",
+  "Eliminatoria Directa",
+] as const;
+
+function filtrarFormatosCuadroFase1<
+  T extends { value: string; label: string },
+>(opciones: readonly T[]): T[] {
+  return opciones.filter((o) =>
+    (FORMATOS_TORNEO_CUADRO_FASE1 as readonly string[]).includes(o.value),
+  );
+}
+
+export const FORMATOS_TORNEO_CLUB_SELECCION = filtrarFormatosCuadroFase1(
+  FORMATOS_TORNEO_CLUB,
+);
+export const FORMATOS_TORNEO_OFICIAL_SELECCION = filtrarFormatosCuadroFase1(
+  FORMATOS_TORNEO_OFICIAL,
+);
+
 // ============================================================================
 // CATEGORÍAS Y NIVELES RECREATIVOS (CLUB)
 // ============================================================================

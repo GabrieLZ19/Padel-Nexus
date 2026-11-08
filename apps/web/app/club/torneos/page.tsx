@@ -93,7 +93,7 @@ export default function ClubTorneosPage() {
     modalidad: "Parejas",
     formato: "Eliminatoria Directa",
     precio_inscripcion: 0,
-    alcance: "Provincial",
+    alcance: "Local",
     asociacion: "FAP",
     premio_1: "",
     premio_2: "",

@@ -10,8 +10,8 @@ import { useProfileStore } from "../../store/useProfileStore";
 import {
   RAMAS_PADEL,
   CUSTOM_OPTION_VALUE,
-  FORMATOS_TORNEO_CLUB,
-  FORMATOS_TORNEO_OFICIAL,
+  FORMATOS_TORNEO_CLUB_SELECCION,
+  FORMATOS_TORNEO_OFICIAL_SELECCION,
   getAlcancesPermitidos,
   getCategoriasParaAsociacion,
   getNivelesParaCategoria,
@@ -70,7 +70,7 @@ export default function TorneoModal({
   }));
 
   const formatoOptions = (
-    esClub ? FORMATOS_TORNEO_CLUB : FORMATOS_TORNEO_OFICIAL
+    esClub ? FORMATOS_TORNEO_CLUB_SELECCION : FORMATOS_TORNEO_OFICIAL_SELECCION
   ).map((f) => ({
     value: f.value,
     label: f.label,

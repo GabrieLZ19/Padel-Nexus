@@ -21,21 +21,28 @@ describe("R4 - Pestaña Programación primero en Cuadros", () => {
     // Verificar orden de aparición en el JSX del tab header
     const posProgramacion = tabBlock.indexOf('setActiveView("programacion")');
     const posZonas = tabBlock.indexOf('setActiveView("zonas")');
+    const posSiembra = tabBlock.indexOf('setActiveView("siembra")');
     const posLlaves = tabBlock.indexOf('setActiveView("llaves")');
     const posAuditoria = tabBlock.indexOf('setActiveView("auditoria")');
 
+    const posGruposOSiembra = Math.min(
+      posZonas > 0 ? posZonas : Number.POSITIVE_INFINITY,
+      posSiembra > 0 ? posSiembra : Number.POSITIVE_INFINITY,
+    );
+
     assert.ok(posProgramacion > 0, "Debe existir la pestaña programacion");
-    assert.ok(posZonas > 0, "Debe existir la pestaña zonas");
+    assert.ok(posZonas > 0, "Debe existir la pestaña zonas (fase de grupos)");
+    assert.ok(posSiembra > 0, "Debe existir la pestaña siembra (eliminatoria directa)");
     assert.ok(posLlaves > 0, "Debe existir la pestaña llaves");
     assert.ok(posAuditoria > 0, "Debe existir la pestaña auditoria");
 
     assert.ok(
-      posProgramacion < posZonas,
-      "Programación debe ir antes de Zonas / Fase de grupos",
+      posProgramacion < posGruposOSiembra,
+      "Programación debe ir antes de Fase de grupos / Siembra",
     );
     assert.ok(
-      posZonas < posLlaves,
-      "Fase de grupos debe ir antes de Llave campeonato",
+      posGruposOSiembra < posLlaves,
+      "Fase de grupos o Siembra debe ir antes de Llave campeonato",
     );
     assert.ok(
       posLlaves < posAuditoria,

@@ -113,7 +113,8 @@ export default function RankingsPage() {
   // El scope se define por rol: provincial y club fuerzan Provincial;
   // federacion/superadmin van a Nacional/Global por defecto.
   const scopePorRol = useMemo(() => {
-    if (rol === "admin_provincial" || rol === "admin_club") return "Provincial";
+    if (rol === "admin_club") return "Local";
+    if (rol === "admin_provincial") return "Provincial";
     if (rol === "admin_federacion") return "Nacional";
     return "Global";
   }, [rol]);

@@ -32,6 +32,8 @@ import {
   esAlcanceSinEntidadOrganizadora,
   puedeUsarReglamentoAmateur,
   reglamentoTorneo,
+  FORMATOS_TORNEO_CLUB_SELECCION,
+  FORMATOS_TORNEO_OFICIAL_SELECCION,
   type ReglamentoTorneo,
 } from "@/utils/constants/fapApaRules";
 import { esRolClub, esRolFederacionNacional } from "@/utils/auth/roles";
@@ -903,21 +905,9 @@ export const Paso1Datos = ({
             value={editFormato}
             onChange={setEditFormato}
             options={
-              (userRole === "admin_club" || userRole === "admin")
-                ? [
-                    { value: "Zonas + Llaves", label: "Zonas + Llaves" },
-                    { value: "Eliminatoria Directa", label: "Eliminatoria Directa (sin fase de grupos)" },
-                    { value: "Todos contra Todos", label: "Todos contra Todos (Round Robin)" },
-                    { value: "Super 8", label: "Super 8" },
-                    { value: "Super 12", label: "Super 12" },
-                    { value: "Americano", label: "Americano" },
-                    { value: "Suma 8", label: "Suma 8" },
-                    { value: "Suma 12", label: "Suma 12" },
-                  ]
-                : [
-                    { value: "Zonas + Llaves", label: "Zonas + Llaves" },
-                    { value: "Eliminatoria Directa", label: "Eliminatoria Directa (sin fase de grupos)" },
-                  ]
+              userRole === "admin_club" || userRole === "admin"
+                ? [...FORMATOS_TORNEO_CLUB_SELECCION]
+                : [...FORMATOS_TORNEO_OFICIAL_SELECCION]
             }
             placeholder="Seleccionar Formato..."
           />
