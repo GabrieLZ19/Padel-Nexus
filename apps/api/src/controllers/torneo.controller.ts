@@ -358,6 +358,17 @@ export const getInscripcionesByTorneo = async (
   }
 };
 
+function sincronizarLlaveEnLecturaPartidos(req: Request): boolean {
+  if (req.query.sincronizar === "0" || req.query.sincronizar === "false") {
+    return false;
+  }
+  const forzar =
+    req.query.sincronizar === "1" || req.query.sincronizar === "true";
+  const rol = req.user?.rol;
+  if (forzar) return esRolAccesoCrm(rol);
+  return esRolAccesoCrm(rol);
+}
+
 export const getPartidosByTorneo = async (
   req: Request,
   res: Response,
@@ -365,6 +376,7 @@ export const getPartidosByTorneo = async (
   try {
     const partidos = await TorneoService.obtenerPartidosFormateados(
       req.params.id,
+      { sincronizarLlave: sincronizarLlaveEnLecturaPartidos(req) },
     );
     return res.status(200).json(partidos);
   } catch (error: unknown) {

@@ -1421,36 +1421,39 @@ export class TorneoService {
     });
   }
 
-  static async obtenerPartidosFormateados(id: string) {
-    try {
-      const poblada = await sincronizarClasificadosALlave(id);
-      if (poblada) {
-        try {
-          SocketService.emitirATodos("bracket_actualizado", {
-            torneo_id: id,
-            fase: "llaves_principales_generadas",
-          });
-        } catch (e) {
-          console.warn("Error al emitir bracket_actualizado (sync):", e);
+  static async obtenerPartidosFormateados(
+    id: string,
+    opciones?: { sincronizarLlave?: boolean },
+  ) {
+    if (opciones?.sincronizarLlave) {
+      try {
+        const poblada = await sincronizarClasificadosALlave(id);
+        if (poblada) {
+          try {
+            SocketService.emitirATodos("bracket_actualizado", {
+              torneo_id: id,
+              fase: "llaves_principales_generadas",
+            });
+          } catch (e) {
+            console.warn("Error al emitir bracket_actualizado (sync):", e);
+          }
         }
+      } catch (e) {
+        console.warn("Error al sincronizar clasificados a llave:", e);
       }
-    } catch (e) {
-      console.warn("Error al sincronizar clasificados a llave:", e);
     }
 
-    const { data: partidos, error: partidosError } = await supabaseAdmin
-      .from("partidos")
-      .select("*")
-      .eq("torneo_id", id)
-      .order("orden", { ascending: true })
-      .order("id", { ascending: true });
-
-    if (partidosError) throw new Error(partidosError.message);
-
-    const { data: inscripciones, error: insError } = await supabaseAdmin
-      .from("inscripciones")
-      .select(
-        `
+    const [partidosRes, inscripcionesRes] = await Promise.all([
+      supabaseAdmin
+        .from("partidos")
+        .select("*")
+        .eq("torneo_id", id)
+        .order("orden", { ascending: true })
+        .order("id", { ascending: true }),
+      supabaseAdmin
+        .from("inscripciones")
+        .select(
+          `
         id, 
         jugador1_nombre, 
         jugador2_nombre,
@@ -1468,9 +1471,14 @@ export class TorneoService {
           clubes:clubes!perfiles_club_id_fkey (nombre)
         )
       `,
-      )
-      .eq("torneo_id", id);
+        )
+        .eq("torneo_id", id),
+    ]);
 
+    const { data: partidos, error: partidosError } = partidosRes;
+    const { data: inscripciones, error: insError } = inscripcionesRes;
+
+    if (partidosError) throw new Error(partidosError.message);
     if (insError) throw new Error(insError.message);
 
     const insMap = new Map<string, ReturnType<typeof mapInscripcionPartido>>();

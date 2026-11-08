@@ -503,6 +503,12 @@ export class FiscalPanelService {
     return {
       ...incidencia,
       conversacion_id: notifResult?.conversacion_id || null,
+      fiscales: {
+        id: fiscal.id,
+        nombre: fiscal.nombre,
+        apellido: fiscal.apellido,
+        rango: fiscal.rango,
+      },
     };
   }
 

@@ -7,8 +7,10 @@ import {
   resolveMercadoPagoInitPoint,
 } from "../config/mercadopago";
 import {
+  MARKETPLACE_AUDIENCIAS_PROMOCION,
   MARKETPLACE_ESTADOS_ORDEN,
   MARKETPLACE_ESTADOS_VENDEDOR,
+  puedeAudienciaPromocionPlataforma,
   type AudienciaPromocion,
   type EntidadMarketplaceTipo,
 } from "../constants/marketplace";
@@ -1351,6 +1353,15 @@ export class MarketplaceService {
     },
   ) {
     const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+
+    if (
+      payload.audiencia === MARKETPLACE_AUDIENCIAS_PROMOCION.PLATAFORMA &&
+      !puedeAudienciaPromocionPlataforma(ref.entidad_tipo)
+    ) {
+      throw new Error(
+        "Solo la federación puede enviar promociones a toda la plataforma. Usá afiliados de tu entidad o compradores previos.",
+      );
+    }
 
     const destinatarios = await this.resolverDestinatariosPromocion(
       tienda.id,

@@ -37,6 +37,13 @@ export const MARKETPLACE_AUDIENCIAS_PROMOCION = {
 export type AudienciaPromocion =
   (typeof MARKETPLACE_AUDIENCIAS_PROMOCION)[keyof typeof MARKETPLACE_AUDIENCIAS_PROMOCION];
 
+/** PUB-5: broadcast masivo solo para tienda de federación (como comunicaciones). */
+export function puedeAudienciaPromocionPlataforma(
+  entidadTipo: EntidadMarketplaceTipo,
+): boolean {
+  return entidadTipo === MARKETPLACE_ENTIDAD_TIPOS.FEDERACION;
+}
+
 export const MARKETPLACE_STORAGE = {
   BUCKET: "marketplace",
   MAX_IMAGENES_POR_PRODUCTO: 5,
