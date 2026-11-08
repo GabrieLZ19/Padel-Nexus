@@ -24,6 +24,16 @@ import {
   normalizarPerfilLicencias,
 } from "../utils/estadoLicencia";
 import { fechaHoyArgentina } from "../utils/fechaArgentina";
+import {
+  orBusquedaJugadoresLicencias,
+  terminoIlikePostgrest,
+} from "../utils/postgrestBusqueda";
+import {
+  datosTransferenciaLicenciaEnv,
+  montoLicenciaDesdeSolicitud,
+  permitirMockMercadoPagoLicencia,
+  textoInstruccionesPagoLicencia,
+} from "../utils/licenciaPago";
 
 export type EstadoLicenciaPublica =
   | "activa"
@@ -161,11 +171,9 @@ export class LicenciaService {
       query = query.eq("licencias.estado", estado);
     }
 
-    if (search) {
-      const term = `%${search.trim()}%`;
-      query = query.or(
-        `nombre.ilike.${term},apellido.ilike.${term},email.ilike.${term},licencias.nro_licencia.ilike.${term}`,
-      );
+    if (search?.trim()) {
+      const quoted = terminoIlikePostgrest(search);
+      query = query.or(orBusquedaJugadoresLicencias(quoted));
     }
 
     // Filtro DB seguro: solo por lugar_residencia del perfil.
@@ -323,11 +331,9 @@ export class LicenciaService {
     const pageSize = 1000;
     for (let from = 0; ; from += pageSize) {
       let query = supabaseAdmin.from("perfiles").select(select);
-      if (search) {
-        const term = `%${search.trim()}%`;
-        query = query.or(
-          `nombre.ilike.${term},apellido.ilike.${term},email.ilike.${term},licencias.nro_licencia.ilike.${term}`,
-        );
+      if (search?.trim()) {
+        const quoted = terminoIlikePostgrest(search);
+        query = query.or(orBusquedaJugadoresLicencias(quoted));
       }
       if (alcanceProvincial) {
         query = query.ilike(
@@ -863,27 +869,40 @@ export class LicenciaService {
     if (error || !licencia) throw new Error("Licencia no encontrada.");
 
     const datos = (licencia.datos_solicitud || {}) as Record<string, unknown>;
-    let precio = Number(datos.precio_anual ?? 0);
+    const config =
+      await LicenciaOrganizacionService.resolverConfigParaLicencia(licencia);
 
-    // Licencias creadas antes del cobro: resolver precio actual y persistirlo
+    let precio = montoLicenciaDesdeSolicitud(datos, config);
+
     if (precio <= 0) {
-      const config =
-        await LicenciaOrganizacionService.resolverConfigParaLicencia(licencia);
-      precio = Number(config.precioAnual || 0);
-      if (precio > 0) {
-        const datosActualizados = {
-          ...datos,
-          precio_anual: precio,
-          estado_pago:
-            datos.estado_pago === "pagado" ? "pagado" : "pendiente",
-          moneda: "ARS",
-        };
-        await supabaseAdmin
-          .from("licencias")
-          .update({ datos_solicitud: datosActualizados })
-          .eq("id", licenciaId);
-        Object.assign(datos, datosActualizados);
-      }
+      precio = montoLicenciaDesdeSolicitud(
+        {
+          frecuencia_pago: config.frecuenciaPago,
+          precio_anual: config.precioAnual,
+          precio_mensual: config.precioMensual,
+        },
+        config,
+      );
+    }
+
+    if (precio > 0) {
+      const datosActualizados = {
+        ...datos,
+        precio_anual: Number(config.precioAnual || datos.precio_anual || 0),
+        precio_mensual: Number(
+          config.precioMensual || datos.precio_mensual || 0,
+        ),
+        frecuencia_pago:
+          datos.frecuencia_pago || config.frecuenciaPago || "anual",
+        estado_pago:
+          datos.estado_pago === "pagado" ? "pagado" : "pendiente",
+        moneda: "ARS",
+      };
+      await supabaseAdmin
+        .from("licencias")
+        .update({ datos_solicitud: datosActualizados })
+        .eq("id", licenciaId);
+      Object.assign(datos, datosActualizados);
     }
 
     if (precio <= 0) {
@@ -893,25 +912,53 @@ export class LicenciaService {
       throw new Error("El pago de esta licencia ya fue registrado.");
     }
 
+    const transferencia = datosTransferenciaLicenciaEnv();
+    const instrucciones = textoInstruccionesPagoLicencia({
+      monto: precio,
+      nroLicencia: String(licencia.nro_licencia || licenciaId),
+      ...transferencia,
+    });
+
     const token = getMercadoPagoAccessToken();
     if (!isMercadoPagoConfigured()) {
-      console.warn(
-        "⚠️ MP Access Token no configurado. Simulando pago de licencia.",
-      );
-      const mockPaymentId = `mock-licencia-${Date.now()}`;
-      const actualizada = await LicenciaService.confirmarPagoLicencia(
-        licenciaId,
-        usuarioId,
-        mockPaymentId,
-        precio,
-      );
+      if (permitirMockMercadoPagoLicencia()) {
+        console.warn(
+          "MP Access Token no configurado. Simulando pago de licencia (solo dev).",
+        );
+        const mockPaymentId = `mock-licencia-${Date.now()}`;
+        const actualizada = await LicenciaService.confirmarPagoLicencia(
+          licenciaId,
+          usuarioId,
+          mockPaymentId,
+          precio,
+        );
+        return {
+          preferenceId: "mock-licencia-pref",
+          initPoint: null,
+          sandboxInitPoint: null,
+          mockConfirmed: true,
+          paymentId: mockPaymentId,
+          licencia: actualizada,
+          monto: precio,
+          moneda: "ARS",
+          referencia: licencia.nro_licencia,
+          instrucciones,
+          pagoAlternativo: false,
+          ...transferencia,
+        };
+      }
+
       return {
-        preferenceId: "mock-licencia-pref",
+        preferenceId: null,
         initPoint: null,
         sandboxInitPoint: null,
-        mockConfirmed: true,
-        paymentId: mockPaymentId,
-        licencia: actualizada,
+        mockConfirmed: false,
+        pagoAlternativo: true,
+        monto: precio,
+        moneda: "ARS",
+        referencia: licencia.nro_licencia,
+        instrucciones,
+        ...transferencia,
       };
     }
 
@@ -954,6 +1001,12 @@ export class LicenciaService {
       ),
       sandboxInitPoint: response.sandbox_init_point,
       mockConfirmed: false,
+      pagoAlternativo: false,
+      monto: precio,
+      moneda: "ARS",
+      referencia: licencia.nro_licencia,
+      instrucciones,
+      ...transferencia,
     };
   }
 

@@ -14,6 +14,10 @@ router.get("/listas", ComunicacionesController.listarListas);
 router.get("/listas/:id", ComunicacionesController.obtenerLista);
 router.post("/listas", ComunicacionesController.crearLista);
 router.patch("/listas/:id", ComunicacionesController.actualizarLista);
+router.post(
+  "/listas/:id/miembros",
+  ComunicacionesController.agregarMiembrosLista,
+);
 router.delete("/listas/:id", ComunicacionesController.eliminarLista);
 
 router.post("/audiencia/preview", ComunicacionesController.previewAudiencia);

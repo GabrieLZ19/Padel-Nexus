@@ -183,6 +183,22 @@ export class ComunicacionesAudienciaService {
     return "jugadores_provincia";
   }
 
+  /** Recorta IDs de lista manual al alcance del remitente (uso en listas y campañas). */
+  static async filtrarMiembrosPorAlcance(
+    actor: { id: string; rol: RolUsuario },
+    ids: string[],
+  ): Promise<string[]> {
+    return ComunicacionesAudienciaService.filtrarIdsPorAlcance(
+      {
+        actorId: actor.id,
+        actorRol: actor.rol,
+        audienciaTipo: "lista",
+        filtros: {},
+      },
+      ids,
+    );
+  }
+
   /** Recorta IDs de lista manual al alcance del remitente. */
   private static async filtrarIdsPorAlcance(
     ctx: ResolverContext,

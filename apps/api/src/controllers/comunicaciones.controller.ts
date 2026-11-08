@@ -14,10 +14,12 @@ export class ComunicacionesController {
     try {
       const actor = getActor(req);
       const q = typeof req.query.q === "string" ? req.query.q : "";
+      const soloJugadores = req.query.solo_jugadores !== "false";
       const data = await ComunicacionesService.buscarContactos(
         actor.id,
         actor.rol,
         q,
+        { solo_jugadores: soloJugadores },
       );
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {
@@ -55,8 +57,12 @@ export class ComunicacionesController {
 
   static async crearLista(req: Request, res: Response) {
     try {
-      const { id } = getActor(req);
-      const data = await ComunicacionesService.crearLista(id, req.body);
+      const actor = getActor(req);
+      const data = await ComunicacionesService.crearLista(
+        actor.id,
+        req.body,
+        actor,
+      );
       return res.status(201).json({ exito: true, data });
     } catch (error: unknown) {
       const message =
@@ -67,16 +73,38 @@ export class ComunicacionesController {
 
   static async actualizarLista(req: Request, res: Response) {
     try {
-      const { id } = getActor(req);
+      const actor = getActor(req);
       const data = await ComunicacionesService.actualizarLista(
-        id,
+        actor.id,
         req.params.id,
         req.body,
+        actor,
       );
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Error al actualizar lista.";
+      const status = message.includes("no encontrada") ? 404 : 400;
+      return res.status(status).json({ exito: false, error: message });
+    }
+  }
+
+  static async agregarMiembrosLista(req: Request, res: Response) {
+    try {
+      const actor = getActor(req);
+      const perfilIds = Array.isArray(req.body?.perfil_ids)
+        ? (req.body.perfil_ids as string[])
+        : [];
+      const data = await ComunicacionesService.agregarMiembros(
+        actor.id,
+        req.params.id,
+        actor,
+        perfilIds,
+      );
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al agregar miembros.";
       const status = message.includes("no encontrada") ? 404 : 400;
       return res.status(status).json({ exito: false, error: message });
     }

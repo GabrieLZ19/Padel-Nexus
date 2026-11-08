@@ -637,7 +637,8 @@ export class ChatService {
   }
 
   /**
-   * Busca perfiles para agregar a un grupo de chat.
+   * Busca perfiles para agregar a un grupo de chat (solo nombre/apellido).
+   * No expone email ni DNI y excluye menores del listado.
    */
   static async buscarContactosGrupo(queryRaw: string) {
     const q = queryRaw.trim();
@@ -650,10 +651,9 @@ export class ChatService {
 
     const { data, error } = await supabaseAdmin
       .from("perfiles")
-      .select("id, nombre, apellido, email, avatar_url, rol")
-      .or(
-        `nombre.ilike.${quoted},apellido.ilike.${quoted},email.ilike.${quoted},dni.ilike.${quoted}`,
-      )
+      .select("id, nombre, apellido, avatar_url, rol")
+      .eq("es_menor", false)
+      .or(`nombre.ilike.${quoted},apellido.ilike.${quoted}`)
       .order("apellido", { ascending: true })
       .limit(25);
 
@@ -661,7 +661,13 @@ export class ChatService {
       throw new Error(`Error al buscar contactos: ${error.message}`);
     }
 
-    return data || [];
+    return (data || []).map((p) => ({
+      id: p.id,
+      nombre: p.nombre,
+      apellido: p.apellido,
+      avatar_url: p.avatar_url ?? null,
+      rol: p.rol ?? null,
+    }));
   }
 
   /**

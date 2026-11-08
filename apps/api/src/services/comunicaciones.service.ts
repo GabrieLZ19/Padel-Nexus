@@ -13,6 +13,10 @@ import {
 } from "../constants/comunicaciones";
 import type { RolUsuario } from "../constants/roles";
 import { ComunicacionesAudienciaService } from "./comunicaciones-audiencia.service";
+import {
+  orBusquedaContactosAdmin,
+  terminoIlikePostgrest,
+} from "../utils/postgrestBusqueda";
 import { NotificacionService } from "./notificacion.service";
 
 export interface CrearListaPayload {
@@ -125,26 +129,28 @@ export class ComunicacionesService {
     actorId: string,
     actorRol: RolUsuario,
     queryRaw: string,
+    options?: { solo_jugadores?: boolean },
   ): Promise<ContactoBusqueda[]> {
     const q = queryRaw.trim();
     if (q.length < 2) {
       throw new Error("Escribí al menos 2 caracteres para buscar.");
     }
 
-    const term = `%${q.replace(/[%_,]/g, "\\$&")}%`;
-    // Comillas dobles: emails con @ rompen el filtro .or() de PostgREST si van sin quoting.
-    const quoted = `"${term.replace(/"/g, '\\"')}"`;
+    const quoted = terminoIlikePostgrest(q);
+    const soloJugadores = options?.solo_jugadores !== false;
 
     let query = supabaseAdmin
       .from("perfiles")
       .select(
         "id, nombre, apellido, email, dni, rol, lugar_residencia, club_id, avatar_url",
       )
-      .or(
-        `nombre.ilike.${quoted},apellido.ilike.${quoted},email.ilike.${quoted},dni.ilike.${quoted}`,
-      )
+      .or(orBusquedaContactosAdmin(quoted))
       .order("apellido", { ascending: true })
       .limit(30);
+
+    if (soloJugadores) {
+      query = query.eq("rol", "usuario");
+    }
 
     if (actorRol === "admin_club") {
       const { data: perfil } = await supabaseAdmin
@@ -268,7 +274,11 @@ export class ComunicacionesService {
     return { ...lista, miembros };
   }
 
-  static async crearLista(ownerId: string, payload: CrearListaPayload) {
+  static async crearLista(
+    ownerId: string,
+    payload: CrearListaPayload,
+    actor?: { id: string; rol: RolUsuario },
+  ) {
     const nombre = (payload.nombre || "").trim();
     if (!nombre) throw new Error("El nombre de la lista es obligatorio.");
     assertListaTipo(payload.tipo);
@@ -302,7 +312,7 @@ export class ComunicacionesService {
     }
 
     if (payload.tipo === "manual" && payload.miembro_ids?.length) {
-      await this.reemplazarMiembros(lista.id, payload.miembro_ids);
+      await this.reemplazarMiembros(lista.id, payload.miembro_ids, actor);
     }
 
     return this.obtenerLista(ownerId, lista.id);
@@ -312,6 +322,7 @@ export class ComunicacionesService {
     ownerId: string,
     listaId: string,
     payload: ActualizarListaPayload,
+    actor?: { id: string; rol: RolUsuario },
   ) {
     const actual = await this.obtenerLista(ownerId, listaId);
 
@@ -352,9 +363,44 @@ export class ComunicacionesService {
       if (actual.tipo !== "manual") {
         throw new Error("Solo las listas manuales admiten miembros.");
       }
-      await this.reemplazarMiembros(listaId, payload.miembro_ids);
+      await this.reemplazarMiembros(listaId, payload.miembro_ids, actor);
     }
 
+    return this.obtenerLista(ownerId, listaId);
+  }
+
+  /**
+   * Agrega miembros a una lista manual existente (sin reemplazar los actuales).
+   */
+  static async agregarMiembros(
+    ownerId: string,
+    listaId: string,
+    actor: { id: string; rol: RolUsuario },
+    perfilIds: string[],
+  ) {
+    const lista = await this.obtenerLista(ownerId, listaId);
+    if (lista.tipo !== "manual") {
+      throw new Error("Solo las listas manuales admiten miembros.");
+    }
+
+    const nuevos = [...new Set((perfilIds || []).filter(Boolean))];
+    if (nuevos.length === 0) {
+      throw new Error("Indicá al menos un contacto para agregar.");
+    }
+
+    const permitidos = await ComunicacionesAudienciaService.filtrarMiembrosPorAlcance(
+      actor,
+      nuevos,
+    );
+    if (permitidos.length !== nuevos.length) {
+      throw new Error(
+        "Uno o más contactos están fuera de tu alcance institucional.",
+      );
+    }
+
+    const actuales = (lista.miembros || []).map((m) => m.perfil_id);
+    const merged = [...new Set([...actuales, ...permitidos])];
+    await this.reemplazarMiembros(listaId, merged);
     return this.obtenerLista(ownerId, listaId);
   }
 
@@ -372,8 +418,22 @@ export class ComunicacionesService {
   private static async reemplazarMiembros(
     listaId: string,
     miembroIds: string[],
+    actor?: { id: string; rol: RolUsuario },
   ) {
     const unique = [...new Set(miembroIds.filter(Boolean))];
+
+    if (actor && unique.length > 0) {
+      const permitidos =
+        await ComunicacionesAudienciaService.filtrarMiembrosPorAlcance(
+          actor,
+          unique,
+        );
+      if (permitidos.length !== unique.length) {
+        throw new Error(
+          "Uno o más contactos están fuera de tu alcance institucional.",
+        );
+      }
+    }
 
     if (unique.length > 0) {
       const { data: perfiles, error: perfError } = await supabaseAdmin
