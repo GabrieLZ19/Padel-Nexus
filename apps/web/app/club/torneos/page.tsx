@@ -101,6 +101,8 @@ export default function ClubTorneosPage() {
     canchas_disponibles: 1,
     duracion_partido_minutos: 90,
     hora_inicio_jornada: "08:00",
+    visible_sitio_publico: true,
+    es_prueba: false,
   });
 
   const [currentPage, setCurrentPage] = useState(1);

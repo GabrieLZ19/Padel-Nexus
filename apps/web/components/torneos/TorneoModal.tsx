@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Save } from "lucide-react";
+import { X, Save, Globe } from "lucide-react";
+import { esNombreTorneoDePrueba } from "@/utils/datoPruebaTorneo";
 import CustomDropdown from "../ui/CustomDropdown";
 import { Club, FormTorneoState } from "../../utils/types";
 import { useProfileStore } from "../../store/useProfileStore";
@@ -353,11 +354,44 @@ export default function TorneoModal({
                     placeholder="Ej: Americano de Primavera / Master Series BA"
                     className="w-full bg-brand-card p-3 rounded-xl border border-transparent focus:border-white/10 text-white focus:outline-none text-sm transition-colors font-medium"
                     value={formData.nombre}
-                    onChange={(e) =>
-                      setFormData({ ...formData, nombre: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const nombre = e.target.value;
+                      const bloquea = esNombreTorneoDePrueba(nombre);
+                      setFormData({
+                        ...formData,
+                        nombre,
+                        ...(bloquea
+                          ? { visible_sitio_publico: false, es_prueba: true }
+                          : {}),
+                      });
+                    }}
                   />
                 </div>
+
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 rounded accent-brand-chartreuse cursor-pointer disabled:opacity-40"
+                    checked={formData.visible_sitio_publico !== false}
+                    disabled={esNombreTorneoDePrueba(formData.nombre)}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        visible_sitio_publico: e.target.checked,
+                        es_prueba: !e.target.checked,
+                      })
+                    }
+                  />
+                  <span className="flex flex-col gap-0.5">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-white">
+                      <Globe className="size-3.5 text-brand-chartreuse" />
+                      Visible en el sitio público
+                    </span>
+                    <span className="text-[10px] text-gray-500 leading-snug">
+                      Habilita inscripción online y listado en /torneos.
+                    </span>
+                  </span>
+                </label>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>

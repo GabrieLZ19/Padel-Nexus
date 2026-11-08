@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -11,15 +11,72 @@ import {
 } from "lucide-react";
 import { isAxiosError } from "axios";
 import { PerfilService } from "@/utils/services/perfil";
+import { getSupabaseBrowserClient } from "@/utils/supabase/client";
 
 export default function UpdatePasswordPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const router = useRouter();
+
+  useEffect(() => {
+    const establecerSesionRecuperacion = async () => {
+      if (typeof window === "undefined") return;
+
+      const supabase = getSupabaseBrowserClient();
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get("code");
+
+      if (code) {
+        const { data, error: exchangeError } =
+          await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError || !data.session) {
+          setError("El enlace de recuperación no es válido o ya venció.");
+          return;
+        }
+        document.cookie = `padel_token=${data.session.access_token}; path=/; max-age=3600; SameSite=Lax`;
+        setSessionReady(true);
+        return;
+      }
+
+      const hash = window.location.hash;
+      if (hash) {
+        const hashParams = new URLSearchParams(hash.substring(1));
+        const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
+        if (accessToken && refreshToken) {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (sessionError) {
+            setError("El enlace de recuperación no es válido o ya venció.");
+            return;
+          }
+          document.cookie = `padel_token=${accessToken}; path=/; max-age=3600; SameSite=Lax`;
+          setSessionReady(true);
+          return;
+        }
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData.session?.access_token) {
+        document.cookie = `padel_token=${sessionData.session.access_token}; path=/; max-age=3600; SameSite=Lax`;
+        setSessionReady(true);
+        return;
+      }
+
+      setError(
+        "Abrí esta pantalla desde el enlace que te enviamos por correo para restablecer la clave.",
+      );
+    };
+
+    void establecerSesionRecuperacion();
+  }, []);
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,8 +200,8 @@ export default function UpdatePasswordPage() {
                 </div>
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full bg-brand-chartreuse text-brand-black font-bold py-4 rounded-xl transition-colors flex justify-center items-center gap-2.5 text-lg shadow-md hover:opacity-95 cursor-pointer"
+                  disabled={loading || !sessionReady}
+                  className="w-full bg-brand-chartreuse text-brand-black font-bold py-4 rounded-xl transition-colors flex justify-center items-center gap-2.5 text-lg shadow-md hover:opacity-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <span className="animate-pulse">Guardando...</span>

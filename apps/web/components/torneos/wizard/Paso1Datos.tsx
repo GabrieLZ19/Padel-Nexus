@@ -6,7 +6,22 @@ import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
 import { FederacionesService, Federacion } from "@/utils/services/federaciones";
 import { Torneo, Club } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
-import { Calendar, Trophy, Settings2, Gift, Info, Building2, Plus, Pencil, X } from "lucide-react";
+import {
+  Calendar,
+  Trophy,
+  Settings2,
+  Gift,
+  Info,
+  Building2,
+  Plus,
+  Pencil,
+  X,
+  Globe,
+} from "lucide-react";
+import {
+  esNombreTorneoDePrueba,
+  torneoVisibleEnSitioPublico,
+} from "@/utils/datoPruebaTorneo";
 import { sileo } from "sileo";
 import { useProfileStore } from "@/store/useProfileStore";
 import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
@@ -180,6 +195,9 @@ export const Paso1Datos = ({
   const [editFormato, setEditFormato] = useState<string>(
     (torneo as { formato?: string }).formato || "Zonas + Llaves",
   );
+  const [visibleSitioPublico, setVisibleSitioPublico] = useState(() =>
+    torneoVisibleEnSitioPublico(torneo),
+  );
 
   const sinEntidadOrganizadora = esAlcanceSinEntidadOrganizadora(editAlcance);
   const organizadorDeshabilitado = sinEntidadOrganizadora;
@@ -278,8 +296,17 @@ export const Paso1Datos = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- carga inicial
   }, []);
 
+  const nombreBloqueaSitioPublico = esNombreTorneoDePrueba(editNombre);
+
+  useEffect(() => {
+    if (nombreBloqueaSitioPublico) {
+      setVisibleSitioPublico(false);
+    }
+  }, [nombreBloqueaSitioPublico]);
+
   // Sincronizar con datos persistidos tras guardar / refrescar torneo
   useEffect(() => {
+    setVisibleSitioPublico(torneoVisibleEnSitioPublico(torneo));
     setEditAsociacion(reglamentoFromTorneo(torneo, userRole));
     const org = organizadorFromTorneo(torneo);
     if (org) {
@@ -311,6 +338,8 @@ export const Paso1Datos = ({
     }
   }, [
     torneo.id,
+    torneo.es_prueba,
+    torneo.nombre,
     torneo.reglamento,
     torneo.asociacion,
     torneo.asociacion_id,
@@ -511,6 +540,8 @@ export const Paso1Datos = ({
         asociacion_id: asociacionIdFinal,
         federacion_id: federacionIdFinal,
         formato: editFormato,
+        visible_sitio_publico: visibleSitioPublico,
+        es_prueba: nombreBloqueaSitioPublico ? true : !visibleSitioPublico,
         ...( ["borrador", "cerrado"].includes(
           String(torneo.estado || "").toLowerCase(),
         )
@@ -587,6 +618,33 @@ export const Paso1Datos = ({
               {erroresCampo.nombre}
             </p>
           ) : null}
+        </div>
+        <div className="md:col-span-2">
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              className="mt-1 size-4 rounded border-white/20 bg-brand-input accent-brand-chartreuse cursor-pointer disabled:opacity-40"
+              checked={visibleSitioPublico}
+              disabled={nombreBloqueaSitioPublico || readOnly}
+              onChange={(e) => setVisibleSitioPublico(e.target.checked)}
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="inline-flex items-center gap-2 text-sm font-bold text-white">
+                <Globe className="size-4 text-brand-chartreuse" />
+                Visible en el sitio público
+              </span>
+              <span className="text-xs text-gray-400 font-medium">
+                Permite que jugadores sin sesión vean el torneo, se inscriban
+                online y accedan al detalle en /torneos.
+              </span>
+              {nombreBloqueaSitioPublico ? (
+                <span className="text-xs text-yellow-500/90 font-semibold">
+                  Los nombres de ensayo (QA, prueba, testing, demo) no se
+                  publican en el sitio.
+                </span>
+              ) : null}
+            </span>
+          </label>
         </div>
         <div>
           <div className="flex items-center justify-between mb-2">

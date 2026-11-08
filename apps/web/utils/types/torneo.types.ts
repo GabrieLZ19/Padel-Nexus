@@ -24,6 +24,8 @@ export interface Torneo {
   id: string;
   created_at?: string;
   nombre: string;
+  /** Si es true, el torneo no aparece en el sitio público ni en contadores oficiales. */
+  es_prueba?: boolean | null;
   subtitulo?: string | null;
   club_id?: string | null;
   fecha?: string | null;
@@ -177,6 +179,8 @@ export interface Cuadro {
 // Formularios de UI
 export interface FormTorneoState {
   nombre: string;
+  es_prueba?: boolean;
+  visible_sitio_publico?: boolean;
   subtitulo?: string | null;
   club_id: string | null;
   fecha: string;

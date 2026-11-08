@@ -27,7 +27,9 @@ export default function ForgotPasswordPage() {
     try {
       // Servicio centralizado
       const data = await PerfilService.recuperarPassword(email);
-      if (data.exito) setSuccess(true);
+      if (data.exito) {
+        setSuccess(true);
+      }
     } catch (err: unknown) {
       if (isAxiosError(err)) {
         setError(
@@ -91,8 +93,8 @@ export default function ForgotPasswordPage() {
                 Enlace despachado
               </h3>
               <p className="text-sm text-gray-300">
-                Si el correo existe en la plataforma, recibirás un link de
-                actualización.
+                Te enviamos un enlace a tu correo si está registrado en la
+                plataforma.
               </p>
             </div>
           ) : (

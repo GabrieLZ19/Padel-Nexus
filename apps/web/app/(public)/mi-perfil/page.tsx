@@ -220,6 +220,20 @@ export default function PlayerDashboard() {
                               {currentLic.nro_licencia}
                             </h2>
                           </div>
+                        ) : currentLic.estado === "Vencida" ? (
+                          <div className="w-full flex flex-col items-center gap-3">
+                            <div className="w-full p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center font-bold">
+                              Estado: Vencida
+                            </div>
+                            <h2 className="text-xl font-bold text-gray-400 font-mono">
+                              {currentLic.nro_licencia}
+                            </h2>
+                            {currentLic.fecha_vencimiento ? (
+                              <p className="text-xs text-gray-500">
+                                Venció el {fechaLatina(currentLic.fecha_vencimiento)}
+                              </p>
+                            ) : null}
+                          </div>
                         ) : (
                           <div className="w-full flex flex-col items-center gap-3">
                             <div className="w-full p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm  text-center uppercase font-bold">
