@@ -1152,10 +1152,15 @@ export class LicenciaService {
       await LicenciaOrganizacionService.resolverConfigParaLicencia(licencia);
 
     const ahora = new Date();
-    const periodo =
-      payload.periodo && /^\d{4}-\d{2}$/.test(payload.periodo)
-        ? payload.periodo
-        : periodoDesdeFecha(ahora);
+    const esMensual = config.frecuenciaPago === "mensual";
+    const periodoDefault = periodoDesdeFecha(
+      ahora,
+      esMensual ? "mensual" : "anual",
+    );
+    const periodoValido = esMensual
+      ? payload.periodo && /^\d{4}-\d{2}$/.test(payload.periodo)
+      : payload.periodo && /^\d{4}$/.test(payload.periodo);
+    const periodo = periodoValido ? String(payload.periodo) : periodoDefault;
 
     const montoDefault =
       config.frecuenciaPago === "mensual"

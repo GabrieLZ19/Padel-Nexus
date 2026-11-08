@@ -238,15 +238,21 @@ export const LicenciasController = {
           .json({ exito: false, message: "Usuario no autenticado." });
       }
 
-      if (!nombre || !apellido || !documento || !provincia || !club_id) {
+      if (!nombre || !apellido || !documento || !provincia) {
         return res.status(400).json({
           exito: false,
           message:
-            "Faltan datos obligatorios para la licencia (nombre, apellido, dni, provincia, club).",
+            "Faltan datos obligatorios para la licencia (nombre, apellido, DNI y provincia).",
         });
       }
 
-      const datosSolicitud = { nombre, apellido, documento, provincia, club_id };
+      const datosSolicitud = {
+        nombre,
+        apellido,
+        documento,
+        provincia,
+        club_id: club_id || null,
+      };
       const data = await LicenciaService.solicitar(
         usuario_id,
         datosSolicitud,

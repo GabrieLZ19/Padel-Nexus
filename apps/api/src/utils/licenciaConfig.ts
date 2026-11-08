@@ -237,9 +237,13 @@ export function descripcionVigenciaLicencia(
   return `${dia}/${mes} (${meses[mes - 1]}) de cada año`;
 }
 
-/** Período YYYY-MM a partir de una fecha. */
-export function periodoDesdeFecha(fecha: Date = new Date()): string {
+/** Período de pago: YYYY-MM (mensual) o YYYY (anual). */
+export function periodoDesdeFecha(
+  fecha: Date = new Date(),
+  frecuencia: "mensual" | "anual" = "mensual",
+): string {
   const y = fecha.getFullYear();
+  if (frecuencia === "anual") return String(y);
   const m = String(fecha.getMonth() + 1).padStart(2, "0");
   return `${y}-${m}`;
 }

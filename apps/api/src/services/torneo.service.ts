@@ -418,13 +418,69 @@ export class TorneoService {
 
     const provinciales = metricasProvincialesTablero(filas, estadosActivos);
 
+    const ultimos = await TorneoService.enriquecerSedesTablero(
+      filas.slice(0, 5) as Record<string, unknown>[],
+    );
+
     return {
       total: filas.length,
       activos,
       porAlcance,
-      ultimos: filas.slice(0, 5),
+      ultimos,
       ...provinciales,
     };
+  }
+
+  private static clubJoinNombre(raw: unknown): string | null {
+    if (!raw || typeof raw !== "object") return null;
+    if (Array.isArray(raw)) {
+      const row = raw[0];
+      if (row && typeof row === "object" && "nombre" in row) {
+        return String((row as { nombre?: string }).nombre || "") || null;
+      }
+      return null;
+    }
+    const nombre = (raw as { nombre?: string }).nombre;
+    return nombre ? String(nombre) : null;
+  }
+
+  /** Sede desde torneo_sedes cuando el torneo no tiene club_id directo. */
+  private static async enriquecerSedesTablero(
+    filas: Record<string, unknown>[],
+  ): Promise<Record<string, unknown>[]> {
+    const ids = filas
+      .map((f) => (typeof f.id === "string" ? f.id : ""))
+      .filter(Boolean);
+    if (ids.length === 0) return filas;
+
+    const existente = new Map<string, string>();
+    for (const t of filas) {
+      const nombre = TorneoService.clubJoinNombre(t.clubes);
+      const id = typeof t.id === "string" ? t.id : "";
+      if (id && nombre) existente.set(id, nombre);
+    }
+
+    const faltantes = ids.filter((id) => !existente.has(id));
+    if (faltantes.length > 0) {
+      const { data: sedes } = await supabaseAdmin
+        .from("torneo_sedes")
+        .select("torneo_id, clubes(nombre)")
+        .in("torneo_id", faltantes);
+
+      for (const row of sedes || []) {
+        const torneoId = String(row.torneo_id || "");
+        if (!torneoId || existente.has(torneoId)) continue;
+        const nombre = TorneoService.clubJoinNombre(row.clubes);
+        if (nombre) existente.set(torneoId, nombre);
+      }
+    }
+
+    return filas.map((t) => {
+      const id = typeof t.id === "string" ? t.id : "";
+      const sede = id ? existente.get(id) : null;
+      if (!sede) return t;
+      return { ...t, clubes: { nombre: sede } };
+    });
   }
 
   static async listarTorneos(

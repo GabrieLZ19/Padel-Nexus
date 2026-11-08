@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../config/supabase";
 import { AFILIACION_ESTADOS } from "../constants/afiliacion";
+import { asociacionOrigenIdDesdeAfiliaciones } from "../utils/afiliacionOrigenPase";
 import { validarPase } from "../utils/pasesRepresentacion";
 import { NotificacionService } from "./notificacion.service";
 
@@ -21,14 +22,14 @@ export class PaseRepresentacionService {
   static async solicitar(usuarioId: string, destinoId: string, motivo: string) {
     const { data: origenes, error: origenError } = await supabaseAdmin
       .from("afiliaciones")
-      .select("asociacion_id")
+      .select("asociacion_id, club_id")
       .eq("usuario_id", usuarioId)
       .eq("estado", AFILIACION_ESTADOS.ACTIVO)
       .not("asociacion_id", "is", null);
 
     if (origenError) throw new Error(origenError.message);
 
-    const origenId = origenes?.find((row) => row.asociacion_id)?.asociacion_id ?? null;
+    const origenId = asociacionOrigenIdDesdeAfiliaciones(origenes);
     const errorValidacion = validarPase({ origenId, destinoId, motivo });
     if (errorValidacion) throw new Error(errorValidacion);
 

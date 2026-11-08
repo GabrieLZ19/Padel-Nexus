@@ -17,6 +17,10 @@ import {
   sumarPuntosPorProvincia,
 } from "../utils/puntosProvincia";
 import { esTorneoDePrueba, esVisibleEnSitioPublico } from "../utils/datoPrueba";
+import {
+  mapaSiglaAsociacionProvincia,
+  provinciaParaRanking,
+} from "../utils/provinciaRanking";
 
 export interface ActualizarPuntosDTO {
   usuarioId: string;
@@ -265,6 +269,8 @@ export class RankingService {
     const userIds = uniqueData.map((jugador) => jugador.usuario_id);
     const afiliacionesMap: Record<string, { nombre: string; provincia: string }> = {};
 
+    const siglasProvincia = await mapaSiglaAsociacionProvincia();
+
     if (userIds.length > 0) {
       const { data: afs } = await supabaseAdmin
         .from("afiliaciones")
@@ -300,6 +306,11 @@ export class RankingService {
       delete perfilObj.es_prueba;
       delete perfilObj.rol;
       const clubInfo = afiliacionesMap[jugador.usuario_id] || null;
+      const provinciaRanking = provinciaParaRanking(
+        String(perfilObj.lugar_residencia || ""),
+        siglasProvincia,
+        clubInfo?.provincia,
+      );
 
       return {
         ...jugador,
@@ -310,6 +321,7 @@ export class RankingService {
         perfiles: {
           ...perfilObj,
           clubes: clubInfo,
+          provincia_ranking: provinciaRanking,
         },
       };
     });

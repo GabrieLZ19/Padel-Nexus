@@ -20,6 +20,8 @@ import {
   MarketplaceEntityAuthService,
   type EntidadMarketplaceRef,
 } from "./marketplace-entity-auth.service";
+import { fechaHoyArgentina } from "../utils/fechaArgentina";
+import { estadoPersistibleCampanaSponsor } from "../utils/sponsorCampanaVigencia";
 
 interface FiltrosProducto {
   categoria_id?: string;
@@ -1609,6 +1611,25 @@ export class MarketplaceService {
 
   // --- Sponsors y campañas ---
 
+  static async finalizarCampanasSponsorVencidas(
+    vendedorId: string,
+    hoy: string = fechaHoyArgentina(),
+  ): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from("marketplace_sponsor_campanas")
+      .update({
+        estado: "finalizada",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("vendedor_id", vendedorId)
+      .eq("estado", "activa")
+      .lt("fecha_fin", hoy);
+
+    if (error) {
+      throw new Error(`Error al cerrar campañas vencidas: ${error.message}`);
+    }
+  }
+
   static async listarSponsors(
     usuarioId: string,
     rol: string | undefined,
@@ -1745,6 +1766,7 @@ export class MarketplaceService {
     sponsorId?: string,
   ) {
     const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+    await MarketplaceService.finalizarCampanasSponsorVencidas(tienda.id);
     let query = supabaseAdmin
       .from("marketplace_sponsor_campanas")
       .select(
@@ -1796,7 +1818,10 @@ export class MarketplaceService {
     }
 
     const espacio: EspacioSponsorCampana = datos.espacio || "banner";
-    const estado: EstadoSponsorCampana = datos.estado || "borrador";
+    const estado: EstadoSponsorCampana = estadoPersistibleCampanaSponsor(
+      datos.estado || "borrador",
+      datos.fecha_fin,
+    );
 
     const { data, error } = await supabaseAdmin
       .from("marketplace_sponsor_campanas")
@@ -1833,7 +1858,7 @@ export class MarketplaceService {
 
     const { data: existente } = await supabaseAdmin
       .from("marketplace_sponsor_campanas")
-      .select("id, fecha_inicio, fecha_fin")
+      .select("id, fecha_inicio, fecha_fin, estado")
       .eq("id", campanaId)
       .eq("vendedor_id", tienda.id)
       .maybeSingle();
@@ -1899,6 +1924,14 @@ export class MarketplaceService {
     if (fechaFin < fechaInicio) {
       throw new Error("La fecha de fin no puede ser anterior al inicio.");
     }
+
+    const estadoBase = String(
+      updatePayload.estado ?? existente.estado ?? "borrador",
+    );
+    updatePayload.estado = estadoPersistibleCampanaSponsor(
+      estadoBase,
+      fechaFin,
+    );
 
     const { data, error } = await supabaseAdmin
       .from("marketplace_sponsor_campanas")
