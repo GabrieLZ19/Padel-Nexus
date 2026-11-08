@@ -3,6 +3,10 @@ import { Partido } from "@/utils/types";
 import { PairDisplay, esAlcanceNacional } from "@/components/torneos/PairDisplay";
 import { LIBRE, POR_DEFINIR } from "@/utils/etiquetaPareja";
 import { PlayerAvatar } from "@/components/torneos/MatchTeamBox";
+import {
+  etiquetaEstadoPartidoLlave,
+  partidoEstaEnCurso,
+} from "@/utils/etiquetaEstadoPartido";
 
 export const MatchCard = ({
   partido,
@@ -34,6 +38,9 @@ export const MatchCard = ({
     partido.ganador === partido.equipo_b_id && partido.ganador !== null;
   const finalizado = partido.ganador != null;
   const nacional = esAlcanceNacional(alcance);
+  const enCurso = partidoEstaEnCurso(partido);
+  const etiquetaEstado = etiquetaEstadoPartidoLlave(partido);
+  const resaltarTarjeta = enCurso || isActive;
 
   const hasA = Boolean(
     partido.equipo_a_j1 || partido.equipo_a_j2 || partido.equipo_a_id,
@@ -195,7 +202,7 @@ export const MatchCard = ({
           ? "cursor-pointer hover:border-brand-chartreuse/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-chartreuse/50"
           : ""
       } ${
-        isActive
+        resaltarTarjeta
           ? "border-brand-chartreuse/50 shadow-sm"
           : "border-brand-input"
       }`}
@@ -221,9 +228,13 @@ export const MatchCard = ({
               Finalizado
             </span>
           )}
-          {!partido.es_wo && !finalizado && (
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-brand-ayuda">
-              {isActive ? "En juego" : "Pendiente"}
+          {!partido.es_wo && !finalizado && etiquetaEstado !== "Finalizado" && (
+            <span
+              className={`text-xs font-bold uppercase tracking-[0.12em] ${
+                enCurso ? "text-brand-chartreuse" : "text-brand-ayuda"
+              }`}
+            >
+              {etiquetaEstado}
             </span>
           )}
         </div>

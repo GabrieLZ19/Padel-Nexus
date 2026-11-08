@@ -22,7 +22,10 @@ import {
   type ParejaFiscal,
 } from "@/utils/services/fiscal-panel";
 import { generarActaFiscalPdf } from "@/utils/actaFiscalPdf";
-import { generarInformePreliminarPdf } from "@/utils/informePreliminarPdf";
+import {
+  generarInformePreliminarPdf,
+  nombreFiscalInformePdf,
+} from "@/utils/informePreliminarPdf";
 import type { Partido } from "@/utils/types";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import {
@@ -1142,9 +1145,7 @@ function SeccionInformes({
         torneo,
         jugador: ficha,
         informe: inc,
-        fiscalNombre: inc.fiscales
-          ? `${inc.fiscales.apellido}, ${inc.fiscales.nombre}`
-          : "Fiscal",
+        fiscalNombre: nombreFiscalInformePdf(inc.fiscales),
       });
     } catch {
       onFeedback({

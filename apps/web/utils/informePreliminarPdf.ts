@@ -7,6 +7,18 @@ const NAVY: [number, number, number] = [15, 23, 42];
 const LIME: [number, number, number] = [163, 230, 53];
 const SLATE: [number, number, number] = [71, 85, 105];
 
+export function nombreFiscalInformePdf(
+  fiscales?: { nombre?: string | null; apellido?: string | null } | null,
+  fallback?: { nombre?: string | null; apellido?: string | null },
+): string {
+  if (fiscales?.apellido || fiscales?.nombre) {
+    return [fiscales.apellido, fiscales.nombre].filter(Boolean).join(", ");
+  }
+  const perfil = [fallback?.apellido, fallback?.nombre].filter(Boolean).join(", ");
+  if (perfil) return perfil;
+  return "Fiscal";
+}
+
 function labelPosicion(pos?: string | null): string {
   if (pos === "drive") return "Drive";
   if (pos === "reves") return "Revés";

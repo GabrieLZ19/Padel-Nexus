@@ -1,5 +1,6 @@
+import axios from "axios";
 import { api } from "../api";
-import { RankingJugador } from "../types";
+import { RankingJugador, RankingPerfilJugador } from "../types";
 
 /**
  * Tipos de ranking según el reglamento de la entidad rectora.
@@ -198,6 +199,21 @@ export const RankingsService = {
   },
 
   /** Ranking por provincias basado en resultados de un torneo nacional. */
+  async getByUserId(usuarioId: string): Promise<RankingPerfilJugador[]> {
+    try {
+      const res = await api.get<RankingApiResponse>(`/rankings/${usuarioId}`);
+      const data = res.data?.data;
+      return Array.isArray(data) ? (data as RankingPerfilJugador[]) : [];
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        if (status === 404 || status === 500) return [];
+      }
+      console.warn("Error al cargar ranking del jugador:", error);
+      return [];
+    }
+  },
+
   async getProvincialPorTorneo(torneoId: string): Promise<{
     torneoId: string;
     provincias: Array<{ provincia: string; puntos: number; parejas: number }>;

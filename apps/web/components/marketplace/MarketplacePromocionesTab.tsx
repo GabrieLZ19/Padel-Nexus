@@ -8,6 +8,8 @@ import type { AudienciaPromocion, Categoria, Producto } from "@/utils/services/m
 type DestinoPromo = "tienda" | "categoria" | "producto";
 
 interface Props {
+  /** Solo tienda federación (PUB-5). */
+  puedeAudienciaPlataforma?: boolean;
   titulo: string;
   mensaje: string;
   audiencia: AudienciaPromocion;
@@ -61,6 +63,7 @@ const destinos: { id: DestinoPromo; label: string }[] = [
 ];
 
 export default function MarketplacePromocionesTab({
+  puedeAudienciaPlataforma = false,
   titulo,
   mensaje,
   audiencia,
@@ -80,6 +83,10 @@ export default function MarketplacePromocionesTab({
   onChangeProductoId,
   onSubmit,
 }: Props) {
+  const audienciasVisibles = puedeAudienciaPlataforma
+    ? audiencias
+    : audiencias.filter((a) => a.id !== "plataforma");
+
   const productosActivos = productos.filter((p) => p.activo);
   const categoriaPreview =
     categorias.find((c) => c.id === categoriaId)?.nombre || "categoría seleccionada";
@@ -115,8 +122,14 @@ export default function MarketplacePromocionesTab({
 
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase">¿A quién enviamos?</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {audiencias.map((a) => (
+            <div
+              className={`grid grid-cols-1 gap-3 ${
+                audienciasVisibles.length >= 3
+                  ? "sm:grid-cols-3"
+                  : "sm:grid-cols-2"
+              }`}
+            >
+              {audienciasVisibles.map((a) => (
                 <button
                   key={a.id}
                   type="button"

@@ -7,10 +7,15 @@ import {
   FiscalPanelService,
   MOTIVOS_INFORME_LABELS,
   type FichaJugadorFiscal,
+  type FiscalTorneo,
   type MotivoInformeFiscal,
   type PosicionJuegoFiscal,
 } from "@/utils/services/fiscal-panel";
-import { generarInformePreliminarPdf } from "@/utils/informePreliminarPdf";
+import {
+  generarInformePreliminarPdf,
+  nombreFiscalInformePdf,
+} from "@/utils/informePreliminarPdf";
+import { useProfileStore } from "@/store/useProfileStore";
 import { NIVELES_PADEL } from "@/utils/constants/padelConfig";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import CustomDropdown from "@/components/ui/CustomDropdown";
@@ -25,7 +30,9 @@ export default function FichaJugadorFiscalPage() {
   const jugadorId = params?.jugadorId as string;
 
   const [ficha, setFicha] = useState<FichaJugadorFiscal | null>(null);
+  const [torneo, setTorneo] = useState<FiscalTorneo | null>(null);
   const [torneoNombre, setTorneoNombre] = useState("");
+  const profile = useProfileStore((s) => s.profile);
   const [loading, setLoading] = useState(true);
   const [motivoInforme, setMotivoInforme] =
     useState<MotivoInformeFiscal>("categorizacion");
@@ -56,6 +63,7 @@ export default function FichaJugadorFiscalPage() {
       FiscalPanelService.getTorneo(torneoId).catch(() => null),
     ]);
     setFicha(data);
+    if (torneo) setTorneo(torneo);
     setTorneoNombre(torneo?.nombre || "");
     setAsociacion(data.asociacion_o_club || data.lugar_residencia || "");
     setCategoriaSugerida(data.categoria_padel || "");
@@ -106,24 +114,46 @@ export default function FichaJugadorFiscalPage() {
         enviar_chat: enviarChat,
       });
 
-      const torneo = await FiscalPanelService.getTorneo(torneoId);
-      generarInformePreliminarPdf({
-        torneo,
-        jugador: ficha,
-        informe,
-        fiscalNombre: "Fiscal actuante",
+      const torneoPdf =
+        torneo ?? (await FiscalPanelService.getTorneo(torneoId).catch(() => null));
+      if (!torneoPdf) {
+        throw new Error(
+          "El informe se registró pero no se pudieron cargar los datos del torneo para el PDF.",
+        );
+      }
+
+      const fiscalNombre = nombreFiscalInformePdf(informe.fiscales, {
+        nombre: profile?.nombre,
+        apellido: profile?.apellido,
       });
+
+      let pdfDescargado = false;
+      try {
+        generarInformePreliminarPdf({
+          torneo: torneoPdf,
+          jugador: ficha,
+          informe,
+          fiscalNombre,
+        });
+        pdfDescargado = true;
+      } catch (pdfError) {
+        console.error("Error al generar PDF del informe:", pdfError);
+      }
 
       setCuerpo("");
       setMotivoTraza("");
-      await cargar();
+      void cargar();
+
+      const baseOk = informe.conversacion_id
+        ? "Quedó registrado como interno y se remitió copia por mensajería interna al Fiscal General."
+        : "Quedó registrado como interno en el torneo.";
       setFeedback({
         isOpen: true,
-        title: "Informe preliminar emitido",
-        description: informe.conversacion_id
-          ? "Quedó registrado como interno, se descargó el PDF y se remitió copia por mensajería interna al Fiscal General."
-          : "Quedó registrado como interno y se descargó el PDF oficial de respaldo.",
-        type: "success",
+        title: pdfDescargado ? "Informe preliminar emitido" : "Informe registrado",
+        description: pdfDescargado
+          ? `${baseOk} Se descargó el PDF con el fiscal ${fiscalNombre}.`
+          : `${baseOk} No se pudo descargar el PDF: reintentá desde la pestaña Informes del torneo.`,
+        type: pdfDescargado ? "success" : "warning",
         onClose: () => setFeedback((p) => ({ ...p, isOpen: false })),
       });
     } catch (error: unknown) {
@@ -281,7 +311,9 @@ export default function FichaJugadorFiscalPage() {
           disabled={saving}
           className="bg-brand-chartreuse text-brand-black font-bold px-5 py-3 rounded-xl text-sm cursor-pointer disabled:opacity-60"
         >
-          {saving ? "Emitiendo…" : "Emitir informe y descargar PDF"}
+          {saving
+            ? "Registrando informe y preparando PDF…"
+            : "Emitir informe y descargar PDF"}
         </button>
       </form>
 

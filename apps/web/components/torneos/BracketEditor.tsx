@@ -1654,11 +1654,6 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                                   setMatchEditMotivo("");
                                   setShowMatchEditModal(true);
                                 }}
-                                isActive={
-                                  partido.ganador === null &&
-                                  partido.equipo_a_id !== null &&
-                                  partido.equipo_b_id !== null
-                                }
                               />
 
                               {rondaIndex > 0 && (

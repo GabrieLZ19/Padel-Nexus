@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   User,
@@ -13,10 +13,15 @@ import {
   Calendar,
 } from "lucide-react";
 import { PerfilService } from "@/utils/services/perfil";
-import { Perfil } from "@/utils/types";
+import { RankingsService } from "@/utils/services/rankings";
+import { Perfil, RankingPerfilJugador } from "@/utils/types";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
+import { formatNombreJugador } from "@/utils/formatoNombreJugador";
 import { useProfileStore } from "@/store/useProfileStore";
 import { puedeVerFichaCompleta } from "@/utils/auth/roles";
+import JugadorPublicoRankingSection, {
+  elegirRegistroPrincipal,
+} from "@/components/jugador/JugadorPublicoRankingSection";
 
 type PerfilVista = Partial<Perfil> & {
   clubes?: { id?: string; nombre?: string } | null;
@@ -47,23 +52,41 @@ function FieldRow({
 export default function FichaJugadorPublicaPage() {
   const { id } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const viewer = useProfileStore((s) => s.profile);
   const esCompleta = puedeVerFichaCompleta(viewer?.rol);
 
+  const posicionQuery = searchParams.get("posicion");
+  const scopeQuery = searchParams.get("scope");
+  const categoriaQuery = searchParams.get("categoria");
+
   const [perfil, setPerfil] = useState<PerfilVista | null>(null);
+  const [registrosRanking, setRegistrosRanking] = useState<
+    RankingPerfilJugador[]
+  >([]);
   const [loading, setLoading] = useState(true);
 
   const fetchPerfil = useCallback(
     async (mounted: boolean) => {
       if (!id) return;
       try {
-        const data = esCompleta
-          ? await PerfilService.getById(id as string)
-          : await PerfilService.getPublico(id as string);
-        if (mounted) setPerfil(data);
+        const userId = id as string;
+        const [perfilData, rankingData] = await Promise.all([
+          esCompleta
+            ? PerfilService.getById(userId).catch(() => null)
+            : PerfilService.getPublico(userId).catch(() => null),
+          RankingsService.getByUserId(userId),
+        ]);
+        if (mounted) {
+          setPerfil(perfilData);
+          setRegistrosRanking(rankingData);
+        }
       } catch (error) {
         console.error("Error al cargar ficha del jugador:", error);
-        if (mounted) setPerfil(null);
+        if (mounted) {
+          setPerfil(null);
+          setRegistrosRanking([]);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -93,7 +116,13 @@ export default function FichaJugadorPublicaPage() {
     );
   }
 
-  if (!perfil) {
+  const registroPrincipal = elegirRegistroPrincipal(
+    registrosRanking,
+    scopeQuery,
+    categoriaQuery,
+  );
+
+  if (!perfil && !registroPrincipal) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 px-6">
         <p className="text-gray-500">No se encontró el jugador.</p>
@@ -108,16 +137,35 @@ export default function FichaJugadorPublicaPage() {
     );
   }
 
-  const nombreCompleto = perfil.nombre
+  const nombreCompleto = perfil?.nombre
     ? `${(perfil.apellido || "").toUpperCase()}, ${perfil.nombre}`
-    : "Jugador";
+    : formatNombreJugador(
+        registroPrincipal?.perfiles?.nombre,
+        registroPrincipal?.perfiles?.apellido,
+        "Jugador",
+      );
+
+  const avatarUrl =
+    (perfil?.es_menor ? null : perfil?.avatar_url) ||
+    registroPrincipal?.perfiles?.avatar_url ||
+    null;
 
   const clubNombre =
-    (perfil.clubes &&
+    (perfil?.clubes &&
       typeof perfil.clubes === "object" &&
       "nombre" in perfil.clubes &&
       perfil.clubes.nombre) ||
+    registroPrincipal?.perfiles?.clubes?.nombre ||
     null;
+
+  const categoriaDisplay =
+    perfil?.categoria_padel ||
+    registroPrincipal?.categoria ||
+    registroPrincipal?.perfiles?.categoria_padel;
+  const residenciaDisplay =
+    perfil?.lugar_residencia ||
+    registroPrincipal?.perfiles?.lugar_residencia ||
+    registroPrincipal?.provincia_jurisdiccion;
 
   return (
     <div className="min-h-[70vh] w-full pb-16">
@@ -134,41 +182,48 @@ export default function FichaJugadorPublicaPage() {
           </button>
 
           <div className="flex flex-col sm:flex-row sm:items-end gap-5 sm:gap-7">
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[#161616] border border-white/10 overflow-hidden flex items-center justify-center text-gray-500 shrink-0 shadow-xl">
-              {perfil.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={perfil.avatar_url}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <User className="size-10" />
-              )}
+            <div className="relative shrink-0">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-[#161616] border border-white/10 overflow-hidden flex items-center justify-center text-gray-500 shadow-xl">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <User className="size-10" />
+                )}
+              </div>
+              {posicionQuery ? (
+                <span className="absolute -bottom-1 -right-1 rounded-xl border border-brand-chartreuse bg-brand-black px-2.5 py-1 text-xs font-black text-brand-chartreuse">
+                  #{posicionQuery}
+                </span>
+              ) : null}
             </div>
 
             <div className="min-w-0 flex-1 pb-1">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-chartreuse/80 mb-2">
-                {esCompleta ? "Ficha completa" : "Jugador"}
+                {esCompleta ? "Ficha completa" : "Ficha deportiva y ranking"}
               </p>
               <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight truncate">
                 {nombreCompleto}
               </h1>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-gray-400">
-                {perfil.categoria_padel ? (
+                {categoriaDisplay ? (
                   <span className="font-semibold text-gray-300">
-                    Cat. {etiquetaCategoria(perfil.categoria_padel)}
+                    Cat. {etiquetaCategoria(categoriaDisplay)}
                   </span>
                 ) : null}
-                {perfil.lugar_residencia ? (
+                {residenciaDisplay ? (
                   <span className="inline-flex items-center gap-1.5">
                     <MapPin className="size-3.5" />
-                    {perfil.lugar_residencia}
+                    {residenciaDisplay}
                   </span>
                 ) : null}
                 {clubNombre ? <span>{clubNombre}</span> : null}
               </div>
-              {esCompleta && perfil.email ? (
+              {esCompleta && perfil?.email ? (
                 <p className="text-gray-500 flex items-center gap-2 text-sm mt-2">
                   <Mail className="size-3.5 shrink-0" /> {perfil.email}
                 </p>
@@ -185,44 +240,53 @@ export default function FichaJugadorPublicaPage() {
             esCompleta ? "lg:grid-cols-2" : ""
           }`}
         >
-          <section>
-            <h2 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.18em] mb-1">
-              Perfil deportivo
-            </h2>
-            <div className="border-t border-white/8">
-              <FieldRow
-                icon={<Medal className="size-4 text-brand-chartreuse/70" />}
-                label="Categoría"
-                value={etiquetaCategoria(perfil.categoria_padel) || "—"}
-              />
-              <FieldRow
-                icon={<Swords className="size-4 text-brand-chartreuse/70" />}
-                label="Lado"
-                value={perfil.lado_preferido || "—"}
-              />
-              <FieldRow
-                icon={<MapPin className="size-4 text-brand-chartreuse/70" />}
-                label="Residencia"
-                value={perfil.lugar_residencia || "—"}
-              />
-              {clubNombre ? (
+          <div className="space-y-10">
+            <section>
+              <h2 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.18em] mb-1">
+                Perfil deportivo
+              </h2>
+              <div className="border-t border-white/8">
                 <FieldRow
-                  icon={<User className="size-4 text-brand-chartreuse/70" />}
-                  label="Club"
-                  value={clubNombre}
+                  icon={<Medal className="size-4 text-brand-chartreuse/70" />}
+                  label="Categoría"
+                  value={etiquetaCategoria(categoriaDisplay) || "—"}
                 />
-              ) : null}
-              {perfil.sexo ? (
                 <FieldRow
-                  icon={<User className="size-4 text-brand-chartreuse/70" />}
-                  label="Sexo"
-                  value={perfil.sexo}
+                  icon={<Swords className="size-4 text-brand-chartreuse/70" />}
+                  label="Lado"
+                  value={perfil?.lado_preferido || "—"}
                 />
-              ) : null}
-            </div>
-          </section>
+                <FieldRow
+                  icon={<MapPin className="size-4 text-brand-chartreuse/70" />}
+                  label="Residencia"
+                  value={residenciaDisplay || "—"}
+                />
+                {clubNombre ? (
+                  <FieldRow
+                    icon={<User className="size-4 text-brand-chartreuse/70" />}
+                    label="Club"
+                    value={clubNombre}
+                  />
+                ) : null}
+                {perfil?.sexo ? (
+                  <FieldRow
+                    icon={<User className="size-4 text-brand-chartreuse/70" />}
+                    label="Sexo"
+                    value={perfil.sexo}
+                  />
+                ) : null}
+              </div>
+            </section>
 
-          {esCompleta ? (
+            <JugadorPublicoRankingSection
+              registros={registrosRanking}
+              principal={registroPrincipal}
+              posicion={posicionQuery}
+              scope={scopeQuery}
+            />
+          </div>
+
+          {esCompleta && perfil ? (
             <section>
               <h2 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.18em] mb-1">
                 Datos de contralor

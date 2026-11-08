@@ -25,6 +25,8 @@ import {
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import Pagination from "@/components/ui/Pagination";
 import Image from "next/image";
+import Link from "next/link";
+import { hrefFichaJugadorPublica } from "@/utils/navigation/jugadorPublico";
 
 export default function RankingPublicPage() {
   const [rankings, setRankings] = useState<RankingJugador[]>([]);
@@ -127,6 +129,13 @@ export default function RankingPublicPage() {
   const etiquetaCategoria =
     opcionesCategorias.find((opcion) => opcion.value === activeCategory)
       ?.label || activeCategory;
+
+  const ctxFicha = (player: RankingJugador, posicion: number) =>
+    hrefFichaJugadorPublica(player.usuario_id, {
+      posicion,
+      scope: activeScope,
+      categoria: activeCategory,
+    });
 
   return (
     <div className="min-h-screen bg-brand-black text-brand-white font-sans selection:bg-brand-chartreuse selection:text-brand-black pb-20">
@@ -258,9 +267,12 @@ export default function RankingPublicPage() {
                     )}
                   </div>
                   <Medal className="text-gray-400 size-6 mb-2 mt-4 md:mt-0" />
-                  <div className="font-black text-xl text-brand-white truncate w-full px-2 mb-1">
+                  <Link
+                    href={ctxFicha(top2, 2)}
+                    className="font-black text-xl text-brand-white truncate w-full px-2 mb-1 hover:text-brand-chartreuse transition-colors"
+                  >
                     {formatNombreJugador(top2?.perfiles?.nombre, top2?.perfiles?.apellido, "A confirmar")}
-                  </div>
+                  </Link>
                   <div className="text-gray-400 text-sm font-semibold mb-3">
                     {top2.perfiles?.clubes?.nombre || "Particular"}
                   </div>
@@ -293,9 +305,14 @@ export default function RankingPublicPage() {
                 <div className="text-brand-chartreuse font-black text-lg tracking-widest mb-1 mt-4 md:mt-0">
                   1.º
                 </div>
-                <div className="font-black text-2xl md:text-3xl text-brand-white truncate w-full px-2 mb-1">
-                  {formatNombreJugador(top1?.perfiles?.nombre, top1?.perfiles?.apellido, "A confirmar")}
-                </div>
+                {top1 ? (
+                  <Link
+                    href={ctxFicha(top1, 1)}
+                    className="font-black text-2xl md:text-3xl text-brand-white truncate w-full px-2 mb-1 hover:text-brand-chartreuse transition-colors block"
+                  >
+                    {formatNombreJugador(top1.perfiles?.nombre, top1.perfiles?.apellido, "A confirmar")}
+                  </Link>
+                ) : null}
                 <div className="text-gray-400 text-sm font-semibold mb-4">
                   {top1?.perfiles?.clubes?.nombre || "Particular"}
                 </div>
@@ -323,9 +340,12 @@ export default function RankingPublicPage() {
                     )}
                   </div>
                   <Medal className="text-amber-600 size-6 mb-2 mt-4 md:mt-0" />
-                  <div className="font-black text-xl text-brand-white truncate w-full px-2 mb-1">
+                  <Link
+                    href={ctxFicha(top3, 3)}
+                    className="font-black text-xl text-brand-white truncate w-full px-2 mb-1 hover:text-brand-chartreuse transition-colors"
+                  >
                     {formatNombreJugador(top3?.perfiles?.nombre, top3?.perfiles?.apellido, "A confirmar")}
-                  </div>
+                  </Link>
                   <div className="text-gray-400 text-sm font-semibold mb-3">
                     {top3.perfiles?.clubes?.nombre || "Particular"}
                   </div>
@@ -340,10 +360,12 @@ export default function RankingPublicPage() {
             <div className="md:hidden flex flex-col gap-3">
               {tablePlayers.map((player, index) => {
                 const posicionReal = startIndex + index + 1;
+                const fichaHref = ctxFicha(player, posicionReal);
                 return (
-                  <div
+                  <Link
                     key={player.id}
-                    className="bg-brand-card border border-brand-white/5 rounded-2xl p-4 flex items-center gap-4 shadow-lg"
+                    href={fichaHref}
+                    className="bg-brand-card border border-brand-white/5 rounded-2xl p-4 flex items-center gap-4 shadow-lg hover:border-brand-chartreuse/30 transition-colors"
                   >
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shrink-0 border ${
                        posicionReal === 1
@@ -389,7 +411,7 @@ export default function RankingPublicPage() {
                         </span>
                       )}
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -420,6 +442,8 @@ export default function RankingPublicPage() {
                           : "0%";
                       const posicionReal = startIndex + index + 1;
 
+                      const fichaHref = ctxFicha(player, posicionReal);
+
                       return (
                         <tr
                           key={player.id}
@@ -436,22 +460,28 @@ export default function RankingPublicPage() {
                            }`}>
                             {posicionReal === 1 ? "1.º" : posicionReal}
                           </td>
-                          <td className="py-5 px-6 flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-full bg-brand-black border border-brand-white/10 flex items-center justify-center text-gray-500 overflow-hidden shrink-0 group-hover:border-brand-chartreuse/50 transition-colors shadow-sm relative">
-                              {player.perfiles?.avatar_url ? (
-                                <Image
-                                  src={player.perfiles.avatar_url}
-                                  alt="Avatar"
-                                  fill
-                                  className="object-cover"
-                                />
-                              ) : (
-                                <User className="size-4" />
-                              )}
-                            </div>
-                            <span className="font-bold text-sm text-white group-hover:opacity-95 transition-all">
-                              {formatNombreJugador(player.perfiles?.nombre, player.perfiles?.apellido, "Jugador Desconocido")}
-                            </span>
+                          <td className="py-5 px-6">
+                            <Link
+                              href={fichaHref}
+                              className="flex items-center gap-4 group/name"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="w-10 h-10 rounded-full bg-brand-black border border-brand-white/10 flex items-center justify-center text-gray-500 overflow-hidden shrink-0 group-hover:border-brand-chartreuse/50 transition-colors shadow-sm relative">
+                                {player.perfiles?.avatar_url ? (
+                                  <Image
+                                    src={player.perfiles.avatar_url}
+                                    alt="Avatar"
+                                    fill
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <User className="size-4" />
+                                )}
+                              </div>
+                              <span className="font-bold text-sm text-white group-hover/name:text-brand-chartreuse transition-colors">
+                                {formatNombreJugador(player.perfiles?.nombre, player.perfiles?.apellido, "Jugador Desconocido")}
+                              </span>
+                            </Link>
                           </td>
                           <td className="py-5 px-6">
                             <span className="bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20 px-3 py-1.5 rounded-lg text-xs font-black uppercase">

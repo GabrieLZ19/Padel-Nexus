@@ -157,6 +157,14 @@ export default function MarketplaceCrmPanel({
     return { entidad_tipo: entidadTipo, entidad_id: entidadId };
   }, [entidadTipo, entidadId]);
 
+  const puedePromoPlataforma = entidadTipo === "federacion";
+
+  useEffect(() => {
+    if (!puedePromoPlataforma && promoAudiencia === "plataforma") {
+      setPromoAudiencia("afiliados");
+    }
+  }, [puedePromoPlataforma, promoAudiencia]);
+
   const nombreEntidadSeleccionada = useMemo(() => {
     if (entidadTipo === "club") {
       return entidades.clubes.find((c) => c.id === entidadId)?.nombre;
@@ -601,6 +609,7 @@ export default function MarketplaceCrmPanel({
                   <p className="text-gray-500 text-sm">Publicá tu tienda para enviar promociones.</p>
                 ) : (
                   <MarketplacePromocionesTab
+                    puedeAudienciaPlataforma={puedePromoPlataforma}
                     titulo={promoTitulo}
                     mensaje={promoMensaje}
                     audiencia={promoAudiencia}

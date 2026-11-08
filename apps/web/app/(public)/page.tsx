@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import { Search, Trophy, TrendingUp, Calendar } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
@@ -14,6 +15,7 @@ import { Torneo, RankingJugador } from "@/utils/types";
 import { formatFechaCalendario } from "@/utils/formatFecha";
 import { CATEGORIA_RANKING_PUBLICO } from "@/utils/rankings/orden";
 import { formatNombreJugador } from "@/utils/formatoNombreJugador";
+import { hrefFichaJugadorPublica } from "@/utils/navigation/jugadorPublico";
 
 function formatoCifra(valor: number): string {
   return new Intl.NumberFormat("es-AR").format(valor);
@@ -231,20 +233,25 @@ export default function LandingPage() {
               ))
             ) : rankings.length > 0 ? (
               rankings.map((r, i) => (
-                <div
+                <Link
                   key={r.usuario_id || i}
-                  className="flex items-center justify-between border-b border-brand-white/5 pb-3"
+                  href={hrefFichaJugadorPublica(r.usuario_id, {
+                    posicion: i + 1,
+                    scope: "Provincial",
+                    categoria: CATEGORIA_RANKING_PUBLICO,
+                  })}
+                  className="flex items-center justify-between border-b border-brand-white/5 pb-3 hover:bg-white/[0.03] -mx-2 px-2 rounded-lg transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <span className="font-black text-gray-600">0{i + 1}</span>
-                    <span className="text-sm font-medium">
+                    <span className="text-sm font-medium hover:text-brand-chartreuse">
                       {formatNombreJugador(r.perfiles?.nombre, r.perfiles?.apellido)}
                     </span>
                   </div>
                   <span className="text-brand-chartreuse font-bold">
                     {r.puntos} pts
                   </span>
-                </div>
+                </Link>
               ))
             ) : (
               <p className="text-sm text-gray-400">

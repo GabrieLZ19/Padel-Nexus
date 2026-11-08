@@ -780,11 +780,6 @@ export function FapBracketDiagram({
                       !!cabezasSerieIds?.has(String(node.partido.equipo_b_id))
                     }
                     onEditSelect={onMatchClick}
-                    isActive={
-                      node.partido.ganador == null &&
-                      node.partido.equipo_a_id != null &&
-                      node.partido.equipo_b_id != null
-                    }
                   />
                 </div>
               );

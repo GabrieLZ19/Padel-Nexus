@@ -38,3 +38,26 @@ export interface HistorialRanking {
   puntos_nuevos: number;
   created_at?: string;
 }
+
+/** Registro de ranking + historial, devuelto por GET /rankings/:usuario_id */
+export interface RankingPerfilJugador {
+  id: string;
+  usuario_id: string;
+  puntos: number;
+  categoria: string;
+  rama?: string | null;
+  pj?: number | null;
+  pg?: number | null;
+  tendencia?: number | null;
+  alcance?: string | null;
+  provincia_jurisdiccion?: string | null;
+  perfiles?: {
+    nombre?: string | null;
+    apellido?: string | null;
+    categoria_padel?: string | null;
+    avatar_url?: string | null;
+    lugar_residencia?: string | null;
+    clubes?: { nombre?: string; provincia?: string } | null;
+  } | null;
+  historial_ranking?: HistorialRanking[];
+}
