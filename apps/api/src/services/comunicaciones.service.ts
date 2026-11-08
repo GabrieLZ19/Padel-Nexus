@@ -409,7 +409,16 @@ export class ComunicacionesService {
       );
     }
 
-    const actuales = (lista.miembros || []).map((m) => m.perfil_id);
+    type MiembroLista = {
+      perfil_id: string;
+      nombre: string | null;
+      apellido: string | null;
+      email: string | null;
+      avatar_url: string | null;
+    };
+    const actuales = ((lista.miembros as MiembroLista[] | undefined) || []).map(
+      (m) => m.perfil_id,
+    );
     const merged = [...new Set([...actuales, ...permitidos])];
     await this.reemplazarMiembros(listaId, merged);
     return this.obtenerLista(ownerId, listaId);

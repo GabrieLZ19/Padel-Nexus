@@ -1,5 +1,15 @@
 import { Request, Response } from "express";
+import { supabaseAdmin } from "../config/supabase";
 import { LicenciaClubService } from "../services/licenciaClub.service";
+
+async function clubIdAsignadoAlUsuario(userId: string): Promise<string | null> {
+  const { data: perfil } = await supabaseAdmin
+    .from("perfiles")
+    .select("club_id")
+    .eq("id", userId)
+    .maybeSingle();
+  return perfil?.club_id ? String(perfil.club_id) : null;
+}
 
 const ROLES_GESTION = [
   "superadmin",
@@ -20,8 +30,9 @@ export const LicenciaClubController = {
           .status(400)
           .json({ exito: false, error: "ID del club requerido." });
       }
-      if (req.user?.rol === "admin_club") {
-        if (String(req.user.club_id || "") !== clubId) {
+      if (req.user?.rol === "admin_club" && req.user.id) {
+        const clubUsuario = await clubIdAsignadoAlUsuario(req.user.id);
+        if (String(clubUsuario || "") !== clubId) {
           return res
             .status(403)
             .json({ exito: false, error: "No podés ver la licencia de otro club." });
@@ -121,7 +132,14 @@ export const LicenciaClubController = {
 
   async obtenerMiClub(req: Request, res: Response): Promise<Response> {
     try {
-      const clubId = req.user?.club_id;
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          exito: false,
+          error: "Sesión no válida.",
+        });
+      }
+      const clubId = await clubIdAsignadoAlUsuario(userId);
       if (!clubId) {
         return res.status(400).json({
           exito: false,

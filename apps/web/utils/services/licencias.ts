@@ -5,7 +5,7 @@ interface DatosSolicitud {
   nombre: string;
   apellido: string;
   documento: string;
-  club_id: string;
+  club_id?: string;
   provincia: string;
 }
 
