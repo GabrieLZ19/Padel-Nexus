@@ -8,6 +8,7 @@ import { LicenciaVencimientoEditor } from "./LicenciaVencimientoEditor";
 import { LicenciaPagosHistorial } from "./LicenciaPagosHistorial";
 import { MenuPuntos, type ItemMenuPuntos } from "@/components/ui/MenuPuntos";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
+import { licenciaFrecuenciaPago } from "@/utils/licenciaPago";
 import { ALTO_FILA_JUGADOR_PX } from "@/utils/jugadoresListado";
 
 interface LicenciaJugadorCardProps {
@@ -201,7 +202,11 @@ export function LicenciaJugadorCard({
           {vencimiento}
         </div>
         {pagosAbiertos ? (
-          <LicenciaPagosHistorial licenciaId={licencia.id} siempreAbierto />
+          <LicenciaPagosHistorial
+            licenciaId={licencia.id}
+            siempreAbierto
+            frecuenciaPago={licenciaFrecuenciaPago(licencia)}
+          />
         ) : null}
       </article>
     );
@@ -243,7 +248,11 @@ export function LicenciaJugadorCard({
       {pagosAbiertos ? (
         <tr className="border-b border-white/5 bg-black/20">
           <td colSpan={7} className="px-0 py-0">
-            <LicenciaPagosHistorial licenciaId={licencia.id} siempreAbierto />
+            <LicenciaPagosHistorial
+              licenciaId={licencia.id}
+              siempreAbierto
+              frecuenciaPago={licenciaFrecuenciaPago(licencia)}
+            />
           </td>
         </tr>
       ) : null}

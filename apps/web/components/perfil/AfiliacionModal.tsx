@@ -8,12 +8,18 @@ import { PasesService } from "@/utils/services/pases";
 import { Perfil } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal from "@/components/ui/FeedbackModal";
+import type { PaseRepresentacion } from "@/utils/services/pases";
+import {
+  asociacionOrigenIdDesdeAfiliaciones,
+  etiquetaAsociacionOrigen,
+} from "@/utils/afiliacionOrigenPase";
 
 interface AfiliacionModalProps {
   isOpen: boolean;
   onClose: () => void;
   userProfile: Perfil | null;
   fetchProfile: () => void;
+  pasePendiente?: PaseRepresentacion | null;
 }
 
 export default function AfiliacionModal({
@@ -21,6 +27,7 @@ export default function AfiliacionModal({
   onClose,
   userProfile,
   fetchProfile,
+  pasePendiente = null,
 }: AfiliacionModalProps) {
   const [asociaciones, setAsociaciones] = useState<Asociacion[]>([]);
   const [destinoId, setDestinoId] = useState("");
@@ -39,9 +46,10 @@ export default function AfiliacionModal({
     type: "info",
   });
 
-  const origen = userProfile?.afiliaciones?.find(
-    (af) => af.asociacion_id && af.estado?.toLowerCase() === "activo",
+  const origenAsociacionId = asociacionOrigenIdDesdeAfiliaciones(
+    userProfile?.afiliaciones,
   );
+  const origenEtiqueta = etiquetaAsociacionOrigen(origenAsociacionId, asociaciones);
 
   useEffect(() => {
     if (!isOpen) {
@@ -63,7 +71,7 @@ export default function AfiliacionModal({
   }, [isOpen]);
 
   const opciones = asociaciones
-    .filter((asoc) => asoc.id !== origen?.asociacion_id)
+    .filter((asoc) => asoc.id !== origenAsociacionId)
     .map((asoc) => ({
       value: asoc.id,
       label: asoc.provincia ? `${asoc.nombre} · ${asoc.provincia}` : asoc.nombre,
@@ -156,10 +164,19 @@ export default function AfiliacionModal({
               </div>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              Origen: {origen?.entidad || "sin asociación activa"}
+              Origen: {origenEtiqueta}
             </p>
           </div>
 
+          {pasePendiente ? (
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-gray-300 space-y-2">
+              <p className="font-bold text-amber-200">Ya tenés un pase pendiente</p>
+              <p className="text-xs text-gray-400">
+                Cancelalo desde tu panel o esperá que la asociación lo apruebe o
+                rechace antes de pedir otro.
+              </p>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 block">
@@ -199,6 +216,7 @@ export default function AfiliacionModal({
               )}
             </button>
           </form>
+          )}
         </motion.div>
       </div>
 

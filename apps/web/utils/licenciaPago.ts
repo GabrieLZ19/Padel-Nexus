@@ -9,6 +9,20 @@ export function licenciaEstadoPago(licencia: Licencia | null | undefined): strin
   return datos?.estado_pago || "no_aplica";
 }
 
+export function etiquetaPeriodoLicencia(
+  periodo: string,
+  frecuencia: "anual" | "mensual",
+): string {
+  if (frecuencia === "anual" && /^\d{4}$/.test(periodo)) {
+    return `Año ${periodo}`;
+  }
+  if (/^\d{4}-\d{2}$/.test(periodo)) {
+    const [y, m] = periodo.split("-");
+    return `${m}/${y}`;
+  }
+  return periodo;
+}
+
 export function licenciaFrecuenciaPago(
   licencia: Licencia | null | undefined,
 ): "anual" | "mensual" {

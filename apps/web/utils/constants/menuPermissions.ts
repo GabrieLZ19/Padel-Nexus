@@ -27,6 +27,7 @@ const MENU_POR_ROL: Record<string, string[]> = {
     "/dashboard",
     "/dashboard/torneos",
     "/dashboard/inscripciones",
+    "/dashboard/clubes",
     "/dashboard/asociaciones",
     "/dashboard/jugadores",
     "/dashboard/fiscales",

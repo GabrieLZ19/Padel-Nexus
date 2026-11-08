@@ -26,3 +26,12 @@ Fuente: plan `qa_testeo_06-11_1f832d0d.plan.md` y PDF del informe.
 | RES-9 | Hecho | Agenda club: turnos en franja bloqueada muestran Bloqueado + motivo |
 | RES-10 | Hecho | Comunicaciones club: audiencia inicial jugadores_club sin selector provincia |
 | RES-11 | Hecho | Montos $8.000, checkout dirección, voseo chat/transferencias, plural notif. |
+
+## Fase D — detalles ENT
+
+| Código | Estado | Notas |
+|--------|--------|-------|
+| ENT-8 | Hecho | Historial campañas: `formatearFechaHoraArgentina` (24 h, AR) |
+| ENT-12 | Hecho | Mi panel: pase pendiente + cancelar; origen = asociación (no club) |
+| ENT-13 | Hecho | Sponsors: activa a finalizada si fecha_fin paso (hoy AR); filtro publico listo |
+| ENT-14 | Hecho | Licencia copy/club opcional; pago anual; ranking APN; clubes fed; sede tablero; SA marketplace |

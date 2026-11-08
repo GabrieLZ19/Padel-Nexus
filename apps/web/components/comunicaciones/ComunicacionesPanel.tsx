@@ -40,6 +40,7 @@ import {
   audienciaInicialSegunRol,
   debeRealinearAudienciaClub,
 } from "@/utils/comunicacionesAudienciaDefault";
+import { formatearFechaHoraArgentina } from "@/utils/fechaArgentina";
 import type {
   AudienciaPreview,
   ComunicacionesAudienciaTipo,
@@ -2033,7 +2034,7 @@ export default function ComunicacionesPanel() {
                         </p>
                       </div>
                       <span className="text-[10px] text-gray-600 shrink-0">
-                        {new Date(c.created_at).toLocaleString("es-AR")}
+                        {formatearFechaHoraArgentina(c.created_at)}
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">

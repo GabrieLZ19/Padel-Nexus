@@ -42,6 +42,10 @@ const ESTADOS: { value: EstadoSponsorCampana; label: string }[] = [
   { value: "finalizada", label: "Finalizada" },
 ];
 
+function etiquetaEstadoCampana(estado: EstadoSponsorCampana): string {
+  return ESTADOS.find((e) => e.value === estado)?.label ?? estado;
+}
+
 const emptySponsorForm = {
   nombre: "",
   contacto_email: "",
@@ -443,7 +447,17 @@ export default function MarketplaceSponsorsTab({ entidadRef }: Props) {
                               {c.provincia ? ` · ${c.provincia}` : ""}
                               {c.categoria ? ` · ${c.categoria}` : ""}
                               {" · "}
-                              <span className="capitalize">{c.estado}</span>
+                              <span
+                                className={
+                                  c.estado === "finalizada"
+                                    ? "text-gray-500"
+                                    : c.estado === "activa"
+                                      ? "text-brand-chartreuse"
+                                      : ""
+                                }
+                              >
+                                {etiquetaEstadoCampana(c.estado)}
+                              </span>
                             </p>
                           </div>
                           <div className="flex gap-2">

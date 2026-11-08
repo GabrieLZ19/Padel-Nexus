@@ -66,11 +66,8 @@ function tipoTiendaDesdeRol(
 ): EntidadMarketplaceTipo {
   if (modoClub || rol === "admin_club") return "club";
   if (rol === "admin_provincial") return "asociacion";
-  if (
-    rol === "admin_federacion" ||
-    rol === "admin" ||
-    rol === "superadmin"
-  ) {
+  if (rol === "superadmin") return "federacion";
+  if (rol === "admin_federacion" || rol === "admin") {
     return "federacion";
   }
   return "club";
@@ -178,10 +175,15 @@ export default function MarketplaceCrmPanel({
   const cargarEntidades = useCallback(async () => {
     const data = await MarketplaceService.crmGetEntidades();
     setEntidades(data);
+    if (mostrarModeracion && profile?.rol === "superadmin") {
+      setEntidadTipo("federacion");
+      setEntidadId("");
+      return;
+    }
     const tipo = tipoTiendaDesdeRol(profile?.rol, modoClub);
     setEntidadTipo(tipo);
     setEntidadId((prev) => primeraEntidadId(tipo, data, prev));
-  }, [modoClub, profile?.rol]);
+  }, [modoClub, profile?.rol, mostrarModeracion]);
 
   const cargarTienda = useCallback(async (ref: EntidadRef) => {
     const tiendaData = await MarketplaceService.crmGetTienda(ref);
@@ -207,6 +209,12 @@ export default function MarketplaceCrmPanel({
       setNombreTienda(nombreEntidadSeleccionada || "");
     }
   }, [nombreEntidadSeleccionada]);
+
+  useEffect(() => {
+    if (mostrarModeracion && profile?.rol === "superadmin") {
+      setVistaModeracion(true);
+    }
+  }, [mostrarModeracion, profile?.rol]);
 
   useEffect(() => {
     setLoading(true);

@@ -6,6 +6,7 @@ import {
   LicenciasService,
   type LicenciaPago,
 } from "@/utils/services/licencias";
+import { etiquetaPeriodoLicencia } from "@/utils/licenciaPago";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { sileo } from "sileo";
 
@@ -15,6 +16,7 @@ interface LicenciaPagosHistorialProps {
   puedeRegistrar?: boolean;
   /** Abre el listado de una vez, para la fila expandida de la tabla. */
   siempreAbierto?: boolean;
+  frecuenciaPago?: "anual" | "mensual";
 }
 
 /**
@@ -25,7 +27,9 @@ export function LicenciaPagosHistorial({
   licenciaId,
   puedeRegistrar = true,
   siempreAbierto = false,
+  frecuenciaPago = "mensual",
 }: LicenciaPagosHistorialProps) {
+  const esAnual = frecuenciaPago === "anual";
   const [open, setOpen] = useState(siempreAbierto);
   const [pagos, setPagos] = useState<LicenciaPago[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,7 +120,7 @@ export function LicenciaPagosHistorial({
                 >
                   <div className="min-w-0">
                     <p className="font-bold text-brand-white tabular-nums">
-                      {p.periodo}
+                      {etiquetaPeriodoLicencia(p.periodo, frecuenciaPago)}
                     </p>
                     <p className="text-[10px] text-gray-500 truncate">
                       {p.metodo || "manual"}
@@ -140,7 +144,7 @@ export function LicenciaPagosHistorial({
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border border-brand-chartreuse/30 text-brand-chartreuse hover:bg-brand-chartreuse/10 cursor-pointer"
             >
               <CalendarPlus className="size-3.5" />
-              Registrar pago del mes
+              {esAnual ? "Registrar pago anual" : "Registrar pago del mes"}
             </button>
           )}
         </div>
@@ -152,7 +156,11 @@ export function LicenciaPagosHistorial({
         onConfirm={() => void registrar()}
         type="warning"
         title="Registrar pago de licencia"
-        description="Se registrará el pago del período actual y se extenderá la vigencia según la configuración de la asociación."
+        description={
+          esAnual
+            ? "Se registrará el pago del año en curso y se extenderá la vigencia según la configuración de la federación."
+            : "Se registrará el pago del mes en curso y se extenderá la vigencia según la configuración de la asociación."
+        }
         confirmText={saving ? "Registrando…" : "Registrar"}
         cancelText="Cancelar"
         isLoading={saving}

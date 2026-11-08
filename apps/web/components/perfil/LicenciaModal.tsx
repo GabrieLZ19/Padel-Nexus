@@ -11,6 +11,7 @@ import { Club, Perfil } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
+import { useSiglaRectora } from "@/utils/useSiglaRectora";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -40,6 +41,7 @@ export default function LicenciaModal({
   userProfile,
   fetchProfile,
 }: LicenciaModalProps) {
+  const siglaRectora = useSiglaRectora();
   const [provincia, setProvincia] = useState("");
   const [selectedClub, setSelectedClub] = useState("");
 
@@ -168,7 +170,7 @@ export default function LicenciaModal({
         nombre: userProfile.nombre,
         apellido: userProfile.apellido,
         documento: userProfile.dni,
-        club_id: selectedClub,
+        club_id: selectedClub || undefined,
         provincia: provincia,
       });
 
@@ -237,7 +239,9 @@ export default function LicenciaModal({
               Solicitar Licencia
             </h2>
             <p className="text-gray-400 text-xs sm:text-sm mt-1 max-w-xs leading-normal">
-              Iniciá tu trámite de fichaje oficial unificado ante la FAP.
+              Iniciá tu trámite de carnet federativo ante la {siglaRectora}. No
+              hace falta afiliarte a un club para jugar; el club es solo referencia
+              opcional.
             </p>
           </div>
 
@@ -324,11 +328,10 @@ export default function LicenciaModal({
               </motion.div>
             )}
 
-            {/* Provincia del Club */}
             <div className="space-y-1.5">
               <label className="text-xs text-gray-400 font-bold tracking-wide uppercase flex items-center gap-1.5">
-                <MapPin size={12} className="text-gray-500" /> Provincia del
-                Club
+                <MapPin size={12} className="text-gray-500" /> Provincia de
+                residencia
               </label>
               <CustomDropdown
                 value={provincia}
@@ -342,7 +345,6 @@ export default function LicenciaModal({
               />
             </div>
 
-            {/* Club Representante */}
             <AnimatePresence>
               {provincia && (
                 <motion.div
@@ -353,20 +355,19 @@ export default function LicenciaModal({
                   className="space-y-1.5"
                 >
                   <label className="text-xs text-gray-400 font-bold tracking-wide uppercase flex items-center gap-1.5">
-                    <Building2 size={12} className="text-gray-500" /> Club
-                    Representante
+                    <Building2 size={12} className="text-gray-500" /> Club de
+                    referencia (opcional)
                   </label>
                   <CustomDropdown
                     value={selectedClub}
                     onChange={(val) => setSelectedClub(val)}
-                    options={clubOptions}
-                    disabled={!hasFetched || clubOptions.length === 0}
+                    options={[
+                      { value: "", label: "Sin club de referencia" },
+                      ...clubOptions,
+                    ]}
+                    disabled={!hasFetched}
                     placeholder={
-                      !hasFetched
-                        ? "Cargando..."
-                        : clubOptions.length === 0
-                          ? "Sin clubes activos"
-                          : "Elegí un club..."
+                      !hasFetched ? "Cargando..." : "Opcional"
                     }
                     haciaArriba={true}
                   />
@@ -401,13 +402,13 @@ export default function LicenciaModal({
               </motion.button>
               <motion.button
                 whileHover={
-                  hasDni && selectedClub && provincia ? { scale: 1.02 } : {}
+                  hasDni && provincia ? { scale: 1.02 } : {}
                 }
                 whileTap={
-                  hasDni && selectedClub && provincia ? { scale: 0.98 } : {}
+                  hasDni && provincia ? { scale: 0.98 } : {}
                 }
                 type="submit"
-                disabled={loading || !selectedClub || !hasDni || !provincia}
+                disabled={loading || !hasDni || !provincia}
                 className="flex-1 py-3.5 bg-brand-chartreuse text-brand-black font-extrabold rounded-xl disabled:bg-brand-white/5 disabled:text-gray-500 hover:bg-[#b3e600] transition-colors flex justify-center items-center gap-2 cursor-pointer text-sm shadow-md shadow-brand-chartreuse/10 hover:shadow-brand-chartreuse/20"
               >
                 {loading ? (

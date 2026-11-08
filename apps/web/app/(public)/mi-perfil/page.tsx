@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   Trophy,
@@ -27,6 +27,11 @@ import { LicenciasService } from "@/utils/services/licencias";
 import { licenciaPagoEnRevision, licenciaRequierePago } from "@/utils/licenciaPago";
 import { sileo } from "sileo";
 import AfiliacionModal from "@/components/perfil/AfiliacionModal";
+import PaseProvinciaPendiente from "@/components/perfil/PaseProvinciaPendiente";
+import {
+  PasesService,
+  type PaseRepresentacion,
+} from "@/utils/services/pases";
 import { MinorModeBanner } from "@/components/legal/MinorModeBanner";
 import { fechaLatina } from "@/utils/fechaArgentina";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
@@ -54,10 +59,29 @@ export default function PlayerDashboard() {
   const [isAfiliacionOpen, setIsAfiliacionOpen] = useState(false);
   const [activeLicenciaIndex, setActiveLicenciaIndex] = useState(0);
   const [panel, setPanel] = useState<PanelJugador | null>(null);
+  const [misPases, setMisPases] = useState<PaseRepresentacion[]>([]);
+
+  const cargarMisPases = useCallback(async () => {
+    try {
+      const data = await PasesService.listarMios();
+      setMisPases(data);
+    } catch {
+      setMisPases([]);
+    }
+  }, []);
+
+  const pasePendiente = useMemo(
+    () => misPases.find((p) => p.estado === "pendiente") ?? null,
+    [misPases],
+  );
 
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  useEffect(() => {
+    if (profile?.id) void cargarMisPases();
+  }, [profile?.id, cargarMisPases]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -366,11 +390,29 @@ export default function PlayerDashboard() {
                     </div>
                   </div>
                 )}
+                {pasePendiente ? (
+                  <PaseProvinciaPendiente
+                    pase={pasePendiente}
+                    onActualizado={async () => {
+                      await cargarMisPases();
+                      await fetchProfile();
+                    }}
+                  />
+                ) : null}
                 <button
+                  type="button"
                   onClick={() => setIsAfiliacionOpen(true)}
-                  className="w-full max-w-50 py-2 bg-brand-white/5 hover:bg-brand-white/10 text-brand-white border border-brand-white/10 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  className="w-full max-w-50 py-2 bg-brand-white/5 hover:bg-brand-white/10 text-brand-white border border-brand-white/10 rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!!pasePendiente}
+                  title={
+                    pasePendiente
+                      ? "Cancelá el pase pendiente para pedir otro"
+                      : undefined
+                  }
                 >
-                  Pedir pase de provincia
+                  {pasePendiente
+                    ? "Pase en trámite"
+                    : "Pedir pase de provincia"}
                 </button>
               </div>
             </div>
@@ -505,10 +547,15 @@ export default function PlayerDashboard() {
         isOpen={isAfiliacionOpen}
         onClose={() => {
           setIsAfiliacionOpen(false);
+          void cargarMisPases();
           fetchProfile();
         }}
         userProfile={profile}
-        fetchProfile={fetchProfile}
+        fetchProfile={async () => {
+          await fetchProfile();
+          await cargarMisPases();
+        }}
+        pasePendiente={pasePendiente}
       />
     </main>
   );

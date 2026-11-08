@@ -77,6 +77,7 @@ function normalizarJugador(raw: unknown, index: number): JugadorRanking {
   }
 
   const provincia =
+    (perfil.provincia_ranking as string | undefined) ||
     (jugador.provincia as string | undefined) ||
     (perfil.lugar_residencia as string | undefined) ||
     (clubes.provincia as string | undefined) ||
