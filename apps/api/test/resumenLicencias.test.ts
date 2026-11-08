@@ -12,11 +12,11 @@ describe("resumen de licencias por jugador", () => {
       { licencias: [{ estado: null }] },
     ]);
 
-    assert.equal(resumen.pendientes, 1);
+    assert.equal(resumen.pendientes, 2);
     assert.equal(resumen.vigentes, 1);
     assert.equal(resumen.vencidas, 1);
     assert.equal(resumen.rechazadas, 1);
-    assert.equal(resumen.otros, 1);
+    assert.equal(resumen.otros, 0);
     assert.equal(
       resumen.pendientes +
         resumen.vigentes +

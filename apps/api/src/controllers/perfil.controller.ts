@@ -212,7 +212,15 @@ export const PerfilController = {
         });
       }
 
-      const resultado = await AuthService.actualizarPassword(password);
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          exito: false,
+          error: "Sesión de recuperación no válida.",
+        });
+      }
+
+      const resultado = await AuthService.actualizarPassword(userId, password);
       return res.status(200).json(resultado);
     } catch (error: unknown) {
       const message =
@@ -343,8 +351,11 @@ export const PerfilController = {
       const message =
         error instanceof Error
           ? error.message
-          : "Error al procesar la solicitud de recuperación.";
-      return res.status(500).json({ exito: false, error: message });
+          : "No pudimos procesar la solicitud de recuperación.";
+      const esValidacion =
+        message.includes("obligatorio") || message.includes("inválido");
+      const status = esValidacion ? 400 : 503;
+      return res.status(status).json({ exito: false, error: message });
     }
   },
 

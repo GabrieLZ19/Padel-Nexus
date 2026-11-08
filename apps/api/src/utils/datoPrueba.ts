@@ -52,3 +52,26 @@ export function esTorneoDePrueba(
   if (!torneo) return false;
   return Boolean(torneo.es_prueba) || esNombreDePrueba(torneo.nombre);
 }
+
+/**
+ * Persiste `es_prueba` en torneos. Los nombres de ensayo nunca se publican.
+ * visibleSitioPublico=true => es_prueba false (salvo nombre de prueba).
+ */
+export function resolverEsPruebaTorneo(
+  nombre: string | null | undefined,
+  visibleSitioPublico?: boolean | null,
+): boolean {
+  if (esNombreDePrueba(nombre)) return true;
+  if (visibleSitioPublico === true) return false;
+  if (visibleSitioPublico === false) return true;
+  return false;
+}
+
+export function normalizarEsPruebaEnActualizacion(
+  nombre: string,
+  esPruebaSolicitado: boolean | undefined,
+): boolean | undefined {
+  if (esNombreDePrueba(nombre)) return true;
+  if (esPruebaSolicitado === undefined) return undefined;
+  return Boolean(esPruebaSolicitado);
+}

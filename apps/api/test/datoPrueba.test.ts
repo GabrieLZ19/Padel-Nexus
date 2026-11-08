@@ -5,6 +5,7 @@ import {
   esNombreDePrueba,
   esTorneoDePrueba,
   esVisibleEnSitioPublico,
+  resolverEsPruebaTorneo,
 } from "../src/utils/datoPrueba";
 
 describe("datos de prueba del sitio público", () => {
@@ -21,6 +22,12 @@ describe("datos de prueba del sitio público", () => {
       esTorneoDePrueba({ nombre: "Masters", es_prueba: true }),
       true,
     );
+    assert.equal(
+      esTorneoDePrueba({ nombre: "Masters", es_prueba: false }),
+      false,
+    );
+    assert.equal(resolverEsPruebaTorneo("Torneo Oficial 7ª", true), false);
+    assert.equal(resolverEsPruebaTorneo("QA Prueba Club", true), true);
   });
 
   it("reconoce jugadores de ensayo por el correo, el nombre o la marca", () => {

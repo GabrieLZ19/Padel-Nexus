@@ -7,7 +7,12 @@ export interface ResumenLicencias {
   otros: number;
 }
 
-type LicenciaEstado = { estado?: string | null };
+import { estadoEfectivoLicencia } from "./estadoLicencia";
+
+type LicenciaEstado = {
+  estado?: string | null;
+  fecha_vencimiento?: string | null;
+};
 
 const PRIORIDAD = ["Pendiente", "Activa", "Vencida", "Suspendida"] as const;
 
@@ -19,7 +24,11 @@ export function estadoVisibleLicencia(
     : licencias
       ? [licencias]
       : [];
-  const estados = new Set(lista.map((licencia) => licencia.estado));
+  const estados = new Set(
+    lista.map((licencia) =>
+      estadoEfectivoLicencia(licencia.estado, licencia.fecha_vencimiento),
+    ),
+  );
   for (const estado of PRIORIDAD) {
     if (estados.has(estado)) return estado;
   }

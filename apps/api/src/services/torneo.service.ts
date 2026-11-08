@@ -14,7 +14,12 @@ import {
   etiquetaInstitucion,
 } from "../utils/denominacionNacional";
 import { inscripcionAbiertaPorFechas } from "../utils/inscripcionElegibilidad";
-import { esNombreDePrueba, esTorneoDePrueba } from "../utils/datoPrueba";
+import {
+  esNombreDePrueba,
+  esTorneoDePrueba,
+  normalizarEsPruebaEnActualizacion,
+  resolverEsPruebaTorneo,
+} from "../utils/datoPrueba";
 import {
   avanzarPartidosInternosZonaCuatro,
   sincronizarClasificadosALlave,
@@ -912,7 +917,27 @@ export class TorneoService {
       .insert([
         {
           nombre: payload.nombre,
-          es_prueba: esNombreDePrueba(payload.nombre),
+          es_prueba: (() => {
+            const ext = datos as {
+              es_prueba?: boolean;
+              visible_sitio_publico?: boolean;
+            };
+            if (typeof ext.visible_sitio_publico === "boolean") {
+              return resolverEsPruebaTorneo(
+                payload.nombre,
+                ext.visible_sitio_publico,
+              );
+            }
+            if (typeof ext.es_prueba === "boolean") {
+              return (
+                normalizarEsPruebaEnActualizacion(
+                  payload.nombre,
+                  ext.es_prueba,
+                ) ?? ext.es_prueba
+              );
+            }
+            return resolverEsPruebaTorneo(payload.nombre);
+          })(),
           subtitulo: payload.subtitulo,
           club_id: payload.club_id || null,
           fecha: payload.fecha,
@@ -1067,6 +1092,7 @@ export class TorneoService {
           reglamento: origen.reglamento,
           asociacion_id: origen.asociacion_id,
           asociacion: origen.reglamento || "FAP",
+          es_prueba: origen.es_prueba,
         };
 
         const creado = await TorneoService.crearTorneo(payload as TorneoPayload);
@@ -1177,6 +1203,7 @@ export class TorneoService {
     "asociacion_id",
     "federacion_id",
     "grupo_id",
+    "es_prueba",
   ]);
 
   public static normalizarAlcance(
@@ -1213,12 +1240,42 @@ export class TorneoService {
   ) {
     const { data: torneoActual } = await supabaseAdmin
       .from("torneos")
-      .select("estado, fecha, fecha_cierre_inscripcion, club_id")
+      .select(
+        "estado, fecha, fecha_cierre_inscripcion, club_id, nombre, es_prueba",
+      )
       .eq("id", id)
       .single();
 
     // Sanitizar: solo columnas válidas de la tabla `torneos`
     const updateData = TorneoService.sanitizeTorneoData(datos);
+
+    const nombreFinal = String(
+      updateData.nombre ?? torneoActual?.nombre ?? "",
+    );
+    if (
+      updateData.es_prueba !== undefined ||
+      (datos as { visible_sitio_publico?: boolean }).visible_sitio_publico !==
+        undefined
+    ) {
+      const visible = (datos as { visible_sitio_publico?: boolean })
+        .visible_sitio_publico;
+      const esPruebaSolicitado =
+        visible !== undefined
+          ? !visible
+          : (updateData.es_prueba as boolean | undefined);
+      const normalizado = normalizarEsPruebaEnActualizacion(
+        nombreFinal,
+        esPruebaSolicitado,
+      );
+      if (normalizado !== undefined) {
+        updateData.es_prueba = normalizado;
+      }
+    } else if (updateData.nombre !== undefined) {
+      updateData.es_prueba = normalizarEsPruebaEnActualizacion(
+        nombreFinal,
+        torneoActual?.es_prueba ?? false,
+      );
+    }
 
     // admin_club: club_id es el ancla de ownership. Un centro de cómputos
     // manual (informativo) no debe desvincular ni reasignar el torneo.

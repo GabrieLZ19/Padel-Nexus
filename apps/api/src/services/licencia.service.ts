@@ -15,6 +15,72 @@ import {
 } from "../utils/licenciaConfig";
 import { resumirLicenciasPorJugador } from "../utils/resumenLicencias";
 import { fechaLatina } from "../utils/fechaArgentina";
+import { enmascararDni } from "../utils/enmascararDni";
+import {
+  aplicarEstadoEfectivoLicencia,
+  estadoEfectivoLicencia,
+  fechaVencimientoPasada,
+  jugadorCoincideEstadoLicencia,
+  normalizarPerfilLicencias,
+} from "../utils/estadoLicencia";
+import { fechaHoyArgentina } from "../utils/fechaArgentina";
+
+export type EstadoLicenciaPublica =
+  | "activa"
+  | "vencida"
+  | "suspendida"
+  | "no_valida";
+
+export type VerificacionLicenciaPublica = {
+  valida: boolean;
+  estado: EstadoLicenciaPublica;
+  nombre: string | null;
+  apellido: string | null;
+  titular: string | null;
+  dni_parcial: string | null;
+  nro_licencia: string | null;
+  fecha_vencimiento: string | null;
+  fecha_vencimiento_texto: string | null;
+  mensaje: string | null;
+};
+
+function resolverEstadoLicenciaPublica(
+  estadoDb: string | null | undefined,
+  fechaVencimiento: string | null | undefined,
+): { estado: EstadoLicenciaPublica; valida: boolean } {
+  const efectivo = estadoEfectivoLicencia(estadoDb, fechaVencimiento);
+
+  if (efectivo === "Suspendida") {
+    return { estado: "suspendida", valida: false };
+  }
+  if (efectivo === "Pendiente" || efectivo === "Rechazada") {
+    return { estado: "no_valida", valida: false };
+  }
+  if (efectivo === "Vencida") {
+    return { estado: "vencida", valida: false };
+  }
+  if (efectivo === "Activa") {
+    return { estado: "activa", valida: true };
+  }
+  return { estado: "no_valida", valida: false };
+}
+
+function respuestaLicenciaNoValida(
+  mensaje = "Licencia no válida.",
+): VerificacionLicenciaPublica {
+  return {
+    valida: false,
+    estado: "no_valida",
+    nombre: null,
+    apellido: null,
+    titular: null,
+    dni_parcial: null,
+    nro_licencia: null,
+    fecha_vencimiento: null,
+    fecha_vencimiento_texto: null,
+    mensaje,
+  };
+}
 
 function normalizarTexto(input?: string | null): string {
   if (!input) return "";
@@ -82,7 +148,16 @@ export class LicenciaService {
       )
       .order("created_at", { ascending: false });
 
-    if (estado) {
+    const hoyArgentina = fechaHoyArgentina();
+    if (estado === "Activa") {
+      query = query
+        .eq("licencias.estado", "Activa")
+        .gte("licencias.fecha_vencimiento", hoyArgentina);
+    } else if (estado === "Vencida") {
+      query = query.or(
+        `licencias.estado.eq.Vencida,and(licencias.estado.eq.Activa,licencias.fecha_vencimiento.lt.${hoyArgentina})`,
+      );
+    } else if (estado) {
       query = query.eq("licencias.estado", estado);
     }
 
@@ -154,6 +229,17 @@ export class LicenciaService {
         return normalizarTexto(perfil.lugar_residencia) === target;
       });
 
+      if (estado) {
+        rows = rows.filter((perfil) =>
+          jugadorCoincideEstadoLicencia(
+            normalizarPerfilLicencias(perfil),
+            estado,
+          ),
+        );
+      }
+
+      rows = rows.map((perfil) => normalizarPerfilLicencias(perfil));
+
       const total = rows.length;
       const resumen = await LicenciaService.resumenEstados(
         search,
@@ -161,6 +247,8 @@ export class LicenciaService {
       );
       return { data: rows.slice(from, to + 1), total, resumen };
     }
+
+    rows = rows.map((perfil) => normalizarPerfilLicencias(perfil));
 
     const resumen = await LicenciaService.resumenEstados(search, null);
     return {
@@ -175,19 +263,29 @@ export class LicenciaService {
    * Evita recorrer todo el padrón de perfiles en cada apertura del tablero.
    */
   private static async resumenDesdeTablaLicencias() {
-    const porJugador = new Map<string, { estado?: string | null }[]>();
+    const porJugador = new Map<
+      string,
+      { estado?: string | null; fecha_vencimiento?: string | null }[]
+    >();
     const pageSize = 1000;
     for (let from = 0; ; from += pageSize) {
       const { data, error } = await supabaseAdmin
         .from("licencias")
-        .select("usuario_id, estado")
+        .select("usuario_id, estado, fecha_vencimiento")
         .range(from, from + pageSize - 1);
       if (error) throw new Error(error.message || "Error al resumir licencias");
       for (const row of data || []) {
         const id = String(row.usuario_id || "");
         if (!id) continue;
         const lista = porJugador.get(id) || [];
-        lista.push({ estado: row.estado as string | null });
+        const efectivo = aplicarEstadoEfectivoLicencia({
+          estado: row.estado as string | null,
+          fecha_vencimiento: row.fecha_vencimiento as string | null,
+        });
+        lista.push({
+          estado: efectivo.estado,
+          fecha_vencimiento: row.fecha_vencimiento as string | null,
+        });
         porJugador.set(id, lista);
       }
       if (!data || data.length < pageSize) break;
@@ -213,7 +311,7 @@ export class LicenciaService {
     }
 
     const select =
-      "id, lugar_residencia, licencias:licencias!fk_licencias_usuario!inner(estado, asociacion_id)";
+      "id, lugar_residencia, licencias:licencias!fk_licencias_usuario!inner(estado, asociacion_id, fecha_vencimiento)";
 
     const filas: Array<{
       id: string;
@@ -338,11 +436,11 @@ export class LicenciaService {
       throw new Error("Licencia no encontrada para este usuario.");
 
     const datos = (data.datos_solicitud || {}) as Record<string, unknown>;
-    return {
+    return aplicarEstadoEfectivoLicencia({
       ...data,
       precio_anual: Number(datos.precio_anual ?? 0),
       estado_pago: (datos.estado_pago as string) || "no_aplica",
-    };
+    });
   }
 
   static async crearLicencia(
@@ -408,14 +506,83 @@ export class LicenciaService {
 
     if (error || !data) throw new Error("Licencia no encontrada");
 
-    // Lógica dinámica de vencimiento
-    if (
-      new Date(data.fecha_vencimiento) < new Date() &&
-      data.estado === "Activa"
-    ) {
-      data.estado = "Vencida";
+    return aplicarEstadoEfectivoLicencia(data);
+  }
+
+  /**
+   * Verificación pública del carné (QR). No expone email ni DNI completo.
+   */
+  static async verificarPublica(
+    usuarioId: string,
+    licenciaId?: string | null,
+  ): Promise<VerificacionLicenciaPublica> {
+    const uid = String(usuarioId || "").trim();
+    if (!uid) {
+      return respuestaLicenciaNoValida("Identificador de jugador no válido.");
     }
-    return data;
+
+    let query = supabaseAdmin
+      .from("licencias")
+      .select(
+        "id, usuario_id, estado, nro_licencia, fecha_vencimiento, perfiles:usuario_id(nombre, apellido, dni)",
+      );
+
+    if (licenciaId) {
+      query = query.eq("id", String(licenciaId).trim());
+    } else {
+      query = query.eq("usuario_id", uid).order("created_at", { ascending: false });
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error || !data) {
+      return respuestaLicenciaNoValida();
+    }
+
+    if (String(data.usuario_id) !== uid) {
+      return respuestaLicenciaNoValida();
+    }
+
+    const perfilRaw = data.perfiles as
+      | { nombre?: string | null; apellido?: string | null; dni?: string | null }
+      | { nombre?: string | null; apellido?: string | null; dni?: string | null }[]
+      | null;
+    const perfil = Array.isArray(perfilRaw) ? perfilRaw[0] : perfilRaw;
+
+    const nombre = perfil?.nombre?.trim() || null;
+    const apellido = perfil?.apellido?.trim() || null;
+    const titular =
+      apellido && nombre
+        ? `${apellido.toUpperCase()}, ${nombre}`
+        : apellido || nombre;
+
+    const { estado, valida } = resolverEstadoLicenciaPublica(
+      data.estado,
+      data.fecha_vencimiento,
+    );
+
+    const fechaVencimiento = data.fecha_vencimiento
+      ? String(data.fecha_vencimiento)
+      : null;
+
+    return {
+      valida,
+      estado,
+      nombre,
+      apellido,
+      titular,
+      dni_parcial: enmascararDni(perfil?.dni),
+      nro_licencia: data.nro_licencia ? String(data.nro_licencia) : null,
+      fecha_vencimiento: fechaVencimiento,
+      fecha_vencimiento_texto: fechaLatina(fechaVencimiento),
+      mensaje: valida
+        ? "Carné federativo vigente."
+        : estado === "vencida"
+          ? "El carné está vencido."
+          : estado === "suspendida"
+            ? "El carné está suspendido."
+            : "Licencia no válida.",
+    };
   }
 
   static async actualizarEstado(id: string, estado: string, fechaVencimientoOverride?: string) {
@@ -473,8 +640,12 @@ export class LicenciaService {
       updateData.fecha_emision = new Date().toISOString().split("T")[0];
       updateData.fecha_vencimiento = fechaVencimiento;
     } else if (fechaVencimientoOverride) {
-      // Solo cambio de fecha (sin cambio de estado, o ya estaba Activa)
       updateData.fecha_vencimiento = fechaVencimientoOverride;
+      if (estado === "Activa" || estadoPrevio === "Activa") {
+        updateData.estado = fechaVencimientoPasada(fechaVencimientoOverride)
+          ? "Vencida"
+          : "Activa";
+      }
     } else if (estado === "Activa" && estadoPrevio === "Activa") {
       // Mismo estado, sin override de fecha → no tocar fechas
     }
@@ -490,7 +661,7 @@ export class LicenciaService {
       throw new Error("Error al actualizar el estado de la licencia.");
     }
 
-    data = updatedData;
+    data = aplicarEstadoEfectivoLicencia(updatedData);
 
     // 4. Emitir notificaciones para otros cambios de estado
     if (estado === "Activa" && estadoPrevio !== "Activa") {

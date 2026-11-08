@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase";
+import { normalizarPerfilLicencias } from "../utils/estadoLicencia";
 import {
   buildPerfilUpdatePatch,
   normalizeFechaNacimiento,
@@ -77,7 +78,7 @@ export class PerfilService {
       }));
     }
 
-    return perfilSincronizado;
+    return normalizarPerfilLicencias(perfilSincronizado);
   }
 
   /**

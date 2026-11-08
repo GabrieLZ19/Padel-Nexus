@@ -10,6 +10,10 @@ import { FiscalSesionService } from "./fiscal-sesion.service";
 import { MenoresService } from "./menores.service";
 import { LegalService } from "./legal.service";
 import { capitalizarNombre } from "../utils/formatoTexto";
+import {
+  buildRecuperacionRedirectUrl,
+  mensajeErrorSupabaseAuth,
+} from "../utils/authError";
 import type { ResponsableInput } from "./menores.service";
 
 // DTO para el registro unificado FAP
@@ -384,23 +388,46 @@ export class AuthService {
    * Solicita el envío de un correo de recuperación de contraseña
    */
   static async solicitarRecuperacionPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-
-    if (error) {
-      throw new Error(`Error al solicitar recuperación: ${error.message}`);
+    const correo = String(email).trim().toLowerCase();
+    if (!correo) {
+      throw new Error("El correo electrónico es obligatorio.");
     }
 
-    return { exito: true, mensaje: "Correo de recuperación enviado." };
+    const redirectTo = buildRecuperacionRedirectUrl(env.FRONTEND_URL);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(correo, {
+      redirectTo,
+    });
+
+    if (error) {
+      const detalle = mensajeErrorSupabaseAuth(
+        error,
+        "No pudimos enviar el correo de recuperación. Revisá que el enlace de restablecimiento esté habilitado en la plataforma.",
+      );
+      throw new Error(detalle);
+    }
+
+    return {
+      exito: true,
+      mensaje:
+        "Si el correo está registrado, te enviamos un enlace para restablecer la clave.",
+    };
   }
 
   /**
-   * Actualiza la contraseña del usuario utilizando el token de sesión activo (obtenido del link del correo)
+   * Actualiza la contraseña del usuario (sesión de recuperación validada por middleware).
    */
-  static async actualizarPassword(password: string) {
-    const { error } = await supabase.auth.updateUser({ password });
+  static async actualizarPassword(userId: string, password: string) {
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      password,
+    });
 
     if (error) {
-      throw new Error(`Error al actualizar contraseña: ${error.message}`);
+      const detalle = mensajeErrorSupabaseAuth(
+        error,
+        "No se pudo actualizar la contraseña.",
+      );
+      throw new Error(detalle);
     }
 
     return { exito: true, mensaje: "Contraseña actualizada correctamente." };

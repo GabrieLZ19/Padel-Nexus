@@ -7,6 +7,7 @@ import {
   type ComunicacionesAudienciaTipo,
   type ComunicacionesFiltros,
 } from "../constants/comunicaciones";
+import { fechaHoyArgentina } from "../utils/fechaArgentina";
 
 export interface AudienciaSamplePerfil {
   id: string;
@@ -430,7 +431,7 @@ export class ComunicacionesAudienciaService {
   ): Promise<string[]> {
     if (!filtros.licencia_estado || ids.length === 0) return ids;
 
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = fechaHoyArgentina();
     const { data, error } = await supabaseAdmin
       .from("licencias")
       .select("usuario_id, fecha_vencimiento, estado")
