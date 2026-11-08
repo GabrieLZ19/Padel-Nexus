@@ -17,6 +17,7 @@ import {
   limitarClubAProvincia,
 } from "../controllers/club.controller";
 import { authenticate, authorize, optionalAuthenticate } from "../middleware/auth";
+import { LicenciaClubController } from "../controllers/licenciaClub.controller";
 
 const router = Router();
 
@@ -51,6 +52,42 @@ router.delete(
   authenticate,
   authorize(["superadmin", "admin_federacion", "admin_provincial"]),
   deleteClub,
+);
+
+router.get(
+  "/:id/licencia",
+  authorize([
+    "superadmin",
+    "admin_federacion",
+    "admin_provincial",
+    "admin_club",
+    "admin",
+  ]),
+  LicenciaClubController.obtener,
+);
+
+router.patch(
+  "/:id/licencia/:licenciaId/estado",
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  LicenciaClubController.actualizarEstado,
+);
+
+router.delete(
+  "/:id/licencia/:licenciaId",
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  LicenciaClubController.darDeBaja,
+);
+
+router.get(
+  "/:id/licencia/:licenciaId/pagos",
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  LicenciaClubController.listarPagos,
+);
+
+router.post(
+  "/:id/licencia/:licenciaId/pagos",
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  LicenciaClubController.registrarPago,
 );
 
 // Rutas protegidas de gestión de canchas y turnos (Para administradores de clubes)

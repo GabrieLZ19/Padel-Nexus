@@ -1,18 +1,23 @@
 import { supabaseAdmin } from "../config/supabase";
 import { FAP_ESTADOS_TORNEO, FAP_ESTADOS_PAGO } from "../constants/fap";
 import { MARKETPLACE_ESTADOS_ORDEN } from "../constants/marketplace";
+import { InscripcionService } from "./inscripcion.service";
+import { CrmContactosService } from "./crm-contactos.service";
 
 export interface CrmMetricas {
   federaciones: number;
   asociaciones: number;
   clubes: number;
   jugadores: number;
+  jugadores_con_licencia: number;
   torneos_activos: number;
   torneos_finalizados: number;
   torneos_borrador: number;
   inscripciones_total: number;
+  inscripciones_confirmadas: number;
   inscripciones_pagadas: number;
   inscripciones_pendientes: number;
+  inscripciones_rechazadas: number;
   reservas_mes: number;
   ventas_marketplace: number;
   ventas_marketplace_count: number;
@@ -40,9 +45,10 @@ export class CrmDashboardService {
       clubesRes,
       jugadoresRes,
       torneosRes,
-      inscripcionesRes,
       reservasMesRes,
       ordenesMpRes,
+      resumenInscripciones,
+      resumenContactos,
     ] = await Promise.all([
       supabaseAdmin.from("federaciones").select("id", { count: "exact", head: true }),
       supabaseAdmin.from("asociaciones").select("id", { count: "exact", head: true }),
@@ -52,13 +58,14 @@ export class CrmDashboardService {
         .select("id", { count: "exact", head: true })
         .eq("rol", "usuario"),
       supabaseAdmin.from("torneos").select("estado"),
-      supabaseAdmin.from("inscripciones").select("monto, estado_pago, tipo"),
       supabaseAdmin
         .from("reservas")
         .select("id", { count: "exact", head: true })
         .gte("fecha_reserva", inicioMesIso)
         .neq("estado_reserva", "cancelada"),
       supabaseAdmin.from("marketplace_ordenes").select("total, estado"),
+      InscripcionService.obtenerResumenInscripciones(),
+      CrmContactosService.obtenerResumen(),
     ]);
 
     const torneosActivos = countByEstado(torneosRes.data, (estado) =>
@@ -78,25 +85,23 @@ export class CrmDashboardService {
       (estado) => estado === FAP_ESTADOS_TORNEO.BORRADOR.toLowerCase(),
     );
 
-    const inscripcionesTorneo = (inscripcionesRes.data || []).filter(
-      (i) => !i.tipo || i.tipo === "Inscripción torneo",
-    );
-    const inscripcionesPagadas = inscripcionesTorneo.filter(
-      (i) => (i.estado_pago || "").toLowerCase() === FAP_ESTADOS_PAGO.CONFIRMADO.toLowerCase(),
-    );
-    const inscripcionesPendientes = inscripcionesTorneo.filter(
-      (i) => (i.estado_pago || "").toLowerCase() === FAP_ESTADOS_PAGO.PENDIENTE.toLowerCase(),
-    );
+    const inscripcionesConfirmadas = resumenInscripciones.confirmadas;
+    const inscripcionesPendientes = resumenInscripciones.pendientes;
+    const inscripcionesRechazadas = resumenInscripciones.rechazadas;
+    const inscripcionesTotal =
+      inscripcionesConfirmadas +
+      inscripcionesPendientes +
+      inscripcionesRechazadas;
 
-    const ingresosTorneos = inscripcionesPagadas.reduce(
+    const ingresosTorneos = resumenInscripciones.recaudacion;
+    const ingresosPendientesRes = await supabaseAdmin
+      .from("inscripciones")
+      .select("monto, estado_pago")
+      .eq("estado_pago", FAP_ESTADOS_PAGO.PENDIENTE);
+    const ingresosPendientes = (ingresosPendientesRes.data || []).reduce(
       (acc, i) => acc + Number(i.monto || 0),
       0,
     );
-    const ingresosPendientes = (inscripcionesRes.data || [])
-      .filter(
-        (i) => (i.estado_pago || "").toLowerCase() === FAP_ESTADOS_PAGO.PENDIENTE.toLowerCase(),
-      )
-      .reduce((acc, i) => acc + Number(i.monto || 0), 0);
 
     const ordenesCobradas = (ordenesMpRes.data || []).filter((o) => {
       const estado = (o.estado || "").toLowerCase();
@@ -115,12 +120,15 @@ export class CrmDashboardService {
       asociaciones: asociacionesRes.count || 0,
       clubes: clubesRes.count || 0,
       jugadores: jugadoresRes.count || 0,
+      jugadores_con_licencia: resumenContactos.con_licencia,
       torneos_activos: torneosActivos,
       torneos_finalizados: torneosFinalizados,
       torneos_borrador: torneosBorrador,
-      inscripciones_total: inscripcionesTorneo.length,
-      inscripciones_pagadas: inscripcionesPagadas.length,
-      inscripciones_pendientes: inscripcionesPendientes.length,
+      inscripciones_total: inscripcionesTotal,
+      inscripciones_confirmadas: inscripcionesConfirmadas,
+      inscripciones_pagadas: inscripcionesConfirmadas,
+      inscripciones_pendientes: inscripcionesPendientes,
+      inscripciones_rechazadas: inscripcionesRechazadas,
       reservas_mes: reservasMesRes.count || 0,
       ventas_marketplace: ventasMarketplace,
       ventas_marketplace_count: ordenesCobradas.length,

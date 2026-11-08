@@ -1,8 +1,81 @@
 import { Request, Response } from "express";
 import { AdminService } from "../services/admin.service";
 import { CrmDashboardService } from "../services/crm-dashboard.service";
+import {
+  CrmContactosService,
+  type FiltroContactoCrm,
+} from "../services/crm-contactos.service";
+import {
+  type ComunicacionesEtiqueta,
+  esEtiquetaComunicacionValida,
+} from "../constants/comunicaciones";
 
 export const AdminController = {
+  async listarContactos(req: Request, res: Response): Promise<Response> {
+    try {
+      const {
+        page = "1",
+        limit = "25",
+        search,
+        filtro = "todos",
+        etiqueta,
+      } = req.query;
+
+      const filtroNormalizado: FiltroContactoCrm =
+        filtro === "con_licencia" || filtro === "sin_licencia"
+          ? filtro
+          : "todos";
+
+      let etiquetaFiltro: ComunicacionesEtiqueta | undefined;
+      if (typeof etiqueta === "string" && esEtiquetaComunicacionValida(etiqueta)) {
+        etiquetaFiltro = etiqueta;
+      }
+
+      const resultado = await CrmContactosService.listar(
+        Number(page),
+        Number(limit),
+        typeof search === "string" ? search : undefined,
+        filtroNormalizado,
+        etiquetaFiltro,
+      );
+
+      return res.status(200).json({ exito: true, ...resultado });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al listar contactos.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
+  async actualizarEtiquetasContacto(
+    req: Request,
+    res: Response,
+  ): Promise<Response> {
+    try {
+      const { perfil_id } = req.params;
+      const { etiquetas } = req.body as { etiquetas?: string[] };
+      if (!perfil_id) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "El ID del contacto es requerido." });
+      }
+      const normalizadas = (etiquetas || []).filter(
+        (e): e is ComunicacionesEtiqueta => esEtiquetaComunicacionValida(e),
+      );
+      const data = await CrmContactosService.actualizarEtiquetas(
+        perfil_id,
+        normalizadas,
+      );
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudieron actualizar las etiquetas.";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
   async getCrmMetricas(_req: Request, res: Response): Promise<Response> {
     try {
       const data = await CrmDashboardService.obtenerMetricas();

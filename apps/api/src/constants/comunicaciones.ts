@@ -45,6 +45,15 @@ export const COMUNICACIONES_ETIQUETAS = ["marketing", "institucional"] as const;
 
 export type ComunicacionesEtiqueta = (typeof COMUNICACIONES_ETIQUETAS)[number];
 
+export function esEtiquetaComunicacionValida(
+  value: string | undefined | null,
+): value is ComunicacionesEtiqueta {
+  return Boolean(
+    value &&
+      (COMUNICACIONES_ETIQUETAS as readonly string[]).includes(value),
+  );
+}
+
 export const COMUNICACIONES_DESTINATARIO_ESTADOS = [
   "enviado",
   "omitido_prefs",

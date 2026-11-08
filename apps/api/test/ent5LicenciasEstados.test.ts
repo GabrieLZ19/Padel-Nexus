@@ -27,7 +27,7 @@ describe("ENT-5 estados licencia (feature 10.0)", () => {
     const pagina = fuente("apps/web/app/dashboard/jugadores/page.tsx");
     const bloque = pagina.slice(
       pagina.indexOf("const FILTRO_A_ESTADO"),
-      pagina.indexOf("const getDisplayLicencia"),
+      pagina.indexOf("function contarPorEstado"),
     );
     assert.match(bloque, /Suspendidas:\s*"Suspendida"/);
     assert.doesNotMatch(bloque, /Rechazadas/);

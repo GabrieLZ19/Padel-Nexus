@@ -392,7 +392,10 @@ export class ClubService {
 
     let query = supabaseAdmin
       .from("clubes")
-      .select(`*, torneos!club_id(count), canchas(count)`, { count: "exact" })
+      .select(
+        `*, torneos!club_id(count), canchas(count), licencias_club(nro_licencia, estado, fecha_vencimiento)`,
+        { count: "exact" },
+      )
       .range(from, to);
 
     if (search) query = query.ilike("nombre", `%${search}%`);
@@ -410,6 +413,18 @@ export class ClubService {
     type SupabaseClub = Record<string, any> & {
       torneos?: { count: number }[] | null;
       canchas?: { count: number }[] | null;
+      licencias_club?:
+        | {
+            nro_licencia: string;
+            estado: string;
+            fecha_vencimiento: string | null;
+          }
+        | {
+            nro_licencia: string;
+            estado: string;
+            fecha_vencimiento: string | null;
+          }[]
+        | null;
     };
 
     const formattedData = ((data as SupabaseClub[]) || []).map((club) => {
@@ -420,12 +435,18 @@ export class ClubService {
         club.canchas && club.canchas.length > 0 ? club.canchas[0].count : 0;
 
       // Eliminamos los arrays crudos para limpiar la respuesta
-      const { torneos, canchas, ...restoClub } = club;
+      const licenciaRaw = club.licencias_club;
+      const licenciaFederativa = Array.isArray(licenciaRaw)
+        ? licenciaRaw[0]
+        : licenciaRaw;
+
+      const { torneos, canchas, licencias_club: _lc, ...restoClub } = club;
 
       return {
         ...restoClub,
         canchas: canchasCount,
         torneos_count: torneosCount,
+        licencia_federativa: licenciaFederativa ?? null,
       };
     });
 
@@ -534,6 +555,17 @@ export class ClubService {
     if (error) throw new Error(`Error al crear el club: ${error.message}`);
 
     // Crear filas reales en `canchas` (el contador de UI usa canchas(count), no solo la columna)
+    if (data?.id) {
+      const { LicenciaClubService } = await import("./licenciaClub.service");
+      await LicenciaClubService.asegurarLicenciaParaClub(
+        data.id,
+        asociacionId,
+        datos.estado,
+      ).catch((err: unknown) => {
+        console.error("No se pudo crear licencia inicial del club:", err);
+      });
+    }
+
     if (data?.id && cantidadCanchas > 0) {
       const rows = Array.from({ length: cantidadCanchas }, (_, i) => ({
         club_id: data.id,

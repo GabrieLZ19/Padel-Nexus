@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { ClubPanelController } from "../controllers/club-panel.controller";
+import { LicenciaClubController } from "../controllers/licenciaClub.controller";
 import { authenticate, authorize } from "../middleware/auth";
 
 const router = Router();
@@ -10,6 +11,7 @@ router.use(authorize(["superadmin", "admin", "admin_club", "admin_federacion", "
 
 // Club
 router.get("/mi-club", ClubPanelController.obtenerMiClub);
+router.get("/mi-club/licencia", LicenciaClubController.obtenerMiClub);
 router.put("/mi-club", ClubPanelController.actualizarMiClub);
 
 // Canchas
