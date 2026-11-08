@@ -2,6 +2,44 @@ import { NextFunction, Request, Response } from "express";
 import { ClubService } from "../services/club.service";
 import { AlcanceCuentaService } from "../services/alcanceCuenta.service";
 import { mismaProvincia } from "../utils/alcanceCuenta";
+import type { FiltrosListadoClubesReserva } from "../utils/filtrosClubReserva";
+
+function parseFiltrosReservaClub(query: Request["query"]): FiltrosListadoClubesReserva {
+  const search = typeof query.search === "string" ? query.search : undefined;
+  const provincia =
+    typeof query.provincia === "string" ? query.provincia : undefined;
+  const tipo_suelo =
+    typeof query.tipo_suelo === "string" ? query.tipo_suelo : undefined;
+
+  let max_distancia_km: number | undefined;
+  if (query.max_distancia_km != null && String(query.max_distancia_km).trim()) {
+    const n = parseFloat(String(query.max_distancia_km));
+    if (!Number.isNaN(n) && n > 0) max_distancia_km = n;
+  }
+
+  let techada: boolean | undefined;
+  if (query.techada === "1" || query.techada === "true") techada = true;
+  if (query.techada === "0" || query.techada === "false") techada = false;
+
+  const fecha_disponibilidad =
+    typeof query.fecha === "string" && /^\d{4}-\d{2}-\d{2}$/.test(query.fecha)
+      ? query.fecha
+      : undefined;
+  const hora_disponibilidad =
+    typeof query.hora === "string" && /^\d{1,2}:\d{2}/.test(query.hora)
+      ? query.hora.slice(0, 5)
+      : undefined;
+
+  return {
+    search,
+    provincia,
+    max_distancia_km,
+    tipo_suelo,
+    techada,
+    fecha_disponibilidad,
+    hora_disponibilidad,
+  };
+}
 
 export async function limitarClubAProvincia(
   req: Request,
@@ -56,19 +94,21 @@ export const getAllClubes = async (
           .json({ exito: false, error: "Coordenadas inválidas." });
       }
 
+      const filtros = parseFiltrosReservaClub(req.query);
       const data = await ClubService.listarTodosConDistancia(
         latNum,
         lngNum,
-        search as string | undefined,
+        filtros,
       );
       return res.status(200).json({ exito: true, data, total: data.length });
     }
 
     if (ordenar === "distancia") {
+      const filtros = parseFiltrosReservaClub(req.query);
       const data = await ClubService.listarTodosConDistancia(
         undefined,
         undefined,
-        search as string | undefined,
+        filtros,
       );
       return res.status(200).json({ exito: true, data, total: data.length });
     }

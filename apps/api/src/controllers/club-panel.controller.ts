@@ -290,7 +290,11 @@ export class ClubPanelController {
           error: "La acción tiene que ser confirmar, cobrar, cancelar o ausente.",
         });
       }
-      const data = await ClubService.gestionarReservaClub(clubId, reservaId, accion);
+      const motivo =
+        typeof req.body?.motivo === "string" ? req.body.motivo : undefined;
+      const data = await ClubService.gestionarReservaClub(clubId, reservaId, accion, {
+        motivo_cancelacion: accion === "cancelar" ? motivo : undefined,
+      });
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Error desconocido";

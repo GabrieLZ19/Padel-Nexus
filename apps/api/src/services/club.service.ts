@@ -16,6 +16,18 @@ import {
   nombreCanchaVisible,
 } from "../utils/ordenCanchas";
 import { mismaProvincia } from "../utils/alcanceCuenta";
+import { NotificacionService } from "./notificacion.service";
+import { mensajeNotificacionReservaCanceladaClub } from "../utils/reservaCancelacion";
+import {
+  claveGeocodeLocalidad,
+  haversineKm,
+} from "../utils/coordenadasClub";
+import {
+  clubCumpleFiltroCancha,
+  slotCoincideHora,
+  type CanchaResumenClub,
+  type FiltrosListadoClubesReserva,
+} from "../utils/filtrosClubReserva";
 
 export interface CrearClubDTO {
   nombre: string;
@@ -54,22 +66,63 @@ export interface ClubCercano {
   distancia_km: number | null;
 }
 
-function haversineKm(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number,
-): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const earthRadiusKm = 6371;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLng / 2) ** 2;
-  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+const geocodeCache = new Map<string, { latitud: number; longitud: number }>();
+
+function parseCanchasClub(canchasRaw: unknown): {
+  count: number;
+  items: CanchaResumenClub[];
+} {
+  if (!Array.isArray(canchasRaw) || canchasRaw.length === 0) {
+    return { count: 0, items: [] };
+  }
+  const first = canchasRaw[0] as Record<string, unknown>;
+  if (first && typeof first === "object" && "count" in first) {
+    return { count: Number(first.count) || 0, items: [] };
+  }
+  const items = (canchasRaw as CanchaResumenClub[]).filter(
+    (c) => c.activa !== false,
+  );
+  return { count: items.length, items };
+}
+
+async function coordsParaDistancia(
+  club: Record<string, unknown>,
+): Promise<{ latitud: number | null; longitud: number | null }> {
+  let latitud =
+    club.latitud == null ? null : Number(club.latitud as number);
+  let longitud =
+    club.longitud == null ? null : Number(club.longitud as number);
+  if (
+    latitud != null &&
+    longitud != null &&
+    !Number.isNaN(latitud) &&
+    !Number.isNaN(longitud)
+  ) {
+    return { latitud, longitud };
+  }
+
+  const key = claveGeocodeLocalidad(
+    club.localidad as string,
+    club.provincia as string,
+  );
+  if (!key.replace("|", "").trim()) {
+    return { latitud: null, longitud: null };
+  }
+
+  const cacheHit = geocodeCache.get(key);
+  if (cacheHit) return cacheHit;
+
+  const resolved = await resolverCoordenadas(
+    club.direccion as string,
+    club.codigo_postal as string,
+    club.localidad as string,
+    club.provincia as string,
+  );
+  if (resolved) {
+    geocodeCache.set(key, resolved);
+    return resolved;
+  }
+  return { latitud: null, longitud: null };
 }
 
 function formatearClubConCanchas(
@@ -169,26 +222,63 @@ export class ClubService {
   static async listarTodosConDistancia(
     lat?: number,
     lng?: number,
-    search?: string,
+    filtros?: FiltrosListadoClubesReserva,
   ): Promise<ClubCercano[]> {
-    let query = supabaseAdmin.from("clubes").select("*, canchas(count)");
+    let query = supabaseAdmin
+      .from("clubes")
+      .select("*, canchas(tipo_suelo, techada, activa)")
+      .eq("estado", "Activo");
 
-    if (search?.trim()) {
-      query = query.ilike("nombre", `%${search.trim()}%`);
+    if (filtros?.search?.trim()) {
+      query = query.ilike("nombre", `%${filtros.search.trim()}%`);
+    }
+    if (filtros?.provincia?.trim()) {
+      query = query.ilike("provincia", `%${filtros.provincia.trim()}%`);
     }
 
     const { data, error } = await query;
     if (error) throw new Error("Error interno al obtener los clubes.");
 
-    const clubes = ((data as Record<string, unknown>[]) || []).map(
-      formatearClubConCanchas,
+    const filas = (data as Record<string, unknown>[]) || [];
+
+    const sinCoords = new Map<string, Record<string, unknown>>();
+    for (const club of filas) {
+      const tieneCoords =
+        club.latitud != null &&
+        club.longitud != null &&
+        !Number.isNaN(Number(club.latitud)) &&
+        !Number.isNaN(Number(club.longitud));
+      if (!tieneCoords) {
+        const key = claveGeocodeLocalidad(
+          club.localidad as string,
+          club.provincia as string,
+        );
+        if (key.replace("|", "").trim() && !geocodeCache.has(key)) {
+          sinCoords.set(key, club);
+        }
+      }
+    }
+    await Promise.all(
+      [...sinCoords.values()].map((club) => coordsParaDistancia(club)),
     );
 
-    const conDistancia: ClubCercano[] = clubes.map((club) => {
-      const latitud =
-        club.latitud == null ? null : Number(club.latitud as number);
-      const longitud =
-        club.longitud == null ? null : Number(club.longitud as number);
+    let candidatos: ClubCercano[] = [];
+
+    for (const club of filas) {
+      const { count, items } = parseCanchasClub(club.canchas);
+      if (count <= 0) continue;
+
+      if (
+        !clubCumpleFiltroCancha(
+          items,
+          filtros?.tipo_suelo,
+          filtros?.techada,
+        )
+      ) {
+        continue;
+      }
+
+      const { latitud, longitud } = await coordsParaDistancia(club);
 
       const distancia_km =
         lat != null &&
@@ -197,12 +287,18 @@ export class ClubService {
         longitud != null &&
         !Number.isNaN(latitud) &&
         !Number.isNaN(longitud)
-          ? Number(
-              haversineKm(lat, lng, latitud, longitud).toFixed(2),
-            )
+          ? Number(haversineKm(lat, lng, latitud, longitud).toFixed(2))
           : null;
 
-      return {
+      if (
+        filtros?.max_distancia_km != null &&
+        distancia_km != null &&
+        distancia_km > filtros.max_distancia_km
+      ) {
+        continue;
+      }
+
+      candidatos.push({
         id: String(club.id),
         nombre: String(club.nombre ?? ""),
         provincia: String(club.provincia ?? ""),
@@ -210,15 +306,22 @@ export class ClubService {
         direccion: (club.direccion as string) || null,
         codigo_postal: (club.codigo_postal as string) || null,
         telefono: (club.telefono as string) || null,
-        canchas: Number(club.canchas ?? 0),
+        canchas: count,
         estado: String(club.estado ?? "Activo"),
         latitud,
         longitud,
         distancia_km,
-      };
-    });
+      });
+    }
 
-    return conDistancia.sort((a, b) => {
+    if (filtros?.fecha_disponibilidad) {
+      candidatos = await ClubService.filtrarClubesConDisponibilidad(
+        candidatos,
+        filtros,
+      );
+    }
+
+    return candidatos.sort((a, b) => {
       if (a.distancia_km == null && b.distancia_km == null) {
         return a.nombre.localeCompare(b.nombre, "es");
       }
@@ -229,6 +332,52 @@ export class ClubService {
       }
       return a.nombre.localeCompare(b.nombre, "es");
     });
+  }
+
+  static async filtrarClubesConDisponibilidad(
+    clubes: ClubCercano[],
+    filtros: FiltrosListadoClubesReserva,
+  ): Promise<ClubCercano[]> {
+    if (!filtros.fecha_disponibilidad) return clubes;
+
+    const { ReservaService } = await import("./reserva.service");
+    const fecha = filtros.fecha_disponibilidad;
+    const hora = filtros.hora_disponibilidad?.slice(0, 5);
+    const tipo = filtros.tipo_suelo;
+    const techada = filtros.techada;
+
+    const resultados = await Promise.all(
+      clubes.map(async (club) => {
+        try {
+          const slots = await ReservaService.obtenerDisponibilidad(club.id, fecha);
+          const libres = slots.filter((s) => {
+            if (!s.disponible) return false;
+            if (
+              tipo &&
+              String(s.tipo_suelo || "").toLowerCase() !== tipo.toLowerCase()
+            ) {
+              return false;
+            }
+            if (techada !== undefined && Boolean(s.techada) !== techada) {
+              return false;
+            }
+            if (hora) {
+              return slotCoincideHora(
+                String(s.hora_inicio),
+                String(s.hora_fin),
+                hora,
+              );
+            }
+            return true;
+          });
+          return libres.length > 0 ? club : null;
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    return resultados.filter((c): c is ClubCercano => c != null);
   }
 
   static async obtenerClubesPaginados(
@@ -893,15 +1042,64 @@ export class ClubService {
     };
   }
 
+  private static async notificarJugadorReservaCancelada(
+    reserva: {
+      id: string;
+      usuario_id: string | null;
+      fecha_reserva?: string | null;
+      turnos?: unknown;
+    },
+    motivo: string | null,
+  ) {
+    if (!reserva.usuario_id) return;
+    try {
+      const turno = Array.isArray(reserva.turnos)
+        ? reserva.turnos[0]
+        : reserva.turnos;
+      const turnoRow = turno as
+        | {
+            hora_inicio?: string | null;
+            canchas?: { nombre?: string | null; clubes?: { nombre?: string } | null } | null;
+          }
+        | null
+        | undefined;
+      const cancha = turnoRow?.canchas
+        ? Array.isArray(turnoRow.canchas)
+          ? turnoRow.canchas[0]
+          : turnoRow.canchas
+        : null;
+      const clubNombre = cancha?.clubes?.nombre || "Club";
+      const canchaNombre = cancha?.nombre || "Cancha";
+      const horaInicio = turnoRow?.hora_inicio?.slice(0, 5) || "00:00";
+      const { titulo, mensaje } = mensajeNotificacionReservaCanceladaClub({
+        clubNombre,
+        canchaNombre,
+        fechaReserva: String(reserva.fecha_reserva || ""),
+        horaInicio,
+        motivo,
+      });
+      await NotificacionService.crearNotificacion({
+        usuario_id: reserva.usuario_id,
+        titulo,
+        mensaje,
+        tipo: "warning",
+        metadata: { reserva_id: reserva.id, motivo_cancelacion: motivo },
+      });
+    } catch (err) {
+      console.warn("Error al notificar cancelación de reserva al jugador:", err);
+    }
+  }
+
   static async gestionarReservaClub(
     clubId: string,
     reservaId: string,
     accion: "confirmar" | "cobrar" | "cancelar" | "ausente",
+    opciones?: { motivo_cancelacion?: string | null },
   ) {
     const { data: reserva, error } = await supabaseAdmin
       .from("reservas")
       .select(
-        "id, usuario_id, estado_reserva, estado_pago, turno_id, turnos(precio, cancha_id, canchas(club_id))",
+        "id, usuario_id, estado_reserva, estado_pago, turno_id, fecha_reserva, turnos(hora_inicio, precio, cancha_id, canchas(nombre, club_id, clubes(nombre)))",
       )
       .eq("id", reservaId)
       .single();
@@ -943,12 +1141,36 @@ export class ClubService {
     }
 
     if (accion === "cancelar") {
+      const motivo = String(opciones?.motivo_cancelacion || "").trim() || null;
+      const ahora = new Date().toISOString();
+
+      const { error: pagosError } = await supabaseAdmin
+        .from("pagos")
+        .update({ estado: "rechazado" })
+        .eq("reserva_id", reservaId)
+        .eq("estado", "pendiente");
+      if (pagosError) throw new Error(pagosError.message);
+
       const { error: updateError } = await supabaseAdmin
         .from("reservas")
-        .update({ estado_reserva: "cancelada" })
+        .update({
+          estado_reserva: "cancelada",
+          estado_pago: "cancelado",
+          motivo_cancelacion: motivo,
+          cancelada_en: ahora,
+          retiene_hasta: null,
+        })
         .eq("id", reservaId);
       if (updateError) throw new Error(updateError.message);
-      return { id: reservaId, estado_reserva: "cancelada", estado_pago: reserva.estado_pago };
+
+      void ClubService.notificarJugadorReservaCancelada(reserva, motivo);
+
+      return {
+        id: reservaId,
+        estado_reserva: "cancelada",
+        estado_pago: "cancelado",
+        motivo_cancelacion: motivo,
+      };
     }
 
     if (reserva.estado_reserva === "ausente") {
