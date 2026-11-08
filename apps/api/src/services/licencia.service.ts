@@ -729,6 +729,60 @@ export class LicenciaService {
     return data;
   }
 
+  /**
+   * Baja definitiva del carnet (distinto de suspender o rechazar solicitud pendiente).
+   */
+  static async darDeBajaLicencia(id: string) {
+    const { data: licencia, error: readError } = await supabaseAdmin
+      .from("licencias")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (readError || !licencia) {
+      throw new Error("No se encontró la licencia.");
+    }
+
+    if (licencia.estado === "Pendiente") {
+      throw new Error(
+        "Para una solicitud pendiente usá «Rechazar solicitud» en el panel de validación.",
+      );
+    }
+
+    const usuario_id = licencia.usuario_id;
+    const nro = licencia.nro_licencia;
+
+    await NotificacionService.crearNotificacion({
+      usuario_id,
+      titulo: "Licencia dada de baja",
+      mensaje: `Tu licencia N° ${nro} fue dada de baja de forma definitiva. Podés iniciar un nuevo trámite desde tu perfil si corresponde.`,
+      tipo: "error",
+      metadata: { nro_licencia: nro, licencia_id: licencia.id },
+    });
+
+    const datosSol = licencia.datos_solicitud as Record<string, unknown> | null;
+    const clubId =
+      datosSol && typeof datosSol.club_id === "string" ? datosSol.club_id : null;
+    if (clubId) {
+      await supabaseAdmin
+        .from("afiliaciones")
+        .update({ estado: "suspendido" })
+        .eq("usuario_id", usuario_id)
+        .eq("club_id", clubId);
+    }
+
+    const { error: deleteError } = await supabaseAdmin
+      .from("licencias")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      throw new Error("No se pudo dar de baja la licencia.");
+    }
+
+    return { id, usuario_id, nro_licencia: nro };
+  }
+
   static async solicitar(usuario_id: string, datos: Record<string, unknown>) {
     const config =
       await LicenciaOrganizacionService.resolverConfigParaLicencia({

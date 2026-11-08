@@ -10,8 +10,17 @@ export class NotificacionService {
     mensaje: string;
     tipo?: "info" | "success" | "warning" | "error";
     metadata?: Record<string, any>;
+    /** Campañas institucionales: siempre crean aviso in-app aunque push esté desactivado. */
+    forzarInApp?: boolean;
   }) {
-    const { usuario_id, titulo, mensaje, tipo = "info", metadata = {} } = params;
+    const {
+      usuario_id,
+      titulo,
+      mensaje,
+      tipo = "info",
+      metadata = {},
+      forzarInApp = false,
+    } = params;
 
     const { data: perfilPrefs } = await supabaseAdmin
       .from("perfiles")
@@ -24,8 +33,7 @@ export class NotificacionService {
       expo_push_token?: string;
     };
 
-    // Si el jugador desactivó push/in-app, no creamos ni emitimos la notificación.
-    if (prefs.push === false) {
+    if (!forzarInApp && prefs.push === false) {
       return null;
     }
 
@@ -56,8 +64,10 @@ export class NotificacionService {
       console.warn("⚠️ No se pudo emitir notificación por websocket:", socketErr);
     }
 
-    // prefs.push === false ya se filtró arriba; acá solo enviamos si hay token.
-    if (prefs.expo_push_token) {
+    if (
+      prefs.expo_push_token &&
+      (forzarInApp || prefs.push !== false)
+    ) {
       void PushNotificationService.enviarExpoPush({
         expoPushToken: prefs.expo_push_token,
         titulo,
@@ -131,6 +141,24 @@ export class NotificacionService {
       console.error("🚨 Error al marcar notificación como leída:", error);
       throw new Error("Error al marcar como leída la notificación.");
     }
+
+    const metadata = (data?.metadata || {}) as Record<string, unknown>;
+    const campanaId =
+      typeof metadata.campana_id === "string" ? metadata.campana_id : null;
+    if (campanaId) {
+      try {
+        const { ComunicacionesMetricasService } = await import(
+          "./comunicaciones-metricas.service"
+        );
+        await ComunicacionesMetricasService.registrarApertura(
+          campanaId,
+          usuarioId,
+        );
+      } catch (metricErr) {
+        console.warn("No se pudo registrar apertura de campaña:", metricErr);
+      }
+    }
+
     return data;
   }
 

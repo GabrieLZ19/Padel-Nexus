@@ -45,10 +45,21 @@ export class ChatController {
   static async iniciarConversacion(req: Request, res: Response) {
     try {
       const creadorId = req.user!.id;
-      const { destinatario_id, producto_id } = req.body as {
+      const { destinatario_id, producto_id, club_id } = req.body as {
         destinatario_id?: string;
         producto_id?: string;
+        club_id?: string;
       };
+
+      if (club_id) {
+        const data = await ChatService.iniciarConversacionClub(
+          creadorId,
+          club_id,
+        );
+        return res
+          .status(data.nueva ? 201 : 200)
+          .json({ exito: true, data });
+      }
 
       if (producto_id) {
         const data = await ChatService.iniciarConversacionMarketplace(
@@ -63,7 +74,7 @@ export class ChatController {
       if (!destinatario_id) {
         return res.status(400).json({
           exito: false,
-          error: "Se requiere destinatario_id o producto_id.",
+          error: "Se requiere destinatario_id, club_id o producto_id.",
         });
       }
 

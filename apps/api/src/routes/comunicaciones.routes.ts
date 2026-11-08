@@ -24,5 +24,6 @@ router.post("/audiencia/preview", ComunicacionesController.previewAudiencia);
 
 router.get("/campanas", ComunicacionesController.listarCampanas);
 router.post("/campanas", ComunicacionesController.enviarCampana);
+router.post("/campanas/:id/clic", ComunicacionesController.registrarClic);
 
 export default router;

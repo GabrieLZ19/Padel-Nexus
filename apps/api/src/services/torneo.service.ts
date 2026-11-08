@@ -28,6 +28,10 @@ import { armarGruposTorneo, nombreBaseTorneo } from "../utils/gruposTorneo";
 import { resolverReglamentoPersistido } from "../utils/reglamentoTorneo";
 import { debeDescalificarPorWoDeZona } from "../utils/walkoverZona";
 import { normalizarAlcanceTorneo } from "../utils/pasesRepresentacion";
+import {
+  estadosActivosTablero,
+  metricasProvincialesTablero,
+} from "../utils/tableroProvincial";
 import { ordenRondaProgramador } from "../utils/programadorReglas";
 import { AlcanceCuentaService } from "./alcanceCuenta.service";
 import { mismaProvincia } from "../utils/alcanceCuenta";
@@ -363,17 +367,26 @@ export class TorneoService {
     if (filtros?.clubId) {
       query = query.eq("club_id", filtros.clubId);
     }
-    if (filtros?.clubIds) {
-      const ids = filtros.clubIds.filter(Boolean);
+
+    if (filtros?.clubIds !== undefined || filtros?.asociacionIds !== undefined) {
+      const ids = (filtros.clubIds || []).filter(Boolean);
+      const asocIds = (filtros.asociacionIds || []).filter(Boolean);
+      const orParts: string[] = [];
+
       if (filtros.incluirNacionales) {
-        query =
-          ids.length === 0
-            ? query.eq("alcance", "Nacional")
-            : query.or(`alcance.eq.Nacional,club_id.in.(${ids.join(",")})`);
-      } else if (ids.length === 0) {
-        query = query.eq("id", "00000000-0000-0000-0000-000000000000");
+        orParts.push("alcance.eq.Nacional");
+      }
+      if (ids.length > 0) {
+        orParts.push(`club_id.in.(${ids.join(",")})`);
+      }
+      if (asocIds.length > 0) {
+        orParts.push(`asociacion_id.in.(${asocIds.join(",")})`);
+      }
+
+      if (orParts.length > 0) {
+        query = query.or(orParts.join(","));
       } else {
-        query = query.in("club_id", ids);
+        query = query.eq("id", "00000000-0000-0000-0000-000000000000");
       }
     }
 
@@ -387,12 +400,7 @@ export class TorneoService {
       filas = filas.filter((torneo) => !esTorneoDePrueba(torneo));
     }
 
-    const estadosActivos = new Set<string>([
-      FAP_ESTADOS_TORNEO.INSCRIPCION,
-      FAP_ESTADOS_TORNEO.CERRADO,
-      FAP_ESTADOS_TORNEO.PROGRAMADO,
-      FAP_ESTADOS_TORNEO.EN_CURSO,
-    ]);
+    const estadosActivos = estadosActivosTablero();
     const porAlcance: Record<string, number> = {
       Nacional: 0,
       Provincial: 0,
@@ -407,11 +415,14 @@ export class TorneoService {
       if (estadosActivos.has(String(torneo.estado || ""))) activos += 1;
     }
 
+    const provinciales = metricasProvincialesTablero(filas, estadosActivos);
+
     return {
       total: filas.length,
       activos,
       porAlcance,
       ultimos: filas.slice(0, 5),
+      ...provinciales,
     };
   }
 

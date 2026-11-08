@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { NotificacionService } from "../services/notificacion.service";
+import { ComunicacionesService } from "../services/comunicaciones.service";
 
 export const NotificacionesController = {
   async listar(req: Request, res: Response): Promise<Response> {
@@ -45,6 +46,24 @@ export const NotificacionesController = {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Error al marcar todas como leídas.";
       return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
+  async registrarClicCampana(req: Request, res: Response): Promise<Response> {
+    try {
+      const usuarioId = req.user?.id;
+      const campanaId = req.params.id;
+      if (!usuarioId) {
+        return res
+          .status(401)
+          .json({ exito: false, message: "Usuario no autenticado." });
+      }
+      await ComunicacionesService.registrarClicCampana(campanaId, usuarioId);
+      return res.status(200).json({ exito: true });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al registrar clic.";
+      return res.status(400).json({ exito: false, error: message });
     }
   },
 

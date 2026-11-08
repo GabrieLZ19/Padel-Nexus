@@ -18,6 +18,16 @@ import {
   terminoIlikePostgrest,
 } from "../utils/postgrestBusqueda";
 import { NotificacionService } from "./notificacion.service";
+import {
+  ComunicacionesCanalesService,
+  normalizarCanales,
+} from "./comunicaciones-canales.service";
+import {
+  ComunicacionesMetricasService,
+  metricasVacias,
+  sumarEntrega,
+  type ComunicacionesCanal,
+} from "./comunicaciones-metricas.service";
 
 export interface CrearListaPayload {
   nombre: string;
@@ -49,6 +59,7 @@ export interface EnviarCampanaPayload {
   filtros?: ComunicacionesFiltros;
   lista_id?: string | null;
   action_url?: string | null;
+  canales?: ComunicacionesCanal[];
 }
 
 export interface ContactoBusqueda {
@@ -513,6 +524,7 @@ export class ComunicacionesService {
 
     const actionUrl = normalizarActionUrl(payload.action_url);
     const filtros = payload.filtros || {};
+    const canales = normalizarCanales(payload.canales);
 
     const audiencia = await ComunicacionesAudienciaService.resolver({
       actorId,
@@ -536,6 +548,8 @@ export class ComunicacionesService {
         audiencia_tipo: payload.audiencia_tipo,
         filtros_usados: filtros,
         action_url: actionUrl,
+        canales,
+        metricas: metricasVacias(),
         total_destinatarios: audiencia.total,
         total_enviados: 0,
       })
@@ -556,10 +570,12 @@ export class ComunicacionesService {
     };
 
     let totalEnviados = 0;
+    let metricas = metricasVacias();
     const destinatarioRows: Array<{
       campana_id: string;
       usuario_id: string;
       estado: ComunicacionesDestinatarioEstado;
+      canal: ComunicacionesCanal;
     }> = [];
 
     for (let i = 0; i < audiencia.ids.length; i += COMUNICACIONES_BATCH_SIZE) {
@@ -567,40 +583,105 @@ export class ComunicacionesService {
 
       const resultados = await Promise.all(
         batch.map(async (usuarioId) => {
-          try {
-            const notif = await NotificacionService.crearNotificacion({
-              usuario_id: usuarioId,
-              titulo,
-              mensaje,
-              tipo: "info",
-              metadata,
-            });
+          const filas: typeof destinatarioRows = [];
+          let huboInApp = false;
+          const contacto =
+            await ComunicacionesCanalesService.cargarContacto(usuarioId);
 
-            if (notif) {
-              totalEnviados += 1;
-              return {
-                campana_id: campana.id,
-                usuario_id: usuarioId,
-                estado: "enviado" as const,
-              };
+          for (const canal of canales) {
+            if (canal === "in_app") {
+              try {
+                const notif = await NotificacionService.crearNotificacion({
+                  usuario_id: usuarioId,
+                  titulo,
+                  mensaje,
+                  tipo: "info",
+                  metadata,
+                  forzarInApp: true,
+                });
+
+                if (notif) {
+                  huboInApp = true;
+                  metricas = sumarEntrega(metricas, "in_app", true);
+                  filas.push({
+                    campana_id: campana.id,
+                    usuario_id: usuarioId,
+                    estado: "enviado",
+                    canal: "in_app",
+                  });
+                } else {
+                  metricas = sumarEntrega(metricas, "in_app", false);
+                  filas.push({
+                    campana_id: campana.id,
+                    usuario_id: usuarioId,
+                    estado: "omitido_prefs",
+                    canal: "in_app",
+                  });
+                }
+              } catch {
+                metricas = sumarEntrega(metricas, "in_app", false);
+                filas.push({
+                  campana_id: campana.id,
+                  usuario_id: usuarioId,
+                  estado: "error",
+                  canal: "in_app",
+                });
+              }
+              continue;
             }
 
-            return {
-              campana_id: campana.id,
-              usuario_id: usuarioId,
-              estado: "omitido_prefs" as const,
-            };
-          } catch {
-            return {
-              campana_id: campana.id,
-              usuario_id: usuarioId,
-              estado: "error" as const,
-            };
+            if (canal === "email") {
+              const resultado = await ComunicacionesCanalesService.enviarEmail(
+                contacto,
+                titulo,
+                mensaje,
+                actionUrl,
+              );
+              metricas = sumarEntrega(
+                metricas,
+                "email",
+                ComunicacionesCanalesService.resultadoEsExito(resultado),
+              );
+              filas.push({
+                campana_id: campana.id,
+                usuario_id: usuarioId,
+                estado:
+                  ComunicacionesCanalesService.estadoDestinatario(resultado),
+                canal: "email",
+              });
+              continue;
+            }
+
+            if (canal === "whatsapp") {
+              const resultado =
+                await ComunicacionesCanalesService.enviarWhatsApp(
+                  contacto,
+                  titulo,
+                  mensaje,
+                );
+              metricas = sumarEntrega(
+                metricas,
+                "whatsapp",
+                ComunicacionesCanalesService.resultadoEsExito(resultado),
+              );
+              filas.push({
+                campana_id: campana.id,
+                usuario_id: usuarioId,
+                estado:
+                  ComunicacionesCanalesService.estadoDestinatario(resultado),
+                canal: "whatsapp",
+              });
+            }
           }
+
+          if (huboInApp) totalEnviados += 1;
+          return filas;
         }),
       );
 
-      destinatarioRows.push(...resultados);
+      for (const filas of resultados) {
+        destinatarioRows.push(...filas);
+      }
     }
 
     if (destinatarioRows.length > 0) {
@@ -618,7 +699,7 @@ export class ComunicacionesService {
 
     const { data: campanaFinal, error: updError } = await supabaseAdmin
       .from("comunicaciones_campanas")
-      .update({ total_enviados: totalEnviados })
+      .update({ total_enviados: totalEnviados, metricas })
       .eq("id", campana.id)
       .select()
       .single();
@@ -628,10 +709,19 @@ export class ComunicacionesService {
     }
 
     return {
-      campana: campanaFinal || { ...campana, total_enviados: totalEnviados },
+      campana: campanaFinal || {
+        ...campana,
+        total_enviados: totalEnviados,
+        metricas,
+      },
       total_destinatarios: audiencia.total,
       total_enviados: totalEnviados,
+      metricas,
     };
+  }
+
+  static async registrarClicCampana(campanaId: string, usuarioId: string) {
+    await ComunicacionesMetricasService.registrarClic(campanaId, usuarioId);
   }
 
   /**

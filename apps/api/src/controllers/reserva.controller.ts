@@ -149,7 +149,7 @@ export const ReservasController = {
 
   /**
    * POST /api/reservas/:id/cancelar
-   * Cancela una reserva pendiente del usuario autenticado.
+   * Cancela una reserva del jugador según política del club.
    */
   async cancelarReserva(req: Request, res: Response) {
     try {

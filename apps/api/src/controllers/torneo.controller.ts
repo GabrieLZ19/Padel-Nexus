@@ -79,6 +79,7 @@ export const getAllTorneos = async (
       const data = await TorneoService.resumenTablero({
         clubId: clubIdFiltro,
         clubIds,
+        asociacionIds,
         incluirNacionales,
         ocultarPrueba: !esRolAccesoCrm(req.user?.rol),
       });

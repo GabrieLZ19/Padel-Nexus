@@ -11,5 +11,9 @@ router.get("/", NotificacionesController.listar);
 router.patch("/:id/leida", NotificacionesController.marcarLeida);
 router.post("/leidas-todas", NotificacionesController.marcarTodasLeidas);
 router.delete("/:id", NotificacionesController.eliminar);
+router.post(
+  "/campana/:id/clic",
+  NotificacionesController.registrarClicCampana,
+);
 
 export default router;

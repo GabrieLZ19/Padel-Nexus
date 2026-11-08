@@ -192,6 +192,38 @@ export const LicenciasController = {
   },
 
   /**
+   * POST /api/licencias/:id/dar-de-baja
+   * Baja definitiva del carnet (no aplica a solicitudes pendientes).
+   */
+  async darDeBaja(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "El ID de licencia es requerido." });
+      }
+
+      if (req.user?.id && req.user?.rol) {
+        await LicenciaService.assertPuedeGestionarLicencia(id, {
+          id: req.user.id,
+          rol: req.user.rol,
+        });
+      }
+
+      const data = await LicenciaService.darDeBajaLicencia(id);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al dar de baja la licencia.";
+      const status = message.includes("No podés gestionar") ? 403 : 400;
+      return res.status(status).json({ exito: false, error: message });
+    }
+  },
+
+  /**
    * 7. POST /api/licencias/solicitar
    * Genera un trámite de autogestión de carnet con token alfanumérico (Jugador)
    */

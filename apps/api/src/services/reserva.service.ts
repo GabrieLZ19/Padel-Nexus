@@ -19,6 +19,7 @@ import {
   retencionMercadoPagoDesde,
   retencionTransferenciaDesde,
 } from "../utils/reservaRetencion";
+import { evaluarCancelacionReservaJugador } from "../utils/cancelacionReservaJugador";
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 
@@ -468,24 +469,68 @@ export class ReservaService {
   }
 
   /**
-   * Cancela una reserva pendiente.
+   * Cancela una reserva del jugador (pendiente o confirmada según política del club).
    */
   static async cancelarReserva(reservaId: string, usuarioId: string) {
     const { data: reserva, error: rError } = await supabaseAdmin
       .from("reservas")
-      .select("id, usuario_id, estado_reserva")
+      .select(
+        `id, usuario_id, estado_reserva, estado_pago, fecha_reserva,
+        turnos ( hora_inicio, canchas ( clubes ( horas_antelacion_cancelacion_jugador ) ) )`,
+      )
       .eq("id", reservaId)
       .single();
 
     if (rError || !reserva) throw new Error("Reserva no encontrada.");
     if (reserva.usuario_id !== usuarioId)
       throw new Error("No tiene permiso sobre esta reserva.");
-    if (reserva.estado_reserva === "cancelada")
-      throw new Error("Esta reserva ya fue cancelada.");
+
+    const turno = Array.isArray(reserva.turnos)
+      ? reserva.turnos[0]
+      : reserva.turnos;
+    const cancha = turno
+      ? Array.isArray(turno.canchas)
+        ? turno.canchas[0]
+        : turno.canchas
+      : null;
+    const club = cancha
+      ? Array.isArray(cancha.clubes)
+        ? cancha.clubes[0]
+        : cancha.clubes
+      : null;
+
+    const evaluacion = evaluarCancelacionReservaJugador({
+      estado_reserva: reserva.estado_reserva,
+      fecha_reserva: reserva.fecha_reserva,
+      hora_inicio: turno?.hora_inicio || "00:00",
+      horas_antelacion_club: club?.horas_antelacion_cancelacion_jugador,
+    });
+    if (!evaluacion.permitido) {
+      throw new Error(evaluacion.motivo || "No podés cancelar esta reserva.");
+    }
+
+    const ahora = new Date().toISOString();
+
+    const { error: pagosError } = await supabaseAdmin
+      .from("pagos")
+      .update({ estado: "rechazado" })
+      .eq("reserva_id", reservaId)
+      .eq("estado", "pendiente");
+    if (pagosError) throw new Error(pagosError.message);
+
+    const estadoPago =
+      reserva.estado_pago === "completado"
+        ? reserva.estado_pago
+        : "cancelado";
 
     const { error } = await supabaseAdmin
       .from("reservas")
-      .update({ estado_reserva: "cancelada" })
+      .update({
+        estado_reserva: "cancelada",
+        estado_pago: estadoPago,
+        cancelada_en: ahora,
+        retiene_hasta: null,
+      })
       .eq("id", reservaId);
 
     if (error) throw new Error("Error al cancelar la reserva.");
@@ -899,7 +944,8 @@ export class ReservaService {
             clubes (
               nombre,
               localidad,
-              provincia
+              provincia,
+              horas_antelacion_cancelacion_jugador
             )
           )
         ),
@@ -914,6 +960,33 @@ export class ReservaService {
     if (error) {
       throw new Error(`Error al obtener las reservas del usuario: ${error.message}`);
     }
-    return data || [];
+
+    return (data || []).map((fila) => {
+      const turno = Array.isArray(fila.turnos) ? fila.turnos[0] : fila.turnos;
+      const cancha = turno
+        ? Array.isArray(turno.canchas)
+          ? turno.canchas[0]
+          : turno.canchas
+        : null;
+      const club = cancha
+        ? Array.isArray(cancha.clubes)
+          ? cancha.clubes[0]
+          : cancha.clubes
+        : null;
+
+      const evaluacion = evaluarCancelacionReservaJugador({
+        estado_reserva: fila.estado_reserva,
+        fecha_reserva: fila.fecha_reserva,
+        hora_inicio: turno?.hora_inicio || "00:00",
+        horas_antelacion_club: club?.horas_antelacion_cancelacion_jugador,
+      });
+
+      return {
+        ...fila,
+        puede_cancelar: evaluacion.permitido,
+        cancelacion_bloqueo: evaluacion.motivo ?? null,
+        horas_antelacion_cancelacion: evaluacion.horas_antelacion ?? null,
+      };
+    });
   }
 }

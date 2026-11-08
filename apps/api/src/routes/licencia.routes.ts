@@ -33,6 +33,12 @@ router.patch(
 );
 
 router.post(
+  "/:id/dar-de-baja",
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  LicenciasController.darDeBaja,
+);
+
+router.post(
   "/:id/pagos",
   authorize(["superadmin", "admin_federacion", "admin_provincial"]),
   LicenciasController.registrarPago,

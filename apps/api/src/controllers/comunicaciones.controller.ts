@@ -156,6 +156,19 @@ export class ComunicacionesController {
     }
   }
 
+  static async registrarClic(req: Request, res: Response) {
+    try {
+      const actor = getActor(req);
+      const campanaId = req.params.id;
+      await ComunicacionesService.registrarClicCampana(campanaId, actor.id);
+      return res.status(200).json({ exito: true });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al registrar clic.";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  }
+
   static async listarCampanas(req: Request, res: Response) {
     try {
       const actor = getActor(req);

@@ -229,7 +229,7 @@ export class ChatService {
         if (otroPerfilId && conv.tipo !== "grupo") {
           const { data: perfil } = await supabaseAdmin
             .from("perfiles")
-            .select("id, nombre, apellido, avatar_url, rol")
+            .select("id, nombre, apellido, avatar_url, rol, club_id")
             .eq("id", otroPerfilId)
             .single();
 
@@ -299,7 +299,49 @@ export class ChatService {
       return new Date(fechaB).getTime() - new Date(fechaA).getTime();
     });
 
-    return resultado;
+    const adminClubIds = new Set<string>();
+    for (const item of resultado) {
+      const p = item.otro_participante as typeof item.otro_participante & {
+        club_id?: string | null;
+      };
+      if (
+        item.tipo === "directo" &&
+        p.rol === "admin_club" &&
+        typeof p.club_id === "string" &&
+        p.club_id
+      ) {
+        adminClubIds.add(p.club_id);
+      }
+    }
+
+    let clubsById = new Map<string, string>();
+    if (adminClubIds.size > 0) {
+      const { data: clubes } = await supabaseAdmin
+        .from("clubes")
+        .select("id, nombre")
+        .in("id", [...adminClubIds]);
+      clubsById = new Map((clubes || []).map((c) => [c.id, c.nombre]));
+    }
+
+    return resultado.map((item) => {
+      const p = item.otro_participante as typeof item.otro_participante & {
+        club_id?: string | null;
+      };
+      const clubId =
+        item.tipo === "directo" && p.rol === "admin_club" && p.club_id
+          ? p.club_id
+          : null;
+      const club_contacto =
+        clubId && clubsById.has(clubId)
+          ? { id: clubId, nombre: clubsById.get(clubId)! }
+          : null;
+      const { club_id: _clubIdOmision, ...otroSinClubId } = p;
+      return {
+        ...item,
+        otro_participante: otroSinClubId,
+        club_contacto,
+      };
+    });
   }
 
   /**
@@ -448,6 +490,67 @@ export class ChatService {
     }
 
     return { id: nuevaConv.id, nueva: true };
+  }
+
+  /**
+   * Resuelve el admin de club que recibe mensajes de jugadores (feature 22.0).
+   */
+  static async resolverContactoClub(clubId: string): Promise<{
+    adminId: string;
+    clubNombre: string;
+  }> {
+    const { data: club, error: clubError } = await supabaseAdmin
+      .from("clubes")
+      .select("id, nombre")
+      .eq("id", clubId)
+      .maybeSingle();
+
+    if (clubError || !club) {
+      throw new Error("Club no encontrado.");
+    }
+
+    const { data: admins, error: adminError } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, cuenta_estado, created_at")
+      .eq("rol", "admin_club")
+      .eq("club_id", clubId)
+      .order("created_at", { ascending: true });
+
+    if (adminError) {
+      throw new Error("No se pudo obtener el contacto del club.");
+    }
+
+    const adminActivo = (admins || [])[0];
+
+    if (!adminActivo?.id) {
+      throw new Error("Este club aún no tiene mensajería habilitada.");
+    }
+
+    return { adminId: adminActivo.id, clubNombre: club.nombre };
+  }
+
+  /**
+   * Abre (o reutiliza) un DM jugador ↔ club vía el admin del club.
+   */
+  static async iniciarConversacionClub(creadorId: string, clubId: string) {
+    const { adminId, clubNombre } = await ChatService.resolverContactoClub(
+      clubId,
+    );
+
+    if (adminId === creadorId) {
+      throw new Error("No podés abrir un chat con tu propio club.");
+    }
+
+    const conv = await ChatService.iniciarConversacion(
+      creadorId,
+      adminId,
+      "directo",
+    );
+
+    return {
+      ...conv,
+      club: { id: clubId, nombre: clubNombre },
+    };
   }
 
   /**

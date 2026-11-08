@@ -3,7 +3,7 @@ export interface ResumenLicencias {
   pendientes: number;
   vigentes: number;
   vencidas: number;
-  rechazadas: number;
+  suspendidas: number;
   otros: number;
 }
 
@@ -45,7 +45,7 @@ export function resumirLicenciasPorJugador(
     pendientes: 0,
     vigentes: 0,
     vencidas: 0,
-    rechazadas: 0,
+    suspendidas: 0,
     otros: 0,
   };
 
@@ -55,7 +55,7 @@ export function resumirLicenciasPorJugador(
     if (estado === "Pendiente") resumen.pendientes += 1;
     else if (estado === "Activa") resumen.vigentes += 1;
     else if (estado === "Vencida") resumen.vencidas += 1;
-    else if (estado === "Suspendida") resumen.rechazadas += 1;
+    else if (estado === "Suspendida") resumen.suspendidas += 1;
     else resumen.otros += 1;
   }
 
