@@ -523,11 +523,18 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     });
   };
 
+  const firmaResultadosPartidos = partidos
+    .map(
+      (p) =>
+        `${p.id}:${p.ganador ?? ""}:${p.set1_a ?? ""}-${p.set1_b ?? ""}:${p.set2_a ?? ""}-${p.set2_b ?? ""}`,
+    )
+    .join("|");
+
   useEffect(() => {
     if (activeView === "auditoria") {
       loadAuditoria();
     }
-  }, [activeView]);
+  }, [activeView, torneoId, firmaResultadosPartidos]);
 
   const handleMovePareja = (
     inscripcionId: string,

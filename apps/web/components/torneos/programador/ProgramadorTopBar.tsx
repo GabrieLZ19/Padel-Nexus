@@ -10,6 +10,10 @@ import {
   Unlock,
 } from "lucide-react";
 import type { ProgramacionBoard } from "@/utils/services/torneos";
+import {
+  motivoPublicacionBloqueada,
+  puedePublicarProgramacion,
+} from "@/utils/programadorPublicar";
 
 interface Props {
   board: ProgramacionBoard;
@@ -63,6 +67,10 @@ export function ProgramadorTopBar({
   const estadoTorneo = board.estado?.trim() || null;
 
   const canLimpiar = !isReadOnly && board.summary.asignados > 0;
+  const puedePublicar = puedePublicarProgramacion(board, { isReadOnly });
+  const motivoBloqueoPublicar = motivoPublicacionBloqueada(board, {
+    isReadOnly,
+  });
 
   return (
     <header className="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -185,21 +193,36 @@ export function ProgramadorTopBar({
               <Sparkles className="size-4 text-brand-chartreuse" />
               Asignar automáticamente
             </button>
-            <button
-              type="button"
-              disabled={busy || board.summary.pendientes > 0}
-              onClick={onPublicar}
-              title="Publicar los horarios y pasar el torneo a En curso"
-              className="inline-flex flex-col items-start gap-0 rounded-xl bg-brand-chartreuse px-4 py-2 text-left hover:brightness-110 disabled:opacity-50 cursor-pointer"
-            >
-              <span className="inline-flex items-center gap-2 text-sm font-bold text-black">
-                <Upload className="size-4" />
-                Publicar
-              </span>
-              <span className="text-[10px] font-medium text-black/70">
-                Pasa el torneo a En curso
-              </span>
-            </button>
+            <div className="flex flex-col items-stretch gap-1">
+              <button
+                type="button"
+                disabled={busy || !puedePublicar}
+                onClick={onPublicar}
+                title={
+                  motivoBloqueoPublicar ||
+                  "Publicar los horarios y pasar el torneo a En curso"
+                }
+                className="inline-flex flex-col items-start gap-0 rounded-xl bg-brand-chartreuse px-4 py-2 text-left hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <span className="inline-flex items-center gap-2 text-sm font-bold text-black">
+                  <Upload className="size-4" />
+                  Publicar
+                </span>
+                <span className="text-[10px] font-medium text-black/70">
+                  {motivoBloqueoPublicar
+                    ? "Revisá el motivo debajo"
+                    : "Pasa el torneo a En curso"}
+                </span>
+              </button>
+              {motivoBloqueoPublicar ? (
+                <p
+                  className="max-w-xs text-[11px] leading-snug text-amber-200/95"
+                  role="status"
+                >
+                  {motivoBloqueoPublicar}
+                </p>
+              ) : null}
+            </div>
           </>
         )}
       </div>

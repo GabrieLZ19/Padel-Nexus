@@ -506,6 +506,21 @@ export const TorneosService = {
     return response.data;
   },
 
+  async persistirConfigProgramacion(
+    torneoId: string,
+    payload: {
+      duracionMinutos?: number;
+      descansoModo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+    } = {},
+  ): Promise<ProgramacionBoard> {
+    const response = await api.post<ProgramacionBoard>(
+      `/torneos/${torneoId}/programacion/config`,
+      payload,
+    );
+    return response.data;
+  },
+
   async guardarBorradorProgramacion(
     torneoId: string,
     payload: {

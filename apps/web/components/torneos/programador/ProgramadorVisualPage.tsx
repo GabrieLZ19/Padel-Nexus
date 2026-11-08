@@ -21,6 +21,8 @@ import { PendingMatchesSidebar } from "./PendingMatchesSidebar";
 import ZonaParejasPanel from "./ZonaParejasPanel";
 import { ScheduleGrid } from "./ScheduleGrid";
 import { useProgramadorBoard } from "./useProgramadorBoard";
+import { motivoPublicacionBloqueada } from "@/utils/programadorPublicar";
+import { sileo } from "sileo";
 
 interface Props {
   torneoId: string;
@@ -154,7 +156,19 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
         onGuardarBorrador={() => void guardarBorrador()}
         onAuto={() => void autoAsignar()}
         onLimpiar={() => setConfirmLimpiar(true)}
-        onPublicar={() => setConfirmPublicar(true)}
+        onPublicar={() => {
+          const motivo = motivoPublicacionBloqueada(board, {
+            isReadOnly,
+          });
+          if (motivo) {
+            sileo.warning({
+              title: "Todavía no se puede publicar",
+              description: motivo,
+            });
+            return;
+          }
+          setConfirmPublicar(true);
+        }}
         onNuevaEdicion={() => setConfirmEdicion(true)}
         onBack={() => router.push(backHref)}
         onFocusConflictos={focusConflictos}

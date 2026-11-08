@@ -7,6 +7,7 @@ import {
   type BoardPartido,
 } from "@/utils/services/torneos";
 import { sileo } from "sileo";
+import { motivoPublicacionBloqueada } from "@/utils/programadorPublicar";
 
 export type ModoDescansoProgramador =
   | "tras_fin_60"
@@ -177,19 +178,23 @@ export function useProgramadorBoard(torneoId: string) {
         return;
       }
 
+      const debePersistir =
+        next?.duracion != null ||
+        next?.descansoModo != null ||
+        next?.franjasPorDia != null;
+
       if (configTimerRef.current) clearTimeout(configTimerRef.current);
       configTimerRef.current = setTimeout(async () => {
         setBusy(true);
         try {
-          if (next?.duracion != null || next?.descansoModo != null) {
-            await TorneosService.update(torneoId, {
-              ...(next?.duracion != null
-                ? { duracion_partido_minutos: merged.duracion }
+          if (debePersistir) {
+            await TorneosService.persistirConfigProgramacion(torneoId, {
+              duracionMinutos: merged.duracion,
+              descansoModo: merged.descansoModo,
+              ...(merged.franjasPorDia && Object.keys(merged.franjasPorDia).length > 0
+                ? { franjasPorDia: merged.franjasPorDia }
                 : {}),
-              ...(next?.descansoModo != null
-                ? { descanso_modo: merged.descansoModo }
-                : {}),
-            } as Parameters<typeof TorneosService.update>[1]);
+            });
           }
           const data = await TorneosService.getProgramacionBoard(
             torneoId,
@@ -485,9 +490,11 @@ export function useProgramadorBoard(torneoId: string) {
 
   const publicar = useCallback(async () => {
     if (!boardRef.current) return;
-    if (boardRef.current.summary.pendientes > 0) {
-      sileo.error({
-        title: `Faltan ${boardRef.current.summary.pendientes} partidos por asignar`,
+    const motivo = motivoPublicacionBloqueada(boardRef.current);
+    if (motivo) {
+      sileo.warning({
+        title: "Todavía no se puede publicar",
+        description: motivo,
       });
       return;
     }

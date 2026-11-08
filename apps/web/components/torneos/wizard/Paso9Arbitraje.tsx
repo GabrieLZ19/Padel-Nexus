@@ -540,8 +540,12 @@ export const PasoResultados = ({
       triggerRefresh();
 
       sileo.success({
-        title: "Marcador guardado",
-        description: "El marcador quedó guardado.",
+        title: scorePayload.motivo?.trim()
+          ? "Corrección registrada"
+          : "Marcador guardado",
+        description: scorePayload.motivo?.trim()
+          ? "El cambio quedó en auditoría (Paso 7 Cuadros > pestaña Auditoría)."
+          : "El marcador quedó guardado.",
       });
     } catch (error: any) {
       const apiMsg =
