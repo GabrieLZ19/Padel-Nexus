@@ -35,6 +35,8 @@ export interface Licencia {
     frecuencia_pago?: "anual" | "mensual";
     precio_anual?: number;
     precio_mensual?: number;
+    estado_pago?: string;
+    moneda?: string;
   } | null;
   // Relación con Supabase
   perfiles?: Partial<Perfil> | null;

@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LicenciasService } from "@/utils/services/licencias";
+import {
+  LicenciasService,
+  type LicenciaCotizacion,
+} from "@/utils/services/licencias";
+import { formatMontoLicenciaArs } from "@/utils/licenciaPago";
 import { ClubesService } from "@/utils/services/clubes";
 import { Club, Perfil } from "@/utils/types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
@@ -42,6 +46,7 @@ export default function LicenciaModal({
   const [allClubes, setAllClubes] = useState<Club[]>([]);
   const [hasFetched, setHasFetched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [cotizacion, setCotizacion] = useState<LicenciaCotizacion | null>(null);
 
   const [feedback, setFeedback] = useState<{
     isOpen: boolean;
@@ -85,6 +90,34 @@ export default function LicenciaModal({
       isMounted = false;
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !provincia) {
+      setCotizacion(null);
+      return;
+    }
+    let activo = true;
+    void LicenciasService.cotizar({
+      provincia,
+      club_id: selectedClub || undefined,
+    })
+      .then((data) => {
+        if (activo) setCotizacion(data);
+      })
+      .catch(() => {
+        if (activo) setCotizacion(null);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [isOpen, provincia, selectedClub]);
+
+  const montoCotizado =
+    cotizacion && cotizacion.frecuencia_pago === "mensual"
+      ? Number(cotizacion.precio_mensual || 0)
+      : Number(cotizacion?.precio_anual || 0);
+  const etiquetaPago =
+    cotizacion?.frecuencia_pago === "mensual" ? "mensual" : "anual";
 
   const filteredClubes = provincia
     ? allClubes.filter(
@@ -145,7 +178,9 @@ export default function LicenciaModal({
         isOpen: true,
         title: "¡Solicitud enviada!",
         description:
-          "Tu licencia está en revisión. Un administrador validará tus datos pronto.",
+          montoCotizado > 0
+            ? `Completá el pago ${etiquetaPago} de ${formatMontoLicenciaArs(montoCotizado)} desde Mi perfil para continuar con la revisión.`
+            : "Tu licencia está en revisión. Un administrador validará tus datos pronto.",
         type: "success",
         isSuccessFlow: true,
       });
@@ -339,6 +374,21 @@ export default function LicenciaModal({
               )}
             </AnimatePresence>
 
+            {provincia && montoCotizado > 0 ? (
+              <div className="rounded-xl border border-brand-chartreuse/25 bg-brand-chartreuse/5 px-4 py-3 text-center">
+                <p className="text-[10px] font-black uppercase tracking-widest text-brand-chartreuse">
+                  Costo {etiquetaPago}
+                </p>
+                <p className="text-xl font-black text-brand-white mt-1">
+                  {formatMontoLicenciaArs(montoCotizado)}
+                </p>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Podés abonar con Mercado Pago o por transferencia después de
+                  enviar la solicitud.
+                </p>
+              </div>
+            ) : null}
+
             <div className="flex gap-3 pt-6 border-t border-brand-white/5 mt-6">
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -362,6 +412,8 @@ export default function LicenciaModal({
               >
                 {loading ? (
                   <Loader2 className="animate-spin size-4" />
+                ) : montoCotizado > 0 ? (
+                  `Solicitar · ${formatMontoLicenciaArs(montoCotizado)}`
                 ) : (
                   "Solicitar Alta"
                 )}

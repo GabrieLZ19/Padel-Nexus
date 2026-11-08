@@ -203,6 +203,10 @@ export default function ComunicacionesPanel() {
   const [listaAsociacionId, setListaAsociacionId] = useState("");
   const [listaClubId, setListaClubId] = useState("");
   const [miembroIds, setMiembroIds] = useState<string[]>([]);
+  const [miembrosInicialesIds, setMiembrosInicialesIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [agregandoMiembros, setAgregandoMiembros] = useState(false);
   const [miembrosSeleccionados, setMiembrosSeleccionados] = useState<
     ComunicacionesContactoBusqueda[]
   >([]);
@@ -806,8 +810,59 @@ export default function ComunicacionesPanel() {
     setListaClubId("");
     setMiembroIds([]);
     setMiembrosSeleccionados([]);
+    setMiembrosInicialesIds(new Set());
     setBusquedaMiembro("");
     setResultadosBusqueda([]);
+  };
+
+  const handleAgregarMiembrosLista = async () => {
+    if (!listaEditandoId) return;
+    const nuevos = miembroIds.filter((id) => !miembrosInicialesIds.has(id));
+    if (nuevos.length === 0) {
+      sileo.warning({
+        title: "Sin contactos nuevos",
+        description:
+          "Marcá jugadores en la búsqueda que aún no estén en la lista.",
+      });
+      return;
+    }
+
+    setAgregandoMiembros(true);
+    try {
+      const lista = await ComunicacionesService.agregarMiembrosLista(
+        listaEditandoId,
+        nuevos,
+      );
+      const contactos: ComunicacionesContactoBusqueda[] = (lista.miembros || []).map(
+        (m) => ({
+          id: m.perfil_id,
+          nombre: m.nombre,
+          apellido: m.apellido,
+          email: m.email,
+          dni: null,
+          rol: null,
+          lugar_residencia: null,
+          club_id: null,
+          avatar_url: m.avatar_url,
+        }),
+      );
+      const ids = contactos.map((c) => c.id);
+      setMiembroIds(ids);
+      setMiembrosSeleccionados(contactos);
+      setMiembrosInicialesIds(new Set(ids));
+      sileo.success({
+        title: "Miembros agregados",
+        description: `Se sumaron ${nuevos.length} contacto(s) a la lista.`,
+      });
+      await cargarListas();
+    } catch (err) {
+      sileo.error({
+        title: "Error",
+        description: errorMessage(err, "No se pudieron agregar los miembros."),
+      });
+    } finally {
+      setAgregandoMiembros(false);
+    }
   };
 
   const toggleEtiqueta = (etiqueta: ComunicacionesEtiqueta) => {
@@ -848,11 +903,14 @@ export default function ComunicacionesPanel() {
             avatar_url: m.avatar_url,
           }),
         );
-        setMiembroIds(contactos.map((c) => c.id));
+        const ids = contactos.map((c) => c.id);
+        setMiembroIds(ids);
         setMiembrosSeleccionados(contactos);
+        setMiembrosInicialesIds(new Set(ids));
       } else {
         setMiembroIds([]);
         setMiembrosSeleccionados([]);
+        setMiembrosInicialesIds(new Set());
       }
     } catch (err) {
       sileo.error({
@@ -1712,6 +1770,18 @@ export default function ComunicacionesPanel() {
                   {miembroIds.length === 1 ? "" : "s"} seleccionado
                   {miembroIds.length === 1 ? "" : "s"}
                 </p>
+                {listaEditandoId && (
+                  <button
+                    type="button"
+                    onClick={() => void handleAgregarMiembrosLista()}
+                    disabled={agregandoMiembros || guardandoLista}
+                    className="w-full py-2.5 rounded-xl border border-brand-chartreuse/40 bg-brand-chartreuse/10 text-brand-chartreuse text-xs font-black uppercase tracking-wide cursor-pointer disabled:opacity-50"
+                  >
+                    {agregandoMiembros
+                      ? "Agregando…"
+                      : "Agregar seleccionados a la lista"}
+                  </button>
+                )}
               </div>
             )}
 

@@ -18,7 +18,7 @@ interface NuevoGrupoModalProps {
 function displayName(c: ChatContactoBusqueda) {
   const parts = [c.nombre, c.apellido].filter(Boolean);
   if (parts.length) return parts.join(" ");
-  return c.email || "Usuario";
+  return "Jugador";
 }
 
 export default function NuevoGrupoModal({
@@ -222,7 +222,7 @@ export default function NuevoGrupoModal({
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Nombre, apellido, email o DNI..."
+                placeholder="Nombre o apellido..."
                 className="w-full pl-10 pr-4 py-2.5 bg-brand-black border border-brand-white/10 rounded-xl text-sm text-brand-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors"
               />
             </div>
@@ -275,11 +275,6 @@ export default function NuevoGrupoModal({
                           <span className="block text-sm font-semibold text-brand-white truncate">
                             {displayName(c)}
                           </span>
-                          {c.email && (
-                            <span className="block text-[11px] text-gray-500 truncate">
-                              {c.email}
-                            </span>
-                          )}
                         </span>
                         <span
                           className={`size-5 rounded-md border flex items-center justify-center shrink-0 ${

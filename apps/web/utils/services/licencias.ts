@@ -65,6 +65,32 @@ export interface LicenciaConfigPayload {
   dia_cobro?: number | null;
 }
 
+export interface LicenciaCotizacion {
+  precio_anual: number;
+  precio_mensual: number;
+  frecuencia_pago: LicenciaFrecuenciaPago;
+  moneda: string;
+  nombre_carne?: string | null;
+  descripcion_vigencia?: string;
+}
+
+export interface LicenciaPreferenciaPago {
+  preferenceId?: string | null;
+  initPoint?: string | null;
+  sandboxInitPoint?: string | null;
+  mockConfirmed?: boolean;
+  paymentId?: string;
+  licencia?: Licencia;
+  pagoAlternativo?: boolean;
+  monto?: number;
+  moneda?: string;
+  referencia?: string;
+  instrucciones?: string;
+  alias?: string | null;
+  cbu?: string | null;
+  titular?: string | null;
+}
+
 export interface LicenciaPago {
   id: string;
   licencia_id: string;
@@ -139,6 +165,31 @@ export const LicenciasService = {
 
   async solicitarAlta(data: DatosSolicitud): Promise<Licencia> {
     const response = await api.post("/licencias/solicitar", data);
+    return unwrapData<Licencia>(response.data);
+  },
+
+  async cotizar(params: {
+    club_id?: string;
+    provincia?: string;
+  }): Promise<LicenciaCotizacion> {
+    const response = await api.get("/licencias/cotizacion", { params });
+    return unwrapData<LicenciaCotizacion>(response.data);
+  },
+
+  async crearPreferenciaMp(
+    licenciaId: string,
+  ): Promise<LicenciaPreferenciaPago> {
+    const response = await api.post(`/licencias/${licenciaId}/preferencia-mp`);
+    return unwrapData<LicenciaPreferenciaPago>(response.data);
+  },
+
+  async confirmarRetornoMp(
+    licenciaId: string,
+    paymentId: string,
+  ): Promise<Licencia> {
+    const response = await api.post(`/licencias/${licenciaId}/confirmar-retorno`, {
+      payment_id: paymentId,
+    });
     return unwrapData<Licencia>(response.data);
   },
 

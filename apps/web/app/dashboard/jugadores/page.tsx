@@ -328,7 +328,7 @@ export default function JugadoresLicenciasPage() {
           <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-gray-500" />
           <input
             type="text"
-            placeholder="Buscar jugador, email o N° licencia..."
+            placeholder="Buscar por nombre, apellido, DNI, email o N° licencia..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);

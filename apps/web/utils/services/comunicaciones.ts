@@ -13,12 +13,17 @@ import type {
 export class ComunicacionesService {
   static async buscarContactos(
     q: string,
+    opts?: { solo_jugadores?: boolean },
   ): Promise<ComunicacionesContactoBusqueda[]> {
     const { data } = await api.get<{
       exito: boolean;
       data: ComunicacionesContactoBusqueda[];
     }>("/comunicaciones/contactos", {
-      params: { q },
+      params: {
+        q,
+        solo_jugadores:
+          opts?.solo_jugadores === false ? "false" : undefined,
+      },
     });
     return data.data || [];
   }
@@ -41,6 +46,17 @@ export class ComunicacionesService {
     const { data } = await api.post<{ exito: boolean; data: ComunicacionesLista }>(
       "/comunicaciones/listas",
       payload,
+    );
+    return data.data;
+  }
+
+  static async agregarMiembrosLista(
+    listaId: string,
+    perfilIds: string[],
+  ): Promise<ComunicacionesLista> {
+    const { data } = await api.post<{ exito: boolean; data: ComunicacionesLista }>(
+      `/comunicaciones/listas/${listaId}/miembros`,
+      { perfil_ids: perfilIds },
     );
     return data.data;
   }

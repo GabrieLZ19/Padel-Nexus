@@ -22,6 +22,10 @@ import { PARTIDOS_ABIERTOS } from "@/utils/constants/partidosAbiertos";
 import { useSocket } from "@/hooks/useSocket";
 import CredencialDigital from "@/components/perfil/CredencialDigital";
 import LicenciaModal from "@/components/perfil/LicenciaModal";
+import LicenciaPagoPanel from "@/components/perfil/LicenciaPagoPanel";
+import { LicenciasService } from "@/utils/services/licencias";
+import { licenciaPagoEnRevision, licenciaRequierePago } from "@/utils/licenciaPago";
+import { sileo } from "sileo";
 import AfiliacionModal from "@/components/perfil/AfiliacionModal";
 import { MinorModeBanner } from "@/components/legal/MinorModeBanner";
 import { fechaLatina } from "@/utils/fechaArgentina";
@@ -53,6 +57,48 @@ export default function PlayerDashboard() {
 
   useEffect(() => {
     fetchProfile();
+  }, [fetchProfile]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const payment =
+      params.get("payment") || params.get("status") || params.get("collection_status");
+    const licenciaId = params.get("licencia_id");
+    const paymentId =
+      params.get("payment_id") || params.get("collection_id") || "";
+
+    if (
+      licenciaId &&
+      (payment === "success" || payment === "approved")
+    ) {
+      const idPago = paymentId || `web-licencia-${Date.now()}`;
+      void LicenciasService.confirmarRetornoMp(licenciaId, idPago)
+        .then(() => {
+          sileo.success({
+            title: "Pago acreditado",
+            description:
+              "Registramos tu pago. La federación revisará la solicitud.",
+          });
+          return fetchProfile();
+        })
+        .catch(() => {
+          sileo.error({
+            title: "No se pudo confirmar el pago",
+            description:
+              "Si se debitó el monto, guardá el comprobante y contactá a la federación.",
+          });
+        })
+        .finally(() => {
+          window.history.replaceState({}, "", "/mi-perfil");
+        });
+    } else if (payment === "failure" || payment === "rejected") {
+      sileo.error({
+        title: "Pago no completado",
+        description: "Podés reintentar desde tu licencia pendiente.",
+      });
+      window.history.replaceState({}, "", "/mi-perfil");
+    }
   }, [fetchProfile]);
 
   useEffect(() => {
@@ -214,11 +260,21 @@ export default function PlayerDashboard() {
                         ) : currentLic.estado === "Pendiente" ? (
                           <div className="w-full flex flex-col items-center gap-3">
                             <div className="w-full p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-500 text-sm font-medium text-center">
-                              En revisión administrativa
+                              {licenciaRequierePago(currentLic)
+                                ? "Solicitud pendiente de pago"
+                                : licenciaPagoEnRevision(currentLic)
+                                  ? "Pago recibido. En revisión administrativa"
+                                  : "En revisión administrativa"}
                             </div>
                             <h2 className="text-xl font-bold text-gray-400 font-mono">
                               {currentLic.nro_licencia}
                             </h2>
+                            {licenciaRequierePago(currentLic) ? (
+                              <LicenciaPagoPanel
+                                licencia={currentLic}
+                                onPagoActualizado={() => void fetchProfile()}
+                              />
+                            ) : null}
                           </div>
                         ) : currentLic.estado === "Vencida" ? (
                           <div className="w-full flex flex-col items-center gap-3">

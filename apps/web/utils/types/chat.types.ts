@@ -73,7 +73,6 @@ export interface ChatContactoBusqueda {
   id: string;
   nombre: string | null;
   apellido: string | null;
-  email: string | null;
   avatar_url: string | null;
   rol: string | null;
 }
