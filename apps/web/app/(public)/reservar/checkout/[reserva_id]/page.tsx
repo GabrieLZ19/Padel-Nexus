@@ -24,6 +24,11 @@ import { ReservasService } from "@/utils/services/reservas";
 import { getSupabaseBrowserClient } from "@/utils/supabase/client";
 import { metodosPagoReservaDisponibles } from "@/utils/metodosPagoReserva";
 import { sileo } from "sileo";
+import { formatMontoArs } from "@/utils/formatMonto";
+import {
+  textoUbicacionClub,
+  urlGoogleMapsClub,
+} from "@/utils/ubicacionClub";
 
 interface ReservaDetalle {
   id: string;
@@ -666,20 +671,13 @@ export default function CheckoutPage() {
                       Ubicación
                     </p>
                     <a
-                      href={
-                        reserva.turnos.canchas.clubes.latitud && reserva.turnos.canchas.clubes.longitud
-                          ? `https://www.google.com/maps/search/?api=1&query=${reserva.turnos.canchas.clubes.latitud},${reserva.turnos.canchas.clubes.longitud}`
-                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                              `${reserva.turnos.canchas.clubes.nombre}, ${reserva.turnos.canchas.clubes.localidad || ""}, ${reserva.turnos.canchas.clubes.provincia || ""}, Argentina`
-                            )}`
-                      }
+                      href={urlGoogleMapsClub(reserva.turnos.canchas.clubes)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-semibold text-white mt-0.5 hover:text-brand-chartreuse transition-colors inline-flex items-center gap-1.5 group cursor-pointer"
                     >
                       <span>
-                        {reserva.turnos.canchas.clubes.localidad || "Ver dirección"},{" "}
-                        {reserva.turnos.canchas.clubes.provincia || ""}
+                        {textoUbicacionClub(reserva.turnos.canchas.clubes)}
                       </span>
                       <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
                     </a>
@@ -717,7 +715,7 @@ export default function CheckoutPage() {
                       Total a Pagar
                     </span>
                     <span className="text-3xl font-extrabold text-brand-chartreuse tracking-tight">
-                      ${reserva.turnos.precio}
+                      {formatMontoArs(reserva.turnos.precio)}
                     </span>
                   </div>
                 </div>

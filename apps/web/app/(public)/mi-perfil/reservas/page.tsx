@@ -22,6 +22,10 @@ import { isAxiosError } from "axios";
 import { ReservasService } from "@/utils/services/reservas";
 import { PartidosService } from "@/utils/services/partidos";
 import { PARTIDOS_ABIERTOS } from "@/utils/constants/partidosAbiertos";
+import {
+  JUGADORES_PARTIDO_ABIERTO,
+  jugadoresFaltantesDesdeConfirmados,
+} from "@/utils/partidoAbiertoCupos";
 import { NIVELES_PARTIDO_ABIERTO } from "@/utils/constants/padelConfig";
 import { NIVEL_PARTIDO_DEFAULT } from "@/utils/types";
 import { sileo } from "sileo";
@@ -29,6 +33,7 @@ import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal, { type FeedbackModalProps } from "@/components/ui/FeedbackModal";
 import { formatFechaCalendario, parseFechaCalendarioLocal } from "@/utils/formatFecha";
 import { EscribirAlClubButton } from "@/components/reservas/EscribirAlClubButton";
+import { formatMontoArs } from "@/utils/formatMonto";
 
 interface ReservaUsuario {
   id: string;
@@ -80,7 +85,7 @@ export default function MisReservasPage() {
 
   const [modalReserva, setModalReserva] = useState<ReservaUsuario | null>(null);
   const [nivel, setNivel] = useState<string>(NIVEL_PARTIDO_DEFAULT);
-  const [cupos, setCupos] = useState(1);
+  const [jugadoresConfirmados, setJugadoresConfirmados] = useState(1);
   const [notas, setNotas] = useState("");
   const [publicando, setPublicando] = useState(false);
   const [cancelandoId, setCancelandoId] = useState<string | null>(null);
@@ -175,7 +180,7 @@ export default function MisReservasPage() {
   const openModal = (reserva: ReservaUsuario) => {
     setModalReserva(reserva);
     setNivel(NIVEL_PARTIDO_DEFAULT);
-    setCupos(1);
+    setJugadoresConfirmados(1);
     setNotas("");
   };
 
@@ -219,7 +224,9 @@ export default function MisReservasPage() {
       const partido = await PartidosService.publicar({
         reserva_id: modalReserva.id,
         nivel_requerido: nivel,
-        jugadores_faltantes: cupos,
+        jugadores_faltantes: jugadoresFaltantesDesdeConfirmados(
+          jugadoresConfirmados,
+        ),
         notas: notas.trim() || undefined,
       });
       sileo.success({
@@ -439,7 +446,7 @@ export default function MisReservasPage() {
                       <DollarSign className="w-4 h-4 text-gray-500" />
                       <span>Precio:</span>
                       <span className="text-white font-extrabold text-lg">
-                        ${turno?.precio ?? 0}
+                        {formatMontoArs(turno?.precio ?? 0)}
                       </span>
                     </div>
 
@@ -598,18 +605,23 @@ export default function MisReservasPage() {
               />
 
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
-                Jugadores faltantes
+                Jugadores confirmados (vos incluido)
               </label>
               <CustomDropdown
-                value={String(cupos)}
-                onChange={(val) => setCupos(Number(val))}
-                placeholder="Seleccioná cupos"
+                value={String(jugadoresConfirmados)}
+                onChange={(val) => setJugadoresConfirmados(Number(val))}
+                placeholder="¿Cuántos ya están?"
                 options={[
-                  { value: "1", label: "1 jugador" },
-                  { value: "2", label: "2 jugadores" },
-                  { value: "3", label: "3 jugadores" },
+                  { value: "1", label: "1 de 4 · busco 3" },
+                  { value: "2", label: "2 de 4 · busco 2" },
+                  { value: "3", label: "3 de 4 · busco 1" },
                 ]}
               />
+              <p className="text-[11px] text-gray-500 leading-snug">
+                Un partido de pádel es de {JUGADORES_PARTIDO_ABIERTO} jugadores.
+                Indicá cuántos ya tenés confirmados; el resto se suma desde la
+                convocatoria.
+              </p>
 
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">
                 Notas (opcional)

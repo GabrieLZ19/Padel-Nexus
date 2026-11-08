@@ -23,6 +23,7 @@ import {
   fechaHoyArgentina,
 } from "@/utils/fechaArgentina";
 import { EscribirAlClubButton } from "@/components/reservas/EscribirAlClubButton";
+import { formatMontoArs } from "@/utils/formatMonto";
 
 interface ClubDetalle {
   id: string;
@@ -398,7 +399,7 @@ export default function ClubHorariosPage() {
                               : "text-brand-chartreuse"
                           }`}
                         >
-                          ${slot.precio}
+                          {formatMontoArs(slot.precio)}
                         </p>
                       </button>
                     );
@@ -423,7 +424,7 @@ export default function ClubHorariosPage() {
               </div>
               <div className="flex items-center gap-4">
                 <p className="text-2xl font-bold text-brand-chartreuse">
-                  ${selectedSlot.precio}
+                  {formatMontoArs(selectedSlot.precio)}
                 </p>
                 <button
                   onClick={handleReservar}

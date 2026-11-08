@@ -36,6 +36,10 @@ import { TorneosService } from "@/utils/services/torneos";
 import type { Torneo } from "@/utils/types/torneo.types";
 import { PROVINCIAS_ARG, NIVELES_PADEL } from "@/utils/constants/padelConfig";
 import { useProfileStore } from "@/store/useProfileStore";
+import {
+  audienciaInicialSegunRol,
+  debeRealinearAudienciaClub,
+} from "@/utils/comunicacionesAudienciaDefault";
 import type {
   AudienciaPreview,
   ComunicacionesAudienciaTipo,
@@ -180,7 +184,9 @@ export default function ComunicacionesPanel() {
   const [categoriaDest, setCategoriaDest] =
     useState<CategoriaDestinatario>("jugadores");
   const [audienciaTipo, setAudienciaTipo] =
-    useState<ComunicacionesAudienciaTipo>("jugadores_provincia");
+    useState<ComunicacionesAudienciaTipo>(() =>
+      audienciaInicialSegunRol(rol),
+    );
   const [provincia, setProvincia] = useState("");
   const [asociacionIds, setAsociacionIds] = useState<string[]>(["todas"]);
   const [clubIds, setClubIds] = useState<string[]>(["todos"]);
@@ -376,6 +382,23 @@ export default function ComunicacionesPanel() {
       setLoadingCampanas(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!rol) return;
+    const inicial = audienciaInicialSegunRol(rol);
+    setAudienciaTipo((actual) =>
+      debeRealinearAudienciaClub(rol, actual) ? inicial : actual,
+    );
+    if (rol === "admin_club") {
+      setCategoriaDest("jugadores");
+    }
+  }, [rol]);
+
+  useEffect(() => {
+    if (rol === "admin_club" && profileClubId) {
+      setClubIds([profileClubId]);
+    }
+  }, [rol, profileClubId]);
 
   useEffect(() => {
     let ignore = false;

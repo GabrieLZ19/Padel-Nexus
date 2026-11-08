@@ -1101,7 +1101,7 @@ export default function ChatInbox({
                     value={inputMsg}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
-                    placeholder="Escribe un mensaje..."
+                    placeholder="Escribí un mensaje..."
                     rows={1}
                     className="flex-1 min-w-0 resize-none bg-brand-card border border-brand-white/5 rounded-2xl px-3 md:px-4 py-2.5 md:py-3 text-sm text-brand-white placeholder-gray-500 focus:outline-none focus:border-brand-chartreuse/50 transition-colors max-h-28 md:max-h-32"
                     style={{ minHeight: "42px" }}

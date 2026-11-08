@@ -82,9 +82,17 @@ export function formatearResultadoSets(p: Partido): string | null {
     sets.push(`${p.set2_a}-${p.set2_b}`);
   }
   if (p.set3_a != null && p.set3_b != null) {
-    sets.push(`${p.set3_a}-${p.set3_b}`);
+    sets.push(
+      p.es_supertiebreak
+        ? `STB ${p.set3_a}-${p.set3_b}`
+        : `${p.set3_a}-${p.set3_b}`,
+    );
   }
-  if (sets.length === 0) return null;
+  if (sets.length === 0) {
+    if (p.es_wo) return "W.O.";
+    if (p.es_lesion) return "Ret.";
+    return null;
+  }
   let res = sets.join(", ");
   if (p.es_wo) res += " (W.O.)";
   else if (p.es_lesion) res += " (Ret.)";

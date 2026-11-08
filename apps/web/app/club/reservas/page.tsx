@@ -511,9 +511,7 @@ function AgendaDia({
                       <td key={celda.cancha_id} className="px-2 py-1.5 align-top">
                         {!celda.turno_id ? (
                           <span className="text-gray-400">—</span>
-                        ) : !celda.reserva ? (
-                          <span className="text-gray-400">Libre</span>
-                        ) : (
+                        ) : celda.reserva ? (
                           <button
                             type="button"
                             className="block w-full rounded-lg bg-white/5 px-2 py-1 text-left hover:bg-white/10 cursor-pointer"
@@ -542,6 +540,22 @@ function AgendaDia({
                               {ETIQUETA_RESERVA[celda.reserva.estado_reserva] || celda.reserva.estado_reserva}
                             </span>
                           </button>
+                        ) : celda.bloqueo ? (
+                          <div
+                            className="block w-full rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-left"
+                            title={celda.bloqueo.motivo}
+                          >
+                            <span className="block truncate font-semibold text-amber-200">
+                              Bloqueado
+                            </span>
+                            <span className="block truncate text-[10px] text-amber-300/90 capitalize">
+                              {[celda.bloqueo.tipo, celda.bloqueo.motivo]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">Libre</span>
                         )}
                       </td>
                     ))}

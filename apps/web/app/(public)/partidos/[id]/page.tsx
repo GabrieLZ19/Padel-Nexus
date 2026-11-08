@@ -25,6 +25,11 @@ import PartidoChatPanel from "@/components/partidos/PartidoChatPanel";
 import FeedbackModal, { type FeedbackModalProps } from "@/components/ui/FeedbackModal";
 import { sileo } from "sileo";
 import { formatFechaCalendario, parseFechaCalendarioLocal } from "@/utils/formatFecha";
+import {
+  JUGADORES_PARTIDO_ABIERTO,
+  jugadoresConfirmadosDesdeFaltantes,
+  slotsPartidoAbierto,
+} from "@/utils/partidoAbiertoCupos";
 
 function formatFecha(fecha: string) {
   const d = parseFechaCalendarioLocal(fecha);
@@ -218,7 +223,10 @@ export default function PartidoDetallePage() {
     !cerrado &&
     (esMio || yaInscripto) &&
     (partido.estado === "abierto" || partido.estado === "completo");
-  const cuposTotales = inscriptos.length + partido.jugadores_faltantes;
+  const jugadoresConfirmados = jugadoresConfirmadosDesdeFaltantes(
+    partido.jugadores_faltantes,
+  );
+  const slots = slotsPartidoAbierto(partido.jugadores_faltantes, inscriptos);
   const puedeVerChat = Boolean(partido.conversacion_id && (esMio || yaInscripto));
   const fechaDetalle = partido.reservas?.fecha_reserva
     ? formatFecha(partido.reservas.fecha_reserva)
@@ -360,7 +368,7 @@ export default function PartidoDetallePage() {
                   <Users className="size-5 text-brand-chartreuse" />
                   Jugadores
                   <span className="text-gray-500 font-bold">
-                    ({inscriptos.length}/{cuposTotales})
+                    ({jugadoresConfirmados}/{JUGADORES_PARTIDO_ABIERTO})
                   </span>
                 </h2>
                 {partido.jugadores_faltantes > 0 &&
@@ -374,35 +382,33 @@ export default function PartidoDetallePage() {
               </div>
 
               {/* Slots visuales */}
-              <div
-                className={`grid gap-3 ${
-                  cuposTotales <= 3
-                    ? "grid-cols-1 sm:grid-cols-3"
-                    : "grid-cols-2 sm:grid-cols-4"
-                }`}
-              >
-                {Array.from({ length: cuposTotales }).map((_, idx) => {
-                  const ins = inscriptos[idx];
-                  const vacio = !ins;
+              <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+                {slots.map((slot, idx) => {
+                  const ins =
+                    slot.tipo === "inscripto" ? slot.inscripto : null;
+                  const libre = slot.tipo === "libre";
+                  const sinPerfil = slot.tipo === "confirmado_sin_perfil";
                   return (
                     <div
                       key={ins?.id || `slot-${idx}`}
                       className={`rounded-2xl border p-5 flex flex-col items-center justify-center text-center gap-3 min-h-[148px] transition-colors ${
-                        vacio
+                        libre
                           ? "border-dashed border-brand-white/15 bg-brand-black/30"
                           : "border-brand-white/10 bg-brand-black/50"
                       }`}
                     >
                       <div
                         className={`size-14 rounded-full flex items-center justify-center overflow-hidden shrink-0 ${
-                          vacio
+                          libre
                             ? "border-2 border-dashed border-brand-white/20 bg-brand-black/40"
                             : "bg-brand-white/10"
                         }`}
                       >
-                        {vacio ? (
+                        {libre ? (
                           <UserPlus className="size-5 text-gray-500" />
-                        ) : ins.perfiles?.avatar_url ? (
+                        ) : sinPerfil ? (
+                          <Users className="size-5 text-gray-400" />
+                        ) : ins?.perfiles?.avatar_url ? (
                           <Image
                             src={ins.perfiles.avatar_url}
                             alt=""
@@ -412,21 +418,30 @@ export default function PartidoDetallePage() {
                           />
                         ) : (
                           <span className="text-sm font-black text-brand-chartreuse">
-                            {iniciales(ins.perfiles)}
+                            {iniciales(ins?.perfiles)}
                           </span>
                         )}
                       </div>
                       <div className="w-full flex flex-col items-center justify-center gap-0.5">
                         <p
                           className={`text-xs font-bold ${
-                            vacio ? "text-gray-500" : "text-brand-white"
+                            libre ? "text-gray-500" : "text-brand-white"
                           }`}
                         >
-                          {vacio ? "Cupo libre" : nombreJugador(ins.perfiles)}
+                          {libre
+                            ? "Cupo libre"
+                            : sinPerfil
+                              ? "Jugador confirmado"
+                              : nombreJugador(ins?.perfiles)}
                         </p>
-                        {!vacio && ins.jugador_id === partido.creador_id && (
+                        {ins && ins.jugador_id === partido.creador_id && (
                           <span className="text-[9px] font-black uppercase text-brand-chartreuse">
                             Organiza
+                          </span>
+                        )}
+                        {sinPerfil && (
+                          <span className="text-[9px] font-black uppercase text-gray-500">
+                            Sin perfil en app
                           </span>
                         )}
                       </div>

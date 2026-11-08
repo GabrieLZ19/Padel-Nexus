@@ -8,6 +8,7 @@ import {
   agruparPartidosPorRonda,
   etiquetaCanchaAsignada,
   etiquetaCruce,
+  formatearResultadoSets,
   partidosDefinidosOrdenados,
 } from "@/utils/fiscalPartidos";
 
@@ -173,6 +174,7 @@ export function generarActaFiscalPdf(reporte: ReporteFiscal) {
           [
             grupo.label.toUpperCase(),
             individual ? "Jugadores" : "Parejas",
+            "Resultado",
             "Cancha",
             "Horario",
             "Estado",
@@ -181,6 +183,7 @@ export function generarActaFiscalPdf(reporte: ReporteFiscal) {
         body: grupo.partidos.map((p: Partido) => [
           p.orden ? `#${p.orden}` : "—",
           `${etiquetaCruce(p.equipo_a_j1, p.equipo_a_j2)}  vs  ${etiquetaCruce(p.equipo_b_j1, p.equipo_b_j2)}`,
+          formatearResultadoSets(p) || "—",
           etiquetaCanchaAsignada(p.cancha_asignada),
           formatFechaHora(p.fecha_partido),
           p.estado_partido || "Programado",
@@ -201,10 +204,11 @@ export function generarActaFiscalPdf(reporte: ReporteFiscal) {
         },
         alternateRowStyles: { fillColor: ROW },
         columnStyles: {
-          0: { cellWidth: 16 },
-          2: { cellWidth: 42 },
-          3: { cellWidth: 28 },
-          4: { cellWidth: 22 },
+          0: { cellWidth: 14 },
+          2: { cellWidth: 30, fontStyle: "bold" },
+          3: { cellWidth: 30 },
+          4: { cellWidth: 26 },
+          5: { cellWidth: 20 },
         },
       });
       y = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 5;

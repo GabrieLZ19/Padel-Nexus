@@ -45,6 +45,10 @@ export interface AgendaReservasClub {
         jugador: string;
         precio: number;
       } | null;
+      bloqueo: {
+        motivo: string;
+        tipo: string | null;
+      } | null;
     }[];
   }[];
 }

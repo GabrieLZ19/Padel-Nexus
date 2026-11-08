@@ -174,8 +174,8 @@ export default function ClubTransferenciasPendientesPage() {
               Validación de Transferencias
             </h1>
             <p className="text-gray-400 mt-1 text-xs font-medium">
-              Gestione y apruebe comprobantes bancarios cargados por los
-              usuarios para asegurar sus turnos
+              Gestioná y aprobá comprobantes bancarios que cargan los jugadores
+              para confirmar sus turnos
             </p>
           </div>
           <div className="flex items-center bg-brand-card border border-brand-white/5 rounded-xl px-3.5 py-2 w-full sm:max-w-xs focus-within:border-brand-chartreuse/40 transition-colors">

@@ -45,6 +45,10 @@ import {
 } from "@/utils/rondasLlave";
 import { formatearFechaHoraArgentina } from "@/utils/fechaArgentina";
 import { esEliminatoriaDirecta } from "@/utils/formatoTorneo";
+import {
+  etiquetaAccionAuditoria,
+  textoResumenAuditoriaTorneo,
+} from "@/utils/etiquetaAccionAuditoria";
 
 function formatearValorAuditoria(val: unknown): string {
   if (val == null) return "-";
@@ -1708,6 +1712,11 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   log.detalles?.valor_anterior != null ||
                     log.detalles?.valor_nuevo != null,
                 );
+                const resumenAuditoria = textoResumenAuditoriaTorneo(
+                  log.detalles,
+                );
+                const numeroPartidoAuditoria =
+                  log.detalles?.numero_partido ?? log.detalles?.orden;
 
                 return (
                   <div
@@ -1717,7 +1726,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     <div className="space-y-1.5 w-full">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="px-2.5 py-0.5 bg-brand-chartreuse/10 border border-brand-chartreuse/20 text-brand-chartreuse text-xs font-bold rounded-full uppercase tracking-wider">
-                          {log.accion.replace(/_/g, " ")}
+                          {etiquetaAccionAuditoria(log.accion)}
                         </span>
                         {log.detalles?.nombre_grupo && (
                           <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-gray-300 text-xs font-bold rounded-full">
@@ -1727,7 +1736,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                         {log.detalles?.ronda && (
                           <span className="px-2 py-0.5 bg-white/5 border border-white/10 text-gray-300 text-xs font-bold rounded-full">
                             Ronda: {log.detalles.ronda}
-                            {log.detalles?.orden ? ` #${log.detalles.orden}` : ""}
+                            {numeroPartidoAuditoria != null
+                              ? ` · Partido #${numeroPartidoAuditoria}`
+                              : ""}
                           </span>
                         )}
                         <span className="text-xs text-brand-ayuda font-semibold">
@@ -1737,6 +1748,11 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                       <p className="text-gray-300 text-sm font-semibold">
                         Por: <span className="text-white">{adminName}</span>
                       </p>
+                      {resumenAuditoria && (
+                        <p className="text-sm text-white/90 font-medium">
+                          {resumenAuditoria}
+                        </p>
+                      )}
                       {log.detalles?.motivo && (
                         <p className="text-xs text-yellow-500 italic mt-1 bg-yellow-500/5 border border-yellow-500/10 px-3 py-1 rounded-lg inline-block">
                           Motivo: &quot;{log.detalles.motivo}&quot;

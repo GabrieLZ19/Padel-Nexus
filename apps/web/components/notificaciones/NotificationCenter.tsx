@@ -346,8 +346,9 @@ export default function NotificationCenter() {
             {notifications.length > 0 && (
               <div className="px-4 py-2.5 border-t border-brand-white/5 text-center">
                 <p className="text-[10px] text-gray-600">
-                  {notifications.length} notificación
-                  {notifications.length !== 1 ? "es" : ""} en total
+                  {notifications.length === 1
+                    ? "1 notificación en total"
+                    : `${notifications.length} notificaciones en total`}
                 </p>
               </div>
             )}

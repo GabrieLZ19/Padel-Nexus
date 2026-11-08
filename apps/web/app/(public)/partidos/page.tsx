@@ -28,6 +28,10 @@ import {
   type PartidoAbierto,
 } from "@/utils/types";
 import { PARTIDOS_ABIERTOS } from "@/utils/constants/partidosAbiertos";
+import {
+  JUGADORES_PARTIDO_ABIERTO,
+  jugadoresConfirmadosDesdeFaltantes,
+} from "@/utils/partidoAbiertoCupos";
 import { sileo } from "sileo";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { formatFechaCalendario } from "@/utils/formatFecha";
@@ -292,6 +296,9 @@ export default function PartidosAbiertosPage() {
                 (i) => i.jugador_id === profile?.id,
               );
               const inscriptos = partido.inscripciones_partidos || [];
+              const confirmados = jugadoresConfirmadosDesdeFaltantes(
+                partido.jugadores_faltantes,
+              );
 
               return (
                 <article
@@ -385,18 +392,27 @@ export default function PartidosAbiertosPage() {
                           )}
                         </div>
                         <span className="text-xs font-bold">
-                          {partido.jugadores_faltantes === 1 ? (
-                            <span className="text-brand-chartreuse">
-                              Nos falta uno
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">
-                              Faltan{" "}
-                              <span className="text-brand-white">
-                                {partido.jugadores_faltantes}
-                              </span>
-                            </span>
-                          )}
+                          <span className="text-gray-400">
+                            {confirmados}/{JUGADORES_PARTIDO_ABIERTO}
+                            {partido.jugadores_faltantes > 0 && (
+                              <>
+                                {" "}
+                                ·{" "}
+                                {partido.jugadores_faltantes === 1 ? (
+                                  <span className="text-brand-chartreuse">
+                                    Nos falta uno
+                                  </span>
+                                ) : (
+                                  <>
+                                    Faltan{" "}
+                                    <span className="text-brand-white">
+                                      {partido.jugadores_faltantes}
+                                    </span>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </span>
                         </span>
                       </div>
                       <p className="text-[10px] text-gray-500 truncate max-w-[120px]">
