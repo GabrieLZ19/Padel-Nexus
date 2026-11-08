@@ -74,7 +74,9 @@ describe("JUG-01 jugadores en tabla", () => {
     assert.match(pagina, /variante="seccion"/);
     assert.equal(pagina.includes("max-w-xl"), false);
     assert.match(fila, /<MenuPuntos/);
-    assert.match(fila, /label: "Revocar"/);
-    assert.match(fila, /danger: true/);
+    assert.match(fila, /label: "Suspender"/);
+    assert.match(fila, /label: "Dar de baja"/);
+    assert.match(fila, /Suspendida/);
+    assert.doesNotMatch(fila, /label: "Rechazada"/);
   });
 });

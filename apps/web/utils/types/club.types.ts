@@ -23,6 +23,8 @@ export interface Club {
   suscripcion_sin_comisiones?: boolean;
   pago_transferencia_habilitado?: boolean;
   pago_efectivo_habilitado?: boolean;
+  /** RES-3: anticipación mínima (h) para cancelar una reserva confirmada. */
+  horas_antelacion_cancelacion_jugador?: number;
   created_at?: string;
   torneos_count?: number; // Virtual
 }

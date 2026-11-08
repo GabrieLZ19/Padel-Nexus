@@ -22,6 +22,7 @@ import {
   esHorarioReservaPasado,
   fechaHoyArgentina,
 } from "@/utils/fechaArgentina";
+import { EscribirAlClubButton } from "@/components/reservas/EscribirAlClubButton";
 
 interface ClubDetalle {
   id: string;
@@ -208,7 +209,7 @@ export default function ClubHorariosPage() {
 
           {club && (
             <div className="bg-brand-card border border-white/10 rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 hover:shadow-[0_0_30px_rgba(203,254,1,0.02)] transition-shadow">
-              <div>
+              <div className="flex-1 min-w-0">
                 <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-2">
                   {club.nombre}
                 </h1>
@@ -229,6 +230,13 @@ export default function ClubHorariosPage() {
                         : ""}
                   </span>
                 </div>
+              </div>
+              <div className="shrink-0">
+                <EscribirAlClubButton
+                  clubId={club.id}
+                  clubNombre={club.nombre}
+                  redirectPath={`/reservar/club/${clubId}`}
+                />
               </div>
             </div>
           )}

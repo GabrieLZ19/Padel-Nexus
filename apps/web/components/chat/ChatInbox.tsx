@@ -431,7 +431,11 @@ export default function ChatInbox({
     const nombreParticipante =
       `${conv.otro_participante.nombre || ""} ${conv.otro_participante.apellido || ""}`.toLowerCase();
     const nombreProducto = (conv.producto?.nombre || "").toLowerCase();
-    const nombreClub = (conv.partido?.club_nombre || "").toLowerCase();
+    const nombreClub = (
+      conv.club_contacto?.nombre ||
+      conv.partido?.club_nombre ||
+      ""
+    ).toLowerCase();
     const nombreCancha = (conv.partido?.cancha_nombre || "").toLowerCase();
     const nombreGrupo = (conv.nombre || "").toLowerCase();
     const q = searchQuery.toLowerCase();
@@ -504,6 +508,9 @@ export default function ChatInbox({
     }
     if (conv.tipo === "partido" && conv.partido) {
       return conv.partido.club_nombre || (esFederacion ? "Convocatoria" : "Grupo de reserva");
+    }
+    if (conv.club_contacto?.nombre) {
+      return conv.club_contacto.nombre;
     }
     return getDisplayName(conv.otro_participante);
   };

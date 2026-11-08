@@ -19,6 +19,15 @@ export type ComunicacionesAudienciaTipo =
  */
 export type ComunicacionesLicenciaEstado = "vigente" | "sin_licencia";
 
+export type ComunicacionesCanal = "in_app" | "email" | "whatsapp";
+
+export interface ComunicacionesMetricasCampana {
+  entregados?: Partial<Record<ComunicacionesCanal, number>>;
+  omitidos?: Partial<Record<ComunicacionesCanal, number>>;
+  abiertos?: number;
+  clics?: number;
+}
+
 export interface ComunicacionesFiltros {
   roles?: string[];
   provincias?: string[];
@@ -89,6 +98,8 @@ export interface ComunicacionesCampana {
   action_url: string | null;
   total_destinatarios: number;
   total_enviados: number;
+  canales?: ComunicacionesCanal[];
+  metricas?: ComunicacionesMetricasCampana | null;
   created_at: string;
   /**
    * Datos del remitente embebidos desde `perfiles` (join en backend).
@@ -110,6 +121,7 @@ export interface EnviarCampanaPayload {
   filtros?: ComunicacionesFiltros;
   lista_id?: string | null;
   action_url?: string | null;
+  canales?: ComunicacionesCanal[];
 }
 
 export interface CrearListaPayload {

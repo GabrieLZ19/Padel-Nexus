@@ -22,6 +22,7 @@ interface LicenciaJugadorCardProps {
   onCancelEditFecha: () => void;
   onValidar: () => void;
   onCambiarEstado: (licenciaId: string, estado: "Activa" | "Suspendida") => void;
+  onDarDeBaja?: (licenciaId: string) => void;
   savingFecha?: boolean;
 }
 
@@ -42,7 +43,7 @@ const ESTADO_STYLES: Record<
     clase: "border-red-500/30 bg-red-500/10 text-red-400",
   },
   Suspendida: {
-    label: "Rechazada",
+    label: "Suspendida",
     clase: "border-orange-500/30 bg-orange-500/10 text-orange-400",
   },
 };
@@ -67,6 +68,7 @@ export function LicenciaJugadorCard({
   onCancelEditFecha,
   onValidar,
   onCambiarEstado,
+  onDarDeBaja,
   savingFecha,
 }: LicenciaJugadorCardProps) {
   const router = useRouter();
@@ -98,9 +100,18 @@ export function LicenciaJugadorCard({
     ...(licencia.estado === "Activa"
       ? [
           {
-            label: "Revocar",
-            danger: true,
+            label: "Suspender",
             onSelect: () => onCambiarEstado(licencia.id, "Suspendida"),
+          },
+        ]
+      : []),
+    ...(["Activa", "Suspendida", "Vencida"].includes(licencia.estado) &&
+    onDarDeBaja
+      ? [
+          {
+            label: "Dar de baja",
+            danger: true,
+            onSelect: () => onDarDeBaja(licencia.id),
           },
         ]
       : []),

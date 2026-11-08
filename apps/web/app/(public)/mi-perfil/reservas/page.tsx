@@ -26,7 +26,9 @@ import { NIVELES_PARTIDO_ABIERTO } from "@/utils/constants/padelConfig";
 import { NIVEL_PARTIDO_DEFAULT } from "@/utils/types";
 import { sileo } from "sileo";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import FeedbackModal, { type FeedbackModalProps } from "@/components/ui/FeedbackModal";
 import { formatFechaCalendario, parseFechaCalendarioLocal } from "@/utils/formatFecha";
+import { EscribirAlClubButton } from "@/components/reservas/EscribirAlClubButton";
 
 interface ReservaUsuario {
   id: string;
@@ -36,6 +38,9 @@ interface ReservaUsuario {
   estado_pago: string;
   estado_reserva: string;
   motivo_cancelacion?: string | null;
+  puede_cancelar?: boolean;
+  cancelacion_bloqueo?: string | null;
+  horas_antelacion_cancelacion?: number | null;
   created_at: string;
   turnos: {
     id: string;
@@ -78,6 +83,17 @@ export default function MisReservasPage() {
   const [cupos, setCupos] = useState(1);
   const [notas, setNotas] = useState("");
   const [publicando, setPublicando] = useState(false);
+  const [cancelandoId, setCancelandoId] = useState<string | null>(null);
+  const [cancelModal, setCancelModal] = useState<FeedbackModalProps>({
+    isOpen: false,
+    type: "warning",
+    title: "",
+    description: "",
+    confirmText: "Cancelar reserva",
+    cancelText: "Volver",
+    onClose: () => setCancelModal((prev) => ({ ...prev, isOpen: false })),
+    onConfirm: () => {},
+  });
 
   const fetchReservas = useCallback(async () => {
     setLoading(true);
@@ -161,6 +177,39 @@ export default function MisReservasPage() {
     setNivel(NIVEL_PARTIDO_DEFAULT);
     setCupos(1);
     setNotas("");
+  };
+
+  const pedirCancelar = (reserva: ReservaUsuario) => {
+    const club = reserva.turnos?.canchas?.clubes;
+    const turno = reserva.turnos;
+    setCancelModal({
+      isOpen: true,
+      type: "warning",
+      title: "¿Cancelar esta reserva?",
+      description: `Se liberará el turno en ${club?.nombre || "el club"} del ${formatFecha(reserva.fecha_reserva)} a las ${formatHora(turno?.hora_inicio)} hs. Esta acción no se puede deshacer.`,
+      confirmText: "Sí, cancelar",
+      cancelText: "Volver",
+      onClose: () => setCancelModal((prev) => ({ ...prev, isOpen: false })),
+      onConfirm: async () => {
+        setCancelModal((prev) => ({ ...prev, isOpen: false }));
+        setCancelandoId(reserva.id);
+        try {
+          await ReservasService.cancelar(reserva.id);
+          sileo.success({
+            title: "Reserva cancelada",
+            description: "El turno quedó liberado.",
+          });
+          await fetchReservas();
+        } catch (err: unknown) {
+          const message = isAxiosError(err)
+            ? err.response?.data?.error || "No se pudo cancelar la reserva."
+            : "No se pudo cancelar la reserva.";
+          sileo.error({ title: "No se pudo cancelar", description: message });
+        } finally {
+          setCancelandoId(null);
+        }
+      },
+    });
   };
 
   const handlePublicar = async () => {
@@ -293,6 +342,9 @@ export default function MisReservasPage() {
               isConfirmed &&
               esReservaFutura(reserva.fecha_reserva) &&
               !partidoExistente;
+            const puedeCancelar =
+              reserva.puede_cancelar === true && !isCancelled;
+            const bloqueoCancelacion = reserva.cancelacion_bloqueo?.trim();
 
             return (
               <div
@@ -448,6 +500,39 @@ export default function MisReservasPage() {
                       detalle
                     </Link>
                   )}
+
+                  {club?.id && !isCancelled && (
+                    <EscribirAlClubButton
+                      clubId={club.id}
+                      clubNombre={club.nombre}
+                      redirectPath="/mi-perfil/reservas"
+                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/15 text-sm font-bold text-white hover:border-brand-chartreuse/40 hover:text-brand-chartreuse transition-colors cursor-pointer disabled:opacity-50"
+                    />
+                  )}
+
+                  {grupo.titulo === "Próximas" && !isCancelled && (
+                    <div className="space-y-2">
+                      {puedeCancelar ? (
+                        <button
+                          type="button"
+                          onClick={() => pedirCancelar(reserva)}
+                          disabled={cancelandoId === reserva.id}
+                          className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-red-500/30 text-red-300 text-sm font-bold hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          {cancelandoId === reserva.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <XCircle className="w-4 h-4" />
+                          )}
+                          Cancelar reserva
+                        </button>
+                      ) : bloqueoCancelacion ? (
+                        <p className="text-[11px] text-gray-500 leading-snug px-1">
+                          {bloqueoCancelacion}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -458,6 +543,8 @@ export default function MisReservasPage() {
           ))}
         </div>
       )}
+
+      <FeedbackModal {...cancelModal} />
 
       {modalReserva && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

@@ -23,7 +23,6 @@ import { InscripcionesService } from "@/utils/services/inscripciones";
 import { ClubesService } from "@/utils/services/clubes";
 import { Torneo, Inscripcion, Club } from "@/utils/types";
 import {
-  contarActivosEnConjunto,
   etiquetaActivos,
   etiquetaCategoriaInscripcion,
 } from "@/utils/categoriaInscripcion";
@@ -31,7 +30,20 @@ import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 
 export default function DashboardProvincial() {
   const router = useRouter();
-  const [torneos, setTorneos] = useState<Torneo[]>([]);
+  const [provincialesTotal, setProvincialesTotal] = useState(0);
+  const [provincialesActivos, setProvincialesActivos] = useState(0);
+  const [clasificatoriosTotal, setClasificatoriosTotal] = useState(0);
+  const [nacionalesTotal, setNacionalesTotal] = useState(0);
+  const [ultimosProvinciales, setUltimosProvinciales] = useState<Torneo[]>([]);
+  const [ultimosNacionales, setUltimosNacionales] = useState<Torneo[]>([]);
+  const [indiceTorneo, setIndiceTorneo] = useState<
+    Array<{
+      id?: string;
+      nivel?: string | null;
+      categoria?: string | null;
+      alcance?: string | null;
+    }>
+  >([]);
   const [inscripciones, setInscripciones] = useState<Inscripcion[]>([]);
   const [pagosConfirmados, setPagosConfirmados] = useState(0);
   const [recaudacionConfirmada, setRecaudacionConfirmada] = useState(0);
@@ -51,7 +63,19 @@ export default function DashboardProvincial() {
   useEffect(() => {
     let isMounted = true;
     Promise.all([
-      TorneosService.getAll().catch(() => []),
+      TorneosService.getResumenTablero().catch(() => ({
+        total: 0,
+        activos: 0,
+        porAlcance: {},
+        ultimos: [] as Torneo[],
+        provinciales_total: 0,
+        provinciales_activos: 0,
+        clasificatorios_total: 0,
+        nacionales_total: 0,
+        ultimos_provinciales: [] as Torneo[],
+        ultimos_nacionales: [] as Torneo[],
+        indice_torneo: [],
+      })),
       InscripcionesService.getAll().catch(() => []),
       InscripcionesService.getResumen().catch(() => ({
         pendientes: 0,
@@ -60,9 +84,15 @@ export default function DashboardProvincial() {
         recaudacion: 0,
       })),
       ClubesService.getAll().catch(() => ({ data: [], total: 0 })),
-    ]).then(([torneosData, inscripcionesData, resumenPagos, clubesData]) => {
+    ]).then(([resumenTorneos, inscripcionesData, resumenPagos, clubesData]) => {
       if (isMounted) {
-        setTorneos(torneosData || []);
+        setProvincialesTotal(resumenTorneos.provinciales_total ?? 0);
+        setProvincialesActivos(resumenTorneos.provinciales_activos ?? 0);
+        setClasificatoriosTotal(resumenTorneos.clasificatorios_total ?? 0);
+        setNacionalesTotal(resumenTorneos.nacionales_total ?? 0);
+        setUltimosProvinciales(resumenTorneos.ultimos_provinciales ?? []);
+        setUltimosNacionales(resumenTorneos.ultimos_nacionales ?? []);
+        setIndiceTorneo(resumenTorneos.indice_torneo ?? []);
         setInscripciones(inscripcionesData || []);
         setPagosConfirmados(resumenPagos.confirmadas);
         setRecaudacionConfirmada(resumenPagos.recaudacion);
@@ -76,14 +106,6 @@ export default function DashboardProvincial() {
   // ==========================================
   // CÁLCULO DE MÉTRICAS PROVINCIALES
   // ==========================================
-  const torneosProvinciales = torneos.filter(
-    (t) => t.alcance === "Provincial" || t.alcance === "Regional",
-  );
-  const torneosClasificatorios = torneos.filter(
-    (t) => t.alcance === "Provincial",
-  );
-  const torneosActivos = contarActivosEnConjunto(torneosProvinciales);
-
   const jugadoresUnicos = new Set<string>();
   inscripciones.forEach((i) => {
     if (i.jugador1_nombre) jugadoresUnicos.add(i.jugador1_nombre.toLowerCase().trim());
@@ -100,8 +122,8 @@ export default function DashboardProvincial() {
   const metrics = [
     {
       title: "Torneos Provinciales",
-      value: torneosProvinciales.length.toString(),
-      change: etiquetaActivos(torneosActivos),
+      value: provincialesTotal.toString(),
+      change: etiquetaActivos(provincialesActivos),
       icon: Trophy,
       trendIcon: Activity,
       color: "bg-[#2a3614]",
@@ -110,7 +132,7 @@ export default function DashboardProvincial() {
     },
     {
       title: "Clasificatorios a Nacionales",
-      value: torneosClasificatorios.length.toString(),
+      value: clasificatoriosTotal.toString(),
       change: "Circuito",
       icon: TrendingUp,
       trendIcon: Trophy,
@@ -161,7 +183,11 @@ export default function DashboardProvincial() {
   ];
 
   // Distribución de inscripciones por categoría
-  const torneoPorId = new Map(torneos.map((torneo) => [torneo.id, torneo]));
+  const torneoPorId = new Map(
+    indiceTorneo
+      .filter((torneo) => Boolean(torneo.id))
+      .map((torneo) => [torneo.id as string, torneo]),
+  );
   const categoriaCount: Record<string, number> = {};
   inscripciones.forEach((inscripcion) => {
     const torneo = torneoPorId.get(inscripcion.torneo_id);
@@ -182,19 +208,8 @@ export default function DashboardProvincial() {
     "provinciales",
   );
 
-  const torneosNacionales = torneos.filter((t) => t.alcance === "Nacional");
-
-  // Competencias para la tabla del dashboard (coincide con los indicadores)
-  const listaParaTabla =
-    tabTorneos === "provinciales" ? torneosProvinciales : torneosNacionales;
-
-  const ultimosTorneos = [...listaParaTabla]
-    .sort(
-      (a, b) =>
-        new Date(b.created_at || "").getTime() -
-        new Date(a.created_at || "").getTime(),
-    )
-    .slice(0, 5);
+  const ultimosTorneos =
+    tabTorneos === "provinciales" ? ultimosProvinciales : ultimosNacionales;
 
   // --- SKELETON ---
   if (loading) {
@@ -350,7 +365,7 @@ export default function DashboardProvincial() {
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
-                  Provinciales ({torneosProvinciales.length})
+                  Provinciales ({provincialesTotal})
                 </button>
                 <button
                   type="button"
@@ -361,7 +376,7 @@ export default function DashboardProvincial() {
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
-                  Nacionales ({torneosNacionales.length})
+                  Nacionales ({nacionalesTotal})
                 </button>
               </div>
               <button

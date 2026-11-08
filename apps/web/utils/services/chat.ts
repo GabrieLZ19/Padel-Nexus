@@ -49,6 +49,19 @@ export class ChatService {
     return data.data;
   }
 
+  static async iniciarChatClub(
+    clubId: string,
+  ): Promise<{
+    id: string;
+    nueva: boolean;
+    club?: { id: string; nombre: string };
+  }> {
+    const { data } = await api.post("/mensajes/conversaciones", {
+      club_id: clubId,
+    });
+    return data.data;
+  }
+
   static async iniciarSoporte(): Promise<{ id: string; nueva: boolean }> {
     const { data } = await api.post("/mensajes/soporte");
     return data.data;

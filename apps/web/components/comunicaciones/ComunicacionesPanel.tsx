@@ -18,6 +18,9 @@ import {
   Landmark,
   User,
   Pencil,
+  Mail,
+  MessageCircle,
+  Bell,
 } from "lucide-react";
 import { isAxiosError } from "axios";
 import { sileo } from "sileo";
@@ -37,6 +40,7 @@ import type {
   AudienciaPreview,
   ComunicacionesAudienciaTipo,
   ComunicacionesCampana,
+  ComunicacionesCanal,
   ComunicacionesContactoBusqueda,
   ComunicacionesEtiqueta,
   ComunicacionesFiltros,
@@ -190,6 +194,19 @@ export default function ComunicacionesPanel() {
   const [preview, setPreview] = useState<AudienciaPreview | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [canalesEnvio, setCanalesEnvio] = useState<ComunicacionesCanal[]>([
+    "in_app",
+  ]);
+
+  const toggleCanalEnvio = (canal: ComunicacionesCanal) => {
+    setCanalesEnvio((prev) => {
+      if (prev.includes(canal)) {
+        const next = prev.filter((c) => c !== canal);
+        return next.length > 0 ? next : ["in_app"];
+      }
+      return [...prev, canal];
+    });
+  };
 
   // Listas form
   const [listaEditandoId, setListaEditandoId] = useState<string | null>(null);
@@ -730,10 +747,24 @@ export default function ComunicacionesPanel() {
           filtros: buildFiltros(),
           lista_id: audienciaTipo === "lista" ? listaId || null : null,
           action_url: actionUrl.trim() || null,
+          canales: canalesEnvio,
         });
+        const m = result.campana.metricas;
+        const entInApp = m?.entregados?.in_app ?? result.total_enviados;
+        const entEmail = m?.entregados?.email;
+        const entWa = m?.entregados?.whatsapp;
+        const partes = [`In-app: ${entInApp}/${result.total_destinatarios}`];
+        if (canalesEnvio.includes("email")) {
+          partes.push(
+            `Email: ${entEmail ?? 0} (requiere RESEND_API_KEY en servidor)`,
+          );
+        }
+        if (canalesEnvio.includes("whatsapp")) {
+          partes.push(`WhatsApp: ${entWa ?? 0} (integración en curso)`);
+        }
         sileo.success({
           title: "Campaña enviada",
-          description: `${result.total_enviados} de ${result.total_destinatarios} notificaciones creadas.`,
+          description: partes.join(" · "),
         });
         setTitulo("");
         setMensaje("");
@@ -790,7 +821,7 @@ export default function ComunicacionesPanel() {
       type: "warning",
       title: "¿Enviar campaña?",
       description: total
-        ? `Se intentará notificar a ${total} destinatario${total === 1 ? "" : "s"}. Quienes tengan push desactivado no recibirán el aviso.`
+        ? `Destinatarios: ${total}. Canales: ${canalesEnvio.join(", ")}. El aviso in-app se guarda en el centro de notificaciones aunque el push esté desactivado.`
         : "Vas a enviar la campaña a la audiencia seleccionada. Recomendamos previsualizar antes.",
       confirmText: "Enviar ahora",
       cancelText: "Cancelar",
@@ -1423,6 +1454,46 @@ export default function ComunicacionesPanel() {
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-500 uppercase">
+                Canales de envío
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    { id: "in_app" as const, label: "In-app / push", Icon: Bell },
+                    { id: "email" as const, label: "Email", Icon: Mail },
+                    {
+                      id: "whatsapp" as const,
+                      label: "WhatsApp",
+                      Icon: MessageCircle,
+                    },
+                  ] as const
+                ).map(({ id, label, Icon }) => {
+                  const active = canalesEnvio.includes(id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => toggleCanalEnvio(id)}
+                      className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
+                        active
+                          ? "border-brand-chartreuse/50 bg-brand-chartreuse/10 text-brand-chartreuse"
+                          : "border-brand-white/10 bg-brand-black/40 text-gray-400 hover:border-brand-white/20"
+                      }`}
+                    >
+                      <Icon className="size-3.5" />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-gray-500">
+                Email usa Resend si está configurado en el servidor. WhatsApp
+                requiere integración con proveedor (fase 2).
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase">
                 Título
               </label>
               <input
@@ -1947,7 +2018,21 @@ export default function ComunicacionesPanel() {
                         {AUDIENCIA_LABELS[c.audiencia_tipo] || c.audiencia_tipo}
                       </span>
                       <span className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-400 border border-brand-white/10">
-                        {c.total_enviados}/{c.total_destinatarios} enviados
+                        In-app: {c.total_enviados}/{c.total_destinatarios}
+                      </span>
+                      {(c.canales || ["in_app"]).map((canal) =>
+                        canal === "in_app" ? null : (
+                          <span
+                            key={canal}
+                            className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-400 border border-brand-white/10"
+                          >
+                            {canal}: {c.metricas?.entregados?.[canal] ?? 0}
+                          </span>
+                        ),
+                      )}
+                      <span className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-500 border border-brand-white/10">
+                        Aperturas: {c.metricas?.abiertos ?? 0} · Clics:{" "}
+                        {c.metricas?.clics ?? 0}
                       </span>
                       <span
                         className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-400 border border-brand-white/10 normal-case tracking-normal"

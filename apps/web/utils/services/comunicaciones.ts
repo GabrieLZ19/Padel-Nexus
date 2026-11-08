@@ -92,6 +92,7 @@ export class ComunicacionesService {
     campana: ComunicacionesCampana;
     total_destinatarios: number;
     total_enviados: number;
+    metricas?: ComunicacionesCampana["metricas"];
   }> {
     const { data } = await api.post<{
       exito: boolean;
@@ -102,6 +103,10 @@ export class ComunicacionesService {
       };
     }>("/comunicaciones/campanas", payload);
     return data.data;
+  }
+
+  static async registrarClicCampana(campanaId: string): Promise<void> {
+    await api.post(`/comunicaciones/campanas/${campanaId}/clic`);
   }
 
   static async listarCampanas(opts?: {

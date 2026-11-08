@@ -68,4 +68,8 @@ export const ReservasService = {
     const response = await api.post(`/reservas/${reservaId}/pagar`, payload);
     return response.data?.data || response.data;
   },
+
+  async cancelar(reservaId: string): Promise<void> {
+    await api.post(`/reservas/${reservaId}/cancelar`);
+  },
 };

@@ -132,7 +132,6 @@ export default function Navbar() {
     { name: "Reservar", path: "/reservar" },
     { name: PARTIDOS_ABIERTOS.titulo, path: "/partidos" },
     { name: "Marketplace", path: "/marketplace" },
-    { name: "Clubes", path: "/clubes" },
   ];
 
   // Extraer nombre directamente del perfil unificado de nuestra API

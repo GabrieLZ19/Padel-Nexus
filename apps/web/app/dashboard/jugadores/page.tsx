@@ -30,7 +30,7 @@ type FiltroLicencia =
   | "Pendientes"
   | "Vigentes"
   | "Vencidas"
-  | "Rechazadas";
+  | "Suspendidas";
 
 const FILTRO_A_ESTADO: Record<
   FiltroLicencia,
@@ -40,7 +40,7 @@ const FILTRO_A_ESTADO: Record<
   Pendientes: "Pendiente",
   Vigentes: "Activa",
   Vencidas: "Vencida",
-  Rechazadas: "Suspendida",
+  Suspendidas: "Suspendida",
 };
 
 const getDisplayLicencia = (licList?: Licencia[]) => {
@@ -58,6 +58,12 @@ function contarPorEstado(items: Perfil[], estado: Licencia["estado"]) {
   return items.filter((j) =>
     j.licencias?.some((l) => l.estado === estado),
   ).length;
+}
+
+function nombreJugadorListado(jugador: Perfil): string {
+  return jugador.nombre
+    ? `${jugador.apellido || ""}, ${jugador.nombre}`.replace(/^, /, "")
+    : "este jugador";
 }
 
 export default function JugadoresLicenciasPage() {
@@ -177,10 +183,10 @@ export default function JugadoresLicenciasPage() {
     }
     setFeedback({
       isOpen: true,
-      type: "danger",
-      title: "¿Revocar licencia?",
-      description: `¿Confirmás revocar la licencia de ${nombre}?`,
-      confirmText: "Revocar",
+      type: "warning",
+      title: "¿Suspender licencia?",
+      description: `La licencia de ${nombre} quedará suspendida. Podés reactivarla más adelante.`,
+      confirmText: "Suspender",
       cancelText: "Cancelar",
       onConfirm: () => {
         setFeedback((prev) => ({ ...prev, isOpen: false, onConfirm: undefined }));
@@ -198,11 +204,12 @@ export default function JugadoresLicenciasPage() {
       await LicenciasService.updateEstado(licenciaId, nuevoEstado);
       setFeedback({
         isOpen: true,
-        title: nuevoEstado === "Activa" ? "Licencia aprobada" : "Licencia revocada",
+        title:
+          nuevoEstado === "Activa" ? "Licencia aprobada" : "Licencia suspendida",
         description:
           nuevoEstado === "Activa"
             ? "La licencia ha sido activada con éxito."
-            : "La licencia ha sido suspendida correctamente.",
+            : "La licencia quedó suspendida. El jugador puede reactivarse cuando corresponda.",
         type: nuevoEstado === "Activa" ? "success" : "info",
       });
       await fetchLicencias(true, page, search, filtroActivo);
@@ -293,7 +300,45 @@ export default function JugadoresLicenciasPage() {
   const pendientes = resumen?.pendientes ?? contarPorEstado(licencias, "Pendiente");
   const vigentes = resumen?.vigentes ?? contarPorEstado(licencias, "Activa");
   const vencidas = resumen?.vencidas ?? contarPorEstado(licencias, "Vencida");
-  const rechazadas = resumen?.rechazadas ?? contarPorEstado(licencias, "Suspendida");
+  const suspendidas =
+    resumen?.suspendidas ?? contarPorEstado(licencias, "Suspendida");
+
+  const pedirDarDeBaja = (licenciaId: string, nombre: string) => {
+    setFeedback({
+      isOpen: true,
+      type: "danger",
+      title: "¿Dar de baja la licencia?",
+      description: `Se eliminará el carnet de ${nombre} de forma definitiva. El jugador deberá iniciar un nuevo trámite.`,
+      confirmText: "Dar de baja",
+      cancelText: "Cancelar",
+      onConfirm: () => {
+        setFeedback((prev) => ({ ...prev, isOpen: false, onConfirm: undefined }));
+        void (async () => {
+          setLoading(true);
+          try {
+            await LicenciasService.darDeBaja(licenciaId);
+            setFeedback({
+              isOpen: true,
+              title: "Licencia dada de baja",
+              description: "El carnet fue eliminado del sistema.",
+              type: "info",
+            });
+            await fetchLicencias(true, page, search, filtroActivo);
+          } catch (error) {
+            console.error("Error al dar de baja licencia:", error);
+            setFeedback({
+              isOpen: true,
+              title: "Error",
+              description: "No se pudo dar de baja la licencia.",
+              type: "error",
+            });
+          } finally {
+            setLoading(false);
+          }
+        })();
+      },
+    });
+  };
   const totalJugadores = resumen?.total ?? total;
 
   return (
@@ -347,7 +392,7 @@ export default function JugadoresLicenciasPage() {
               { filtro: "Pendientes" as FiltroLicencia, label: "Pendientes", value: pendientes, color: "text-yellow-400" },
               { filtro: "Vigentes" as FiltroLicencia, label: "Vigentes", value: vigentes, color: "text-green-400" },
               { filtro: "Vencidas" as FiltroLicencia, label: "Vencidas", value: vencidas, color: "text-red-400" },
-              { filtro: "Rechazadas" as FiltroLicencia, label: "Rechazadas", value: rechazadas, color: "text-red-300" },
+              { filtro: "Suspendidas" as FiltroLicencia, label: "Suspendidas", value: suspendidas, color: "text-orange-300" },
             ] as const
           ).map((stat) => (
             <button
@@ -446,13 +491,11 @@ export default function JugadoresLicenciasPage() {
                       pedirCambioEstado(
                         licenciaId,
                         estado,
-                        jugador.nombre
-                          ? `${jugador.apellido || ""}, ${jugador.nombre}`.replace(
-                              /^, /,
-                              "",
-                            )
-                          : "este jugador",
+                        nombreJugadorListado(jugador),
                       )
+                    }
+                    onDarDeBaja={(licenciaId) =>
+                      pedirDarDeBaja(licenciaId, nombreJugadorListado(jugador))
                     }
                     savingFecha={savingFecha}
                   />
@@ -522,12 +565,13 @@ export default function JugadoresLicenciasPage() {
                           pedirCambioEstado(
                             licenciaId,
                             estado,
-                            jugador.nombre
-                              ? `${jugador.apellido || ""}, ${jugador.nombre}`.replace(
-                                  /^, /,
-                                  "",
-                                )
-                              : "este jugador",
+                            nombreJugadorListado(jugador),
+                          )
+                        }
+                        onDarDeBaja={(licenciaId) =>
+                          pedirDarDeBaja(
+                            licenciaId,
+                            nombreJugadorListado(jugador),
                           )
                         }
                         savingFecha={savingFecha}

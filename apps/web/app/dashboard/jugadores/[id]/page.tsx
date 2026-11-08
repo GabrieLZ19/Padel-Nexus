@@ -33,7 +33,8 @@ export default function PerfilJugadorAdminPage() {
   const [editingFecha, setEditingFecha] = useState(false);
   const [fechaVencimientoInput, setFechaVencimientoInput] = useState("");
   const [activeLicenciaIndex, setActiveLicenciaIndex] = useState(0);
-  const [confirmarRevocar, setConfirmarRevocar] = useState(false);
+  const [confirmarSuspender, setConfirmarSuspender] = useState(false);
+  const [confirmarBaja, setConfirmarBaja] = useState(false);
 
   const licenciasList = perfil?.licencias || [];
   const currentLicencia =
@@ -355,19 +356,33 @@ export default function PerfilJugadorAdminPage() {
                   <div className="flex flex-col gap-2 pt-4 border-t border-white/5">
                     {currentLicencia.estado === "Activa" ? (
                       <button
+                        type="button"
                         disabled={actualizando}
-                        onClick={() => setConfirmarRevocar(true)}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50"
+                        onClick={() => setConfirmarSuspender(true)}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 border border-orange-500/30 bg-orange-500/10 text-orange-300 font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50 hover:bg-orange-500/20"
                       >
-                        <Ban size={14} /> Revocar Licencia
+                        <Ban size={14} /> Suspender licencia
                       </button>
-                    ) : (
+                    ) : currentLicencia.estado !== "Pendiente" ? (
                       <button
+                        type="button"
                         disabled={actualizando}
                         onClick={() => handleUpdateLicencia("Activa")}
                         className="w-full flex items-center justify-center gap-2 py-2.5 bg-brand-chartreuse text-brand-black font-extrabold rounded-xl text-xs hover:bg-[#b3e600] transition-colors cursor-pointer disabled:opacity-50"
                       >
-                        <ShieldCheck size={14} /> Activar Licencia
+                        <ShieldCheck size={14} /> Reactivar licencia
+                      </button>
+                    ) : null}
+                    {["Activa", "Suspendida", "Vencida"].includes(
+                      currentLicencia.estado,
+                    ) && (
+                      <button
+                        type="button"
+                        disabled={actualizando}
+                        onClick={() => setConfirmarBaja(true)}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <Ban size={14} /> Dar de baja
                       </button>
                     )}
                   </div>
@@ -438,22 +453,39 @@ export default function PerfilJugadorAdminPage() {
         </div>
       </div>
       <FeedbackModal
-        isOpen={confirmarRevocar}
-        type="danger"
-        title="¿Revocar licencia?"
-        description={`¿Confirmás revocar la licencia de ${
-          perfil.nombre
-            ? `${perfil.apellido ? `${perfil.apellido}, ` : ""}${perfil.nombre}`
-            : "este jugador"
-        }?`}
-        confirmText="Revocar"
+        isOpen={confirmarSuspender}
+        type="warning"
+        title="¿Suspender licencia?"
+        description={`La licencia quedará suspendida y podrá reactivarse más adelante.`}
+        confirmText="Suspender"
         cancelText="Cancelar"
         isLoading={actualizando}
-        onClose={() => setConfirmarRevocar(false)}
+        onClose={() => setConfirmarSuspender(false)}
         onConfirm={() => {
           void handleUpdateLicencia("Suspendida").finally(() =>
-            setConfirmarRevocar(false),
+            setConfirmarSuspender(false),
           );
+        }}
+      />
+      <FeedbackModal
+        isOpen={confirmarBaja}
+        type="danger"
+        title="¿Dar de baja la licencia?"
+        description="Se eliminará el carnet de forma definitiva. El jugador deberá iniciar un nuevo trámite."
+        confirmText="Dar de baja"
+        cancelText="Cancelar"
+        isLoading={actualizando}
+        onClose={() => setConfirmarBaja(false)}
+        onConfirm={() => {
+          if (!currentLicencia) return;
+          setActualizando(true);
+          void LicenciasService.darDeBaja(currentLicencia.id)
+            .then(() => fetchPerfil(true))
+            .catch((err) => console.error("Error al dar de baja:", err))
+            .finally(() => {
+              setActualizando(false);
+              setConfirmarBaja(false);
+            });
         }}
       />
     </div>

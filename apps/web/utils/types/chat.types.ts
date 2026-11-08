@@ -58,6 +58,8 @@ export interface ChatConversacion {
   partido?: ChatPartidoContexto | null;
   /** Solo tipo grupo: todos los integrantes */
   participantes?: ChatPartidoParticipante[];
+  /** DM con admin_club: nombre del club para el jugador */
+  club_contacto?: { id: string; nombre: string } | null;
 }
 
 export interface ChatMensaje {

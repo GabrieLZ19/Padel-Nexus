@@ -14,7 +14,7 @@ export interface ResumenLicencias {
   pendientes: number;
   vigentes: number;
   vencidas: number;
-  rechazadas: number;
+  suspendidas: number;
   otros: number;
 }
 
@@ -203,6 +203,10 @@ export const LicenciasService = {
       fecha_vencimiento,
     });
     return unwrapData<Licencia>(response.data);
+  },
+
+  async darDeBaja(id: string): Promise<void> {
+    await api.post(`/licencias/${id}/dar-de-baja`);
   },
 
   async verificarLicencia(usuario_id: string): Promise<Licencia> {

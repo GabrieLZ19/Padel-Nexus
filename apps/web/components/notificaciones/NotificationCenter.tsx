@@ -94,6 +94,11 @@ export default function NotificationCenter() {
     }
 
     const actionUrl = notif.metadata?.action_url as string | undefined;
+    const campanaId = notif.metadata?.campana_id as string | undefined;
+    if (campanaId && actionUrl) {
+      void NotificacionesService.registrarClicCampana(campanaId).catch(() => {});
+    }
+
     if (actionUrl) {
       setIsOpen(false);
       if (/^https?:\/\//i.test(actionUrl)) {

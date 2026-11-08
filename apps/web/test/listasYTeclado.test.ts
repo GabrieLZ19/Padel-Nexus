@@ -24,11 +24,14 @@ describe("GEN-10 filas y tablero", () => {
   });
 
   it("el tablero no espera el padrón completo ni las inscripciones de cada torneo", () => {
-    const tablero = fuente(WEB, "components/dashboard/DashboardFederacion.tsx");
+    const tableroFed = fuente(WEB, "components/dashboard/DashboardFederacion.tsx");
+    const tableroProv = fuente(WEB, "components/dashboard/DashboardProvincial.tsx");
     const listado = fuente(API, "src/services/torneo.service.ts");
     const licencias = fuente(API, "src/services/licencia.service.ts");
-    assert.match(tablero, /getResumenTablero\(/);
-    assert.equal(tablero.includes("ClubesService.getAll"), false);
+    assert.match(tableroFed, /getResumenTablero\(/);
+    assert.match(tableroProv, /getResumenTablero\(/);
+    assert.equal(tableroProv.includes("TorneosService.getAll"), false);
+    assert.equal(tableroFed.includes("ClubesService.getAll"), false);
     const antesDelTope = listado.split("query.limit(5000)")[0] || "";
     assert.equal(antesDelTope.includes("inscripciones(usuario_id)"), false);
     assert.match(licencias, /resumenDesdeTablaLicencias/);

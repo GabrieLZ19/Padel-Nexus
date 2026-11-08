@@ -21,4 +21,8 @@ export const NotificacionesService = {
     const response = await api.delete<{ exito: boolean }>(`/notificaciones/${id}`);
     return response.data.exito;
   },
+
+  async registrarClicCampana(campanaId: string): Promise<void> {
+    await api.post(`/notificaciones/campana/${campanaId}/clic`);
+  },
 };

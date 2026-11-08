@@ -69,6 +69,18 @@ export const TorneosService = {
     activos: number;
     porAlcance: Record<string, number>;
     ultimos: Torneo[];
+    provinciales_total?: number;
+    provinciales_activos?: number;
+    clasificatorios_total?: number;
+    nacionales_total?: number;
+    ultimos_provinciales?: Torneo[];
+    ultimos_nacionales?: Torneo[];
+    indice_torneo?: Array<{
+      id?: string;
+      nivel?: string | null;
+      categoria?: string | null;
+      alcance?: string | null;
+    }>;
   }> {
     const response = await api.get("/torneos", { params: { resumen: "tablero" } });
     return response.data;
