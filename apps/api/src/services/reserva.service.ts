@@ -12,6 +12,13 @@ import {
   type ClubMetodosPagoConfig,
 } from "../utils/metodos-pago-reserva";
 import { ClubService } from "./club.service";
+import {
+  reservaOcupaTurno,
+  reservaPendienteExpirada,
+  retencionInicialDesde,
+  retencionMercadoPagoDesde,
+  retencionTransferenciaDesde,
+} from "../utils/reservaRetencion";
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 
@@ -37,6 +44,36 @@ export interface CrearReservaDTO {
 // ── Servicio ───────────────────────────────────────────────────────────
 
 export class ReservaService {
+  private static async eliminarReservasPorIds(ids: string[]) {
+    if (ids.length === 0) return;
+    await supabaseAdmin.from("pagos").delete().in("reserva_id", ids);
+    await supabaseAdmin.from("reservas").delete().in("id", ids);
+  }
+
+  /**
+   * Libera turnos con reservas pendientes cuya retención ya venció (checkout abandonado).
+   */
+  private static async liberarPendientesExpiradas(
+    turnoIds: string[],
+    fecha: string,
+  ) {
+    if (turnoIds.length === 0) return;
+    const ahora = new Date();
+    const { data: candidatas, error } = await supabaseAdmin
+      .from("reservas")
+      .select("id, estado_reserva, created_at, retiene_hasta")
+      .in("turno_id", turnoIds)
+      .eq("fecha_reserva", fecha)
+      .eq("estado_reserva", "pendiente");
+
+    if (error) throw new Error("Error al liberar reservas pendientes expiradas.");
+
+    const expiradas = (candidatas || [])
+      .filter((r) => reservaPendienteExpirada(r, ahora))
+      .map((r) => r.id as string);
+    await this.eliminarReservasPorIds(expiradas);
+  }
+
   /**
    * Obtiene la disponibilidad de todos los turnos de un club para una fecha dada.
    * Cruza los turnos semanales preestablecidos con las reservas existentes.
@@ -74,13 +111,17 @@ export class ReservaService {
 
     const turnoIds = turnos.map((t) => t.id);
 
-    // 3. Obtener reservas ya tomadas para esos turnos en esa fecha
+    await this.liberarPendientesExpiradas(turnoIds, fecha);
+
+    const ahora = new Date();
+
+    // 3. Reservas que ocupan el turno (confirmadas o pendientes con retención vigente)
     const { data: reservas, error: reservasError } = await supabaseAdmin
       .from("reservas")
-      .select("turno_id")
+      .select("turno_id, estado_reserva, created_at, retiene_hasta")
       .in("turno_id", turnoIds)
       .eq("fecha_reserva", fecha)
-      .in("estado_reserva", ["confirmada"]);
+      .neq("estado_reserva", "cancelada");
 
     if (reservasError)
       throw new Error("Error al consultar las reservas existentes.");
@@ -102,7 +143,9 @@ export class ReservaService {
       .gte("fecha_fin", fecha);
 
     const turnosOcupados = new Set(
-      (reservas || []).map((r) => r.turno_id as string),
+      (reservas || [])
+        .filter((r) => reservaOcupaTurno(r, ahora))
+        .map((r) => r.turno_id as string),
     );
 
     const toMin = (t: string) => {
@@ -178,7 +221,7 @@ export class ReservaService {
 
   /**
    * Crea una reserva tras verificar que no exista solapamiento.
-   * Si existen reservas anteriores en estado 'pendiente' (abandonadas), se eliminan automáticamente.
+   * Las pendientes expiradas se liberan; las vigentes retienen el turno (RES-1).
    */
   static async crearReserva(dto: CrearReservaDTO) {
     const { turno_id, usuario_id, fecha_reserva } = dto;
@@ -211,10 +254,14 @@ export class ReservaService {
       }
     }
 
+    await this.liberarPendientesExpiradas([turno_id], fecha_reserva);
+
+    const ahora = new Date();
+
     // 1. Verificar solapamiento
     const { data: existentes, error: checkError } = await supabaseAdmin
       .from("reservas")
-      .select("id, estado_reserva")
+      .select("id, estado_reserva, usuario_id, created_at, retiene_hasta")
       .eq("turno_id", turno_id)
       .eq("fecha_reserva", fecha_reserva);
 
@@ -228,16 +275,34 @@ export class ReservaService {
         throw new Error("TURNO_OCUPADO");
       }
 
-      // Si sólo existen pendientes, las eliminamos para liberar la restricción única de la base de datos
-      const pendientes = existentes.filter(
-        (r) => r.estado_reserva === "pendiente",
+      const vigentes = existentes.filter(
+        (r) =>
+          r.estado_reserva === "pendiente" && reservaOcupaTurno(r, ahora),
       );
-      if (pendientes.length > 0) {
-        const idsABorrar = pendientes.map((p) => p.id);
-        await supabaseAdmin.from("pagos").delete().in("reserva_id", idsABorrar);
-        await supabaseAdmin.from("reservas").delete().in("id", idsABorrar);
+      if (vigentes.length > 0) {
+        const delUsuario = vigentes.find((r) => r.usuario_id === usuario_id);
+        if (delUsuario) {
+          return this.obtenerReservaPorId(delUsuario.id);
+        }
+        throw new Error("TURNO_OCUPADO");
       }
+
+      const idsABorrar = existentes
+        .filter((r) => {
+          if (r.estado_reserva === "cancelada") return true;
+          if (
+            r.estado_reserva === "pendiente" &&
+            reservaPendienteExpirada(r, ahora)
+          ) {
+            return true;
+          }
+          return false;
+        })
+        .map((r) => r.id as string);
+      await this.eliminarReservasPorIds(idsABorrar);
     }
+
+    const retieneHasta = retencionInicialDesde(ahora);
 
     // 2. Crear la reserva en estado pendiente
     const { data, error } = await supabaseAdmin
@@ -249,6 +314,7 @@ export class ReservaService {
           fecha_reserva,
           estado_reserva: "pendiente",
           estado_pago: "pendiente",
+          retiene_hasta: retieneHasta,
         },
       ])
       .select()
@@ -354,12 +420,17 @@ export class ReservaService {
 
     const esTransferencia = metodoPago === "transferencia";
 
+    const retieneHasta = esTransferencia
+      ? retencionTransferenciaDesde(new Date())
+      : null;
+
     // 2. Actualizar la reserva
     const { error: updError } = await supabaseAdmin
       .from("reservas")
       .update({
         estado_reserva: esTransferencia ? "pendiente" : "confirmada",
         estado_pago: esTransferencia ? "pendiente" : "completado",
+        ...(esTransferencia ? { retiene_hasta: retieneHasta } : { retiene_hasta: null }),
       })
       .eq("id", reservaId);
 
@@ -481,6 +552,11 @@ export class ReservaService {
 
     const { id, turnos } = reserva;
     if (!turnos) throw new Error("Turno asociado no encontrado.");
+
+    await supabaseAdmin
+      .from("reservas")
+      .update({ retiene_hasta: retencionMercadoPagoDesde(new Date()) })
+      .eq("id", reservaId);
 
     // @ts-ignore
     const cancha = turnos.canchas;

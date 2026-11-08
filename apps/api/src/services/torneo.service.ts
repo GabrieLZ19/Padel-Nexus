@@ -31,6 +31,13 @@ import { normalizarAlcanceTorneo } from "../utils/pasesRepresentacion";
 import { ordenRondaProgramador } from "../utils/programadorReglas";
 import { AlcanceCuentaService } from "./alcanceCuenta.service";
 import { mismaProvincia } from "../utils/alcanceCuenta";
+import { formatoTorneoSoportaGeneracionCuadro } from "../constants/torneoFormato";
+import { esEliminatoriaDirecta } from "../utils/formatoTorneo";
+import {
+  alcanceRankingDesdeTorneo,
+  tablaPuntosDesdeConfig,
+  type ConfigPuntosTorneo,
+} from "../utils/rankingTorneo";
 
 async function marcarDescalificacionesDeZona(
   torneoId: string,
@@ -1518,6 +1525,12 @@ export class TorneoService {
 
     if (torneoError || !torneo) throw new Error("Torneo no encontrado");
 
+    if (!formatoTorneoSoportaGeneracionCuadro(torneo.formato)) {
+      throw new Error(
+        `El formato "${torneo.formato || "—"}" aún no tiene generación de cuadros. Usá Zonas + Llaves o Eliminatoria Directa.`,
+      );
+    }
+
     const diasJuegoRaw = (torneo as any).dias_juego;
     const diasValidos = Array.isArray(diasJuegoRaw)
       ? diasJuegoRaw.filter((d: any) => typeof d === "string" && d.trim().length > 0)
@@ -1606,7 +1619,7 @@ export class TorneoService {
     let currentRoundStartTime = new Date(`${baseDateStr}T12:00:00`);
     currentRoundStartTime.setHours(hours, minutes, 0, 0);
 
-    if (torneo.formato === "Eliminatoria Directa") {
+    if (esEliminatoriaDirecta(torneo.formato)) {
       const N = inscripciones.length;
       let cupos = 4;
       while (cupos < N) {
@@ -1704,11 +1717,6 @@ export class TorneoService {
 
       for (let j = 0; j < numPartidosIniciales; j++) {
         const slot = slotsIniciales[j];
-        const slotIndex = Math.floor(j / canchasCount);
-        const canchaNo = (j % canchasCount) + 1;
-        const matchTime = new Date(
-          currentRoundStartTime.getTime() + slotIndex * matchDur * 60 * 1000,
-        );
 
         if (slot.equipo_a_id && slot.equipo_b_id) {
           // Partido real entre 2 contrincantes
@@ -1720,7 +1728,7 @@ export class TorneoService {
             orden: orden++,
             estado_partido: "Programado",
             cancha_asignada: null,
-            fecha_partido: matchTime.toISOString(),
+            fecha_partido: null,
             ganador: null,
           });
         } else if (slot.equipo_a_id && !slot.equipo_b_id) {
@@ -1739,9 +1747,6 @@ export class TorneoService {
 
       // Guardar la ronda siguiente preparada con los clasificados por BYE
       if (nextRoundName && partidosPorRonda[nextRoundName]) {
-        const matchTimeNext = new Date(
-          currentRoundStartTime.getTime() + matchDur * 60 * 1000,
-        );
         for (let nr = 0; nr < nextRoundMatchesCount; nr++) {
           const nrSlot = nextRoundSlots[nr];
           partidosPorRonda[nextRoundName].push({
@@ -1752,16 +1757,11 @@ export class TorneoService {
             orden: orden++,
             estado_partido: "Programado",
             cancha_asignada: null,
-            fecha_partido: matchTimeNext.toISOString(),
+            fecha_partido: null,
             ganador: null,
           });
         }
       }
-
-      let roundStartTime = new Date(
-        currentRoundStartTime.getTime() +
-          Math.ceil(initialRound.matches / canchasCount) * matchDur * 60 * 1000,
-      );
 
       for (let i = startIndex + 1; i < roundsConfig.length; i++) {
         const round = roundsConfig[i];
@@ -1776,7 +1776,7 @@ export class TorneoService {
               orden: orden++,
               estado_partido: "Programado",
               cancha_asignada: null,
-              fecha_partido: currentRoundStartTime.toISOString(),
+              fecha_partido: null,
               ganador: null,
             });
           }
@@ -2026,102 +2026,28 @@ export class TorneoService {
     const { data: torneoInfo } = await supabaseAdmin
       .from("torneos")
       .select(
-        "nivel, categoria, modalidad, configuracion_puntos",
+        "nivel, categoria, modalidad, configuracion_puntos, alcance, clubes!club_id ( provincia )",
       )
       .eq("id", partido.torneo_id)
       .single();
 
     if (torneoInfo && !yaTeniaResultado) {
-      let TABLA_PUNTOS: Record<string, { ganador: number; perdedor: number }> =
-        {
-          "16AVOS": { ganador: 45, perdedor: 10 },
-          OCTAVOS: { ganador: 90, perdedor: 45 },
-          CUARTOS: { ganador: 180, perdedor: 90 },
-          SEMIS: { ganador: 360, perdedor: 180 },
-          FINAL: { ganador: 1000, perdedor: 600 },
-        };
+      const configP = torneoInfo.configuracion_puntos as
+        | ConfigPuntosTorneo
+        | null
+        | undefined;
+      const TABLA_PUNTOS = tablaPuntosDesdeConfig(configP);
 
-      const configP = torneoInfo.configuracion_puntos as any;
-      if (configP && configP.puntos_activados) {
-        TABLA_PUNTOS = {
-          "32AVOS": { ganador: configP.puntos_32avos || 0, perdedor: 0 },
-          "16AVOS": {
-            ganador: configP.puntos_16avos || 0,
-            perdedor: configP.puntos_zona || 0,
-          },
-          OCTAVOS: {
-            ganador: configP.puntos_octavos || 0,
-            perdedor: configP.puntos_16avos || 0,
-          },
-          CUARTOS: {
-            ganador: configP.puntos_cuartos || 0,
-            perdedor: configP.puntos_octavos || 0,
-          },
-          SEMIS: {
-            ganador: configP.puntos_semis || 0,
-            perdedor: configP.puntos_cuartos || 0,
-          },
-          FINAL: {
-            ganador: configP.puntos_campeon || 0,
-            perdedor: configP.puntos_final || 0,
-          },
-        };
-      }
-
-      const rondaNormalizada = partido.ronda.toUpperCase().trim();
-      const puntosRonda = TABLA_PUNTOS[rondaNormalizada];
-
-      let puntosGanadorNetos = puntosRonda?.ganador || 0;
-      let puntosPerdedorNetos = puntosRonda?.perdedor || 0;
-
-      if (puntosRonda) {
-        const SECUENCIA_RONDAS = [
-          "16AVOS",
-          "OCTAVOS",
-          "CUARTOS",
-          "SEMIS",
-          "FINAL",
-        ];
-        const idxRonda = SECUENCIA_RONDAS.indexOf(rondaNormalizada);
-        let rondaAnterior = null;
-
-        if (idxRonda > 0) {
-          for (let i = idxRonda - 1; i >= 0; i--) {
-            const { data: prevMatches } = await supabaseAdmin
-              .from("partidos")
-              .select("id")
-              .eq("torneo_id", partido.torneo_id)
-              .eq("ronda", SECUENCIA_RONDAS[i])
-              .limit(1);
-
-            if (prevMatches && prevMatches.length > 0) {
-              rondaAnterior = SECUENCIA_RONDAS[i];
-              break;
-            }
-          }
-        }
-
-        if (rondaAnterior) {
-          const puntosRondaAnterior = TABLA_PUNTOS[rondaAnterior];
-          if (puntosRondaAnterior) {
-            puntosGanadorNetos = Math.max(
-              0,
-              puntosRonda.ganador - puntosRondaAnterior.ganador,
-            );
-            puntosPerdedorNetos = Math.max(
-              0,
-              puntosRonda.perdedor - puntosRondaAnterior.ganador,
-            );
-          }
-        }
-      }
+      const clubEmbed = torneoInfo.clubes as { provincia?: string } | null;
+      const alcanceRanking = alcanceRankingDesdeTorneo(torneoInfo.alcance);
+      const provinciaJurisdiccion = clubEmbed?.provincia ?? null;
 
       const otorgarPuntosAInscripcion = async (
         inscripcionId: string | null,
         puntos: number,
         esGanador: boolean,
       ) => {
-        if (!inscripcionId) return;
+        if (!inscripcionId || puntos <= 0) return;
         const { data: ins } = await supabaseAdmin
           .from("inscripciones")
           .select("usuario_id, usuario2_id")
@@ -2150,6 +2076,8 @@ export class TorneoService {
                 usuario_id: uid,
                 categoria: torneoInfo.nivel,
                 rama: torneoInfo.categoria,
+                alcance: alcanceRanking,
+                provincia_jurisdiccion: provinciaJurisdiccion,
                 puntos: pAnt + puntos,
                 pj: pjAnt + 1,
                 pg: esGanador ? pgAnt + 1 : pgAnt,
@@ -2167,32 +2095,95 @@ export class TorneoService {
             );
           }
 
-          if (puntos > 0) {
-            const { error: histError } = await supabaseAdmin
-              .from("historial_ranking")
-              .insert([
-                {
-                  usuario_id: uid,
-                  torneo_id: partido.torneo_id,
-                  puntos_anteriores: pAnt,
-                  puntos_nuevos: pAnt + puntos,
-                },
-              ]);
-            if (histError) {
-              console.error(
-                `Error al insertar historial de ranking para usuario ${uid}:`,
-                histError,
-              );
-              throw new Error(
-                `Error al insertar historial de ranking: ${histError.message}`,
-              );
-            }
+          const { error: histError } = await supabaseAdmin
+            .from("historial_ranking")
+            .insert([
+              {
+                usuario_id: uid,
+                torneo_id: partido.torneo_id,
+                puntos_anteriores: pAnt,
+                puntos_nuevos: pAnt + puntos,
+              },
+            ]);
+          if (histError) {
+            console.error(
+              `Error al insertar historial de ranking para usuario ${uid}:`,
+              histError,
+            );
+            throw new Error(
+              `Error al insertar historial de ranking: ${histError.message}`,
+            );
           }
         }
       };
 
-      await otorgarPuntosAInscripcion(perdedorId, puntosPerdedorNetos, false);
-      await otorgarPuntosAInscripcion(ganadorId, puntosGanadorNetos, true);
+      if (TABLA_PUNTOS) {
+        const rondaNormalizada = partido.ronda.toUpperCase().trim();
+
+        if (rondaNormalizada.startsWith("ZONA")) {
+          const ptsZona = Number(configP?.puntos_zona) || 0;
+          if (ptsZona > 0) {
+            await otorgarPuntosAInscripcion(ganadorId, ptsZona, true);
+            await otorgarPuntosAInscripcion(perdedorId, ptsZona, false);
+          }
+        } else {
+          const puntosRonda = TABLA_PUNTOS[rondaNormalizada];
+          let puntosGanadorNetos = puntosRonda?.ganador || 0;
+          let puntosPerdedorNetos = puntosRonda?.perdedor || 0;
+
+          if (puntosRonda) {
+            const SECUENCIA_RONDAS = [
+              "32AVOS",
+              "16AVOS",
+              "PRELIMINARES",
+              "OCTAVOS",
+              "CUARTOS",
+              "SEMIS",
+              "FINAL",
+            ];
+            const idxRonda = SECUENCIA_RONDAS.indexOf(rondaNormalizada);
+            let rondaAnterior: string | null = null;
+
+            if (idxRonda > 0) {
+              for (let i = idxRonda - 1; i >= 0; i--) {
+                const rondaCandidata = SECUENCIA_RONDAS[i];
+                const { data: prevMatches } = await supabaseAdmin
+                  .from("partidos")
+                  .select("id")
+                  .eq("torneo_id", partido.torneo_id)
+                  .eq("ronda", rondaCandidata)
+                  .limit(1);
+
+                if (prevMatches && prevMatches.length > 0) {
+                  rondaAnterior = rondaCandidata;
+                  break;
+                }
+              }
+            }
+
+            if (rondaAnterior) {
+              const puntosRondaAnterior = TABLA_PUNTOS[rondaAnterior];
+              if (puntosRondaAnterior) {
+                puntosGanadorNetos = Math.max(
+                  0,
+                  puntosRonda.ganador - puntosRondaAnterior.ganador,
+                );
+                puntosPerdedorNetos = Math.max(
+                  0,
+                  puntosRonda.perdedor - puntosRondaAnterior.ganador,
+                );
+              }
+            }
+          }
+
+          await otorgarPuntosAInscripcion(
+            perdedorId,
+            puntosPerdedorNetos,
+            false,
+          );
+          await otorgarPuntosAInscripcion(ganadorId, puntosGanadorNetos, true);
+        }
+      }
     }
 
     if (partido.ronda.toUpperCase() === "FINAL") {
