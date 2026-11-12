@@ -24,6 +24,12 @@ export interface Afiliacion {
   } | null;
 }
 
+export interface PreferenciasNotificacion {
+  push?: boolean;
+  email?: boolean;
+  whatsapp?: boolean;
+}
+
 export interface Licencia {
   id: string;
   created_at?: string;
@@ -79,6 +85,7 @@ export interface Perfil {
   marketing_opt_in?: boolean;
   /** Segmentos CRM (superadmin): marketing | institucional */
   etiquetas_contacto?: ("marketing" | "institucional")[];
+  preferencias_notificacion?: PreferenciasNotificacion | null;
 }
 
 export interface LogAuditoria {

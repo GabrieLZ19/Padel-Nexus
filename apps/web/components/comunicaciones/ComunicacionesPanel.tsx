@@ -171,6 +171,7 @@ export default function ComunicacionesPanel() {
   const [campanas, setCampanas] = useState<ComunicacionesCampana[]>([]);
   const [loadingListas, setLoadingListas] = useState(true);
   const [loadingCampanas, setLoadingCampanas] = useState(false);
+  const [campanaEmailHabilitado, setCampanaEmailHabilitado] = useState(false);
 
   // Catalogos: guardamos `provincia` como metadato para filtrar por rol.
   const [asociaciones, setAsociaciones] = useState<
@@ -208,6 +209,9 @@ export default function ComunicacionesPanel() {
   ]);
 
   const toggleCanalEnvio = (canal: ComunicacionesCanal) => {
+    if (canal === "email" && !campanaEmailHabilitado) {
+      return;
+    }
     setCanalesEnvio((prev) => {
       if (prev.includes(canal)) {
         const next = prev.filter((c) => c !== canal);
@@ -384,6 +388,26 @@ export default function ComunicacionesPanel() {
     } finally {
       setLoadingCampanas(false);
     }
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    void (async () => {
+      try {
+        const cfg = await ComunicacionesService.obtenerConfig();
+        if (!ignore) {
+          setCampanaEmailHabilitado(cfg.campana_email_habilitado);
+          if (!cfg.campana_email_habilitado) {
+            setCanalesEnvio((prev) => prev.filter((c) => c !== "email"));
+          }
+        }
+      } catch {
+        if (!ignore) setCampanaEmailHabilitado(false);
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -1505,15 +1529,24 @@ export default function ComunicacionesPanel() {
                   ] as const
                 ).map(({ id, label, Icon }) => {
                   const active = canalesEnvio.includes(id);
+                  const emailDeshabilitado =
+                    id === "email" && !campanaEmailHabilitado;
                   return (
                     <button
                       key={id}
                       type="button"
+                      disabled={emailDeshabilitado}
                       onClick={() => toggleCanalEnvio(id)}
-                      className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
-                        active
+                      className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-colors ${
+                        emailDeshabilitado
+                          ? "cursor-not-allowed opacity-45 border-brand-white/5 bg-brand-black/20 text-gray-600"
+                          : "cursor-pointer"
+                      } ${
+                        active && !emailDeshabilitado
                           ? "border-brand-chartreuse/50 bg-brand-chartreuse/10 text-brand-chartreuse"
-                          : "border-brand-white/10 bg-brand-black/40 text-gray-400 hover:border-brand-white/20"
+                          : !emailDeshabilitado
+                            ? "border-brand-white/10 bg-brand-black/40 text-gray-400 hover:border-brand-white/20"
+                            : ""
                       }`}
                     >
                       <Icon className="size-3.5" />
@@ -1523,8 +1556,9 @@ export default function ComunicacionesPanel() {
                 })}
               </div>
               <p className="text-[11px] text-gray-500">
-                In-app muestra el aviso en la plataforma. El correo llega si el
-                destinatario tiene email y acepta notificaciones por mail.
+                In-app muestra el aviso en la plataforma. El correo en campañas
+                permanece desactivado hasta ampliar la cuota de envío institucional;
+                recuperación de clave y avisos vitales siguen por mail.
                 WhatsApp todavía no está disponible para campañas.
               </p>
             </div>

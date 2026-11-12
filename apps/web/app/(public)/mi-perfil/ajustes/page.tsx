@@ -15,7 +15,10 @@ import {
   Calendar,
   Phone,
   Camera,
+  Bell,
+  MessageCircle,
 } from "lucide-react";
+import type { PreferenciasNotificacion } from "@/utils/types/user.types";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { useProfileStore } from "@/store/useProfileStore";
@@ -28,11 +31,29 @@ export const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-white/5 rounded-2xl ${className}`} />
 );
 
+const DEFAULT_PREFS: PreferenciasNotificacion = {
+  push: true,
+  email: true,
+  whatsapp: false,
+};
+
+function normalizePrefs(
+  value?: PreferenciasNotificacion | null,
+): PreferenciasNotificacion {
+  return {
+    push: value?.push ?? DEFAULT_PREFS.push,
+    email: value?.email ?? DEFAULT_PREFS.email,
+    whatsapp: value?.whatsapp ?? DEFAULT_PREFS.whatsapp,
+  };
+}
+
 export default function ProfileSettings() {
   const [profile, setProfile] = useState<Perfil | null>(null);
   const [saving, setSaving] = useState(false);
   const [pedidoAbierto, setPedidoAbierto] = useState(false);
   const [pedidoEnviando, setPedidoEnviando] = useState(false);
+  const [prefs, setPrefs] = useState<PreferenciasNotificacion>(DEFAULT_PREFS);
+  const [prefSaving, setPrefSaving] = useState(false);
 
   // Estados para subida de avatar
   const [uploading, setUploading] = useState(false);
@@ -48,8 +69,54 @@ export default function ProfileSettings() {
   }>({});
 
   useEffect(() => {
-    PerfilService.getMe().then(setProfile).catch(console.error);
+    PerfilService.getMe()
+      .then((p) => {
+        setProfile(p);
+        setPrefs(normalizePrefs(p.preferencias_notificacion));
+      })
+      .catch(console.error);
   }, []);
+
+  useEffect(() => {
+  if (typeof window === "undefined") return;
+  if (window.location.hash === "#notificaciones") {
+    const el = document.getElementById("notificaciones");
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  }, [profile]);
+
+  const updatePref = async (
+    key: keyof PreferenciasNotificacion,
+    value: boolean,
+  ) => {
+    const previous = prefs;
+    const next = { ...prefs, [key]: value };
+    setPrefs(next);
+    setPrefSaving(true);
+    try {
+      const updated = await PerfilService.updateMe({
+        preferencias_notificacion: next,
+      });
+      setProfile(updated);
+      setPrefs(normalizePrefs(updated.preferencias_notificacion));
+      useProfileStore.getState().setProfile(updated);
+      toastExito({
+        title: "Preferencias guardadas",
+        description: "Tus canales de notificación quedaron actualizados.",
+      });
+    } catch (err: unknown) {
+      setPrefs(previous);
+      toastError({
+        title: "Error",
+        description:
+          err instanceof Error
+            ? err.message
+            : "No se pudieron guardar las preferencias.",
+      });
+    } finally {
+      setPrefSaving(false);
+    }
+  };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -403,6 +470,58 @@ export default function ProfileSettings() {
                 <p className="text-red-400 text-xs mt-1 ml-1">{errors.lugar_residencia}</p>
               )}
             </div>
+          </div>
+        </section>
+
+        <section
+          id="notificaciones"
+          className="bg-brand-card p-6 md:p-8 rounded-3xl border-x border-b border-t-2 border-brand-white/5 border-t-brand-chartreuse/20 shadow-xl scroll-mt-24"
+        >
+          <h3 className="text-lg font-bold mb-2 flex items-center gap-2.5 text-brand-white">
+            <Bell size={20} className="text-brand-chartreuse" /> Notificaciones
+          </h3>
+          <p className="text-sm text-gray-400 mb-6">
+            Elegí cómo querés recibir avisos de la plataforma y de tu entidad.
+            El correo de recuperación de contraseña siempre se envía por
+            seguridad.
+          </p>
+          <div className="space-y-3">
+            {(
+              [
+                {
+                  key: "push" as const,
+                  label: "En la plataforma y push",
+                  Icon: Bell,
+                },
+                {
+                  key: "email" as const,
+                  label: "Email",
+                  Icon: Mail,
+                },
+                {
+                  key: "whatsapp" as const,
+                  label: "WhatsApp",
+                  Icon: MessageCircle,
+                },
+              ] as const
+            ).map(({ key, label, Icon }) => (
+              <label
+                key={key}
+                className="flex items-center justify-between gap-4 rounded-2xl border border-brand-white/10 bg-brand-black/30 px-4 py-3 cursor-pointer"
+              >
+                <span className="flex items-center gap-3 text-sm font-medium text-brand-white">
+                  <Icon size={18} className="text-brand-chartreuse shrink-0" />
+                  {label}
+                </span>
+                <input
+                  type="checkbox"
+                  className="size-5 accent-[#c8f542] cursor-pointer"
+                  checked={Boolean(prefs[key])}
+                  disabled={prefSaving}
+                  onChange={(e) => void updatePref(key, e.target.checked)}
+                />
+              </label>
+            ))}
           </div>
         </section>
 

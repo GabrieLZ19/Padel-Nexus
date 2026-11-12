@@ -10,7 +10,25 @@ import type {
   ComunicacionesAudienciaTipo,
 } from "../types/comunicaciones.types";
 
+export type ComunicacionesConfig = {
+  campana_email_habilitado: boolean;
+  resend_configurado: boolean;
+};
+
 export class ComunicacionesService {
+  static async obtenerConfig(): Promise<ComunicacionesConfig> {
+    const { data } = await api.get<{
+      exito: boolean;
+      data: ComunicacionesConfig;
+    }>("/comunicaciones/config");
+    return (
+      data.data || {
+        campana_email_habilitado: false,
+        resend_configurado: false,
+      }
+    );
+  }
+
   static async buscarContactos(
     q: string,
     opts?: { solo_jugadores?: boolean },
