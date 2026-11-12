@@ -41,6 +41,22 @@ export function fechaLatina(iso?: string | null): string {
   return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
 }
 
+/** Fecha y hora en Argentina (dd/mm/aaaa HH:mm). */
+export function fechaHoraLatinaArgentina(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("es-AR", {
+    timeZone: ZONA_HORARIA_ARGENTINA,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
 /** Fecha YYYY-MM-DD del día actual en Argentina. */
 export function fechaHoyArgentina(ahora: Date = new Date()): string {
   return partesEnArgentina(ahora).fecha;

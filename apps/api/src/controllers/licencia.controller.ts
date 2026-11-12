@@ -366,6 +366,29 @@ export const LicenciasController = {
     }
   },
 
+  async obtenerDatosTransferenciaLicencia(
+    req: Request,
+    res: Response,
+  ): Promise<Response> {
+    try {
+      const usuarioId = req.user?.id;
+      if (!usuarioId) {
+        return res.status(401).json({ exito: false, error: "No autenticado." });
+      }
+      const data = await LicenciaService.obtenerDatosTransferenciaLicencia(
+        req.params.id,
+        usuarioId,
+      );
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al obtener datos de transferencia.";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
   async crearPreferenciaPago(req: Request, res: Response): Promise<Response> {
     try {
       const usuarioId = req.user?.id;

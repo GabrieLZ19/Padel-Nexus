@@ -39,6 +39,7 @@ describe("ENT-18 suspender licencia — motivo, auditoría y notificación", () 
     );
     assert.match(listado, /inputType="textarea"/);
     assert.match(listado, /Motivo \(obligatorio\)/);
+    assert.match(listado, /inputMinLength=\{3\}/);
     assert.match(ficha, /Historial de licencia/);
     assert.match(ficha, /getHistorial/);
   });

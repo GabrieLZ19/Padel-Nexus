@@ -11,7 +11,7 @@ import {
 } from "../utils/licenciaConfig";
 
 const LICENCIA_CONFIG_COLUMNS =
-  "licencia_precio_anual, licencia_vigencia_modo, licencia_vencimiento_mes, licencia_vencimiento_dia, licencia_vigencia_meses, licencia_nombre_carne, licencia_frecuencia_pago, licencia_precio_mensual, licencia_dia_cobro";
+  "licencia_precio_anual, licencia_vigencia_modo, licencia_vencimiento_mes, licencia_vencimiento_dia, licencia_vigencia_meses, licencia_nombre_carne, licencia_frecuencia_pago, licencia_precio_mensual, licencia_dia_cobro, licencia_pago_alias, licencia_pago_cbu, licencia_pago_titular";
 
 export interface LicenciaConfigPayload {
   precio_anual?: number;
@@ -23,6 +23,9 @@ export interface LicenciaConfigPayload {
   frecuencia_pago?: LicenciaFrecuenciaPago;
   precio_mensual?: number;
   dia_cobro?: number | null;
+  pago_alias?: string | null;
+  pago_cbu?: string | null;
+  pago_titular?: string | null;
 }
 
 function toDbPayload(payload: LicenciaConfigPayload): Record<string, unknown> {
@@ -64,6 +67,24 @@ function toDbPayload(payload: LicenciaConfigPayload): Record<string, unknown> {
         Math.max(1, Number(payload.dia_cobro)),
       );
     }
+  }
+  if (payload.pago_alias !== undefined) {
+    const trimmed =
+      typeof payload.pago_alias === "string" ? payload.pago_alias.trim() : "";
+    out.licencia_pago_alias = trimmed || null;
+  }
+  if (payload.pago_cbu !== undefined) {
+    const raw =
+      typeof payload.pago_cbu === "string" ? payload.pago_cbu.trim() : "";
+    const soloDigitos = raw.replace(/\s+/g, "");
+    out.licencia_pago_cbu = soloDigitos || null;
+  }
+  if (payload.pago_titular !== undefined) {
+    const trimmed =
+      typeof payload.pago_titular === "string"
+        ? payload.pago_titular.trim()
+        : "";
+    out.licencia_pago_titular = trimmed || null;
   }
   return out;
 }

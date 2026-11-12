@@ -32,10 +32,11 @@ import {
   terminoIlikePostgrest,
 } from "../utils/postgrestBusqueda";
 import {
-  datosTransferenciaLicenciaEnv,
   montoLicenciaDesdeSolicitud,
   permitirMockMercadoPagoLicencia,
+  resolverDatosTransferenciaLicencia,
   textoInstruccionesPagoLicencia,
+  transferenciaLicenciaDisponible,
 } from "../utils/licenciaPago";
 
 export type { EstadoLicenciaPublica };
@@ -704,7 +705,40 @@ export class LicenciaService {
     if (error) {
       throw new Error("No se pudo cargar el historial de la licencia.");
     }
-    return data ?? [];
+
+    const filas = data ?? [];
+    const adminIds = [
+      ...new Set(
+        filas
+          .map((r) => r.usuario_id_admin)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    ];
+
+    const nombresAdmin = new Map<string, string>();
+    if (adminIds.length > 0) {
+      const { data: perfiles } = await supabaseAdmin
+        .from("perfiles")
+        .select("id, nombre, apellido, email")
+        .in("id", adminIds);
+      for (const p of perfiles ?? []) {
+        const etiqueta = [p.nombre, p.apellido]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+        nombresAdmin.set(
+          p.id,
+          etiqueta || (typeof p.email === "string" ? p.email : "Administrador"),
+        );
+      }
+    }
+
+    return filas.map((fila) => ({
+      ...fila,
+      admin_nombre: fila.usuario_id_admin
+        ? nombresAdmin.get(fila.usuario_id_admin) ?? null
+        : null,
+    }));
   }
 
   static async actualizarEstado(
@@ -876,7 +910,11 @@ export class LicenciaService {
           motivo: motivoSuspension,
         },
       });
-    } else if (estado === "Activa" && estadoPreviaNorm === "Suspendida") {
+    } else if (
+      estadoSolicitado === "Activa" &&
+      estadoPreviaNorm !== "Activa" &&
+      estadoPreviaNorm !== "Pendiente"
+    ) {
       await LicenciaService.registrarAuditoriaLicencia(
         id,
         contexto?.adminId,
@@ -884,6 +922,27 @@ export class LicenciaService {
         {
           estado_previo: estadoPrevio,
           estado_nuevo: "Activa",
+          nro_licencia: data.nro_licencia,
+          usuario_id,
+        },
+      );
+    }
+
+    const fechaAnteriorNorm = String(licenciaPrevia.fecha_vencimiento || "").split(
+      "T",
+    )[0];
+    if (
+      fechaVencimientoOverride &&
+      contexto?.adminId &&
+      fechaAnteriorNorm !== fechaVencimientoOverride
+    ) {
+      await LicenciaService.registrarAuditoriaLicencia(
+        id,
+        contexto?.adminId,
+        "cambiar_vencimiento_licencia",
+        {
+          fecha_anterior: fechaAnteriorNorm || null,
+          fecha_nueva: fechaVencimientoOverride,
           nro_licencia: data.nro_licencia,
           usuario_id,
         },
@@ -1105,10 +1164,10 @@ export class LicenciaService {
     };
   }
 
-  static async crearPreferenciaPago(
+  private static async resolverPagoLicenciaJugador(
     licenciaId: string,
     usuarioId: string,
-    options?: { mobile?: boolean },
+    opts?: { persistirMontos?: boolean },
   ) {
     const { data: licencia, error } = await supabaseAdmin
       .from("licencias")
@@ -1136,7 +1195,7 @@ export class LicenciaService {
       );
     }
 
-    if (precio > 0) {
+    if (precio > 0 && opts?.persistirMontos !== false) {
       const datosActualizados = {
         ...datos,
         precio_anual: Number(config.precioAnual || datos.precio_anual || 0),
@@ -1163,12 +1222,62 @@ export class LicenciaService {
       throw new Error("El pago de esta licencia ya fue registrado.");
     }
 
-    const transferencia = datosTransferenciaLicenciaEnv();
-    const instrucciones = textoInstruccionesPagoLicencia({
-      monto: precio,
-      nroLicencia: String(licencia.nro_licencia || licenciaId),
-      ...transferencia,
-    });
+    const transferencia = resolverDatosTransferenciaLicencia(config);
+    const transferencia_disponible =
+      transferenciaLicenciaDisponible(transferencia);
+    const instrucciones = transferencia_disponible
+      ? textoInstruccionesPagoLicencia({
+          monto: precio,
+          nroLicencia: String(licencia.nro_licencia || licenciaId),
+          ...transferencia,
+        })
+      : null;
+
+    return {
+      licencia,
+      precio,
+      config,
+      transferencia,
+      transferencia_disponible,
+      instrucciones,
+    };
+  }
+
+  static async obtenerDatosTransferenciaLicencia(
+    licenciaId: string,
+    usuarioId: string,
+  ) {
+    const ctx = await LicenciaService.resolverPagoLicenciaJugador(
+      licenciaId,
+      usuarioId,
+      { persistirMontos: false },
+    );
+
+    return {
+      transferencia_disponible: ctx.transferencia_disponible,
+      monto: ctx.precio,
+      moneda: "ARS",
+      referencia: ctx.licencia.nro_licencia,
+      instrucciones: ctx.instrucciones,
+      ...ctx.transferencia,
+    };
+  }
+
+  static async crearPreferenciaPago(
+    licenciaId: string,
+    usuarioId: string,
+    options?: { mobile?: boolean },
+  ) {
+    const {
+      licencia,
+      precio,
+      transferencia,
+      transferencia_disponible,
+      instrucciones,
+    } = await LicenciaService.resolverPagoLicenciaJugador(
+      licenciaId,
+      usuarioId,
+    );
 
     const token = getMercadoPagoAccessToken();
     if (!isMercadoPagoConfigured()) {
@@ -1195,6 +1304,7 @@ export class LicenciaService {
           referencia: licencia.nro_licencia,
           instrucciones,
           pagoAlternativo: false,
+          transferencia_disponible,
           ...transferencia,
         };
       }
@@ -1209,6 +1319,7 @@ export class LicenciaService {
         moneda: "ARS",
         referencia: licencia.nro_licencia,
         instrucciones,
+        transferencia_disponible,
         ...transferencia,
       };
     }
@@ -1257,6 +1368,7 @@ export class LicenciaService {
       moneda: "ARS",
       referencia: licencia.nro_licencia,
       instrucciones,
+      transferencia_disponible,
       ...transferencia,
     };
   }

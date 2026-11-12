@@ -16,6 +16,10 @@ export interface LicenciaOrganizacionConfig {
   precioMensual: number;
   /** Día del mes (1-28) de cobro/vencimiento cuando frecuencia = mensual. */
   diaCobro: number | null;
+  /** Datos para transferencia bancaria (pago de licencia). */
+  pagoAlias: string | null;
+  pagoCbu: string | null;
+  pagoTitular: string | null;
   origen: "asociacion" | "federacion" | "sistema";
 }
 
@@ -29,6 +33,9 @@ export const LICENCIA_CONFIG_DEFAULT: LicenciaOrganizacionConfig = {
   frecuenciaPago: "anual",
   precioMensual: 0,
   diaCobro: 1,
+  pagoAlias: null,
+  pagoCbu: null,
+  pagoTitular: null,
   origen: "sistema",
 };
 
@@ -42,6 +49,9 @@ type RowConfig = {
   licencia_frecuencia_pago?: string | null;
   licencia_precio_mensual?: number | string | null;
   licencia_dia_cobro?: number | null;
+  licencia_pago_alias?: string | null;
+  licencia_pago_cbu?: string | null;
+  licencia_pago_titular?: string | null;
 };
 
 function clampDiaCobro(v: number | null | undefined): number | null {
@@ -77,6 +87,20 @@ export function mapRowToLicenciaConfig(
     frecuenciaPago: frecuencia,
     precioMensual: Number(row.licencia_precio_mensual ?? 0),
     diaCobro: clampDiaCobro(row.licencia_dia_cobro) ?? 1,
+    pagoAlias:
+      typeof row.licencia_pago_alias === "string" &&
+      row.licencia_pago_alias.trim()
+        ? row.licencia_pago_alias.trim()
+        : null,
+    pagoCbu:
+      typeof row.licencia_pago_cbu === "string" && row.licencia_pago_cbu.trim()
+        ? row.licencia_pago_cbu.trim()
+        : null,
+    pagoTitular:
+      typeof row.licencia_pago_titular === "string" &&
+      row.licencia_pago_titular.trim()
+        ? row.licencia_pago_titular.trim()
+        : null,
     origen,
   };
 }
@@ -98,7 +122,10 @@ export function mergeLicenciaConfig(
     asociacion.licencia_nombre_carne != null ||
     asociacion.licencia_frecuencia_pago != null ||
     asociacion.licencia_precio_mensual != null ||
-    asociacion.licencia_dia_cobro != null;
+    asociacion.licencia_dia_cobro != null ||
+    asociacion.licencia_pago_alias != null ||
+    asociacion.licencia_pago_cbu != null ||
+    asociacion.licencia_pago_titular != null;
 
   if (!tieneOverride) return base;
 
@@ -138,6 +165,27 @@ export function mergeLicenciaConfig(
         : base.precioMensual,
     diaCobro:
       clampDiaCobro(asociacion.licencia_dia_cobro) ?? base.diaCobro,
+    pagoAlias:
+      asociacion.licencia_pago_alias != null
+        ? typeof asociacion.licencia_pago_alias === "string" &&
+          asociacion.licencia_pago_alias.trim()
+          ? asociacion.licencia_pago_alias.trim()
+          : null
+        : base.pagoAlias,
+    pagoCbu:
+      asociacion.licencia_pago_cbu != null
+        ? typeof asociacion.licencia_pago_cbu === "string" &&
+          asociacion.licencia_pago_cbu.trim()
+          ? asociacion.licencia_pago_cbu.trim()
+          : null
+        : base.pagoCbu,
+    pagoTitular:
+      asociacion.licencia_pago_titular != null
+        ? typeof asociacion.licencia_pago_titular === "string" &&
+          asociacion.licencia_pago_titular.trim()
+          ? asociacion.licencia_pago_titular.trim()
+          : null
+        : base.pagoTitular,
     origen: "asociacion",
   };
 }

@@ -22,7 +22,13 @@ export function montoLicenciaDesdeSolicitud(
   return Number(datos.precio_anual ?? config?.precioAnual ?? 0);
 }
 
-export function datosTransferenciaLicenciaEnv() {
+export type DatosTransferenciaLicencia = {
+  alias: string | null;
+  cbu: string | null;
+  titular: string | null;
+};
+
+export function datosTransferenciaLicenciaEnv(): DatosTransferenciaLicencia {
   return {
     alias: process.env.LICENCIA_PAGO_ALIAS?.trim() || null,
     cbu: process.env.LICENCIA_PAGO_CBU?.trim() || null,
@@ -30,6 +36,36 @@ export function datosTransferenciaLicenciaEnv() {
       process.env.LICENCIA_PAGO_TITULAR?.trim() ||
       "Federación Argentina de Pádel",
   };
+}
+
+export function transferenciaLicenciaDisponible(
+  datos: Pick<DatosTransferenciaLicencia, "alias" | "cbu">,
+): boolean {
+  return Boolean(datos.alias?.trim() || datos.cbu?.trim());
+}
+
+/** Config de organización + variables de entorno como respaldo ops. */
+export function resolverDatosTransferenciaLicencia(
+  config?: Pick<
+    LicenciaOrganizacionConfig,
+    "pagoAlias" | "pagoCbu" | "pagoTitular"
+  > | null,
+): DatosTransferenciaLicencia {
+  const desdeConfig: DatosTransferenciaLicencia = {
+    alias: config?.pagoAlias?.trim() || null,
+    cbu: config?.pagoCbu?.trim() || null,
+    titular: config?.pagoTitular?.trim() || null,
+  };
+
+  if (transferenciaLicenciaDisponible(desdeConfig)) {
+    const env = datosTransferenciaLicenciaEnv();
+    return {
+      ...desdeConfig,
+      titular: desdeConfig.titular || env.titular,
+    };
+  }
+
+  return datosTransferenciaLicenciaEnv();
 }
 
 export function permitirMockMercadoPagoLicencia(): boolean {
