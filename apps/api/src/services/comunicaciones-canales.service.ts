@@ -1,4 +1,10 @@
+import { env } from "../config/env.config";
 import { supabaseAdmin } from "../config/supabase";
+import {
+  campanaEmailHabilitado,
+  resendFromCampana,
+  urlGestionarNotificaciones,
+} from "../utils/resendConfig";
 import type { ComunicacionesCanal } from "./comunicaciones-metricas.service";
 
 type ResultadoCanal = "enviado" | "omitido_prefs" | "omitido_sin_dato" | "omitido_config" | "error";
@@ -28,6 +34,10 @@ export class ComunicacionesCanalesService {
     titulo: string,
     mensaje: string,
     actionUrl?: string | null,
+    opciones?: {
+      entidadRemitente?: string;
+      gestionarUrl?: string;
+    },
   ): Promise<ResultadoCanal> {
     const prefs = perfil?.preferencias_notificacion;
     if (prefs?.email === false) return "omitido_prefs";
@@ -35,13 +45,47 @@ export class ComunicacionesCanalesService {
     if (!destino) return "omitido_sin_dato";
 
     const apiKey = process.env.RESEND_API_KEY;
-    const from =
-      process.env.RESEND_FROM || "Padel Nexus <comunicaciones@padelnexus.com>";
     if (!apiKey) return "omitido_config";
+    if (!campanaEmailHabilitado()) return "omitido_config";
 
-    const cuerpo = actionUrl
-      ? `${mensaje}\n\nVer más: ${actionUrl}`
-      : mensaje;
+    const entidad = (opciones?.entidadRemitente || "Padel Nexus").trim();
+    const from = resendFromCampana(entidad);
+    const gestionarUrl = opciones?.gestionarUrl || urlGestionarNotificaciones();
+
+    const baseWeb = (env.FRONTEND_URL || "http://localhost:3000").replace(
+      /\/$/,
+      "",
+    );
+    const linkAbsoluto = actionUrl
+      ? actionUrl.startsWith("http")
+        ? actionUrl
+        : `${baseWeb}${actionUrl.startsWith("/") ? actionUrl : `/${actionUrl}`}`
+      : null;
+
+    const cuerpoTexto = [
+      mensaje,
+      linkAbsoluto ? `\nVer más: ${linkAbsoluto}` : "",
+      `\n---\nEnviado por ${entidad} · Padel Nexus.`,
+      `Gestionar notificaciones: ${gestionarUrl}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const htmlMensaje = mensaje
+      .split("\n")
+      .map((line) => `<p>${escapeHtml(line)}</p>`)
+      .join("");
+    const html = `
+      ${htmlMensaje}
+      ${linkAbsoluto ? `<p><a href="${escapeHtml(linkAbsoluto)}">Ver más</a></p>` : ""}
+      <hr style="margin:24px 0;border:none;border-top:1px solid #e5e5e5;" />
+      <p style="font-size:13px;color:#666;">
+        Enviado por <strong>${escapeHtml(entidad)}</strong> · Padel Nexus.
+      </p>
+      <p style="font-size:13px;">
+        <a href="${escapeHtml(gestionarUrl)}">Gestionar notificaciones</a>
+      </p>
+    `.trim();
 
     try {
       const res = await fetch("https://api.resend.com/emails", {
@@ -54,7 +98,8 @@ export class ComunicacionesCanalesService {
           from,
           to: [destino],
           subject: titulo,
-          text: cuerpo,
+          text: cuerpoTexto,
+          html,
         }),
       });
       if (!res.ok) {
@@ -107,6 +152,14 @@ export const COMUNICACIONES_CANALES: ComunicacionesCanal[] = [
   "email",
   "whatsapp",
 ];
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 export function normalizarCanales(
   raw?: string[] | null,

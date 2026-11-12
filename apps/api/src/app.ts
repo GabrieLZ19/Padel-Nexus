@@ -29,12 +29,22 @@ const app = express();
 const server = createServer(app);
 
 // Inicializar Socket.io
-SocketService.init(server, env.FRONTEND_URL);
+SocketService.init(server, env.CORS_ORIGINS);
 
 // Configuración de Middlewares
 app.use(
   cors({
-    origin: env.FRONTEND_URL,
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      if (env.CORS_ORIGINS.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
     credentials: true,
   }),
 );

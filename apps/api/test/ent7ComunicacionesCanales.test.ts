@@ -53,6 +53,17 @@ describe("ENT-7 canales y metricas de campaña (feature 20.0)", () => {
     assert.equal(/fase\s*2/i.test(panel), false);
   });
 
+  it("resend separa auth, campanas y flag de plan gratuito", () => {
+    const recuperacion = fuente("apps/api/src/utils/recuperacionPasswordEmail.ts");
+    const canales = fuente("apps/api/src/services/comunicaciones-canales.service.ts");
+    const resendCfg = fuente("apps/api/src/utils/resendConfig.ts");
+    assert.match(recuperacion, /resendFromAuth/);
+    assert.match(canales, /campanaEmailHabilitado/);
+    assert.match(canales, /Gestionar notificaciones/);
+    assert.match(resendCfg, /RESEND_FROM_AUTH/);
+    assert.match(resendCfg, /RESEND_CAMPANA_EMAIL_HABILITADO/);
+  });
+
   it("envio expone canales, forzarInApp y endpoints de retencion", () => {
     const envio = fuente("apps/api/src/services/comunicaciones.service.ts");
     assert.match(envio, /canales/);

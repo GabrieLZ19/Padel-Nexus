@@ -22,6 +22,11 @@ import {
   ComunicacionesCanalesService,
   normalizarCanales,
 } from "./comunicaciones-canales.service";
+import { ComunicacionesRemitenteService } from "./comunicaciones-remitente.service";
+import {
+  campanaEmailHabilitado,
+  urlGestionarNotificaciones,
+} from "../utils/resendConfig";
 import {
   ComunicacionesMetricasService,
   metricasVacias,
@@ -133,6 +138,13 @@ function normalizarActionUrl(url?: string | null): string | null {
 }
 
 export class ComunicacionesService {
+  static getConfig() {
+    return {
+      campana_email_habilitado: campanaEmailHabilitado(),
+      resend_configurado: Boolean(process.env.RESEND_API_KEY?.trim()),
+    };
+  }
+
   /**
    * Busca perfiles para armar listas manuales (nombre, apellido, email, DNI).
    * Respeta el alcance del rol del remitente.
@@ -534,7 +546,16 @@ export class ComunicacionesService {
 
     const actionUrl = normalizarActionUrl(payload.action_url);
     const filtros = payload.filtros || {};
-    const canales = normalizarCanales(payload.canales);
+    let canales = normalizarCanales(payload.canales);
+    if (!campanaEmailHabilitado()) {
+      canales = canales.filter((c) => c !== "email");
+    }
+
+    const etiquetaEntidad = await ComunicacionesRemitenteService.etiquetaEntidad(
+      actorId,
+      actorRol,
+    );
+    const gestionarUrl = urlGestionarNotificaciones();
 
     const audiencia = await ComunicacionesAudienciaService.resolver({
       actorId,
@@ -646,6 +667,10 @@ export class ComunicacionesService {
                 titulo,
                 mensaje,
                 actionUrl,
+                {
+                  entidadRemitente: etiquetaEntidad,
+                  gestionarUrl,
+                },
               );
               metricas = sumarEntrega(
                 metricas,

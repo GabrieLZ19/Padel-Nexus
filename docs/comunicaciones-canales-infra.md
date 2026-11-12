@@ -12,18 +12,24 @@ El código ya soporta canales `in_app`, `email` y `whatsapp`. Sin variables de e
 
 | Variable | Obligatoria | Uso |
 |----------|-------------|-----|
-| `RESEND_API_KEY` | Sí, para enviar | Campañas CRM, recuperación de contraseña (si no se usa solo Supabase Auth mail) |
-| `RESEND_FROM` | Recomendada | Remitente visible. Ej.: `Padel Nexus <comunicaciones@dominio-oficial.com>` |
+| `RESEND_API_KEY` | Sí, para enviar | Recuperación de contraseña y campañas (cuando estén habilitadas) |
+| `RESEND_FROM_AUTH` | Recomendada | Recuperación de clave. Ej.: `Padel Nexus <no-responder@padelnexus.app>` |
+| `RESEND_CAMPAIGN_FROM_EMAIL` | Recomendada | Solo la dirección de campañas: `info@padelnexus.app` (el nombre visible lo arma el API: `FAP · Padel Nexus <info@...>`) |
+| `RESEND_FROM` | Legacy / fallback | Si falta `RESEND_FROM_AUTH`, se usa acá para auth |
+| `RESEND_CAMPANA_EMAIL_HABILITADO` | Recomendada | `true` solo con plan Resend pago. En free dejar **sin valor** o `false` (campañas solo in-app; recuperación sigue activa). |
+| `FRONTEND_URL` | Sí | Pie de campaña y link «Gestionar notificaciones» → `/mi-perfil/ajustes#notificaciones` |
 
-Implementación actual: `apps/api/src/services/comunicaciones-canales.service.ts` y `apps/api/src/utils/recuperacionPasswordEmail.ts`.
+Implementación actual: `comunicaciones-canales.service.ts`, `recuperacionPasswordEmail.ts`, `utils/resendConfig.ts`.
 
 ### Checklist técnico (nosotros)
 
-- [ ] Crear cuenta Resend y dominio verificado (SPF, DKIM, opcional DMARC).
-- [ ] Definir `RESEND_FROM` con el dominio verificado (no usar dominio de prueba en producción).
-- [ ] Cargar `RESEND_API_KEY` en el entorno del API (Railway/Vercel/secret manager; nunca en frontend).
-- [ ] Probar recuperación de contraseña (`POST /perfil/recuperar-password`) y una campaña CRM de prueba con audiencia chica.
-- [ ] Revisar historial de campañas: badge **Email: N entregados · M omitidos**.
+- [x] Dominio `padelnexus.app` verificado en Resend (Hostinger).
+- [ ] Cargar `RESEND_API_KEY` en Render (nunca en frontend ni en el repo).
+- [ ] `RESEND_FROM_AUTH=Padel Nexus <no-responder@padelnexus.app>`
+- [ ] `RESEND_CAMPAIGN_FROM_EMAIL=info@padelnexus.app` (sin activar campañas hasta plan pago).
+- [ ] Probar recuperación (`POST /api/perfiles/recuperar-password`) y campaña chica **solo in-app** mientras email de campaña esté off.
+- [ ] Con `padelnexus.app` en Vercel: `RECUPERACION_PASSWORD_REDIRECT_URL` y Redirect URLs en Supabase Auth.
+- [ ] Revisar historial: **Email: omitidos** esperado en campañas hasta `RESEND_CAMPANA_EMAIL_HABILITADO=true`.
 
 ### Preguntas al cliente
 

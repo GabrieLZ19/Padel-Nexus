@@ -10,6 +10,17 @@ function getActor(req: Request): { id: string; rol: RolUsuario } {
 }
 
 export class ComunicacionesController {
+  static async obtenerConfig(req: Request, res: Response) {
+    try {
+      const data = ComunicacionesService.getConfig();
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error al leer configuración.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  }
+
   static async buscarContactos(req: Request, res: Response) {
     try {
       const actor = getActor(req);

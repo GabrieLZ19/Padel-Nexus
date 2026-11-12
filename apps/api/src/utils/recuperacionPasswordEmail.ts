@@ -1,3 +1,5 @@
+import { resendFromAuth } from "./resendConfig";
+
 /**
  * Envío del enlace de recuperación vía Resend cuando Supabase Auth no despacha el correo.
  */
@@ -6,9 +8,7 @@ export async function enviarCorreoRecuperacionResend(
   actionLink: string,
 ): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from =
-    process.env.RESEND_FROM?.trim() ||
-    "Padel Nexus <comunicaciones@padelnexus.com>";
+  const from = resendFromAuth();
   if (!apiKey) {
     throw new Error(
       "RESEND_API_KEY no está configurado en el servidor para enviar recuperación.",

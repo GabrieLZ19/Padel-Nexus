@@ -8,6 +8,7 @@ const router = Router();
 router.use(authenticate);
 router.use(authorize(COMUNICACIONES_ROLES_PERMITIDOS));
 
+router.get("/config", ComunicacionesController.obtenerConfig);
 router.get("/contactos", ComunicacionesController.buscarContactos);
 
 router.get("/listas", ComunicacionesController.listarListas);

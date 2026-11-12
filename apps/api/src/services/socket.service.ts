@@ -8,10 +8,10 @@ const socketUserMap = new Map<string, string>();
 export class SocketService {
   private static io: Server | null = null;
 
-  static init(server: HttpServer, frontendUrl: string) {
+  static init(server: HttpServer, allowedOrigins: string | string[]) {
     this.io = new Server(server, {
       cors: {
-        origin: frontendUrl,
+        origin: allowedOrigins,
         credentials: true,
       },
     });
