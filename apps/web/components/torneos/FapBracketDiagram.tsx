@@ -46,7 +46,10 @@ type Props = {
   alcance?: string | null;
   cabezasSerieIds?: Set<string>;
   interactive?: boolean;
-  onMatchClick?: (partido: Partido) => void;
+  onMatchClick?: (
+    partido: Partido,
+    opciones?: { slotFocus?: "a" | "b" },
+  ) => void;
   /** Vista pública / mobile: zoom inicial más bajo y tipografía compacta. */
   compact?: boolean;
   /** Primer número visible de la llave. Con 16 partidos de zona, es 17. */
@@ -664,10 +667,34 @@ export function FapBracketDiagram({
               const isCabeza =
                 !!pairId && !!cabezasSerieIds?.has(String(pairId));
 
+              const abrirEdicionBye = () => {
+                if (!interactive || !onMatchClick || !p) return;
+                onMatchClick(p, { slotFocus: side });
+              };
+
               return (
                 <div
                   key={`bye-${bye.leaf}`}
-                  className="absolute z-[2] box-border rounded-2xl border border-dashed border-brand-chartreuse/40 bg-brand-card px-3 py-3 shadow-sm"
+                  role={interactive && p ? "button" : undefined}
+                  tabIndex={interactive && p ? 0 : undefined}
+                  onClick={
+                    interactive && p ? () => abrirEdicionBye() : undefined
+                  }
+                  onKeyDown={
+                    interactive && p
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            abrirEdicionBye();
+                          }
+                        }
+                      : undefined
+                  }
+                  className={`absolute z-[2] box-border rounded-2xl border border-dashed border-brand-chartreuse/40 bg-brand-card px-3 py-3 shadow-sm ${
+                    interactive && p
+                      ? "cursor-pointer hover:border-brand-chartreuse/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-chartreuse/40"
+                      : ""
+                  }`}
                   style={{
                     left: bye.cardX,
                     top: bye.y,
@@ -680,9 +707,16 @@ export function FapBracketDiagram({
                     <span className="text-xs font-black uppercase tracking-wider text-brand-ayuda">
                       Pase directo
                     </span>
-                    <span className="text-xs font-black text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
-                      → #{bye.targetNumero}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-xs font-black text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
+                        → #{bye.targetNumero}
+                      </span>
+                      {interactive && p ? (
+                        <span className="text-xs font-bold text-brand-chartreuse uppercase tracking-wide">
+                          Editar
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="space-y-3">

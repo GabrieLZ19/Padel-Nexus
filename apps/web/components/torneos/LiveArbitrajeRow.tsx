@@ -103,7 +103,9 @@ export const LiveArbitrajeRow = ({
   const esModoCorreccion = Boolean(
     esCorreccion ||
       partido.ganador ||
-      partido.estado_partido === "finalizado",
+      String(partido.estado_partido || "")
+        .trim()
+        .toLowerCase() === "finalizado",
   );
   const [motivo, setMotivo] = useState<string>("");
 

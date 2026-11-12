@@ -394,6 +394,8 @@ export const TorneosService = {
         etiqueta: string;
         jugador1_nombre: string;
         jugador2_nombre: string | null;
+        bloqueada_en_torneo?: boolean;
+        motivo_bloqueo?: string;
       }>;
     }>(`/torneos/${torneoId}/llave/buscar-parejas`, {
       params: { q },

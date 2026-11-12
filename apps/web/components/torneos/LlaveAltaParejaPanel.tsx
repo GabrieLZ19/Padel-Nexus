@@ -5,6 +5,7 @@ import { Search, UserPlus } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { identificadorPareceDni } from "@/utils/identificadorJugadorManual";
 import { sileo } from "sileo";
+import type { AltaLlavePreparada } from "./llaveAltaParejaTypes";
 
 type ModoAlta = "externa" | "manual";
 
@@ -17,18 +18,15 @@ export function LlaveAltaParejaPanel({
   esNacional,
   motivoAuditoria,
   slotDestino,
-  onInscripcionCreada,
+  categoriaTorneo,
+  onInscripcionPreparada,
 }: {
   torneoId: string;
   esNacional: boolean;
   motivoAuditoria: string;
   slotDestino: "a" | "b";
-  onInscripcionCreada: (datos: {
-    id: string;
-    label: string;
-    name1: string;
-    name2: string | null;
-  }) => void;
+  categoriaTorneo?: string | null;
+  onInscripcionPreparada: (datos: AltaLlavePreparada) => void;
 }) {
   const [modo, setModo] = useState<ModoAlta>("externa");
   const [busqueda, setBusqueda] = useState("");
@@ -113,79 +111,107 @@ export function LlaveAltaParejaPanel({
     }
   }, [busqueda, torneoId]);
 
-  const confirmarAlta = async () => {
+  const prepararAlta = () => {
     if (!validarMotivo()) return;
+
+    if (modo === "externa") {
+      const row = resultados.find(
+        (r) => r.inscripcion_origen_id === seleccionExterna,
+      );
+      if (!row) {
+        sileo.warning({
+          title: "Elegí una pareja",
+          description: "Seleccioná una pareja de la lista.",
+        });
+        return;
+      }
+      if (row.bloqueada_en_torneo) {
+        sileo.warning({
+          title: "Ya está en este torneo",
+          description:
+            row.motivo_bloqueo ||
+            "Esos jugadores ya están inscriptos en este torneo.",
+        });
+        return;
+      }
+    }
 
     setGuardando(true);
     try {
-      const inscripcion =
-        modo === "externa"
-          ? await TorneosService.altaParejaLlave(torneoId, {
-              modo: "externa",
-              inscripcion_origen_id: seleccionExterna,
-              motivo: motivoAuditoria.trim(),
-              ...(letraPrioridad.trim()
-                ? { letra_prioridad: letraPrioridad.trim() }
-                : {}),
-            })
-          : await TorneosService.altaParejaLlave(torneoId, {
-              modo: "manual",
-              jugador1_identificador: j1.trim(),
-              jugador2_identificador: j2.trim() || undefined,
-              jugador1_datos: armarDatosAlta(
-                j1,
-                j1Nombre,
-                j1Apellido,
-                j1Categoria,
-                j1Nacimiento,
-                j1Telefono,
-              ),
-              jugador2_datos: armarDatosAlta(
-                j2,
-                j2Nombre,
-                j2Apellido,
-                j2Categoria,
-                j2Nacimiento,
-                j2Telefono,
-              ),
-              motivo: motivoAuditoria.trim(),
-              ...(letraPrioridad.trim()
-                ? { letra_prioridad: letraPrioridad.trim() }
-                : {}),
-            });
+      const tempId = `pending-alta-${crypto.randomUUID()}`;
+      const letra = letraPrioridad.trim()
+        ? { letra_prioridad: letraPrioridad.trim() }
+        : {};
 
-      const j2NombreIns =
-        inscripcion.jugador2_nombre &&
-        inscripcion.jugador2_nombre !== "-"
-          ? inscripcion.jugador2_nombre
-          : null;
-      const label = j2NombreIns
-        ? `${inscripcion.jugador1_nombre} / ${j2NombreIns}`
-        : inscripcion.jugador1_nombre;
+      if (modo === "externa") {
+        const row = resultados.find(
+          (r) => r.inscripcion_origen_id === seleccionExterna,
+        );
+        if (!row) return;
+        const j2n =
+          row.jugador2_nombre && row.jugador2_nombre !== "-"
+            ? row.jugador2_nombre
+            : null;
+        const label = j2n ? `${row.jugador1_nombre} / ${j2n}` : row.jugador1_nombre;
 
-      onInscripcionCreada({
-        id: inscripcion.id,
-        label,
-        name1: inscripcion.jugador1_nombre,
-        name2: j2NombreIns,
-      });
+        onInscripcionPreparada({
+          tempId,
+          label,
+          name1: row.jugador1_nombre,
+          name2: j2n,
+          payload: {
+            modo: "externa",
+            inscripcion_origen_id: seleccionExterna,
+            ...letra,
+          },
+        });
+      } else {
+        const j1nom = j1Nombre.trim() || "Jugador 1";
+        const j1ape = j1Apellido.trim();
+        const j2nom = j2Nombre.trim();
+        const j2ape = j2Apellido.trim();
+        const labelJ1 = j1ape ? `${j1ape.toUpperCase()}, ${j1nom}` : j1nom;
+        const labelJ2 =
+          j2.trim() && j2ape
+            ? `${j2ape.toUpperCase()}, ${j2nom || "Jugador 2"}`
+            : j2nom && j2ape
+              ? `${j2ape.toUpperCase()}, ${j2nom}`
+              : null;
+        const label = labelJ2 ? `${labelJ1} / ${labelJ2}` : labelJ1;
+
+        onInscripcionPreparada({
+          tempId,
+          label,
+          name1: labelJ1,
+          name2: labelJ2,
+          payload: {
+            modo: "manual",
+            jugador1_identificador: j1.trim(),
+            jugador2_identificador: j2.trim() || undefined,
+            jugador1_datos: armarDatosAlta(
+              j1,
+              j1Nombre,
+              j1Apellido,
+              j1Categoria,
+              j1Nacimiento,
+              j1Telefono,
+            ),
+            jugador2_datos: armarDatosAlta(
+              j2,
+              j2Nombre,
+              j2Apellido,
+              j2Categoria,
+              j2Nacimiento,
+              j2Telefono,
+            ),
+            ...letra,
+          },
+        });
+      }
 
       sileo.success({
-        title: "Pareja inscripta",
-        description: `Quedó asignada al lado ${slotDestino.toUpperCase()}. Guardá el partido para registrar el cambio.`,
-      });
-    } catch (error: unknown) {
-      const err = error as {
-        response?: { data?: { message?: string; error?: string } };
-        message?: string;
-      };
-      sileo.error({
-        title: "No se pudo dar de alta la pareja",
-        description:
-          err.response?.data?.message ||
-          err.response?.data?.error ||
-          err.message ||
-          "Revisá los datos e intentá de nuevo.",
+        title: "Pareja lista para el cruce",
+        description: `Quedará inscripta al guardar el partido (lado ${slotDestino.toUpperCase()}).`,
       });
     } finally {
       setGuardando(false);
@@ -196,7 +222,9 @@ export function LlaveAltaParejaPanel({
     <div className="rounded-xl border border-brand-chartreuse/20 bg-brand-chartreuse/5 p-3 space-y-3">
       <p className="text-xs text-gray-300 leading-relaxed">
         Si la pareja no está en este torneo, buscala en otra categoría o
-        cargala por DNI. Queda inscripta y disponible en el lado{" "}
+        cargala por DNI. La inscripción se confirma al{" "}
+        <span className="text-brand-chartreuse font-bold">guardar el partido</span>{" "}
+        en el lado{" "}
         <span className="text-brand-chartreuse font-bold">
           {slotDestino.toUpperCase()}
         </span>
@@ -274,16 +302,24 @@ export function LlaveAltaParejaPanel({
                 <button
                   key={row.inscripcion_origen_id}
                   type="button"
+                  disabled={row.bloqueada_en_torneo}
                   onClick={() =>
                     setSeleccionExterna(row.inscripcion_origen_id)
                   }
                   className={`w-full text-left px-2 py-1.5 rounded-lg text-[11px] border ${
-                    seleccionExterna === row.inscripcion_origen_id
-                      ? "border-brand-chartreuse/50 bg-brand-chartreuse/10 text-white"
-                      : "border-white/8 bg-black/20 text-gray-300 hover:border-white/20"
+                    row.bloqueada_en_torneo
+                      ? "border-amber-500/30 bg-amber-500/5 text-gray-500 cursor-not-allowed"
+                      : seleccionExterna === row.inscripcion_origen_id
+                        ? "border-brand-chartreuse/50 bg-brand-chartreuse/10 text-white"
+                        : "border-white/8 bg-black/20 text-gray-300 hover:border-white/20"
                   }`}
                 >
                   {row.etiqueta}
+                  {row.bloqueada_en_torneo ? (
+                    <span className="block text-[10px] text-amber-400/90 mt-0.5">
+                      {row.motivo_bloqueo || "Ya en este torneo"}
+                    </span>
+                  ) : null}
                 </button>
               ))
             )}
@@ -291,10 +327,10 @@ export function LlaveAltaParejaPanel({
           <button
             type="button"
             disabled={guardando || !seleccionExterna}
-            onClick={() => void confirmarAlta()}
+            onClick={() => prepararAlta()}
             className="w-full py-2 rounded-lg text-[10px] font-black uppercase tracking-wider bg-brand-chartreuse text-brand-black disabled:opacity-40"
           >
-            Inscribir y usar en lado {slotDestino.toUpperCase()}
+            Preparar en lado {slotDestino.toUpperCase()}
           </button>
         </>
       ) : (
@@ -355,16 +391,26 @@ export function LlaveAltaParejaPanel({
                 placeholder="Nombre J2"
                 className="bg-[#0a0a0a] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white"
               />
+              <input
+                value={j2Categoria}
+                onChange={(e) => setJ2Categoria(e.target.value)}
+                placeholder={
+                  categoriaTorneo
+                    ? `Categoría J2 (def. ${categoriaTorneo})`
+                    : "Categoría J2"
+                }
+                className="bg-[#0a0a0a] border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white col-span-2"
+              />
             </div>
           )}
           <button
             type="button"
             disabled={guardando || !j1.trim()}
-            onClick={() => void confirmarAlta()}
+            onClick={() => prepararAlta()}
             className="w-full py-2 rounded-lg text-[10px] font-black uppercase tracking-wider bg-brand-chartreuse text-brand-black disabled:opacity-40 flex items-center justify-center gap-1.5"
           >
             <UserPlus className="size-3.5" />
-            Alta e inscripción en lado {slotDestino.toUpperCase()}
+            Preparar alta en lado {slotDestino.toUpperCase()}
           </button>
         </>
       )}

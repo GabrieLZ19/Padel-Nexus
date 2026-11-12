@@ -25,6 +25,10 @@ import { useSiglaRectora } from "@/utils/useSiglaRectora";
 import { ZonaCard } from "./ZonaCard";
 import { PromoverParejaMenores } from "./PromoverParejaMenores";
 import { LlaveAltaParejaPanel } from "./LlaveAltaParejaPanel";
+import {
+  esIdInscripcionPendiente,
+  type AltaLlavePreparada,
+} from "./llaveAltaParejaTypes";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
@@ -219,6 +223,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       name2: string;
     }>
   >([]);
+  const [altasPendientesLlave, setAltasPendientesLlave] = useState<
+    Record<string, AltaLlavePreparada>
+  >({});
   const [matchEditBusy, setMatchEditBusy] = useState(false);
 
   const loadZonas = async () => {
@@ -1111,15 +1118,76 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     return avisos;
   };
 
+  const descartarPendientesModalLlave = () => {
+    setInscripcionesExtraLlave((prev) =>
+      prev.filter((p) => !esIdInscripcionPendiente(p.value)),
+    );
+    setAltasPendientesLlave({});
+  };
+
+  const cerrarModalEdicionPartido = () => {
+    descartarPendientesModalLlave();
+    setShowMatchEditModal(false);
+    setSelectedMatchToEdit(null);
+    setMatchEditMotivo("");
+  };
+
+  const resolverIdInscripcionParaGuardar = async (
+    id: string | null | undefined,
+  ): Promise<string | null> => {
+    if (!id) return null;
+    if (!esIdInscripcionPendiente(id)) return id;
+
+    const pendiente = altasPendientesLlave[id];
+    if (!pendiente) {
+      throw new Error(
+        "La alta de pareja pendiente ya no está disponible. Volvé a prepararla.",
+      );
+    }
+
+    const motivo = matchEditMotivo.trim();
+    const inscripcion = await TorneosService.altaParejaLlave(torneoId, {
+      ...pendiente.payload,
+      motivo,
+    } as Parameters<typeof TorneosService.altaParejaLlave>[1]);
+
+    setAltasPendientesLlave((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setInscripcionesExtraLlave((prev) =>
+      prev.map((p) =>
+        p.value === id
+          ? {
+              value: inscripcion.id,
+              label: pendiente.label,
+              name1: pendiente.name1,
+              name2: pendiente.name2 || "",
+            }
+          : p,
+      ),
+    );
+
+    return inscripcion.id;
+  };
+
   const ejecutarGuardarMatchEdit = async () => {
     if (!selectedMatchToEdit) return;
     try {
       setMatchEditBusy(true);
+      const equipoAId = await resolverIdInscripcionParaGuardar(
+        selectedMatchToEdit.equipo_a_id,
+      );
+      const equipoBId = await resolverIdInscripcionParaGuardar(
+        selectedMatchToEdit.equipo_b_id,
+      );
       await TorneosService.actualizarEquiposPartido(selectedMatchToEdit.id, {
-        equipo_a_id: selectedMatchToEdit.equipo_a_id || null,
-        equipo_b_id: selectedMatchToEdit.equipo_b_id || null,
+        equipo_a_id: equipoAId || null,
+        equipo_b_id: equipoBId || null,
         motivo: matchEditMotivo.trim(),
       });
+      descartarPendientesModalLlave();
       setShowMatchEditModal(false);
       setSelectedMatchToEdit(null);
       setMatchEditMotivo("");
@@ -1805,8 +1873,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   alcance={torneo?.alcance}
                   cabezasSerieIds={cabezasSerieIds}
                   interactive={puedeEditarLlave}
-                  onMatchClick={(pToEdit) => {
+                  onMatchClick={(pToEdit, opciones) => {
                     setSelectedMatchToEdit({ ...pToEdit });
+                    setMatchEditSlotFocus(opciones?.slotFocus ?? "a");
                     setMatchEditMotivo("");
                     setShowMatchEditModal(true);
                   }}
@@ -1876,6 +1945,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                                 onEditSelect={(pToEdit) => {
                                   setSelectedMatchToEdit({ ...pToEdit });
                                   setMatchEditMotivo("");
+                                  setMatchEditSlotFocus("a");
                                   setShowMatchEditModal(true);
                                 }}
                               />
@@ -2080,11 +2150,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setShowMatchEditModal(false);
-                  setSelectedMatchToEdit(null);
-                  setMatchEditMotivo("");
-                }}
+                onClick={cerrarModalEdicionPartido}
                 className="text-brand-ayuda hover:text-white p-1 rounded-lg hover:bg-white/5"
                 aria-label="Cerrar"
               >
@@ -2134,22 +2200,27 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               <LlaveAltaParejaPanel
                 torneoId={torneoId}
                 esNacional={/nacional/i.test(String(torneo?.alcance || ""))}
+                categoriaTorneo={torneo?.categoria}
                 motivoAuditoria={matchEditMotivo}
                 slotDestino={matchEditSlotFocus}
-                onInscripcionCreada={(datos) => {
+                onInscripcionPreparada={(datos) => {
+                  setAltasPendientesLlave((prev) => ({
+                    ...prev,
+                    [datos.tempId]: datos,
+                  }));
                   setInscripcionesExtraLlave((prev) => {
-                    if (prev.some((p) => p.value === datos.id)) return prev;
+                    if (prev.some((p) => p.value === datos.tempId)) return prev;
                     return [
                       ...prev,
                       {
-                        value: datos.id,
-                        label: datos.label,
+                        value: datos.tempId,
+                        label: `${datos.label} (pendiente)`,
                         name1: datos.name1,
                         name2: datos.name2 || "",
                       },
                     ];
                   });
-                  applyInscripcionToSlot(matchEditSlotFocus, datos.id);
+                  applyInscripcionToSlot(matchEditSlotFocus, datos.tempId);
                 }}
               />
 
@@ -2232,11 +2303,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/8 bg-white/[0.02]">
               <button
                 type="button"
-                onClick={() => {
-                  setShowMatchEditModal(false);
-                  setSelectedMatchToEdit(null);
-                  setMatchEditMotivo("");
-                }}
+                onClick={cerrarModalEdicionPartido}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold bg-white/5 border border-white/10 text-gray-300 hover:text-white"
               >
                 Cancelar

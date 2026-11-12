@@ -21,6 +21,15 @@ describe("TOR-22 editor de llaves: otra categoría o DNI", () => {
     );
     assert.match(panel, /Otro torneo/);
     assert.match(panel, /Alta por DNI/);
+    assert.match(panel, /Preparar/);
+    assert.match(panel, /guardar el partido/);
+
+    const diagrama = readFileSync(
+      path.join(RAIZ, "components/torneos/FapBracketDiagram.tsx"),
+      "utf8",
+    );
+    assert.match(diagrama, /Editar/);
+    assert.match(diagrama, /slotFocus/);
 
     const svc = readFileSync(
       path.join(RAIZ, "utils/services/torneos.ts"),
