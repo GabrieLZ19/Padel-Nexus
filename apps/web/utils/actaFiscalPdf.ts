@@ -8,7 +8,9 @@ import {
   agruparPartidosPorRonda,
   etiquetaCanchaAsignada,
   etiquetaCruce,
+  etiquetaNumeroPartidoVisible,
   formatearResultadoSets,
+  mapaNumerosVisiblesPartidos,
   partidosDefinidosOrdenados,
 } from "@/utils/fiscalPartidos";
 
@@ -68,8 +70,11 @@ export function generarActaFiscalPdf(reporte: ReporteFiscal) {
   const pageHeight = doc.internal.pageSize.getHeight();
   const individual = esModalidadIndividual(reporte.torneo.modalidad);
   const sede = nombreSedeFiscal(reporte.torneo);
-  const partidos = partidosDefinidosOrdenados(reporte.partidos || []);
-  const grupos = agruparPartidosPorRonda(reporte.partidos || []);
+  const todosPartidos = reporte.partidos || [];
+  const partidos = partidosDefinidosOrdenados(todosPartidos);
+  const grupos = agruparPartidosPorRonda(todosPartidos);
+  const numerosVisibles = mapaNumerosVisiblesPartidos(todosPartidos);
+  const colPartido = individual ? "Jugadores" : "Parejas";
 
   const fiscalNombre = reporte.fiscal
     ? `${reporte.fiscal.apellido}, ${reporte.fiscal.nombre}`
@@ -167,21 +172,25 @@ export function generarActaFiscalPdf(reporte: ReporteFiscal) {
     y += 14;
   } else {
     grupos.forEach((grupo) => {
+      if (y > pageHeight - 36) {
+        doc.addPage();
+        y = 16;
+      }
+      doc.setFillColor(241, 245, 249);
+      doc.setDrawColor(...LINE);
+      doc.rect(14, y, pageWidth - 28, 7, "FD");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(...NAVY);
+      doc.text(grupo.label, 17, y + 4.8);
+      y += 9;
+
       autoTable(doc, {
         startY: y,
         margin: { left: 14, right: 14 },
-        head: [
-          [
-            grupo.label.toUpperCase(),
-            individual ? "Jugadores" : "Parejas",
-            "Resultado",
-            "Cancha",
-            "Horario",
-            "Estado",
-          ],
-        ],
+        head: [["#", colPartido, "Resultado", "Cancha", "Horario", "Estado"]],
         body: grupo.partidos.map((p: Partido) => [
-          p.orden ? `#${p.orden}` : "—",
+          etiquetaNumeroPartidoVisible(numerosVisibles, p),
           `${etiquetaCruce(p.equipo_a_j1, p.equipo_a_j2)}  vs  ${etiquetaCruce(p.equipo_b_j1, p.equipo_b_j2)}`,
           formatearResultadoSets(p) || "—",
           etiquetaCanchaAsignada(p.cancha_asignada),
@@ -205,6 +214,7 @@ export function generarActaFiscalPdf(reporte: ReporteFiscal) {
         alternateRowStyles: { fillColor: ROW },
         columnStyles: {
           0: { cellWidth: 14 },
+          1: { cellWidth: "auto" },
           2: { cellWidth: 30, fontStyle: "bold" },
           3: { cellWidth: 30 },
           4: { cellWidth: 26 },

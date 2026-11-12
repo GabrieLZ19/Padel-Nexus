@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -40,6 +40,8 @@ import {
   canchaAsignadaReal,
   etiquetaCanchaAsignada,
   etiquetaCruce,
+  etiquetaNumeroPartidoVisible,
+  mapaNumerosVisiblesPartidos,
   partidosDefinidosOrdenados,
   formatearResultadoSets,
 } from "@/utils/fiscalPartidos";
@@ -499,6 +501,10 @@ function TablaPartidos({
   onAbrirJugador: (id: string) => void;
 }) {
   const grupos = agruparPartidosPorRonda(partidos);
+  const numerosVisibles = useMemo(
+    () => mapaNumerosVisiblesPartidos(partidos),
+    [partidos],
+  );
   const individual = esModalidadIndividual(modalidad);
   const cruceLabel = individual ? "Jugadores" : "Parejas";
   const pendientes = partidos.length - grupos.reduce((n, g) => n + g.partidos.length, 0);
@@ -571,7 +577,7 @@ function TablaPartidos({
                   return (
                     <tr key={p.id} className="hover:bg-white/[0.02]">
                       <td className="px-4 py-3 text-gray-500 font-mono text-xs">
-                        {p.orden || "—"}
+                        {etiquetaNumeroPartidoVisible(numerosVisibles, p)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-2">

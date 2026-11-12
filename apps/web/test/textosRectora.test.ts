@@ -8,18 +8,20 @@ import { textoRectora } from "../utils/textosRectora.ts";
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("GEN-07 entidad rectora", () => {
-  it("arma los cinco textos con la sigla que se le pasa", () => {
+  it("arma los textos de entidad rectora con la sigla que se le pasa", () => {
     assert.equal(textoRectora("puntos", "FAP"), "Puntos FAP");
     assert.equal(textoRectora("reglamento", "FAP"), "Reglamento FAP");
     assert.equal(textoRectora("licencias", "FAP"), "licencias FAP");
     assert.equal(textoRectora("plantilla", "FAP"), "Plantilla FAP");
     assert.equal(textoRectora("afiliadas", "FAP"), "Entidades afiliadas FAP");
+    assert.equal(textoRectora("ranking", "FAP"), "Ranking FAP");
 
     assert.equal(textoRectora("puntos", "FNP"), "Puntos FNP");
     assert.equal(textoRectora("reglamento", "FNP"), "Reglamento FNP");
     assert.equal(textoRectora("licencias", "FNP"), "licencias FNP");
     assert.equal(textoRectora("plantilla", "FNP"), "Plantilla FNP");
     assert.equal(textoRectora("afiliadas", "FNP"), "Entidades afiliadas FNP");
+    assert.equal(textoRectora("ranking", "FNP"), "Ranking FNP");
   });
 
   it("sigue encontrando la federación argentina si la sigla deja de ser FAP", () => {
@@ -37,6 +39,9 @@ describe("GEN-07 entidad rectora", () => {
       "components/torneos/BracketEditor.tsx",
       "components/torneos/wizard/Paso7Cierre.tsx",
       "app/(public)/torneos/[id]/page.tsx",
+      "components/perfil/LicenciaModal.tsx",
+      "components/jugador/JugadorPublicoRankingSection.tsx",
+      "app/dashboard/asociaciones/[id]/page.tsx",
     ];
     const fijas = [
       "Puntos FAP",
@@ -44,6 +49,10 @@ describe("GEN-07 entidad rectora", () => {
       "licencias FAP",
       "Plantilla FAP",
       "Entidades afiliadas FAP",
+      "Ranking FAP",
+      "licencia oficial FAP",
+      "Posición Ranking FAP",
+      "Federación FAP",
     ];
     for (const relativo of pantallas) {
       const limpio = readFileSync(path.join(RAIZ, relativo), "utf8")
@@ -52,7 +61,7 @@ describe("GEN-07 entidad rectora", () => {
       for (const frase of fijas) {
         assert.equal(limpio.includes(frase), false, `${relativo} ${frase}`);
       }
-      assert.match(limpio, /textoRectora\(/);
+      assert.match(limpio, /textoRectora\(|useSiglaRectora\(/);
     }
   });
 });

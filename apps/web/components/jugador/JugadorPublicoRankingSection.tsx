@@ -3,6 +3,8 @@
 import { TrendingDown, TrendingUp, Trophy, Swords, Medal } from "lucide-react";
 import type { RankingPerfilJugador } from "@/utils/types";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
+import { textoRectora } from "@/utils/textosRectora";
+import { useSiglaRectora } from "@/utils/useSiglaRectora";
 
 function labelAlcance(alcance?: string | null): string {
   switch (alcance) {
@@ -73,11 +75,13 @@ export default function JugadorPublicoRankingSection({
   posicion?: string | null;
   scope?: string | null;
 }) {
+  const siglaRectora = useSiglaRectora();
+
   if (!principal) {
     return (
       <section className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-6">
         <h2 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.18em] mb-2">
-          Ranking FAP
+          {textoRectora("ranking", siglaRectora)}
         </h2>
         <p className="text-sm text-gray-400">
           Todavía no acumuló puntos oficiales en este circuito. Los puntos
@@ -105,7 +109,7 @@ export default function JugadorPublicoRankingSection({
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-1">
-              Puntos FAP
+              {textoRectora("puntos", siglaRectora)}
             </p>
             <p className="text-4xl md:text-5xl font-black text-brand-chartreuse tabular-nums">
               {principal.puntos.toLocaleString("es-AR")}

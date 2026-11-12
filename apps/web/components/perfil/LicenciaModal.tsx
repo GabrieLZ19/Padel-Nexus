@@ -310,8 +310,9 @@ export default function LicenciaModal({
                     Se requiere DNI para continuar
                   </p>
                   <p className="text-xs text-amber-300/80 leading-normal">
-                    Para tramitar la licencia oficial FAP es obligatorio
-                    vincular tu número de documento nacional de identidad.
+                    Para tramitar la licencia oficial ante {siglaRectora} es
+                    obligatorio vincular tu número de documento nacional de
+                    identidad.
                   </p>
                   <Link
                     href="/mi-perfil/ajustes"

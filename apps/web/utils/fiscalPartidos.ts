@@ -1,5 +1,9 @@
 import type { Partido } from "@/utils/types";
-import { etiquetaRondaLlave, ordenRondaLlave } from "@/utils/rondasLlave";
+import {
+  etiquetaRondaLlave,
+  numerosVisiblesDePartidos,
+  ordenRondaLlave,
+} from "@/utils/rondasLlave";
 
 /** Placeholder que deja la generación de llaves (`Cancha 1`), no una sede real. */
 export function esCanchaPlaceholder(cancha?: string | null): boolean {
@@ -56,6 +60,21 @@ export function partidosDefinidosOrdenados(partidos: Partido[]): Partido[] {
       if (pr !== 0) return pr;
       return (a.orden || 0) - (b.orden || 0);
     });
+}
+
+/** Misma numeración que llave / CRM (#17… tras zonas). */
+export function mapaNumerosVisiblesPartidos(partidos: Partido[]): Map<string, number> {
+  return numerosVisiblesDePartidos(partidos);
+}
+
+export function etiquetaNumeroPartidoVisible(
+  mapa: Map<string, number>,
+  partido: Partido,
+): string {
+  const visible = mapa.get(partido.id);
+  if (visible != null) return `#${visible}`;
+  if (partido.orden != null) return `#${partido.orden}`;
+  return "—";
 }
 
 export function agruparPartidosPorRonda(partidos: Partido[]): { ronda: string; label: string; partidos: Partido[] }[] {

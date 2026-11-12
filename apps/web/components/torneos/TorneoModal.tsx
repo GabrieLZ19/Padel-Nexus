@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Save, Globe } from "lucide-react";
-import { esNombreTorneoDePrueba } from "@/utils/datoPruebaTorneo";
+import {
+  AVISO_NOMBRE_TORNEO_PRUEBA,
+  esNombreTorneoDePrueba,
+} from "@/utils/datoPruebaTorneo";
 import CustomDropdown from "../ui/CustomDropdown";
+import FeedbackModal, {
+  type FeedbackModalProps,
+} from "@/components/ui/FeedbackModal";
 import { Club, FormTorneoState } from "../../utils/types";
 import { useProfileStore } from "../../store/useProfileStore";
 import {
@@ -45,6 +51,55 @@ export default function TorneoModal({
   const profile = useProfileStore((s) => s.profile);
   const userRole = (profile?.rol || "admin") as RolUsuario;
   const esClub = sedeFija || userRole === "admin_club" || userRole === "admin";
+  const nombreBloqueaSitioPublico = esNombreTorneoDePrueba(formData.nombre);
+  const prevNombreBloquea = useRef(nombreBloqueaSitioPublico);
+  const [feedback, setFeedback] = useState<FeedbackModalProps>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "info",
+    onClose: () => setFeedback((p) => ({ ...p, isOpen: false })),
+  });
+
+  useEffect(() => {
+    if (!isOpen) {
+      prevNombreBloquea.current = false;
+      return;
+    }
+    if (nombreBloqueaSitioPublico && !prevNombreBloquea.current) {
+      setFeedback({
+        isOpen: true,
+        type: "info",
+        title: "Torneo de ensayo",
+        description: `${AVISO_NOMBRE_TORNEO_PRUEBA} Desmarcamos «Visible en el sitio público».`,
+        confirmText: "Entendido",
+        onConfirm: () => setFeedback((p) => ({ ...p, isOpen: false })),
+        onClose: () => setFeedback((p) => ({ ...p, isOpen: false })),
+      });
+    }
+    prevNombreBloquea.current = nombreBloqueaSitioPublico;
+  }, [nombreBloqueaSitioPublico, isOpen]);
+
+  const solicitarOcultarSitioPublico = () => {
+    setFeedback({
+      isOpen: true,
+      type: "warning",
+      title: "Ocultar del sitio público",
+      description:
+        "El torneo no aparecerá en /torneos ni admitirá inscripción online hasta que vuelvas a marcar esta opción.",
+      confirmText: "Ocultar",
+      cancelText: "Cancelar",
+      onConfirm: () => {
+        setFormData({
+          ...formData,
+          visible_sitio_publico: false,
+          es_prueba: true,
+        });
+        setFeedback((p) => ({ ...p, isOpen: false }));
+      },
+      onClose: () => setFeedback((p) => ({ ...p, isOpen: false })),
+    });
+  };
 
   // Day logic in local user timezone
   const hoy = new Date();
@@ -314,6 +369,7 @@ export default function TorneoModal({
     null;
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm">
@@ -373,14 +429,18 @@ export default function TorneoModal({
                     type="checkbox"
                     className="mt-0.5 size-4 rounded accent-brand-chartreuse cursor-pointer disabled:opacity-40"
                     checked={formData.visible_sitio_publico !== false}
-                    disabled={esNombreTorneoDePrueba(formData.nombre)}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        visible_sitio_publico: e.target.checked,
-                        es_prueba: !e.target.checked,
-                      })
-                    }
+                    disabled={nombreBloqueaSitioPublico}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData({
+                          ...formData,
+                          visible_sitio_publico: true,
+                          es_prueba: false,
+                        });
+                        return;
+                      }
+                      solicitarOcultarSitioPublico();
+                    }}
                   />
                   <span className="flex flex-col gap-0.5">
                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-white">
@@ -390,6 +450,11 @@ export default function TorneoModal({
                     <span className="text-[10px] text-gray-500 leading-snug">
                       Habilita inscripción online y listado en /torneos.
                     </span>
+                    {nombreBloqueaSitioPublico ? (
+                      <span className="text-[10px] text-yellow-500/90 font-semibold leading-snug">
+                        {AVISO_NOMBRE_TORNEO_PRUEBA}
+                      </span>
+                    ) : null}
                   </span>
                 </label>
 
@@ -616,5 +681,7 @@ export default function TorneoModal({
         </div>
       )}
     </AnimatePresence>
+    <FeedbackModal {...feedback} />
+    </>
   );
 }

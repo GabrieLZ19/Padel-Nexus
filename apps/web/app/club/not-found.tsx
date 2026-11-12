@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import NotFoundView from "@/components/layout/NotFoundView";
+import { pageMetadata } from "@/utils/siteMetadata";
 
-export const metadata: Metadata = {
-  title: "Página no encontrada | Padel Nexus",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Página no encontrada",
+  description: "La ruta del panel de club no existe.",
+});
 
 export default function ClubNotFoundPage() {
   return (

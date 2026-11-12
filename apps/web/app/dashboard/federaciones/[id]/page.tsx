@@ -93,7 +93,7 @@ export default function DetalleFederacionPage() {
       <ConfigLicenciasPanel
         scope="federacion"
         entidadId={federacion.id}
-        titulo="Configuración nacional de carnets (FAP)"
+        titulo={`Configuración nacional de carnets (${federacion.sigla || "Federación"})`}
       />
 
       <div>

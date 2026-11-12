@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Toaster } from "sileo";
-import { sileoToastStyles } from "@/utils/sileoStyles";
+import { SILEO_TOAST_DURATION_MS, sileoToastStyles } from "@/utils/sileoStyles";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -48,6 +48,7 @@ export default function RootLayout({
           options={{
             fill: "#0b0b0b",
             roundness: 14,
+            duration: SILEO_TOAST_DURATION_MS,
             styles: sileoToastStyles,
           }}
         />

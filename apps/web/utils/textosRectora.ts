@@ -3,7 +3,8 @@ export type ClaveTextoRectora =
   | "reglamento"
   | "licencias"
   | "plantilla"
-  | "afiliadas";
+  | "afiliadas"
+  | "ranking";
 
 /** Los textos de la entidad rectora salen de su sigla configurada. */
 export function textoRectora(
@@ -22,5 +23,7 @@ export function textoRectora(
       return `Plantilla ${s}`;
     case "afiliadas":
       return `Entidades afiliadas ${s}`;
+    case "ranking":
+      return `Ranking ${s}`;
   }
 }

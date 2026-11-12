@@ -19,6 +19,7 @@ import {
   Globe,
 } from "lucide-react";
 import {
+  AVISO_NOMBRE_TORNEO_PRUEBA,
   esNombreTorneoDePrueba,
   torneoVisibleEnSitioPublico,
 } from "@/utils/datoPruebaTorneo";
@@ -299,12 +300,46 @@ export const Paso1Datos = ({
   }, []);
 
   const nombreBloqueaSitioPublico = esNombreTorneoDePrueba(editNombre);
+  const prevNombreBloquea = useRef(nombreBloqueaSitioPublico);
 
   useEffect(() => {
-    if (nombreBloqueaSitioPublico) {
+    if (nombreBloqueaSitioPublico && !prevNombreBloquea.current) {
       setVisibleSitioPublico(false);
+      setFeedbackModal((prev: any) => ({
+        ...prev,
+        isOpen: true,
+        type: "info",
+        title: "Torneo de ensayo",
+        description: `${AVISO_NOMBRE_TORNEO_PRUEBA} Desmarcamos «Visible en el sitio público».`,
+        confirmText: "Entendido",
+        cancelText: undefined,
+        onConfirm: () =>
+          setFeedbackModal((p: any) => ({ ...p, isOpen: false })),
+        onClose: () =>
+          setFeedbackModal((p: any) => ({ ...p, isOpen: false })),
+      }));
     }
-  }, [nombreBloqueaSitioPublico]);
+    prevNombreBloquea.current = nombreBloqueaSitioPublico;
+  }, [nombreBloqueaSitioPublico, setFeedbackModal]);
+
+  const solicitarOcultarSitioPublico = () => {
+    setFeedbackModal((prev: any) => ({
+      ...prev,
+      isOpen: true,
+      type: "warning",
+      title: "Ocultar del sitio público",
+      description:
+        "El torneo no aparecerá en /torneos ni admitirá inscripción online hasta que vuelvas a marcar esta opción.",
+      confirmText: "Ocultar",
+      cancelText: "Cancelar",
+      onConfirm: () => {
+        setVisibleSitioPublico(false);
+        setFeedbackModal((p: any) => ({ ...p, isOpen: false }));
+      },
+      onClose: () =>
+        setFeedbackModal((p: any) => ({ ...p, isOpen: false })),
+    }));
+  };
 
   // Sincronizar con datos persistidos tras guardar / refrescar torneo
   useEffect(() => {
@@ -628,7 +663,13 @@ export const Paso1Datos = ({
               className="mt-1 size-4 rounded border-white/20 bg-brand-input accent-brand-chartreuse cursor-pointer disabled:opacity-40"
               checked={visibleSitioPublico}
               disabled={nombreBloqueaSitioPublico || readOnly}
-              onChange={(e) => setVisibleSitioPublico(e.target.checked)}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setVisibleSitioPublico(true);
+                } else {
+                  solicitarOcultarSitioPublico();
+                }
+              }}
             />
             <span className="flex flex-col gap-0.5">
               <span className="inline-flex items-center gap-2 text-sm font-bold text-white">
@@ -641,8 +682,7 @@ export const Paso1Datos = ({
               </span>
               {nombreBloqueaSitioPublico ? (
                 <span className="text-xs text-yellow-500/90 font-semibold">
-                  Los nombres de ensayo (QA, prueba, testing, demo) no se
-                  publican en el sitio.
+                  {AVISO_NOMBRE_TORNEO_PRUEBA}
                 </span>
               ) : null}
             </span>

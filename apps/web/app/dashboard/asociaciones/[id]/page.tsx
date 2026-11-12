@@ -22,8 +22,11 @@ import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { ConfigLicenciasPanel } from "@/components/licencias/ConfigLicenciasPanel";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
+import { textoRectora } from "@/utils/textosRectora";
+import { useSiglaRectora } from "@/utils/useSiglaRectora";
 
 export default function DetalleAsociacionPage() {
+  const siglaRectora = useSiglaRectora();
   const params = useParams();
   const id = params?.id as string;
 
@@ -475,7 +478,9 @@ export default function DetalleAsociacionPage() {
               </div>
 
               <div className="bg-black/30 p-3.5 rounded-2xl border border-white/5 space-y-1">
-                <span className="text-gray-500 font-bold uppercase text-[10px] block">Posición Ranking FAP</span>
+                <span className="text-gray-500 font-bold uppercase text-[10px] block">
+                  Posición {textoRectora("ranking", siglaRectora)}
+                </span>
                 <span className="text-yellow-400 font-black text-xs block">
                   {selectedJugador.ranking && selectedJugador.ranking > 0
                     ? `#${selectedJugador.ranking} en el Ranking`

@@ -177,7 +177,7 @@ export default function CheckoutPage() {
             .catch((err) => {
               console.error("Error al confirmar retorno de pago:", err);
               sileo.error({
-                title: "Error de Acreditación",
+                title: "Error de acreditación",
                 description: "Hubo un problema al registrar tu pago. Si se debitó dinero de tu cuenta, por favor contactá al club.",
               });
             });
@@ -190,13 +190,14 @@ export default function CheckoutPage() {
       } else if (paymentStatus === "failure") {
         setMetodoPago("mercadopago");
         sileo.error({
-          title: "Pago Fallido",
-          description: "El pago a través de Mercado Pago no pudo completarse. Por favor, intenta nuevamente.",
+          title: "Pago fallido",
+          description:
+            "El pago a través de Mercado Pago no pudo completarse. Intentá nuevamente.",
         });
       } else if (paymentStatus === "pending") {
         setMetodoPago("mercadopago");
         sileo.warning({
-          title: "Pago Pendiente",
+          title: "Pago pendiente",
           description: "Tu pago se encuentra pendiente de acreditación en Mercado Pago.",
         });
       }
@@ -209,15 +210,16 @@ export default function CheckoutPage() {
     if (metodoPago === "transferencia") {
       if (!referenciaTransferencia.trim()) {
         sileo.warning({
-          title: "Referencia Requerida",
-          description: "Por favor, ingresá la referencia de la transferencia.",
+          title: "Referencia requerida",
+          description: "Ingresá la referencia de la transferencia.",
         });
         return;
       }
       if (!comprobanteArchivo) {
         sileo.warning({
-          title: "Comprobante Requerido",
-          description: "Por favor, seleccioná la imagen o PDF del comprobante de transferencia.",
+          title: "Comprobante requerido",
+          description:
+            "Seleccioná la imagen o el PDF del comprobante de transferencia.",
         });
         return;
       }

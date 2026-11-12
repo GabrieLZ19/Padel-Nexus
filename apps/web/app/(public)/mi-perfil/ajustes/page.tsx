@@ -22,7 +22,7 @@ import { useProfileStore } from "@/store/useProfileStore";
 import { LADOS_PADEL, PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
 import { toDateInputValue } from "@/utils/dateUtils";
 import { validateNombre, validateDni, validateTelefono } from "@/utils/validation";
-import { sileo } from "sileo";
+import { toastError, toastExito } from "@/utils/sileoToast";
 
 export const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-white/5 rounded-2xl ${className}`} />
@@ -31,7 +31,6 @@ export const Skeleton = ({ className }: { className?: string }) => (
 export default function ProfileSettings() {
   const [profile, setProfile] = useState<Perfil | null>(null);
   const [saving, setSaving] = useState(false);
-  const [showModal, setShowModal] = useState(false);
   const [pedidoAbierto, setPedidoAbierto] = useState(false);
   const [pedidoEnviando, setPedidoEnviando] = useState(false);
 
@@ -145,9 +144,16 @@ export default function ProfileSettings() {
       const updatedProfile = await PerfilService.updateMe(cleanedProfile);
       setProfile(updatedProfile);
       useProfileStore.getState().setProfile(updatedProfile);
-      setShowModal(true);
+      toastExito({
+        title: "Ficha actualizada",
+        description: "Tus datos de perfil se guardaron correctamente.",
+      });
     } catch (error) {
       console.error("Error al actualizar:", error);
+      toastError({
+        title: "No se pudo guardar",
+        description: "Revisá los datos e intentá de nuevo.",
+      });
     } finally {
       setSaving(false);
     }
@@ -159,7 +165,7 @@ export default function ProfileSettings() {
     try {
       await PerfilService.solicitarCambio(campo, valor.trim());
       setPedidoAbierto(false);
-      sileo.success({
+      toastExito({
         title: "Pedido registrado",
         description: "La federación va a revisar el cambio. Tu ficha no se modificó.",
       });
@@ -168,7 +174,7 @@ export default function ProfileSettings() {
         error && typeof error === "object" && "response" in error
           ? (error as { response?: { data?: { error?: string } } }).response?.data?.error
           : null;
-      sileo.error({
+      toastError({
         title: "No se pudo registrar el pedido",
         description: mensaje || "Intentá de nuevo.",
       });
@@ -455,7 +461,7 @@ export default function ProfileSettings() {
             ) : (
               <Save size={20} />
             )}
-            {saving ? "Guardando..." : "Guardar Ajustes"}
+            {saving ? "Guardando..." : "Guardar ajustes"}
           </button>
         </div>
       </form>
@@ -475,7 +481,7 @@ export default function ProfileSettings() {
         selectLabel="Dato"
         selectOptions={[
           { value: "dni", label: "DNI" },
-          { value: "fecha_nacimiento", label: "Fecha de Nacimiento (AAAA-MM-DD)" },
+          { value: "fecha_nacimiento", label: "Fecha de nacimiento (AAAA-MM-DD)" },
           { value: "categoria", label: "Categoría" },
         ]}
         showInput
@@ -484,13 +490,6 @@ export default function ProfileSettings() {
         onConfirm={enviarPedido}
       />
 
-      <FeedbackModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title="Ficha Actualizada"
-        description="Los cambios de tu perfil federativo impactaron con éxito en la base de datos."
-        type="success"
-      />
     </div>
   );
 }

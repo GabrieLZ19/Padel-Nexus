@@ -38,4 +38,25 @@ describe("PUB-12 títulos por página", () => {
     assert.match(home, /title: "Inicio"/);
     assert.match(login, /Iniciar sesión/);
   });
+
+  it("signup y 404 usan pageMetadata descriptivo", () => {
+    const signup = readFileSync(
+      path.join(RAIZ, "app/(auth)/signup/layout.tsx"),
+      "utf8",
+    );
+    assert.match(signup, /pageMetadata/);
+    assert.match(signup, /Crear cuenta/);
+
+    for (const rel of [
+      "app/not-found.tsx",
+      "app/(public)/not-found.tsx",
+      "app/dashboard/not-found.tsx",
+      "app/club/not-found.tsx",
+    ]) {
+      const file = readFileSync(path.join(RAIZ, rel), "utf8");
+      assert.match(file, /pageMetadata/);
+      assert.match(file, /Página no encontrada/);
+      assert.doesNotMatch(file, /\| Padel Nexus/);
+    }
+  });
 });

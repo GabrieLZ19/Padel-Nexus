@@ -28,6 +28,7 @@ import FeedbackModal, {
 import { PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
 import { sileo } from "sileo";
 import { MenuPuntos } from "@/components/ui/MenuPuntos";
+import { useSiglaRectora } from "@/utils/useSiglaRectora";
 
 const MapaClubs = dynamic(() => import("@/components/reservas/MapaClubs"), {
   ssr: false,
@@ -41,6 +42,7 @@ const MapaClubs = dynamic(() => import("@/components/reservas/MapaClubs"), {
 const defaultUserLocation = { lat: -34.6037, lng: -58.3816 };
 
 export default function PadrónAsociacionesPage() {
+  const siglaRectora = useSiglaRectora();
   const [asociaciones, setAsociaciones] = useState<Asociacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -167,8 +169,8 @@ export default function PadrónAsociacionesPage() {
       setSaving(true);
       await AsociacionesService.create(form);
       sileo.success({
-        title: "Asociación Registrada",
-        description: `${form.nombre} ha sido dada de alta en el padrón de la Federación FAP.`,
+        title: "Asociación registrada",
+        description: `${form.nombre} ha sido dada de alta en el padrón de la federación ${siglaRectora}.`,
       });
       setShowCreateModal(false);
       fetchAsociaciones();
