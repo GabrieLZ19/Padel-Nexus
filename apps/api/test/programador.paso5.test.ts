@@ -585,6 +585,56 @@ describe("programador paso 5", () => {
     assert.ok((inicioFinal || 0) >= 12 * 60 + 30);
   });
 
+  it("TOR-17/4 — lote en llave respeta feeders (semis tras cuartos con descanso 120)", () => {
+    const slots = generarSlotsDesdeSedesYVentana({
+      canchas: [
+        {
+          club_id: "c1",
+          cancha_id: "ca1",
+          fecha: "2026-11-09",
+          hora_inicio: "09:30:00",
+          hora_fin: "23:59:59",
+          clubes: { nombre: "Club QA" },
+          canchas: { nombre: "1" },
+        } as DisponibilidadTorneo,
+      ],
+      dias: ["2026-11-09"],
+      duracionMinutos: 90,
+    });
+
+    const cuartos: PartidoProgramable = {
+      id: "c1",
+      ronda: "CUARTOS",
+      orden: 25,
+      estado_partido: "Programado",
+      cancha_asignada: "Club QA — 1",
+      fecha_partido: "2026-11-09T09:30:00-03:00",
+    };
+    const semi: PartidoProgramable = {
+      id: "s1",
+      ronda: "SEMIS",
+      orden: 29,
+      estado_partido: "Programado",
+    };
+
+    const feeders = new Map<number, number[]>();
+    feeders.set(29, [25]);
+
+    const todos = [cuartos, semi];
+    asignarHorariosAPartidos(todos, slots, new Set(), {
+      duracionMinutos: 90,
+      descansoModo: "tras_fin_120",
+      feedersByMatchNo: feeders,
+      permitirSinEquipos: true,
+      limitarAIds: new Set(["s1"]),
+    });
+
+    const inicioSemi = parseFechaPartidoIsoPublic(String(semi.fecha_partido))
+      ?.startMin;
+  // Cuartos 09:30–11:00 + 120 min => semi no antes de 13:00
+    assert.ok((inicioSemi ?? 0) >= 13 * 60);
+  });
+
   it("R3 - reconoce rondas de campeonato (semis y final) para distribuirlas en el último día", () => {
     assert.equal(esRondaCampeonato("SEMIS"), true);
     assert.equal(esRondaCampeonato("Semifinales"), true);

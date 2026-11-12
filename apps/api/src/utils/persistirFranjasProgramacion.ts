@@ -27,11 +27,23 @@ export async function persistirFranjasPorDiaTorneo(
     }
     if (Object.keys(updates).length === 0) continue;
 
+    const { data: filas, error: listError } = await supabaseAdmin
+      .from("torneo_canchas_disponibilidad")
+      .select("id, fecha")
+      .eq("torneo_id", torneoId);
+
+    if (listError) throw new Error(listError.message);
+
+    const ids = (filas || [])
+      .filter((row) => normalizarFechaProgramacionDia(row.fecha) === fecha)
+      .map((row) => row.id);
+
+    if (!ids.length) continue;
+
     const { error } = await supabaseAdmin
       .from("torneo_canchas_disponibilidad")
       .update(updates)
-      .eq("torneo_id", torneoId)
-      .eq("fecha", fecha);
+      .in("id", ids);
 
     if (error) {
       throw new Error(error.message);

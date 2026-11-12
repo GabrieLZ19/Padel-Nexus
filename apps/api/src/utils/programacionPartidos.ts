@@ -923,6 +923,8 @@ export function asignarHorariosAPartidos(
     distribucion?: DistribucionProgramacion;
     /** No asignar antes de estos instantes (p. ej. fin de todas las zonas). */
     notBeforeExtra?: { fecha: string; startMin: number }[];
+    /** Solo agenda estos IDs (el resto del array alimenta feeders/ocupación). */
+    limitarAIds?: Set<string>;
   },
 ): void {
   if (!slots.length || !partidos.length) return;
@@ -933,6 +935,7 @@ export function asignarHorariosAPartidos(
   const feedersByMatchNo = opciones?.feedersByMatchNo || new Map();
   const permitirSinEquipos = opciones?.permitirSinEquipos === true;
   const notBeforeExtra = opciones?.notBeforeExtra || [];
+  const limitarAIds = opciones?.limitarAIds;
   const ocupados = new Set(ocupadosIniciales || []);
   const historial = new Map<string, PartidoParejaHistorial[]>();
 
@@ -940,9 +943,10 @@ export function asignarHorariosAPartidos(
 
   const pendientes = partidos
     .map((partido, index) => ({ partido, index }))
-    .filter(({ partido }) =>
-      necesitaHorario(partido, { permitirSinEquipos }),
-    );
+    .filter(({ partido }) => {
+      if (limitarAIds && !limitarAIds.has(String(partido.id))) return false;
+      return necesitaHorario(partido, { permitirSinEquipos });
+    });
 
   if (opciones?.distribucion === "continua") {
     const secuencia = [...pendientes].sort((a, b) => {

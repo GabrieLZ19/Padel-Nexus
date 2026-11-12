@@ -108,4 +108,22 @@ describe("TOR-3 descanso e inicio por día persisten en programador", () => {
     assert.match(svc, /persistirFranjasPorDiaTorneo/);
     assert.match(svc, /persistirDescansoYDuracionTorneo/);
   });
+
+  it("persistir franjas matchea fechas con timestamp en disponibilidad", () => {
+    const src = fuenteApi("src/utils/persistirFranjasProgramacion.ts");
+    assert.match(src, /normalizarFechaProgramacionDia\(row\.fecha\)/);
+    assert.doesNotMatch(src, /\.eq\("fecha", fecha\)/);
+  });
+
+  it("asignar lote respeta descanso persistido y feeders de llave", () => {
+    const svc = fuenteApi("src/services/programacion.service.ts");
+    const bloque = svc.slice(
+      svc.indexOf("static async asignarLote"),
+      svc.indexOf("static async desasignar"),
+    );
+    assert.match(bloque, /feedersForTorneo/);
+    assert.match(bloque, /limitarAIds/);
+    assert.match(bloque, /descansoModo/);
+    assert.match(bloque, /sin_slot_ids/);
+  });
 });

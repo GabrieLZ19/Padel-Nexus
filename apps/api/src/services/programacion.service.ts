@@ -822,7 +822,7 @@ export class ProgramacionService {
   ): Promise<ProgramacionBoard> {
     const { data: torneo } = await supabaseAdmin
       .from("torneos")
-      .select("id, programacion_estado, duracion_partido_minutos")
+      .select("id, programacion_estado, duracion_partido_minutos, descanso_modo")
       .eq("id", torneoId)
       .maybeSingle();
     if (!torneo) throw new Error("Torneo no encontrado");
@@ -840,6 +840,7 @@ export class ProgramacionService {
       cancha_label: string;
       fecha_iso: string;
     }> = [];
+    let metaLote: ProgramacionBoard["asignacion_lote"];
 
     if (Array.isArray(payload.asignaciones) && payload.asignaciones.length > 0) {
       asignacionesFinales = payload.asignaciones;
@@ -849,6 +850,12 @@ export class ProgramacionService {
     ) {
       const contexto = await cargarContextoProgramacion(torneoId);
       const duracion = Number(torneo.duracion_partido_minutos || 90);
+      const descansoModo = esModoDescanso(torneo.descanso_modo)
+        ? torneo.descanso_modo
+        : "tras_fin_60";
+      const descansoMinutos = minutosDeModoDescanso(descansoModo);
+      const targetIds = new Set(payload.partido_ids.map((id) => String(id)));
+
       const { data: todosPartidosDb } = await supabaseAdmin
         .from("partidos")
         .select(
@@ -856,36 +863,31 @@ export class ProgramacionService {
         )
         .eq("torneo_id", torneoId);
 
-      const todosPartidos = todosPartidosDb || [];
-      const partidosAAsignar: PartidoProgramable[] = [];
+      const todosProg: PartidoProgramable[] = (todosPartidosDb || []).map(
+        (p) => ({
+          id: p.id,
+          ronda: p.ronda || "",
+          orden: p.orden || undefined,
+          equipo_a_id: p.equipo_a_id,
+          equipo_b_id: p.equipo_b_id,
+          estado_partido: p.estado_partido || "Programado",
+          cancha_asignada: targetIds.has(String(p.id))
+            ? null
+            : p.cancha_asignada,
+          fecha_partido: targetIds.has(String(p.id)) ? null : p.fecha_partido,
+          horario_bloqueado: p.horario_bloqueado,
+        }),
+      );
+
       const ocupados = buildOcupadosDesdePartidos(
-        todosPartidos.filter(
-          (p) =>
-            p.cancha_asignada &&
-            p.fecha_partido &&
-            !payload.partido_ids?.includes(p.id),
-        ),
+        todosProg.filter((p) => p.cancha_asignada && p.fecha_partido),
       );
 
-      for (const p of todosPartidos) {
-        if (payload.partido_ids.includes(p.id)) {
-          partidosAAsignar.push({
-            id: p.id,
-            ronda: p.ronda || "",
-            orden: p.orden || undefined,
-            equipo_a_id: p.equipo_a_id,
-            equipo_b_id: p.equipo_b_id,
-            estado_partido: p.estado_partido || "Programado",
-            cancha_asignada: null,
-            fecha_partido: null,
-          });
-        }
-      }
-
-      const ordenMap = new Map(payload.partido_ids.map((id, idx) => [id, idx]));
-      partidosAAsignar.sort(
-        (a, b) => (ordenMap.get(String(a.id)) ?? 0) - (ordenMap.get(String(b.id)) ?? 0),
-      );
+      const feeders = await ProgramacionService.feedersForTorneo(torneoId);
+      const hayLlave = [...targetIds].some((id) => {
+        const row = todosProg.find((p) => String(p.id) === id);
+        return row && !/^ZONA\s+/i.test(String(row.ronda || ""));
+      });
 
       const allSlots = slotsDesdeContexto(contexto, duracion);
       let slots = allSlots;
@@ -896,20 +898,44 @@ export class ProgramacionService {
         slots = [...slotsDelDia, ...slotsOtros];
       }
 
-      asignarHorariosAPartidos(partidosAAsignar, slots, ocupados, {
+      asignarHorariosAPartidos(todosProg, slots, ocupados, {
         duracionMinutos: duracion,
-        descansoMinutos: 60,
-        distribucion: "continua",
+        descansoMinutos,
+        descansoModo,
+        feedersByMatchNo: feeders,
+        permitirSinEquipos: hayLlave,
+        distribucion: hayLlave ? "zonas_primero" : "continua",
+        limitarAIds: targetIds,
+        notBeforeExtra: finWallClockTrasPartidos(
+          todosProg.filter((p) => /^ZONA\s+/i.test(String(p.ronda || ""))),
+          duracion,
+        ),
       });
 
-      for (const p of partidosAAsignar) {
-        if (p.cancha_asignada && p.fecha_partido) {
+      const sinSlot: string[] = [];
+      for (const id of payload.partido_ids) {
+        const draft = todosProg.find((p) => String(p.id) === id);
+        if (draft?.cancha_asignada && draft.fecha_partido) {
           asignacionesFinales.push({
-            partido_id: String(p.id),
-            cancha_label: p.cancha_asignada,
-            fecha_iso: p.fecha_partido,
+            partido_id: String(id),
+            cancha_label: draft.cancha_asignada,
+            fecha_iso: draft.fecha_partido,
           });
+        } else {
+          sinSlot.push(String(id));
         }
+      }
+
+      metaLote = {
+        solicitados: payload.partido_ids.length,
+        asignados: asignacionesFinales.length,
+        sin_slot_ids: sinSlot,
+      };
+
+      if (asignacionesFinales.length === 0) {
+        throw new Error(
+          "No hubo espacio en la grilla para los partidos seleccionados. Revisá descanso entre rondas, canchas o el día activo.",
+        );
       }
     } else {
       throw new Error("Se requieren asignaciones o una lista de partido_ids");
@@ -955,7 +981,8 @@ export class ProgramacionService {
       });
     }
 
-    return this.getBoard(torneoId);
+    const board = await this.getBoard(torneoId);
+    return metaLote ? { ...board, asignacion_lote: metaLote } : board;
   }
 
   static async desasignar(
@@ -1669,6 +1696,11 @@ export interface ProgramacionBoard {
     asignados: number;
     pendientes: number;
     advertencias: number;
+  };
+  asignacion_lote?: {
+    solicitados: number;
+    asignados: number;
+    sin_slot_ids: string[];
   };
 }
 
