@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   ETIQUETA_PUNTOS_FICHA_PUBLICA,
   categoriasJuegoYRankingDifieren,
+  etiquetaSexoPerfil,
   subtituloMovimientoHistorial,
   tituloMovimientoHistorial,
 } from "../utils/fichaPublicaJugador.ts";
@@ -36,6 +37,16 @@ describe("PUB-16 ficha pública jugador", () => {
     );
     assert.match(pagina, /Categoría de juego/);
     assert.match(pagina, /Categoría en ranking/);
+  });
+
+  it("capitaliza sexo en ficha pública", () => {
+    assert.equal(etiquetaSexoPerfil("masculino"), "Masculino");
+    assert.equal(etiquetaSexoPerfil("femenino"), "Femenino");
+    const pagina = readFileSync(
+      path.join(RAIZ, "app/(public)/jugadores/[id]/page.tsx"),
+      "utf8",
+    );
+    assert.match(pagina, /etiquetaSexoPerfil/);
   });
 
   it("arma título de movimiento con torneo y ronda", () => {

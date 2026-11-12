@@ -22,7 +22,10 @@ import { puedeVerFichaCompleta } from "@/utils/auth/roles";
 import JugadorPublicoRankingSection, {
   elegirRegistroPrincipal,
 } from "@/components/jugador/JugadorPublicoRankingSection";
-import { categoriasJuegoYRankingDifieren } from "@/utils/fichaPublicaJugador";
+import {
+  categoriasJuegoYRankingDifieren,
+  etiquetaSexoPerfil,
+} from "@/utils/fichaPublicaJugador";
 
 type PerfilVista = Partial<Perfil> & {
   clubes?: { id?: string; nombre?: string } | null;
@@ -295,7 +298,7 @@ export default function FichaJugadorPublicaPage() {
                   <FieldRow
                     icon={<User className="size-4 text-brand-chartreuse/70" />}
                     label="Sexo"
-                    value={perfil.sexo}
+                    value={etiquetaSexoPerfil(perfil.sexo)}
                   />
                 ) : null}
               </div>

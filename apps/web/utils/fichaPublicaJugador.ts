@@ -4,6 +4,17 @@ import type { HistorialRanking } from "./types/ranking.types";
 /** Etiqueta de puntos en ficha pública (sin sigla de entidad rectora). */
 export const ETIQUETA_PUNTOS_FICHA_PUBLICA = "Puntos";
 
+/** Presentación legible del sexo en fichas públicas (PUB-16). */
+export function etiquetaSexoPerfil(valor?: string | null): string {
+  const v = String(valor || "").trim();
+  if (!v) return "—";
+  const key = v.toLowerCase();
+  if (key === "masculino") return "Masculino";
+  if (key === "femenino") return "Femenino";
+  if (key === "otro") return "Otro";
+  return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+}
+
 function claveCategoria(c?: string | null): string {
   return String(c ?? "")
     .trim()
