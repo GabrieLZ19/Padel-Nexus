@@ -27,6 +27,7 @@ import {
 import { fechaHoyArgentina } from "../utils/fechaArgentina";
 import {
   orBusquedaJugadoresLicencias,
+  patronIlikeSql,
   terminoIlikePostgrest,
 } from "../utils/postgrestBusqueda";
 import {
@@ -75,6 +76,32 @@ function normalizarTexto(input?: string | null): string {
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase();
+}
+
+const MAX_IDS_BUSQUEDA_NRO_LICENCIA = 500;
+
+async function usuarioIdsPorBusquedaNroLicencia(
+  search: string,
+): Promise<string[]> {
+  const pattern = patronIlikeSql(search);
+  const { data, error } = await supabaseAdmin
+    .from("licencias")
+    .select("usuario_id")
+    .ilike("nro_licencia", pattern)
+    .limit(MAX_IDS_BUSQUEDA_NRO_LICENCIA);
+
+  if (error) {
+    console.error("Busqueda nro_licencia (ENT-3):", error.message);
+    return [];
+  }
+
+  return [
+    ...new Set(
+      (data || [])
+        .map((row) => String(row.usuario_id || "").trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 export class LicenciaService {
@@ -149,7 +176,8 @@ export class LicenciaService {
 
     if (search?.trim()) {
       const quoted = terminoIlikePostgrest(search);
-      query = query.or(orBusquedaJugadoresLicencias(quoted));
+      const idsNro = await usuarioIdsPorBusquedaNroLicencia(search);
+      query = query.or(orBusquedaJugadoresLicencias(quoted, idsNro));
     }
 
     // Filtro DB seguro: solo por lugar_residencia del perfil.
@@ -304,12 +332,17 @@ export class LicenciaService {
         | { estado?: string | null; asociacion_id?: string | null }
         | { estado?: string | null; asociacion_id?: string | null }[];
     }> = [];
+    const idsNro =
+      search?.trim() ?
+        await usuarioIdsPorBusquedaNroLicencia(search)
+      : [];
+
     const pageSize = 1000;
     for (let from = 0; ; from += pageSize) {
       let query = supabaseAdmin.from("perfiles").select(select);
       if (search?.trim()) {
         const quoted = terminoIlikePostgrest(search);
-        query = query.or(orBusquedaJugadoresLicencias(quoted));
+        query = query.or(orBusquedaJugadoresLicencias(quoted, idsNro));
       }
       if (alcanceProvincial) {
         query = query.ilike(

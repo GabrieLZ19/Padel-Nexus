@@ -30,13 +30,22 @@ describe("ENT-3 buscador jugadores federación/superadmin", () => {
     assert.doesNotMatch(quoted, /^%qa@/);
   });
 
-  it("orBusquedaJugadoresLicencias incluye DNI y N° licencia", () => {
+  it("orBusquedaJugadoresLicencias solo filtra columnas de perfiles", () => {
     const quoted = terminoIlikePostgrest("30123456");
     const filtro = orBusquedaJugadoresLicencias(quoted);
     assert.match(filtro, /dni\.ilike/);
-    assert.match(filtro, /licencias\.nro_licencia\.ilike/);
+    assert.doesNotMatch(filtro, /licencias\./);
     assert.match(filtro, /nombre\.ilike/);
     assert.match(filtro, /apellido\.ilike/);
+  });
+
+  it("orBusquedaJugadoresLicencias une ids de nro_licencia sin embed", () => {
+    const quoted = terminoIlikePostgrest("PAD-7MBWT2");
+    const filtro = orBusquedaJugadoresLicencias(quoted, [
+      "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    ]);
+    assert.match(filtro, /id\.in\.\("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"\)/);
+    assert.doesNotMatch(filtro, /licencias\./);
   });
 
   it("obtenerLicencias usa util compartida y no arma term sin comillas", () => {
@@ -44,6 +53,7 @@ describe("ENT-3 buscador jugadores federación/superadmin", () => {
     const bloque = cuerpoObtenerLicencias(licencias);
     assert.match(bloque, /terminoIlikePostgrest/);
     assert.match(bloque, /orBusquedaJugadoresLicencias/);
+    assert.match(bloque, /usuarioIdsPorBusquedaNroLicencia/);
     assert.doesNotMatch(bloque, /const term = `%/);
   });
 

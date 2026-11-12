@@ -2,9 +2,13 @@
  * Arma un patrón ilike con comillas para filtros `.or()` de PostgREST.
  * Sin comillas, valores con @ o comas rompen el parser del filtro.
  */
-export function terminoIlikePostgrest(queryRaw: string): string {
+export function patronIlikeSql(queryRaw: string): string {
   const q = queryRaw.trim();
-  const term = `%${q.replace(/[%_,]/g, "\\$&")}%`;
+  return `%${q.replace(/[%_,]/g, "\\$&")}%`;
+}
+
+export function terminoIlikePostgrest(queryRaw: string): string {
+  const term = patronIlikeSql(queryRaw);
   return `"${term.replace(/"/g, '\\"')}"`;
 }
 
@@ -18,12 +22,24 @@ export function orBusquedaContactosAdmin(quoted: string): string {
   ].join(",");
 }
 
-export function orBusquedaJugadoresLicencias(quoted: string): string {
-  return [
+/**
+ * Filtro `.or()` solo sobre columnas de `perfiles`.
+ * La búsqueda por N° de licencia va aparte (tabla `licencias`) y se une vía `usuarioIdsNroLicencia`.
+ * Mezclar `licencias.*` en este or rompe el parser de PostgREST con embed inner.
+ */
+export function orBusquedaJugadoresLicencias(
+  quoted: string,
+  usuarioIdsNroLicencia?: string[],
+): string {
+  const parts = [
     `nombre.ilike.${quoted}`,
     `apellido.ilike.${quoted}`,
     `email.ilike.${quoted}`,
     `dni.ilike.${quoted}`,
-    `licencias.nro_licencia.ilike.${quoted}`,
-  ].join(",");
+  ];
+  const ids = (usuarioIdsNroLicencia || []).filter(Boolean);
+  if (ids.length > 0) {
+    parts.push(`id.in.(${ids.map((id) => `"${id}"`).join(",")})`);
+  }
+  return parts.join(",");
 }
