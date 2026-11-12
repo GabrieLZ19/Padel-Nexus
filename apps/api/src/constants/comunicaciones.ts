@@ -57,6 +57,8 @@ export function esEtiquetaComunicacionValida(
 export const COMUNICACIONES_DESTINATARIO_ESTADOS = [
   "enviado",
   "omitido_prefs",
+  "omitido_sin_dato",
+  "omitido_config",
   "error",
 ] as const;
 

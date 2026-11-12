@@ -1,10 +1,21 @@
 import { supabaseAdmin } from "../config/supabase";
 
+import {
+  motivoOmitidoDesdeResultado,
+  type OmitidoMotivoClave,
+  type ResultadoCanalEntrega,
+} from "../utils/comunicacionesOmitidos";
+
 export type ComunicacionesCanal = "in_app" | "email" | "whatsapp";
 
 export interface ComunicacionesMetricasCampana {
   entregados: Partial<Record<ComunicacionesCanal, number>>;
   omitidos: Partial<Record<ComunicacionesCanal, number>>;
+  omitidos_motivo?: Partial<
+    Record<ComunicacionesCanal, Partial<Record<OmitidoMotivoClave, number>>>
+  >;
+  /** Etiqueta institucional del remitente al momento del envío (FAP, club, etc.). */
+  entidad_remitente?: string;
   abiertos: number;
   clics: number;
 }
@@ -39,6 +50,13 @@ export function normalizarMetricasCampana(
     clics: Number(m.clics) || 0,
     entregados: { ...base.entregados, ...(m.entregados || {}) },
     omitidos: { ...base.omitidos, ...(m.omitidos || {}) },
+    omitidos_motivo: m.omitidos_motivo
+      ? { ...m.omitidos_motivo }
+      : undefined,
+    entidad_remitente:
+      typeof m.entidad_remitente === "string"
+        ? m.entidad_remitente.trim() || undefined
+        : undefined,
   };
 }
 
@@ -55,6 +73,40 @@ export function sumarEntrega(
       [canal]: (metricas[bucket][canal] || 0) + 1,
     },
   };
+}
+
+export function sumarOmitidoConMotivo(
+  metricas: ComunicacionesMetricasCampana,
+  canal: ComunicacionesCanal,
+  motivo: OmitidoMotivoClave,
+): ComunicacionesMetricasCampana {
+  const conConteo = sumarEntrega(metricas, canal, false);
+  const prevCanal = conConteo.omitidos_motivo?.[canal] || {};
+  return {
+    ...conConteo,
+    omitidos_motivo: {
+      ...conConteo.omitidos_motivo,
+      [canal]: {
+        ...prevCanal,
+        [motivo]: (prevCanal[motivo] || 0) + 1,
+      },
+    },
+  };
+}
+
+export function registrarResultadoCanal(
+  metricas: ComunicacionesMetricasCampana,
+  canal: ComunicacionesCanal,
+  resultado: ResultadoCanalEntrega,
+): ComunicacionesMetricasCampana {
+  if (resultado === "enviado") {
+    return sumarEntrega(metricas, canal, true);
+  }
+  const motivo = motivoOmitidoDesdeResultado(resultado);
+  if (motivo) {
+    return sumarOmitidoConMotivo(metricas, canal, motivo);
+  }
+  return sumarEntrega(metricas, canal, false);
 }
 
 export class ComunicacionesMetricasService {
