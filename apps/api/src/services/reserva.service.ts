@@ -18,6 +18,7 @@ import {
   retencionInicialDesde,
   retencionMercadoPagoDesde,
   retencionTransferenciaDesde,
+  limitePagoReserva,
 } from "../utils/reservaRetencion";
 import { evaluarCancelacionReservaJugador } from "../utils/cancelacionReservaJugador";
 
@@ -73,6 +74,52 @@ export class ReservaService {
       .filter((r) => reservaPendienteExpirada(r, ahora))
       .map((r) => r.id as string);
     await this.eliminarReservasPorIds(expiradas);
+  }
+
+  private static async liberarPendientesExpiradasUsuario(usuarioId: string) {
+    const ahora = new Date();
+    const { data: candidatas, error } = await supabaseAdmin
+      .from("reservas")
+      .select(
+        "id, estado_reserva, estado_pago, created_at, retiene_hasta, fecha_reserva, usuario_id, turno_id",
+      )
+      .eq("usuario_id", usuarioId)
+      .eq("estado_reserva", "pendiente")
+      .eq("estado_pago", "pendiente");
+
+    if (error || !candidatas?.length) return;
+
+    const expiradas = candidatas.filter((r) => reservaPendienteExpirada(r, ahora));
+    if (expiradas.length === 0) return;
+
+    await Promise.all(
+      expiradas.map((r) =>
+        ReservaService.enviarNotificacionReservaPagoVencido(
+          String(r.id),
+          String(r.usuario_id),
+        ),
+      ),
+    );
+    await this.eliminarReservasPorIds(expiradas.map((r) => String(r.id)));
+  }
+
+  static async enviarNotificacionReservaPagoVencido(
+    reservaId: string,
+    usuarioId: string,
+  ) {
+    try {
+      const { NotificacionService } = await import("./notificacion.service");
+      await NotificacionService.crearNotificacion({
+        usuario_id: usuarioId,
+        titulo: "Plazo de pago vencido",
+        mensaje:
+          "Tu reserva pendiente de pago expiró y el turno quedó liberado. Podés elegir otro horario desde Reservar.",
+        tipo: "warning",
+        metadata: { reserva_id: reservaId, motivo: "pago_vencido" },
+      });
+    } catch (e) {
+      console.warn("Error al notificar vencimiento de pago de reserva:", e);
+    }
   }
 
   /**
@@ -373,7 +420,24 @@ export class ReservaService {
       .single();
 
     if (error || !data) throw new Error("Reserva no encontrada.");
-    return data;
+
+    const ahora = new Date();
+    if (reservaPendienteExpirada(data, ahora)) {
+      const usuarioId = String(data.usuario_id || "");
+      await ReservaService.enviarNotificacionReservaPagoVencido(
+        reservaId,
+        usuarioId,
+      );
+      await this.eliminarReservasPorIds([reservaId]);
+      throw new Error("RESERVA_PAGO_VENCIDO");
+    }
+
+    const limite = limitePagoReserva(data);
+    return {
+      ...data,
+      retiene_hasta:
+        data.retiene_hasta || (limite ? limite.toISOString() : null),
+    };
   }
 
   /**
@@ -598,9 +662,11 @@ export class ReservaService {
     const { id, turnos } = reserva;
     if (!turnos) throw new Error("Turno asociado no encontrado.");
 
+    const ahoraMp = new Date();
+    const retieneHastaMp = retencionMercadoPagoDesde(ahoraMp);
     await supabaseAdmin
       .from("reservas")
-      .update({ retiene_hasta: retencionMercadoPagoDesde(new Date()) })
+      .update({ retiene_hasta: retieneHastaMp })
       .eq("id", reservaId);
 
     // @ts-ignore
@@ -654,6 +720,8 @@ export class ReservaService {
           : undefined,
         external_reference: id,
         notification_url: `${process.env.BACKEND_URL || "http://localhost:4000"}/api/reservas/webhook/mercadopago`,
+        expiration_date_from: ahoraMp.toISOString(),
+        expiration_date_to: retieneHastaMp,
       },
     });
 
@@ -929,6 +997,8 @@ export class ReservaService {
    * Obtiene todas las reservas de un usuario con detalles de turno, cancha y club.
    */
   static async obtenerReservasUsuario(usuarioId: string) {
+    await this.liberarPendientesExpiradasUsuario(usuarioId);
+
     const { data, error } = await supabaseAdmin
       .from("reservas")
       .select(`
@@ -984,8 +1054,12 @@ export class ReservaService {
         horas_antelacion_club: club?.horas_antelacion_cancelacion_jugador,
       });
 
+      const limite = limitePagoReserva(fila);
+
       return {
         ...fila,
+        retiene_hasta:
+          fila.retiene_hasta || (limite ? limite.toISOString() : null),
         puede_cancelar: evaluacion.permitido,
         cancelacion_bloqueo: evaluacion.motivo ?? null,
         horas_antelacion_cancelacion: evaluacion.horas_antelacion ?? null,

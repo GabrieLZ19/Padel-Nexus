@@ -61,3 +61,21 @@ export function reservaPendienteExpirada(
   if (estado !== "pendiente") return false;
   return !reservaOcupaTurno(reserva, ahora);
 }
+
+/** Instantáneo límite para completar el pago de una reserva pendiente (ISO o ms). */
+export function limitePagoReserva(
+  reserva: ReservaRetencionInput,
+): Date | null {
+  const estado = (reserva.estado_reserva || "").toLowerCase();
+  if (estado !== "pendiente") return null;
+  if (reserva.retiene_hasta) {
+    return new Date(reserva.retiene_hasta);
+  }
+  if (reserva.created_at) {
+    return sumarMinutos(
+      new Date(reserva.created_at),
+      RESERVA_PENDIENTE_RETENCION_MINUTOS,
+    );
+  }
+  return null;
+}

@@ -103,6 +103,14 @@ export const ReservasController = {
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Error desconocido";
+      if (message === "RESERVA_PAGO_VENCIDO") {
+        return res.status(410).json({
+          exito: false,
+          error: message,
+          mensaje:
+            "El plazo para pagar esta reserva venció y el turno quedó liberado.",
+        });
+      }
       return res.status(404).json({ exito: false, error: message });
     }
   },

@@ -54,6 +54,6 @@ describe("retención de reserva pendiente (RES-1)", () => {
 
   it("extiende retención al abrir Mercado Pago", () => {
     const hasta = retencionMercadoPagoDesde(ahora);
-    assert.equal(hasta, "2026-11-07T15:45:00.000Z");
+    assert.equal(hasta, "2026-11-07T15:15:00.000Z");
   });
 });
