@@ -20,6 +20,7 @@ import { Notificacion } from "@/utils/types";
 import { useSocket } from "@/hooks/useSocket";
 import { useProfileStore } from "@/store/useProfileStore";
 import { mostrarToastNotificacion } from "@/utils/notificacionesToast";
+import { formatMarcaTiempoNotificacion } from "@/utils/fechaArgentina";
 
 export default function NotificationCenter() {
   const router = useRouter();
@@ -275,14 +276,8 @@ export default function NotificationCenter() {
                           <span className="text-[13px] font-semibold text-brand-white leading-snug">
                             {notif.titulo}
                           </span>
-                          <span className="text-[10px] text-gray-600 shrink-0 mt-0.5">
-                            {new Date(notif.created_at).toLocaleTimeString(
-                              "es-AR",
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            )}
+                          <span className="text-[10px] text-gray-600 shrink-0 mt-0.5 whitespace-nowrap">
+                            {formatMarcaTiempoNotificacion(notif.created_at)}
                           </span>
                         </div>
                         <p className="text-[12px] text-gray-400 leading-relaxed whitespace-pre-line">

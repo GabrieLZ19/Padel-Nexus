@@ -88,3 +88,42 @@ export function formatearFechaHoraArgentina(iso?: string | null): string {
   }).format(d);
   return `${partes} hs`;
 }
+
+function restarDiasCalendario(fechaIso: string, dias: number): string {
+  const [y, m, d] = fechaIso.split("-").map(Number);
+  const calendario = new Date(Date.UTC(y, m - 1, d));
+  calendario.setUTCDate(calendario.getUTCDate() + dias);
+  const anio = calendario.getUTCFullYear();
+  const mes = String(calendario.getUTCMonth() + 1).padStart(2, "0");
+  const dia = String(calendario.getUTCDate()).padStart(2, "0");
+  return `${anio}-${mes}-${dia}`;
+}
+
+function hora24Argentina(instante: Date): string {
+  const { horas, minutos } = partesEnArgentina(instante);
+  return `${String(horas).padStart(2, "0")}:${String(minutos).padStart(2, "0")}`;
+}
+
+/**
+ * Marca de tiempo para el panel de notificaciones (PUB-17):
+ * Hoy HH:mm, Ayer, o dd/mm HH:mm en zona Argentina.
+ */
+export function formatMarcaTiempoNotificacion(
+  iso?: string | null,
+  ahora: Date = new Date(),
+): string {
+  if (!iso) return "";
+  const instante = new Date(iso);
+  if (Number.isNaN(instante.getTime())) return "";
+
+  const fecha = partesEnArgentina(instante).fecha;
+  const hora = hora24Argentina(instante);
+  const hoy = fechaHoyArgentina(ahora);
+  const ayer = restarDiasCalendario(hoy, -1);
+
+  if (fecha === hoy) return `Hoy ${hora}`;
+  if (fecha === ayer) return "Ayer";
+
+  const [, mes, dia] = fecha.split("-");
+  return `${dia}/${mes} ${hora}`;
+}

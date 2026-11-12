@@ -225,31 +225,12 @@ export default function SignUpPage() {
       return;
     }
 
-    // Capitalización automática respetando acrónimos intencionales (ej: "QA Prueba")
-    const capitalizarPalabra = (word: string) => {
-      if (!word) return "";
-      if (word === word.toUpperCase() && word.length <= 4 && !/^\d+$/.test(word)) {
-        return word;
-      }
-      if (word === word.toUpperCase()) {
-        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-      }
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    };
-
-    const capitalizeWords = (str: string) =>
-      str
-        .trim()
-        .split(/\s+/)
-        .map(capitalizarPalabra)
-        .join(" ");
-
     try {
       const data = await PerfilService.registrarUsuario({
         email,
         password,
-        nombre: capitalizeWords(nombre),
-        apellido: capitalizeWords(apellido),
+        nombre: nombre.trim(),
+        apellido: apellido.trim(),
         telefono: telefono.trim(),
         dni: dni.trim().replace(/\./g, ""),
         lugar_residencia: residencia,
