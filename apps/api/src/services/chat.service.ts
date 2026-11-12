@@ -345,6 +345,32 @@ export class ChatService {
   }
 
   /**
+   * Devuelve una conversación enriquecida para el inbox (deep links ?c=).
+   */
+  static async obtenerConversacionResumen(
+    usuarioId: string,
+    conversacionId: string,
+  ) {
+    const { data: esParticipante } = await supabaseAdmin
+      .from("chat_participantes")
+      .select("conversacion_id")
+      .eq("conversacion_id", conversacionId)
+      .eq("perfil_id", usuarioId)
+      .maybeSingle();
+
+    if (!esParticipante) {
+      throw new Error("No tiene acceso a esta conversación.");
+    }
+
+    const conversaciones = await ChatService.obtenerConversaciones(usuarioId);
+    const found = conversaciones.find((c) => c.id === conversacionId);
+    if (!found) {
+      throw new Error("Conversación no encontrada.");
+    }
+    return found;
+  }
+
+  /**
    * Obtiene mensajes paginados de una conversación y marca como leídos los recibidos.
    */
   static async obtenerMensajes(

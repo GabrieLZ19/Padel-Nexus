@@ -25,6 +25,7 @@ import {
 import {
   ComunicacionesMetricasService,
   metricasVacias,
+  normalizarMetricasCampana,
   sumarEntrega,
   type ComunicacionesCanal,
 } from "./comunicaciones-metricas.service";
@@ -356,10 +357,10 @@ export class ComunicacionesService {
     }
 
     if (payload.filtros !== undefined) {
-      if (actual.tipo !== "dinamica") {
-        throw new Error("Solo las listas dinámicas admiten filtros.");
+      if (actual.tipo === "dinamica") {
+        patch.filtros = payload.filtros;
       }
-      patch.filtros = payload.filtros;
+      // Listas manuales: ignorar filtros del payload (p. ej. {} desde clientes legacy).
     }
 
     const { error } = await supabaseAdmin
@@ -793,7 +794,16 @@ export class ComunicacionesService {
     if (error) throw new Error(`Error al listar campañas: ${error.message}`);
 
     return {
-      data: data || [],
+      data: (data || []).map((row) => ({
+        ...row,
+        canales: normalizarCanales(
+          row.canales as string[] | null | undefined,
+        ),
+        metricas: normalizarMetricasCampana(
+          row.metricas,
+          row.total_enviados,
+        ),
+      })),
       total: count || 0,
       limit,
       offset,

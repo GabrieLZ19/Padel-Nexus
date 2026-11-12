@@ -48,7 +48,9 @@ export class PerfilService {
   static async obtenerPerfilCompleto(userId: string) {
     const { data, error } = await supabaseAdmin
       .from("perfiles")
-      .select("*, licencias:licencias!fk_licencias_usuario(*), afiliaciones:afiliaciones!fk_afiliaciones_usuario(*), clubes:clubes!perfiles_club_id_fkey(id, nombre)")
+      .select(
+        "*, licencias:licencias!fk_licencias_usuario(*), afiliaciones:afiliaciones!fk_afiliaciones_usuario(*, asociaciones:asociacion_id(id, nombre, sigla)), clubes:clubes!perfiles_club_id_fkey(id, nombre)",
+      )
       .eq("id", userId)
       .single();
 

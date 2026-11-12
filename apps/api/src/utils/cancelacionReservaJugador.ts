@@ -28,6 +28,30 @@ export type EvaluacionCancelacionJugador = {
   horas_antelacion?: number;
 };
 
+export function etiquetaPlazoCancelacionConfirmada(horas: number): string {
+  if (horas <= 0) {
+    return "Podés cancelar hasta el inicio del turno.";
+  }
+  if (horas === 1) {
+    return "El club exige cancelar con al menos 1 h de anticipación.";
+  }
+  return `El club exige cancelar con al menos ${horas} h de anticipación.`;
+}
+
+/** Texto para el aviso de reintegro al confirmar cancelación (jugador). */
+export function lineaReintegroCancelacionReserva(
+  estadoPago: string | null | undefined,
+): string {
+  const estado = String(estadoPago || "").toLowerCase();
+  if (estado === "completado") {
+    return "Si ya pagaste, el reintegro lo gestiona el club según su política. Puede demorar según el medio de pago.";
+  }
+  if (estado === "pendiente") {
+    return "No hay pago acreditado: al cancelar solo se libera el turno.";
+  }
+  return "Al cancelar se libera el turno. Consultá con el club si tenés dudas sobre pagos.";
+}
+
 export function evaluarCancelacionReservaJugador(input: {
   estado_reserva?: string | null;
   fecha_reserva: string;

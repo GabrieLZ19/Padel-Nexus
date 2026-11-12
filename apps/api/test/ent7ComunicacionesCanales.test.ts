@@ -4,7 +4,11 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { normalizarCanales } from "../src/services/comunicaciones-canales.service.ts";
-import { sumarEntrega, metricasVacias } from "../src/services/comunicaciones-metricas.service.ts";
+import {
+  normalizarMetricasCampana,
+  sumarEntrega,
+  metricasVacias,
+} from "../src/services/comunicaciones-metricas.service.ts";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -28,6 +32,23 @@ describe("ENT-7 canales y metricas de campaña (feature 20.0)", () => {
     m = sumarEntrega(m, "email", false);
     assert.equal(m.entregados.in_app, 1);
     assert.equal(m.omitidos?.email, 1);
+  });
+
+  it("normaliza metricas en listado de campañas legacy", () => {
+    const vacio = normalizarMetricasCampana(null, 8);
+    assert.equal(vacio.entregados.in_app, 8);
+
+    const envio = fuente("apps/api/src/services/comunicaciones.service.ts");
+    assert.match(envio, /normalizarMetricasCampana/);
+  });
+
+  it("historial muestra entregas y omitidos por canal", () => {
+    const util = fuente("apps/web/utils/comunicacionesMetricasCampana.ts");
+    const panel = fuente("apps/web/components/comunicaciones/ComunicacionesPanel.tsx");
+    assert.match(util, /omitido/);
+    assert.match(util, /resumenMetricasCampana/);
+    assert.match(panel, /resumenMetricasCampana/);
+    assert.equal(panel.includes("RESEND_API_KEY"), false);
   });
 
   it("envio expone canales, forzarInApp y endpoints de retencion", () => {

@@ -19,6 +19,28 @@ export class ChatController {
   }
 
   /**
+   * GET /api/mensajes/conversaciones/:id/resumen
+   * Metadatos de una conversación para abrir el inbox vía deep link (?c=).
+   */
+  static async obtenerConversacionResumen(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const usuarioId = req.user!.id;
+      const data = await ChatService.obtenerConversacionResumen(usuarioId, id);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error desconocido";
+      const status = message.includes("No tiene acceso")
+        ? 403
+        : message.includes("no encontrada")
+          ? 404
+          : 500;
+      return res.status(status).json({ exito: false, error: message });
+    }
+  }
+
+  /**
    * GET /api/mensajes/conversaciones/:id
    * Obtiene el historial de mensajes de una conversación específica (paginado).
    */

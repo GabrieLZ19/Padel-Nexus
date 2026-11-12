@@ -6,8 +6,10 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_HORAS_ANTELACION_CANCELACION_JUGADOR,
   evaluarCancelacionReservaJugador,
+  lineaReintegroCancelacionReserva,
   minutosHastaInicioTurno,
 } from "../src/utils/cancelacionReservaJugador.ts";
+import { mensajeNotificacionReservaCanceladaPorJugador } from "../src/utils/reservaCancelacion.ts";
 
 const RAIZ_API = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const RAIZ_WEB = path.resolve(RAIZ_API, "../web");
@@ -75,9 +77,40 @@ describe("RES-3 cancelación por el jugador", () => {
   it("contrato web: servicio y UI de mis reservas", () => {
     const servicio = fuenteWeb("utils/services/reservas.ts");
     const pagina = fuenteWeb("app/(public)/mi-perfil/reservas/page.tsx");
+    const politica = fuenteWeb("utils/politicaCancelacionReserva.ts");
     assert.match(servicio, /async cancelar\(reservaId: string\)/);
     assert.match(pagina, /ReservasService\.cancelar/);
     assert.match(pagina, /puede_cancelar/);
     assert.match(pagina, /FeedbackModal/);
+    assert.match(pagina, /descripcionModalCancelarReserva/);
+    assert.match(politica, /lineaReintegroCancelacionReserva/);
+  });
+
+  it("aviso de reintegro distingue pago acreditado", () => {
+    assert.match(lineaReintegroCancelacionReserva("completado"), /reintegro/i);
+    assert.match(lineaReintegroCancelacionReserva("pendiente"), /libera el turno/i);
+  });
+
+  it("notificación al club cuando el jugador cancela", () => {
+    const { titulo, mensaje } = mensajeNotificacionReservaCanceladaPorJugador({
+      jugadorNombre: "Juan Pérez",
+      canchaNombre: "Cancha 1",
+      fechaReserva: "2026-06-01",
+      horaInicio: "18:00",
+      estadoPago: "completado",
+    });
+    assert.match(titulo, /jugador/i);
+    assert.match(mensaje, /Juan Pérez/);
+    assert.match(mensaje, /pago acreditado/i);
+  });
+
+  it("backend notifica admin_club del club al cancelar jugador", () => {
+    const src = readFileSync(
+      path.join(RAIZ_API, "src/services/reserva.service.ts"),
+      "utf8",
+    );
+    assert.match(src, /notificarClubCancelacionPorJugador/);
+    assert.match(src, /notificarAdminsClub/);
+    assert.match(src, /mensajeNotificacionReservaCanceladaPorJugador/);
   });
 });

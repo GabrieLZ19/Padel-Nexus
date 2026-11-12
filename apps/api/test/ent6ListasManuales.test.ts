@@ -40,4 +40,20 @@ describe("ENT-6 listas manuales — agregar miembros", () => {
     );
     assert.match(src, /static async filtrarMiembrosPorAlcance/);
   });
+
+  it("actualizar lista manual ignora filtros dinámicos en el payload", () => {
+    const servicio = fuente("apps/api/src/services/comunicaciones.service.ts");
+    assert.match(
+      servicio,
+      /actual\.tipo === "dinamica"[\s\S]*patch\.filtros = payload\.filtros/,
+    );
+    assert.equal(
+      servicio.includes('throw new Error("Solo las listas dinámicas admiten filtros.")'),
+      false,
+    );
+
+    const panel = fuente("apps/web/components/comunicaciones/ComunicacionesPanel.tsx");
+    assert.match(panel, /listaTipo === "dinamica"/);
+    assert.equal(panel.includes("filtros: listaTipo ==="), false);
+  });
 });

@@ -9,6 +9,10 @@ router.use(authenticate);
 
 // Conversaciones
 router.get("/conversaciones", ChatController.listarConversaciones);
+router.get(
+  "/conversaciones/:id/resumen",
+  ChatController.obtenerConversacionResumen,
+);
 router.get("/conversaciones/:id", ChatController.obtenerMensajes);
 router.post("/conversaciones", ChatController.iniciarConversacion);
 

@@ -21,6 +21,7 @@ import {
   limitePagoReserva,
 } from "../utils/reservaRetencion";
 import { evaluarCancelacionReservaJugador } from "../utils/cancelacionReservaJugador";
+import { mensajeNotificacionReservaCanceladaPorJugador } from "../utils/reservaCancelacion";
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 
@@ -384,7 +385,7 @@ export class ReservaService {
         id, hora_inicio, hora_fin, precio, dia_semana,
         canchas (
           id, nombre, tipo_suelo, techada,
-          clubes ( id, nombre, provincia, localidad, cbu, alias, suscripcion_sin_comisiones, pago_transferencia_habilitado, pago_efectivo_habilitado )
+          clubes ( id, nombre, provincia, localidad, direccion, latitud, longitud, cbu, alias, suscripcion_sin_comisiones, pago_transferencia_habilitado, pago_efectivo_habilitado )
         )
       `,
       )
@@ -540,7 +541,16 @@ export class ReservaService {
       .from("reservas")
       .select(
         `id, usuario_id, estado_reserva, estado_pago, fecha_reserva,
-        turnos ( hora_inicio, canchas ( clubes ( horas_antelacion_cancelacion_jugador ) ) )`,
+        perfiles!reservas_usuario_id_fkey ( nombre, apellido ),
+        turnos (
+          hora_inicio,
+          canchas (
+            id,
+            nombre,
+            club_id,
+            clubes ( id, nombre, horas_antelacion_cancelacion_jugador )
+          )
+        )`,
       )
       .eq("id", reservaId)
       .single();
@@ -598,6 +608,65 @@ export class ReservaService {
       .eq("id", reservaId);
 
     if (error) throw new Error("Error al cancelar la reserva.");
+
+    void ReservaService.notificarClubCancelacionPorJugador({
+      reservaId,
+      fechaReserva: String(reserva.fecha_reserva || ""),
+      estadoPago: estadoPago,
+      horaInicio: turno?.hora_inicio || "00:00",
+      canchaNombre: cancha?.nombre || "Cancha",
+      clubId: cancha?.club_id || club?.id,
+      jugador: Array.isArray(reserva.perfiles)
+        ? reserva.perfiles[0]
+        : reserva.perfiles,
+    });
+  }
+
+  private static async notificarClubCancelacionPorJugador(params: {
+    reservaId: string;
+    clubId?: string | null;
+    fechaReserva: string;
+    horaInicio: string;
+    canchaNombre: string;
+    estadoPago: string;
+    jugador?: { nombre?: string | null; apellido?: string | null } | null;
+  }) {
+    try {
+      const clubId = String(params.clubId || "").trim();
+      if (!clubId) return;
+
+      const { NotificacionService } = await import("./notificacion.service");
+      const perfil = params.jugador;
+      const jugadorNombre = [perfil?.nombre, perfil?.apellido]
+        .map((p) => String(p || "").trim())
+        .filter(Boolean)
+        .join(" ")
+        .trim() || "Un jugador";
+      const horaInicio = params.horaInicio.slice(0, 5);
+      const { titulo, mensaje } = mensajeNotificacionReservaCanceladaPorJugador({
+        jugadorNombre,
+        canchaNombre: params.canchaNombre,
+        fechaReserva: params.fechaReserva,
+        horaInicio,
+        estadoPago: params.estadoPago,
+      });
+
+      await NotificacionService.notificarAdminsClub(clubId, {
+        titulo,
+        mensaje,
+        tipo: "warning",
+        metadata: {
+          reserva_id: params.reservaId,
+          club_id: clubId,
+          origen: "jugador",
+        },
+      });
+    } catch (err) {
+      console.warn(
+        "Error al notificar cancelación de reserva por jugador al club:",
+        err,
+      );
+    }
   }
 
   /**

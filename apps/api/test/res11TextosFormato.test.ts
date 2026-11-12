@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { etiquetaRepresentacionProvincial } from "../src/utils/etiquetaRepresentacionProvincial.ts";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -31,6 +32,28 @@ describe("RES-11 textos y formatos (lote)", () => {
       "utf8",
     );
     assert.match(api, /direccion, latitud, longitud/);
+    assert.match(api, /obtenerTurnoConDetalles[\s\S]*direccion/);
+  });
+
+  it("mi panel: representación provincial muestra asociación", () => {
+    const page = readFileSync(
+      path.join(RAIZ, "web/app/(public)/mi-perfil/page.tsx"),
+      "utf8",
+    );
+    assert.match(page, /etiquetaRepresentacionProvincial/);
+    assert.equal(page.includes("{af.entidad}"), false);
+
+    const perfil = readFileSync(
+      path.join(RAIZ, "api/src/services/perfil.service.ts"),
+      "utf8",
+    );
+    assert.match(perfil, /asociaciones:asociacion_id/);
+
+    const etiqueta = etiquetaRepresentacionProvincial({
+      entidad: "Club QA Prueba",
+      asociaciones: { nombre: "Asociación Neuquén", sigla: "ANP" },
+    });
+    assert.equal(etiqueta, "ANP");
   });
 
   it("voseo y notificaciones corregidos", () => {

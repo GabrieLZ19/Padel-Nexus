@@ -18,6 +18,30 @@ export function metricasVacias(): ComunicacionesMetricasCampana {
   };
 }
 
+/** Asegura métricas legibles en listados (campañas legacy sin JSON). */
+export function normalizarMetricasCampana(
+  raw: unknown,
+  totalEnviadosInApp?: number | null,
+): ComunicacionesMetricasCampana {
+  const base = metricasVacias();
+  if (!raw || typeof raw !== "object") {
+    if (totalEnviadosInApp != null && totalEnviadosInApp > 0) {
+      return {
+        ...base,
+        entregados: { in_app: totalEnviadosInApp },
+      };
+    }
+    return base;
+  }
+  const m = raw as ComunicacionesMetricasCampana;
+  return {
+    abiertos: Number(m.abiertos) || 0,
+    clics: Number(m.clics) || 0,
+    entregados: { ...base.entregados, ...(m.entregados || {}) },
+    omitidos: { ...base.omitidos, ...(m.omitidos || {}) },
+  };
+}
+
 export function sumarEntrega(
   metricas: ComunicacionesMetricasCampana,
   canal: ComunicacionesCanal,

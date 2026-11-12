@@ -45,4 +45,18 @@ describe("RES-7 DM jugador ↔ club", () => {
     const inbox = fuente("apps/web/components/chat/ChatInbox.tsx");
     assert.match(inbox, /club_contacto/);
   });
+
+  it("deep link ?c= reabre el hilo (resumen API + fallback club)", () => {
+    const inbox = fuente("apps/web/components/chat/ChatInbox.tsx");
+    const service = fuente("apps/web/utils/services/chat.ts");
+    const routes = fuente("apps/api/src/routes/chat.routes.ts");
+    const hook = fuente("apps/web/hooks/useIniciarChatClub.ts");
+
+    assert.match(inbox, /getConversacionResumen/);
+    assert.match(inbox, /deepLinkClubId/);
+    assert.match(inbox, /resolviendoDeepLink/);
+    assert.match(service, /getConversacionResumen/);
+    assert.match(routes, /conversaciones\/:id\/resumen/);
+    assert.match(hook, /club:/);
+  });
 });

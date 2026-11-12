@@ -114,6 +114,45 @@ export class NotificacionService {
     await Promise.allSettled(promesas);
   }
 
+  /** Notifica solo a perfiles con rol admin_club vinculados al club. */
+  static async notificarAdminsClub(
+    clubId: string,
+    params: {
+      titulo: string;
+      mensaje: string;
+      tipo?: "info" | "success" | "warning" | "error";
+      metadata?: Record<string, unknown>;
+    },
+  ) {
+    const idClub = String(clubId || "").trim();
+    if (!idClub) return;
+
+    const { data: admins, error } = await supabaseAdmin
+      .from("perfiles")
+      .select("id")
+      .eq("rol", "admin_club")
+      .eq("club_id", idClub);
+
+    if (error || !admins?.length) {
+      if (error) {
+        console.error("Error al obtener admins del club para notificar:", error);
+      }
+      return;
+    }
+
+    const promesas = admins.map((admin) =>
+      this.crearNotificacion({
+        usuario_id: admin.id,
+        titulo: params.titulo,
+        mensaje: params.mensaje,
+        tipo: params.tipo,
+        metadata: params.metadata,
+      }),
+    );
+
+    await Promise.allSettled(promesas);
+  }
+
   static async obtenerNotificaciones(usuarioId: string) {
     const { data, error } = await supabaseAdmin
       .from("notificaciones")
