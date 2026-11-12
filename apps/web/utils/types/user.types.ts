@@ -23,6 +23,7 @@ export interface Licencia {
   id: string;
   created_at?: string;
   usuario_id: string;
+  club_id?: string | null;
   nro_licencia: string;
   estado: "Pendiente" | "Activa" | "Vencida" | "Suspendida";
   fecha_emision?: string | null;
@@ -30,7 +31,7 @@ export interface Licencia {
   datos_solicitud?: {
     documento: string;
     provincia: string;
-    club_id: string;
+    club_id?: string;
     nombre_carne?: string;
     frecuencia_pago?: "anual" | "mensual";
     precio_anual?: number;

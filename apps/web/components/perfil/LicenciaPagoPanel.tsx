@@ -118,6 +118,8 @@ export default function LicenciaPagoPanel({
   };
 
   const montoLabel = monto != null ? formatMontoLicenciaArs(monto) : "—";
+  const licenciaAprobada =
+    (licencia.estado || "").toLowerCase() === "activa";
 
   return (
     <div className="w-full max-w-sm space-y-3 text-left">
@@ -129,7 +131,9 @@ export default function LicenciaPagoPanel({
           {montoLabel}
         </p>
         <p className="text-[11px] text-gray-400 mt-1 leading-snug">
-          Completá el pago para que la federación pueda revisar tu solicitud.
+          {licenciaAprobada
+            ? "Tu licencia ya está aprobada; completá este pago para regularizar el alta."
+            : "Completá el pago para que la federación pueda revisar tu solicitud."}
         </p>
       </div>
 

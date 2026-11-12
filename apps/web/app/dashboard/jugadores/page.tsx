@@ -29,6 +29,12 @@ import {
   licenciaPreferidaListado,
   licenciasComoArray,
 } from "@/utils/licenciasArray";
+import {
+  etiquetaEstadoPagoLicencia,
+  formatMontoLicenciaArs,
+  licenciaMontoPendiente,
+  licenciaTienePagoPendiente,
+} from "@/utils/licenciaPago";
 
 type VistaJugadores = "jugadores" | "contactos" | "configuracion";
 type FiltroLicencia =
@@ -59,6 +65,17 @@ function nombreJugadorListado(jugador: Perfil): string {
   return jugador.nombre
     ? `${jugador.apellido || ""}, ${jugador.nombre}`.replace(/^, /, "")
     : "este jugador";
+}
+
+function etiquetaClubRepresentante(
+  licencia: Licencia,
+  clubes: Record<string, string>,
+): string {
+  const clubId =
+    licencia.club_id ||
+    (licencia.datos_solicitud as { club_id?: string } | undefined)?.club_id;
+  if (!clubId) return "Sin club de referencia";
+  return clubes[clubId] || "Club no encontrado";
 }
 
 export default function JugadoresLicenciasPage() {
@@ -674,13 +691,48 @@ export default function JugadoresLicenciasPage() {
 
               <div className="pt-3 border-t border-brand-white/5">
                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">
-                  Club Representante Solicitado
+                  Club de referencia (opcional)
                 </p>
                 <p className="text-sm font-bold text-brand-chartreuse">
-                  {clubes[licenciaAVerificar.datos_solicitud?.club_id || ""] ||
-                    "Cargando club..."}
+                  {etiquetaClubRepresentante(licenciaAVerificar, clubes)}
                 </p>
               </div>
+
+              <div className="pt-3 border-t border-brand-white/5 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">
+                    Estado del pago
+                  </p>
+                  <p
+                    className={`text-sm font-bold ${
+                      licenciaTienePagoPendiente(licenciaAVerificar)
+                        ? "text-amber-400"
+                        : "text-brand-white"
+                    }`}
+                  >
+                    {etiquetaEstadoPagoLicencia(licenciaAVerificar)}
+                  </p>
+                </div>
+                {licenciaMontoPendiente(licenciaAVerificar) > 0 ? (
+                  <div>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">
+                      Monto
+                    </p>
+                    <p className="text-sm font-bold text-brand-white tabular-nums">
+                      {formatMontoLicenciaArs(
+                        licenciaMontoPendiente(licenciaAVerificar),
+                      )}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+
+              {licenciaTienePagoPendiente(licenciaAVerificar) ? (
+                <p className="text-[11px] text-amber-300/90 leading-snug bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+                  El jugador aún no completó el pago. Podés aprobar la ficha; deberá
+                  abonar desde Mi panel.
+                </p>
+              ) : null}
 
               <div className="pt-3 border-t border-brand-white/5">
                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1.5">

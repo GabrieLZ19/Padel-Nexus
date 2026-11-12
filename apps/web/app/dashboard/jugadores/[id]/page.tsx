@@ -24,6 +24,7 @@ import CredencialDigital from "@/components/perfil/CredencialDigital";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { useProfileStore } from "@/store/useProfileStore";
 import { CrmContactosService } from "@/utils/services/crm-contactos";
+import { licenciasComoArray } from "@/utils/licenciasArray";
 import { ContactoEtiquetasEditor } from "@/components/crm/ContactoEtiquetasEditor";
 import type { ComunicacionesEtiqueta } from "@/utils/types/comunicaciones.types";
 import { sileo } from "sileo";
@@ -46,7 +47,7 @@ export default function PerfilJugadorAdminPage() {
   );
   const [guardandoEtiquetas, setGuardandoEtiquetas] = useState(false);
 
-  const licenciasList = perfil?.licencias || [];
+  const licenciasList = licenciasComoArray(perfil?.licencias);
   const currentLicencia =
     licenciasList[activeLicenciaIndex] || licenciasList[0];
 
@@ -92,16 +93,16 @@ export default function PerfilJugadorAdminPage() {
   );
 
   useEffect(() => {
-    if (perfil?.licencias) {
+    if (licenciasList.length > 0) {
       const current =
-        perfil.licencias[activeLicenciaIndex] || perfil.licencias[0];
+        licenciasList[activeLicenciaIndex] || licenciasList[0];
       if (current?.fecha_vencimiento) {
         setFechaVencimientoInput(current.fecha_vencimiento.split("T")[0]);
       } else {
         setFechaVencimientoInput("");
       }
     }
-  }, [activeLicenciaIndex, perfil]);
+  }, [activeLicenciaIndex, licenciasList]);
 
   useEffect(() => {
     let isMounted = true;
@@ -187,7 +188,7 @@ export default function PerfilJugadorAdminPage() {
     );
   }
 
-  const licencia = perfil.licencias?.[0];
+  const licencia = licenciasList[0];
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 md:p-10 space-y-8">

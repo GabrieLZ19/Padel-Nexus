@@ -24,7 +24,12 @@ import CredencialDigital from "@/components/perfil/CredencialDigital";
 import LicenciaModal from "@/components/perfil/LicenciaModal";
 import LicenciaPagoPanel from "@/components/perfil/LicenciaPagoPanel";
 import { LicenciasService } from "@/utils/services/licencias";
-import { licenciaPagoEnRevision, licenciaRequierePago } from "@/utils/licenciaPago";
+import {
+  licenciaPagoEnRevision,
+  licenciaRequierePago,
+  licenciaTienePagoPendiente,
+} from "@/utils/licenciaPago";
+import { licenciaPreferidaListado } from "@/utils/licenciasArray";
 import { sileo } from "sileo";
 import AfiliacionModal from "@/components/perfil/AfiliacionModal";
 import PaseProvinciaPendiente from "@/components/perfil/PaseProvinciaPendiente";
@@ -35,6 +40,7 @@ import {
 import { MinorModeBanner } from "@/components/legal/MinorModeBanner";
 import { fechaLatina } from "@/utils/fechaArgentina";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
+import { licenciasComoArray } from "@/utils/licenciasArray";
 
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-white/5 rounded-3xl ${className}`} />
@@ -75,9 +81,23 @@ export default function PlayerDashboard() {
     [misPases],
   );
 
+  const licenciasJugador = useMemo(
+    () => licenciasComoArray(profile?.licencias),
+    [profile?.licencias],
+  );
+
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  useEffect(() => {
+    const list = licenciasComoArray(profile?.licencias);
+    if (list.length === 0) return;
+    const preferida = licenciaPreferidaListado(list);
+    if (!preferida) return;
+    const idx = list.findIndex((l) => l.id === preferida.id);
+    if (idx >= 0) setActiveLicenciaIndex(idx);
+  }, [profile?.licencias]);
 
   useEffect(() => {
     if (profile?.id) void cargarMisPases();
@@ -217,9 +237,9 @@ export default function PlayerDashboard() {
               </div>
 
               <div className="w-full flex flex-col items-center relative z-10">
-                {profile.licencias && profile.licencias.length > 0 ? (
+                {licenciasJugador.length > 0 ? (
                   (() => {
-                    const licList = profile.licencias;
+                    const licList = licenciasJugador;
                     const index =
                       activeLicenciaIndex < licList.length
                         ? activeLicenciaIndex
@@ -279,6 +299,17 @@ export default function PlayerDashboard() {
                               <p className="text-xs text-gray-400 mt-1">
                                 Vence el {fechaLatina(currentLic.fecha_vencimiento)}
                               </p>
+                            ) : null}
+                            {licenciaTienePagoPendiente(currentLic) ? (
+                              <div className="w-full mt-5 space-y-3">
+                                <p className="text-xs text-center text-amber-400/90 font-semibold px-2">
+                                  Tenés un pago pendiente para regularizar tu alta.
+                                </p>
+                                <LicenciaPagoPanel
+                                  licencia={currentLic}
+                                  onPagoActualizado={() => void fetchProfile()}
+                                />
+                              </div>
                             ) : null}
                           </div>
                         ) : currentLic.estado === "Pendiente" ? (

@@ -47,11 +47,21 @@ export function licenciaMontoPendiente(
   return Number(datos?.precio_anual ?? 0);
 }
 
-export function licenciaRequierePago(licencia: Licencia | null | undefined): boolean {
+const ESTADOS_CON_PAGO_PENDIENTE = new Set(["pendiente", "activa"]);
+
+/** Pago federativo pendiente (antes o después de la aprobación administrativa). */
+export function licenciaTienePagoPendiente(
+  licencia: Licencia | null | undefined,
+): boolean {
   if (!licencia) return false;
-  if ((licencia.estado || "").toLowerCase() !== "pendiente") return false;
+  const estado = (licencia.estado || "").toLowerCase();
+  if (!ESTADOS_CON_PAGO_PENDIENTE.has(estado)) return false;
   if (licenciaEstadoPago(licencia) !== "pendiente") return false;
   return licenciaMontoPendiente(licencia) > 0;
+}
+
+export function licenciaRequierePago(licencia: Licencia | null | undefined): boolean {
+  return licenciaTienePagoPendiente(licencia);
 }
 
 export function licenciaPagoEnRevision(
@@ -60,6 +70,18 @@ export function licenciaPagoEnRevision(
   if (!licencia) return false;
   if ((licencia.estado || "").toLowerCase() !== "pendiente") return false;
   return licenciaEstadoPago(licencia) === "pagado";
+}
+
+export function etiquetaEstadoPagoLicencia(
+  licencia: Licencia | null | undefined,
+): string {
+  const estado = licenciaEstadoPago(licencia);
+  if (estado === "pagado") return "Pago acreditado";
+  if (estado === "pendiente" && licenciaMontoPendiente(licencia) > 0) {
+    return "Pago pendiente";
+  }
+  if (estado === "no_aplica") return "Sin costo";
+  return "Sin registro de pago";
 }
 
 export function formatMontoLicenciaArs(monto: number): string {

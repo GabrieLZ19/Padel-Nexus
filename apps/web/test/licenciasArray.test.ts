@@ -43,6 +43,20 @@ describe("licenciasArray — objeto vs array del API", () => {
     assert.equal(licenciaPreferidaListado(lista[1])?.id, "b");
   });
 
+  it("mi-perfil y ficha jugador normalizan licencias del API", () => {
+    const miPerfil = readFileSync(
+      path.join(RAIZ, "app/(public)/mi-perfil/page.tsx"),
+      "utf8",
+    );
+    assert.match(miPerfil, /licenciasComoArray/);
+
+    const ficha = readFileSync(
+      path.join(RAIZ, "app/dashboard/jugadores/[id]/page.tsx"),
+      "utf8",
+    );
+    assert.match(ficha, /licenciasComoArray/);
+  });
+
   it("el listado de jugadores no usa .find sobre licencias sin normalizar", () => {
     const pagina = readFileSync(
       path.join(RAIZ, "app/dashboard/jugadores/page.tsx"),
