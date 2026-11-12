@@ -654,4 +654,9 @@ export interface ProgramacionBoard {
     pendientes: number;
     advertencias: number;
   };
+  asignacion_lote?: {
+    solicitados: number;
+    asignados: number;
+    sin_slot_ids: string[];
+  };
 }

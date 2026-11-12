@@ -26,10 +26,15 @@ export interface ProgramadorConfig {
   franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
 }
 
-function boardQuery(config: ProgramadorConfig) {
+function boardQuery(
+  config: ProgramadorConfig,
+  opts?: { incluirDescansoPreview?: boolean },
+) {
   return {
     duracion: config.duracion,
-    descansoModo: config.descansoModo,
+    ...(opts?.incluirDescansoPreview
+      ? { descansoModo: config.descansoModo }
+      : {}),
     ...(config.jornadas ? { jornadas: config.jornadas } : {}),
     // No forzar 08:00: si está vacío, el backend usa la franja/disponibilidad de cada día.
     ...(config.horaInicio ? { horaInicio: config.horaInicio } : {}),
@@ -73,6 +78,7 @@ export function useProgramadorBoard(torneoId: string) {
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const configTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncGenRef = useRef(0);
+  const configHidratadaRef = useRef(false);
 
   useEffect(() => {
     configRef.current = config;
@@ -82,6 +88,7 @@ export function useProgramadorBoard(torneoId: string) {
   }, [board]);
 
   const applyBoard = useCallback((data: ProgramacionBoard) => {
+    configHidratadaRef.current = true;
     setBoard(data);
     setConfig((c) => {
       const descansoBoard = data.descanso_modo;
@@ -121,7 +128,9 @@ export function useProgramadorBoard(torneoId: string) {
       try {
         const data = await TorneosService.getProgramacionBoard(
           torneoId,
-          boardQuery(configRef.current),
+          boardQuery(configRef.current, {
+            incluirDescansoPreview: configHidratadaRef.current,
+          }),
         );
         applyBoard(data);
       } catch (e: unknown) {
@@ -135,6 +144,7 @@ export function useProgramadorBoard(torneoId: string) {
   );
 
   useEffect(() => {
+    configHidratadaRef.current = false;
     void load();
     return () => {
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
@@ -151,7 +161,9 @@ export function useProgramadorBoard(torneoId: string) {
       try {
         const data = await TorneosService.getProgramacionBoard(
           torneoId,
-          boardQuery(configRef.current),
+          boardQuery(configRef.current, {
+            incluirDescansoPreview: configHidratadaRef.current,
+          }),
         );
         if (gen !== syncGenRef.current) return;
         applyBoard(data);
@@ -198,7 +210,7 @@ export function useProgramadorBoard(torneoId: string) {
           }
           const data = await TorneosService.getProgramacionBoard(
             torneoId,
-            boardQuery(merged),
+            boardQuery(merged, { incluirDescansoPreview: true }),
           );
           applyBoard(data);
         } catch {
@@ -336,10 +348,26 @@ export function useProgramadorBoard(torneoId: string) {
           motivo,
         });
         applyBoard(data);
-        sileo.success({
-          title: "Partidos asignados",
-          description: `Se asignaron los partidos seleccionados a la grilla.`,
-        });
+        const lote = data.asignacion_lote;
+        if (lote && lote.sin_slot_ids.length > 0) {
+          sileo.warning({
+            title: "Asignación parcial",
+            description: `Se asignaron ${lote.asignados} de ${lote.solicitados}. Sin espacio para ${lote.sin_slot_ids.length}.`,
+          });
+        } else {
+          const asignados = lote?.asignados ?? partidoIds.length;
+          if (asignados === 0) {
+            sileo.warning({
+              title: "Sin cambios",
+              description: "Ningún partido pudo ubicarse en la grilla.",
+            });
+          } else {
+            sileo.success({
+              title: "Partidos asignados",
+              description: `Se ubicaron ${asignados} partido${asignados === 1 ? "" : "s"} en la grilla.`,
+            });
+          }
+        }
       } catch (e: unknown) {
         if (prev) setBoard(prev);
         sileo.error({
@@ -454,7 +482,15 @@ export function useProgramadorBoard(torneoId: string) {
           : {}),
       });
       applyBoard(data);
-      sileo.success({ title: "Auto-asignación aplicada" });
+      const pendientes = data.summary?.pendientes ?? 0;
+      if (pendientes > 0) {
+        sileo.warning({
+          title: "Auto-asignación incompleta",
+          description: `Quedan ${pendientes} partido${pendientes === 1 ? "" : "s"} sin horario. Revisá canchas, descanso o el día activo.`,
+        });
+      } else {
+        sileo.success({ title: "Auto-asignación aplicada" });
+      }
     } catch (e: unknown) {
       sileo.error({ title: apiErrorMessage(e, "Error en auto-asignación") });
     } finally {
