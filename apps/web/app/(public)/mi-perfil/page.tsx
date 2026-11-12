@@ -51,8 +51,11 @@ const Skeleton = ({ className }: { className?: string }) => (
 );
 
 const LICENSE_RELATED_TITLES = [
+  "Licencia aprobada",
   "Licencia Aprobada",
+  "Licencia suspendida",
   "Licencia Suspendida",
+  "Solicitud de alta rechazada",
   "Solicitud de Alta Rechazada",
   "Afiliación aprobada",
   "Afiliación rechazada",
