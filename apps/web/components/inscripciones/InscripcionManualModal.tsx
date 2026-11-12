@@ -11,6 +11,7 @@ import { useProfileStore } from "../../store/useProfileStore";
 import { esTorneoContextoFederacion } from "../../utils/constants/fapApaRules";
 import { esModalidadParejas } from "../../utils/formatFecha";
 import type { RolUsuario } from "../../utils/types/user.types";
+import { identificadorPareceDni } from "../../utils/identificadorJugadorManual";
 
 interface InscripcionManualModalProps {
   isOpen: boolean;
@@ -38,6 +39,16 @@ export default function InscripcionManualModal({
 
   const [j1, setJ1] = useState("");
   const [j2, setJ2] = useState("");
+  const [j1Nombre, setJ1Nombre] = useState("");
+  const [j1Apellido, setJ1Apellido] = useState("");
+  const [j1Categoria, setJ1Categoria] = useState("");
+  const [j1Nacimiento, setJ1Nacimiento] = useState("");
+  const [j1Telefono, setJ1Telefono] = useState("");
+  const [j2Nombre, setJ2Nombre] = useState("");
+  const [j2Apellido, setJ2Apellido] = useState("");
+  const [j2Categoria, setJ2Categoria] = useState("");
+  const [j2Nacimiento, setJ2Nacimiento] = useState("");
+  const [j2Telefono, setJ2Telefono] = useState("");
   const [letraPrioridad, setLetraPrioridad] = useState("");
   const [monto, setMonto] = useState<number>(
     Number(torneo.precio_inscripcion || 0),
@@ -60,6 +71,29 @@ export default function InscripcionManualModal({
     typeof torneo.es_gratis === "boolean"
       ? torneo.es_gratis
       : Number(torneo.precio_inscripcion || 0) === 0;
+
+  const mostrarDatosJ1 = identificadorPareceDni(j1);
+  const mostrarDatosJ2 = identificadorPareceDni(j2);
+
+  const armarDatosAlta = (
+    identificador: string,
+    nombre: string,
+    apellido: string,
+    categoria: string,
+    nacimiento: string,
+    telefono: string,
+  ) => {
+    if (!identificadorPareceDni(identificador)) return undefined;
+    const payload = {
+      nombre: nombre.trim(),
+      apellido: apellido.trim(),
+      ...(categoria.trim() ? { categoria_padel: categoria.trim() } : {}),
+      ...(nacimiento.trim() ? { fecha_nacimiento: nacimiento.trim() } : {}),
+      ...(telefono.trim() ? { telefono: telefono.trim() } : {}),
+    };
+    if (!payload.nombre && !payload.apellido) return undefined;
+    return payload;
+  };
 
   const handleSubmit = async () => {
     if (!j1) {
@@ -103,6 +137,22 @@ export default function InscripcionManualModal({
         torneo_id: torneo.id,
         jugador1_identificador: j1.trim(),
         jugador2_identificador: j2.trim() || undefined,
+        jugador1_datos: armarDatosAlta(
+          j1,
+          j1Nombre,
+          j1Apellido,
+          j1Categoria,
+          j1Nacimiento,
+          j1Telefono,
+        ),
+        jugador2_datos: armarDatosAlta(
+          j2,
+          j2Nombre,
+          j2Apellido,
+          j2Categoria,
+          j2Nacimiento,
+          j2Telefono,
+        ),
         monto: Number(monto),
         metodo_pago: gratuito
           ? undefined
@@ -118,6 +168,16 @@ export default function InscripcionManualModal({
 
       setJ1("");
       setJ2("");
+      setJ1Nombre("");
+      setJ1Apellido("");
+      setJ1Categoria("");
+      setJ1Nacimiento("");
+      setJ1Telefono("");
+      setJ2Nombre("");
+      setJ2Apellido("");
+      setJ2Categoria("");
+      setJ2Nacimiento("");
+      setJ2Telefono("");
       setLetraPrioridad("");
       setEstadoPago("");
       setOmitirValidaciones(false);
@@ -164,7 +224,7 @@ export default function InscripcionManualModal({
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-[#1a1a1a] border border-white/10 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl relative p-6 space-y-6"
+              className="bg-[#1a1a1a] border border-white/10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl relative p-6 space-y-6"
             >
               <div className="flex justify-between items-center border-b border-white/5 pb-4">
                 <div>
@@ -201,6 +261,56 @@ export default function InscripcionManualModal({
                   </div>
                 </div>
 
+                {mostrarDatosJ1 ? (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-3"
+                  >
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Si el DNI no tiene cuenta: nombre y apellido *
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        placeholder="Nombre *"
+                        className="w-full bg-[#111] border border-white/5 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-chartreuse/50"
+                        value={j1Nombre}
+                        onChange={(e) => setJ1Nombre(e.target.value)}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Apellido *"
+                        className="w-full bg-[#111] border border-white/5 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-chartreuse/50"
+                        value={j1Apellido}
+                        onChange={(e) => setJ1Apellido(e.target.value)}
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Categoría"
+                        className="w-full bg-[#111] border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-chartreuse/50"
+                        value={j1Categoria}
+                        onChange={(e) => setJ1Categoria(e.target.value)}
+                      />
+                      <input
+                        type="date"
+                        className="w-full bg-[#111] border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-chartreuse/50"
+                        value={j1Nacimiento}
+                        onChange={(e) => setJ1Nacimiento(e.target.value)}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Teléfono"
+                        className="w-full bg-[#111] border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-chartreuse/50"
+                        value={j1Telefono}
+                        onChange={(e) => setJ1Telefono(e.target.value)}
+                      />
+                    </div>
+                  </motion.div>
+                ) : null}
+
                 {esModalidadParejas(torneo.modalidad) && (
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
@@ -218,6 +328,56 @@ export default function InscripcionManualModal({
                     </div>
                   </div>
                 )}
+
+                {mostrarDatosJ2 && esModalidadParejas(torneo.modalidad) ? (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-3"
+                  >
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Si el DNI no tiene cuenta: nombre y apellido *
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        placeholder="Nombre *"
+                        className="w-full bg-[#111] border border-white/5 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-chartreuse/50"
+                        value={j2Nombre}
+                        onChange={(e) => setJ2Nombre(e.target.value)}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Apellido *"
+                        className="w-full bg-[#111] border border-white/5 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-chartreuse/50"
+                        value={j2Apellido}
+                        onChange={(e) => setJ2Apellido(e.target.value)}
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Categoría"
+                        className="w-full bg-[#111] border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-chartreuse/50"
+                        value={j2Categoria}
+                        onChange={(e) => setJ2Categoria(e.target.value)}
+                      />
+                      <input
+                        type="date"
+                        className="w-full bg-[#111] border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-chartreuse/50"
+                        value={j2Nacimiento}
+                        onChange={(e) => setJ2Nacimiento(e.target.value)}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Teléfono"
+                        className="w-full bg-[#111] border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-chartreuse/50"
+                        value={j2Telefono}
+                        onChange={(e) => setJ2Telefono(e.target.value)}
+                      />
+                    </div>
+                  </motion.div>
+                ) : null}
 
                 {esNacional && (
                   <div>

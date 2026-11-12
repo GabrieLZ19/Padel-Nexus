@@ -1,5 +1,6 @@
 const ETIQUETAS: Record<string, string> = {
   cambio_pareja_llave: "Cambio de pareja",
+  alta_pareja_edicion_llave: "Alta de pareja (llave)",
   override_rival_partido: "Cambio de pareja",
   corregir_resultado: "Corrección de resultado",
   notificar_sorteo_zona: "Notificación de sorteo",

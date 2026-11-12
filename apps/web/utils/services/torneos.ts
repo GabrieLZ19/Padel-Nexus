@@ -256,9 +256,17 @@ export const TorneosService = {
   async guardarZonas(
     torneoId: string,
     payload: {
-      zonas: { id: string; nombre: string; parejas: { id: string }[] }[];
+      zonas: {
+        id: string;
+        nombre: string;
+        parejas: { id: string; es_cabeza_serie?: boolean }[];
+      }[];
       motivo: string;
       validarCabezasSerie?: boolean;
+      resoluciones_cabezas_serie?: {
+        grupo_id: string;
+        cabeza_inscripcion_id: string;
+      }[];
     }
   ) {
     const response = await api.put(`/torneos/${torneoId}/guardar-zonas`, payload);
@@ -375,6 +383,63 @@ export const TorneosService = {
   ) {
     const response = await api.put(`/torneos/${torneoId}/llave/pareja`, payload);
     return response.data;
+  },
+
+  async buscarParejasLlaveExternas(torneoId: string, q: string) {
+    const response = await api.get<{
+      resultados: Array<{
+        inscripcion_origen_id: string;
+        torneo_origen_nombre: string;
+        categoria_origen: string | null;
+        etiqueta: string;
+        jugador1_nombre: string;
+        jugador2_nombre: string | null;
+      }>;
+    }>(`/torneos/${torneoId}/llave/buscar-parejas`, {
+      params: { q },
+    });
+    return response.data.resultados;
+  },
+
+  async altaParejaLlave(
+    torneoId: string,
+    payload:
+      | {
+          modo: "externa";
+          inscripcion_origen_id: string;
+          motivo: string;
+          letra_prioridad?: string;
+        }
+      | {
+          modo: "manual";
+          jugador1_identificador: string;
+          jugador2_identificador?: string;
+          jugador1_datos?: {
+            nombre?: string;
+            apellido?: string;
+            categoria_padel?: string;
+            fecha_nacimiento?: string;
+            telefono?: string;
+          };
+          jugador2_datos?: {
+            nombre?: string;
+            apellido?: string;
+            categoria_padel?: string;
+            fecha_nacimiento?: string;
+            telefono?: string;
+          };
+          motivo: string;
+          letra_prioridad?: string;
+        },
+  ) {
+    const response = await api.post<{
+      inscripcion: {
+        id: string;
+        jugador1_nombre: string;
+        jugador2_nombre: string;
+      };
+    }>(`/torneos/${torneoId}/llave/alta-pareja`, payload);
+    return response.data.inscripcion;
   },
 
   async actualizarPartido(

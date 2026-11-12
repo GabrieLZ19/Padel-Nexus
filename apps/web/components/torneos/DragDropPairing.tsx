@@ -49,6 +49,7 @@ export interface ParejaDrag {
   seed: number;
   club?: string;
   cabezaDeSerie?: boolean;
+  puntos_ranking?: number;
   descalificada?: boolean;
   usuario_id?: string | null;
   usuario2_id?: string | null;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { DragDropPairing, ZonaDrag, ParejaDrag } from "./DragDropPairing";
 import { TablaPosicionesZona } from "./TablaPosicionesZona";
 import { TorneosService } from "@/utils/services/torneos";
@@ -24,9 +24,16 @@ import { textoRectora } from "@/utils/textosRectora";
 import { useSiglaRectora } from "@/utils/useSiglaRectora";
 import { ZonaCard } from "./ZonaCard";
 import { PromoverParejaMenores } from "./PromoverParejaMenores";
+import { LlaveAltaParejaPanel } from "./LlaveAltaParejaPanel";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
+import {
+  cabezaPorMejorRanking,
+  etiquetaParejaCorta,
+  resolverCabezasEnZona,
+  zonaConMultiplesCabezas,
+} from "@/utils/cabezasSerieZonas";
 import { MatchCard } from "./MatchCard";
 import { FapBracketDiagram, type FapMatrixMatch } from "./FapBracketDiagram";
 import CustomDropdown from "@/components/ui/CustomDropdown";
@@ -142,6 +149,18 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
   const autoSwitchedToLlave = React.useRef(false);
   const [zonas, setZonas] = useState<ZonaDrag[]>([]);
+  const zonasAntesConflictoRef = useRef<ZonaDrag[]>([]);
+  const [resolucionesCabezasSerie, setResolucionesCabezasSerie] = useState<
+    { grupo_id: string; cabeza_inscripcion_id: string }[]
+  >([]);
+  const [modalCabezaConflicto, setModalCabezaConflicto] =
+    useState<FeedbackModalProps>({
+      isOpen: false,
+      title: "",
+      description: "",
+      onClose: () =>
+        setModalCabezaConflicto((prev) => ({ ...prev, isOpen: false })),
+    });
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   // Siembra (Eliminatoria Directa) drag-and-drop state
@@ -191,6 +210,15 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
   });
   const [matchEditMotivo, setMatchEditMotivo] = useState("");
+  const [matchEditSlotFocus, setMatchEditSlotFocus] = useState<"a" | "b">("a");
+  const [inscripcionesExtraLlave, setInscripcionesExtraLlave] = useState<
+    Array<{
+      value: string;
+      label: string;
+      name1: string;
+      name2: string;
+    }>
+  >([]);
   const [matchEditBusy, setMatchEditBusy] = useState(false);
 
   const loadZonas = async () => {
@@ -211,6 +239,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             letra_prioridad: gp.inscripciones?.letra_prioridad,
           }),
           cabezaDeSerie: gp.cabezaDeSerie,
+          puntos_ranking: Number(gp.puntosRanking ?? 0),
           descalificada: Boolean(gp.descalificada),
           usuario_id: gp.inscripciones?.usuario_id ?? null,
           usuario2_id: gp.inscripciones?.usuario2_id ?? null,
@@ -541,35 +570,85 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     }
   }, [activeView, torneoId, firmaResultadosPartidos]);
 
+  const abrirModalConflictoCabezas = useCallback(
+    (nextZonas: ZonaDrag[], conflicto: NonNullable<ReturnType<typeof zonaConMultiplesCabezas>>) => {
+      const defaultId = cabezaPorMejorRanking(conflicto.candidatos);
+      setModalCabezaConflicto({
+        isOpen: true,
+        type: "warning",
+        title: "Dos cabezas de serie en la misma zona",
+        description: `${conflicto.zona.nombre} concentró más de una cabeza de serie. Elegí cuál conserva el rótulo; el resto lo pierde en esta zona. Quedará registrado al guardar los cambios.`,
+        confirmText: "Confirmar",
+        cancelText: "Deshacer movimiento",
+        showSelect: true,
+        selectLabel: "Cabeza de serie en la zona",
+        selectOptions: conflicto.candidatos.map((p) => ({
+          value: p.id,
+          label: `${etiquetaParejaCorta(p)} · ${p.puntos_ranking ?? 0} pts ranking`,
+        })),
+        onClose: () => {
+          setZonas(zonasAntesConflictoRef.current);
+          setModalCabezaConflicto((prev) => ({ ...prev, isOpen: false }));
+        },
+        onConfirm: (_motivo, selectValue) => {
+          const elegido = selectValue || defaultId;
+          setZonas(
+            nextZonas.map((z) =>
+              z.id === conflicto.zona.id
+                ? resolverCabezasEnZona(z, elegido)
+                : z,
+            ),
+          );
+          setResolucionesCabezasSerie((hist) => [
+            ...hist.filter((r) => r.grupo_id !== conflicto.zona.id),
+            { grupo_id: conflicto.zona.id, cabeza_inscripcion_id: elegido },
+          ]);
+          setModalCabezaConflicto((prev) => ({ ...prev, isOpen: false }));
+        },
+      });
+    },
+    [],
+  );
+
+  const aplicarZonasYRevisarCabezas = useCallback(
+    (next: ZonaDrag[] | ((prev: ZonaDrag[]) => ZonaDrag[])) => {
+      setZonas((prev) => {
+        const resolved = typeof next === "function" ? next(prev) : next;
+        const conflicto = zonaConMultiplesCabezas(resolved);
+        if (conflicto && isEditing) {
+          zonasAntesConflictoRef.current = prev;
+          queueMicrotask(() => abrirModalConflictoCabezas(resolved, conflicto));
+        }
+        return resolved;
+      });
+    },
+    [abrirModalConflictoCabezas, isEditing],
+  );
+
   const handleMovePareja = (
     inscripcionId: string,
     origenId: string,
     destinoId: string,
   ) => {
-    let movedPareja: any = null;
-    const nextZonas = zonas.map((z) => {
-      if (z.id === origenId) {
-        movedPareja = z.parejas.find((p) => p.id === inscripcionId);
-        return {
-          ...z,
-          parejas: z.parejas.filter((p) => p.id !== inscripcionId),
-        };
-      }
-      return z;
-    });
-
-    if (movedPareja) {
-      const finalZonas = nextZonas.map((z) => {
-        if (z.id === destinoId) {
+    aplicarZonasYRevisarCabezas((prev) => {
+      let movedPareja: ParejaDrag | undefined;
+      const sinOrigen = prev.map((z) => {
+        if (z.id === origenId) {
+          movedPareja = z.parejas.find((p) => p.id === inscripcionId);
           return {
             ...z,
-            parejas: [...z.parejas, movedPareja],
+            parejas: z.parejas.filter((p) => p.id !== inscripcionId),
           };
         }
         return z;
       });
-      setZonas(finalZonas);
-    }
+      if (!movedPareja) return prev;
+      return sinOrigen.map((z) =>
+        z.id === destinoId
+          ? { ...z, parejas: [...z.parejas, movedPareja!] }
+          : z,
+      );
+    });
   };
 
   const handleGuardarCambios = () => {
@@ -593,12 +672,17 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               zonas: zonas.map((z) => ({
                 id: z.id,
                 nombre: z.nombre,
-                parejas: z.parejas.map((p) => ({ id: p.id })),
+                parejas: z.parejas.map((p) => ({
+                  id: p.id,
+                  es_cabeza_serie: Boolean(p.cabezaDeSerie),
+                })),
               })),
               motivo: motivo,
               validarCabezasSerie: validarCabezasSerie,
+              resoluciones_cabezas_serie: resolucionesCabezasSerie,
             });
             setIsEditing(false);
+            setResolucionesCabezasSerie([]);
             setFeedbackModal({
               isOpen: true,
               type: "success",
@@ -949,7 +1033,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   }, [zonas]);
 
   const inscripcionOptions = React.useMemo(() => {
-    return (inscripciones || []).map((ins) => {
+    const base = (inscripciones || []).map((ins) => {
       const row = ins as Inscripcion & {
         jugador_1_nombre?: string;
         jugador1_nombre?: string;
@@ -982,7 +1066,19 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         name2,
       };
     });
-  }, [inscripciones, firstRoundTeams]);
+    const ids = new Set(base.map((o) => o.value));
+    for (const extra of inscripcionesExtraLlave) {
+      if (!ids.has(extra.value)) {
+        base.push({
+          value: extra.value,
+          label: `${extra.label} · Alta llave`,
+          name1: extra.name1,
+          name2: extra.name2,
+        });
+      }
+    }
+    return base;
+  }, [inscripciones, firstRoundTeams, inscripcionesExtraLlave]);
 
   const partidoQueOcupaPareja = (
     inscripcionId: string,
@@ -1530,7 +1626,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               {isEditing && puedeEditarZonas ? (
                 <DragDropPairing
                   zonas={zonas}
-                  onZonasChange={setZonas}
+                  onZonasChange={aplicarZonasYRevisarCabezas}
                   onMovePareja={handleMovePareja}
                   isEditing={isEditing}
                   partidos={partidos}
@@ -1905,6 +2001,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       )}
 
       <FeedbackModal {...feedbackModal} />
+      <FeedbackModal {...modalCabezaConflicto} />
 
       {/* FLOATING TOUR OVERLAY / STEP-BY-STEP DIALOG */}
       {tourStep !== null && (
@@ -1967,7 +2064,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       {/* Modal: gestionar pareja en un partido de la llave */}
       {showMatchEditModal && selectedMatchToEdit && (
         <div className="fixed inset-0 z-110 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-          <div className="bg-[#121212] border border-white/10 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+          <div className="bg-[#121212] border border-white/10 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-white/8 bg-white/[0.02]">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-brand-chartreuse mb-1">
@@ -1996,6 +2093,66 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             </div>
 
             <div className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-black uppercase tracking-wider text-gray-400 block mb-1.5">
+                  Motivo (auditoría)
+                </label>
+                <input
+                  type="text"
+                  value={matchEditMotivo}
+                  onChange={(e) => setMatchEditMotivo(e.target.value)}
+                  placeholder="Ej: Pase de menores / pareja de otra categoría"
+                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-brand-ayuda focus:outline-none focus:border-brand-chartreuse/40"
+                />
+              </div>
+
+              <div className="flex gap-2 text-[10px] font-black uppercase tracking-wider">
+                <button
+                  type="button"
+                  onClick={() => setMatchEditSlotFocus("a")}
+                  className={`flex-1 py-2 rounded-lg border ${
+                    matchEditSlotFocus === "a"
+                      ? "border-sky-400/60 text-sky-300 bg-sky-500/10"
+                      : "border-white/10 text-gray-500"
+                  }`}
+                >
+                  Alta para lado A
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMatchEditSlotFocus("b")}
+                  className={`flex-1 py-2 rounded-lg border ${
+                    matchEditSlotFocus === "b"
+                      ? "border-sky-400/60 text-sky-300 bg-sky-500/10"
+                      : "border-white/10 text-gray-500"
+                  }`}
+                >
+                  Alta para lado B
+                </button>
+              </div>
+
+              <LlaveAltaParejaPanel
+                torneoId={torneoId}
+                esNacional={/nacional/i.test(String(torneo?.alcance || ""))}
+                motivoAuditoria={matchEditMotivo}
+                slotDestino={matchEditSlotFocus}
+                onInscripcionCreada={(datos) => {
+                  setInscripcionesExtraLlave((prev) => {
+                    if (prev.some((p) => p.value === datos.id)) return prev;
+                    return [
+                      ...prev,
+                      {
+                        value: datos.id,
+                        label: datos.label,
+                        name1: datos.name1,
+                        name2: datos.name2 || "",
+                      },
+                    ];
+                  });
+                  applyInscripcionToSlot(matchEditSlotFocus, datos.id);
+                }}
+              />
+
               <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-3 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <label className="text-xs font-black uppercase tracking-wider text-sky-400">
@@ -2070,18 +2227,6 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-black uppercase tracking-wider text-gray-400 block mb-1.5">
-                  Motivo (auditoría)
-                </label>
-                <input
-                  type="text"
-                  value={matchEditMotivo}
-                  onChange={(e) => setMatchEditMotivo(e.target.value)}
-                  placeholder="Ej: Reasignación por baja / error de categoría"
-                  className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-brand-ayuda focus:outline-none focus:border-brand-chartreuse/40"
-                />
-              </div>
             </div>
 
             <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/8 bg-white/[0.02]">

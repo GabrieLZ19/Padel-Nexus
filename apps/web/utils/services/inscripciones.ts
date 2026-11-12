@@ -120,6 +120,20 @@ export const InscripcionesService = {
     torneo_id: string;
     jugador1_identificador: string;
     jugador2_identificador?: string;
+    jugador1_datos?: {
+      nombre?: string;
+      apellido?: string;
+      categoria_padel?: string;
+      fecha_nacimiento?: string;
+      telefono?: string;
+    };
+    jugador2_datos?: {
+      nombre?: string;
+      apellido?: string;
+      categoria_padel?: string;
+      fecha_nacimiento?: string;
+      telefono?: string;
+    };
     monto: number;
     metodo_pago?: string;
     omitir_validaciones?: boolean;
