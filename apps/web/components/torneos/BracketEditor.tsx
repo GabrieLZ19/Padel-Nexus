@@ -1113,8 +1113,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     }
 
     const traslados = mensajesTrasladoPareja(
-      selectedMatchToEdit.equipo_a_id,
-      selectedMatchToEdit.equipo_b_id,
+      selectedMatchToEdit.equipo_a_id ?? null,
+      selectedMatchToEdit.equipo_b_id ?? null,
       selectedMatchToEdit.id,
     );
 

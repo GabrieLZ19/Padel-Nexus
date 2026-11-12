@@ -35,7 +35,7 @@ function normalizarTexto(valor: unknown): string {
 }
 
 export function normalizarEmailCeldaPlanilla(
-  raw?: string | null,
+  raw?: unknown,
 ): string | undefined {
   const s = sanearValorCeldaPlanilla(raw);
   if (!s) return undefined;

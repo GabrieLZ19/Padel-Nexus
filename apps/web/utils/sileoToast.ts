@@ -3,11 +3,11 @@ import type { SileoOptions } from "sileo";
 import { SILEO_TOAST_DURATION_MS, sileoToastStyles } from "@/utils/sileoStyles";
 
 function mergeToastOptions(opts: SileoOptions): SileoOptions {
+  const { styles: stylesOverride, ...resto } = opts;
   return {
     duration: SILEO_TOAST_DURATION_MS,
-    styles: sileoToastStyles,
-    ...opts,
-    styles: { ...sileoToastStyles, ...opts.styles },
+    ...resto,
+    styles: { ...sileoToastStyles, ...stylesOverride },
   };
 }
 

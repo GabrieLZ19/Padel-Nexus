@@ -1015,7 +1015,16 @@ export default function ComunicacionesPanel() {
         await ComunicacionesService.actualizarLista(listaEditandoId, payload);
         sileo.success({ title: "Lista actualizada" });
       } else {
-        await ComunicacionesService.crearLista(payload);
+        const crearPayload: CrearListaPayload = {
+          nombre: payload.nombre,
+          tipo: listaTipo,
+          descripcion: payload.descripcion,
+          etiquetas: payload.etiquetas,
+          ...(listaTipo === "dinamica"
+            ? { filtros: payload.filtros }
+            : { miembro_ids: payload.miembro_ids }),
+        };
+        await ComunicacionesService.crearLista(crearPayload);
         sileo.success({ title: "Lista creada" });
       }
 
