@@ -34,6 +34,7 @@ import FeedbackModal, { type FeedbackModalProps } from "@/components/ui/Feedback
 import { formatFechaCalendario, parseFechaCalendarioLocal } from "@/utils/formatFecha";
 import { EscribirAlClubButton } from "@/components/reservas/EscribirAlClubButton";
 import { formatMontoArs } from "@/utils/formatMonto";
+import { ReservaPlazoPagoBanner } from "@/components/reservas/ReservaPlazoPagoBanner";
 
 interface ReservaUsuario {
   id: string;
@@ -46,6 +47,7 @@ interface ReservaUsuario {
   puede_cancelar?: boolean;
   cancelacion_bloqueo?: string | null;
   horas_antelacion_cancelacion?: number | null;
+  retiene_hasta?: string | null;
   created_at: string;
   turnos: {
     id: string;
@@ -409,6 +411,15 @@ export default function MisReservasPage() {
                       </span>
                     </p>
                   )}
+
+                  {isPayPending &&
+                    isPending &&
+                    !isWaitingValidation && (
+                      <ReservaPlazoPagoBanner
+                        reserva={reserva}
+                        onVencido={() => void fetchReservas()}
+                      />
+                    )}
 
                   <div className="border-t border-white/5 pt-3.5 grid grid-cols-2 gap-4 text-xs text-gray-300">
                     <div className="space-y-1">

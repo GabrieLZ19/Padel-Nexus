@@ -29,6 +29,8 @@ import {
   textoUbicacionClub,
   urlGoogleMapsClub,
 } from "@/utils/ubicacionClub";
+import { ReservaPlazoPagoBanner } from "@/components/reservas/ReservaPlazoPagoBanner";
+import { isAxiosError } from "axios";
 
 interface ReservaDetalle {
   id: string;
@@ -37,6 +39,8 @@ interface ReservaDetalle {
   fecha_reserva: string;
   estado_pago: string;
   estado_reserva: string;
+  retiene_hasta?: string | null;
+  created_at?: string;
   turnos: {
     id: string;
     hora_inicio: string;
@@ -78,6 +82,7 @@ export default function CheckoutPage() {
   const [comprobanteArchivo, setComprobanteArchivo] = useState<File | null>(null);
   const [copiadoCbu, setCopiadoCbu] = useState(false);
   const [copiadoAlias, setCopiadoAlias] = useState(false);
+  const [plazoVencido, setPlazoVencido] = useState(false);
 
   const handleCopiarCbu = () => {
     if (reserva?.turnos?.canchas?.clubes?.cbu) {
@@ -135,7 +140,19 @@ export default function CheckoutPage() {
             }
           }
         }
-      } catch {
+      } catch (err) {
+        if (
+          isAxiosError(err) &&
+          (err.response?.data?.error === "RESERVA_PAGO_VENCIDO" ||
+            err.response?.status === 410)
+        ) {
+          setPlazoVencido(true);
+          sileo.warning({
+            title: "Plazo de pago vencido",
+            description:
+              "El turno ya no está reservado. Elegí otro horario en el club.",
+          });
+        }
         setReserva(null);
       } finally {
         setLoading(false);
@@ -319,7 +336,9 @@ export default function CheckoutPage() {
     return (
       <main className="min-h-screen pt-24 flex flex-col items-center justify-center gap-4">
         <h2 className="text-xl font-semibold text-gray-400">
-          Reserva no encontrada
+          {plazoVencido
+            ? "El plazo para pagar venció"
+            : "Reserva no encontrada"}
         </h2>
         <Link
           href="/reservar"
@@ -428,6 +447,26 @@ export default function CheckoutPage() {
             </p>
           </div>
         </div>
+
+        {reserva.estado_reserva === "pendiente" &&
+          reserva.estado_pago !== "completado" && (
+            <ReservaPlazoPagoBanner
+              reserva={reserva}
+              className="mb-6"
+              onVencido={() => {
+                setPlazoVencido(true);
+                sileo.warning({
+                  title: "Plazo de pago vencido",
+                  description:
+                    "El turno quedó liberado. Volvé a elegir un horario.",
+                });
+                const clubId = reserva.turnos?.canchas?.clubes?.id;
+                router.push(
+                  clubId ? `/reservar/club/${clubId}` : "/reservar",
+                );
+              }}
+            />
+          )}
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* ── Columna Izquierda: Método de Pago ────── */}
