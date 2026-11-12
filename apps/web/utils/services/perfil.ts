@@ -261,6 +261,8 @@ export const PerfilService = {
   async buscarPreinscripcionPorDni(dni: string): Promise<{
     encontrado: boolean;
     pendiente_activacion?: boolean;
+    verificacion_requerida?: boolean;
+    metodos_disponibles?: Array<"telefono" | "email">;
     mensaje?: string;
     perfil?: Partial<RegistroPayload>;
   }> {
@@ -268,9 +270,30 @@ export const PerfilService = {
       exito: boolean;
       encontrado: boolean;
       pendiente_activacion?: boolean;
+      verificacion_requerida?: boolean;
+      metodos_disponibles?: Array<"telefono" | "email">;
       mensaje?: string;
       perfil?: Partial<RegistroPayload>;
     }>(`/perfil/preinscripcion/${encodeURIComponent(dni)}`);
+    return response.data;
+  },
+
+  async verificarPreinscripcionPorDni(
+    dni: string,
+    payload:
+      | { metodo: "telefono"; telefono_ultimos4: string }
+      | { metodo: "email"; email: string },
+  ): Promise<{
+    encontrado: boolean;
+    pendiente_activacion?: boolean;
+    perfil?: Partial<RegistroPayload>;
+  }> {
+    const response = await api.post<{
+      exito: boolean;
+      encontrado: boolean;
+      pendiente_activacion?: boolean;
+      perfil?: Partial<RegistroPayload>;
+    }>(`/perfil/preinscripcion/${encodeURIComponent(dni)}/verificar`, payload);
     return response.data;
   },
 };

@@ -61,6 +61,18 @@ export default function SignUpPage() {
   const [preinscripcionMsg, setPreinscripcionMsg] = useState<string | null>(
     null,
   );
+  const [preinscripcionRequiereVerificacion, setPreinscripcionRequiereVerificacion] =
+    useState(false);
+  const [metodosPreinscripcion, setMetodosPreinscripcion] = useState<
+    Array<"telefono" | "email">
+  >([]);
+  const [metodoVerificacionPreinscripcion, setMetodoVerificacionPreinscripcion] =
+    useState<"telefono" | "email">("telefono");
+  const [ultimos4Verificacion, setUltimos4Verificacion] = useState("");
+  const [verificandoPreinscripcion, setVerificandoPreinscripcion] =
+    useState(false);
+  const [errorVerificacionPreinscripcion, setErrorVerificacionPreinscripcion] =
+    useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<{
     nombre?: string;
@@ -303,7 +315,33 @@ export default function SignUpPage() {
     const cleaned = val.replace(/[^0-9.]/g, "").slice(0, 10);
     setDni(cleaned);
     setPreinscripcionMsg(null);
+    setPreinscripcionRequiereVerificacion(false);
+    setMetodosPreinscripcion([]);
+    setUltimos4Verificacion("");
+    setErrorVerificacionPreinscripcion(null);
     if (errors.dni) setErrors((p) => ({ ...p, dni: undefined }));
+  };
+
+  const aplicarPerfilPreinscripcion = (p: Partial<{
+    nombre?: string;
+    apellido?: string;
+    email?: string;
+    telefono?: string;
+    lugar_residencia?: string;
+    fecha_nacimiento?: string;
+    sexo?: string;
+    categoria_padel?: string;
+    lado_preferido?: string;
+  }>) => {
+    if (p.nombre) setNombre(p.nombre);
+    if (p.apellido) setApellido(p.apellido);
+    if (p.email) setEmail(p.email);
+    if (p.telefono) setTelefono(p.telefono);
+    if (p.lugar_residencia) setResidencia(p.lugar_residencia);
+    if (p.fecha_nacimiento) setFechaNacimiento(p.fecha_nacimiento);
+    if (p.sexo) setSexo(p.sexo);
+    if (p.categoria_padel) setCategoria(p.categoria_padel);
+    if (p.lado_preferido) setLadoPreferido(p.lado_preferido);
   };
 
   const buscarPreinscripcionPorDni = async () => {
@@ -312,6 +350,9 @@ export default function SignUpPage() {
 
     setBuscandoDni(true);
     setPreinscripcionMsg(null);
+    setPreinscripcionRequiereVerificacion(false);
+    setMetodosPreinscripcion([]);
+    setErrorVerificacionPreinscripcion(null);
     try {
       const resultado = await PerfilService.buscarPreinscripcionPorDni(dniLimpio);
       if (!resultado.encontrado) return;
@@ -324,26 +365,80 @@ export default function SignUpPage() {
         return;
       }
 
-      const p = resultado.perfil;
-      if (!p) return;
-
-      if (p.nombre) setNombre(p.nombre);
-      if (p.apellido) setApellido(p.apellido);
-      if (p.email) setEmail(p.email);
-      if (p.telefono) setTelefono(p.telefono);
-      if (p.lugar_residencia) setResidencia(p.lugar_residencia);
-      if (p.fecha_nacimiento) setFechaNacimiento(p.fecha_nacimiento);
-      if (p.sexo) setSexo(p.sexo);
-      if (p.categoria_padel) setCategoria(p.categoria_padel);
-      if (p.lado_preferido) setLadoPreferido(p.lado_preferido);
-
+      const metodos = resultado.metodos_disponibles ?? [];
+      setMetodosPreinscripcion(metodos);
+      setPreinscripcionRequiereVerificacion(
+        Boolean(resultado.verificacion_requerida && metodos.length > 0),
+      );
+      setMetodoVerificacionPreinscripcion(
+        metodos.includes("telefono") ? "telefono" : "email",
+      );
       setPreinscripcionMsg(
-        "Encontramos tus datos cargados por tu asociación. Completá email y contraseña para activar tu cuenta en la App.",
+        resultado.mensaje ||
+          "Encontramos una ficha con este DNI. Confirmá tu identidad para continuar.",
       );
     } catch {
       // Sin preinscripción: flujo normal de registro
     } finally {
       setBuscandoDni(false);
+    }
+  };
+
+  const verificarYcargarPreinscripcion = async () => {
+    const dniLimpio = dni.trim().replace(/\./g, "");
+    if (!validateDni(dniLimpio)) return;
+
+    setVerificandoPreinscripcion(true);
+    setErrorVerificacionPreinscripcion(null);
+    try {
+      const payload =
+        metodoVerificacionPreinscripcion === "telefono"
+          ? {
+              metodo: "telefono" as const,
+              telefono_ultimos4: ultimos4Verificacion.replace(/\D/g, ""),
+            }
+          : {
+              metodo: "email" as const,
+              email: email.trim(),
+            };
+
+      if (
+        payload.metodo === "telefono" &&
+        payload.telefono_ultimos4.length !== 4
+      ) {
+        setErrorVerificacionPreinscripcion(
+          "Ingresá los últimos 4 dígitos del teléfono que registró tu club.",
+        );
+        return;
+      }
+
+      if (payload.metodo === "email" && !payload.email.includes("@")) {
+        setErrorVerificacionPreinscripcion(
+          "Ingresá el email que figura en tu ficha.",
+        );
+        return;
+      }
+
+      const resultado = await PerfilService.verificarPreinscripcionPorDni(
+        dniLimpio,
+        payload,
+      );
+      if (!resultado.perfil) return;
+
+      aplicarPerfilPreinscripcion(resultado.perfil);
+      setPreinscripcionRequiereVerificacion(false);
+      setPreinscripcionMsg(
+        "Datos verificados. Completá email y contraseña para activar tu cuenta en la App.",
+      );
+    } catch (err) {
+      const msg = isAxiosError(err)
+        ? (err.response?.data as { error?: string } | undefined)?.error
+        : null;
+      setErrorVerificacionPreinscripcion(
+        msg || "No pudimos verificar la ficha. Revisá los datos e intentá de nuevo.",
+      );
+    } finally {
+      setVerificandoPreinscripcion(false);
     }
   };
 
@@ -714,6 +809,75 @@ export default function SignUpPage() {
                     <p className="text-brand-chartreuse text-xs mt-1.5 ml-1">
                       {preinscripcionMsg}
                     </p>
+                  )}
+                  {preinscripcionRequiereVerificacion && (
+                    <div className="mt-3 p-3 rounded-xl border border-brand-white/10 bg-brand-card/40 space-y-3">
+                      {metodosPreinscripcion.length > 1 && (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMetodoVerificacionPreinscripcion("telefono")
+                            }
+                            className={`flex-1 text-xs py-2 rounded-lg border transition-colors ${
+                              metodoVerificacionPreinscripcion === "telefono"
+                                ? "border-brand-chartreuse text-brand-chartreuse"
+                                : "border-brand-white/10 text-gray-400"
+                            }`}
+                          >
+                            Teléfono del club
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMetodoVerificacionPreinscripcion("email")
+                            }
+                            className={`flex-1 text-xs py-2 rounded-lg border transition-colors ${
+                              metodoVerificacionPreinscripcion === "email"
+                                ? "border-brand-chartreuse text-brand-chartreuse"
+                                : "border-brand-white/10 text-gray-400"
+                            }`}
+                          >
+                            Email del club
+                          </button>
+                        </div>
+                      )}
+                      {metodoVerificacionPreinscripcion === "telefono" ? (
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={4}
+                          placeholder="Últimos 4 dígitos del teléfono"
+                          value={ultimos4Verificacion}
+                          onChange={(e) =>
+                            setUltimos4Verificacion(
+                              e.target.value.replace(/\D/g, "").slice(0, 4),
+                            )
+                          }
+                          className={getInputStyles(false)}
+                        />
+                      ) : (
+                        <p className="text-gray-400 text-xs">
+                          Usá el campo Email más abajo con el correo que cargó tu
+                          club o asociación y confirmá.
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        disabled={verificandoPreinscripcion}
+                        onClick={() => void verificarYcargarPreinscripcion()}
+                        className="w-full text-xs font-bold uppercase tracking-wider py-2.5 rounded-lg bg-brand-chartreuse text-brand-black disabled:opacity-50"
+                      >
+                        {verificandoPreinscripcion
+                          ? "Verificando..."
+                          : "Verificar y cargar datos"}
+                      </button>
+                      {errorVerificacionPreinscripcion && (
+                        <p className="text-red-400 text-xs">
+                          {errorVerificacionPreinscripcion}
+                        </p>
+                      )}
+                    </div>
                   )}
                   {errors.dni && (
                     <p className="text-red-400 text-xs mt-1.5 ml-1">
