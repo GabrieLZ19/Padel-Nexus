@@ -1,8 +1,15 @@
 import { Router } from "express";
 import { PerfilController } from "../controllers/perfil.controller";
 import { authenticate, authorize } from "../middleware/auth";
+import { crearRateLimiter } from "../middleware/rateLimit";
 
 const router = Router();
+
+const rateLimitPreinscripcion = crearRateLimiter({
+  clave: "preinscripcion",
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+});
 
 // ==========================================
 // ENDPOINTS PÚBLICOS (Sin Token)
@@ -10,7 +17,16 @@ const router = Router();
 router.post("/login", PerfilController.login);
 router.post("/registro", PerfilController.registro);
 router.post("/recuperar-password", PerfilController.solicitarRecuperarPassword);
-router.get("/preinscripcion/:dni", PerfilController.buscarPreinscripcionPorDni);
+router.get(
+  "/preinscripcion/:dni",
+  rateLimitPreinscripcion,
+  PerfilController.buscarPreinscripcionPorDni,
+);
+router.post(
+  "/preinscripcion/:dni/verificar",
+  rateLimitPreinscripcion,
+  PerfilController.verificarPreinscripcionPorDni,
+);
 
 router.get("/google", PerfilController.iniciarGoogleAuth);
 router.get("/google/callback", PerfilController.googleCallback);

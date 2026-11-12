@@ -28,6 +28,8 @@ import { SocketService } from "./services/socket.service";
 const app = express();
 const server = createServer(app);
 
+app.set("trust proxy", 1);
+
 // Inicializar Socket.io
 SocketService.init(server, env.CORS_ORIGINS);
 

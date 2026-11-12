@@ -12,6 +12,12 @@ import {
   resolverProvinciaDesdePlanilla,
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
+import {
+  coincideEmailPreinscripcion,
+  coincideUltimos4Telefono,
+  metodosVerificacionPreinscripcion,
+  type MetodoVerificacionPreinscripcion,
+} from "../utils/preinscripcionVerificacion";
 import { randomBytes } from "crypto";
 import { esVisibleEnSitioPublico } from "../utils/datoPrueba";
 import { capitalizarNombre } from "../utils/formatoTexto";
@@ -378,10 +384,7 @@ export class PerfilService {
     return `preinscripto+${dni}@padelnexus.local`;
   }
 
-  /**
-   * Busca un perfil pre-cargado desde planilla por DNI (flujo de activación).
-   */
-  static async buscarPreinscripcionPorDni(dni: string) {
+  private static async obtenerFichaPreinscripcionPorDni(dni: string) {
     const dniLimpio = normalizarDni(dni);
     if (!dniLimpio || dniLimpio.length < 7) {
       throw new Error("Ingresá un DNI válido.");
@@ -396,6 +399,40 @@ export class PerfilService {
       .maybeSingle();
 
     if (error) throw new Error("Error al consultar el DNI.");
+    return data;
+  }
+
+  private static perfilPublicableDesdeFicha(data: {
+    nombre: string | null;
+    apellido: string | null;
+    email: string | null;
+    telefono: string | null;
+    dni: string | null;
+    lugar_residencia: string | null;
+    categoria_padel: string | null;
+    lado_preferido: string | null;
+    fecha_nacimiento: string | null;
+    sexo: string | null;
+  }) {
+    return {
+      nombre: data.nombre,
+      apellido: data.apellido,
+      email: esEmailPlaceholderPlanilla(data.email) ? "" : data.email,
+      telefono: data.telefono,
+      dni: data.dni,
+      lugar_residencia: data.lugar_residencia,
+      categoria_padel: data.categoria_padel,
+      lado_preferido: data.lado_preferido || "indistinto",
+      fecha_nacimiento: data.fecha_nacimiento,
+      sexo: data.sexo || "masculino",
+    };
+  }
+
+  /**
+   * Consulta anónima: indica si hay ficha pendiente sin exponer PII (PUB-18).
+   */
+  static async consultarPreinscripcionPorDni(dni: string) {
+    const data = await PerfilService.obtenerFichaPreinscripcionPorDni(dni);
     if (!data) {
       return { encontrado: false as const };
     }
@@ -407,26 +444,77 @@ export class PerfilService {
       return {
         encontrado: true as const,
         pendiente_activacion: false as const,
-        mensaje: "Este DNI ya tiene una cuenta activa. Iniciá sesión o recuperá tu contraseña.",
+        mensaje:
+          "Este DNI ya tiene una cuenta activa. Iniciá sesión o recuperá tu contraseña.",
       };
+    }
+
+    const metodos_disponibles = metodosVerificacionPreinscripcion(data);
+
+    return {
+      encontrado: true as const,
+      pendiente_activacion: true as const,
+      verificacion_requerida: true as const,
+      metodos_disponibles,
+      mensaje:
+        metodos_disponibles.length > 0
+          ? "Encontramos una ficha con este DNI. Confirmá tu identidad para cargar los datos."
+          : "Encontramos una ficha con este DNI. Contactá a tu club o asociación para completar el teléfono o email de verificación.",
+    };
+  }
+
+  /**
+   * Devuelve datos de preinscripción solo tras verificar teléfono o email del club.
+   */
+  static async verificarYObtenerPreinscripcionPorDni(
+    dni: string,
+    payload: {
+      metodo: MetodoVerificacionPreinscripcion;
+      telefono_ultimos4?: string;
+      email?: string;
+    },
+  ) {
+    const data = await PerfilService.obtenerFichaPreinscripcionPorDni(dni);
+    if (!data) {
+      throw new Error("Los datos de verificación no coinciden.");
+    }
+
+    const cuentaPendienteApp =
+      data.pendiente_activacion || esEmailPlaceholderPlanilla(data.email);
+
+    if (!cuentaPendienteApp) {
+      throw new Error("Este DNI ya tiene una cuenta activa.");
+    }
+
+    const metodos = metodosVerificacionPreinscripcion(data);
+    if (!metodos.includes(payload.metodo)) {
+      throw new Error("Los datos de verificación no coinciden.");
+    }
+
+    let verificado = false;
+    if (payload.metodo === "telefono") {
+      verificado = coincideUltimos4Telefono(
+        data.telefono,
+        payload.telefono_ultimos4 || "",
+      );
+    } else if (payload.metodo === "email") {
+      verificado = coincideEmailPreinscripcion(data.email, payload.email || "");
+    }
+
+    if (!verificado) {
+      throw new Error("Los datos de verificación no coinciden.");
     }
 
     return {
       encontrado: true as const,
       pendiente_activacion: true as const,
-      perfil: {
-        nombre: data.nombre,
-        apellido: data.apellido,
-        email: esEmailPlaceholderPlanilla(data.email) ? "" : data.email,
-        telefono: data.telefono,
-        dni: data.dni,
-        lugar_residencia: data.lugar_residencia,
-        categoria_padel: data.categoria_padel,
-        lado_preferido: data.lado_preferido || "indistinto",
-        fecha_nacimiento: data.fecha_nacimiento,
-        sexo: data.sexo || "masculino",
-      },
+      perfil: PerfilService.perfilPublicableDesdeFicha(data),
     };
+  }
+
+  /** @deprecated Usar consultarPreinscripcionPorDni / verificarYObtenerPreinscripcionPorDni */
+  static async buscarPreinscripcionPorDni(dni: string) {
+    return PerfilService.consultarPreinscripcionPorDni(dni);
   }
 
   /**

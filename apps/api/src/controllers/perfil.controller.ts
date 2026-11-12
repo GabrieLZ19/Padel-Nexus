@@ -233,7 +233,7 @@ export const PerfilController = {
 
   /**
    * GET /api/perfil/preinscripcion/:dni
-   * Consulta si un DNI tiene datos precargados desde planilla.
+   * Consulta si un DNI tiene ficha pendiente sin exponer datos personales (PUB-18).
    */
   async buscarPreinscripcionPorDni(req: Request, res: Response): Promise<Response> {
     try {
@@ -244,12 +244,69 @@ export const PerfilController = {
           .json({ exito: false, error: "El DNI es obligatorio." });
       }
 
-      const resultado = await PerfilService.buscarPreinscripcionPorDni(dni);
+      const resultado = await PerfilService.consultarPreinscripcionPorDni(dni);
       return res.status(200).json({ exito: true, ...resultado });
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Error al consultar el DNI.";
       return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * POST /api/perfil/preinscripcion/:dni/verificar
+   * Devuelve datos de preinscripción tras validar teléfono o email declarado en la ficha.
+   */
+  async verificarPreinscripcionPorDni(
+    req: Request,
+    res: Response,
+  ): Promise<Response> {
+    try {
+      const { dni } = req.params;
+      if (!dni) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "El DNI es obligatorio." });
+      }
+
+      const { metodo, telefono_ultimos4, email } = req.body ?? {};
+      if (metodo !== "telefono" && metodo !== "email") {
+        return res.status(400).json({
+          exito: false,
+          error: "Indicá un método de verificación válido (telefono o email).",
+        });
+      }
+
+      if (metodo === "telefono" && !telefono_ultimos4) {
+        return res.status(400).json({
+          exito: false,
+          error: "Ingresá los últimos 4 dígitos del teléfono registrado.",
+        });
+      }
+
+      if (metodo === "email" && !email) {
+        return res.status(400).json({
+          exito: false,
+          error: "Ingresá el email que figura en tu ficha.",
+        });
+      }
+
+      const resultado = await PerfilService.verificarYObtenerPreinscripcionPorDni(
+        dni,
+        { metodo, telefono_ultimos4, email },
+      );
+      return res.status(200).json({ exito: true, ...resultado });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No pudimos verificar la ficha.";
+      const esCoincidencia =
+        message === "Los datos de verificación no coinciden.";
+      return res.status(esCoincidencia ? 403 : 400).json({
+        exito: false,
+        error: message,
+      });
     }
   },
 
