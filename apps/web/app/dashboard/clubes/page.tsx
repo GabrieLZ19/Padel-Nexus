@@ -273,20 +273,21 @@ export default function GestionClubesPage() {
               </div>
               <div className="flex flex-col gap-4 mt-6 pt-6 border-t border-white/5">
                 {/* Estado y Ajustes */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        club.estado === "Pendiente"
-                          ? "bg-orange-500"
-                          : club.estado === "Inactivo"
-                            ? "bg-red-500"
-                            : "bg-green-500"
-                      }`}
-                    ></span>
-                    <div className="text-right">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
                       <span
-                        className={`text-sm font-bold block ${
+                        className={`size-2 shrink-0 rounded-full ${
+                          club.estado === "Pendiente"
+                            ? "bg-orange-500"
+                            : club.estado === "Inactivo"
+                              ? "bg-red-500"
+                              : "bg-green-500"
+                        }`}
+                        aria-hidden
+                      />
+                      <span
+                        className={`text-sm font-bold leading-none ${
                           club.estado === "Pendiente"
                             ? "text-orange-500"
                             : club.estado === "Inactivo"
@@ -296,13 +297,13 @@ export default function GestionClubesPage() {
                       >
                         {club.estado || "Activo"}
                       </span>
-                      {club.licencia_federativa ? (
-                        <span className="text-[10px] text-gray-500 block mt-0.5">
-                          Lic. {club.licencia_federativa.nro_licencia} ·{" "}
-                          {club.licencia_federativa.estado}
-                        </span>
-                      ) : null}
                     </div>
+                    {club.licencia_federativa ? (
+                      <span className="mt-1 block pl-4 text-[10px] text-gray-500">
+                        Lic. {club.licencia_federativa.nro_licencia} ·{" "}
+                        {club.licencia_federativa.estado}
+                      </span>
+                    ) : null}
                   </div>
                   <button
                     onClick={() => handleOpenEdit(club)}
