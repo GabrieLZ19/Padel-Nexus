@@ -22,6 +22,8 @@ import {
   validateDni,
   validateTelefono,
 } from "@/src/lib/validation";
+import { LegalDocumentSheet } from "@/src/components/legal/LegalDocumentSheet";
+import type { LegalTipo } from "@/src/services/legal";
 import { useAuthStore } from "@/src/stores/authStore";
 
 type FieldErrors = {
@@ -66,6 +68,7 @@ export default function RegistroScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [legalSheet, setLegalSheet] = useState<LegalTipo | null>(null);
 
   const fechaIsoPreview = useMemo(() => {
     return formatIsoDate(parseIsoDate(fechaNacimiento)) || "";
@@ -385,44 +388,74 @@ export default function RegistroScreen() {
           />
         </View>
 
-        <Pressable
-          onPress={() => setAceptaTyc((v) => !v)}
-          className="mt-6 flex-row items-start gap-3"
-        >
-          <View
-            className={`mt-0.5 h-5 w-5 items-center justify-center rounded border ${
-              aceptaTyc
-                ? "border-brand-chartreuse bg-brand-chartreuse"
-                : "border-brand-border"
-            }`}
-          >
-            {aceptaTyc ? (
-              <FontAwesome name="check" size={11} color="#000" />
-            ) : null}
+        <View className="mt-6 gap-3 rounded-2xl border border-brand-border bg-brand-surface/40 p-4">
+          <View className="flex-row items-start gap-3">
+            <Pressable
+              onPress={() => setAceptaTyc((v) => !v)}
+              hitSlop={8}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: aceptaTyc }}
+            >
+              <View
+                className={`mt-0.5 h-5 w-5 items-center justify-center rounded border ${
+                  aceptaTyc
+                    ? "border-brand-chartreuse bg-brand-chartreuse"
+                    : "border-brand-border"
+                }`}
+              >
+                {aceptaTyc ? (
+                  <FontAwesome name="check" size={11} color="#000" />
+                ) : null}
+              </View>
+            </Pressable>
+            <Text className="flex-1 font-sans text-sm leading-5 text-brand-muted">
+              Acepto los{" "}
+              <Text
+                className="text-brand-chartreuse underline"
+                onPress={() => setLegalSheet("tyc")}
+              >
+                Términos y Condiciones
+              </Text>
+              .
+            </Text>
           </View>
-          <Text className="flex-1 font-sans text-sm leading-5 text-brand-muted">
-            Acepto los Términos y Condiciones
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setAceptaPrivacidad((v) => !v)}
-          className="mt-3 flex-row items-start gap-3"
-        >
-          <View
-            className={`mt-0.5 h-5 w-5 items-center justify-center rounded border ${
-              aceptaPrivacidad
-                ? "border-brand-chartreuse bg-brand-chartreuse"
-                : "border-brand-border"
-            }`}
-          >
-            {aceptaPrivacidad ? (
-              <FontAwesome name="check" size={11} color="#000" />
-            ) : null}
+          <View className="flex-row items-start gap-3">
+            <Pressable
+              onPress={() => setAceptaPrivacidad((v) => !v)}
+              hitSlop={8}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: aceptaPrivacidad }}
+            >
+              <View
+                className={`mt-0.5 h-5 w-5 items-center justify-center rounded border ${
+                  aceptaPrivacidad
+                    ? "border-brand-chartreuse bg-brand-chartreuse"
+                    : "border-brand-border"
+                }`}
+              >
+                {aceptaPrivacidad ? (
+                  <FontAwesome name="check" size={11} color="#000" />
+                ) : null}
+              </View>
+            </Pressable>
+            <Text className="flex-1 font-sans text-sm leading-5 text-brand-muted">
+              Acepto la{" "}
+              <Text
+                className="text-brand-chartreuse underline"
+                onPress={() => setLegalSheet("privacidad")}
+              >
+                Política de Privacidad
+              </Text>
+              .
+            </Text>
           </View>
-          <Text className="flex-1 font-sans text-sm leading-5 text-brand-muted">
-            Acepto la Política de Privacidad
-          </Text>
-        </Pressable>
+        </View>
+
+        <LegalDocumentSheet
+          tipo={legalSheet}
+          visible={legalSheet !== null}
+          onClose={() => setLegalSheet(null)}
+        />
 
         {error ? (
           <Text className="mt-4 font-sans text-sm text-red-400">{error}</Text>

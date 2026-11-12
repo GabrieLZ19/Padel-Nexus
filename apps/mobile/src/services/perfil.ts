@@ -126,7 +126,11 @@ export const PerfilService = {
     try {
       const response = await api.post<
         import("@/src/types/user.types").RegistroResponse
-      >("/perfil/registro", payload);
+      >("/perfil/registro", {
+        ...payload,
+        acepta_tyc: Boolean(payload.acepta_tyc),
+        acepta_privacidad: Boolean(payload.acepta_privacidad),
+      });
       return response.data;
     } catch (error: unknown) {
       throw new Error(getErrorMessage(error, "No se pudo crear la cuenta."));
