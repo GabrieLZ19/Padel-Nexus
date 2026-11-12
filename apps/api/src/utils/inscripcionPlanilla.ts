@@ -195,7 +195,7 @@ export function parsearFilasPlanilla(
 
 /** Email de fila: válido y sin dominios técnicos/QA. */
 export function normalizarEmailCeldaPlanilla(
-  raw?: string | null,
+  raw?: unknown,
 ): string | undefined {
   const s = sanearValorCeldaPlanilla(raw);
   if (!s) return undefined;

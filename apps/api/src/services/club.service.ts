@@ -215,10 +215,9 @@ export class ClubService {
     return (data as ClubCercano[]) || [];
   }
 
-  private static aplicarFiltrosNombreProvincia(
-    query: ReturnType<typeof supabaseAdmin.from>,
-    filtros?: FiltrosListadoClubesReserva,
-  ) {
+  private static aplicarFiltrosNombreProvincia<
+    Q extends { ilike: (column: string, pattern: string) => Q },
+  >(query: Q, filtros?: FiltrosListadoClubesReserva): Q {
     let q = query;
     if (filtros?.search?.trim()) {
       q = q.ilike("nombre", `%${filtros.search.trim()}%`);

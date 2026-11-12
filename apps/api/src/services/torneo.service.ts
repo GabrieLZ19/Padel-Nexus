@@ -2066,7 +2066,7 @@ export class TorneoService {
       ? String(previo.torneo_id)
       : null;
     if (yaTeniaResultado) {
-      if (!valorAnterior || !torneoIdPartido) {
+      if (!valorAnterior || !torneoIdPartido || !previo) {
         throw new Error(
           "No se pudo auditar la corrección: falta el torneo o el marcador anterior.",
         );
@@ -2335,6 +2335,11 @@ export class TorneoService {
       // Avance FAP por matchNo (orden) si existe matriz zonas+llaves; eliminatoria directa usa árbol por ronda.
       const usaMatrizFap = !esEliminatoriaDirecta(torneoInfo?.formato);
       let fapMatch: { matchNo: number; winnerTo: number | null } | undefined;
+      let matrix: Awaited<
+        ReturnType<
+          typeof import("../utils/fapBracketMatrices").getFapBracketForPairCount
+        >
+      > = null;
 
       if (usaMatrizFap) {
         const { count: pairCount } = await supabaseAdmin
@@ -2346,8 +2351,8 @@ export class TorneoService {
         const { getFapBracketForPairCount } = await import(
           "../utils/fapBracketMatrices"
         );
-        const matrix = getFapBracketForPairCount(pairCount ?? 0);
-        fapMatch = matrix?.find((m) => m.matchNo === partido.orden);
+        matrix = getFapBracketForPairCount(pairCount ?? 0);
+        fapMatch = matrix?.find((m) => m.matchNo === partido.orden) ?? undefined;
       }
 
       if (fapMatch?.winnerTo != null) {

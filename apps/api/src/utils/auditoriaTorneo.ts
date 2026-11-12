@@ -94,7 +94,7 @@ export async function listarAuditoriaTorneo(torneoId: string): Promise<unknown[]
 
   const entidades = referenciasEntidadTorneoEnAuditoria(id);
 
-  const consultas: Promise<{ data: unknown[] | null; error: { message: string } | null }>[] = [
+  const consultas = [
     supabaseAdmin
       .from("logs_auditoria")
       .select(SELECT_AUDITORIA_TORNEO)
