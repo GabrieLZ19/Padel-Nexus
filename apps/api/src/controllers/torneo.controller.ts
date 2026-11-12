@@ -361,9 +361,8 @@ function sincronizarLlaveEnLecturaPartidos(req: Request): boolean {
   }
   const forzar =
     req.query.sincronizar === "1" || req.query.sincronizar === "true";
-  const rol = req.user?.rol;
-  if (forzar) return esRolAccesoCrm(rol);
-  return esRolAccesoCrm(rol);
+  if (!forzar) return false;
+  return esRolAccesoCrm(req.user?.rol);
 }
 
 export const getPartidosByTorneo = async (

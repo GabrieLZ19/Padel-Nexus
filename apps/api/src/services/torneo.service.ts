@@ -1504,19 +1504,18 @@ export class TorneoService {
       }
     }
 
-    const [partidosRes, inscripcionesRes] = await Promise.all([
-      supabaseAdmin
-        .from("partidos")
-        .select("*")
-        .eq("torneo_id", id)
-        .order("orden", { ascending: true })
-        .order("id", { ascending: true }),
-      supabaseAdmin
-        .from("inscripciones")
-        .select(
-          `
-        id, 
-        jugador1_nombre, 
+    const { data: partidos, error: partidosError } = await supabaseAdmin
+      .from("partidos")
+      .select("*")
+      .eq("torneo_id", id)
+      .order("orden", { ascending: true })
+      .order("id", { ascending: true });
+
+    if (partidosError) throw new Error(partidosError.message);
+
+    const inscripcionSelect = `
+        id,
+        jugador1_nombre,
         jugador2_nombre,
         usuario_id,
         usuario2_id,
@@ -1531,16 +1530,29 @@ export class TorneoService {
           lugar_residencia,
           clubes:clubes!perfiles_club_id_fkey (nombre)
         )
-      `,
-        )
-        .eq("torneo_id", id),
-    ]);
+      `;
 
-    const { data: partidos, error: partidosError } = partidosRes;
-    const { data: inscripciones, error: insError } = inscripcionesRes;
+    const inscripcionIds = new Set<string>();
+    for (const p of partidos || []) {
+      if (p.equipo_a_id) inscripcionIds.add(String(p.equipo_a_id));
+      if (p.equipo_b_id) inscripcionIds.add(String(p.equipo_b_id));
+    }
 
-    if (partidosError) throw new Error(partidosError.message);
-    if (insError) throw new Error(insError.message);
+    let inscripciones: Record<string, unknown>[] = [];
+    if (inscripcionIds.size > 0) {
+      const ids = [...inscripcionIds];
+      const chunkSize = 150;
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        const chunk = ids.slice(i, i + chunkSize);
+        const { data, error: insError } = await supabaseAdmin
+          .from("inscripciones")
+          .select(inscripcionSelect)
+          .eq("torneo_id", id)
+          .in("id", chunk);
+        if (insError) throw new Error(insError.message);
+        if (data?.length) inscripciones.push(...data);
+      }
+    }
 
     const insMap = new Map<string, ReturnType<typeof mapInscripcionPartido>>();
     (inscripciones || []).forEach((ins: Record<string, unknown>) => {

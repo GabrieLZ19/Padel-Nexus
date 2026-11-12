@@ -15,6 +15,10 @@ describe("PUB-3 lectura de partidos sin sincronizar en público", () => {
     assert.match(ctrl, /sincronizarLlaveEnLecturaPartidos/);
     assert.match(ctrl, /sincronizarLlave: sincronizarLlaveEnLecturaPartidos/);
     assert.match(ctrl, /esRolAccesoCrm/);
+    const fnStart = ctrl.indexOf("function sincronizarLlaveEnLecturaPartidos");
+    assert.ok(fnStart > 0);
+    const fnBlock = ctrl.slice(fnStart, fnStart + 480);
+    assert.match(fnBlock, /if \(!forzar\) return false/);
   });
 
   it("obtenerPartidosFormateados solo sincroniza si sincronizarLlave es true", () => {
@@ -24,13 +28,14 @@ describe("PUB-3 lectura de partidos sin sincronizar en público", () => {
     );
     const idx = svc.indexOf("static async obtenerPartidosFormateados");
     assert.ok(idx > 0);
-    const bloque = svc.slice(idx, idx + 900);
+    const bloque = svc.slice(idx, idx + 2200);
     assert.match(bloque, /opciones\?: \{ sincronizarLlave\?: boolean \}/);
     assert.match(
       bloque,
       /if \(opciones\?\.sincronizarLlave\) \{[\s\S]*sincronizarClasificadosALlave/,
     );
-    assert.match(bloque, /Promise\.all\(\[/);
+    assert.match(bloque, /inscripcionIds/);
+    assert.match(bloque, /\.in\("id", chunk\)/);
   });
 
   it("GET partidos usa optionalAuthenticate para resolver rol sin exigir sesión", () => {
