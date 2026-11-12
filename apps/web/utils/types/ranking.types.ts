@@ -42,6 +42,7 @@ export interface HistorialRanking {
   torneo_nombre?: string | null;
   torneo_nivel?: string | null;
   torneo_alcance?: string | null;
+  ronda?: string | null;
 }
 
 /** Registro de ranking + historial, devuelto por GET /rankings/:usuario_id */

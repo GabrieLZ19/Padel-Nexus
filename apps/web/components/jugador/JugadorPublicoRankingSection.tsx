@@ -5,6 +5,11 @@ import type { RankingPerfilJugador } from "@/utils/types";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import { textoRectora } from "@/utils/textosRectora";
 import { useSiglaRectora } from "@/utils/useSiglaRectora";
+import {
+  ETIQUETA_PUNTOS_FICHA_PUBLICA,
+  subtituloMovimientoHistorial,
+  tituloMovimientoHistorial,
+} from "@/utils/fichaPublicaJugador";
 
 function labelAlcance(alcance?: string | null): string {
   switch (alcance) {
@@ -109,14 +114,16 @@ export default function JugadorPublicoRankingSection({
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-1">
-              {textoRectora("puntos", siglaRectora)}
+              {ETIQUETA_PUNTOS_FICHA_PUBLICA}
             </p>
             <p className="text-4xl md:text-5xl font-black text-brand-chartreuse tabular-nums">
               {principal.puntos.toLocaleString("es-AR")}
             </p>
             <p className="text-sm text-gray-400 mt-2">
-              {labelAlcance(principal.alcance || scope)} ·{" "}
-              {etiquetaCategoria(principal.categoria)}
+              {labelAlcance(principal.alcance || scope)} · Categoría en ranking:{" "}
+              <span className="text-gray-300 font-semibold">
+                {etiquetaCategoria(principal.categoria)}
+              </span>
             </p>
             {principal.ranking_provisional ? (
               <p className="text-xs text-amber-400/90 mt-2 max-w-sm">
@@ -218,14 +225,6 @@ export default function JugadorPublicoRankingSection({
             {historial.map((h, i) => {
               const delta =
                 (h.puntos_nuevos ?? 0) - (h.puntos_anteriores ?? 0);
-              const fecha = h.created_at
-                ? new Date(h.created_at).toLocaleDateString("es-AR", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                  })
-                : "—";
-              const torneoLabel = h.torneo_nombre?.trim() || "Torneo";
               return (
                 <li
                   key={`${h.torneo_id || "mov"}-${i}`}
@@ -233,9 +232,11 @@ export default function JugadorPublicoRankingSection({
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-white truncate">
-                      {torneoLabel}
+                      {tituloMovimientoHistorial(h)}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">{fecha}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {subtituloMovimientoHistorial(h)}
+                    </p>
                   </div>
                   <span
                     className={`text-sm font-bold tabular-nums shrink-0 ${

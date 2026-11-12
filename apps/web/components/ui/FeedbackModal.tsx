@@ -175,13 +175,23 @@ export default function FeedbackModal({
                     <label className="block text-xs font-bold text-gray-400 mb-1">
                       {inputLabel}
                     </label>
-                    <input
-                      type={inputType}
-                      placeholder={inputPlaceholder}
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      className="w-full bg-[#111111] text-white rounded-xl border border-white/10 px-4 py-3 focus:border-brand-chartreuse focus:ring-1 focus:ring-brand-chartreuse transition-colors"
-                    />
+                    {inputType === "textarea" ? (
+                      <textarea
+                        placeholder={inputPlaceholder}
+                        value={inputValue}
+                        rows={3}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        className="w-full resize-y bg-[#111111] text-white rounded-xl border border-white/10 px-4 py-3 focus:border-brand-chartreuse focus:ring-1 focus:ring-brand-chartreuse transition-colors"
+                      />
+                    ) : (
+                      <input
+                        type={inputType}
+                        placeholder={inputPlaceholder}
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        className="w-full bg-[#111111] text-white rounded-xl border border-white/10 px-4 py-3 focus:border-brand-chartreuse focus:ring-1 focus:ring-brand-chartreuse transition-colors"
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -191,7 +201,7 @@ export default function FeedbackModal({
             <div className="flex flex-col gap-3">
               {onConfirm && (
                 <button
-                  disabled={isLoading || (showInput && !inputValue)}
+                  disabled={isLoading || (showInput && !inputValue.trim())}
                   onClick={() => onConfirm(inputValue, selectValue)}
                   className={`w-full py-4 rounded-xl font-bold text-[15px] transition-all ${btnClass} disabled:opacity-50 flex items-center justify-center gap-2`}
                 >

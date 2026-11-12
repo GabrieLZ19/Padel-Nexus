@@ -197,12 +197,26 @@ export const LicenciasService = {
     id: string,
     estado: string,
     fecha_vencimiento?: string,
+    motivo?: string,
   ): Promise<Licencia> {
     const response = await api.patch(`/licencias/${id}/estado`, {
       estado,
       fecha_vencimiento,
+      ...(motivo?.trim() ? { motivo: motivo.trim() } : {}),
     });
     return unwrapData<Licencia>(response.data);
+  },
+
+  async getHistorial(licenciaId: string): Promise<
+    Array<{
+      id: string;
+      accion: string;
+      detalles: Record<string, unknown> | null;
+      created_at: string;
+    }>
+  > {
+    const response = await api.get(`/licencias/${licenciaId}/historial`);
+    return unwrapData(response.data);
   },
 
   async darDeBaja(id: string): Promise<void> {

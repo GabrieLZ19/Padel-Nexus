@@ -22,6 +22,7 @@ import { puedeVerFichaCompleta } from "@/utils/auth/roles";
 import JugadorPublicoRankingSection, {
   elegirRegistroPrincipal,
 } from "@/components/jugador/JugadorPublicoRankingSection";
+import { categoriasJuegoYRankingDifieren } from "@/utils/fichaPublicaJugador";
 
 type PerfilVista = Partial<Perfil> & {
   clubes?: { id?: string; nombre?: string } | null;
@@ -158,10 +159,15 @@ export default function FichaJugadorPublicaPage() {
     registroPrincipal?.perfiles?.clubes?.nombre ||
     null;
 
-  const categoriaDisplay =
+  const categoriaJuego =
     perfil?.categoria_padel ||
-    registroPrincipal?.categoria ||
-    registroPrincipal?.perfiles?.categoria_padel;
+    registroPrincipal?.perfiles?.categoria_padel ||
+    null;
+  const categoriaRanking = registroPrincipal?.categoria ?? null;
+  const categoriasDifieren = categoriasJuegoYRankingDifieren(
+    categoriaJuego,
+    categoriaRanking,
+  );
   const residenciaDisplay =
     perfil?.lugar_residencia ||
     registroPrincipal?.perfiles?.lugar_residencia ||
@@ -210,9 +216,19 @@ export default function FichaJugadorPublicaPage() {
                 {nombreCompleto}
               </h1>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm text-gray-400">
-                {categoriaDisplay ? (
+                {categoriaJuego ? (
                   <span className="font-semibold text-gray-300">
-                    Cat. {etiquetaCategoria(categoriaDisplay)}
+                    Categoría de juego:{" "}
+                    {etiquetaCategoria(categoriaJuego)}
+                  </span>
+                ) : categoriaRanking ? (
+                  <span className="font-semibold text-gray-300">
+                    Ranking: {etiquetaCategoria(categoriaRanking)}
+                  </span>
+                ) : null}
+                {categoriasDifieren && categoriaRanking ? (
+                  <span className="text-gray-500">
+                    Ranking actual: {etiquetaCategoria(categoriaRanking)}
                   </span>
                 ) : null}
                 {residenciaDisplay ? (
@@ -248,9 +264,16 @@ export default function FichaJugadorPublicaPage() {
               <div className="border-t border-white/8">
                 <FieldRow
                   icon={<Medal className="size-4 text-brand-chartreuse/70" />}
-                  label="Categoría"
-                  value={etiquetaCategoria(categoriaDisplay) || "—"}
+                  label="Categoría de juego"
+                  value={etiquetaCategoria(categoriaJuego) || "—"}
                 />
+                {categoriaRanking ? (
+                  <FieldRow
+                    icon={<Medal className="size-4 text-white/50" />}
+                    label="Categoría en ranking"
+                    value={etiquetaCategoria(categoriaRanking)}
+                  />
+                ) : null}
                 <FieldRow
                   icon={<Swords className="size-4 text-brand-chartreuse/70" />}
                   label="Lado"

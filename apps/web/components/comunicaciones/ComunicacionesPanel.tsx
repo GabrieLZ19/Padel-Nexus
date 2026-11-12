@@ -1514,8 +1514,9 @@ export default function ComunicacionesPanel() {
                 })}
               </div>
               <p className="text-[11px] text-gray-500">
-                Email usa Resend si está configurado en el servidor. WhatsApp
-                requiere integración con proveedor (fase 2).
+                In-app muestra el aviso en la plataforma. El correo llega si el
+                destinatario tiene email y acepta notificaciones por mail.
+                WhatsApp todavía no está disponible para campañas.
               </p>
             </div>
 

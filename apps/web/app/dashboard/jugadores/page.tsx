@@ -192,6 +192,11 @@ export default function JugadoresLicenciasPage() {
     };
   }, [fetchLicencias, page, search, filtroActivo]);
 
+  const [suspenderLicencia, setSuspenderLicencia] = useState<{
+    id: string;
+    nombre: string;
+  } | null>(null);
+
   const pedirCambioEstado = (
     licenciaId: string,
     nuevoEstado: "Activa" | "Suspendida",
@@ -201,27 +206,17 @@ export default function JugadoresLicenciasPage() {
       void handleCambiarEstadoRapido(licenciaId, nuevoEstado);
       return;
     }
-    setFeedback({
-      isOpen: true,
-      type: "warning",
-      title: "¿Suspender licencia?",
-      description: `La licencia de ${nombre} quedará suspendida. Podés reactivarla más adelante.`,
-      confirmText: "Suspender",
-      cancelText: "Cancelar",
-      onConfirm: () => {
-        setFeedback((prev) => ({ ...prev, isOpen: false, onConfirm: undefined }));
-        void handleCambiarEstadoRapido(licenciaId, nuevoEstado);
-      },
-    });
+    setSuspenderLicencia({ id: licenciaId, nombre });
   };
 
   const handleCambiarEstadoRapido = async (
     licenciaId: string,
     nuevoEstado: "Activa" | "Suspendida",
+    motivo?: string,
   ) => {
     setLoading(true);
     try {
-      await LicenciasService.updateEstado(licenciaId, nuevoEstado);
+      await LicenciasService.updateEstado(licenciaId, nuevoEstado, undefined, motivo);
       setFeedback({
         isOpen: true,
         title:
@@ -253,15 +248,23 @@ export default function JugadoresLicenciasPage() {
     if (!editingFechaInput) return;
     setSavingFecha(true);
     try {
-      await LicenciasService.updateEstado(
+      const actualizada = await LicenciasService.updateEstado(
         licenciaId,
         estadoActual,
         editingFechaInput,
       );
+      let description = "La fecha de vencimiento individual fue guardada.";
+      if (estadoActual === "Vencida" && actualizada.estado === "Activa") {
+        description =
+          "La licencia quedó vigente con la nueva fecha de vencimiento.";
+      } else if (estadoActual === "Activa" && actualizada.estado === "Vencida") {
+        description =
+          "Con esa fecha la licencia figura vencida. Podés ampliar el vencimiento o reactivarla si corresponde.";
+      }
       setFeedback({
         isOpen: true,
         title: "Vencimiento actualizado",
-        description: "La fecha de vencimiento individual fue guardada.",
+        description,
         type: "success",
       });
       setEditingLicenciaId(null);
@@ -805,6 +808,32 @@ export default function JugadoresLicenciasPage() {
         confirmText={feedback.confirmText}
         cancelText={feedback.cancelText}
         onConfirm={feedback.onConfirm}
+      />
+      <FeedbackModal
+        isOpen={!!suspenderLicencia}
+        type="warning"
+        title="¿Suspender licencia?"
+        description={
+          suspenderLicencia
+            ? `La licencia de ${suspenderLicencia.nombre} quedará suspendida. El jugador recibirá una notificación con el motivo.`
+            : ""
+        }
+        confirmText="Suspender"
+        cancelText="Cancelar"
+        isLoading={loading}
+        showInput
+        inputType="textarea"
+        inputLabel="Motivo (obligatorio)"
+        inputPlaceholder="Ej. falta de pago, documentación incompleta..."
+        onClose={() => setSuspenderLicencia(null)}
+        onConfirm={(motivo) => {
+          if (!suspenderLicencia || !motivo?.trim()) return;
+          void handleCambiarEstadoRapido(
+            suspenderLicencia.id,
+            "Suspendida",
+            motivo.trim(),
+          ).finally(() => setSuspenderLicencia(null));
+        }}
       />
     </div>
   );

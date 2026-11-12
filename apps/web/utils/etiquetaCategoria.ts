@@ -3,7 +3,10 @@
  * Acepta «7», «7a», «7ª», «7º» y «6TA», y no duplica «6TA 6TA».
  */
 export function etiquetaCategoria(valor: string | null | undefined): string {
-  const limpio = (valor ?? "").trim().replace(/\s+/g, " ");
+  const limpio = (valor ?? "")
+    .trim()
+    .replace(/^>\s*/, "")
+    .replace(/\s+/g, " ");
   if (!limpio) return "";
   const repetida = limpio.match(/^(.+?)\s+\1$/i);
   const base = (repetida ? repetida[1] : limpio).replace(

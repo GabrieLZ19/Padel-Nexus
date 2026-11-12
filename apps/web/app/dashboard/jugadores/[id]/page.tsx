@@ -51,21 +51,71 @@ export default function PerfilJugadorAdminPage() {
   const currentLicencia =
     licenciasList[activeLicenciaIndex] || licenciasList[0];
 
+  const [historialLicencia, setHistorialLicencia] = useState<
+    Array<{
+      id: string;
+      accion: string;
+      detalles: Record<string, unknown> | null;
+      created_at: string;
+    }>
+  >([]);
+
+  const cargarHistorialLicencia = useCallback(async (licenciaId: string) => {
+    try {
+      const rows = await LicenciasService.getHistorial(licenciaId);
+      setHistorialLicencia(rows);
+    } catch {
+      setHistorialLicencia([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentLicencia?.id) {
+      void cargarHistorialLicencia(currentLicencia.id);
+    }
+  }, [currentLicencia?.id, cargarHistorialLicencia]);
+
   const handleUpdateLicencia = async (
     nuevoEstado: string,
     fechaVenc?: string,
+    motivo?: string,
   ) => {
     if (!currentLicencia) return;
     setActualizando(true);
     try {
-      await LicenciasService.updateEstado(
+      const previo = currentLicencia.estado;
+      const actualizada = await LicenciasService.updateEstado(
         currentLicencia.id,
         nuevoEstado,
         fechaVenc,
+        motivo,
       );
       // Actualizamos el input de fecha con la nueva
       if (fechaVenc) setFechaVencimientoInput(fechaVenc);
+      if (fechaVenc) {
+        if (previo === "Vencida" && actualizada.estado === "Activa") {
+          sileo.success({
+            title: "Licencia vigente",
+            description:
+              "Se actualizó el vencimiento y la licencia volvió a estado activo.",
+          });
+        } else if (previo === "Activa" && actualizada.estado === "Vencida") {
+          sileo.warning({
+            title: "Vencimiento en el pasado",
+            description:
+              "Con esa fecha la licencia figura vencida en el sistema.",
+          });
+        } else {
+          sileo.success({
+            title: "Vencimiento actualizado",
+            description: "La fecha de vencimiento fue guardada.",
+          });
+        }
+      }
       await fetchPerfil(true);
+      if (currentLicencia?.id) {
+        await cargarHistorialLicencia(currentLicencia.id);
+      }
       setEditingFecha(false);
     } catch (err) {
       console.error("Error al actualizar licencia:", err);
@@ -403,6 +453,33 @@ export default function PerfilJugadorAdminPage() {
                     </div>
                   </div>
 
+                  {historialLicencia.length > 0 ? (
+                    <div className="mt-3 rounded-xl border border-white/5 bg-black/20 px-3 py-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+                        Historial de licencia
+                      </p>
+                      <ul className="space-y-1.5 max-h-28 overflow-y-auto text-[11px] text-gray-400">
+                        {historialLicencia.map((ev) => (
+                          <li key={ev.id}>
+                            <span className="text-gray-300">
+                              {ev.accion === "suspender_licencia"
+                                ? "Suspensión"
+                                : ev.accion === "reactivar_licencia"
+                                  ? "Reactivación"
+                                  : ev.accion}
+                            </span>
+                            {typeof ev.detalles?.motivo === "string" ? (
+                              <span className="text-gray-500">
+                                {" "}
+                                · {String(ev.detalles.motivo)}
+                              </span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
                   {/* Acciones de Licencia */}
                   <div className="flex flex-col gap-2 pt-4 border-t border-white/5">
                     {currentLicencia.estado === "Activa" ? (
@@ -507,14 +584,19 @@ export default function PerfilJugadorAdminPage() {
         isOpen={confirmarSuspender}
         type="warning"
         title="¿Suspender licencia?"
-        description={`La licencia quedará suspendida y podrá reactivarse más adelante.`}
+        description="La licencia quedará suspendida. El jugador recibirá una notificación con el motivo."
         confirmText="Suspender"
         cancelText="Cancelar"
         isLoading={actualizando}
+        showInput
+        inputType="textarea"
+        inputLabel="Motivo (obligatorio)"
+        inputPlaceholder="Ej. falta de pago, documentación incompleta..."
         onClose={() => setConfirmarSuspender(false)}
-        onConfirm={() => {
-          void handleUpdateLicencia("Suspendida").finally(() =>
-            setConfirmarSuspender(false),
+        onConfirm={(motivo) => {
+          if (!motivo?.trim()) return;
+          void handleUpdateLicencia("Suspendida", undefined, motivo.trim()).finally(
+            () => setConfirmarSuspender(false),
           );
         }}
       />

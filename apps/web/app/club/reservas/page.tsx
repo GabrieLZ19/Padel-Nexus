@@ -22,6 +22,7 @@ import CustomDropdown from "@/components/ui/CustomDropdown";
 import Pagination from "@/components/ui/Pagination";
 import FeedbackModal, { type FeedbackModalProps } from "@/components/ui/FeedbackModal";
 import { formatFechaCalendario } from "@/utils/formatFecha";
+import { resumenBloqueoAgenda } from "@/utils/bloqueoDisponibilidad";
 
 type VistaReservas = "lista" | "agenda";
 
@@ -548,10 +549,11 @@ function AgendaDia({
                             <span className="block truncate font-semibold text-amber-200">
                               Bloqueado
                             </span>
-                            <span className="block truncate text-[10px] text-amber-300/90 capitalize">
-                              {[celda.bloqueo.tipo, celda.bloqueo.motivo]
-                                .filter(Boolean)
-                                .join(" · ")}
+                            <span className="block truncate text-[10px] text-amber-300/90 normal-case">
+                              {resumenBloqueoAgenda(
+                                celda.bloqueo.tipo,
+                                celda.bloqueo.motivo,
+                              )}
                             </span>
                           </div>
                         ) : (

@@ -21,10 +21,27 @@ export interface ParsePlanillaResult {
   filas: FilaPlanillaInscripcion[];
 }
 
+export function sanearValorCeldaPlanilla(valor: unknown): string {
+  let s = String(valor ?? "").trim();
+  s = s.replace(/<\/?v\s*>/gi, "");
+  s = s.replace(/^<v\s*/i, "");
+  s = s.replace(/<[^>]*>/g, "");
+  s = s.replace(/^>\s*/, "");
+  return s.replace(/\s+/g, " ").trim();
+}
+
 function normalizarTexto(valor: unknown): string {
-  return String(valor ?? "")
-    .trim()
-    .replace(/\s+/g, " ");
+  return sanearValorCeldaPlanilla(valor);
+}
+
+export function normalizarEmailCeldaPlanilla(
+  raw?: string | null,
+): string | undefined {
+  const s = sanearValorCeldaPlanilla(raw);
+  if (!s) return undefined;
+  const email = s.toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return undefined;
+  return email;
 }
 
 function normalizarDni(valor: unknown): string {
@@ -142,7 +159,9 @@ export function parsearFilasPlanilla(matrix: unknown[][]): ParsePlanillaResult {
           ? normalizarTexto(row[idxCategoria]) || undefined
           : undefined,
       email:
-        idxEmail >= 0 ? normalizarTexto(row[idxEmail]) || undefined : undefined,
+        idxEmail >= 0
+          ? normalizarEmailCeldaPlanilla(row[idxEmail])
+          : undefined,
       telefono:
         idxTelefono >= 0
           ? normalizarTexto(row[idxTelefono]) || undefined
@@ -203,7 +222,12 @@ export function nombrePlantillaInscripcion(torneo: {
 export function esEmailPlaceholderPlanilla(
   email: string | null | undefined,
 ): boolean {
-  return Boolean(email?.toLowerCase().includes("@padelnexus.local"));
+  const e = String(email || "").trim().toLowerCase();
+  if (!e) return true;
+  if (e.includes("@padelnexus.local")) return true;
+  if (/@example\.com$/i.test(e)) return true;
+  if (/^preinscripto\+/i.test(e)) return true;
+  return false;
 }
 
 export function etiquetaTipoPlanillaInscripcion(torneo: {

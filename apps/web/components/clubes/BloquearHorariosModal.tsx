@@ -5,6 +5,9 @@ import { Ban, CalendarRange, Trash2, X } from "lucide-react";
 import { sileo } from "sileo";
 import { ClubPanelService } from "@/utils/services/club-panel";
 import { ClubesService } from "@/utils/services/clubes";
+import {
+  ETIQUETA_TIPO_BLOQUEO,
+} from "@/utils/bloqueoDisponibilidad";
 import type {
   BloqueoDisponibilidad,
   BloqueoTipo,
@@ -25,12 +28,9 @@ interface BloquearHorariosModalProps {
   clubId?: string;
 }
 
-const TIPOS: Array<{ id: BloqueoTipo; label: string }> = [
-  { id: "torneo", label: "Torneo" },
-  { id: "abono", label: "Abono / fijo" },
-  { id: "mantenimiento", label: "Mantenimiento" },
-  { id: "otro", label: "Otro" },
-];
+const TIPOS: Array<{ id: BloqueoTipo; label: string }> = (
+  Object.entries(ETIQUETA_TIPO_BLOQUEO) as Array<[BloqueoTipo, string]>
+).map(([id, label]) => ({ id, label }));
 
 function fmtDate(iso: string) {
   const d = String(iso).slice(0, 10);
@@ -326,7 +326,7 @@ export function BloquearHorariosModal({
                           {b.cancha_id
                             ? b.canchas?.nombre || "Cancha"
                             : "Todas las canchas"}{" "}
-                          · {b.tipo}
+                          · {ETIQUETA_TIPO_BLOQUEO[b.tipo] ?? b.tipo}
                           {b.motivo ? ` · ${b.motivo}` : ""}
                         </p>
                       </div>
