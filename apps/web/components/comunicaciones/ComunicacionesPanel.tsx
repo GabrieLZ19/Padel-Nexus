@@ -42,6 +42,10 @@ import {
 } from "@/utils/comunicacionesAudienciaDefault";
 import { formatearFechaHoraArgentina } from "@/utils/fechaArgentina";
 import { resumenMetricasCampana } from "@/utils/comunicacionesMetricasCampana";
+import {
+  etiquetasCanalesLegibles,
+  remitenteCampanaLegible,
+} from "@/utils/remitenteCampana";
 import type {
   AudienciaPreview,
   ComunicacionesAudienciaTipo,
@@ -864,7 +868,7 @@ export default function ComunicacionesPanel() {
       type: "warning",
       title: "¿Enviar campaña?",
       description: total
-        ? `Destinatarios: ${total}. Canales: ${canalesEnvio.join(", ")}. El aviso in-app se guarda en el centro de notificaciones aunque el push esté desactivado.`
+        ? `Destinatarios: ${total}. Canales: ${etiquetasCanalesLegibles(canalesEnvio)}. El aviso in-app se guarda en el centro de notificaciones aunque el push esté desactivado.`
         : "Vas a enviar la campaña a la audiencia seleccionada. Recomendamos previsualizar antes.",
       confirmText: "Enviar ahora",
       cancelText: "Cancelar",
@@ -2065,14 +2069,7 @@ export default function ComunicacionesPanel() {
           ) : (
             <ul className="space-y-3">
               {campanas.map((c) => {
-                const remitenteNombre = c.creador
-                  ? nombrePersona({
-                      nombre: c.creador.nombre,
-                      apellido: c.creador.apellido,
-                      email: c.creador.email,
-                    })
-                  : "Usuario desconocido";
-                const remitenteRol = c.creador?.rol;
+                const remitenteNombre = remitenteCampanaLegible(c);
                 return (
                   <li
                     key={c.id}
@@ -2111,12 +2108,8 @@ export default function ComunicacionesPanel() {
                         Aperturas: {c.metricas?.abiertos ?? 0} · Clics:{" "}
                         {c.metricas?.clics ?? 0}
                       </span>
-                      <span
-                        className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-400 border border-brand-white/10 normal-case tracking-normal"
-                        title={remitenteRol || undefined}
-                      >
+                      <span className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-400 border border-brand-white/10 normal-case tracking-normal">
                         Enviado por: {remitenteNombre}
-                        {remitenteRol ? ` · ${remitenteRol}` : ""}
                       </span>
                       {c.action_url && (
                         <span className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-500 border border-brand-white/10 font-mono normal-case tracking-normal">

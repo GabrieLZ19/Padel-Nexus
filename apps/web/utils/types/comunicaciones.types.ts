@@ -21,9 +21,15 @@ export type ComunicacionesLicenciaEstado = "vigente" | "sin_licencia";
 
 export type ComunicacionesCanal = "in_app" | "email" | "whatsapp";
 
+export type OmitidoMotivoClave = "sin_dato" | "no_configurado" | "prefs" | "error";
+
 export interface ComunicacionesMetricasCampana {
   entregados?: Partial<Record<ComunicacionesCanal, number>>;
   omitidos?: Partial<Record<ComunicacionesCanal, number>>;
+  omitidos_motivo?: Partial<
+    Record<ComunicacionesCanal, Partial<Record<OmitidoMotivoClave, number>>>
+  >;
+  entidad_remitente?: string;
   abiertos?: number;
   clics?: number;
 }
