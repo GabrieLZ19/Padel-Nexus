@@ -28,6 +28,11 @@ import { licenciasComoArray } from "@/utils/licenciasArray";
 import { ContactoEtiquetasEditor } from "@/components/crm/ContactoEtiquetasEditor";
 import type { ComunicacionesEtiqueta } from "@/utils/types/comunicaciones.types";
 import { sileo } from "sileo";
+import { fechaLatina, fechaHoraLatinaArgentina } from "@/utils/fechaArgentina";
+import {
+  detalleTextoHistorialLicencia,
+  etiquetaAccionHistorialLicencia,
+} from "@/utils/historialLicenciaUi";
 
 export default function PerfilJugadorAdminPage() {
   const { id } = useParams();
@@ -41,6 +46,7 @@ export default function PerfilJugadorAdminPage() {
   const [fechaVencimientoInput, setFechaVencimientoInput] = useState("");
   const [activeLicenciaIndex, setActiveLicenciaIndex] = useState(0);
   const [confirmarSuspender, setConfirmarSuspender] = useState(false);
+  const [confirmarReactivar, setConfirmarReactivar] = useState(false);
   const [confirmarBaja, setConfirmarBaja] = useState(false);
   const [etiquetasCrm, setEtiquetasCrm] = useState<ComunicacionesEtiqueta[]>(
     [],
@@ -57,6 +63,7 @@ export default function PerfilJugadorAdminPage() {
       accion: string;
       detalles: Record<string, unknown> | null;
       created_at: string;
+      admin_nombre?: string | null;
     }>
   >([]);
 
@@ -439,7 +446,7 @@ export default function PerfilJugadorAdminPage() {
                           {/* 🚀 CORRECCIÓN APLICADA AQUÍ ABAJO */}
                           <span className="text-gray-300 text-sm font-semibold">
                             {currentLicencia.fecha_vencimiento
-                              ? currentLicencia.fecha_vencimiento.split("T")[0]
+                              ? fechaLatina(currentLicencia.fecha_vencimiento)
                               : "No asignada"}
                           </span>
                           <button
@@ -458,24 +465,28 @@ export default function PerfilJugadorAdminPage() {
                       <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
                         Historial de licencia
                       </p>
-                      <ul className="space-y-1.5 max-h-28 overflow-y-auto text-[11px] text-gray-400">
-                        {historialLicencia.map((ev) => (
-                          <li key={ev.id}>
-                            <span className="text-gray-300">
-                              {ev.accion === "suspender_licencia"
-                                ? "Suspensión"
-                                : ev.accion === "reactivar_licencia"
-                                  ? "Reactivación"
-                                  : ev.accion}
-                            </span>
-                            {typeof ev.detalles?.motivo === "string" ? (
-                              <span className="text-gray-500">
-                                {" "}
-                                · {String(ev.detalles.motivo)}
-                              </span>
-                            ) : null}
-                          </li>
-                        ))}
+                      <ul className="space-y-2 max-h-36 overflow-y-auto text-[11px] text-gray-400">
+                        {historialLicencia.map((ev) => {
+                          const detalle = detalleTextoHistorialLicencia(ev);
+                          const autor =
+                            ev.admin_nombre?.trim() || "Sin autor registrado";
+                          return (
+                            <li key={ev.id} className="space-y-0.5">
+                              <div className="flex flex-wrap items-center gap-x-2">
+                                <span className="font-semibold text-gray-200">
+                                  {etiquetaAccionHistorialLicencia(ev.accion)}
+                                </span>
+                                <span className="text-gray-500">
+                                  {fechaHoraLatinaArgentina(ev.created_at)}
+                                </span>
+                              </div>
+                              <p className="text-gray-500 leading-snug">
+                                Por {autor}
+                                {detalle ? ` · ${detalle}` : ""}
+                              </p>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   ) : null}
@@ -495,7 +506,7 @@ export default function PerfilJugadorAdminPage() {
                       <button
                         type="button"
                         disabled={actualizando}
-                        onClick={() => handleUpdateLicencia("Activa")}
+                        onClick={() => setConfirmarReactivar(true)}
                         className="w-full flex items-center justify-center gap-2 py-2.5 bg-brand-chartreuse text-brand-black font-extrabold rounded-xl text-xs hover:bg-[#b3e600] transition-colors cursor-pointer disabled:opacity-50"
                       >
                         <ShieldCheck size={14} /> Reactivar licencia
@@ -592,11 +603,27 @@ export default function PerfilJugadorAdminPage() {
         inputType="textarea"
         inputLabel="Motivo (obligatorio)"
         inputPlaceholder="Ej. falta de pago, documentación incompleta..."
+        inputMinLength={3}
         onClose={() => setConfirmarSuspender(false)}
         onConfirm={(motivo) => {
-          if (!motivo?.trim()) return;
+          if (!motivo?.trim() || motivo.trim().length < 3) return;
           void handleUpdateLicencia("Suspendida", undefined, motivo.trim()).finally(
             () => setConfirmarSuspender(false),
+          );
+        }}
+      />
+      <FeedbackModal
+        isOpen={confirmarReactivar}
+        type="info"
+        title="¿Reactivar licencia?"
+        description="La licencia volverá a estado activo. El jugador podrá usar el carnet según la vigencia actual."
+        confirmText="Reactivar"
+        cancelText="Cancelar"
+        isLoading={actualizando}
+        onClose={() => setConfirmarReactivar(false)}
+        onConfirm={() => {
+          void handleUpdateLicencia("Activa").finally(() =>
+            setConfirmarReactivar(false),
           );
         }}
       />

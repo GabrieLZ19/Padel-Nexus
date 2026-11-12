@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Copy, Check, Loader2, Wallet, Building2 } from "lucide-react";
 import { sileo } from "sileo";
 import { LicenciasService } from "@/utils/services/licencias";
@@ -29,6 +29,9 @@ export default function LicenciaPagoPanel({
   const [preferenciaCache, setPreferenciaCache] = useState<Awaited<
     ReturnType<typeof LicenciasService.crearPreferenciaMp>
   > | null>(null);
+  const [transferenciaDisponible, setTransferenciaDisponible] = useState<
+    boolean | null
+  >(null);
 
   const monto =
     licenciaMontoPendiente(licencia) > 0
@@ -36,6 +39,22 @@ export default function LicenciaPagoPanel({
       : undefined;
   const etiqueta =
     licenciaFrecuenciaPago(licencia) === "mensual" ? "mensual" : "anual";
+
+  useEffect(() => {
+    let mounted = true;
+    void LicenciasService.getDatosTransferencia(licencia.id)
+      .then((datos) => {
+        if (mounted) {
+          setTransferenciaDisponible(datos.transferencia_disponible);
+        }
+      })
+      .catch(() => {
+        if (mounted) setTransferenciaDisponible(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [licencia.id]);
 
   const copiar = async (valor: string, tipo: "alias" | "cbu" | "ref") => {
     try {
@@ -108,13 +127,29 @@ export default function LicenciaPagoPanel({
   };
 
   const mostrarTransferencia = async () => {
-    const pref = await cargarPreferencia(true);
-    if (!pref) return;
-    if (pref.initPoint || pref.sandboxInitPoint) {
-      aplicarDatosPago(pref);
-      return;
+    setProcesando(true);
+    try {
+      const datos = await LicenciasService.getDatosTransferencia(licencia.id);
+      if (!datos.transferencia_disponible) {
+        sileo.warning({
+          title: "Transferencia no disponible",
+          description:
+            "Tu federación aún no cargó alias ni CBU. Usá Mercado Pago o contactalos.",
+        });
+        setTransferenciaDisponible(false);
+        return;
+      }
+      setInstrucciones(datos.instrucciones || null);
+      setAlias(datos.alias ?? null);
+      setCbu(datos.cbu ?? null);
+      setReferencia(datos.referencia || licencia.nro_licencia);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "No se pudieron cargar los datos.";
+      sileo.error({ title: "Error", description: msg });
+    } finally {
+      setProcesando(false);
     }
-    aplicarDatosPago(pref);
   };
 
   const montoLabel = monto != null ? formatMontoLicenciaArs(monto) : "—";
@@ -151,15 +186,24 @@ export default function LicenciaPagoPanel({
         {procesando ? "Procesando..." : "Pagar con Mercado Pago"}
       </button>
 
-      <button
-        type="button"
-        onClick={() => void mostrarTransferencia()}
-        disabled={procesando}
-        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-brand-white/15 bg-brand-white/5 text-brand-white text-xs font-bold hover:bg-brand-white/10 transition-colors cursor-pointer disabled:opacity-50"
-      >
-        <Building2 className="size-3.5 text-brand-chartreuse" />
-        Ver datos para transferencia
-      </button>
+      {transferenciaDisponible !== false ? (
+        <button
+          type="button"
+          onClick={() => void mostrarTransferencia()}
+          disabled={procesando || transferenciaDisponible === null}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-brand-white/15 bg-brand-white/5 text-brand-white text-xs font-bold hover:bg-brand-white/10 transition-colors cursor-pointer disabled:opacity-50"
+        >
+          <Building2 className="size-3.5 text-brand-chartreuse" />
+          {transferenciaDisponible === null
+            ? "Cargando datos..."
+            : "Ver datos para transferencia"}
+        </button>
+      ) : (
+        <p className="text-[11px] text-gray-500 text-center px-2 leading-snug">
+          El pago por transferencia no está habilitado: la federación debe cargar
+          alias o CBU en Jugadores → Configuración.
+        </p>
+      )}
 
       {(instrucciones || alias || cbu || referencia) && (
         <div className="rounded-xl border border-brand-white/10 bg-brand-black/50 p-3 space-y-2.5 text-xs text-gray-300">

@@ -196,17 +196,21 @@ export default function JugadoresLicenciasPage() {
     id: string;
     nombre: string;
   } | null>(null);
+  const [reactivarLicencia, setReactivarLicencia] = useState<{
+    id: string;
+    nombre: string;
+  } | null>(null);
 
   const pedirCambioEstado = (
     licenciaId: string,
     nuevoEstado: "Activa" | "Suspendida",
     nombre: string,
   ) => {
-    if (nuevoEstado !== "Suspendida") {
-      void handleCambiarEstadoRapido(licenciaId, nuevoEstado);
+    if (nuevoEstado === "Suspendida") {
+      setSuspenderLicencia({ id: licenciaId, nombre });
       return;
     }
-    setSuspenderLicencia({ id: licenciaId, nombre });
+    setReactivarLicencia({ id: licenciaId, nombre });
   };
 
   const handleCambiarEstadoRapido = async (
@@ -825,14 +829,38 @@ export default function JugadoresLicenciasPage() {
         inputType="textarea"
         inputLabel="Motivo (obligatorio)"
         inputPlaceholder="Ej. falta de pago, documentación incompleta..."
+        inputMinLength={3}
         onClose={() => setSuspenderLicencia(null)}
         onConfirm={(motivo) => {
-          if (!suspenderLicencia || !motivo?.trim()) return;
+          if (!suspenderLicencia || !motivo?.trim() || motivo.trim().length < 3) {
+            return;
+          }
           void handleCambiarEstadoRapido(
             suspenderLicencia.id,
             "Suspendida",
             motivo.trim(),
           ).finally(() => setSuspenderLicencia(null));
+        }}
+      />
+      <FeedbackModal
+        isOpen={!!reactivarLicencia}
+        type="info"
+        title="¿Reactivar licencia?"
+        description={
+          reactivarLicencia
+            ? `La licencia de ${reactivarLicencia.nombre} volverá a estado activo.`
+            : ""
+        }
+        confirmText="Reactivar"
+        cancelText="Cancelar"
+        isLoading={loading}
+        onClose={() => setReactivarLicencia(null)}
+        onConfirm={() => {
+          if (!reactivarLicencia) return;
+          void handleCambiarEstadoRapido(
+            reactivarLicencia.id,
+            "Activa",
+          ).finally(() => setReactivarLicencia(null));
         }}
       />
     </div>

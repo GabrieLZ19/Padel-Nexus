@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Info,
   IdCard,
+  Building2,
 } from "lucide-react";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import {
@@ -93,6 +94,9 @@ export function ConfigLicenciasPanel({
   const [mes, setMes] = useState(12);
   const [dia, setDia] = useState(31);
   const [mesesInput, setMesesInput] = useState("12");
+  const [pagoAlias, setPagoAlias] = useState("");
+  const [pagoCbu, setPagoCbu] = useState("");
+  const [pagoTitular, setPagoTitular] = useState("");
 
   const editarHabilitado =
     puedeEditar && (scope !== "contexto" || meta.puede_editar !== false);
@@ -127,6 +131,9 @@ export function ConfigLicenciasPanel({
         setMes(data.config.vencimientoMes ?? 12);
         setDia(data.config.vencimientoDia ?? 31);
         setMesesInput(String(data.config.vigenciaMeses ?? 12));
+        setPagoAlias(data.config.pagoAlias || "");
+        setPagoCbu(data.config.pagoCbu || "");
+        setPagoTitular(data.config.pagoTitular || "");
         setDescripcion(data.descripcion_vigencia || "");
         setHereda(Boolean(data.hereda_de_federacion));
         setMeta({
@@ -173,6 +180,9 @@ export function ConfigLicenciasPanel({
         vencimiento_mes: modo === "fecha_fija" ? mes : null,
         vencimiento_dia: modo === "fecha_fija" ? dia : null,
         vigencia_meses: modo === "meses_desde_emision" ? meses : 12,
+        pago_alias: pagoAlias.trim() || null,
+        pago_cbu: pagoCbu.replace(/\s+/g, "").trim() || null,
+        pago_titular: pagoTitular.trim() || null,
       };
 
       let data: LicenciaConfigData;
@@ -199,6 +209,9 @@ export function ConfigLicenciasPanel({
         setPrecioMensualInput(String(data.config.precioMensual ?? ""));
         setDiaCobro(data.config.diaCobro ?? 1);
         setMesesInput(String(data.config.vigenciaMeses ?? 12));
+        setPagoAlias(data.config.pagoAlias || "");
+        setPagoCbu(data.config.pagoCbu || "");
+        setPagoTitular(data.config.pagoTitular || "");
       }
       setDescripcion(data.descripcion_vigencia || "");
       setHereda(Boolean(data.hereda_de_federacion));
@@ -527,6 +540,69 @@ export function ConfigLicenciasPanel({
           </p>
         ) : null}
         </div>
+      </div>
+
+      <div
+        className={
+          seccion
+            ? "space-y-3 rounded-xl border border-white/10 bg-[#111111] p-4"
+            : "space-y-3 rounded-xl border border-white/10 bg-black/20 p-4"
+        }
+      >
+        <p className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+          <Building2 className="size-3.5 text-brand-chartreuse" />
+          Transferencia bancaria (jugadores)
+        </p>
+        <p className="text-[11px] text-gray-500 leading-snug">
+          Alias o CBU para el botón «Ver datos para transferencia» en Mi panel.
+          Si dejás ambos vacíos, esa opción no se muestra hasta cargar al menos
+          uno.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="space-y-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              Alias
+            </span>
+            <input
+              type="text"
+              disabled={!editarHabilitado}
+              value={pagoAlias}
+              onChange={(e) => setPagoAlias(e.target.value)}
+              placeholder="Ej: fap.licencias"
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white disabled:opacity-50 placeholder:text-gray-600"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+              CBU / CVU
+            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              disabled={!editarHabilitado}
+              value={pagoCbu}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "" || /^[\d\s]+$/.test(val)) setPagoCbu(val);
+              }}
+              placeholder="22 dígitos"
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white font-mono disabled:opacity-50 placeholder:text-gray-600"
+            />
+          </label>
+        </div>
+        <label className="block space-y-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+            Titular de la cuenta
+          </span>
+          <input
+            type="text"
+            disabled={!editarHabilitado}
+            value={pagoTitular}
+            onChange={(e) => setPagoTitular(e.target.value)}
+            placeholder="Ej: Federación Argentina de Pádel"
+            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white disabled:opacity-50 placeholder:text-gray-600"
+          />
+        </label>
       </div>
 
       <div className="flex items-start gap-2 text-xs text-gray-400 bg-black/20 border border-white/5 rounded-xl px-3 py-2.5 mt-auto">

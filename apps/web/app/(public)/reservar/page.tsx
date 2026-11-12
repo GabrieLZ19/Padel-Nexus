@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   MapPin,
   Search,
-  SlidersHorizontal,
+  Filter,
   Navigation,
   Star,
   ChevronRight,
@@ -41,7 +41,6 @@ export default function ReservarPage() {
   } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [geoResolved, setGeoResolved] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filtroProvincia, setFiltroProvincia] = useState("");
   const [filtroDistanciaKm, setFiltroDistanciaKm] = useState("");
@@ -138,6 +137,24 @@ export default function ReservarPage() {
     return `${km.toFixed(1)}km`;
   };
 
+  const hayFiltrosActivos = Boolean(
+    filtroProvincia ||
+      filtroDistanciaKm ||
+      filtroTipoSuelo ||
+      filtroTechada ||
+      filtroFecha ||
+      filtroHora,
+  );
+
+  const limpiarFiltros = () => {
+    setFiltroProvincia("");
+    setFiltroDistanciaKm("");
+    setFiltroTipoSuelo("");
+    setFiltroTechada("");
+    setFiltroFecha("");
+    setFiltroHora("");
+  };
+
   return (
     <main className="min-h-screen pt-24 pb-16">
       {/* ── Hero Section ─────────────────────────────────────── */}
@@ -152,8 +169,8 @@ export default function ReservarPage() {
             <span className="text-brand-chartreuse">cancha ideal</span>
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Buscá clubes cercanos, elegí tu horario y reservá en segundos.
-            Filtrá por distancia, tipo de suelo y disponibilidad.
+            Buscá por nombre o usá los filtros para distancia, tipo de cancha y
+            disponibilidad. Ordenamos por cercanía cuando compartís tu ubicación.
           </p>
         </div>
 
@@ -204,16 +221,6 @@ export default function ReservarPage() {
                   </div>
                 )}
             </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`p-3.5 rounded-xl border transition-all ${
-                showFilters
-                  ? "bg-brand-chartreuse text-black border-brand-chartreuse"
-                  : "bg-brand-card border-white/10 text-gray-400 hover:text-white hover:border-white/20"
-              }`}
-            >
-              <SlidersHorizontal className="w-5 h-5" />
-            </button>
             {!userLocation && (
               <button
                 onClick={requestLocation}
@@ -225,31 +232,42 @@ export default function ReservarPage() {
             )}
           </div>
 
-          {/* ── Filtros expandibles ─────────────────────────── */}
-          {showFilters && (
-            <div className="mt-4 p-5 bg-brand-card border border-white/10 rounded-xl space-y-4 animate-in slide-in-from-top-2">
-              {userLocation ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs text-green-400">
-                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                    Ubicación activa: {userLocation.lat.toFixed(4)},{" "}
-                    {userLocation.lng.toFixed(4)}
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    Ordenamos por distancia (km en cada tarjeta). Sin coordenadas
-                    del club usamos localidad y provincia.
-                  </p>
-                </div>
-              ) : (
-                <p className="text-xs text-gray-400">
-                  Activá tu ubicación para ver kilómetros y orden por cercanía.
-                </p>
+          {/* ── Filtros ───────────────────────────────────────── */}
+          <div className="mt-4 p-5 bg-brand-card border border-white/10 rounded-xl space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+                <Filter className="size-3.5 text-brand-chartreuse" />
+                Filtros
+              </div>
+              {hayFiltrosActivos && (
+                <button
+                  type="button"
+                  onClick={limpiarFiltros}
+                  className="text-[11px] font-bold text-brand-chartreuse hover:underline cursor-pointer bg-transparent border-0"
+                >
+                  Limpiar filtros
+                </button>
               )}
-              {geoError && (
-                <p className="text-xs text-yellow-400">{geoError}</p>
-              )}
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-white/10">
+            {userLocation ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs text-green-400">
+                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  Ubicación activa: orden por cercanía y km en cada tarjeta
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400">
+                Activá tu ubicación (botón al lado del buscador) para ver
+                kilómetros y el radio máximo de distancia.
+              </p>
+            )}
+            {geoError && (
+              <p className="text-xs text-yellow-400">{geoError}</p>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-white/10">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
                     Provincia
@@ -340,7 +358,6 @@ export default function ReservarPage() {
                 </div>
               </div>
             </div>
-          )}
         </div>
 
         {/* ── Mapa ───────────────────────────────────────────── */}

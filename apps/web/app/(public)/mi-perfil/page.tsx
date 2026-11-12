@@ -41,7 +41,10 @@ import { MinorModeBanner } from "@/components/legal/MinorModeBanner";
 import { fechaLatina } from "@/utils/fechaArgentina";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import { licenciasComoArray } from "@/utils/licenciasArray";
-import { etiquetaRepresentacionProvincial } from "@/utils/etiquetaRepresentacionProvincial";
+import {
+  representacionesProvincialMiPerfil,
+  etiquetaRepresentacionProvincialConFallback,
+} from "@/utils/representacionProvincialMiPerfil";
 
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-white/5 rounded-3xl ${className}`} />
@@ -54,11 +57,6 @@ const LICENSE_RELATED_TITLES = [
   "Afiliación aprobada",
   "Afiliación rechazada",
 ];
-
-function afiliacionVisible(estado?: string | null) {
-  const e = (estado || "").toLowerCase();
-  return e !== "suspendido" && e !== "rechazado" && e !== "baja";
-}
 
 export default function PlayerDashboard() {
   const { profile, fetchProfile } = useProfileStore();
@@ -85,6 +83,20 @@ export default function PlayerDashboard() {
   const licenciasJugador = useMemo(
     () => licenciasComoArray(profile?.licencias),
     [profile?.licencias],
+  );
+
+  const representacionesProvinciales = useMemo(
+    () =>
+      representacionesProvincialMiPerfil({
+        afiliaciones: profile?.afiliaciones,
+        licencias: profile?.licencias,
+      }),
+    [profile?.afiliaciones, profile?.licencias],
+  );
+
+  const representacionDesdeLicencia = useMemo(
+    () => representacionesProvinciales.some((r) => r.desde_licencia),
+    [representacionesProvinciales],
   );
 
   useEffect(() => {
@@ -376,33 +388,29 @@ export default function PlayerDashboard() {
               </div>
 
               <div className="mt-4 pt-4 border-t border-brand-white/5 w-full relative z-10 flex flex-col items-center">
-                {profile.afiliaciones &&
-                profile.afiliaciones.filter((af) => afiliacionVisible(af.estado))
-                  .length > 0 ? (
+                {representacionesProvinciales.length > 0 ? (
                   <>
                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2">
-                      Representación provincial (
-                      {
-                        profile.afiliaciones.filter((af) =>
-                          afiliacionVisible(af.estado),
-                        ).length
-                      }
-                      )
+                      Representación provincial ({representacionesProvinciales.length})
                     </p>
+                    {representacionDesdeLicencia ? (
+                      <p className="text-[10px] text-gray-500 mb-2 text-center leading-snug">
+                        Según tu licencia activa (sin afiliación provincial
+                        aparte).
+                      </p>
+                    ) : null}
                     <div className="flex flex-wrap justify-center gap-1.5 max-h-24 overflow-y-auto pr-1 mb-3 w-full">
-                      {profile.afiliaciones
-                        .filter((af) => afiliacionVisible(af.estado))
-                        .map((af) => (
-                          <span
-                            key={af.id}
-                            className="px-2.5 py-1 bg-brand-chartreuse/10 border border-brand-chartreuse/25 rounded-lg text-[9px] text-brand-chartreuse font-extrabold uppercase tracking-wider"
-                          >
-                            {etiquetaRepresentacionProvincial(af)}
-                            {af.estado?.toLowerCase() === "pendiente"
-                              ? " · pendiente"
-                              : ""}
-                          </span>
-                        ))}
+                      {representacionesProvinciales.map((af) => (
+                        <span
+                          key={af.id}
+                          className="px-2.5 py-1 bg-brand-chartreuse/10 border border-brand-chartreuse/25 rounded-lg text-[9px] text-brand-chartreuse font-extrabold uppercase tracking-wider"
+                        >
+                          {etiquetaRepresentacionProvincialConFallback(af)}
+                          {af.estado?.toLowerCase() === "pendiente"
+                            ? " · pendiente"
+                            : ""}
+                        </span>
+                      ))}
                     </div>
                   </>
                 ) : (

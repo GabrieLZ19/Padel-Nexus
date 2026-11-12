@@ -37,6 +37,9 @@ export interface LicenciaOrganizacionConfig {
   frecuenciaPago: LicenciaFrecuenciaPago;
   precioMensual: number;
   diaCobro: number | null;
+  pagoAlias?: string | null;
+  pagoCbu?: string | null;
+  pagoTitular?: string | null;
   origen?: string;
 }
 
@@ -63,6 +66,9 @@ export interface LicenciaConfigPayload {
   frecuencia_pago?: LicenciaFrecuenciaPago;
   precio_mensual?: number;
   dia_cobro?: number | null;
+  pago_alias?: string | null;
+  pago_cbu?: string | null;
+  pago_titular?: string | null;
 }
 
 export interface LicenciaCotizacion {
@@ -86,6 +92,18 @@ export interface LicenciaPreferenciaPago {
   moneda?: string;
   referencia?: string;
   instrucciones?: string;
+  alias?: string | null;
+  cbu?: string | null;
+  titular?: string | null;
+  transferencia_disponible?: boolean;
+}
+
+export interface LicenciaDatosTransferencia {
+  transferencia_disponible: boolean;
+  monto?: number;
+  moneda?: string;
+  referencia?: string;
+  instrucciones?: string | null;
   alias?: string | null;
   cbu?: string | null;
   titular?: string | null;
@@ -183,6 +201,15 @@ export const LicenciasService = {
     return unwrapData<LicenciaPreferenciaPago>(response.data);
   },
 
+  async getDatosTransferencia(
+    licenciaId: string,
+  ): Promise<LicenciaDatosTransferencia> {
+    const response = await api.get(
+      `/licencias/${licenciaId}/datos-transferencia`,
+    );
+    return unwrapData<LicenciaDatosTransferencia>(response.data);
+  },
+
   async confirmarRetornoMp(
     licenciaId: string,
     paymentId: string,
@@ -213,6 +240,7 @@ export const LicenciasService = {
       accion: string;
       detalles: Record<string, unknown> | null;
       created_at: string;
+      admin_nombre?: string | null;
     }>
   > {
     const response = await api.get(`/licencias/${licenciaId}/historial`);

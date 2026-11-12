@@ -23,6 +23,8 @@ export interface FeedbackModalProps {
   selectPlaceholder?: string;
   selectOptions?: { value: string; label: string }[];
   onConfirm?: (inputValue?: string, selectValue?: string) => void;
+  /** Mínimo de caracteres para habilitar confirmar cuando showInput. */
+  inputMinLength?: number;
 }
 
 export default function FeedbackModal({
@@ -43,6 +45,7 @@ export default function FeedbackModal({
   selectLabel = "Método",
   selectPlaceholder = "Seleccioná el método",
   selectOptions = [],
+  inputMinLength = 1,
 }: FeedbackModalProps) {
   // Guard defensivo: si onClose es undefined, usar noop seguro
   const safeOnClose = onClose || (() => {});
@@ -205,7 +208,8 @@ export default function FeedbackModal({
                 <button
                   disabled={
                     isLoading ||
-                    (showInput && !inputValue.trim()) ||
+                    (showInput &&
+                      inputValue.trim().length < inputMinLength) ||
                     (showSelect && selectOptions.length > 0 && !selectValue)
                   }
                   onClick={() => onConfirm(inputValue, selectValue)}

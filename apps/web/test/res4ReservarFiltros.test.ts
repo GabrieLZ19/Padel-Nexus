@@ -20,5 +20,7 @@ describe("RES-4 · /reservar filtros y cercanía", () => {
     assert.match(src, /tipo_suelo/);
     assert.match(src, /params\.fecha = filtroFecha/);
     assert.match(src, /Distancia máxima/);
+    assert.match(src, />\s*Filtros\s*</);
+    assert.doesNotMatch(src, /showFilters/);
   });
 });

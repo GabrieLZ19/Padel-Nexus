@@ -35,6 +35,13 @@ export interface Licencia {
   created_at?: string;
   usuario_id: string;
   club_id?: string | null;
+  asociacion_id?: string | null;
+  asociaciones?: {
+    id: string;
+    nombre: string;
+    sigla?: string | null;
+    provincia?: string | null;
+  } | null;
   nro_licencia: string;
   estado: "Pendiente" | "Activa" | "Vencida" | "Suspendida";
   fecha_emision?: string | null;
