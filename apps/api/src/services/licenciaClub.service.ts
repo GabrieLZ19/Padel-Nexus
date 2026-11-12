@@ -227,6 +227,20 @@ export class LicenciaClubService {
     };
   }
 
+  static async licenciaPerteneceAClub(
+    licenciaId: string,
+    clubId: string,
+  ): Promise<boolean> {
+    const { data, error } = await supabaseAdmin
+      .from("licencias_club")
+      .select("id")
+      .eq("id", licenciaId)
+      .eq("club_id", clubId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return Boolean(data?.id);
+  }
+
   static async listarPagos(licenciaId: string) {
     const { data, error } = await supabaseAdmin
       .from("licencias_club_pagos")

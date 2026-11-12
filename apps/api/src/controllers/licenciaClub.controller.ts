@@ -21,6 +21,36 @@ function puedeGestionar(rol?: string): boolean {
   return Boolean(rol && (ROLES_GESTION as readonly string[]).includes(rol));
 }
 
+async function validarLecturaLicenciaClub(
+  req: Request,
+  clubId: string,
+  licenciaId: string,
+): Promise<{ status: number; error: string } | null> {
+  if (!clubId || !licenciaId) {
+    return { status: 400, error: "Club y licencia son obligatorios." };
+  }
+
+  if (req.user?.rol === "admin_club" && req.user.id) {
+    const clubUsuario = await clubIdAsignadoAlUsuario(req.user.id);
+    if (String(clubUsuario || "") !== clubId) {
+      return {
+        status: 403,
+        error: "No podés ver la licencia de otro club.",
+      };
+    }
+  }
+
+  const pertenece = await LicenciaClubService.licenciaPerteneceAClub(
+    licenciaId,
+    clubId,
+  );
+  if (!pertenece) {
+    return { status: 404, error: "Licencia no encontrada para este club." };
+  }
+
+  return null;
+}
+
 export const LicenciaClubController = {
   async obtener(req: Request, res: Response): Promise<Response> {
     try {
@@ -120,7 +150,14 @@ export const LicenciaClubController = {
 
   async listarPagos(req: Request, res: Response): Promise<Response> {
     try {
+      const clubId = String(req.params.id || "");
       const licenciaId = String(req.params.licenciaId || "");
+      const denegado = await validarLecturaLicenciaClub(req, clubId, licenciaId);
+      if (denegado) {
+        return res
+          .status(denegado.status)
+          .json({ exito: false, error: denegado.error });
+      }
       const data = await LicenciaClubService.listarPagos(licenciaId);
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {

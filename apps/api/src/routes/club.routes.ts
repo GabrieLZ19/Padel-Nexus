@@ -80,7 +80,13 @@ router.delete(
 
 router.get(
   "/:id/licencia/:licenciaId/pagos",
-  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  authorize([
+    "superadmin",
+    "admin_federacion",
+    "admin_provincial",
+    "admin_club",
+    "admin",
+  ]),
   LicenciaClubController.listarPagos,
 );
 
