@@ -199,6 +199,13 @@ export function nombrePlantillaInscripcion(torneo: {
     : "Planilla de Inscripciones Generales.xls";
 }
 
+/** Cuentas creadas al importar planilla (sin mail personal del jugador). */
+export function esEmailPlaceholderPlanilla(
+  email: string | null | undefined,
+): boolean {
+  return Boolean(email?.toLowerCase().includes("@padelnexus.local"));
+}
+
 export function etiquetaTipoPlanillaInscripcion(torneo: {
   alcance?: string | null;
   reglamento?: string | null;

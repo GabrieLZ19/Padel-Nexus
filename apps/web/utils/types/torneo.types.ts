@@ -112,12 +112,14 @@ export interface Inscripcion {
     lugar_residencia?: string | null;
     avatar_url?: string | null;
     pendiente_activacion?: boolean | null;
+    email?: string | null;
     clubes?: { nombre?: string } | null;
   } | null;
   perfiles_jugador2?: {
     lugar_residencia?: string | null;
     avatar_url?: string | null;
     pendiente_activacion?: boolean | null;
+    email?: string | null;
     clubes?: { nombre?: string } | null;
   } | null;
 }

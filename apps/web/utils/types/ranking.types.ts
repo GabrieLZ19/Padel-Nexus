@@ -6,6 +6,8 @@ export interface RankingJugador {
   usuario_id: string;
   puntos: number;
   posicion_actual?: number;
+  /** Importado por planilla; aún sin activar la app con su mail. */
+  ranking_provisional?: boolean;
   categoria: string;
   rama: string;
   actualizado_hace?: string;
@@ -37,6 +39,9 @@ export interface HistorialRanking {
   puntos_anteriores: number;
   puntos_nuevos: number;
   created_at?: string;
+  torneo_nombre?: string | null;
+  torneo_nivel?: string | null;
+  torneo_alcance?: string | null;
 }
 
 /** Registro de ranking + historial, devuelto por GET /rankings/:usuario_id */
@@ -44,6 +49,7 @@ export interface RankingPerfilJugador {
   id: string;
   usuario_id: string;
   puntos: number;
+  ranking_provisional?: boolean;
   categoria: string;
   rama?: string | null;
   pj?: number | null;

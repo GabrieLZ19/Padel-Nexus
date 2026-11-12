@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { esEmailPlaceholderPlanilla } from "@/utils/inscripcionPlanilla";
 import {
   useNumeroPaso,
   usePasosOcultos,
@@ -44,6 +45,23 @@ export const Paso5Cierre = ({
   const confirmadasCount = inscripciones.filter(
     (i) => i.estado_pago === "Confirmado",
   ).length;
+
+  const jugadoresPlanillaConfirmados = useMemo(() => {
+    const ids = new Set<string>();
+    for (const ins of inscripciones) {
+      if (ins.estado_pago !== "Confirmado") continue;
+      if (esEmailPlaceholderPlanilla(ins.perfiles?.email) && ins.usuario_id) {
+        ids.add(ins.usuario_id);
+      }
+      if (
+        esEmailPlaceholderPlanilla(ins.perfiles_jugador2?.email) &&
+        ins.usuario2_id
+      ) {
+        ids.add(String(ins.usuario2_id));
+      }
+    }
+    return ids.size;
+  }, [inscripciones]);
   const estadoNorm = (torneo.estado || "").toLowerCase();
   const isOpenState =
     estadoNorm === "inscripción" ||
@@ -236,6 +254,21 @@ export const Paso5Cierre = ({
           </span>
         </div>
       </div>
+
+      {puntosActivados && jugadoresPlanillaConfirmados > 0 ? (
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm text-amber-100/90">
+          <p className="font-bold text-amber-300 mb-1">
+            {jugadoresPlanillaConfirmados} jugador
+            {jugadoresPlanillaConfirmados === 1 ? "" : "es"} importado
+            {jugadoresPlanillaConfirmados === 1 ? "" : "s"} por planilla
+          </p>
+          <p className="text-amber-100/80 leading-relaxed">
+            Sumarán puntos oficiales al cerrar resultados y aparecerán en el
+            ranking con ficha provisional hasta que se registren en la app con su
+            DNI.
+          </p>
+        </div>
+      ) : null}
 
       {/* INFORMACIÓN SOBRE EL RANKING VINCULADO */}
       <div className="border-t border-white/10 pt-6 space-y-4">

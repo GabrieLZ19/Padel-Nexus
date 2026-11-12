@@ -842,7 +842,16 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   >([]);
   const [fapPairCount, setFapPairCount] = React.useState<number | null>(null);
 
-  const usaPlantillaFap = fapMatrixByOrden.size > 0;
+  const usaPlantillaFap = !isEliminatoriaDirecta && fapMatrixByOrden.size > 0;
+
+  const inscripcionesConfirmadas = React.useMemo(
+    () =>
+      inscripciones.filter((ins) => ins.estado_pago === "Confirmado").length,
+    [inscripciones],
+  );
+  const byesEliminatoria = isEliminatoriaDirecta
+    ? Math.max(0, bracketCapacity - inscripcionesConfirmadas)
+    : 0;
   const byesFap = React.useMemo(() => {
     if (!usaPlantillaFap || !firstPlayoffRound) return 0;
     const firstRoundMatchNos = new Set(
@@ -876,6 +885,12 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   }, [firstPlayoffRound]);
 
   React.useEffect(() => {
+    if (isEliminatoriaDirecta) {
+      setFapMatrixByOrden(new Map());
+      setFapMatrixMatches([]);
+      setFapPairCount(null);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -896,7 +911,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [torneoId]);
+  }, [torneoId, isEliminatoriaDirecta]);
 
   const numerosLlave = React.useMemo(
     () =>
@@ -1638,7 +1653,19 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     </>
                   )}
                 </span>
-                {usaPlantillaFap ? (
+                {isEliminatoriaDirecta ? (
+                  byesEliminatoria > 0 ? (
+                    <span className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-amber-400">
+                      {byesEliminatoria} bye
+                      {byesEliminatoria === 1 ? "" : "s"} a{" "}
+                      {targetRoundForByes}
+                    </span>
+                  ) : (
+                    <span className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-gray-300">
+                      Eliminatoria directa · sin byes
+                    </span>
+                  )
+                ) : usaPlantillaFap ? (
                   <span className="rounded-lg bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-3 py-2 text-brand-chartreuse">
                     {textoRectora("plantilla", siglaRectora)} · {byesFap > 0 ? `${byesFap} bye(s) a ${targetRoundForByes}` : "sin byes"}
                   </span>

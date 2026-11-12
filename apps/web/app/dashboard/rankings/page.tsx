@@ -563,6 +563,11 @@ export default function RankingsPage() {
                           <div>
                             <span className="font-bold text-white block">
                               {j.nombre} {j.apellido}
+                              {j.ranking_provisional ? (
+                                <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-amber-400 border border-amber-500/30 rounded px-1.5 py-0.5 align-middle">
+                                  Planilla
+                                </span>
+                              ) : null}
                             </span>
                             <span className="text-[11px] text-gray-500 font-normal">
                               DNI: {j.dni || "N/D"}

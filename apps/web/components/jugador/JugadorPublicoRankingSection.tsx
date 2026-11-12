@@ -114,6 +114,12 @@ export default function JugadorPublicoRankingSection({
               {labelAlcance(principal.alcance || scope)} ·{" "}
               {etiquetaCategoria(principal.categoria)}
             </p>
+            {principal.ranking_provisional ? (
+              <p className="text-xs text-amber-400/90 mt-2 max-w-sm">
+                Ficha provisional (alta por planilla). Los puntos son oficiales;
+                al registrarse en la app con su DNI consolidará la cuenta.
+              </p>
+            ) : null}
           </div>
           <TrendPill tendencia={tendencia} />
         </div>
@@ -215,14 +221,20 @@ export default function JugadorPublicoRankingSection({
                     year: "numeric",
                   })
                 : "—";
+              const torneoLabel = h.torneo_nombre?.trim() || "Torneo";
               return (
                 <li
                   key={`${h.torneo_id || "mov"}-${i}`}
-                  className="flex items-center justify-between rounded-xl border border-white/6 bg-white/[0.02] px-4 py-3"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-white/6 bg-white/[0.02] px-4 py-3"
                 >
-                  <span className="text-sm text-gray-400">{fecha}</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white truncate">
+                      {torneoLabel}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">{fecha}</p>
+                  </div>
                   <span
-                    className={`text-sm font-bold tabular-nums ${
+                    className={`text-sm font-bold tabular-nums shrink-0 ${
                       delta >= 0 ? "text-emerald-400" : "text-red-400"
                     }`}
                   >

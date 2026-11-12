@@ -13,6 +13,11 @@ import { FiscalesService, Fiscal } from "@/utils/services/fiscales";
 import { Torneo } from "@/utils/types";
 import { sileo } from "sileo";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import {
+  etiquetaRangoMinimoFiscal,
+  fiscalHabilitadoParaTorneo,
+  mensajeFiscalInhabilParaTorneo,
+} from "@/utils/fiscalAlcance";
 
 interface Paso6FiscalesProps {
   torneo: Torneo;
@@ -102,6 +107,11 @@ export const Paso6Fiscales = ({
       );
       if (fiscal) {
         setFoundFiscal(fiscal);
+        if (!fiscalHabilitadoParaTorneo(torneo.alcance, fiscal.rango)) {
+          setSearchError(
+            mensajeFiscalInhabilParaTorneo(torneo.alcance, fiscal.rango),
+          );
+        }
       } else {
         setSearchError(
           "No se encontró ningún fiscal registrado con ese DNI en el Colegio.",
@@ -129,6 +139,17 @@ export const Paso6Fiscales = ({
 
       if (!fiscalBase) {
         throw new Error("Fiscal no encontrado en el padrón.");
+      }
+
+      if (!fiscalHabilitadoParaTorneo(torneo.alcance, fiscalBase.rango)) {
+        sileo.error({
+          title: "Rango insuficiente",
+          description: mensajeFiscalInhabilParaTorneo(
+            torneo.alcance,
+            fiscalBase.rango,
+          ),
+        });
+        return;
       }
 
       let roles = buildRolesMap(fiscalesTorneo);
@@ -239,7 +260,11 @@ export const Paso6Fiscales = ({
         </h3>
         <p className="text-sm text-gray-400 mt-1">
           Designá el fiscal general y los fiscales auxiliares homologados para
-          este torneo.
+          este torneo. Requiere rango{" "}
+          <span className="text-white font-semibold">
+            {etiquetaRangoMinimoFiscal(torneo.alcance)}
+          </span>{" "}
+          o superior (alcance del torneo: {torneo.alcance || "Local"}).
         </p>
       </div>
 
@@ -284,23 +309,13 @@ export const Paso6Fiscales = ({
                 .filter((f) => {
                   const esAsignado = fiscalesTorneo.some((ft) => ft.id === f.id);
                   if (esAsignado) return false;
-
-                  const RANGOS: Record<string, number> = {
-                    Local: 1,
-                    Privado: 1,
-                    Regional: 2,
-                    Provincial: 3,
-                    Nacional: 4,
-                  };
-                  const minimoReq = RANGOS[torneo.alcance || "Local"] || 1;
-                  const nivelF = RANGOS[f.rango || "Local"] || 1;
-                  return nivelF >= minimoReq;
+                  return fiscalHabilitadoParaTorneo(torneo.alcance, f.rango);
                 })
                 .map((f) => ({
                   value: f.id,
                   label: `${f.nombre} ${f.apellido} (DNI: ${f.dni}) — ${f.rango || "Provincial"}`,
                 }))}
-              placeholder={`-- Seleccionar fiscal homologado (${torneo.alcance || "Local"} o superior) --`}
+              placeholder={`-- Fiscal ${etiquetaRangoMinimoFiscal(torneo.alcance)} o superior --`}
             />
           </div>
         )}
@@ -334,26 +349,48 @@ export const Paso6Fiscales = ({
           <p className="text-xs text-rose-400 font-medium">{searchError}</p>
         )}
 
-        {foundFiscal && (
-          <div className="bg-brand-chartreuse/10 border border-brand-chartreuse/30 p-4 rounded-xl flex items-center justify-between gap-3">
-            <div>
-              <p className="font-extrabold text-sm text-white">
-                {foundFiscal.nombre} {foundFiscal.apellido}
-              </p>
-              <p className="text-xs text-gray-400">
-                DNI: {foundFiscal.dni} · Alcance:{" "}
-                {foundFiscal.rango || "Provincial"}
-              </p>
-            </div>
-            <button
-              onClick={() => handleAsignarFiscal(foundFiscal.id)}
-              disabled={asignando}
-              className="bg-brand-chartreuse text-brand-black px-4 py-2 rounded-xl text-xs font-extrabold hover:opacity-90 transition-all cursor-pointer shrink-0"
+        {foundFiscal && (() => {
+          const puedeDesignar = fiscalHabilitadoParaTorneo(
+            torneo.alcance,
+            foundFiscal.rango,
+          );
+          return (
+            <div
+              className={`p-4 rounded-xl flex items-center justify-between gap-3 border ${
+                puedeDesignar
+                  ? "bg-brand-chartreuse/10 border-brand-chartreuse/30"
+                  : "bg-rose-500/10 border-rose-500/25"
+              }`}
             >
-              {asignando ? "Designando..." : "Confirmar designación"}
-            </button>
-          </div>
-        )}
+              <div>
+                <p className="font-extrabold text-sm text-white">
+                  {foundFiscal.nombre} {foundFiscal.apellido}
+                </p>
+                <p className="text-xs text-gray-400">
+                  DNI: {foundFiscal.dni} · Rango:{" "}
+                  {foundFiscal.rango || "Provincial"}
+                </p>
+                {!puedeDesignar ? (
+                  <p className="text-xs text-rose-300/90 mt-2 max-w-md leading-relaxed">
+                    {mensajeFiscalInhabilParaTorneo(
+                      torneo.alcance,
+                      foundFiscal.rango,
+                    )}
+                  </p>
+                ) : null}
+              </div>
+              {puedeDesignar ? (
+                <button
+                  onClick={() => handleAsignarFiscal(foundFiscal.id)}
+                  disabled={asignando}
+                  className="bg-brand-chartreuse text-brand-black px-4 py-2 rounded-xl text-xs font-extrabold hover:opacity-90 transition-all cursor-pointer shrink-0"
+                >
+                  {asignando ? "Designando..." : "Confirmar designación"}
+                </button>
+              ) : null}
+            </div>
+          );
+        })()}
       </div>
 
       <div className="space-y-4">
