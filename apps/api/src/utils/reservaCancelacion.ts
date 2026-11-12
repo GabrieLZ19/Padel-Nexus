@@ -1,3 +1,5 @@
+import { fraseFechaTurnoReserva } from "./fechaArgentina";
+
 export function mensajeNotificacionReservaCanceladaPorJugador(params: {
   jugadorNombre: string;
   canchaNombre: string;
@@ -17,7 +19,8 @@ export function mensajeNotificacionReservaCanceladaPorJugador(params: {
     pago === "completado"
       ? " Tenía el pago acreditado; revisá reintegros si corresponde."
       : "";
-  const mensaje = `${jugadorNombre} canceló el turno en ${canchaNombre} del ${fechaReserva} a las ${horaInicio} hs.${pagoTxt} El horario quedó liberado en la agenda.`;
+  const cuando = fraseFechaTurnoReserva(fechaReserva, horaInicio);
+  const mensaje = `${jugadorNombre} canceló el turno en ${canchaNombre} ${cuando}.${pagoTxt} El horario quedó liberado en la agenda.`;
   return {
     titulo: "Reserva cancelada por el jugador",
     mensaje,
@@ -32,7 +35,8 @@ export function mensajeNotificacionReservaCanceladaClub(params: {
   motivo?: string | null;
 }): { titulo: string; mensaje: string } {
   const { clubNombre, canchaNombre, fechaReserva, horaInicio, motivo } = params;
-  const base = `El club ${clubNombre} canceló tu turno en ${canchaNombre} del ${fechaReserva} a las ${horaInicio} hs.`;
+  const cuando = fraseFechaTurnoReserva(fechaReserva, horaInicio);
+  const base = `El club ${clubNombre} canceló tu turno en ${canchaNombre} ${cuando}.`;
   const motivoLimpio = String(motivo || "").trim();
   const mensaje =
     motivoLimpio.length > 0

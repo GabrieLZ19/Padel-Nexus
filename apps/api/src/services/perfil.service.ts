@@ -21,7 +21,7 @@ import {
 } from "../utils/preinscripcionVerificacion";
 import { randomBytes } from "crypto";
 import { esVisibleEnSitioPublico } from "../utils/datoPrueba";
-import { capitalizarNombre } from "../utils/formatoTexto";
+import { capitalizarNombre, normalizarNombrePerfil } from "../utils/formatoTexto";
 import { NotificacionService } from "./notificacion.service";
 import {
   CATEGORIAS_LIBRES,
@@ -211,8 +211,6 @@ export class PerfilService {
     userId: string,
     datos: ActualizarPerfilDTO,
   ) {
-    const capitalizarTexto = (texto?: string) => texto ? capitalizarNombre(texto) : undefined;
-
     if (datos.apellido !== undefined) {
       const apellidoTrim = datos.apellido.trim();
       if (apellidoTrim.length < 2 || /\d/.test(apellidoTrim)) {
@@ -222,8 +220,10 @@ export class PerfilService {
       }
     }
 
-    const nombreCapitalizado = capitalizarTexto(datos.nombre);
-    const apellidoCapitalizado = capitalizarTexto(datos.apellido);
+    const nombreCapitalizado =
+      datos.nombre !== undefined ? normalizarNombrePerfil(datos.nombre) : undefined;
+    const apellidoCapitalizado =
+      datos.apellido !== undefined ? normalizarNombrePerfil(datos.apellido) : undefined;
 
     if (
       datos.lugar_residencia !== undefined &&

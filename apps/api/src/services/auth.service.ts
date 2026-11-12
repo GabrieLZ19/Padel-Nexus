@@ -9,7 +9,7 @@ import { FiscalSesionService } from "./fiscal-sesion.service";
 
 import { MenoresService } from "./menores.service";
 import { LegalService } from "./legal.service";
-import { capitalizarNombre } from "../utils/formatoTexto";
+import { normalizarNombrePerfil } from "../utils/formatoTexto";
 import {
   buildRecuperacionRedirectUrl,
   esErrorUsuarioInexistenteRecuperacion,
@@ -127,10 +127,8 @@ export class AuthService {
       throw new Error("El nombre es obligatorio.");
     }
 
-    const capitalizarTexto = (texto: string) => capitalizarNombre(texto);
-
-    const nombreCapitalizado = capitalizarTexto(datos.nombre);
-    const apellidoCapitalizado = capitalizarTexto(apellidoTrim);
+    const nombreCapitalizado = normalizarNombrePerfil(datos.nombre);
+    const apellidoCapitalizado = normalizarNombrePerfil(apellidoTrim);
     const dniLimpio = String(datos.dni || "").replace(/[^\d]/g, "");
 
     const finalizarPostRegistro = async (userId: string) => {

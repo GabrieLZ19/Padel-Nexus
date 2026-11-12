@@ -88,3 +88,30 @@ export function esTurnoReservaFinalizado(
 ): boolean {
   return esHorarioReservaPasado(fechaReserva, horaFin, ahora);
 }
+
+function diaSemanaCortoArgentina(fechaCalendario: string): string {
+  const [y, m, d] = fechaCalendario.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const ancla = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const crudo = new Intl.DateTimeFormat("es-AR", {
+    timeZone: ZONA_HORARIA_ARGENTINA,
+    weekday: "short",
+  }).format(ancla);
+  return crudo.replace(/\.$/, "").trim();
+}
+
+/**
+ * Fecha de turno reservado para copys de notificación (RES-16): «del sáb 14/11 a las 20:00 hs».
+ */
+export function fraseFechaTurnoReserva(
+  fechaReserva: string,
+  horaInicio: string,
+): string {
+  const fecha = String(fechaReserva || "").split("T")[0];
+  const hora = String(horaInicio || "00:00").slice(0, 5);
+  const [, mes, dia] = fecha.split("-");
+  if (!mes || !dia) return `del ${fecha} a las ${hora} hs`;
+  const diaSemana = diaSemanaCortoArgentina(fecha);
+  const prefijoDia = diaSemana ? `del ${diaSemana} ` : "del ";
+  return `${prefijoDia}${dia.padStart(2, "0")}/${mes.padStart(2, "0")} a las ${hora} hs`;
+}

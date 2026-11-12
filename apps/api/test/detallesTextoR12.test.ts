@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { capitalizarNombre, capitalizarPalabra } from "../src/utils/formatoTexto";
+import {
+  capitalizarNombre,
+  capitalizarPalabra,
+  normalizarNombrePerfil,
+} from "../src/utils/formatoTexto";
 
 describe("Detalles de texto e interfaz - Capitalización de nombres (Item 5)", () => {
   it("preserva siglas en mayúsculas como QA Prueba", () => {
@@ -22,5 +26,10 @@ describe("Detalles de texto e interfaz - Capitalización de nombres (Item 5)", (
   it("capitaliza nombres en minúsculas adecuadamente", () => {
     assert.equal(capitalizarNombre("juan carlos"), "Juan Carlos");
     assert.equal(capitalizarNombre("  lucas   silva  "), "Lucas Silva");
+  });
+
+  it("normalizar perfil preserva mayúsculas intencionales", () => {
+    assert.equal(normalizarNombrePerfil("QA Prueba"), "QA Prueba");
+    assert.equal(normalizarNombrePerfil("qa prueba"), "Qa Prueba");
   });
 });

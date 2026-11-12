@@ -31,3 +31,14 @@ export function capitalizarNombre(texto?: string): string {
     .map(capitalizarPalabra)
     .join(" ");
 }
+
+/**
+ * Si el usuario usó mayúsculas (p. ej. «QA»), conserva el texto; si viene todo en minúsculas, aplica capitalizarNombre.
+ */
+export function normalizarNombrePerfil(texto?: string): string {
+  if (!texto) return "";
+  const trimmed = texto.trim();
+  if (!trimmed) return "";
+  if (trimmed !== trimmed.toLowerCase()) return trimmed;
+  return capitalizarNombre(trimmed);
+}
