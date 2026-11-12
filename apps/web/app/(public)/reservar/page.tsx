@@ -40,6 +40,7 @@ export default function ReservarPage() {
     lng: number;
   } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [geoResolved, setGeoResolved] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filtroProvincia, setFiltroProvincia] = useState("");
@@ -53,6 +54,7 @@ export default function ReservarPage() {
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setGeoError("La geolocalización no está soportada en este navegador.");
+      setGeoResolved(true);
       return;
     }
 
@@ -63,11 +65,13 @@ export default function ReservarPage() {
           lng: pos.coords.longitude,
         });
         setGeoError(null);
+        setGeoResolved(true);
       },
       () => {
         setGeoError(
           "No se pudo obtener tu ubicación. Mostrando todos los clubes.",
         );
+        setGeoResolved(true);
       },
     );
   }, []);
@@ -87,6 +91,7 @@ export default function ReservarPage() {
       if (userLocation) {
         params.lat = userLocation.lat;
         params.lng = userLocation.lng;
+        params.ordenar = "distancia";
       } else {
         params.ordenar = "distancia";
       }
@@ -123,8 +128,9 @@ export default function ReservarPage() {
   ]);
 
   useEffect(() => {
+    if (!geoResolved) return;
     fetchClubes();
-  }, [fetchClubes]);
+  }, [geoResolved, fetchClubes]);
 
   const formatDistancia = (km?: number | null) => {
     if (km == null) return "";
@@ -188,7 +194,7 @@ export default function ReservarPage() {
                             {club.localidad}, {club.provincia}
                           </p>
                         </div>
-                        {club.distancia_km !== undefined && (
+                        {club.distancia_km != null && (
                           <span className="text-xs text-brand-chartreuse font-medium">
                             {formatDistancia(club.distancia_km)}
                           </span>
@@ -392,7 +398,7 @@ export default function ReservarPage() {
                   className="group relative bg-brand-card border border-white/5 rounded-2xl p-6 hover:border-brand-chartreuse/30 transition-all duration-300 hover:shadow-[0_0_30px_rgba(203,254,1,0.05)]"
                 >
                   {/* Badge de distancia */}
-                  {club.distancia_km !== undefined && (
+                  {club.distancia_km != null && (
                     <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-chartreuse/10 text-brand-chartreuse text-xs font-medium">
                       <Navigation className="w-3 h-3" />
                       {formatDistancia(club.distancia_km)}
