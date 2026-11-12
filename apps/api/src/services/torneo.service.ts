@@ -43,9 +43,9 @@ import {
   type ConfigPuntosTorneo,
 } from "../utils/rankingTorneo";
 import {
-  construirResumenCorreccionResultado,
   numeroVisiblePartidoTorneo,
   partidoYaTeniaResultado,
+  registrarAuditoriaCorreccionResultado,
 } from "../utils/auditoriaTorneo";
 import { registrarAuditoriaCambioParejaPartido } from "../utils/auditoriaOverridePareja";
 
@@ -2077,34 +2077,17 @@ export class TorneoService {
         partidoId,
         previo.orden,
       );
-      const resumen = construirResumenCorreccionResultado({
-        numeroPartido,
+      await registrarAuditoriaCorreccionResultado({
+        torneoId: torneoIdPartido,
+        partidoId,
+        adminId: adminId!,
+        motivo: motivo!,
         ronda: previo.ronda,
+        orden: previo.orden,
+        numeroPartido,
         valorAnterior,
         valorNuevo,
       });
-
-      const { error: errAudit } = await supabaseAdmin.from("logs_auditoria").insert({
-        usuario_id_admin: adminId!,
-        accion: "corregir_resultado",
-        entidad_afectada: torneoIdPartido,
-        detalles: {
-          torneo_id: torneoIdPartido,
-          partido_id: partidoId,
-          ronda: previo.ronda,
-          orden: previo.orden,
-          numero_partido: numeroPartido,
-          motivo: motivo!.trim(),
-          resumen,
-          valor_anterior: valorAnterior,
-          valor_nuevo: valorNuevo,
-        },
-      });
-      if (errAudit) {
-        throw new Error(
-          `No se pudo registrar la corrección en auditoría: ${errAudit.message}`,
-        );
-      }
     }
 
     const { data: partido, error: updateError } = await supabaseAdmin

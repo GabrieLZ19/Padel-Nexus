@@ -8,22 +8,42 @@ export function referenciasEntidadTorneoEnAuditoria(torneoId: string): string[] 
   return [id, `torneo_id: ${id}`, `torneos_id: ${id}`];
 }
 
+type SnapshotPartidoResultado = {
+  ganador?: string | null;
+  estado_partido?: string | null;
+  set1_a?: number | null;
+  set1_b?: number | null;
+  set2_a?: number | null;
+  set2_b?: number | null;
+  set3_a?: number | null;
+  set3_b?: number | null;
+  es_wo?: boolean | null;
+  es_lesion?: boolean | null;
+};
+
+function tieneMarcadorEnSnapshot(previo: SnapshotPartidoResultado): boolean {
+  return (
+    (previo.set1_a != null && previo.set1_b != null) ||
+    (previo.set2_a != null && previo.set2_b != null) ||
+    (previo.set3_a != null && previo.set3_b != null)
+  );
+}
+
 export function partidoYaTeniaResultado(
-  previo:
-    | {
-        ganador?: string | null;
-        estado_partido?: string | null;
-        set1_a?: number | null;
-        set1_b?: number | null;
-      }
-    | null
-    | undefined,
+  previo: SnapshotPartidoResultado | null | undefined,
 ): boolean {
   if (!previo) return false;
   if (previo.ganador) return true;
+  if (previo.es_wo || previo.es_lesion) return true;
   const estado = String(previo.estado_partido || "").trim().toLowerCase();
-  if (estado === "finalizado" || estado === "completado") return true;
-  return previo.set1_a != null && previo.set1_b != null;
+  if (
+    estado === "finalizado" ||
+    estado === "completado" ||
+    (estado === "en curso" && tieneMarcadorEnSnapshot(previo))
+  ) {
+    return true;
+  }
+  return tieneMarcadorEnSnapshot(previo);
 }
 
 export function dedupeAuditoriaPorId<T extends { id: string | number }>(
@@ -88,6 +108,49 @@ const SELECT_AUDITORIA_TORNEO = `
   perfiles!fk_logs_admin(nombre, apellido)
 `;
 
+export async function registrarAuditoriaCorreccionResultado(params: {
+  torneoId: string;
+  partidoId: string;
+  adminId: string;
+  motivo: string;
+  ronda: string | null;
+  orden: number | null;
+  numeroPartido: number;
+  valorAnterior: MarcadorAuditoria & { ganador?: string | null };
+  valorNuevo: MarcadorAuditoria & { ganador?: string | null };
+}): Promise<void> {
+  const resumen = construirResumenCorreccionResultado({
+    numeroPartido: params.numeroPartido,
+    ronda: params.ronda,
+    valorAnterior: params.valorAnterior,
+    valorNuevo: params.valorNuevo,
+  });
+
+  const torneoId = String(params.torneoId);
+  const { error } = await supabaseAdmin.from("logs_auditoria").insert({
+    usuario_id_admin: params.adminId,
+    accion: "corregir_resultado",
+    entidad_afectada: `torneo_id: ${torneoId}`,
+    detalles: {
+      torneo_id: torneoId,
+      partido_id: params.partidoId,
+      ronda: params.ronda,
+      orden: params.orden,
+      numero_partido: params.numeroPartido,
+      motivo: params.motivo.trim(),
+      resumen,
+      valor_anterior: params.valorAnterior,
+      valor_nuevo: params.valorNuevo,
+    },
+  });
+
+  if (error) {
+    throw new Error(
+      `No se pudo registrar la corrección en auditoría: ${error.message}`,
+    );
+  }
+}
+
 export async function listarAuditoriaTorneo(torneoId: string): Promise<unknown[]> {
   const id = String(torneoId || "").trim();
   if (!id) return [];
@@ -110,6 +173,12 @@ export async function listarAuditoriaTorneo(torneoId: string): Promise<unknown[]
       .select(SELECT_AUDITORIA_TORNEO)
       .ilike("entidad_afectada", `%${id}%`)
       .order("created_at", { ascending: false }),
+    supabaseAdmin
+      .from("logs_auditoria")
+      .select(SELECT_AUDITORIA_TORNEO)
+      .eq("accion", "corregir_resultado")
+      .filter("detalles->>torneo_id", "eq", id)
+      .order("created_at", { ascending: false }),
   ];
 
   const { data: partidosTorneo } = await supabaseAdmin
@@ -118,24 +187,26 @@ export async function listarAuditoriaTorneo(torneoId: string): Promise<unknown[]
     .eq("torneo_id", id);
 
   const partidoIds = (partidosTorneo || []).map((p) => String(p.id)).filter(Boolean);
-  if (partidoIds.length > 0) {
+  const LOTE = 40;
+  for (let i = 0; i < partidoIds.length; i += LOTE) {
+    const lote = partidoIds.slice(i, i + LOTE);
     consultas.push(
       supabaseAdmin
         .from("logs_auditoria")
         .select(SELECT_AUDITORIA_TORNEO)
-        .in("detalles->>partido_id", partidoIds)
+        .in("detalles->>partido_id", lote)
         .order("created_at", { ascending: false }),
     );
   }
 
   const resultados = await Promise.all(consultas);
+  const filas: { id: string | number }[] = [];
   for (const res of resultados) {
-    if (res.error) throw new Error(res.error.message);
+    if (res.error) continue;
+    filas.push(...((res.data || []) as { id: string | number }[]));
   }
 
-  const merged = dedupeAuditoriaPorId(
-    resultados.flatMap((res) => (res.data || []) as { id: string | number }[]),
-  );
+  const merged = dedupeAuditoriaPorId(filas);
 
   merged.sort(
     (a, b) =>

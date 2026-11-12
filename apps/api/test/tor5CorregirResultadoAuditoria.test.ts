@@ -19,6 +19,14 @@ describe("TOR-5 corrección de resultado en auditoría", () => {
       partidoYaTeniaResultado({ set1_a: 6, set1_b: 4, ganador: null }),
       true,
     );
+    assert.equal(
+      partidoYaTeniaResultado({ set2_a: 6, set2_b: 3, ganador: null }),
+      true,
+    );
+    assert.equal(
+      partidoYaTeniaResultado({ es_wo: true, ganador: null }),
+      true,
+    );
     assert.equal(partidoYaTeniaResultado({ ganador: null }), false);
   });
 
@@ -36,11 +44,15 @@ describe("TOR-5 corrección de resultado en auditoría", () => {
       path.join(RAIZ, "src/services/torneo.service.ts"),
       "utf8",
     );
-    const idxAudit = svc.indexOf('accion: "corregir_resultado"');
+    const idxAudit = svc.indexOf("registrarAuditoriaCorreccionResultado");
     const idxUpdate = svc.indexOf('.from("partidos")\n      .update({', idxAudit);
     assert.ok(idxAudit > 0);
     assert.ok(idxUpdate > idxAudit);
-    assert.match(svc, /No se pudo registrar la corrección en auditoría/);
+    const util = readFileSync(
+      path.join(RAIZ, "src/utils/auditoriaTorneo.ts"),
+      "utf8",
+    );
+    assert.match(util, /No se pudo registrar la corrección en auditoría/);
   });
 
   it("getAuditoria delega en listarAuditoriaTorneo", () => {
@@ -75,18 +87,20 @@ describe("TOR-5 corrección de resultado en auditoría", () => {
     );
   });
 
-  it("insert de corregir_resultado incluye resumen y numero_partido", () => {
+  it("insert de corregir_resultado centralizado con resumen y entidad legacy", () => {
+    const util = readFileSync(
+      path.join(RAIZ, "src/utils/auditoriaTorneo.ts"),
+      "utf8",
+    );
+    assert.match(util, /registrarAuditoriaCorreccionResultado/);
+    assert.match(util, /entidad_afectada: `torneo_id: \$\{torneoId\}`/);
+    assert.match(util, /numero_partido/);
+    assert.match(util, /construirResumenCorreccionResultado/);
+
     const svc = readFileSync(
       path.join(RAIZ, "src/services/torneo.service.ts"),
       "utf8",
     );
-    const bloque = svc.slice(
-      svc.indexOf('accion: "corregir_resultado"'),
-      svc.indexOf('accion: "corregir_resultado"') + 600,
-    );
-    assert.match(bloque, /numero_partido/);
-    assert.match(bloque, /resumen/);
-    assert.match(bloque, /resumen/);
-    assert.match(svc, /construirResumenCorreccionResultado/);
+    assert.match(svc, /registrarAuditoriaCorreccionResultado/);
   });
 });

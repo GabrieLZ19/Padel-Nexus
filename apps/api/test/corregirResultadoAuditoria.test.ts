@@ -242,7 +242,7 @@ describe("F6: Auditoría y motivo obligatorio al corregir resultado", () => {
 
     assert.equal(payload.usuario_id_admin, ADMIN_ID);
     assert.equal(payload.accion, "corregir_resultado");
-    assert.equal(payload.entidad_afectada, TORNEO);
+    assert.equal(payload.entidad_afectada, `torneo_id: ${TORNEO}`);
     assert.equal(payload.detalles.partido_id, PARTIDO);
     assert.equal(payload.detalles.motivo, "Corrección de marcador de 6-2 6-2 a 6-4 6-4");
     assert.match(String(payload.detalles.resumen || ""), /Corrección de resultado/);
