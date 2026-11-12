@@ -17,6 +17,11 @@ import {
   programarPartidosConDisponibilidad,
   type PartidoProgramable,
 } from "../utils/programacionPartidos";
+import {
+  idsCabezasGlobalesPorRanking,
+  marcarCabezasUnicasEnZonas,
+  type ParejaPuntosRanking,
+} from "../utils/cabezasSerieZonas";
 
 interface ParejaRanking {
   inscripcionId: string;
@@ -272,6 +277,7 @@ export class CompetenciaService {
         grupo_id: grupoInsertado.id,
         inscripcion_id: pareja.inscripcionId,
         seed: idx + 1,
+        es_cabeza_serie: idx === 0,
       }));
       if (grupoParejasData.length > 0) {
         await supabaseAdmin.from("grupo_parejas").insert(grupoParejasData);
@@ -488,6 +494,7 @@ export class CompetenciaService {
           sorteo_aplicado_por,
           sorteo_aplicado_at,
           inscripcion_id,
+          es_cabeza_serie,
         inscripciones (
             id,
             jugador1_nombre,
@@ -525,9 +532,12 @@ export class CompetenciaService {
       .eq("torneo_id", torneoId)
       .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
 
-    const cabezasDeSerieIds = new Set<string>();
+    let parejasConPuntos: ParejaPuntosRanking[] = [];
+    const puntosPorId = new Map<string, number>();
+  const persistidas = new Map<string, boolean>();
+
     if (inscripciones && inscripciones.length > 0) {
-      const parejasConPuntos = await Promise.all(
+      parejasConPuntos = await Promise.all(
         inscripciones.map(async (ins) => {
           const ids = ins.usuario2_id
             ? [ins.usuario_id, ins.usuario2_id]
@@ -544,11 +554,35 @@ export class CompetenciaService {
           return { id: ins.id, puntosTotales };
         }),
       );
-
-      parejasConPuntos.sort((a, b) => b.puntosTotales - a.puntosTotales);
-      const K = grupos.length;
-      parejasConPuntos.slice(0, K).forEach((p) => cabezasDeSerieIds.add(p.id));
+      for (const p of parejasConPuntos) {
+        puntosPorId.set(p.id, p.puntosTotales);
+      }
     }
+
+    grupos.forEach((g) => {
+      (g.grupo_parejas || []).forEach((gp: { inscripcion_id?: string; es_cabeza_serie?: boolean }) => {
+        if (gp.inscripcion_id && gp.es_cabeza_serie) {
+          persistidas.set(gp.inscripcion_id, true);
+        }
+      });
+    });
+
+    const cabezasDeSerieIds = idsCabezasGlobalesPorRanking(
+      parejasConPuntos,
+      grupos.length,
+    );
+
+    const cabezasPorInscripcion = marcarCabezasUnicasEnZonas(
+      grupos.map((g) => ({
+        id: g.id,
+        parejas: (g.grupo_parejas || []).map((gp: { inscripcion_id: string }) => ({
+          id: gp.inscripcion_id,
+        })),
+      })),
+      cabezasDeSerieIds,
+      puntosPorId,
+      persistidas,
+    );
 
     // Obtener los ids de usuario para consultar afiliaciones activas
     const userIds: string[] = [];
@@ -585,8 +619,11 @@ export class CompetenciaService {
         const club2 = pClub2 || (gp.inscripciones?.usuario2_id ? afiliacionesMap[gp.inscripciones.usuario2_id] : null);
 
         const cabezaDeSerie = gp.inscripcion_id
-          ? cabezasDeSerieIds.has(gp.inscripcion_id)
+          ? cabezasPorInscripcion.get(gp.inscripcion_id) ?? false
           : false;
+        const puntosRanking = gp.inscripcion_id
+          ? puntosPorId.get(gp.inscripcion_id) ?? 0
+          : 0;
 
         const enriched = enrichInscripcionDenominacion(gp.inscripciones || {});
 
@@ -605,6 +642,7 @@ export class CompetenciaService {
           club1: club1 || null,
           club2: club2 || null,
           cabezaDeSerie,
+          puntosRanking,
         };
       }),
     }));
@@ -655,6 +693,7 @@ export class CompetenciaService {
       grupo_id: grupoDestinoId,
       inscripcion_id: inscripcionId,
       seed: 0, // Se inserta sin seed o se recalcula si es necesario
+      es_cabeza_serie: false,
     });
 
     if (errIns) throw new Error(`Error insertando pareja: ${errIns.message}`);
@@ -810,10 +849,18 @@ export class CompetenciaService {
    */
   static async guardarZonas(
     torneoId: string,
-    zonas: { id: string; nombre: string; parejas: { id: string }[] }[],
+    zonas: {
+      id: string;
+      nombre: string;
+      parejas: { id: string; es_cabeza_serie?: boolean }[];
+    }[],
     motivo: string,
     adminId: string,
     validarCabezasSerie?: boolean,
+    resolucionesCabezasSerie?: {
+      grupo_id: string;
+      cabeza_inscripcion_id: string;
+    }[],
   ) {
     if (validarCabezasSerie) {
       // 0. OBTENER INSCRIPCIONES CONFIRMADAS
@@ -881,6 +928,15 @@ export class CompetenciaService {
       }
     }
 
+    for (const z of zonas) {
+      const marcadas = z.parejas.filter((p) => p.es_cabeza_serie);
+      if (marcadas.length > 1) {
+        throw new Error(
+          `La ${z.nombre} no puede tener más de una cabeza de serie designada.`,
+        );
+      }
+    }
+
     // 1. Guardar la nueva distribución de parejas para cada zona
     for (const z of zonas) {
       // Eliminar las parejas anteriores del grupo
@@ -898,6 +954,7 @@ export class CompetenciaService {
         grupo_id: z.id,
         inscripcion_id: p.id,
         seed: idx + 1,
+        es_cabeza_serie: Boolean(p.es_cabeza_serie),
       }));
 
       if (toInsert.length > 0) {
@@ -927,6 +984,13 @@ export class CompetenciaService {
           parejas: z.parejas.map((p) => p.id),
         })),
         motivo: motivo,
+        cabezas_serie_por_grupo: zonas.map((z) => ({
+          grupo_id: z.id,
+          nombre: z.nombre,
+          cabeza_inscripcion_id:
+            z.parejas.find((p) => p.es_cabeza_serie)?.id ?? null,
+        })),
+        resoluciones_cabezas_serie: resolucionesCabezasSerie ?? [],
       },
     });
 

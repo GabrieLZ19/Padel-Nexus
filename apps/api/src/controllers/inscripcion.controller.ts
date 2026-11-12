@@ -181,6 +181,8 @@ export const createInscripcionManual = async (
       motivo,
       letra_prioridad,
       letraPrioridad,
+      jugador1_datos,
+      jugador2_datos,
     } = req.body;
 
     const adminId = req.user?.id;
@@ -196,6 +198,14 @@ export const createInscripcionManual = async (
       torneoId: torneo_id,
       jugador1Identificador: jugador1_identificador,
       jugador2Identificador: jugador2_identificador,
+      jugador1Datos:
+        jugador1_datos && typeof jugador1_datos === "object"
+          ? jugador1_datos
+          : undefined,
+      jugador2Datos:
+        jugador2_datos && typeof jugador2_datos === "object"
+          ? jugador2_datos
+          : undefined,
       monto: Number(monto),
       metodoPago: metodo_pago,
       adminId,

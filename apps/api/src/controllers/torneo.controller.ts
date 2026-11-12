@@ -646,6 +646,111 @@ export const gestionarParejaLlave = async (
   }
 };
 
+export const buscarParejasLlaveExternas = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const torneoId = req.params.id;
+    const negado = await negarAlcance(req, torneoId, "editar");
+    if (negado) return res.status(403).json({ message: negado });
+    const q = String(req.query.q || "").trim();
+    const { LlaveAltaParejaService } = await import(
+      "../services/llaveAltaPareja.service"
+    );
+    const resultados = await LlaveAltaParejaService.buscarParejasExternas(
+      torneoId,
+      q,
+    );
+    return res.status(200).json({ resultados });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error";
+    return res.status(400).json({ message });
+  }
+};
+
+export const altaParejaLlave = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const torneoId = req.params.id;
+    const negado = await negarAlcance(req, torneoId, "editar");
+    if (negado) return res.status(403).json({ message: negado });
+    const adminId = req.user?.id;
+    if (!adminId) return res.status(401).json({ message: "No autorizado" });
+
+    const {
+      modo,
+      motivo,
+      inscripcion_origen_id,
+      jugador1_identificador,
+      jugador2_identificador,
+      jugador1_datos,
+      jugador2_datos,
+      letra_prioridad,
+    } = req.body as {
+      modo?: "externa" | "manual";
+      motivo?: string;
+      inscripcion_origen_id?: string;
+      jugador1_identificador?: string;
+      jugador2_identificador?: string;
+      jugador1_datos?: Record<string, string>;
+      jugador2_datos?: Record<string, string>;
+      letra_prioridad?: string;
+    };
+
+    if (!motivo?.trim()) {
+      return res.status(400).json({ message: "El motivo es obligatorio." });
+    }
+    if (modo !== "externa" && modo !== "manual") {
+      return res
+        .status(400)
+        .json({ message: "modo debe ser 'externa' o 'manual'." });
+    }
+
+    if (modo === "externa" && !inscripcion_origen_id) {
+      return res
+        .status(400)
+        .json({ message: "inscripcion_origen_id es obligatorio." });
+    }
+    if (modo === "manual" && !jugador1_identificador?.trim()) {
+      return res
+        .status(400)
+        .json({ message: "jugador1_identificador es obligatorio." });
+    }
+
+    const { LlaveAltaParejaService } = await import(
+      "../services/llaveAltaPareja.service"
+    );
+
+    const inscripcion =
+      modo === "externa"
+        ? await LlaveAltaParejaService.importarParejaDesdeOtroTorneo({
+            torneoDestinoId: torneoId,
+            inscripcionOrigenId: String(inscripcion_origen_id),
+            motivo,
+            adminId,
+            letraPrioridad: letra_prioridad,
+          })
+        : await LlaveAltaParejaService.altaParejaPorIdentificadores({
+            torneoDestinoId: torneoId,
+            jugador1Identificador: String(jugador1_identificador || "").trim(),
+            jugador2Identificador: jugador2_identificador,
+            jugador1Datos: jugador1_datos,
+            jugador2Datos: jugador2_datos,
+            motivo,
+            adminId,
+            letraPrioridad: letra_prioridad,
+          });
+
+    return res.status(201).json({ inscripcion });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error";
+    return res.status(400).json({ message, error: message });
+  }
+};
+
 export const opcionesPromocionMenores = async (
   req: Request,
   res: Response,
@@ -796,7 +901,8 @@ export const guardarZonasOverride = async (
 ): Promise<Response> => {
   try {
     const torneoId = req.params.id;
-    const { zonas, motivo, validarCabezasSerie } = req.body;
+    const { zonas, motivo, validarCabezasSerie, resoluciones_cabezas_serie } =
+      req.body;
     const admin_id = req.user?.id;
     if (!admin_id) {
       return res.status(401).json({ message: "No autorizado" });
@@ -806,7 +912,10 @@ export const guardarZonasOverride = async (
       zonas,
       motivo,
       admin_id,
-      validarCabezasSerie
+      validarCabezasSerie,
+      Array.isArray(resoluciones_cabezas_serie)
+        ? resoluciones_cabezas_serie
+        : undefined,
     );
     return res.status(200).json(resultado);
   } catch (error: any) {

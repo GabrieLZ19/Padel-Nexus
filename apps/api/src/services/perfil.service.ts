@@ -22,6 +22,18 @@ import {
   CATEGORIAS_VETERANOS,
 } from "../constants/rankings";
 
+/** Datos opcionales para alta provisional en inscripción manual (TOR-20). */
+export interface DatosAltaJugadorManual {
+  nombre?: string;
+  apellido?: string;
+  categoria_padel?: string;
+  fecha_nacimiento?: string;
+  telefono?: string;
+}
+
+const PERFIL_SELECT_INSCRIPCION_MANUAL =
+  "id, nombre, apellido, categoria_padel, fecha_nacimiento, sexo, dni";
+
 export interface PreferenciasNotificacion {
   push: boolean;
   email: boolean;
@@ -529,6 +541,84 @@ export class PerfilService {
     }
 
     return { ...perfil, creado: true };
+  }
+
+  /**
+   * Resuelve un jugador por DNI/email o crea ficha provisional (mismo flujo que planilla).
+   */
+  static async resolverJugadorParaInscripcionManual(
+    identificador: string,
+    datos: DatosAltaJugadorManual | undefined,
+    etiqueta: string,
+  ): Promise<{
+    id: string;
+    nombre: string | null;
+    apellido: string | null;
+    categoria_padel: string | null;
+    fecha_nacimiento: string | null;
+    sexo: string | null;
+    creado: boolean;
+  }> {
+    const raw = identificador.trim();
+    if (!raw) {
+      throw new Error(`${etiqueta}: el identificador es obligatorio.`);
+    }
+
+    const { data: existente, error: busquedaError } = await supabaseAdmin
+      .from("perfiles")
+      .select(PERFIL_SELECT_INSCRIPCION_MANUAL)
+      .or(`dni.eq."${raw}",email.eq."${raw}"`)
+      .maybeSingle();
+
+    if (busquedaError) {
+      throw new Error(`Error al buscar ${etiqueta}.`);
+    }
+    if (existente) {
+      return { ...existente, creado: false };
+    }
+
+    if (raw.includes("@")) {
+      throw new Error(
+        `${etiqueta} (${raw}) no está registrado en la plataforma.`,
+      );
+    }
+
+    const dni = normalizarDni(raw);
+    if (!dni || dni.length < 7) {
+      throw new Error(
+        `${etiqueta} (${raw}) no está registrado. Para un DNI nuevo indicá nombre y apellido.`,
+      );
+    }
+
+    const nombre = (datos?.nombre || "").trim();
+    const apellido = (datos?.apellido || "").trim();
+    if (!nombre || !apellido) {
+      throw new Error(
+        `El ${etiqueta.toLowerCase()} (${dni}) no está registrado en la plataforma. Completá nombre y apellido para crear la ficha provisional.`,
+      );
+    }
+
+    const fila: FilaPlanillaInscripcion = {
+      fila: 0,
+      dni,
+      apellidoNombre: `${apellido}, ${nombre}`,
+      categoria: datos?.categoria_padel,
+      fechaNacimiento: datos?.fecha_nacimiento,
+      telefono: datos?.telefono,
+    };
+
+    const creado = await PerfilService.resolverJugadorDesdePlanilla(fila);
+    const { data: perfil, error: perfilError } = await supabaseAdmin
+      .from("perfiles")
+      .select(PERFIL_SELECT_INSCRIPCION_MANUAL)
+      .eq("id", creado.id)
+      .single();
+
+    if (perfilError || !perfil) {
+      throw new Error(`No se pudo cargar el perfil de ${etiqueta}.`);
+    }
+
+    return { ...perfil, creado: creado.creado };
   }
 
   /**

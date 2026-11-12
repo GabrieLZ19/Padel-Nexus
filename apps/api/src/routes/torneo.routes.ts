@@ -26,6 +26,8 @@ import {
   guardarSiembraCustom,
   actualizarPartido,
   gestionarParejaLlave,
+  buscarParejasLlaveExternas,
+  altaParejaLlave,
   opcionesPromocionMenores,
   promoverParejaMenores,
 } from "../controllers/torneo.controller";
@@ -167,6 +169,16 @@ router.put(
   "/:id/llave/pareja",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   gestionarParejaLlave,
+);
+router.get(
+  "/:id/llave/buscar-parejas",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  buscarParejasLlaveExternas,
+);
+router.post(
+  "/:id/llave/alta-pareja",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  altaParejaLlave,
 );
 router.put(
   "/override/mover-pareja",

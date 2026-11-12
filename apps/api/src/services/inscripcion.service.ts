@@ -20,7 +20,10 @@ import {
   esTorneoNacional,
 } from "../utils/inscripcionElegibilidad";
 import { AFILIACION_ESTADOS } from "../constants/afiliacion";
-import { PerfilService } from "./perfil.service";
+import {
+  PerfilService,
+  type DatosAltaJugadorManual,
+} from "./perfil.service";
 import {
   agruparFilasEnParejas,
   sanitizarFilaPlanillaInscripcion,
@@ -776,6 +779,8 @@ export class InscripcionService {
     torneoId: string;
     jugador1Identificador: string;
     jugador2Identificador?: string;
+    jugador1Datos?: DatosAltaJugadorManual;
+    jugador2Datos?: DatosAltaJugadorManual;
     monto: number;
     metodoPago?: string;
     adminId: string;
@@ -787,6 +792,8 @@ export class InscripcionService {
       torneoId,
       jugador1Identificador,
       jugador2Identificador,
+      jugador1Datos,
+      jugador2Datos,
       monto,
       metodoPago,
       adminId,
@@ -804,48 +811,28 @@ export class InscripcionService {
       }
     }
 
-    const { data: j1, error: j1Error } = await supabaseAdmin
-      .from("perfiles")
-      .select("id, nombre, apellido, categoria_padel, fecha_nacimiento, sexo, dni")
-      .or(
-        `dni.eq."${jugador1Identificador}",email.eq."${jugador1Identificador}"`,
-      )
-      .maybeSingle();
+    const resJ1 = await PerfilService.resolverJugadorParaInscripcionManual(
+      jugador1Identificador,
+      jugador1Datos,
+      "Jugador 1",
+    );
+    const j1 = resJ1;
 
-    if (j1Error || !j1) {
-      throw new Error(
-        `El jugador 1 (${jugador1Identificador}) no está registrado en la plataforma.`,
-      );
-    }
-
-    let j2: {
-      id: string;
-      nombre: string | null;
-      apellido: string | null;
-      categoria_padel: string | null;
-      fecha_nacimiento: string | null;
-      sexo: string | null;
-    } | null = null;
+    let j2: typeof j1 | null = null;
+    let j2Creado = false;
 
     if (
       jugador2Identificador &&
       jugador2Identificador.trim() !== "" &&
       jugador2Identificador !== "-"
     ) {
-      const { data: resolvedJ2, error: j2Error } = await supabaseAdmin
-        .from("perfiles")
-        .select("id, nombre, apellido, categoria_padel, fecha_nacimiento, sexo, dni")
-        .or(
-          `dni.eq."${jugador2Identificador}",email.eq."${jugador2Identificador}"`,
-        )
-        .maybeSingle();
-
-      if (j2Error || !resolvedJ2) {
-        throw new Error(
-          `El jugador 2 (${jugador2Identificador}) no está registrado en la plataforma.`,
-        );
-      }
-      j2 = resolvedJ2;
+      const resJ2 = await PerfilService.resolverJugadorParaInscripcionManual(
+        jugador2Identificador,
+        jugador2Datos,
+        "Jugador 2",
+      );
+      j2 = resJ2;
+      j2Creado = resJ2.creado;
     }
 
     const torneo = await InscripcionService.cargarTorneoElegibilidad(torneoId);
@@ -936,6 +923,8 @@ export class InscripcionService {
         motivo: omitirValidaciones ? (motivo || "").trim() : null,
         jugador1_id: j1.id,
         jugador2_id: j2?.id || null,
+        jugador1_ficha_creada: resJ1.creado,
+        jugador2_ficha_creada: j2 ? j2Creado : false,
       },
     });
 
