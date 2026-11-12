@@ -77,17 +77,17 @@ export default function HomePageClient() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-black text-brand-white font-sans selection:bg-brand-chartreuse selection:text-brand-black relative overflow-x-hidden">
+    <div className="min-h-screen w-full max-w-[100vw] bg-brand-black text-brand-white font-sans selection:bg-brand-chartreuse selection:text-brand-black relative overflow-x-clip">
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         {/* El destello verde oliva/musgo de la esquina superior derecha */}
-        <div className="absolute -top-50 -right-37.5 w-162.5 h-162.5 rounded-full bg-brand-moss opacity-20 blur-[140px]" />
+        <div className="absolute -top-32 right-0 h-80 w-[min(100vw,28rem)] rounded-full bg-brand-moss opacity-20 blur-[100px] sm:-top-50 sm:-right-20 sm:h-162.5 sm:w-162.5 sm:blur-[140px]" />
 
         {/* El destello chartreuse sutil de apoyo en la zona izquierda */}
-        <div className="absolute top-[20%] -left-50 w-137.5 h-137.5 rounded-full bg-brand-chartreuse opacity-5 blur-[160px]" />
+        <div className="absolute top-[20%] left-0 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-chartreuse opacity-5 blur-[120px] sm:-left-50 sm:h-137.5 sm:w-137.5 sm:translate-x-0 sm:blur-[160px]" />
       </div>
       {/* --- HERO SECTION --- */}
-      <main className="max-w-[1600px] mx-auto px-6 sm:px-10 pt-8 pb-12 sm:pt-10 sm:pb-16 xl:pt-12 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start relative z-10">
-        <div className="max-w-xl space-y-5 sm:space-y-6">
+      <main className="relative z-10 mx-auto grid max-w-[1600px] grid-cols-1 items-start gap-8 px-6 pt-8 pb-12 sm:px-10 sm:pt-10 sm:pb-16 lg:grid-cols-2 lg:gap-12 xl:pt-12">
+        <div className="w-full min-w-0 max-w-xl space-y-5 sm:space-y-6">
           <h1 className="text-balance text-[2.35rem] font-extrabold leading-[1.05] tracking-tight sm:text-5xl xl:text-[3.25rem] xl:leading-[1.02] 2xl:text-7xl">
             El ecosistema del pádel, en una sola plataforma
           </h1>
@@ -99,16 +99,16 @@ export default function HomePageClient() {
 
           <form
             onSubmit={handleSearch}
-            className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 p-2 bg-[#151515] border border-brand-white/10 rounded-2xl w-full max-w-xl shadow-2xl focus-within:border-brand-chartreuse/50 transition-colors"
+            className="grid w-full min-w-0 max-w-xl grid-cols-1 gap-3 rounded-2xl border border-brand-white/10 bg-[#151515] p-2 shadow-2xl transition-colors focus-within:border-brand-chartreuse/50 sm:grid-cols-[1fr_auto]"
           >
-            <label className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-[#111111]">
-              <Search className="size-5 text-gray-500" />
+            <label className="flex min-w-0 items-center gap-2.5 rounded-2xl bg-[#111111] px-3 py-3 sm:gap-3 sm:px-4">
+              <Search className="size-5 shrink-0 text-gray-500" aria-hidden />
               <input
-                type="text"
+                type="search"
                 placeholder="Buscá torneos, clubes o jugadores"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent border-none text-brand-white focus:outline-none placeholder-gray-500 text-base p-2"
+                className="min-w-0 flex-1 border-none bg-transparent text-base text-brand-white placeholder:text-gray-500 focus:outline-none sm:text-base"
               />
             </label>
             <button

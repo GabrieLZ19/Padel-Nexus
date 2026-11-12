@@ -7,9 +7,9 @@ export default function PublicLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-brand-black text-brand-white font-sans selection:bg-brand-chartreuse selection:text-brand-black flex flex-col">
+    <div className="flex min-h-screen w-full max-w-[100vw] flex-col overflow-x-clip bg-brand-black font-sans text-brand-white selection:bg-brand-chartreuse selection:text-brand-black">
       <Navbar />
-      <div className="flex-1 min-h-0 public-content-soporte-fab-safe">
+      <div className="public-content-soporte-fab-safe min-h-0 min-w-0 flex-1">
         {children}
       </div>
       <SoporteChat />
