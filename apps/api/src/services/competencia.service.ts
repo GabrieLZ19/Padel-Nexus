@@ -790,30 +790,34 @@ export class CompetenciaService {
       pushIfNew(1, parejas[0].inscripcion_id, parejas[3].inscripcion_id);
       pushIfNew(2, parejas[1].inscripcion_id, parejas[2].inscripcion_id);
 
-      const ordenesExistentes = new Set(
-        (existentes || []).map((m) => m.orden).filter(Boolean),
-      );
-      const faltanSegundaFase =
-        !ordenesExistentes.has(3) || !ordenesExistentes.has(4);
-
-      if (jugados.length === 0 && faltanSegundaFase) {
-        if (!ordenesExistentes.has(3)) {
-          partidos.push({
-            torneo_id: torneoId,
-            ronda: nombreGrupo,
-            orden: 3,
-            estado_partido: "Pendiente Ganadores",
-          });
+      const ordenTrasBorrado = new Set<number>();
+      for (const m of existentes || []) {
+        if (m.ganador) {
+          if (m.orden != null) ordenTrasBorrado.add(m.orden);
+          continue;
         }
-        if (!ordenesExistentes.has(4)) {
-          partidos.push({
-            torneo_id: torneoId,
-            ronda: nombreGrupo,
-            orden: 4,
-            estado_partido: "Pendiente Perdedores",
-          });
-        }
+        if (pendientesIds.includes(m.id)) continue;
+        if (m.orden != null) ordenTrasBorrado.add(m.orden);
       }
+
+      if (!ordenTrasBorrado.has(3)) {
+        partidos.push({
+          torneo_id: torneoId,
+          ronda: nombreGrupo,
+          orden: 3,
+          estado_partido: "Pendiente Ganadores",
+        });
+      }
+      if (!ordenTrasBorrado.has(4)) {
+        partidos.push({
+          torneo_id: torneoId,
+          ronda: nombreGrupo,
+          orden: 4,
+          estado_partido: "Pendiente Perdedores",
+        });
+      }
+    } else if (parejas.length === 2) {
+      pushIfNew(1, parejas[0].inscripcion_id, parejas[1].inscripcion_id);
     } else {
       let orden = 1;
       for (let i = 0; i < parejas.length; i++) {
@@ -937,6 +941,21 @@ export class CompetenciaService {
       }
     }
 
+    const { data: gruposPrevios } = await supabaseAdmin
+      .from("grupos")
+      .select("id, grupo_parejas(inscripcion_id)")
+      .eq("torneo_id", torneoId);
+
+    const firmaParejas = (ids: string[]) => [...ids].sort().join("|");
+    const firmaPorGrupoAntes = new Map(
+      (gruposPrevios || []).map((g) => [
+        g.id,
+        firmaParejas(
+          (g.grupo_parejas || []).map((p) => String(p.inscripcion_id)),
+        ),
+      ]),
+    );
+
     // 1. Guardar la nueva distribución de parejas para cada zona
     for (const z of zonas) {
       // Eliminar las parejas anteriores del grupo
@@ -967,10 +986,24 @@ export class CompetenciaService {
       }
     }
 
-    // 2. Regenerar los partidos para cada una de las zonas guardadas
+    // 2. Regenerar fixture solo en zonas cuya composición cambió
     for (const z of zonas) {
-      await CompetenciaService.regenerarPartidosDeGrupo(torneoId, z.id, z.nombre);
+      const firmaNueva = firmaParejas(z.parejas.map((p) => p.id));
+      const firmaAnterior = firmaPorGrupoAntes.get(z.id);
+      if (firmaAnterior !== undefined && firmaAnterior === firmaNueva) {
+        continue;
+      }
+      await CompetenciaService.regenerarPartidosDeGrupo(
+        torneoId,
+        z.id,
+        z.nombre,
+      );
     }
+
+    const { sincronizarLlaveTrasCambioZonas } = await import(
+      "../utils/playoffAvance"
+    );
+    await sincronizarLlaveTrasCambioZonas(torneoId);
 
     // 3. Registrar auditoría única
     await supabaseAdmin.from("logs_auditoria").insert({

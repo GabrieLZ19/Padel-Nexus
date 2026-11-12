@@ -10,6 +10,10 @@ import {
   fillLeafSidesFromQualified,
 } from "./fapBracketPlacement";
 import type { QualifiedPair } from "./fapBracketTypes";
+import {
+  buildZonePairCountsByLetter,
+  isSeedRefValidForZoneComposition,
+} from "./fapZoneSeeds";
 
 /** @deprecated Prefer matriz FAP por cantidad de parejas. */
 export function getPlayoffSize(zonasCount: number): number {
@@ -142,13 +146,8 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
 
   if (!grupos || grupos.length === 0) return;
 
-  const { count: pairCount } = await supabaseAdmin
-    .from("inscripciones")
-    .select("id", { count: "exact", head: true })
-    .eq("torneo_id", torneoId)
-    .eq("estado_pago", "Confirmado");
-
-  const nParejas = pairCount ?? 0;
+  const { resolveFapPlantillaPairCount } = await import("./fapPlantillaTorneo");
+  const nParejas = await resolveFapPlantillaPairCount(torneoId);
   const matrix = getFapBracketForPairCount(nParejas);
   if (!matrix) {
     console.error(
@@ -211,6 +210,7 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
 
   if (!playoffMatches || playoffMatches.length === 0) return;
 
+  const countsByZone = buildZonePairCountsByLetter(grupos);
   const byOrden = new Map(playoffMatches.map((p) => [p.orden, p]));
   const fills = fillLeafSidesFromQualified(matrix, qualifiedMap);
 
@@ -223,10 +223,14 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
 
     const equipo_a_id = matrixMatch.a.startsWith("W")
       ? partido.equipo_a_id
-      : fill.equipo_a_id;
+      : isSeedRefValidForZoneComposition(matrixMatch.a, countsByZone)
+        ? fill.equipo_a_id
+        : null;
     const equipo_b_id = matrixMatch.b.startsWith("W")
       ? partido.equipo_b_id
-      : fill.equipo_b_id;
+      : isSeedRefValidForZoneComposition(matrixMatch.b, countsByZone)
+        ? fill.equipo_b_id
+        : null;
 
     if (
       equipo_a_id === partido.equipo_a_id &&
@@ -275,4 +279,25 @@ export async function sincronizarClasificadosALlave(
   // Si ya hay alguna hoja rellena, igual re-sincronizamos con FAP (idempotente en lados W*).
   await avanzarJugadoresALlaves(torneoId);
   return true;
+}
+
+/**
+ * Tras editar zonas: rehidrata partidos internos de zonas de 4 y
+ * re-sincroniza hojas de llave con semillas aún válidas (p. ej. sin 2º en zona de 2).
+ */
+export async function sincronizarLlaveTrasCambioZonas(
+  torneoId: string,
+): Promise<void> {
+  await avanzarPartidosInternosTodasLasZonasCuatro(torneoId);
+
+  const { data: playoffMatches } = await supabaseAdmin
+    .from("partidos")
+    .select("id")
+    .eq("torneo_id", torneoId)
+    .in("ronda", [...PLAYOFF_RONDAS])
+    .limit(1);
+
+  if (!playoffMatches || playoffMatches.length === 0) return;
+
+  await avanzarJugadoresALlaves(torneoId);
 }
