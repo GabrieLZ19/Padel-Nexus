@@ -35,14 +35,17 @@ describe("RES-12 plazo visible de pago pendiente", () => {
     assert.equal(fallback?.toISOString(), "2026-11-07T15:20:00.000Z");
   });
 
-  it("servicio notifica, libera y expone TTL en preferencia MP", () => {
+  it("servicio notifica, marca vencida y expone TTL en preferencia MP", () => {
     const svc = readFileSync(
       path.join(RAIZ, "src/services/reserva.service.ts"),
       "utf8",
     );
     assert.match(svc, /liberarPendientesExpiradasUsuario/);
     assert.match(svc, /enviarNotificacionReservaPagoVencido/);
+    assert.match(svc, /marcarReservaVencidaPorPago/);
+    assert.match(svc, /RESERVA_MOTIVO_PAGO_VENCIDO/);
     assert.match(svc, /expiration_date_to:\s*retieneHastaMp/);
     assert.match(svc, /RESERVA_PAGO_VENCIDO/);
+    assert.doesNotMatch(svc, /eliminarReservasPorIds/);
   });
 });

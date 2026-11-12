@@ -360,54 +360,78 @@ export class LlaveAltaParejaService {
     const categoriaTorneo =
       (torneoMeta?.categoria && String(torneoMeta.categoria).trim()) || null;
 
-    const j1Datos: DatosAltaJugadorManual = { ...(datos.jugador1Datos || {}) };
-    if (!j1Datos.categoria_padel?.trim() && categoriaTorneo) {
-      j1Datos.categoria_padel = categoriaTorneo;
-    }
+    const optsPlanilla = {
+      categoriaFallback: categoriaTorneo,
+      usarFallbackPlanilla5: false as const,
+    };
 
-    const resJ1 = await PerfilService.resolverJugadorParaInscripcionManual(
-      datos.jugador1Identificador,
-      j1Datos,
-      "Jugador 1",
-    );
-    let j2: typeof resJ1 | null = null;
-    let j2Creado = false;
-    if (
-      datos.jugador2Identificador &&
-      datos.jugador2Identificador.trim() !== "" &&
-      datos.jugador2Identificador !== "-"
-    ) {
-      const j2Datos: DatosAltaJugadorManual = { ...(datos.jugador2Datos || {}) };
-      if (!j2Datos.categoria_padel?.trim() && categoriaTorneo) {
-        j2Datos.categoria_padel = categoriaTorneo;
+    const completarDatos = (
+      base?: DatosAltaJugadorManual,
+    ): DatosAltaJugadorManual | undefined => {
+      const out: DatosAltaJugadorManual = { ...(base || {}) };
+      if (!out.categoria_padel?.trim() && categoriaTorneo) {
+        out.categoria_padel = categoriaTorneo;
       }
-      const resJ2 = await PerfilService.resolverJugadorParaInscripcionManual(
-        datos.jugador2Identificador,
-        j2Datos,
-        "Jugador 2",
+      return Object.keys(out).length > 0 ? out : base;
+    };
+
+    const fichasCreadas: string[] = [];
+
+    try {
+      const resJ1 = await PerfilService.resolverJugadorParaInscripcionManual(
+        datos.jugador1Identificador,
+        completarDatos(datos.jugador1Datos),
+        "Jugador 1",
+        optsPlanilla,
       );
-      j2 = resJ2;
-      j2Creado = resJ2.creado;
+      if (resJ1.creado) fichasCreadas.push(resJ1.id);
+
+      let j2: typeof resJ1 | null = null;
+      let j2Creado = false;
+      if (
+        datos.jugador2Identificador &&
+        datos.jugador2Identificador.trim() !== "" &&
+        datos.jugador2Identificador !== "-"
+      ) {
+        const resJ2 = await PerfilService.resolverJugadorParaInscripcionManual(
+          datos.jugador2Identificador,
+          completarDatos(datos.jugador2Datos),
+          "Jugador 2",
+          optsPlanilla,
+        );
+        if (resJ2.creado) fichasCreadas.push(resJ2.id);
+        j2 = resJ2;
+        j2Creado = resJ2.creado;
+      }
+
+      const j1Nombre = formatNombreCompleto(resJ1.apellido, resJ1.nombre);
+      const j2Nombre = j2 ? formatNombreCompleto(j2.apellido, j2.nombre) : "-";
+
+      return await insertarInscripcionLlave({
+        torneoId: datos.torneoDestinoId,
+        adminId: datos.adminId,
+        motivo: datos.motivo,
+        usuario1Id: resJ1.id,
+        usuario2Id: j2?.id || null,
+        jugador1Nombre: j1Nombre,
+        jugador2Nombre: j2Nombre,
+        letraPrioridad: datos.letraPrioridad || null,
+        metodoPago: "Confirmado",
+        detallesAuditoria: {
+          origen: "alta_dni_manual",
+          jugador1_ficha_creada: resJ1.creado,
+          jugador2_ficha_creada: j2 ? j2Creado : false,
+        },
+      });
+    } catch (error) {
+      for (const id of fichasCreadas) {
+        try {
+          await PerfilService.revertirFichaProvisionalInscripcion(id);
+        } catch {
+          /* mejor esfuerzo */
+        }
+      }
+      throw error;
     }
-
-    const j1Nombre = formatNombreCompleto(resJ1.apellido, resJ1.nombre);
-    const j2Nombre = j2 ? formatNombreCompleto(j2.apellido, j2.nombre) : "-";
-
-    return insertarInscripcionLlave({
-      torneoId: datos.torneoDestinoId,
-      adminId: datos.adminId,
-      motivo: datos.motivo,
-      usuario1Id: resJ1.id,
-      usuario2Id: j2?.id || null,
-      jugador1Nombre: j1Nombre,
-      jugador2Nombre: j2Nombre,
-      letraPrioridad: datos.letraPrioridad || null,
-      metodoPago: "Confirmado",
-      detallesAuditoria: {
-        origen: "alta_dni_manual",
-        jugador1_ficha_creada: resJ1.creado,
-        jugador2_ficha_creada: j2 ? j2Creado : false,
-      },
-    });
   }
 }

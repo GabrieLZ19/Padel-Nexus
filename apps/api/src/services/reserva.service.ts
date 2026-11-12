@@ -22,6 +22,7 @@ import {
 } from "../utils/reservaRetencion";
 import { evaluarCancelacionReservaJugador } from "../utils/cancelacionReservaJugador";
 import { mensajeNotificacionReservaCanceladaPorJugador } from "../utils/reservaCancelacion";
+import { RESERVA_MOTIVO_PAGO_VENCIDO } from "../constants/reserva";
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 
@@ -47,10 +48,68 @@ export interface CrearReservaDTO {
 // ── Servicio ───────────────────────────────────────────────────────────
 
 export class ReservaService {
-  private static async eliminarReservasPorIds(ids: string[]) {
-    if (ids.length === 0) return;
-    await supabaseAdmin.from("pagos").delete().in("reserva_id", ids);
-    await supabaseAdmin.from("reservas").delete().in("id", ids);
+  private static esReservaMarcadaPagoVencido(reserva: {
+    estado_reserva?: string | null;
+    motivo_cancelacion?: string | null;
+  }): boolean {
+    return (
+      (reserva.estado_reserva || "").toLowerCase() === "cancelada" &&
+      (reserva.motivo_cancelacion || "").trim() === RESERVA_MOTIVO_PAGO_VENCIDO
+    );
+  }
+
+  /**
+   * Marca la reserva como cancelada por plazo de pago y libera el turno (sin borrar el registro).
+   */
+  static async marcarReservaVencidaPorPago(
+    reservaId: string,
+    opciones?: { notificar?: boolean },
+  ): Promise<boolean> {
+    const { data: reserva, error } = await supabaseAdmin
+      .from("reservas")
+      .select(
+        "id, usuario_id, estado_reserva, estado_pago, motivo_cancelacion",
+      )
+      .eq("id", reservaId)
+      .maybeSingle();
+
+    if (error || !reserva) return false;
+    if (ReservaService.esReservaMarcadaPagoVencido(reserva)) return false;
+    if (
+      (reserva.estado_reserva || "").toLowerCase() !== "pendiente" ||
+      (reserva.estado_pago || "").toLowerCase() === "completado"
+    ) {
+      return false;
+    }
+
+    const ahora = new Date().toISOString();
+
+    await supabaseAdmin
+      .from("pagos")
+      .update({ estado: "rechazado" })
+      .eq("reserva_id", reservaId)
+      .eq("estado", "pendiente");
+
+    const { error: updError } = await supabaseAdmin
+      .from("reservas")
+      .update({
+        estado_reserva: "cancelada",
+        estado_pago: "cancelado",
+        motivo_cancelacion: RESERVA_MOTIVO_PAGO_VENCIDO,
+        cancelada_en: ahora,
+        retiene_hasta: null,
+      })
+      .eq("id", reservaId);
+
+    if (updError) return false;
+
+    if (opciones?.notificar !== false && reserva.usuario_id) {
+      await ReservaService.enviarNotificacionReservaPagoVencido(
+        reservaId,
+        String(reserva.usuario_id),
+      );
+    }
+    return true;
   }
 
   /**
@@ -64,17 +123,23 @@ export class ReservaService {
     const ahora = new Date();
     const { data: candidatas, error } = await supabaseAdmin
       .from("reservas")
-      .select("id, estado_reserva, created_at, retiene_hasta")
+      .select(
+        "id, estado_reserva, estado_pago, created_at, retiene_hasta, usuario_id",
+      )
       .in("turno_id", turnoIds)
       .eq("fecha_reserva", fecha)
       .eq("estado_reserva", "pendiente");
 
     if (error) throw new Error("Error al liberar reservas pendientes expiradas.");
 
-    const expiradas = (candidatas || [])
-      .filter((r) => reservaPendienteExpirada(r, ahora))
-      .map((r) => r.id as string);
-    await this.eliminarReservasPorIds(expiradas);
+    const expiradas = (candidatas || []).filter((r) =>
+      reservaPendienteExpirada(r, ahora),
+    );
+    await Promise.all(
+      expiradas.map((r) =>
+        ReservaService.marcarReservaVencidaPorPago(String(r.id)),
+      ),
+    );
   }
 
   private static async liberarPendientesExpiradasUsuario(usuarioId: string) {
@@ -95,13 +160,9 @@ export class ReservaService {
 
     await Promise.all(
       expiradas.map((r) =>
-        ReservaService.enviarNotificacionReservaPagoVencido(
-          String(r.id),
-          String(r.usuario_id),
-        ),
+        ReservaService.marcarReservaVencidaPorPago(String(r.id)),
       ),
     );
-    await this.eliminarReservasPorIds(expiradas.map((r) => String(r.id)));
   }
 
   static async enviarNotificacionReservaPagoVencido(
@@ -336,19 +397,6 @@ export class ReservaService {
         throw new Error("TURNO_OCUPADO");
       }
 
-      const idsABorrar = existentes
-        .filter((r) => {
-          if (r.estado_reserva === "cancelada") return true;
-          if (
-            r.estado_reserva === "pendiente" &&
-            reservaPendienteExpirada(r, ahora)
-          ) {
-            return true;
-          }
-          return false;
-        })
-        .map((r) => r.id as string);
-      await this.eliminarReservasPorIds(idsABorrar);
     }
 
     const retieneHasta = retencionInicialDesde(ahora);
@@ -422,14 +470,13 @@ export class ReservaService {
 
     if (error || !data) throw new Error("Reserva no encontrada.");
 
+    if (ReservaService.esReservaMarcadaPagoVencido(data)) {
+      throw new Error("RESERVA_PAGO_VENCIDO");
+    }
+
     const ahora = new Date();
     if (reservaPendienteExpirada(data, ahora)) {
-      const usuarioId = String(data.usuario_id || "");
-      await ReservaService.enviarNotificacionReservaPagoVencido(
-        reservaId,
-        usuarioId,
-      );
-      await this.eliminarReservasPorIds([reservaId]);
+      await ReservaService.marcarReservaVencidaPorPago(reservaId);
       throw new Error("RESERVA_PAGO_VENCIDO");
     }
 
@@ -458,7 +505,7 @@ export class ReservaService {
       .from("reservas")
       .select(
         `
-        id, usuario_id, estado_pago,
+        id, usuario_id, estado_pago, estado_reserva, created_at, retiene_hasta, motivo_cancelacion,
         turnos (
           canchas (
             clubes ( id, nombre, provincia, localidad, direccion, latitud, longitud, cbu, alias, suscripcion_sin_comisiones, pago_transferencia_habilitado, pago_efectivo_habilitado )
@@ -472,6 +519,13 @@ export class ReservaService {
     if (rError || !reserva) throw new Error("Reserva no encontrada.");
     if (reserva.usuario_id !== usuarioId)
       throw new Error("No tiene permiso sobre esta reserva.");
+    if (ReservaService.esReservaMarcadaPagoVencido(reserva)) {
+      throw new Error("RESERVA_PAGO_VENCIDO");
+    }
+    if (reservaPendienteExpirada(reserva, new Date())) {
+      await ReservaService.marcarReservaVencidaPorPago(reservaId);
+      throw new Error("RESERVA_PAGO_VENCIDO");
+    }
     if (reserva.estado_pago === "completado")
       throw new Error("Esta reserva ya fue pagada.");
 
@@ -1081,6 +1135,7 @@ export class ReservaService {
             tipo_suelo,
             techada,
             clubes (
+              id,
               nombre,
               localidad,
               provincia,

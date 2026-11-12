@@ -46,6 +46,13 @@ export interface PreferenciasNotificacion {
   whatsapp: boolean;
 }
 
+export type OpcionesResolverJugadorPlanilla = {
+  /** Categoría por defecto si la fila no trae categoría (p. ej. categoría del torneo). */
+  categoriaFallback?: string | null;
+  /** Planilla oficial: true (default). Inscripción manual: false para no asumir 5ª. */
+  usarFallbackPlanilla5?: boolean;
+};
+
 export interface ActualizarPerfilDTO {
   nombre?: string;
   apellido?: string;
@@ -458,8 +465,8 @@ export class PerfilService {
       metodos_disponibles,
       mensaje:
         metodos_disponibles.length > 0
-          ? "Encontramos una ficha con este DNI. Confirmá tu identidad para cargar los datos."
-          : "Encontramos una ficha con este DNI. Contactá a tu club o asociación para completar el teléfono o email de verificación.",
+          ? "Encontramos tus datos cargados por tu club o asociación. Confirmá tu identidad para continuar."
+          : "Encontramos tus datos cargados por tu club o asociación. Contactá a tu entidad para completar el teléfono o email de verificación.",
     };
   }
 
@@ -517,11 +524,57 @@ export class PerfilService {
     return PerfilService.consultarPreinscripcionPorDni(dni);
   }
 
+  private static resolverCategoriaDesdePlanilla(
+    fila: FilaPlanillaInscripcion,
+    opciones?: OpcionesResolverJugadorPlanilla,
+  ): string {
+    const explicita = fila.categoria?.trim();
+    if (explicita) return explicita;
+    const fallbackTorneo = opciones?.categoriaFallback?.trim();
+    if (fallbackTorneo) return fallbackTorneo;
+    if (opciones?.usarFallbackPlanilla5 !== false) {
+      return "5ª";
+    }
+    throw new Error(
+      `Fila ${fila.fila}: la categoría es obligatoria para crear la ficha provisional.`,
+    );
+  }
+
+  /**
+   * Elimina una ficha provisional creada en un intento fallido de inscripción (TOR-23).
+   */
+  static async revertirFichaProvisionalInscripcion(userId: string): Promise<void> {
+    const { data: perfil } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!perfil?.email || !esEmailPlaceholderPlanilla(perfil.email)) {
+      return;
+    }
+
+    const { count } = await supabaseAdmin
+      .from("inscripciones")
+      .select("id", { count: "exact", head: true })
+      .or(`usuario_id.eq."${userId}",usuario2_id.eq."${userId}"`);
+
+    if (count && count > 0) {
+      return;
+    }
+
+    await supabaseAdmin.from("perfiles").delete().eq("id", userId);
+    await supabaseAdmin.auth.admin.deleteUser(userId);
+  }
+
   /**
    * Crea o actualiza un jugador a partir de una fila de planilla.
    * La ficha queda completa para torneos; la activación en App ocurre al registrarse con su DNI.
    */
-  static async resolverJugadorDesdePlanilla(fila: FilaPlanillaInscripcion) {
+  static async resolverJugadorDesdePlanilla(
+    fila: FilaPlanillaInscripcion,
+    opciones?: OpcionesResolverJugadorPlanilla,
+  ) {
     fila = sanitizarFilaPlanillaInscripcion(fila);
     const dni = normalizarDni(fila.dni);
     if (!dni || dni.length < 7) {
@@ -597,6 +650,10 @@ export class PerfilService {
     }
 
     const userId = authUser.user.id;
+    const categoriaPadel = PerfilService.resolverCategoriaDesdePlanilla(
+      fila,
+      opciones,
+    );
     const { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
       .upsert(
@@ -609,7 +666,7 @@ export class PerfilService {
           telefono: fila.telefono || null,
           // Solo ASOCIACIÓN; si falta, placeholder (denominación usará residencia al completar).
           lugar_residencia: provinciaPlanilla || "A completar",
-          categoria_padel: fila.categoria || "5ª",
+          categoria_padel: categoriaPadel,
           lado_preferido: "indistinto",
           fecha_nacimiento: fila.fechaNacimiento || null,
           sexo: "masculino",
@@ -638,6 +695,7 @@ export class PerfilService {
     identificador: string,
     datos: DatosAltaJugadorManual | undefined,
     etiqueta: string,
+    opciones?: OpcionesResolverJugadorPlanilla,
   ): Promise<{
     id: string;
     nombre: string | null;
@@ -695,7 +753,10 @@ export class PerfilService {
       telefono: datos?.telefono,
     };
 
-    const creado = await PerfilService.resolverJugadorDesdePlanilla(fila);
+    const creado = await PerfilService.resolverJugadorDesdePlanilla(fila, {
+      categoriaFallback: opciones?.categoriaFallback ?? datos?.categoria_padel,
+      usarFallbackPlanilla5: opciones?.usarFallbackPlanilla5 ?? false,
+    });
     const { data: perfil, error: perfilError } = await supabaseAdmin
       .from("perfiles")
       .select(PERFIL_SELECT_INSCRIPCION_MANUAL)

@@ -46,6 +46,18 @@ describe("RES-7 DM jugador ↔ club", () => {
     assert.match(inbox, /club_contacto/);
   });
 
+  it("mis-reservas incluye club.id para el boton Escribir al club", () => {
+    const reserva = fuente("apps/api/src/services/reserva.service.ts");
+    assert.match(
+      reserva,
+      /clubes\s*\(\s*\n\s*id,\s*\n\s*nombre,/,
+    );
+    const misReservas = fuente(
+      "apps/web/app/(public)/mi-perfil/reservas/page.tsx",
+    );
+    assert.match(misReservas, /club\?\.id/);
+  });
+
   it("deep link ?c= reabre el hilo (resumen API + fallback club)", () => {
     const inbox = fuente("apps/web/components/chat/ChatInbox.tsx");
     const service = fuente("apps/web/utils/services/chat.ts");

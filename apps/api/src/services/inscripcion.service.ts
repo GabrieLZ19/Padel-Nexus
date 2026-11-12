@@ -43,6 +43,33 @@ interface RegistroInscripcionDTO {
   letraPrioridad?: string;
 }
 
+function completarDatosAltaConCategoriaTorneo(
+  datos: DatosAltaJugadorManual | undefined,
+  categoriaTorneo: string | null,
+): DatosAltaJugadorManual | undefined {
+  if (!datos && !categoriaTorneo) return datos;
+  const out: DatosAltaJugadorManual = { ...(datos || {}) };
+  if (!out.categoria_padel?.trim() && categoriaTorneo) {
+    out.categoria_padel = categoriaTorneo;
+  }
+  const tieneCampo = Object.values(out).some(
+    (v) => typeof v === "string" && v.trim().length > 0,
+  );
+  return tieneCampo ? out : datos;
+}
+
+async function revertirFichasProvisionalInscripcion(
+  userIds: string[],
+): Promise<void> {
+  for (const id of userIds) {
+    try {
+      await PerfilService.revertirFichaProvisionalInscripcion(id);
+    } catch {
+      /* mejor esfuerzo */
+    }
+  }
+}
+
 function formatNombreCompleto(
   apellido?: string | null,
   nombre?: string | null,
@@ -811,30 +838,6 @@ export class InscripcionService {
       }
     }
 
-    const resJ1 = await PerfilService.resolverJugadorParaInscripcionManual(
-      jugador1Identificador,
-      jugador1Datos,
-      "Jugador 1",
-    );
-    const j1 = resJ1;
-
-    let j2: typeof j1 | null = null;
-    let j2Creado = false;
-
-    if (
-      jugador2Identificador &&
-      jugador2Identificador.trim() !== "" &&
-      jugador2Identificador !== "-"
-    ) {
-      const resJ2 = await PerfilService.resolverJugadorParaInscripcionManual(
-        jugador2Identificador,
-        jugador2Datos,
-        "Jugador 2",
-      );
-      j2 = resJ2;
-      j2Creado = resJ2.creado;
-    }
-
     const torneo = await InscripcionService.cargarTorneoElegibilidad(torneoId);
     assertPasoJugadoresEditable(torneo);
 
@@ -844,91 +847,133 @@ export class InscripcionService {
       );
     }
 
-    if (!omitirValidaciones) {
-      assertInscripcionAbierta(torneo);
-      await InscripcionService.aplicarReglasJugador(j1, torneo, "Jugador 1");
-      if (j2) {
-        await InscripcionService.aplicarReglasJugador(j2, torneo, "Jugador 2");
+    const categoriaTorneo =
+      (torneo.categoria && String(torneo.categoria).trim()) || null;
+    const optsPlanilla = {
+      categoriaFallback: categoriaTorneo,
+      usarFallbackPlanilla5: false as const,
+    };
+
+    const fichasCreadas: string[] = [];
+
+    try {
+      const resJ1 = await PerfilService.resolverJugadorParaInscripcionManual(
+        jugador1Identificador,
+        completarDatosAltaConCategoriaTorneo(jugador1Datos, categoriaTorneo),
+        "Jugador 1",
+        optsPlanilla,
+      );
+      if (resJ1.creado) fichasCreadas.push(resJ1.id);
+      const j1 = resJ1;
+
+      let j2: typeof j1 | null = null;
+      let j2Creado = false;
+
+      if (
+        jugador2Identificador &&
+        jugador2Identificador.trim() !== "" &&
+        jugador2Identificador !== "-"
+      ) {
+        const resJ2 = await PerfilService.resolverJugadorParaInscripcionManual(
+          jugador2Identificador,
+          completarDatosAltaConCategoriaTorneo(jugador2Datos, categoriaTorneo),
+          "Jugador 2",
+          optsPlanilla,
+        );
+        if (resJ2.creado) fichasCreadas.push(resJ2.id);
+        j2 = resJ2;
+        j2Creado = resJ2.creado;
       }
-    }
 
-    const idsAValidar = j2
-      ? `usuario_id.in.("${j1.id}","${j2.id}"),usuario2_id.in.("${j1.id}","${j2.id}")`
-      : `usuario_id.eq."${j1.id}",usuario2_id.eq."${j1.id}"`;
-    const { count: inscripcionesPrevias } = await supabaseAdmin
-      .from("inscripciones")
-      .select("id", { count: "exact", head: true })
-      .eq("torneo_id", torneoId)
-      .or(idsAValidar);
+      if (!omitirValidaciones) {
+        assertInscripcionAbierta(torneo);
+        await InscripcionService.aplicarReglasJugador(j1, torneo, "Jugador 1");
+        if (j2) {
+          await InscripcionService.aplicarReglasJugador(j2, torneo, "Jugador 2");
+        }
+      }
 
-    if (inscripcionesPrevias && inscripcionesPrevias > 0) {
-      throw new Error(
-        "Uno de los jugadores ya se encuentra inscripto en este torneo.",
-      );
-    }
+      const idsAValidar = j2
+        ? `usuario_id.in.("${j1.id}","${j2.id}"),usuario2_id.in.("${j1.id}","${j2.id}")`
+        : `usuario_id.eq."${j1.id}",usuario2_id.eq."${j1.id}"`;
+      const { count: inscripcionesPrevias } = await supabaseAdmin
+        .from("inscripciones")
+        .select("id", { count: "exact", head: true })
+        .eq("torneo_id", torneoId)
+        .or(idsAValidar);
 
-    if ((torneo.cupos_actuales || 0) >= (torneo.cupos_maximos || 32)) {
-      throw new Error("El torneo ha alcanzado el límite máximo de cupos.");
-    }
+      if (inscripcionesPrevias && inscripcionesPrevias > 0) {
+        throw new Error(
+          "Uno de los jugadores ya se encuentra inscripto en este torneo.",
+        );
+      }
 
-    const estadoPago = metodoPago
-      ? FAP_ESTADOS_PAGO.CONFIRMADO
-      : FAP_ESTADOS_PAGO.PENDIENTE;
-    const j1Nombre = formatNombreCompleto(j1.apellido, j1.nombre);
-    const j2Nombre = j2 ? formatNombreCompleto(j2.apellido, j2.nombre) : "-";
+      if ((torneo.cupos_actuales || 0) >= (torneo.cupos_maximos || 32)) {
+        throw new Error("El torneo ha alcanzado el límite máximo de cupos.");
+      }
 
-    const { data: inscripcionInsertada, error: errInsert } = await supabaseAdmin
-      .from("inscripciones")
-      .insert([
-        {
-          torneo_id: torneoId,
-          usuario_id: j1.id,
-          usuario2_id: j2 ? j2.id : null,
-          jugador1_nombre: j1Nombre,
-          jugador2_nombre: j2Nombre,
+      const estadoPago = metodoPago
+        ? FAP_ESTADOS_PAGO.CONFIRMADO
+        : FAP_ESTADOS_PAGO.PENDIENTE;
+      const j1Nombre = formatNombreCompleto(j1.apellido, j1.nombre);
+      const j2Nombre = j2 ? formatNombreCompleto(j2.apellido, j2.nombre) : "-";
+
+      const { data: inscripcionInsertada, error: errInsert } = await supabaseAdmin
+        .from("inscripciones")
+        .insert([
+          {
+            torneo_id: torneoId,
+            usuario_id: j1.id,
+            usuario2_id: j2 ? j2.id : null,
+            jugador1_nombre: j1Nombre,
+            jugador2_nombre: j2Nombre,
+            monto,
+            estado_pago: estadoPago,
+            tipo: "Inscripción torneo",
+            letra_prioridad: letraPrioridad?.trim().toUpperCase() || null,
+          },
+        ])
+        .select()
+        .single();
+
+      if (errInsert || !inscripcionInsertada) {
+        throw new Error(
+          `Error al registrar la inscripción manual: ${errInsert?.message}`,
+        );
+      }
+
+      await supabaseAdmin
+        .from("torneos")
+        .update({ cupos_actuales: (torneo.cupos_actuales || 0) + 1 })
+        .eq("id", torneoId);
+
+      await supabaseAdmin.from("logs_auditoria").insert({
+        usuario_id_admin: adminId,
+        accion: omitirValidaciones
+          ? "INSCRIPCION_MANUAL_OVERRIDE"
+          : "PAGO_MANUAL_INSCRIPCION_MANUAL",
+        entidad_afectada: `inscripciones_id: ${inscripcionInsertada.id}`,
+        detalles: {
           monto,
-          estado_pago: estadoPago,
-          tipo: "Inscripción torneo",
-          letra_prioridad: letraPrioridad?.trim().toUpperCase() || null,
+          metodo_pago: metodoPago || "No especificado",
+          fecha_pago: new Date().toISOString(),
+          observaciones: omitirValidaciones
+            ? "Inscripción manual con override de validaciones."
+            : "Inscripción manual directa desde CRM.",
+          omitir_validaciones: omitirValidaciones,
+          motivo: omitirValidaciones ? (motivo || "").trim() : null,
+          jugador1_id: j1.id,
+          jugador2_id: j2?.id || null,
+          jugador1_ficha_creada: resJ1.creado,
+          jugador2_ficha_creada: j2 ? j2Creado : false,
         },
-      ])
-      .select()
-      .single();
+      });
 
-    if (errInsert || !inscripcionInsertada) {
-      throw new Error(
-        `Error al registrar la inscripción manual: ${errInsert?.message}`,
-      );
+      return inscripcionInsertada;
+    } catch (error) {
+      await revertirFichasProvisionalInscripcion(fichasCreadas);
+      throw error;
     }
-
-    await supabaseAdmin
-      .from("torneos")
-      .update({ cupos_actuales: (torneo.cupos_actuales || 0) + 1 })
-      .eq("id", torneoId);
-
-    await supabaseAdmin.from("logs_auditoria").insert({
-      usuario_id_admin: adminId,
-      accion: omitirValidaciones
-        ? "INSCRIPCION_MANUAL_OVERRIDE"
-        : "PAGO_MANUAL_INSCRIPCION_MANUAL",
-      entidad_afectada: `inscripciones_id: ${inscripcionInsertada.id}`,
-      detalles: {
-        monto,
-        metodo_pago: metodoPago || "No especificado",
-        fecha_pago: new Date().toISOString(),
-        observaciones: omitirValidaciones
-          ? "Inscripción manual con override de validaciones."
-          : "Inscripción manual directa desde CRM.",
-        omitir_validaciones: omitirValidaciones,
-        motivo: omitirValidaciones ? (motivo || "").trim() : null,
-        jugador1_id: j1.id,
-        jugador2_id: j2?.id || null,
-        jugador1_ficha_creada: resJ1.creado,
-        jugador2_ficha_creada: j2 ? j2Creado : false,
-      },
-    });
-
-    return inscripcionInsertada;
   }
 
   /**
