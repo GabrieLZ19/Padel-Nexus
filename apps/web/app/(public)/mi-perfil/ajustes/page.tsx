@@ -71,6 +71,7 @@ export default function ProfileSettings() {
   useEffect(() => {
     PerfilService.getMe()
       .then((p) => {
+        if (!p) return;
         setProfile(p);
         setPrefs(normalizePrefs(p.preferencias_notificacion));
       })
@@ -78,11 +79,11 @@ export default function ProfileSettings() {
   }, []);
 
   useEffect(() => {
-  if (typeof window === "undefined") return;
-  if (window.location.hash === "#notificaciones") {
-    const el = document.getElementById("notificaciones");
-    el?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+    if (typeof window === "undefined") return;
+    if (window.location.hash === "#notificaciones") {
+      const el = document.getElementById("notificaciones");
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }, [profile]);
 
   const updatePref = async (
