@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import { haversineKm } from "../src/utils/coordenadasClub.ts";
 import {
   clubCumpleFiltroCancha,
   slotCoincideHora,
 } from "../src/utils/filtrosClubReserva.ts";
+
+const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("RES-4 cercanía y filtros de reservar", () => {
   it("haversine aproxima distancia Neuquén vs Mendoza desde Neuquén capital", () => {
@@ -34,5 +39,18 @@ describe("RES-4 cercanía y filtros de reservar", () => {
     assert.equal(slotCoincideHora("09:00", "10:30", "09:30"), true);
     assert.equal(slotCoincideHora("09:00", "10:30", "10:30"), false);
     assert.equal(slotCoincideHora("09:00", "10:30", "08:30"), false);
+  });
+
+  it("listado con ubicación usa RPC buscar_clubes_cercanos sin geocode en lectura", () => {
+    const src = readFileSync(
+      path.join(RAIZ, "src/services/club.service.ts"),
+      "utf8",
+    );
+    assert.match(src, /listarClubesConUbicacionUsuario/);
+    assert.match(src, /buscarCercanos\(lat, lng, maxRadio\)/);
+    const idx = src.indexOf("listarClubesConUbicacionUsuario");
+    const bloque = src.slice(idx, idx + 3200);
+    assert.doesNotMatch(bloque, /resolverCoordenadas/);
+    assert.doesNotMatch(bloque, /nominatim\.openstreetmap/);
   });
 });

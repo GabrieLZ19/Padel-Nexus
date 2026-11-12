@@ -215,113 +215,45 @@ export class ClubService {
     return (data as ClubCercano[]) || [];
   }
 
-  /**
-   * Lista todos los clubes y, si hay coordenadas del usuario, calcula distancia
-   * y ordena del más cercano al más lejano. Los clubes sin ubicación quedan al final.
-   */
-  static async listarTodosConDistancia(
-    lat?: number,
-    lng?: number,
+  private static aplicarFiltrosNombreProvincia(
+    query: ReturnType<typeof supabaseAdmin.from>,
     filtros?: FiltrosListadoClubesReserva,
-  ): Promise<ClubCercano[]> {
-    let query = supabaseAdmin
-      .from("clubes")
-      .select("*, canchas(tipo_suelo, techada, activa)")
-      .eq("estado", "Activo");
-
+  ) {
+    let q = query;
     if (filtros?.search?.trim()) {
-      query = query.ilike("nombre", `%${filtros.search.trim()}%`);
+      q = q.ilike("nombre", `%${filtros.search.trim()}%`);
     }
     if (filtros?.provincia?.trim()) {
-      query = query.ilike("provincia", `%${filtros.provincia.trim()}%`);
+      q = q.ilike("provincia", `%${filtros.provincia.trim()}%`);
     }
+    return q;
+  }
 
-    const { data, error } = await query;
-    if (error) throw new Error("Error interno al obtener los clubes.");
+  private static clubDesdeFila(
+    club: Record<string, unknown>,
+    distancia_km: number | null,
+    latitud: number | null,
+    longitud: number | null,
+    canchas: number,
+  ): ClubCercano {
+    return {
+      id: String(club.id),
+      nombre: String(club.nombre ?? ""),
+      provincia: String(club.provincia ?? ""),
+      localidad: String(club.localidad ?? ""),
+      direccion: (club.direccion as string) || null,
+      codigo_postal: (club.codigo_postal as string) || null,
+      telefono: (club.telefono as string) || null,
+      canchas,
+      estado: String(club.estado ?? "Activo"),
+      latitud,
+      longitud,
+      distancia_km,
+    };
+  }
 
-    const filas = (data as Record<string, unknown>[]) || [];
-
-    const sinCoords = new Map<string, Record<string, unknown>>();
-    for (const club of filas) {
-      const tieneCoords =
-        club.latitud != null &&
-        club.longitud != null &&
-        !Number.isNaN(Number(club.latitud)) &&
-        !Number.isNaN(Number(club.longitud));
-      if (!tieneCoords) {
-        const key = claveGeocodeLocalidad(
-          club.localidad as string,
-          club.provincia as string,
-        );
-        if (key.replace("|", "").trim() && !geocodeCache.has(key)) {
-          sinCoords.set(key, club);
-        }
-      }
-    }
-    await Promise.all(
-      [...sinCoords.values()].map((club) => coordsParaDistancia(club)),
-    );
-
-    let candidatos: ClubCercano[] = [];
-
-    for (const club of filas) {
-      const { count, items } = parseCanchasClub(club.canchas);
-      if (count <= 0) continue;
-
-      if (
-        !clubCumpleFiltroCancha(
-          items,
-          filtros?.tipo_suelo,
-          filtros?.techada,
-        )
-      ) {
-        continue;
-      }
-
-      const { latitud, longitud } = await coordsParaDistancia(club);
-
-      const distancia_km =
-        lat != null &&
-        lng != null &&
-        latitud != null &&
-        longitud != null &&
-        !Number.isNaN(latitud) &&
-        !Number.isNaN(longitud)
-          ? Number(haversineKm(lat, lng, latitud, longitud).toFixed(2))
-          : null;
-
-      if (
-        filtros?.max_distancia_km != null &&
-        distancia_km != null &&
-        distancia_km > filtros.max_distancia_km
-      ) {
-        continue;
-      }
-
-      candidatos.push({
-        id: String(club.id),
-        nombre: String(club.nombre ?? ""),
-        provincia: String(club.provincia ?? ""),
-        localidad: String(club.localidad ?? ""),
-        direccion: (club.direccion as string) || null,
-        codigo_postal: (club.codigo_postal as string) || null,
-        telefono: (club.telefono as string) || null,
-        canchas: count,
-        estado: String(club.estado ?? "Activo"),
-        latitud,
-        longitud,
-        distancia_km,
-      });
-    }
-
-    if (filtros?.fecha_disponibilidad) {
-      candidatos = await ClubService.filtrarClubesConDisponibilidad(
-        candidatos,
-        filtros,
-      );
-    }
-
-    return candidatos.sort((a, b) => {
+  private static ordenarPorDistanciaNombre(clubes: ClubCercano[]): ClubCercano[] {
+    return [...clubes].sort((a, b) => {
       if (a.distancia_km == null && b.distancia_km == null) {
         return a.nombre.localeCompare(b.nombre, "es");
       }
@@ -332,6 +264,181 @@ export class ClubService {
       }
       return a.nombre.localeCompare(b.nombre, "es");
     });
+  }
+
+  private static coordsClubEnBd(
+    club: Record<string, unknown>,
+  ): { latitud: number | null; longitud: number | null } {
+    const latitud =
+      club.latitud == null ? null : Number(club.latitud as number);
+    const longitud =
+      club.longitud == null ? null : Number(club.longitud as number);
+    if (
+      latitud != null &&
+      longitud != null &&
+      !Number.isNaN(latitud) &&
+      !Number.isNaN(longitud)
+    ) {
+      return { latitud, longitud };
+    }
+    return { latitud: null, longitud: null };
+  }
+
+  private static candidatosDesdeFilas(
+    filas: Record<string, unknown>[],
+    filtros: FiltrosListadoClubesReserva | undefined,
+    distanciaPorId: Map<string, number | null>,
+  ): ClubCercano[] {
+    const candidatos: ClubCercano[] = [];
+
+    for (const club of filas) {
+      const { count, items } = parseCanchasClub(club.canchas);
+      if (count <= 0) continue;
+
+      if (!clubCumpleFiltroCancha(items, filtros?.tipo_suelo, filtros?.techada)) {
+        continue;
+      }
+
+      const id = String(club.id);
+      const { latitud, longitud } = ClubService.coordsClubEnBd(club);
+      const distancia_km = distanciaPorId.get(id) ?? null;
+
+      if (
+        filtros?.max_distancia_km != null &&
+        distancia_km != null &&
+        distancia_km > filtros.max_distancia_km
+      ) {
+        continue;
+      }
+
+      candidatos.push(
+        ClubService.clubDesdeFila(club, distancia_km, latitud, longitud, count),
+      );
+    }
+
+    return candidatos;
+  }
+
+  private static async listarClubesSinUbicacionUsuario(
+    filtros?: FiltrosListadoClubesReserva,
+  ): Promise<ClubCercano[]> {
+    let query = supabaseAdmin
+      .from("clubes")
+      .select("*, canchas(tipo_suelo, techada, activa)")
+      .eq("estado", "Activo");
+    query = ClubService.aplicarFiltrosNombreProvincia(query, filtros);
+
+    const { data, error } = await query;
+    if (error) throw new Error("Error interno al obtener los clubes.");
+
+    const filas = (data as Record<string, unknown>[]) || [];
+    const distanciaNula = new Map<string, number | null>();
+    for (const club of filas) {
+      distanciaNula.set(String(club.id), null);
+    }
+
+    let candidatos = ClubService.candidatosDesdeFilas(filas, filtros, distanciaNula);
+
+    if (filtros?.fecha_disponibilidad) {
+      candidatos = await ClubService.filtrarClubesConDisponibilidad(
+        candidatos,
+        filtros,
+      );
+    }
+
+    return ClubService.ordenarPorDistanciaNombre(candidatos);
+  }
+
+  private static async listarClubesConUbicacionUsuario(
+    lat: number,
+    lng: number,
+    filtros?: FiltrosListadoClubesReserva,
+  ): Promise<ClubCercano[]> {
+    const maxRadio = filtros?.max_distancia_km ?? 2000;
+    const cercanosRpc = await ClubService.buscarCercanos(lat, lng, maxRadio);
+    const distanciaPorId = new Map<string, number | null>();
+    for (const row of cercanosRpc) {
+      distanciaPorId.set(
+        String(row.id),
+        row.distancia_km != null
+          ? Number(Number(row.distancia_km).toFixed(2))
+          : null,
+      );
+    }
+
+    const idsConDistancia = [...distanciaPorId.keys()];
+    const filasConDistancia: Record<string, unknown>[] = [];
+
+    if (idsConDistancia.length > 0) {
+      const chunkSize = 80;
+      for (let i = 0; i < idsConDistancia.length; i += chunkSize) {
+        const chunk = idsConDistancia.slice(i, i + chunkSize);
+        let query = supabaseAdmin
+          .from("clubes")
+          .select("*, canchas(tipo_suelo, techada, activa)")
+          .eq("estado", "Activo")
+          .in("id", chunk);
+        query = ClubService.aplicarFiltrosNombreProvincia(query, filtros);
+        const { data, error } = await query;
+        if (error) throw new Error("Error interno al obtener los clubes.");
+        if (data?.length) filasConDistancia.push(...(data as Record<string, unknown>[]));
+      }
+    }
+
+    let querySinCoords = supabaseAdmin
+      .from("clubes")
+      .select("*, canchas(tipo_suelo, techada, activa)")
+      .eq("estado", "Activo")
+      .or("latitud.is.null,longitud.is.null");
+    querySinCoords = ClubService.aplicarFiltrosNombreProvincia(
+      querySinCoords,
+      filtros,
+    );
+    const { data: sinCoordsData, error: sinCoordsError } = await querySinCoords;
+    if (sinCoordsError) {
+      throw new Error("Error interno al obtener los clubes.");
+    }
+
+    const idsConDistanciaSet = new Set(idsConDistancia);
+    const filasSinCoords = ((sinCoordsData as Record<string, unknown>[]) || []).filter(
+      (club) => !idsConDistanciaSet.has(String(club.id)),
+    );
+    for (const club of filasSinCoords) {
+      distanciaPorId.set(String(club.id), null);
+    }
+
+    const filas = [...filasConDistancia, ...filasSinCoords];
+    let candidatos = ClubService.candidatosDesdeFilas(filas, filtros, distanciaPorId);
+
+    if (filtros?.fecha_disponibilidad) {
+      candidatos = await ClubService.filtrarClubesConDisponibilidad(
+        candidatos,
+        filtros,
+      );
+    }
+
+    return ClubService.ordenarPorDistanciaNombre(candidatos);
+  }
+
+  /**
+   * Lista clubes reservables. Con ubicación del usuario usa RPC Haversine (rápido);
+   * sin ubicación, orden alfabético. Los clubes sin coordenadas en BD quedan al final.
+   */
+  static async listarTodosConDistancia(
+    lat?: number,
+    lng?: number,
+    filtros?: FiltrosListadoClubesReserva,
+  ): Promise<ClubCercano[]> {
+    const tieneUsuario =
+      lat != null &&
+      lng != null &&
+      !Number.isNaN(lat) &&
+      !Number.isNaN(lng);
+
+    if (tieneUsuario) {
+      return ClubService.listarClubesConUbicacionUsuario(lat, lng, filtros);
+    }
+    return ClubService.listarClubesSinUbicacionUsuario(filtros);
   }
 
   /** Alineado con el listado público de /reservar (club activo, cancha activa). */
