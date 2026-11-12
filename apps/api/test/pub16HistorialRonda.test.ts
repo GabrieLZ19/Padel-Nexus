@@ -34,5 +34,6 @@ describe("PUB-16 historial ranking — ronda", () => {
       "utf8",
     );
     assert.match(fuente, /historial_ranking[\s\S]{0,120}ronda/);
+    assert.match(fuente, /enriquecerHistorialConRonda/);
   });
 });

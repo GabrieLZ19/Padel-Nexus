@@ -23,6 +23,7 @@ import {
   mapaSiglaAsociacionProvincia,
   provinciaParaRanking,
 } from "../utils/provinciaRanking";
+import { enriquecerHistorialConRonda } from "../utils/historialRankingRonda";
 
 export interface ActualizarPuntosDTO {
   usuarioId: string;
@@ -151,6 +152,8 @@ export class RankingService {
         torneo_alcance: t?.alcance ?? null,
       };
     });
+
+    historial = await enriquecerHistorialConRonda(usuarioId, historial);
 
     return (rankingsResult.data ?? []).map((row) => ({
       ...row,
