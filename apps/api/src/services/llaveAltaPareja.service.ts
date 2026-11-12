@@ -13,6 +13,9 @@ export type ParejaExternaLlave = {
   etiqueta: string;
   jugador1_nombre: string;
   jugador2_nombre: string | null;
+  /** TOR-22: jugadores ya inscriptos en el torneo destino. */
+  bloqueada_en_torneo?: boolean;
+  motivo_bloqueo?: string;
 };
 
 function formatNombreCompleto(
@@ -202,6 +205,8 @@ export class LlaveAltaParejaService {
     type FilaIns = {
       id: string;
       torneo_id: string;
+      usuario_id: string;
+      usuario2_id: string | null;
       jugador1_nombre: string | null;
       jugador2_nombre: string | null;
       torneos:
@@ -235,7 +240,7 @@ export class LlaveAltaParejaService {
         const { data, error } = await supabaseAdmin
           .from("inscripciones")
           .select(
-            "id, torneo_id, jugador1_nombre, jugador2_nombre, torneos ( nombre, categoria )",
+            "id, torneo_id, usuario_id, usuario2_id, jugador1_nombre, jugador2_nombre, torneos ( nombre, categoria )",
           )
           .in("torneo_id", torneoIds)
           .or(orUsuarios)
@@ -248,7 +253,7 @@ export class LlaveAltaParejaService {
       const { data, error } = await supabaseAdmin
         .from("inscripciones")
         .select(
-          "id, torneo_id, jugador1_nombre, jugador2_nombre, torneos ( nombre, categoria )",
+          "id, torneo_id, usuario_id, usuario2_id, jugador1_nombre, jugador2_nombre, torneos ( nombre, categoria )",
         )
         .in("torneo_id", torneoIds)
         .or(
@@ -259,15 +264,22 @@ export class LlaveAltaParejaService {
       filas = (data || []) as unknown as FilaIns[];
     }
 
-    return filas.map((fila) => {
+    const filasMapeadas: ParejaExternaLlave[] = [];
+    for (const fila of filas) {
       const j1 = (fila.jugador1_nombre || "Jugador 1").trim();
       const j2 = (fila.jugador2_nombre || "").trim();
-      const etiquetaPareja =
-        j2 && j2 !== "-" ? `${j1} / ${j2}` : j1;
+      const etiquetaPareja = j2 && j2 !== "-" ? `${j1} / ${j2}` : j1;
       const torneoMeta = torneoDeFila(fila);
       const torneoNombre = torneoMeta?.nombre || "Otro torneo";
       const cat = torneoMeta?.categoria || null;
-      return {
+
+      const yaEnTorneo = await jugadoresYaEnTorneo(
+        torneoDestinoId,
+        String(fila.usuario_id),
+        fila.usuario2_id ? String(fila.usuario2_id) : null,
+      );
+
+      filasMapeadas.push({
         inscripcion_origen_id: fila.id,
         torneo_origen_id: fila.torneo_id,
         torneo_origen_nombre: torneoNombre,
@@ -277,8 +289,14 @@ export class LlaveAltaParejaService {
         }`,
         jugador1_nombre: j1,
         jugador2_nombre: j2 && j2 !== "-" ? j2 : null,
-      };
-    });
+        bloqueada_en_torneo: yaEnTorneo,
+        motivo_bloqueo: yaEnTorneo
+          ? "Esos jugadores ya están inscriptos en este torneo."
+          : undefined,
+      });
+    }
+
+    return filasMapeadas;
   }
 
   static async importarParejaDesdeOtroTorneo(datos: {
@@ -334,9 +352,22 @@ export class LlaveAltaParejaService {
     adminId: string;
     letraPrioridad?: string;
   }) {
+    const { data: torneoMeta } = await supabaseAdmin
+      .from("torneos")
+      .select("categoria")
+      .eq("id", datos.torneoDestinoId)
+      .maybeSingle();
+    const categoriaTorneo =
+      (torneoMeta?.categoria && String(torneoMeta.categoria).trim()) || null;
+
+    const j1Datos: DatosAltaJugadorManual = { ...(datos.jugador1Datos || {}) };
+    if (!j1Datos.categoria_padel?.trim() && categoriaTorneo) {
+      j1Datos.categoria_padel = categoriaTorneo;
+    }
+
     const resJ1 = await PerfilService.resolverJugadorParaInscripcionManual(
       datos.jugador1Identificador,
-      datos.jugador1Datos,
+      j1Datos,
       "Jugador 1",
     );
     let j2: typeof resJ1 | null = null;
@@ -346,9 +377,13 @@ export class LlaveAltaParejaService {
       datos.jugador2Identificador.trim() !== "" &&
       datos.jugador2Identificador !== "-"
     ) {
+      const j2Datos: DatosAltaJugadorManual = { ...(datos.jugador2Datos || {}) };
+      if (!j2Datos.categoria_padel?.trim() && categoriaTorneo) {
+        j2Datos.categoria_padel = categoriaTorneo;
+      }
       const resJ2 = await PerfilService.resolverJugadorParaInscripcionManual(
         datos.jugador2Identificador,
-        datos.jugador2Datos,
+        j2Datos,
         "Jugador 2",
       );
       j2 = resJ2;

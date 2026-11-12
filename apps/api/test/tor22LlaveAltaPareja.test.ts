@@ -15,6 +15,8 @@ describe("TOR-22 alta de pareja en edición de llave", () => {
     assert.match(svc, /ALTA_PAREJA_EDICION_LLAVE/);
     assert.match(svc, /buscarParejasExternas/);
     assert.match(svc, /importarParejaDesdeOtroTorneo/);
+    assert.match(svc, /bloqueada_en_torneo/);
+    assert.match(svc, /categoriaTorneo/);
     assert.doesNotMatch(svc, /assertPasoJugadoresEditable/);
 
     const routes = readFileSync(
