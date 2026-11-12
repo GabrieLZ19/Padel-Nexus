@@ -35,6 +35,7 @@ import { formatFechaCalendario, parseFechaCalendarioLocal } from "@/utils/format
 import { EscribirAlClubButton } from "@/components/reservas/EscribirAlClubButton";
 import { formatMontoArs } from "@/utils/formatMonto";
 import { ReservaPlazoPagoBanner } from "@/components/reservas/ReservaPlazoPagoBanner";
+import { descripcionModalCancelarReserva } from "@/utils/politicaCancelacionReserva";
 
 interface ReservaUsuario {
   id: string;
@@ -189,11 +190,19 @@ export default function MisReservasPage() {
   const pedirCancelar = (reserva: ReservaUsuario) => {
     const club = reserva.turnos?.canchas?.clubes;
     const turno = reserva.turnos;
+    const horaTxt = formatHora(turno?.hora_inicio);
     setCancelModal({
       isOpen: true,
       type: "warning",
       title: "¿Cancelar esta reserva?",
-      description: `Se liberará el turno en ${club?.nombre || "el club"} del ${formatFecha(reserva.fecha_reserva)} a las ${formatHora(turno?.hora_inicio)} hs. Esta acción no se puede deshacer.`,
+      description: descripcionModalCancelarReserva({
+        clubNombre: club?.nombre || "el club",
+        fechaReserva: formatFecha(reserva.fecha_reserva),
+        horaInicio: horaTxt,
+        estadoReserva: reserva.estado_reserva,
+        estadoPago: reserva.estado_pago,
+        horasAntelacion: reserva.horas_antelacion_cancelacion,
+      }),
       confirmText: "Sí, cancelar",
       cancelText: "Volver",
       onClose: () => setCancelModal((prev) => ({ ...prev, isOpen: false })),

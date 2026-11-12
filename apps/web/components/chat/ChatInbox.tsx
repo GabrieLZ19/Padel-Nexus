@@ -14,6 +14,7 @@ import {
   Users,
   Calendar,
   UserPlus,
+  Loader2,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -79,6 +80,19 @@ function esConversacionGrupo(tipo: ChatConversacion["tipo"]) {
   return tipo === "partido" || tipo === "grupo";
 }
 
+function parseChatInboxTab(value: string | null): ChatInboxTab | null {
+  if (
+    value === "todos" ||
+    value === "directos" ||
+    value === "marketplace" ||
+    value === "partidos" ||
+    value === "grupos"
+  ) {
+    return value;
+  }
+  return null;
+}
+
 function buildMensajesUrl(convId?: string | null, tab?: ChatInboxTab) {
   const params = new URLSearchParams();
   if (tab) params.set("tab", tab);
@@ -100,6 +114,7 @@ export default function ChatInbox({
   const router = useRouter();
   const searchParams = useSearchParams();
   const deepLinkConvId = searchParams.get("c");
+  const deepLinkClubId = searchParams.get("club");
   const tabParam = searchParams.get("tab");
 
   const {
@@ -132,6 +147,8 @@ export default function ChatInbox({
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeConvRef = useRef<ChatConversacion | null>(null);
   const mensajesFetchGenRef = useRef(0);
+  const deepLinkResolvingRef = useRef(false);
+  const [resolviendoDeepLink, setResolviendoDeepLink] = useState(false);
 
   const fetchConversaciones = useCallback(async () => {
     try {
@@ -231,13 +248,82 @@ export default function ChatInbox({
     [selectConversacion, router],
   );
 
-  // Deep link ?c=conversacionId — solo cuando cambia la URL, no al elegir en sidebar
+  // Deep link ?c=conversacionId (p. ej. tras "Escribir al club" en reservas)
   useEffect(() => {
-    if (loading || !deepLinkConvId) return;
-    const conv = conversaciones.find((c) => c.id === deepLinkConvId);
-    if (!conv || activeConvRef.current?.id === deepLinkConvId) return;
-    selectConversacion(conv);
-  }, [deepLinkConvId, conversaciones, loading, selectConversacion]);
+    if (!deepLinkConvId || loading) return;
+    if (activeConvRef.current?.id === deepLinkConvId) return;
+
+    const convInList = conversaciones.find((c) => c.id === deepLinkConvId);
+    if (convInList) {
+      const tab = parseChatInboxTab(tabParam) ?? tabForConv(convInList);
+      setActiveTab(tab);
+      selectConversacion(convInList);
+      return;
+    }
+
+    if (deepLinkResolvingRef.current) return;
+    deepLinkResolvingRef.current = true;
+    setResolviendoDeepLink(true);
+
+    void (async () => {
+      try {
+        let conv: ChatConversacion | undefined;
+
+        const actualizadas = await ChatService.getConversaciones();
+        setConversaciones(actualizadas);
+        conv = actualizadas.find((c) => c.id === deepLinkConvId);
+
+        if (!conv) {
+          try {
+            conv = await ChatService.getConversacionResumen(deepLinkConvId);
+            setConversaciones((prev) =>
+              prev.some((c) => c.id === conv!.id) ? prev : [conv!, ...prev],
+            );
+          } catch {
+            if (deepLinkClubId) {
+              const abierta = await ChatService.iniciarChatClub(deepLinkClubId);
+              const refresco = await ChatService.getConversaciones();
+              setConversaciones(refresco);
+              conv =
+                refresco.find((c) => c.id === abierta.id) ||
+                refresco.find((c) => c.id === deepLinkConvId);
+            }
+          }
+        }
+
+        if (!conv) {
+          sileo.error({
+            title: "No se abrió el chat",
+            description:
+              "Elegí la conversación en la lista o intentá de nuevo.",
+          });
+          return;
+        }
+
+        if (activeConvRef.current?.id === conv.id) return;
+
+        const tab = parseChatInboxTab(tabParam) ?? tabForConv(conv);
+        setActiveTab(tab);
+        selectConversacion(conv);
+      } catch (err) {
+        console.error("Error al resolver deep link de mensajes:", err);
+        sileo.error({
+          title: "No se abrió el chat",
+          description: "Elegí la conversación en la lista o intentá de nuevo.",
+        });
+      } finally {
+        deepLinkResolvingRef.current = false;
+        setResolviendoDeepLink(false);
+      }
+    })();
+  }, [
+    deepLinkConvId,
+    deepLinkClubId,
+    conversaciones,
+    loading,
+    tabParam,
+    selectConversacion,
+  ]);
 
   const handleContactarAdministracion = useCallback(async () => {
     setLoading(true);
@@ -1119,6 +1205,16 @@ export default function ChatInbox({
                 </p>
               </div>
             </>
+          ) : resolviendoDeepLink && deepLinkConvId ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-gray-500 px-6">
+              <Loader2 className="size-10 text-brand-chartreuse animate-spin mb-4" />
+              <h3 className="text-lg font-bold text-brand-white mb-2">
+                Abriendo conversación
+              </h3>
+              <p className="text-sm text-gray-500 text-center max-w-sm">
+                Estamos cargando el hilo seleccionado.
+              </p>
+            </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-gray-500 px-6">
               <div className="size-20 rounded-3xl bg-brand-card border border-brand-white/5 flex items-center justify-center mb-6">

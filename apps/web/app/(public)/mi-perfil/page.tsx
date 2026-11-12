@@ -41,6 +41,7 @@ import { MinorModeBanner } from "@/components/legal/MinorModeBanner";
 import { fechaLatina } from "@/utils/fechaArgentina";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import { licenciasComoArray } from "@/utils/licenciasArray";
+import { etiquetaRepresentacionProvincial } from "@/utils/etiquetaRepresentacionProvincial";
 
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-white/5 rounded-3xl ${className}`} />
@@ -396,7 +397,7 @@ export default function PlayerDashboard() {
                             key={af.id}
                             className="px-2.5 py-1 bg-brand-chartreuse/10 border border-brand-chartreuse/25 rounded-lg text-[9px] text-brand-chartreuse font-extrabold uppercase tracking-wider"
                           >
-                            {af.entidad}
+                            {etiquetaRepresentacionProvincial(af)}
                             {af.estado?.toLowerCase() === "pendiente"
                               ? " · pendiente"
                               : ""}

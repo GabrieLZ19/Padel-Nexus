@@ -13,7 +13,12 @@ export function useIniciarChatClub() {
     async (clubId: string) => {
       try {
         const conv = await ChatService.iniciarChatClub(clubId);
-        router.push(`/mensajes?c=${conv.id}&tab=directos`);
+        const params = new URLSearchParams({
+          c: conv.id,
+          tab: "directos",
+          club: clubId,
+        });
+        router.push(`/mensajes?${params.toString()}`);
       } catch (err: unknown) {
         const message = isAxiosError(err)
           ? err.response?.data?.error ||

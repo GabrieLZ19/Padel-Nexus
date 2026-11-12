@@ -12,6 +12,15 @@ export class ChatService {
     return data.data || [];
   }
 
+  static async getConversacionResumen(
+    conversacionId: string,
+  ): Promise<ChatConversacion> {
+    const { data } = await api.get(
+      `/mensajes/conversaciones/${conversacionId}/resumen`,
+    );
+    return data.data;
+  }
+
   static async getMensajes(
     conversacionId: string,
     cursor?: string,

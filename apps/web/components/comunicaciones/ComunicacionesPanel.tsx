@@ -41,6 +41,7 @@ import {
   debeRealinearAudienciaClub,
 } from "@/utils/comunicacionesAudienciaDefault";
 import { formatearFechaHoraArgentina } from "@/utils/fechaArgentina";
+import { resumenMetricasCampana } from "@/utils/comunicacionesMetricasCampana";
 import type {
   AudienciaPreview,
   ComunicacionesAudienciaTipo,
@@ -52,6 +53,7 @@ import type {
   ComunicacionesLicenciaEstado,
   ComunicacionesLista,
   ComunicacionesListaTipo,
+  CrearListaPayload,
 } from "@/utils/types/comunicaciones.types";
 
 const ETIQUETAS_OPTS: ComunicacionesEtiqueta[] = ["marketing", "institucional"];
@@ -773,22 +775,15 @@ export default function ComunicacionesPanel() {
           action_url: actionUrl.trim() || null,
           canales: canalesEnvio,
         });
-        const m = result.campana.metricas;
-        const entInApp = m?.entregados?.in_app ?? result.total_enviados;
-        const entEmail = m?.entregados?.email;
-        const entWa = m?.entregados?.whatsapp;
-        const partes = [`In-app: ${entInApp}/${result.total_destinatarios}`];
-        if (canalesEnvio.includes("email")) {
-          partes.push(
-            `Email: ${entEmail ?? 0} (requiere RESEND_API_KEY en servidor)`,
-          );
-        }
-        if (canalesEnvio.includes("whatsapp")) {
-          partes.push(`WhatsApp: ${entWa ?? 0} (integración en curso)`);
-        }
+        const partes = resumenMetricasCampana({
+          canales: result.campana.canales ?? canalesEnvio,
+          metricas: result.campana.metricas ?? result.metricas,
+          total_destinatarios: result.total_destinatarios,
+          total_enviados: result.total_enviados,
+        });
         sileo.success({
           title: "Campaña enviada",
-          description: partes.join(" · "),
+          description: `${partes.join(" · ")}. Revisá el historial para aperturas y clics in-app.`,
         });
         setTitulo("");
         setMensaje("");
@@ -999,14 +994,22 @@ export default function ComunicacionesPanel() {
         filtros.solo_rol_usuario = true;
       }
 
-      const payload = {
-        nombre: listaNombre.trim(),
-        tipo: listaTipo,
-        descripcion: listaDesc.trim() || null,
-        etiquetas: listaEtiquetas,
-        filtros: listaTipo === "dinamica" ? filtros : {},
-        miembro_ids: listaTipo === "manual" ? miembroIds : undefined,
-      };
+      const payload: Partial<CrearListaPayload> & Pick<CrearListaPayload, "nombre"> =
+        {
+          nombre: listaNombre.trim(),
+          descripcion: listaDesc.trim() || null,
+          etiquetas: listaEtiquetas,
+        };
+
+      if (!listaEditandoId) {
+        payload.tipo = listaTipo;
+      }
+
+      if (listaTipo === "dinamica") {
+        payload.filtros = filtros;
+      } else {
+        payload.miembro_ids = miembroIds;
+      }
 
       if (listaEditandoId) {
         await ComunicacionesService.actualizarLista(listaEditandoId, payload);
@@ -1881,6 +1884,13 @@ export default function ComunicacionesPanel() {
             )}
 
             <div className="flex flex-col gap-2">
+              {listaEditandoId && listaTipo === "manual" && (
+                <p className="text-[11px] text-gray-500 leading-snug px-0.5">
+                  Guardar cambios actualiza nombre, descripción y miembros que
+                  quites acá. Para sumar contactos usá &quot;Agregar seleccionados
+                  a la lista&quot;.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => void handleGuardarLista()}
@@ -2041,19 +2051,18 @@ export default function ComunicacionesPanel() {
                       <span className="px-2 py-0.5 rounded-md bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20">
                         {AUDIENCIA_LABELS[c.audiencia_tipo] || c.audiencia_tipo}
                       </span>
-                      <span className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-400 border border-brand-white/10">
-                        In-app: {c.total_enviados}/{c.total_destinatarios}
+                      <span className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-500 border border-brand-white/10">
+                        {c.total_destinatarios} destinatario
+                        {c.total_destinatarios === 1 ? "" : "s"}
                       </span>
-                      {(c.canales || ["in_app"]).map((canal) =>
-                        canal === "in_app" ? null : (
-                          <span
-                            key={canal}
-                            className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-400 border border-brand-white/10"
-                          >
-                            {canal}: {c.metricas?.entregados?.[canal] ?? 0}
-                          </span>
-                        ),
-                      )}
+                      {resumenMetricasCampana(c).map((linea, idx) => (
+                        <span
+                          key={`${c.id}-canal-${idx}`}
+                          className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-400 border border-brand-white/10 normal-case tracking-normal"
+                        >
+                          {linea}
+                        </span>
+                      ))}
                       <span className="px-2 py-0.5 rounded-md bg-brand-white/5 text-gray-500 border border-brand-white/10">
                         Aperturas: {c.metricas?.abiertos ?? 0} · Clics:{" "}
                         {c.metricas?.clics ?? 0}

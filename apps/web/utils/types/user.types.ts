@@ -17,6 +17,11 @@ export interface Afiliacion {
   created_at?: string;
   club_id?: string | null;
   asociacion_id?: string | null;
+  asociaciones?: {
+    id: string;
+    nombre: string;
+    sigla?: string | null;
+  } | null;
 }
 
 export interface Licencia {

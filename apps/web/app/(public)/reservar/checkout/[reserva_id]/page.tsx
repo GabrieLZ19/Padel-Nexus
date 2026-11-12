@@ -56,6 +56,7 @@ interface ReservaDetalle {
         nombre: string;
         provincia: string;
         localidad: string;
+        direccion?: string | null;
         cbu?: string | null;
         alias?: string | null;
         latitud?: number | null;
@@ -401,7 +402,15 @@ export default function CheckoutPage() {
               <MapPin className="w-4 h-4 text-brand-chartreuse shrink-0" />
               <span>
                 {reserva.turnos.canchas.nombre} —{" "}
-                {reserva.turnos.canchas.clubes.localidad}
+                <a
+                  href={urlGoogleMapsClub(reserva.turnos.canchas.clubes)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-brand-chartreuse transition-colors inline-flex items-center gap-1"
+                >
+                  {textoUbicacionClub(reserva.turnos.canchas.clubes)}
+                  <ExternalLink className="w-3 h-3 opacity-70" />
+                </a>
               </span>
             </div>
           </div>

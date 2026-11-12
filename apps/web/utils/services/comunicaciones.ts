@@ -100,6 +100,7 @@ export class ComunicacionesService {
         campana: ComunicacionesCampana;
         total_destinatarios: number;
         total_enviados: number;
+        metricas?: ComunicacionesCampana["metricas"];
       };
     }>("/comunicaciones/campanas", payload);
     return data.data;
