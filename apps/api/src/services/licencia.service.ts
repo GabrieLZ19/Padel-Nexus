@@ -25,6 +25,10 @@ import {
   resolverEstadoLicenciaPublica,
   type EstadoLicenciaPublica,
 } from "../utils/estadoLicencia";
+import {
+  exponeIdentidadVerificacionPublica,
+  mensajeVerificacionLicenciaPublica,
+} from "../utils/verificacionLicenciaPublica";
 import { fechaHoyArgentina } from "../utils/fechaArgentina";
 import {
   orBusquedaJugadoresLicencias,
@@ -537,12 +541,18 @@ export class LicenciaService {
     estado: string | null;
     nro_licencia: string | null;
     fecha_vencimiento: string | null;
+    datos_solicitud: Record<string, unknown> | null;
     perfiles:
-      | { nombre?: string | null; apellido?: string | null; dni?: string | null }
+      | {
+          nombre?: string | null;
+          apellido?: string | null;
+          dni?: string | null;
+          es_menor?: boolean | null;
+        }
       | null;
   } | null> {
     const selectConPerfil =
-      "id, usuario_id, estado, nro_licencia, fecha_vencimiento, perfiles!fk_licencias_usuario(nombre, apellido, dni)";
+      "id, usuario_id, estado, nro_licencia, fecha_vencimiento, datos_solicitud, perfiles!fk_licencias_usuario(nombre, apellido, dni, es_menor)";
 
     let query = supabaseAdmin.from("licencias").select(selectConPerfil);
     if (licenciaId) {
@@ -560,8 +570,18 @@ export class LicenciaService {
 
     if (!error && data && String(data.usuario_id) === uid) {
       const perfilRaw = data.perfiles as
-        | { nombre?: string | null; apellido?: string | null; dni?: string | null }
-        | { nombre?: string | null; apellido?: string | null; dni?: string | null }[]
+        | {
+            nombre?: string | null;
+            apellido?: string | null;
+            dni?: string | null;
+            es_menor?: boolean | null;
+          }
+        | {
+            nombre?: string | null;
+            apellido?: string | null;
+            dni?: string | null;
+            es_menor?: boolean | null;
+          }[]
         | null;
       const perfil = Array.isArray(perfilRaw) ? perfilRaw[0] : perfilRaw;
       return {
@@ -570,13 +590,16 @@ export class LicenciaService {
         estado: data.estado ?? null,
         nro_licencia: data.nro_licencia ?? null,
         fecha_vencimiento: data.fecha_vencimiento ?? null,
+        datos_solicitud: (data.datos_solicitud as Record<string, unknown>) ?? null,
         perfiles: perfil ?? null,
       };
     }
 
     let queryBase = supabaseAdmin
       .from("licencias")
-      .select("id, usuario_id, estado, nro_licencia, fecha_vencimiento");
+      .select(
+        "id, usuario_id, estado, nro_licencia, fecha_vencimiento, datos_solicitud",
+      );
     if (licenciaId) {
       queryBase = queryBase
         .eq("id", String(licenciaId).trim())
@@ -596,7 +619,7 @@ export class LicenciaService {
 
     const { data: perfilSolo } = await supabaseAdmin
       .from("perfiles")
-      .select("nombre, apellido, dni")
+      .select("nombre, apellido, dni, es_menor")
       .eq("id", uid)
       .maybeSingle();
 
@@ -606,6 +629,8 @@ export class LicenciaService {
       estado: licenciaSola.estado ?? null,
       nro_licencia: licenciaSola.nro_licencia ?? null,
       fecha_vencimiento: licenciaSola.fecha_vencimiento ?? null,
+      datos_solicitud:
+        (licenciaSola.datos_solicitud as Record<string, unknown>) ?? null,
       perfiles: perfilSolo ?? null,
     };
   }
@@ -633,12 +658,6 @@ export class LicenciaService {
     }
 
     const perfil = data.perfiles;
-    const nombre = perfil?.nombre?.trim() || null;
-    const apellido = perfil?.apellido?.trim() || null;
-    const titular =
-      apellido && nombre
-        ? `${apellido.toUpperCase()}, ${nombre}`
-        : apellido || nombre;
 
     const { estado, valida } = resolverEstadoLicenciaPublica(
       data.estado,
@@ -649,23 +668,35 @@ export class LicenciaService {
       ? String(data.fecha_vencimiento)
       : null;
 
+    const mostrarIdentidad = exponeIdentidadVerificacionPublica(
+      valida,
+      perfil?.es_menor,
+    );
+    const nombre = mostrarIdentidad
+      ? perfil?.nombre?.trim() || null
+      : null;
+    const apellido = mostrarIdentidad
+      ? perfil?.apellido?.trim() || null
+      : null;
+    const titular =
+      apellido && nombre
+        ? `${apellido.toUpperCase()}, ${nombre}`
+        : apellido || nombre;
+
     return {
       valida,
       estado,
       nombre,
       apellido,
       titular,
-      dni_parcial: enmascararDni(perfil?.dni),
+      dni_parcial: mostrarIdentidad ? enmascararDni(perfil?.dni) : null,
       nro_licencia: data.nro_licencia ? String(data.nro_licencia) : null,
       fecha_vencimiento: fechaVencimiento,
       fecha_vencimiento_texto: fechaLatina(fechaVencimiento),
-      mensaje: valida
-        ? "Carné federativo vigente."
-        : estado === "vencida"
-          ? "El carné está vencido."
-          : estado === "suspendida"
-            ? "El carné está suspendido."
-            : "Licencia no válida.",
+      mensaje: mensajeVerificacionLicenciaPublica(
+        estado,
+        data.datos_solicitud,
+      ),
     };
   }
 
@@ -790,7 +821,7 @@ export class LicenciaService {
       // Notificar al usuario sobre el rechazo
       await NotificacionService.crearNotificacion({
         usuario_id,
-        titulo: "Solicitud de Alta Rechazada",
+        titulo: "Solicitud de alta rechazada",
         mensaje: "Tu solicitud de alta para la licencia deportiva fue rechazada. Puedes volver a iniciar el trámite desde tu perfil.",
         tipo: "error"
       });
@@ -873,7 +904,7 @@ export class LicenciaService {
         : "";
       await NotificacionService.crearNotificacion({
         usuario_id,
-        titulo: "Licencia Aprobada",
+        titulo: "Licencia aprobada",
         mensaje: `¡Felicidades! Tu licencia N° ${data.nro_licencia} fue aprobada. Vence el ${vence}. Ya podés ver tu carnet digital.${avisoPago}`,
         tipo: "success",
         metadata: {
@@ -1099,7 +1130,7 @@ export class LicenciaService {
     if (error) throw new Error(error.message);
 
     NotificacionService.notificarAdmins({
-      titulo: "Nueva Solicitud de Licencia",
+      titulo: "Nueva solicitud de licencia",
       mensaje: `${datos.nombre} ${datos.apellido} ha solicitado una nueva licencia deportiva.`,
       tipo: "info",
     }).catch((err) =>

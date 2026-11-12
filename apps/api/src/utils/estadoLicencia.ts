@@ -11,6 +11,7 @@ export type EstadoLicenciaPublica =
   | "activa"
   | "vencida"
   | "suspendida"
+  | "en_tramite"
   | "no_valida";
 
 const ESTADOS_CANONICOS: Record<string, EstadoLicenciaAlmacenado> = {
@@ -105,7 +106,10 @@ export function resolverEstadoLicenciaPublica(
   if (efectivo === "Suspendida") {
     return { estado: "suspendida", valida: false };
   }
-  if (efectivo === "Pendiente" || efectivo === "Rechazada") {
+  if (efectivo === "Pendiente") {
+    return { estado: "en_tramite", valida: false };
+  }
+  if (efectivo === "Rechazada") {
     return { estado: "no_valida", valida: false };
   }
   if (efectivo === "Vencida") {

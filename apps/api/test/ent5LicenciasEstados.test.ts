@@ -37,7 +37,7 @@ describe("ENT-5 estados licencia (feature 10.0)", () => {
     const licencia = fuente("apps/api/src/services/licencia.service.ts");
     const rechazo = licencia.indexOf("estado === \"Suspendida\" && estadoPrevio === \"Pendiente\"");
     assert.ok(rechazo >= 0);
-    assert.match(licencia, /Solicitud de Alta Rechazada/);
+    assert.match(licencia, /Solicitud de alta rechazada/);
     assert.match(licencia, /estado === "Suspendida" && estadoPrevio === "Activa"/);
     assert.match(licencia, /darDeBajaLicencia/);
   });

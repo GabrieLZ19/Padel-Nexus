@@ -35,12 +35,16 @@ describe("ENT-1: verificación pública de carné", () => {
     assert.equal(res.estado, "activa");
   });
 
-  it("rechaza licencia suspendida o pendiente", () => {
+  it("distingue suspendida, en trámite y rechazada", () => {
     assert.deepEqual(resolverEstadoLicenciaPublica("Suspendida", "2026-12-31"), {
       estado: "suspendida",
       valida: false,
     });
     assert.deepEqual(resolverEstadoLicenciaPublica("Pendiente", "2026-12-31"), {
+      estado: "en_tramite",
+      valida: false,
+    });
+    assert.deepEqual(resolverEstadoLicenciaPublica("Rechazada", "2026-12-31"), {
       estado: "no_valida",
       valida: false,
     });
@@ -51,7 +55,7 @@ describe("ENT-1: verificación pública de carné", () => {
       path.join(RAIZ_API, "src/services/licencia.service.ts"),
       "utf8",
     );
-    assert.match(fuente, /perfiles!fk_licencias_usuario\(nombre, apellido, dni\)/);
+    assert.match(fuente, /perfiles!fk_licencias_usuario\(nombre, apellido, dni, es_menor\)/);
     assert.match(fuente, /obtenerLicenciaParaVerificacionPublica/);
     assert.match(fuente, /\.from\("perfiles"\)/);
   });
