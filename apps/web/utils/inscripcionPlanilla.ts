@@ -230,6 +230,15 @@ export function esEmailPlaceholderPlanilla(
   return false;
 }
 
+/** Email mostrable en CRM; null si es cuenta técnica de planilla. */
+export function emailContactoVisible(
+  email: string | null | undefined,
+): string | null {
+  if (esEmailPlaceholderPlanilla(email)) return null;
+  const e = String(email || "").trim();
+  return e || null;
+}
+
 export function etiquetaTipoPlanillaInscripcion(torneo: {
   alcance?: string | null;
   reglamento?: string | null;

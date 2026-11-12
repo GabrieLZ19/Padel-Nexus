@@ -33,6 +33,7 @@ import {
   detalleTextoHistorialLicencia,
   etiquetaAccionHistorialLicencia,
 } from "@/utils/historialLicenciaUi";
+import { emailContactoVisible } from "@/utils/inscripcionPlanilla";
 
 export default function PerfilJugadorAdminPage() {
   const { id } = useParams();
@@ -291,7 +292,8 @@ export default function PerfilJugadorAdminPage() {
               : "Usuario sin nombre"}
           </h1>
           <p className="text-gray-400 flex items-center gap-2 text-sm">
-            <Mail className="size-4" /> {perfil.email || "Sin email registrado"}
+            <Mail className="size-4" />{" "}
+            {emailContactoVisible(perfil.email) ?? "Sin email registrado"}
           </p>
         </div>
 

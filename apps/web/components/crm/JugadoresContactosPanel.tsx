@@ -14,6 +14,7 @@ import type { ComunicacionesEtiqueta } from "@/utils/types/comunicaciones.types"
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import { licenciaPreferidaListado } from "@/utils/licenciasArray";
 import { ContactoEtiquetasBadges } from "./ContactoEtiquetasEditor";
+import { emailContactoVisible } from "@/utils/inscripcionPlanilla";
 
 type FiltroEtiqueta = "todas" | ComunicacionesEtiqueta;
 
@@ -226,7 +227,7 @@ export default function JugadoresContactosPanel() {
                   <td className="truncate px-3 font-semibold text-white">
                     {nombreListado(jugador)}
                     <span className="mt-0.5 block truncate text-[10px] font-normal text-gray-500">
-                      {jugador.email || "—"}
+                      {emailContactoVisible(jugador.email) ?? "Sin email"}
                     </span>
                   </td>
                   <td className="truncate px-3 font-mono">{jugador.dni || "—"}</td>
