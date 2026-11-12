@@ -8,7 +8,10 @@ import { LicenciaVencimientoEditor } from "./LicenciaVencimientoEditor";
 import { LicenciaPagosHistorial } from "./LicenciaPagosHistorial";
 import { MenuPuntos, type ItemMenuPuntos } from "@/components/ui/MenuPuntos";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
-import { licenciaFrecuenciaPago } from "@/utils/licenciaPago";
+import {
+  licenciaFrecuenciaPago,
+  licenciaTienePagoPendiente,
+} from "@/utils/licenciaPago";
 import { ALTO_FILA_JUGADOR_PX } from "@/utils/jugadoresListado";
 
 interface LicenciaJugadorCardProps {
@@ -75,6 +78,7 @@ export function LicenciaJugadorCard({
   const router = useRouter();
   const [pagosAbiertos, setPagosAbiertos] = useState(false);
   const estado = ESTADO_STYLES[licencia.estado] || ESTADO_STYLES.Activa;
+  const pagoPendiente = licenciaTienePagoPendiente(licencia);
   const nombreCompleto = jugador.nombre
     ? `${jugador.apellido?.toUpperCase()}, ${jugador.nombre}`
     : "Sin nombre";
@@ -169,11 +173,18 @@ export function LicenciaJugadorCard({
   );
 
   const insignia = (
-    <span
-      className={`inline-flex h-5 items-center rounded-full border px-2 text-xs font-semibold ${estado.clase}`}
-    >
-      {estado.label}
-    </span>
+    <div className="flex flex-wrap items-center gap-1">
+      <span
+        className={`inline-flex h-5 items-center rounded-full border px-2 text-xs font-semibold ${estado.clase}`}
+      >
+        {estado.label}
+      </span>
+      {pagoPendiente ? (
+        <span className="inline-flex h-5 items-center rounded-full border border-amber-500/35 bg-amber-500/10 px-2 text-[10px] font-bold uppercase tracking-wide text-amber-300">
+          Pago pendiente
+        </span>
+      ) : null}
+    </div>
   );
 
   if (presentacion === "tarjeta") {

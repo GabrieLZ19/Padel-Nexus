@@ -11,6 +11,7 @@ export type EstadoLicenciaPublica =
   | "activa"
   | "vencida"
   | "suspendida"
+  | "en_tramite"
   | "no_valida";
 
 export interface VerificacionLicenciaPublica {

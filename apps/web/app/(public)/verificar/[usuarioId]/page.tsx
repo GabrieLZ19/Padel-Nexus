@@ -25,6 +25,10 @@ const ESTADO_UI: Record<
     label: "Suspendida",
     clase: "border-orange-500/40 bg-orange-500/10 text-orange-400",
   },
+  en_tramite: {
+    label: "En trámite",
+    clase: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+  },
   no_valida: {
     label: "No válida",
     clase: "border-white/15 bg-white/5 text-gray-400",
@@ -111,6 +115,8 @@ export default function VerificarCredencialPage() {
             <div className="flex flex-col items-center gap-3">
               {dato.valida ? (
                 <ShieldCheck className="size-14 text-green-400" />
+              ) : dato.estado === "en_tramite" ? (
+                <ShieldCheck className="size-14 text-amber-300" />
               ) : (
                 <ShieldX className="size-14 text-gray-400" />
               )}
