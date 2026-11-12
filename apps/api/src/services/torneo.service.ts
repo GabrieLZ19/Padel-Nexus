@@ -42,7 +42,11 @@ import {
   tablaPuntosDesdeConfig,
   type ConfigPuntosTorneo,
 } from "../utils/rankingTorneo";
-import { partidoYaTeniaResultado } from "../utils/auditoriaTorneo";
+import {
+  construirResumenCorreccionResultado,
+  numeroVisiblePartidoTorneo,
+  partidoYaTeniaResultado,
+} from "../utils/auditoriaTorneo";
 import { registrarAuditoriaCambioParejaPartido } from "../utils/auditoriaOverridePareja";
 
 async function marcarDescalificacionesDeZona(
@@ -2044,8 +2048,28 @@ export class TorneoService {
       es_lesion: Boolean(esLesion),
     };
 
-    const torneoIdPartido = previo?.torneo_id;
-    if (yaTeniaResultado && valorAnterior && torneoIdPartido) {
+    const torneoIdPartido = previo?.torneo_id
+      ? String(previo.torneo_id)
+      : null;
+    if (yaTeniaResultado) {
+      if (!valorAnterior || !torneoIdPartido) {
+        throw new Error(
+          "No se pudo auditar la corrección: falta el torneo o el marcador anterior.",
+        );
+      }
+
+      const numeroPartido = await numeroVisiblePartidoTorneo(
+        torneoIdPartido,
+        partidoId,
+        previo.orden,
+      );
+      const resumen = construirResumenCorreccionResultado({
+        numeroPartido,
+        ronda: previo.ronda,
+        valorAnterior,
+        valorNuevo,
+      });
+
       const { error: errAudit } = await supabaseAdmin.from("logs_auditoria").insert({
         usuario_id_admin: adminId!,
         accion: "corregir_resultado",
@@ -2055,7 +2079,9 @@ export class TorneoService {
           partido_id: partidoId,
           ronda: previo.ronda,
           orden: previo.orden,
+          numero_partido: numeroPartido,
           motivo: motivo!.trim(),
+          resumen,
           valor_anterior: valorAnterior,
           valor_nuevo: valorNuevo,
         },
@@ -2454,9 +2480,22 @@ export class TorneoService {
     const { ORDEN_RONDAS_LLAVE, normalizarRonda } = await import(
       "../utils/edicionLlaveMenores"
     );
+    const { liberarParejasDuplicadasEnLlave } = await import(
+      "../utils/edicionLlaveDuplicados"
+    );
     const esLlave = (ORDEN_RONDAS_LLAVE as readonly string[]).includes(
       normalizarRonda(partido.ronda || ""),
     );
+    if (esLlave) {
+      await liberarParejasDuplicadasEnLlave(
+        partido.torneo_id,
+        partido.id,
+        prevA,
+        prevB,
+        equipoAId,
+        equipoBId,
+      );
+    }
     if (!esLlave) {
       const { error: updateZona } = await supabaseAdmin
         .from("partidos")

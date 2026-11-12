@@ -1,0 +1,126 @@
+import { supabaseAdmin } from "../config/supabase";
+import {
+  limpiarSlot,
+  type LadoLlave,
+  type PartidoEditable,
+} from "./edicionLlaveMenores";
+
+export const RONDAS_PLAYOFF_LLAVE = [
+  "32AVOS",
+  "16AVOS",
+  "OCTAVOS",
+  "CUARTOS",
+  "SEMIS",
+  "FINAL",
+] as const;
+
+export class LlaveConflictoError extends Error {
+  readonly statusCode = 409;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "LlaveConflictoError";
+  }
+}
+
+type FilaPartidoLlave = {
+  id: string;
+  ronda: string;
+  orden: number | null;
+  equipo_a_id: string | null;
+  equipo_b_id: string | null;
+  ganador: string | null;
+  set1_a: number | null;
+  set1_b: number | null;
+};
+
+function ladoDePareja(
+  fila: FilaPartidoLlave,
+  inscripcionId: string,
+): LadoLlave | null {
+  if (fila.equipo_a_id === inscripcionId) return "a";
+  if (fila.equipo_b_id === inscripcionId) return "b";
+  return null;
+}
+
+function aPartidoEditable(fila: FilaPartidoLlave): PartidoEditable {
+  return {
+    id: fila.id,
+    ronda: fila.ronda,
+    orden: fila.orden ?? 0,
+    equipoAId: fila.equipo_a_id,
+    equipoBId: fila.equipo_b_id,
+    ganador: fila.ganador,
+    set1A: fila.set1_a,
+    set1B: fila.set1_b,
+  };
+}
+
+/**
+ * Antes de asignar una pareja a otro cruce, la libera del slot pendiente donde
+ * ya figuraba (no destructivo: no toca partidos con resultado real).
+ */
+export async function liberarParejasDuplicadasEnLlave(
+  torneoId: string,
+  partidoId: string,
+  prevA: string | null,
+  prevB: string | null,
+  nextA: string | null,
+  nextB: string | null,
+): Promise<string[]> {
+  const mover = new Set<string>();
+  for (const id of [nextA, nextB]) {
+    if (!id) continue;
+    if (id === prevA || id === prevB) continue;
+    mover.add(id);
+  }
+  if (mover.size === 0) return [];
+
+  const { data: matches, error } = await supabaseAdmin
+    .from("partidos")
+    .select(
+      "id, ronda, orden, equipo_a_id, equipo_b_id, ganador, set1_a, set1_b",
+    )
+    .eq("torneo_id", torneoId)
+    .in("ronda", [...RONDAS_PLAYOFF_LLAVE]);
+
+  if (error) throw new Error(error.message);
+
+  const liberados: string[] = [];
+
+  for (const inscripcionId of mover) {
+    for (const fila of (matches || []) as FilaPartidoLlave[]) {
+      if (fila.id === partidoId) continue;
+      const lado = ladoDePareja(fila, inscripcionId);
+      if (!lado) continue;
+
+      let parche;
+      try {
+        parche = limpiarSlot(aPartidoEditable(fila), lado);
+      } catch (e) {
+        const msg =
+          e instanceof Error
+            ? e.message
+            : "La pareja ya jugó un partido de la llave.";
+        throw new LlaveConflictoError(msg);
+      }
+
+      const { error: updErr } = await supabaseAdmin
+        .from("partidos")
+        .update({
+          equipo_a_id: parche.equipoAId,
+          equipo_b_id: parche.equipoBId,
+          ganador: parche.ganador,
+          set1_a: parche.set1A,
+          set1_b: parche.set1B,
+          estado_partido: parche.estado,
+        })
+        .eq("id", fila.id);
+
+      if (updErr) throw new Error(updErr.message);
+      liberados.push(fila.id);
+    }
+  }
+
+  return liberados;
+}

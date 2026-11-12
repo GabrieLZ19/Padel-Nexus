@@ -179,9 +179,14 @@ describe("F6: Auditoría y motivo obligatorio al corregir resultado", () => {
         },
         error: null,
       },
-      // 2. insert logs_auditoria (antes de actualizar el partido)
+      // 2. partidos del torneo (número visible para auditoría)
+      {
+        data: [{ id: PARTIDO, ronda: "OCTAVOS", orden: 1 }],
+        error: null,
+      },
+      // 3. insert logs_auditoria (antes de actualizar el partido)
       { data: null, error: null },
-      // 3. update partido
+      // 4. update partido
       {
         data: {
           id: PARTIDO,
@@ -193,9 +198,9 @@ describe("F6: Auditoría y motivo obligatorio al corregir resultado", () => {
         },
         error: null,
       },
-      // 4. select torneoInfo (ranking)
+      // 5. select torneoInfo (ranking)
       { data: null, error: null },
-      // 5. inscripciones count (fap bracket)
+      // 6. inscripciones count (fap bracket)
       { count: 0, error: null },
     ]);
 
@@ -240,6 +245,8 @@ describe("F6: Auditoría y motivo obligatorio al corregir resultado", () => {
     assert.equal(payload.entidad_afectada, TORNEO);
     assert.equal(payload.detalles.partido_id, PARTIDO);
     assert.equal(payload.detalles.motivo, "Corrección de marcador de 6-2 6-2 a 6-4 6-4");
+    assert.match(String(payload.detalles.resumen || ""), /Corrección de resultado/);
+    assert.ok(payload.detalles.numero_partido != null);
     assert.equal(payload.detalles.valor_anterior.set1_a, 6);
     assert.equal(payload.detalles.valor_anterior.set1_b, 2);
     assert.equal(payload.detalles.valor_anterior.set2_a, 6);

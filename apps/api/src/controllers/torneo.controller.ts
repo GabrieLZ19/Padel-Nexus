@@ -1,9 +1,6 @@
 import { Request, Response } from "express";
 import { TorneoService } from "../services/torneo.service";
-import {
-  dedupeAuditoriaPorId,
-  referenciasEntidadTorneoEnAuditoria,
-} from "../utils/auditoriaTorneo";
+import { listarAuditoriaTorneo } from "../utils/auditoriaTorneo";
 import { CompetenciaService } from "../services/competencia.service";
 import { supabaseAdmin } from "../config/supabase";
 import sharp from "sharp";
@@ -604,8 +601,16 @@ export const actualizarEquiposPartido = async (
     }
     await TorneoService.actualizarEquiposPartido(partido_id, equipo_a_id ?? null, equipo_b_id ?? null, motivo, admin_id);
     return res.status(200).json({ message: "Rivales actualizados exitosamente" });
-  } catch (error: any) {
-    return res.status(500).json({ message: "Error al actualizar rivales", error: error.message });
+  } catch (error: unknown) {
+    const err = error as { statusCode?: number; message?: string };
+    const status = err?.statusCode === 409 ? 409 : 500;
+    return res.status(status).json({
+      message:
+        status === 409
+          ? "No se puede duplicar la pareja en la llave"
+          : "Error al actualizar rivales",
+      error: err?.message || "Error desconocido",
+    });
   }
 };
 
@@ -800,42 +805,7 @@ export const getAuditoriaByTorneo = async (
 ): Promise<Response> => {
   try {
     const torneoId = req.params.id;
-    const selectCols = `
-        id,
-        accion,
-        detalles,
-        created_at,
-        perfiles!fk_logs_admin(nombre, apellido)
-      `;
-
-    const entidades = referenciasEntidadTorneoEnAuditoria(torneoId);
-
-    // 1) Logs anclados al torneo (programación, correcciones, sorteos nuevos).
-    const { data: porEntidad, error: errEntidad } = await supabaseAdmin
-      .from("logs_auditoria")
-      .select(selectCols)
-      .in("entidad_afectada", entidades)
-      .order("created_at", { ascending: false });
-    if (errEntidad) throw new Error(errEntidad.message);
-
-    // 2) Logs históricos de sorteo/aviso que guardaban entidad_afectada="grupo_parejas"
-    //    y el torneo_id solo en detalles (p. ej. correcciones legacy).
-    const { data: porDetalle, error: errDetalle } = await supabaseAdmin
-      .from("logs_auditoria")
-      .select(selectCols)
-      .filter("detalles->>torneo_id", "eq", torneoId)
-      .order("created_at", { ascending: false });
-    if (errDetalle) throw new Error(errDetalle.message);
-
-    const merged = dedupeAuditoriaPorId([
-      ...(porEntidad || []),
-      ...(porDetalle || []),
-    ]).sort(
-      (a, b) =>
-        new Date(String(b.created_at)).getTime() -
-        new Date(String(a.created_at)).getTime(),
-    );
-
+    const merged = await listarAuditoriaTorneo(torneoId);
     return res.status(200).json(merged);
   } catch (error: any) {
     return res.status(400).json({ message: "Error al obtener auditoría", error: error.message });
