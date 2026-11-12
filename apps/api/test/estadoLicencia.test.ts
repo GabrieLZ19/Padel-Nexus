@@ -4,6 +4,7 @@ import {
   estadoEfectivoLicencia,
   fechaVencimientoPasada,
   normalizarPerfilLicencias,
+  reconciliarEstadoAlmacenadoConVencimiento,
 } from "../src/utils/estadoLicencia.ts";
 import { resumirLicenciasPorJugador } from "../src/utils/resumenLicencias.ts";
 
@@ -23,6 +24,26 @@ describe("ENT-2: vencimiento efectivo de licencias", () => {
     assert.equal(
       estadoEfectivoLicencia("Activa", "2026-11-06", new Date("2026-11-06T15:00:00Z")),
       "Activa",
+    );
+  });
+
+  it("ENT-16: Vencida almacenada con fecha futura se considera vigente", () => {
+    const ref = new Date("2026-11-06T15:00:00Z");
+    assert.equal(
+      estadoEfectivoLicencia("Vencida", "2027-01-15", ref),
+      "Activa",
+    );
+    assert.equal(
+      reconciliarEstadoAlmacenadoConVencimiento("Vencida", "2027-01-15", ref),
+      "Activa",
+    );
+    assert.equal(
+      reconciliarEstadoAlmacenadoConVencimiento("Activa", "2026-10-01", ref),
+      "Vencida",
+    );
+    assert.equal(
+      reconciliarEstadoAlmacenadoConVencimiento("Suspendida", "2027-01-15", ref),
+      "Suspendida",
     );
   });
 

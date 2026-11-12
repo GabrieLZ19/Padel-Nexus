@@ -2227,6 +2227,7 @@ export class TorneoService {
                 torneo_id: partido.torneo_id,
                 puntos_anteriores: pAnt,
                 puntos_nuevos: pAnt + puntos,
+                ronda: partido.ronda ?? null,
               },
             ]);
           if (histError) {

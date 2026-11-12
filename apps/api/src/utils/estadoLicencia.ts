@@ -50,7 +50,30 @@ export function fechaVencimientoPasada(
 }
 
 /**
- * Estado mostrado en CRM y perfil: una licencia "Activa" con vencimiento pasado es "Vencida".
+ * Persistencia: alineá `licencias.estado` con el calendario (Activa/Vencida).
+ * No toca Suspendida, Pendiente ni Rechazada.
+ */
+export function reconciliarEstadoAlmacenadoConVencimiento(
+  estadoDb?: string | null,
+  fechaVencimiento?: string | null,
+  ahora: Date = new Date(),
+): EstadoLicenciaAlmacenado {
+  const estado = normalizarEstadoAlmacenadoLicencia(estadoDb);
+  if (
+    estado === "Suspendida" ||
+    estado === "Pendiente" ||
+    estado === "Rechazada"
+  ) {
+    return estado;
+  }
+  if (!fechaVencimiento) {
+    return estado === "Vencida" ? "Vencida" : "Activa";
+  }
+  return fechaVencimientoPasada(fechaVencimiento, ahora) ? "Vencida" : "Activa";
+}
+
+/**
+ * Estado mostrado en CRM y perfil según vencimiento (día inclusive en Argentina).
  */
 export function estadoEfectivoLicencia(
   estadoDb?: string | null,
@@ -58,10 +81,17 @@ export function estadoEfectivoLicencia(
   ahora: Date = new Date(),
 ): EstadoLicenciaAlmacenado {
   const estado = normalizarEstadoAlmacenadoLicencia(estadoDb);
-  if (estado === "Activa" && fechaVencimientoPasada(fechaVencimiento, ahora)) {
+  if (
+    estado === "Suspendida" ||
+    estado === "Pendiente" ||
+    estado === "Rechazada"
+  ) {
+    return estado;
+  }
+  if (fechaVencimientoPasada(fechaVencimiento, ahora)) {
     return "Vencida";
   }
-  return estado;
+  return "Activa";
 }
 
 /** Estado expuesto en /verificar (público, sin datos sensibles). */

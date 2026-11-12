@@ -32,6 +32,12 @@ router.patch(
   LicenciasController.cambiarEstadoLicencia,
 );
 
+router.get(
+  "/:id/historial",
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  LicenciasController.historialLicencia,
+);
+
 router.post(
   "/:id/dar-de-baja",
   authorize(["superadmin", "admin_federacion", "admin_provincial"]),

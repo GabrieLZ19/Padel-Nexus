@@ -2,7 +2,7 @@ import { esEmailPlaceholderPlanilla } from "./inscripcionPlanilla";
 
 const NOMBRE_TORNEO_PRUEBA =
   /prue|\bqa\b|\btest\b|testing|\bdemo\b|auditor|^asdf/i;
-const EMAIL_PRUEBA = /\.test$|prueba|demo\d|whapy/i;
+const EMAIL_PRUEBA = /\.test$|@example\.com$|prueba|demo\d|whapy/i;
 const NOMBRE_JUGADOR_PRUEBA = /whapy/i;
 
 export function esNombreDePrueba(nombre: string | null | undefined): boolean {
@@ -23,8 +23,8 @@ export function esJugadorDePrueba(
   if (!perfil) return false;
   if (perfil.es_prueba) return true;
   const email = String(perfil.email || "");
-  if (esEmailPlaceholderPlanilla(email)) return false;
   if (EMAIL_PRUEBA.test(email)) return true;
+  if (esEmailPlaceholderPlanilla(email)) return false;
   if (/\.local$/i.test(email)) return true;
   const nombre = `${perfil.nombre || ""} ${perfil.apellido || ""}`;
   return NOMBRE_JUGADOR_PRUEBA.test(nombre);

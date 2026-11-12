@@ -18,8 +18,9 @@ import { fechaLatina } from "../utils/fechaArgentina";
 import { enmascararDni } from "../utils/enmascararDni";
 import {
   aplicarEstadoEfectivoLicencia,
-  fechaVencimientoPasada,
   jugadorCoincideEstadoLicencia,
+  normalizarEstadoAlmacenadoLicencia,
+  reconciliarEstadoAlmacenadoConVencimiento,
   normalizarPerfilLicencias,
   resolverEstadoLicenciaPublica,
   type EstadoLicenciaPublica,
@@ -667,7 +668,51 @@ export class LicenciaService {
     };
   }
 
-  static async actualizarEstado(id: string, estado: string, fechaVencimientoOverride?: string) {
+  private static async registrarAuditoriaLicencia(
+    licenciaId: string,
+    adminId: string | undefined,
+    accion: string,
+    detalles: Record<string, unknown>,
+  ): Promise<void> {
+    if (!adminId) return;
+    const { error } = await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: adminId,
+      accion,
+      entidad_afectada: `licencia_id: ${licenciaId}`,
+      detalles,
+    });
+    if (error) {
+      console.error("No se pudo registrar auditoría de licencia:", error.message);
+    }
+  }
+
+  static async listarHistorialLicencia(
+    licenciaId: string,
+    actor?: { id: string; rol: string },
+  ) {
+    if (actor) {
+      await LicenciaService.assertPuedeGestionarLicencia(licenciaId, actor);
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("logs_auditoria")
+      .select("id, accion, detalles, created_at, usuario_id_admin")
+      .eq("entidad_afectada", `licencia_id: ${licenciaId}`)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    if (error) {
+      throw new Error("No se pudo cargar el historial de la licencia.");
+    }
+    return data ?? [];
+  }
+
+  static async actualizarEstado(
+    id: string,
+    estado: string,
+    fechaVencimientoOverride?: string,
+    contexto?: { motivo?: string; adminId?: string },
+  ) {
     // 1. Obtener la licencia actual para saber el estado previo y usuario
     const { data: licenciaPrevia, error: readError } = await supabaseAdmin
       .from("licencias")
@@ -680,8 +725,24 @@ export class LicenciaService {
     }
 
     const estadoPrevio = licenciaPrevia.estado;
+    const estadoSolicitado = normalizarEstadoAlmacenadoLicencia(estado);
+    const estadoPreviaNorm = normalizarEstadoAlmacenadoLicencia(estadoPrevio);
     const usuario_id = licenciaPrevia.usuario_id;
     let data = { ...licenciaPrevia, estado };
+
+    const motivoSuspension =
+      estadoSolicitado === "Suspendida" && estadoPreviaNorm !== "Pendiente"
+        ? contexto?.motivo?.trim() ?? ""
+        : "";
+    if (
+      estadoSolicitado === "Suspendida" &&
+      estadoPreviaNorm !== "Pendiente" &&
+      motivoSuspension.length < 3
+    ) {
+      throw new Error(
+        "Indicá el motivo de la suspensión (mínimo 3 caracteres).",
+      );
+    }
 
     const fechaVencimientoCalculada =
       await LicenciaOrganizacionService.calcularVencimientoParaLicencia(
@@ -717,17 +778,34 @@ export class LicenciaService {
     // 3. Si no es rechazo, actualizamos normalmente
     const updateData: Record<string, any> = { estado };
 
+    if (motivoSuspension) {
+      const datosSol = (licenciaPrevia.datos_solicitud || {}) as Record<
+        string,
+        unknown
+      >;
+      updateData.datos_solicitud = {
+        ...datosSol,
+        ultima_suspension: {
+          motivo: motivoSuspension,
+          fecha: new Date().toISOString(),
+          admin_id: contexto?.adminId ?? null,
+        },
+      };
+    }
+
     if (estado === "Activa" && estadoPrevio !== "Activa") {
       // Activación real: registrar la fecha de emisión y calcular vencimiento
       updateData.fecha_emision = new Date().toISOString().split("T")[0];
       updateData.fecha_vencimiento = fechaVencimiento;
     } else if (fechaVencimientoOverride) {
       updateData.fecha_vencimiento = fechaVencimientoOverride;
-      if (estado === "Activa" || estadoPrevio === "Activa") {
-        updateData.estado = fechaVencimientoPasada(fechaVencimientoOverride)
-          ? "Vencida"
-          : "Activa";
-      }
+      const solicitud = normalizarEstadoAlmacenadoLicencia(estado);
+      const baseEstado =
+        solicitud === "Suspendida" ? "Suspendida" : estadoPrevio;
+      updateData.estado = reconciliarEstadoAlmacenadoConVencimiento(
+        baseEstado,
+        fechaVencimientoOverride,
+      );
     } else if (estado === "Activa" && estadoPrevio === "Activa") {
       // Mismo estado, sin override de fecha → no tocar fechas
     }
@@ -771,14 +849,45 @@ export class LicenciaService {
           estado_pago: datosSolPago.estado_pago ?? null,
         },
       });
-    } else if (estado === "Suspendida" && estadoPrevio === "Activa") {
+    } else if (
+      estadoSolicitado === "Suspendida" &&
+      estadoPreviaNorm !== "Pendiente"
+    ) {
+      await LicenciaService.registrarAuditoriaLicencia(
+        id,
+        contexto?.adminId,
+        "suspender_licencia",
+        {
+          motivo: motivoSuspension,
+          estado_previo: estadoPrevio,
+          estado_nuevo: "Suspendida",
+          nro_licencia: data.nro_licencia,
+          usuario_id,
+        },
+      );
       await NotificacionService.crearNotificacion({
         usuario_id,
-        titulo: "Licencia Suspendida",
-        mensaje: `Tu licencia N° ${data.nro_licencia} fue suspendida administrativamente. Contactá a tu federación para más información.`,
+        titulo: "Licencia suspendida",
+        mensaje: `Tu licencia N° ${data.nro_licencia} fue suspendida. Motivo: ${motivoSuspension}`,
         tipo: "error",
-        metadata: { nro_licencia: data.nro_licencia, licencia_id: data.id },
+        metadata: {
+          nro_licencia: data.nro_licencia,
+          licencia_id: data.id,
+          motivo: motivoSuspension,
+        },
       });
+    } else if (estado === "Activa" && estadoPreviaNorm === "Suspendida") {
+      await LicenciaService.registrarAuditoriaLicencia(
+        id,
+        contexto?.adminId,
+        "reactivar_licencia",
+        {
+          estado_previo: estadoPrevio,
+          estado_nuevo: "Activa",
+          nro_licencia: data.nro_licencia,
+          usuario_id,
+        },
+      );
     }
 
     // 5. Si se activa o se suspende, actualizamos la afiliación correspondiente

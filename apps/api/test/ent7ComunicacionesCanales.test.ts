@@ -49,6 +49,8 @@ describe("ENT-7 canales y metricas de campaña (feature 20.0)", () => {
     assert.match(util, /resumenMetricasCampana/);
     assert.match(panel, /resumenMetricasCampana/);
     assert.equal(panel.includes("RESEND_API_KEY"), false);
+    assert.equal(panel.includes("Resend"), false);
+    assert.equal(/fase\s*2/i.test(panel), false);
   });
 
   it("envio expone canales, forzarInApp y endpoints de retencion", () => {

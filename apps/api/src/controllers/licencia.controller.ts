@@ -161,7 +161,11 @@ export const LicenciasController = {
   async cambiarEstadoLicencia(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
-      const { estado, fecha_vencimiento } = req.body;
+      const { estado, fecha_vencimiento, motivo } = req.body as {
+        estado?: string;
+        fecha_vencimiento?: string;
+        motivo?: string;
+      };
 
       if (!id || !estado) {
         return res
@@ -179,13 +183,48 @@ export const LicenciasController = {
         });
       }
 
-      const data = await LicenciaService.actualizarEstado(id, estado, fecha_vencimiento);
+      const data = await LicenciaService.actualizarEstado(
+        id,
+        estado,
+        fecha_vencimiento,
+        { motivo, adminId: req.user?.id },
+      );
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {
       const message =
         error instanceof Error
           ? error.message
           : "Error al actualizar el estado de la licencia.";
+      const status = message.includes("No podés gestionar")
+        ? 403
+        : message.includes("motivo")
+          ? 400
+          : 500;
+      return res.status(status).json({ exito: false, error: message });
+    }
+  },
+
+  async historialLicencia(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "El ID de licencia es requerido." });
+      }
+
+      const actor =
+        req.user?.id && req.user?.rol
+          ? { id: req.user.id, rol: req.user.rol }
+          : undefined;
+
+      const data = await LicenciaService.listarHistorialLicencia(id, actor);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al cargar el historial.";
       const status = message.includes("No podés gestionar") ? 403 : 500;
       return res.status(status).json({ exito: false, error: message });
     }

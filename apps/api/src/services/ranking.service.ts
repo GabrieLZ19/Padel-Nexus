@@ -84,7 +84,9 @@ export class RankingService {
         .eq("usuario_id", usuarioId),
       supabaseAdmin
         .from("historial_ranking")
-        .select("torneo_id, puntos_nuevos, puntos_anteriores, created_at")
+        .select(
+          "torneo_id, puntos_nuevos, puntos_anteriores, created_at, ronda",
+        )
         .eq("usuario_id", usuarioId)
         .order("created_at", { ascending: false }),
       supabaseAdmin

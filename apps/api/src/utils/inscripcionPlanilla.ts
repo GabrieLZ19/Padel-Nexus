@@ -18,10 +18,18 @@ export interface ParsePlanillaResult {
   filas: FilaPlanillaInscripcion[];
 }
 
+/** Quita artefactos OOXML/HTML que a veces filtran desde celdas Excel (`<v>`, etc.). */
+export function sanearValorCeldaPlanilla(valor: unknown): string {
+  let s = String(valor ?? "").trim();
+  s = s.replace(/<\/?v\s*>/gi, "");
+  s = s.replace(/^<v\s*/i, "");
+  s = s.replace(/<[^>]*>/g, "");
+  s = s.replace(/^>\s*/, "");
+  return s.replace(/\s+/g, " ").trim();
+}
+
 function normalizarTexto(valor: unknown): string {
-  return String(valor ?? "")
-    .trim()
-    .replace(/\s+/g, " ");
+  return sanearValorCeldaPlanilla(valor);
 }
 
 function normalizarDni(valor: unknown): string {
@@ -168,7 +176,9 @@ export function parsearFilasPlanilla(
           ? normalizarTexto(row[idxCategoria]) || undefined
           : undefined,
       email:
-        idxEmail >= 0 ? normalizarTexto(row[idxEmail]) || undefined : undefined,
+        idxEmail >= 0
+          ? normalizarEmailCeldaPlanilla(row[idxEmail])
+          : undefined,
       telefono:
         idxTelefono >= 0
           ? normalizarTexto(row[idxTelefono]) || undefined
@@ -183,11 +193,53 @@ export function parsearFilasPlanilla(
   return { tipo, filas };
 }
 
-/** Cuentas creadas desde planilla sin credenciales reales del jugador. */
+/** Email de fila: válido y sin dominios técnicos/QA. */
+export function normalizarEmailCeldaPlanilla(
+  raw?: string | null,
+): string | undefined {
+  const s = sanearValorCeldaPlanilla(raw);
+  if (!s) return undefined;
+  const email = s.toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return undefined;
+  return email;
+}
+
+/** Cuentas sin correo personal del jugador (placeholder o ensayo). */
 export function esEmailPlaceholderPlanilla(
   email: string | null | undefined,
 ): boolean {
-  return Boolean(email?.includes("@padelnexus.local"));
+  const e = String(email || "").trim().toLowerCase();
+  if (!e) return true;
+  if (e.includes("@padelnexus.local")) return true;
+  if (/@example\.com$/i.test(e)) return true;
+  if (/^preinscripto\+/i.test(e)) return true;
+  return false;
+}
+
+export function sanitizarFilaPlanillaInscripcion(
+  fila: FilaPlanillaInscripcion,
+): FilaPlanillaInscripcion {
+  return {
+    ...fila,
+    apellidoNombre: sanearValorCeldaPlanilla(fila.apellidoNombre),
+    dni: normalizarDni(fila.dni),
+    letraOrden: fila.letraOrden
+      ? sanearValorCeldaPlanilla(fila.letraOrden)
+      : undefined,
+    asociacion: fila.asociacion
+      ? sanearValorCeldaPlanilla(fila.asociacion)
+      : undefined,
+    categoria: fila.categoria
+      ? sanearValorCeldaPlanilla(fila.categoria)
+      : undefined,
+    email: normalizarEmailCeldaPlanilla(fila.email),
+    telefono: fila.telefono
+      ? sanearValorCeldaPlanilla(fila.telefono)
+      : undefined,
+    direccion: fila.direccion
+      ? sanearValorCeldaPlanilla(fila.direccion)
+      : undefined,
+  };
 }
 
 export function agruparFilasEnParejas(

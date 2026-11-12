@@ -3,6 +3,8 @@ import { LicenciaOrganizacionService } from "./licenciaOrganizacion.service";
 import {
   aplicarEstadoEfectivoLicencia,
   estadoEfectivoLicencia,
+  normalizarEstadoAlmacenadoLicencia,
+  reconciliarEstadoAlmacenadoConVencimiento,
 } from "../utils/estadoLicencia";
 import {
   calcularVencimientoTrasPagoMensual,
@@ -100,7 +102,18 @@ export class LicenciaClubService {
       estado: nuevoEstado,
       updated_at: new Date().toISOString(),
     };
-    if (fechaVencimiento) patch.fecha_vencimiento = fechaVencimiento;
+    if (fechaVencimiento) {
+      patch.fecha_vencimiento = fechaVencimiento;
+      const solicitud = normalizarEstadoAlmacenadoLicencia(nuevoEstado);
+      const base =
+        solicitud === "Suspendida"
+          ? "Suspendida"
+          : normalizarEstadoAlmacenadoLicencia(actual.estado);
+      patch.estado = reconciliarEstadoAlmacenadoConVencimiento(
+        base,
+        fechaVencimiento,
+      );
+    }
     if (nuevoEstado === "Activa" && !actual.fecha_emision) {
       patch.fecha_emision = new Date().toISOString().slice(0, 10);
     }

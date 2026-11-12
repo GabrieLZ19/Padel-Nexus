@@ -8,6 +8,7 @@ import {
   parseNombreCompleto,
   normalizarDni,
   esEmailPlaceholderPlanilla,
+  sanitizarFilaPlanillaInscripcion,
   resolverProvinciaDesdePlanilla,
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
@@ -421,6 +422,7 @@ export class PerfilService {
    * La ficha queda completa para torneos; la activación en App ocurre al registrarse con su DNI.
    */
   static async resolverJugadorDesdePlanilla(fila: FilaPlanillaInscripcion) {
+    fila = sanitizarFilaPlanillaInscripcion(fila);
     const dni = normalizarDni(fila.dni);
     if (!dni || dni.length < 7) {
       throw new Error(
@@ -436,7 +438,7 @@ export class PerfilService {
     }
 
     const email =
-      fila.email && !fila.email.includes("@padelnexus.local")
+      fila.email && !esEmailPlaceholderPlanilla(fila.email)
         ? fila.email.toLowerCase()
         : PerfilService.emailPlaceholderDesdeDni(dni);
 

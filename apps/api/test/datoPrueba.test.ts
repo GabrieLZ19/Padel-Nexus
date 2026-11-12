@@ -75,6 +75,14 @@ describe("datos de prueba del sitio público", () => {
       false,
     );
     assert.equal(
+      esJugadorDePrueba({
+        nombre: "Test",
+        apellido: "E2E",
+        email: "federado123@example.com",
+      }),
+      true,
+    );
+    assert.equal(
       esVisibleEnSitioPublico({
         nombre: "New Center",
         apellido: "Administrador",

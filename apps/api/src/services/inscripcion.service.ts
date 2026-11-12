@@ -23,6 +23,7 @@ import { AFILIACION_ESTADOS } from "../constants/afiliacion";
 import { PerfilService } from "./perfil.service";
 import {
   agruparFilasEnParejas,
+  sanitizarFilaPlanillaInscripcion,
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
 import { esModalidadIndividual } from "../utils/modalidad";
@@ -966,6 +967,8 @@ export class InscripcionService {
       throw new Error("La planilla no contiene jugadores para importar.");
     }
 
+    const filasLimpias = filas.map(sanitizarFilaPlanillaInscripcion);
+
     const torneo = await InscripcionService.cargarTorneoElegibilidad(torneoId);
     assertPasoJugadoresEditable(torneo);
     const { data: torneoCompleto } = await supabaseAdmin
@@ -982,8 +985,8 @@ export class InscripcionService {
       j1: FilaPlanillaInscripcion;
       j2?: FilaPlanillaInscripcion;
     }> = individual
-      ? filas.map((fila) => ({ j1: fila }))
-      : agruparFilasEnParejas(filas);
+      ? filasLimpias.map((fila) => ({ j1: fila }))
+      : agruparFilasEnParejas(filasLimpias);
 
     let inscripcionesOk = 0;
     let jugadoresCreados = 0;
