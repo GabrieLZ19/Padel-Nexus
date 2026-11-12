@@ -1,7 +1,7 @@
 import { esEmailPlaceholderPlanilla } from "./inscripcionPlanilla";
 
 const NOMBRE_TORNEO_PRUEBA =
-  /prue|\bqa\b|testing|\bdemo\b|auditor|^asdf/i;
+  /prue|\bqa\b|\btest\b|testing|\bdemo\b|auditor|^asdf/i;
 const EMAIL_PRUEBA = /\.test$|prueba|demo\d|whapy/i;
 const NOMBRE_JUGADOR_PRUEBA = /whapy/i;
 

@@ -14,6 +14,7 @@ describe("datos de prueba del sitio público", () => {
     assert.equal(esNombreDePrueba("prueaba 2"), true);
     assert.equal(esNombreDePrueba("QA FAP · 32 parejas · Visual"), true);
     assert.equal(esNombreDePrueba("testing"), true);
+    assert.equal(esNombreDePrueba("Torneo test club QA"), true);
     assert.equal(esNombreDePrueba("Open Demo 16 jugadores"), true);
     assert.equal(esNombreDePrueba("AUDITORIA UX - borrador de prueba"), true);
     assert.equal(esNombreDePrueba("asdfadsf"), true);

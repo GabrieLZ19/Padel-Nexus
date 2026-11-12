@@ -33,8 +33,15 @@ describe("ENT-14 textos y datos menores", () => {
     assert.match(modal, /siglaRectora/);
     assert.match(modal, /referencia \(opcional\)/);
     assert.equal(modal.includes("ante la FAP"), false);
+    assert.equal(modal.includes("licencia oficial FAP"), false);
     const ctrl = fuenteApi("src/controllers/licencia.controller.ts");
     assert.match(ctrl, /club_id: club_id \|\| null/);
+  });
+
+  it("detalle federación usa sigla en título de carnets", () => {
+    const det = fuenteWeb("app/dashboard/federaciones/[id]/page.tsx");
+    assert.doesNotMatch(det, /carnets \(FAP\)/);
+    assert.match(det, /federacion\.sigla/);
   });
 
   it("federación ve menú Clubes y superadmin no hereda tienda FAP por defecto", () => {
