@@ -30,6 +30,7 @@ import FeedbackModal, {
 import { MatchCard } from "./MatchCard";
 import { FapBracketDiagram, type FapMatrixMatch } from "./FapBracketDiagram";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import { sileo } from "sileo";
 import {
   getCapacidadesZonasPorReglamento,
   resumirCapacidadesZonas,
@@ -782,6 +783,16 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       if (p.equipo_b_id) firstRoundTeams.add(p.equipo_b_id);
     });
 
+  const parejasBloqueadasEnLlave = React.useMemo(() => {
+    const bloqueadas = new Set<string>();
+    for (const p of playoffPartidos) {
+      if (!p.ganador) continue;
+      if (p.equipo_a_id) bloqueadas.add(String(p.equipo_a_id));
+      if (p.equipo_b_id) bloqueadas.add(String(p.equipo_b_id));
+    }
+    return bloqueadas;
+  }, [playoffPartidos]);
+
   const slotsPrimeraRonda =
     playoffPartidos.filter(
       (p) => (p.ronda || "").toUpperCase() === firstPlayoffRound,
@@ -958,6 +969,78 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     });
   }, [inscripciones, firstRoundTeams]);
 
+  const partidoQueOcupaPareja = (
+    inscripcionId: string,
+    excluirPartidoId: string,
+  ) =>
+    playoffPartidos.find(
+      (p) =>
+        p.id !== excluirPartidoId &&
+        (p.equipo_a_id === inscripcionId || p.equipo_b_id === inscripcionId),
+    );
+
+  const mensajesTrasladoPareja = (
+    equipoAId: string | null,
+    equipoBId: string | null,
+    partidoId: string,
+  ): string[] => {
+    const avisos: string[] = [];
+    for (const id of [equipoAId, equipoBId]) {
+      if (!id) continue;
+      const origen = partidoQueOcupaPareja(id, partidoId);
+      if (!origen) continue;
+      const num =
+        numerosPartido.get(origen.id) ?? origen.orden ?? null;
+      avisos.push(
+        num != null
+          ? `La pareja deja de figurar en el partido #${num}.`
+          : "La pareja deja de figurar en otro cruce de la llave.",
+      );
+    }
+    return avisos;
+  };
+
+  const ejecutarGuardarMatchEdit = async () => {
+    if (!selectedMatchToEdit) return;
+    try {
+      setMatchEditBusy(true);
+      await TorneosService.actualizarEquiposPartido(selectedMatchToEdit.id, {
+        equipo_a_id: selectedMatchToEdit.equipo_a_id || null,
+        equipo_b_id: selectedMatchToEdit.equipo_b_id || null,
+        motivo: matchEditMotivo.trim(),
+      });
+      setShowMatchEditModal(false);
+      setSelectedMatchToEdit(null);
+      setMatchEditMotivo("");
+      onRefresh?.();
+      sileo.success({
+        title: "Partido actualizado",
+        description: "Las parejas quedaron registradas con auditoría.",
+      });
+    } catch (err: unknown) {
+      const e = err as {
+        response?: { status?: number; data?: { error?: string } };
+        message?: string;
+      };
+      setFeedbackModal({
+        isOpen: true,
+        type: "error",
+        title:
+          e.response?.status === 409
+            ? "Pareja no disponible"
+            : "Error al actualizar",
+        description:
+          e.response?.data?.error ||
+          e.message ||
+          "No se pudo actualizar la pareja del partido.",
+        onClose: () =>
+          setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
+    } finally {
+      setMatchEditBusy(false);
+    }
+  };
+
   const applyInscripcionToSlot = (
     slot: "a" | "b",
     newId: string,
@@ -982,7 +1065,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     });
   };
 
-  const handleGuardarMatchEdit = async () => {
+  const handleGuardarMatchEdit = () => {
     if (!selectedMatchToEdit) return;
     if (!matchEditMotivo.trim()) {
       setFeedbackModal({
@@ -995,36 +1078,50 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       });
       return;
     }
-    try {
-      setMatchEditBusy(true);
-      await TorneosService.actualizarEquiposPartido(selectedMatchToEdit.id, {
-        equipo_a_id: selectedMatchToEdit.equipo_a_id || null,
-        equipo_b_id: selectedMatchToEdit.equipo_b_id || null,
-        motivo: matchEditMotivo.trim(),
-      });
-      setShowMatchEditModal(false);
-      setSelectedMatchToEdit(null);
-      setMatchEditMotivo("");
-      onRefresh?.();
-    } catch (err: unknown) {
-      const e = err as {
-        response?: { data?: { error?: string } };
-        message?: string;
-      };
+
+    for (const id of [
+      selectedMatchToEdit.equipo_a_id,
+      selectedMatchToEdit.equipo_b_id,
+    ]) {
+      if (id && parejasBloqueadasEnLlave.has(id)) {
+        setFeedbackModal({
+          isOpen: true,
+          type: "warning",
+          title: "Pareja con partido jugado",
+          description:
+            "Esa pareja ya tiene resultado en la llave. Elegí otra inscripción o corregí el partido anterior.",
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+        return;
+      }
+    }
+
+    const traslados = mensajesTrasladoPareja(
+      selectedMatchToEdit.equipo_a_id,
+      selectedMatchToEdit.equipo_b_id,
+      selectedMatchToEdit.id,
+    );
+
+    if (traslados.length > 0) {
       setFeedbackModal({
         isOpen: true,
-        type: "error",
-        title: "Error al actualizar",
-        description:
-          e.response?.data?.error ||
-          e.message ||
-          "No se pudo actualizar la pareja del partido.",
+        type: "warning",
+        title: "Mover pareja en la llave",
+        description: `${traslados.join(" ")} El cambio queda auditado.`,
+        confirmText: "Confirmar movimiento",
+        cancelText: "Cancelar",
+        onConfirm: () => {
+          setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
+          void ejecutarGuardarMatchEdit();
+        },
         onClose: () =>
           setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
       });
-    } finally {
-      setMatchEditBusy(false);
+      return;
     }
+
+    void ejecutarGuardarMatchEdit();
   };
 
   return (
@@ -1892,10 +1989,18 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   onChange={(newId) => applyInscripcionToSlot("a", newId)}
                   options={[
                     { value: "", label: "Vacío / BYE" },
-                    ...inscripcionOptions.map((o) => ({
-                      value: o.value,
-                      label: o.label,
-                    })),
+                    ...inscripcionOptions
+                      .filter((o) => {
+                        if (!o.value) return true;
+                        if (o.value === selectedMatchToEdit.equipo_a_id)
+                          return true;
+                        if (parejasBloqueadasEnLlave.has(o.value)) return false;
+                        return true;
+                      })
+                      .map((o) => ({
+                        value: o.value,
+                        label: o.label,
+                      })),
                   ]}
                   placeholder="Seleccionar pareja A..."
                 />
@@ -1921,10 +2026,18 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   onChange={(newId) => applyInscripcionToSlot("b", newId)}
                   options={[
                     { value: "", label: "Vacío / BYE" },
-                    ...inscripcionOptions.map((o) => ({
-                      value: o.value,
-                      label: o.label,
-                    })),
+                    ...inscripcionOptions
+                      .filter((o) => {
+                        if (!o.value) return true;
+                        if (o.value === selectedMatchToEdit.equipo_b_id)
+                          return true;
+                        if (parejasBloqueadasEnLlave.has(o.value)) return false;
+                        return true;
+                      })
+                      .map((o) => ({
+                        value: o.value,
+                        label: o.label,
+                      })),
                   ]}
                   placeholder="Seleccionar pareja B..."
                 />
