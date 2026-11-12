@@ -198,20 +198,24 @@ export class FiscalPanelService {
   }
 
   static async obtenerLlaveMatriz(torneoId: string) {
-    const [{ count }, { data: torneo }] = await Promise.all([
-      supabaseAdmin
-        .from("inscripciones")
-        .select("id", { count: "exact", head: true })
-        .eq("torneo_id", torneoId)
-        .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO),
-      supabaseAdmin
-        .from("torneos")
-        .select("formato")
-        .eq("id", torneoId)
-        .maybeSingle(),
-    ]);
+    const { resolveFapPlantillaPairCount } = await import(
+      "../utils/fapPlantillaTorneo"
+    );
 
-    const pairCount = count || 0;
+    const [{ count: inscripcionesConfirmadas }, { data: torneo }, pairCount] =
+      await Promise.all([
+        supabaseAdmin
+          .from("inscripciones")
+          .select("id", { count: "exact", head: true })
+          .eq("torneo_id", torneoId)
+          .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO),
+        supabaseAdmin
+          .from("torneos")
+          .select("formato")
+          .eq("id", torneoId)
+          .maybeSingle(),
+        resolveFapPlantillaPairCount(torneoId),
+      ]);
 
     if (esEliminatoriaDirecta(torneo?.formato)) {
       return {
@@ -226,6 +230,7 @@ export class FiscalPanelService {
 
     return {
       pairCount,
+      inscripcionesConfirmadas: inscripcionesConfirmadas || 0,
       matches: matches || [],
       supported: Boolean(matches),
     };

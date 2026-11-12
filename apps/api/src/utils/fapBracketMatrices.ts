@@ -485,6 +485,40 @@ export function getFapBracketForPairCount(pairCount: number): readonly FapBracke
   return FAP_BRACKETS_BY_PAIR_COUNT[pairCount] ?? null;
 }
 
+/**
+ * Cuando la cantidad de inscripciones supera la plantilla (altas solo en llave),
+ * inferimos N a partir de los matchNo (orden) ya persistidos en playoff.
+ */
+export function inferFapPlantillaPairCountFromOrdens(
+  ordens: number[],
+): number | null {
+  const unique = [
+    ...new Set(ordens.filter((o) => Number.isFinite(o) && o > 0)),
+  ];
+  if (unique.length === 0) return null;
+
+  const candidatosExactos: number[] = [];
+  const candidatosSuperconjunto: number[] = [];
+
+  for (const n of FAP_BRACKET_PAIR_COUNTS) {
+    const matrix = FAP_BRACKETS_BY_PAIR_COUNT[n];
+    const matchNos = new Set(matrix.map((m) => m.matchNo));
+    if (!unique.every((o) => matchNos.has(o))) continue;
+    candidatosSuperconjunto.push(n);
+    if (unique.length === matrix.length) {
+      candidatosExactos.push(n);
+    }
+  }
+
+  if (candidatosExactos.length > 0) {
+    return Math.max(...candidatosExactos);
+  }
+  if (candidatosSuperconjunto.length > 0) {
+    return Math.min(...candidatosSuperconjunto);
+  }
+  return null;
+}
+
 export function listLeafSeeds(matches: readonly FapBracketMatch[]): string[] {
   const seeds = new Set<string>();
   for (const m of matches) {

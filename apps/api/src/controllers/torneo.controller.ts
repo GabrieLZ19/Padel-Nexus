@@ -831,20 +831,24 @@ export const getLlaveMatriz = async (
       "../utils/fapBracketMatrices"
     );
 
-    const [{ count }, { data: torneo }] = await Promise.all([
-      supabaseAdmin
-        .from("inscripciones")
-        .select("id", { count: "exact", head: true })
-        .eq("torneo_id", req.params.id)
-        .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO),
-      supabaseAdmin
-        .from("torneos")
-        .select("formato")
-        .eq("id", req.params.id)
-        .maybeSingle(),
-    ]);
+    const { resolveFapPlantillaPairCount } = await import(
+      "../utils/fapPlantillaTorneo"
+    );
 
-    const pairCount = count || 0;
+    const [{ count: inscripcionesConfirmadas }, { data: torneo }, pairCount] =
+      await Promise.all([
+        supabaseAdmin
+          .from("inscripciones")
+          .select("id", { count: "exact", head: true })
+          .eq("torneo_id", req.params.id)
+          .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO),
+        supabaseAdmin
+          .from("torneos")
+          .select("formato")
+          .eq("id", req.params.id)
+          .maybeSingle(),
+        resolveFapPlantillaPairCount(req.params.id),
+      ]);
 
     if (esEliminatoriaDirecta(torneo?.formato)) {
       return res.status(200).json({
@@ -859,6 +863,7 @@ export const getLlaveMatriz = async (
 
     return res.status(200).json({
       pairCount,
+      inscripcionesConfirmadas: inscripcionesConfirmadas || 0,
       matches: matches || [],
       supported: Boolean(matches),
     });

@@ -108,12 +108,11 @@ async function destinoDeAvance(
   partido: PartidoEditable,
   mismaRonda: PartidoEditable[],
 ): Promise<{ id: string; lado: LadoLlave } | null> {
-  const { count } = await supabaseAdmin
-    .from("inscripciones")
-    .select("id", { count: "exact", head: true })
-    .eq("torneo_id", torneoId)
-    .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
-  const matrix = getFapBracketForPairCount(count ?? 0);
+  const { resolveFapPlantillaPairCount } = await import(
+    "../utils/fapPlantillaTorneo"
+  );
+  const pairCount = await resolveFapPlantillaPairCount(torneoId);
+  const matrix = getFapBracketForPairCount(pairCount);
   const porMatriz = ladoEnMatriz(matrix, partido.orden);
   if (porMatriz) {
     const { data } = await supabaseAdmin

@@ -2342,16 +2342,16 @@ export class TorneoService {
       > = null;
 
       if (usaMatrizFap) {
-        const { count: pairCount } = await supabaseAdmin
-          .from("inscripciones")
-          .select("id", { count: "exact", head: true })
-          .eq("torneo_id", partido.torneo_id)
-          .eq("estado_pago", "Confirmado");
-
+        const { resolveFapPlantillaPairCount } = await import(
+          "../utils/fapPlantillaTorneo"
+        );
         const { getFapBracketForPairCount } = await import(
           "../utils/fapBracketMatrices"
         );
-        matrix = getFapBracketForPairCount(pairCount ?? 0);
+        const pairCount = await resolveFapPlantillaPairCount(
+          partido.torneo_id,
+        );
+        matrix = getFapBracketForPairCount(pairCount);
         fapMatch = matrix?.find((m) => m.matchNo === partido.orden) ?? undefined;
       }
 
