@@ -38,4 +38,25 @@ describe("TOR-2 eliminatoria directa — UI y generación", () => {
     assert.match(editor, /!isEliminatoriaDirecta \? \(/);
     assert.match(editor, /esEliminatoriaDirecta\(torneo\?\.formato\)/);
   });
+
+  it("getLlaveMatriz no devuelve matriz FAP en eliminatoria directa", () => {
+    const ctrl = fuente("apps/api/src/controllers/torneo.controller.ts");
+    assert.match(ctrl, /esEliminatoriaDirecta\(torneo\?\.formato\)/);
+    assert.match(ctrl, /eliminatoriaDirecta:\s*true/);
+  });
+
+  it("BracketEditor: 8 parejas sin byes (no usa matriz zonas)", () => {
+    const editor = fuente("apps/web/components/torneos/BracketEditor.tsx");
+    assert.match(
+      editor,
+      /const usaPlantillaFap = !isEliminatoriaDirecta/,
+      "No debe contar byes con plantilla FAP de zonas",
+    );
+    assert.match(editor, /Eliminatoria directa · sin byes/);
+  });
+
+  it("feeders eliminatoria directa: semis dependen de cuartos por orden", () => {
+    const src = fuente("apps/api/src/utils/programacionPartidos.ts");
+    assert.match(src, /buildFeedersEliminatoriaDirecta/);
+  });
 });

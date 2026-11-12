@@ -4,6 +4,7 @@ import { NotificacionService } from "./notificacion.service";
 import { CompetenciaService } from "./competencia.service";
 import { ChatService } from "./chat.service";
 import { FAP_ESTADOS_PAGO } from "../constants/fap";
+import { esEliminatoriaDirecta } from "../utils/formatoTorneo";
 import { getFapBracketForPairCount } from "../utils/fapBracketMatrices";
 import type { FiscalSesion } from "./fiscal-sesion.service";
 import { filtrarIncidenciasVisiblesPorFiscal } from "../utils/fiscalIncidenciasVisibilidad";
@@ -197,13 +198,30 @@ export class FiscalPanelService {
   }
 
   static async obtenerLlaveMatriz(torneoId: string) {
-    const { count } = await supabaseAdmin
-      .from("inscripciones")
-      .select("id", { count: "exact", head: true })
-      .eq("torneo_id", torneoId)
-      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
+    const [{ count }, { data: torneo }] = await Promise.all([
+      supabaseAdmin
+        .from("inscripciones")
+        .select("id", { count: "exact", head: true })
+        .eq("torneo_id", torneoId)
+        .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO),
+      supabaseAdmin
+        .from("torneos")
+        .select("formato")
+        .eq("id", torneoId)
+        .maybeSingle(),
+    ]);
 
     const pairCount = count || 0;
+
+    if (esEliminatoriaDirecta(torneo?.formato)) {
+      return {
+        pairCount,
+        matches: [],
+        supported: false,
+        eliminatoriaDirecta: true,
+      };
+    }
+
     const matches = getFapBracketForPairCount(pairCount);
 
     return {

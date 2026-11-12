@@ -18,6 +18,7 @@ import {
   sumarPuntosPorProvincia,
 } from "../utils/puntosProvincia";
 import { esTorneoDePrueba, esVisibleEnSitioPublico } from "../utils/datoPrueba";
+import { esEmailPlaceholderPlanilla } from "../utils/inscripcionPlanilla";
 import {
   mapaSiglaAsociacionProvincia,
   provinciaParaRanking,
@@ -60,7 +61,8 @@ export class RankingService {
    * Obtiene la billetera de ranking de un jugador específico junto con su historial deportivo
    */
   static async obtenerRankingPorUsuario(usuarioId: string) {
-    const [rankingsResult, historialResult] = await Promise.all([
+    const [rankingsResult, historialResult, perfilEmailResult] =
+      await Promise.all([
       supabaseAdmin
         .from("rankings")
         .select(
@@ -85,7 +87,16 @@ export class RankingService {
         .select("torneo_id, puntos_nuevos, puntos_anteriores, created_at")
         .eq("usuario_id", usuarioId)
         .order("created_at", { ascending: false }),
+      supabaseAdmin
+        .from("perfiles")
+        .select("email")
+        .eq("id", usuarioId)
+        .maybeSingle(),
     ]);
+
+    const rankingProvisional = esEmailPlaceholderPlanilla(
+      perfilEmailResult.data?.email,
+    );
 
     if (rankingsResult.error) {
       console.error(
@@ -104,10 +115,44 @@ export class RankingService {
       );
     }
 
-    const historial = historialResult.data ?? [];
+    let historial = historialResult.data ?? [];
+    const torneoIds = [
+      ...new Set(
+        historial
+          .map((h) => h.torneo_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const torneosPorId = new Map<
+      string,
+      { nombre: string | null; nivel: string | null; alcance: string | null }
+    >();
+    if (torneoIds.length > 0) {
+      const { data: torneosHist } = await supabaseAdmin
+        .from("torneos")
+        .select("id, nombre, nivel, alcance")
+        .in("id", torneoIds);
+      for (const t of torneosHist || []) {
+        torneosPorId.set(String(t.id), {
+          nombre: t.nombre ?? null,
+          nivel: t.nivel ?? null,
+          alcance: t.alcance ?? null,
+        });
+      }
+    }
+    historial = historial.map((h) => {
+      const t = h.torneo_id ? torneosPorId.get(String(h.torneo_id)) : undefined;
+      return {
+        ...h,
+        torneo_nombre: t?.nombre ?? null,
+        torneo_nivel: t?.nivel ?? null,
+        torneo_alcance: t?.alcance ?? null,
+      };
+    });
 
     return (rankingsResult.data ?? []).map((row) => ({
       ...row,
+      ranking_provisional: rankingProvisional,
       historial_ranking: historial,
     }));
   }
@@ -317,12 +362,17 @@ export class RankingService {
         clubInfo?.provincia,
       );
 
+      const emailPerfil = String(
+        (jugador.perfiles as { email?: string | null } | undefined)?.email || "",
+      );
+
       return {
         ...jugador,
         posicion_actual: index + 1,
         pj: jugador.pj || 0,
         pg: jugador.pg || 0,
         tendencia: jugador.tendencia || 0,
+        ranking_provisional: esEmailPlaceholderPlanilla(emailPerfil),
         perfiles: {
           ...perfilObj,
           clubes: clubInfo,

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   asignarHorariosAPartidos,
+  buildFeedersEliminatoriaDirecta,
   evaluateProgramacionIssues,
   generarSlotsDesdeSedesYVentana,
   parseFechaPartidoIsoPublic,
@@ -583,6 +584,72 @@ describe("programador paso 5", () => {
     // Con 120 min descanso: 09:30 + 120 min = 11:30.
     // El slot de las 11:00 es inválido (< 11:30). Debe ser a las 12:30 o posterior.
     assert.ok((inicioFinal || 0) >= 12 * 60 + 30);
+  });
+
+  it("TOR-2 — feeders eliminatoria directa (orden 1-4 cuartos alimentan semis)", () => {
+    const feeders = buildFeedersEliminatoriaDirecta([
+      { ronda: "CUARTOS", orden: 1 },
+      { ronda: "CUARTOS", orden: 2 },
+      { ronda: "CUARTOS", orden: 3 },
+      { ronda: "CUARTOS", orden: 4 },
+      { ronda: "SEMIS", orden: 5 },
+      { ronda: "SEMIS", orden: 6 },
+      { ronda: "FINAL", orden: 7 },
+    ]);
+    assert.deepEqual(feeders.get(5), [1, 2]);
+    assert.deepEqual(feeders.get(6), [3, 4]);
+    assert.deepEqual(feeders.get(7), [5, 6]);
+  });
+
+  it("TOR-2 — auto-asignar semis tras cuartos (orden llave, descanso 120)", () => {
+    const slots = generarSlotsDesdeSedesYVentana({
+      canchas: [
+        {
+          club_id: "c1",
+          cancha_id: "ca1",
+          fecha: "2026-11-09",
+          hora_inicio: "09:30:00",
+          hora_fin: "23:59:59",
+          clubes: { nombre: "Club QA" },
+          canchas: { nombre: "1" },
+        } as DisponibilidadTorneo,
+      ],
+      dias: ["2026-11-09"],
+      duracionMinutos: 90,
+    });
+
+    const cuartos: PartidoProgramable[] = [1, 2, 3, 4].map((orden) => ({
+      id: `c-${orden}`,
+      ronda: "CUARTOS",
+      orden,
+      estado_partido: "Programado",
+      ...(orden === 1
+        ? {
+            cancha_asignada: "Club QA — 1",
+            fecha_partido: "2026-11-09T09:30:00-03:00",
+          }
+        : {}),
+    }));
+    const semi: PartidoProgramable = {
+      id: "s1",
+      ronda: "SEMIS",
+      orden: 5,
+      estado_partido: "Programado",
+    };
+
+    const feeders = buildFeedersEliminatoriaDirecta([...cuartos, semi]);
+
+    asignarHorariosAPartidos([...cuartos, semi], slots, new Set(), {
+      duracionMinutos: 90,
+      descansoModo: "tras_fin_120",
+      feedersByMatchNo: feeders,
+      permitirSinEquipos: true,
+      limitarAIds: new Set(["s1"]),
+    });
+
+    const inicioSemi = parseFechaPartidoIsoPublic(String(semi.fecha_partido))
+      ?.startMin;
+    assert.ok((inicioSemi ?? 0) >= 13 * 60);
   });
 
   it("TOR-17/4 — lote en llave respeta feeders (semis tras cuartos con descanso 120)", () => {

@@ -721,17 +721,35 @@ export const getLlaveMatriz = async (
 ): Promise<Response> => {
   try {
     const { FAP_ESTADOS_PAGO } = await import("../constants/fap");
+    const { esEliminatoriaDirecta } = await import("../utils/formatoTorneo");
     const { getFapBracketForPairCount } = await import(
       "../utils/fapBracketMatrices"
     );
 
-    const { count } = await supabaseAdmin
-      .from("inscripciones")
-      .select("id", { count: "exact", head: true })
-      .eq("torneo_id", req.params.id)
-      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
+    const [{ count }, { data: torneo }] = await Promise.all([
+      supabaseAdmin
+        .from("inscripciones")
+        .select("id", { count: "exact", head: true })
+        .eq("torneo_id", req.params.id)
+        .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO),
+      supabaseAdmin
+        .from("torneos")
+        .select("formato")
+        .eq("id", req.params.id)
+        .maybeSingle(),
+    ]);
 
     const pairCount = count || 0;
+
+    if (esEliminatoriaDirecta(torneo?.formato)) {
+      return res.status(200).json({
+        pairCount,
+        matches: [],
+        supported: false,
+        eliminatoriaDirecta: true,
+      });
+    }
+
     const matches = getFapBracketForPairCount(pairCount);
 
     return res.status(200).json({

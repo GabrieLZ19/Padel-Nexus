@@ -1,6 +1,10 @@
 import { randomInt } from "crypto";
 import { supabaseAdmin } from "../config/supabase";
 import { esRolAdministrativo } from "../constants/roles";
+import {
+  fiscalHabilitadoParaTorneo,
+  mensajeFiscalInhabilParaTorneo,
+} from "../utils/fiscalAlcance";
 
 export interface FiscalPayload {
   nombre: string;
@@ -491,9 +495,16 @@ export class FiscalService {
 
     const colegioId = await this.resolverColegioDeTorneo(torneoId);
 
+    const { data: torneo, error: errTorneo } = await supabaseAdmin
+      .from("torneos")
+      .select("alcance")
+      .eq("id", torneoId)
+      .maybeSingle();
+    if (errTorneo) throw new Error(errTorneo.message);
+
     const { data: fiscales, error: errF } = await supabaseAdmin
       .from("fiscales")
-      .select("id, dni, asociacion_id")
+      .select("id, dni, asociacion_id, rango, nombre, apellido, activo")
       .eq("asociacion_id", colegioId)
       .or(
         `id.in.(${items.map((i) => `"${i}"`).join(",")}),dni.in.(${items.map((i) => `"${i}"`).join(",")})`,
@@ -504,6 +515,19 @@ export class FiscalService {
       throw new Error(
         "No se encontraron fiscales del colegio de esta entidad con los parámetros provistos.",
       );
+    }
+
+    for (const f of fiscales) {
+      if (f.activo === false) {
+        throw new Error(
+          `El fiscal ${f.apellido || ""}, ${f.nombre || ""} está inactivo en el colegio.`,
+        );
+      }
+      if (!fiscalHabilitadoParaTorneo(torneo?.alcance, f.rango)) {
+        throw new Error(
+          mensajeFiscalInhabilParaTorneo(torneo?.alcance, f.rango),
+        );
+      }
     }
 
     await supabaseAdmin.from("torneo_fiscales").delete().eq("torneo_id", torneoId);

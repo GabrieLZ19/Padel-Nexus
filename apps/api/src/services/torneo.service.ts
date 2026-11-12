@@ -1457,12 +1457,14 @@ export class TorneoService {
           lugar_residencia,
           avatar_url,
           pendiente_activacion,
+          email,
           clubes:clubes!perfiles_club_id_fkey (nombre)
         ),
         perfiles_jugador2:perfiles!fk_inscripciones_usuario2 (
           lugar_residencia,
           avatar_url,
           pendiente_activacion,
+          email,
           clubes:clubes!perfiles_club_id_fkey (nombre)
         )
       `,
@@ -2147,7 +2149,7 @@ export class TorneoService {
     const { data: torneoInfo } = await supabaseAdmin
       .from("torneos")
       .select(
-        "nivel, categoria, modalidad, configuracion_puntos, alcance, clubes!club_id ( provincia )",
+        "nivel, categoria, modalidad, formato, configuracion_puntos, alcance, clubes!club_id ( provincia )",
       )
       .eq("id", partido.torneo_id)
       .single();
@@ -2183,6 +2185,7 @@ export class TorneoService {
             .select("id, puntos, pj, pg")
             .eq("usuario_id", uid)
             .eq("categoria", torneoInfo.nivel)
+            .eq("alcance", alcanceRanking)
             .maybeSingle();
 
           const pAnt = rank?.puntos || 0;
@@ -2328,18 +2331,23 @@ export class TorneoService {
         console.warn("Error al emitir eventos de torneo finalizado:", e);
       }
     } else {
-      // Avance FAP por matchNo (orden) si existe matriz; si no, índice legacy.
-      const { count: pairCount } = await supabaseAdmin
-        .from("inscripciones")
-        .select("id", { count: "exact", head: true })
-        .eq("torneo_id", partido.torneo_id)
-        .eq("estado_pago", "Confirmado");
+      // Avance FAP por matchNo (orden) si existe matriz zonas+llaves; eliminatoria directa usa árbol por ronda.
+      const usaMatrizFap = !esEliminatoriaDirecta(torneoInfo?.formato);
+      let fapMatch: { matchNo: number; winnerTo: number | null } | undefined;
 
-      const { getFapBracketForPairCount } = await import(
-        "../utils/fapBracketMatrices"
-      );
-      const matrix = getFapBracketForPairCount(pairCount ?? 0);
-      const fapMatch = matrix?.find((m) => m.matchNo === partido.orden);
+      if (usaMatrizFap) {
+        const { count: pairCount } = await supabaseAdmin
+          .from("inscripciones")
+          .select("id", { count: "exact", head: true })
+          .eq("torneo_id", partido.torneo_id)
+          .eq("estado_pago", "Confirmado");
+
+        const { getFapBracketForPairCount } = await import(
+          "../utils/fapBracketMatrices"
+        );
+        const matrix = getFapBracketForPairCount(pairCount ?? 0);
+        fapMatch = matrix?.find((m) => m.matchNo === partido.orden);
+      }
 
       if (fapMatch?.winnerTo != null) {
         const { data: destino } = await supabaseAdmin

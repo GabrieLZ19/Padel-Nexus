@@ -37,6 +37,16 @@ describe("datos de prueba del sitio público", () => {
         apellido: "Carrasco",
         email: "preinscripto+22377823@padelnexus.local",
       }),
+      false,
+      "Planilla: cuenta técnica pero figura en ranking con puntos",
+    );
+    assert.equal(
+      esVisibleEnSitioPublico({
+        nombre: "José",
+        apellido: "Carrasco",
+        email: "preinscripto+22377823@padelnexus.local",
+        rol: "usuario",
+      }),
       true,
     );
     assert.equal(

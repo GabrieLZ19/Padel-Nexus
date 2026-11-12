@@ -782,6 +782,58 @@ export function buildFeedersByMatchNo(
   return map;
 }
 
+const RONDAS_LLAVE_DIRECTA = new Set([
+  "32AVOS",
+  "16AVOS",
+  "PRELIMINARES",
+  "OCTAVOS",
+  "CUARTOS",
+  "SEMIS",
+  "FINAL",
+  "LLAVE",
+]);
+
+/**
+ * Feeders por `orden` de partido para eliminatoria directa (árbol clásico).
+ * No usa matchNo FAP de zonas+llaves (p. ej. 58→61).
+ */
+export function buildFeedersEliminatoriaDirecta(
+  partidos: ReadonlyArray<Pick<PartidoProgramable, "ronda" | "orden">>,
+): Map<number, number[]> {
+  const porRonda = new Map<string, PartidoProgramable[]>();
+  for (const p of partidos) {
+    const ronda = String(p.ronda || "").toUpperCase().trim();
+    if (!RONDAS_LLAVE_DIRECTA.has(ronda)) continue;
+    const list = porRonda.get(ronda) || [];
+    list.push({ ronda, orden: p.orden });
+    porRonda.set(ronda, list);
+  }
+  for (const list of porRonda.values()) {
+    list.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+  }
+
+  const rondasOrdenadas = [...porRonda.keys()].sort(
+    (a, b) => ordenRondaProgramador(a) - ordenRondaProgramador(b),
+  );
+
+  const map = new Map<number, number[]>();
+  for (let i = 1; i < rondasOrdenadas.length; i++) {
+    const prev = porRonda.get(rondasOrdenadas[i - 1]) || [];
+    const next = porRonda.get(rondasOrdenadas[i]) || [];
+    for (let j = 0; j < next.length; j++) {
+      const destOrden = Number(next[j].orden);
+      if (!Number.isFinite(destOrden) || destOrden <= 0) continue;
+      const feeders: number[] = [];
+      const f1 = prev[j * 2];
+      const f2 = prev[j * 2 + 1];
+      if (f1?.orden != null) feeders.push(Number(f1.orden));
+      if (f2?.orden != null) feeders.push(Number(f2.orden));
+      if (feeders.length > 0) map.set(destOrden, feeders);
+    }
+  }
+  return map;
+}
+
 function notBeforeDesdeFeeders(
   partido: PartidoProgramable,
   todos: PartidoProgramable[],
@@ -1316,15 +1368,27 @@ export async function programarPartidosLlavePendientes(
 
   if (!partidos?.length) return 0;
 
-  const { count: pairCount } = await supabaseAdmin
-    .from("inscripciones")
-    .select("id", { count: "exact", head: true })
-    .eq("torneo_id", torneoId)
-    .eq("estado_pago", "Confirmado");
+  const { data: torneo } = await supabaseAdmin
+    .from("torneos")
+    .select("formato")
+    .eq("id", torneoId)
+    .maybeSingle();
 
-  const { getFapBracketForPairCount } = await import("./fapBracketMatrices");
-  const matrix = getFapBracketForPairCount(pairCount ?? 0) || [];
-  const feedersByMatchNo = buildFeedersByMatchNo(matrix);
+  const { esEliminatoriaDirecta } = await import("./formatoTorneo");
+  let feedersByMatchNo: Map<number, number[]>;
+  if (esEliminatoriaDirecta(torneo?.formato)) {
+    feedersByMatchNo = buildFeedersEliminatoriaDirecta(partidos);
+  } else {
+    const { count: pairCount } = await supabaseAdmin
+      .from("inscripciones")
+      .select("id", { count: "exact", head: true })
+      .eq("torneo_id", torneoId)
+      .eq("estado_pago", "Confirmado");
+
+    const { getFapBracketForPairCount } = await import("./fapBracketMatrices");
+    const matrix = getFapBracketForPairCount(pairCount ?? 0) || [];
+    feedersByMatchNo = buildFeedersByMatchNo(matrix);
+  }
 
   const { duracionMinutos: configurada } =
     await cargarContextoProgramacion(torneoId);

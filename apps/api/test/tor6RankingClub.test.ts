@@ -54,4 +54,12 @@ describe("TOR-6 puntos de torneo club en ranking local", () => {
     const rankings = fuente("apps/web/app/dashboard/rankings/page.tsx");
     assert.match(rankings, /rol === "admin_club"[\s\S]*?return "Local"/);
   });
+
+  it("jugadores de planilla entran al ranking público (no son datos de prueba)", () => {
+    const dato = fuente("apps/api/src/utils/datoPrueba.ts");
+    assert.match(dato, /esEmailPlaceholderPlanilla/);
+    const ranking = fuente("apps/api/src/services/ranking.service.ts");
+    assert.match(ranking, /ranking_provisional/);
+    assert.match(ranking, /torneo_nombre/);
+  });
 });

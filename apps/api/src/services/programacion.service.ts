@@ -1,11 +1,13 @@
 import { supabaseAdmin } from "../config/supabase";
 import { estadoAlPublicarProgramacion } from "../utils/estadoCompetencia";
 import { SocketService } from "./socket.service";
+import { esEliminatoriaDirecta } from "../utils/formatoTorneo";
 import { getFapBracketForPairCount } from "../utils/fapBracketMatrices";
 import {
   asignarHorariosAPartidos,
   buildCanchaLabel,
   buildFeedersByMatchNo,
+  buildFeedersEliminatoriaDirecta,
   buildOcupadosDesdePartidos,
   cargarContextoProgramacion,
   duracionParaFase,
@@ -123,7 +125,7 @@ export class ProgramacionService {
     const [{ data: torneo }, { data: partidosDb }, contexto] = await Promise.all([
       supabaseAdmin
         .from("torneos")
-        .select("id, programacion_estado")
+        .select("id, programacion_estado, formato")
         .eq("id", torneoId)
         .maybeSingle(),
       supabaseAdmin
@@ -206,8 +208,11 @@ export class ProgramacionService {
     // Programamos llave (permitirSinEquipos + feeders).
     if (llaveDrafts.length) {
       const pairCount = await this.contarParejasConfirmadas(torneoId);
-      const matrix = getFapBracketForPairCount(pairCount) || [];
-      const feedersByMatchNo = buildFeedersByMatchNo(matrix);
+      const feedersByMatchNo = esEliminatoriaDirecta(torneo.formato)
+        ? buildFeedersEliminatoriaDirecta(
+            llaveDrafts.map((d) => ({ ronda: d.ronda, orden: d.orden })),
+          )
+        : buildFeedersByMatchNo(getFapBracketForPairCount(pairCount) || []);
 
       const dur = duracionParaFase(contexto.duracionMinutos, "llave");
       const slots = slotsDesdeContexto(contexto, dur);
@@ -453,6 +458,22 @@ export class ProgramacionService {
     torneoId: string,
     pairCount?: number,
   ): Promise<Map<number, number[]>> {
+    const [{ data: torneo }, { data: partidosDb }] = await Promise.all([
+      supabaseAdmin
+        .from("torneos")
+        .select("formato")
+        .eq("id", torneoId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("partidos")
+        .select("ronda, orden")
+        .eq("torneo_id", torneoId),
+    ]);
+
+    if (esEliminatoriaDirecta(torneo?.formato)) {
+      return buildFeedersEliminatoriaDirecta(partidosDb || []);
+    }
+
     const totalPairs =
       pairCount !== undefined
         ? pairCount
