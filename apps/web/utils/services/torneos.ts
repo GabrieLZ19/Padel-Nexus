@@ -142,8 +142,16 @@ export const TorneosService = {
     return response.data;
   },
 
-  async getPartidos(torneoId: string): Promise<Partido[]> {
-    const response = await api.get<Partido[]>(`/torneos/${torneoId}/partidos`);
+  async getPartidos(
+    torneoId: string,
+    options?: { sincronizar?: boolean },
+  ): Promise<Partido[]> {
+    const params: Record<string, string> = {};
+    if (options?.sincronizar === true) params.sincronizar = "1";
+    if (options?.sincronizar === false) params.sincronizar = "0";
+    const response = await api.get<Partido[]>(`/torneos/${torneoId}/partidos`, {
+      params: Object.keys(params).length ? params : undefined,
+    });
     return response.data;
   },
 

@@ -56,7 +56,8 @@ export default function TorneoDetallePage() {
     [],
   );
   const [fapPairCount, setFapPairCount] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingTorneo, setLoadingTorneo] = useState(true);
+  const [loadingFixture, setLoadingFixture] = useState(true);
   const [isInscripcionOpen, setIsInscripcionModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -69,15 +70,26 @@ export default function TorneoDetallePage() {
   useEffect(() => {
     let isMounted = true;
 
+    setLoadingFixture(true);
+    TorneosService.getById(torneoId)
+      .then((torneoData) => {
+        if (isMounted) {
+          setTorneo(torneoData);
+          setLoadingTorneo(false);
+        }
+      })
+      .catch((error) => {
+        console.error("Error al cargar el torneo:", error);
+        if (isMounted) setLoadingTorneo(false);
+      });
+
     Promise.all([
-      TorneosService.getById(torneoId),
-      TorneosService.getPartidos(torneoId),
+      TorneosService.getPartidos(torneoId, { sincronizar: false }),
       TorneosService.getZonas(torneoId).catch(() => []),
       TorneosService.getLlaveMatriz(torneoId).catch(() => null),
     ])
-      .then(([torneoData, partidosData, zonasData, matrizData]) => {
+      .then(([partidosData, zonasData, matrizData]) => {
         if (isMounted) {
-          setTorneo(torneoData);
           setPartidos(partidosData || []);
           setZonas(zonasData || []);
           if (matrizData?.supported && matrizData.matches?.length) {
@@ -87,12 +99,13 @@ export default function TorneoDetallePage() {
             setFapMatrixMatches([]);
             setFapPairCount(null);
           }
-          setLoading(false);
         }
       })
       .catch((error) => {
-        console.error("Error al cargar la data:", error);
-        if (isMounted) setLoading(false);
+        console.error("Error al cargar fixture del torneo:", error);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingFixture(false);
       });
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -100,7 +113,7 @@ export default function TorneoDetallePage() {
     const debouncedRefreshPartidos = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        TorneosService.getPartidos(torneoId).then(
+        TorneosService.getPartidos(torneoId, { sincronizar: false }).then(
           (p) => isMounted && setPartidos(p || []),
         );
         TorneosService.getZonas(torneoId)
@@ -189,13 +202,12 @@ export default function TorneoDetallePage() {
     setIsInscripcionModalOpen(true);
   };
 
-  if (loading) {
+  if (loadingTorneo) {
     return (
       <div className="min-h-screen bg-brand-black text-brand-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-8 animate-pulse space-y-6">
           <div className="h-4 w-28 bg-white/5 rounded" />
           <div className="h-40 bg-brand-card rounded-2xl" />
-          <div className="h-96 bg-brand-card rounded-2xl" />
         </div>
       </div>
     );
@@ -396,6 +408,15 @@ export default function TorneoDetallePage() {
                   </div>
                 </div>
               </section>
+            ) : loadingFixture ? (
+              <div className="rounded-2xl border border-white/8 bg-[#0f0f0f] p-6 animate-pulse space-y-4">
+                <div className="h-5 w-36 bg-white/5 rounded" />
+                <div className="h-44 bg-white/[0.03] rounded-xl" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="h-28 bg-white/[0.03] rounded-xl" />
+                  <div className="h-28 bg-white/[0.03] rounded-xl" />
+                </div>
+              </div>
             ) : (
               <>
                 {showZonasTab ? (
