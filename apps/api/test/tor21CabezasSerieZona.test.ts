@@ -49,5 +49,11 @@ describe("TOR-21 cabezas de serie por zona", () => {
     );
     assert.match(svc, /es_cabeza_serie/);
     assert.match(svc, /resoluciones_cabezas_serie/);
+    assert.match(svc, /resumenAuditoria/);
+    assert.match(svc, /resumen: resumenAuditoria/);
+    assert.doesNotMatch(
+      svc.slice(svc.indexOf("static async guardarZonas")),
+      /reglamento FAP/,
+    );
   });
 });

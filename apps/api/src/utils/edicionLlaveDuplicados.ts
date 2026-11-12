@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../config/supabase";
 import {
   limpiarSlot,
+  reemplazarParejaEnLado,
   type LadoLlave,
   type PartidoEditable,
 } from "./edicionLlaveMenores";
@@ -68,13 +69,15 @@ export async function liberarParejasDuplicadasEnLlave(
   nextA: string | null,
   nextB: string | null,
 ): Promise<string[]> {
-  const mover = new Set<string>();
-  for (const id of [nextA, nextB]) {
-    if (!id) continue;
-    if (id === prevA || id === prevB) continue;
-    mover.add(id);
-  }
-  if (mover.size === 0) return [];
+  const cambios: { prev: string | null; next: string | null }[] = [
+    { prev: prevA, next: nextA },
+    { prev: prevB, next: nextB },
+  ];
+
+  const hayTraslado = cambios.some(
+    (c) => c.next && c.next !== c.prev,
+  );
+  if (!hayTraslado) return [];
 
   const { data: matches, error } = await supabaseAdmin
     .from("partidos")
@@ -86,12 +89,70 @@ export async function liberarParejasDuplicadasEnLlave(
 
   if (error) throw new Error(error.message);
 
-  const liberados: string[] = [];
+  const filas = (matches || []) as FilaPartidoLlave[];
+  const afectados: string[] = [];
+  const intercambiados = new Set<string>();
 
-  for (const inscripcionId of mover) {
-    for (const fila of (matches || []) as FilaPartidoLlave[]) {
+  const persistirParche = async (
+    filaId: string,
+    parche: ReturnType<typeof limpiarSlot>,
+  ) => {
+    const { error: updErr } = await supabaseAdmin
+      .from("partidos")
+      .update({
+        equipo_a_id: parche.equipoAId,
+        equipo_b_id: parche.equipoBId,
+        ganador: parche.ganador,
+        set1_a: parche.set1A,
+        set1_b: parche.set1B,
+        estado_partido: parche.estado,
+      })
+      .eq("id", filaId);
+    if (updErr) throw new Error(updErr.message);
+    afectados.push(filaId);
+  };
+
+  for (const { prev, next } of cambios) {
+    if (!next || next === prev) continue;
+    if (intercambiados.has(next)) continue;
+
+    let origen: FilaPartidoLlave | undefined;
+    let ladoOrigen: LadoLlave | null = null;
+    for (const fila of filas) {
       if (fila.id === partidoId) continue;
-      const lado = ladoDePareja(fila, inscripcionId);
+      const lado = ladoDePareja(fila, next);
+      if (lado) {
+        origen = fila;
+        ladoOrigen = lado;
+        break;
+      }
+    }
+
+    if (origen && ladoOrigen && prev) {
+      try {
+        const parche = reemplazarParejaEnLado(
+          aPartidoEditable(origen),
+          ladoOrigen,
+          prev,
+        );
+        await persistirParche(origen.id, parche);
+        intercambiados.add(next);
+        continue;
+      } catch (e) {
+        const msg =
+          e instanceof Error
+            ? e.message
+            : "La pareja ya jugó un partido de la llave.";
+        throw new LlaveConflictoError(msg);
+      }
+    }
+
+    for (const fila of filas) {
+      if (fila.id === partidoId) continue;
+      if (origen && fila.id === origen.id && intercambiados.has(next)) {
+        continue;
+      }
+      const lado = ladoDePareja(fila, next);
       if (!lado) continue;
 
       let parche;
@@ -105,22 +166,9 @@ export async function liberarParejasDuplicadasEnLlave(
         throw new LlaveConflictoError(msg);
       }
 
-      const { error: updErr } = await supabaseAdmin
-        .from("partidos")
-        .update({
-          equipo_a_id: parche.equipoAId,
-          equipo_b_id: parche.equipoBId,
-          ganador: parche.ganador,
-          set1_a: parche.set1A,
-          set1_b: parche.set1B,
-          estado_partido: parche.estado,
-        })
-        .eq("id", fila.id);
-
-      if (updErr) throw new Error(updErr.message);
-      liberados.push(fila.id);
+      await persistirParche(fila.id, parche);
     }
   }
 
-  return liberados;
+  return [...new Set(afectados)];
 }

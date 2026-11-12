@@ -866,84 +866,108 @@ export class CompetenciaService {
       cabeza_inscripcion_id: string;
     }[],
   ) {
+    const { data: inscripciones, error: errInsc } = await supabaseAdmin
+      .from("inscripciones")
+      .select(`
+        id,
+        usuario_id,
+        usuario2_id,
+        jugador1_nombre,
+        jugador2_nombre
+      `)
+      .eq("torneo_id", torneoId)
+      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
+
+    if (errInsc || !inscripciones?.length) {
+      throw new Error(
+        "No hay inscripciones confirmadas para guardar la distribución de zonas.",
+      );
+    }
+
+    const parejasConPuntos = await Promise.all(
+      inscripciones.map(async (ins) => {
+        const ids = ins.usuario2_id
+          ? [ins.usuario_id, ins.usuario2_id]
+          : [ins.usuario_id];
+
+        const { data: rankings } = await supabaseAdmin
+          .from("rankings")
+          .select("puntos")
+          .in("usuario_id", ids);
+
+        const puntosTotales =
+          rankings?.reduce((acc, curr) => acc + (curr.puntos || 0), 0) || 0;
+
+        const cleanJ1 = ins.jugador1_nombre ? ins.jugador1_nombre.trim() : "";
+        const cleanJ2 = ins.jugador2_nombre ? ins.jugador2_nombre.trim() : "";
+        const nombre =
+          cleanJ1 && cleanJ2
+            ? `${cleanJ1} / ${cleanJ2}`
+            : cleanJ1 || "Pareja sin nombre";
+
+        return { id: ins.id, puntosTotales, nombre };
+      }),
+    );
+
+    const nombresPorId = new Map(
+      parejasConPuntos.map((p) => [p.id, p.nombre]),
+    );
+    const puntosPorId = new Map(
+      parejasConPuntos.map((p) => [p.id, p.puntosTotales]),
+    );
+
+    let cabezaFlags = new Map<string, boolean>();
+
     if (validarCabezasSerie) {
-      // 0. OBTENER INSCRIPCIONES CONFIRMADAS
-      const { data: inscripciones, error: errInsc } = await supabaseAdmin
-        .from("inscripciones")
-        .select(`
-          id, 
-          usuario_id, 
-          usuario2_id,
-          jugador1_nombre,
-          jugador2_nombre
-        `)
-        .eq("torneo_id", torneoId)
-        .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
-
-      if (errInsc || !inscripciones || inscripciones.length === 0) {
-        throw new Error("No hay inscripciones confirmadas para validar las cabezas de serie.");
+      const cabezasGlobales = idsCabezasGlobalesPorRanking(
+        parejasConPuntos,
+        zonas.length,
+      );
+      const persistidas = new Map<string, boolean>();
+      for (const z of zonas) {
+        for (const p of z.parejas) {
+          if (p.es_cabeza_serie) persistidas.set(p.id, true);
+        }
       }
-
-      // Calcular puntos de cada pareja
-      const parejasConPuntos = await Promise.all(
-        inscripciones.map(async (ins) => {
-          const ids = ins.usuario2_id
-            ? [ins.usuario_id, ins.usuario2_id]
-            : [ins.usuario_id];
-
-          const { data: rankings } = await supabaseAdmin
-            .from("rankings")
-            .select("puntos")
-            .in("usuario_id", ids);
-
-          const puntosTotales =
-            rankings?.reduce((acc, curr) => acc + (curr.puntos || 0), 0) || 0;
-
-          const cleanJ1 = ins.jugador1_nombre ? ins.jugador1_nombre.trim() : "";
-          const cleanJ2 = ins.jugador2_nombre ? ins.jugador2_nombre.trim() : "";
-          const nombre = cleanJ1 && cleanJ2 ? `${cleanJ1} / ${cleanJ2}` : cleanJ1 || "Pareja sin nombre";
-
-          return { id: ins.id, puntosTotales, nombre };
-        }),
+      const preferidas = new Map(
+        (resolucionesCabezasSerie ?? []).map((r) => [
+          r.grupo_id,
+          r.cabeza_inscripcion_id,
+        ]),
+      );
+      cabezaFlags = marcarCabezasUnicasEnZonas(
+        zonas,
+        cabezasGlobales,
+        puntosPorId,
+        persistidas,
+        preferidas,
       );
 
-      // Ordenar de mayor a menor puntos
-      parejasConPuntos.sort((a, b) => b.puntosTotales - a.puntosTotales);
-
-      // El número de zonas es K
-      const K = zonas.length;
-      // Las top K parejas son las cabezas de serie
-      const cabezasDeSerieIds = new Set(parejasConPuntos.slice(0, K).map((p) => p.id));
-
-      // Verificar que ninguna zona tenga más de una cabeza de serie
       for (const z of zonas) {
-        const cabezasEnZona = z.parejas.filter((p) => cabezasDeSerieIds.has(p.id));
+        const cabezasEnZona = z.parejas.filter((p) => cabezasGlobales.has(p.id));
         if (cabezasEnZona.length > 1) {
           const nombresCabezas = cabezasEnZona
-            .map((c) => {
-              const found = parejasConPuntos.find((p) => p.id === c.id);
-              return found ? found.nombre : "Pareja";
-            })
+            .map((c) => nombresPorId.get(c.id) || "Pareja")
             .join(" y ");
           throw new Error(
-            `La ${z.nombre} tiene más de una pareja cabeza de serie (${nombresCabezas}) según el ranking. Por favor, sepárelas conforme al reglamento FAP.`
+            `La ${z.nombre} no puede tener a la vez a ${nombresCabezas} (parejas del top del ranking). Sepáralas en zonas distintas o desactivá la validación.`,
+          );
+        }
+      }
+    } else {
+      for (const z of zonas) {
+        const marcadas = z.parejas.filter((p) => p.es_cabeza_serie);
+        if (marcadas.length > 1) {
+          throw new Error(
+            `La ${z.nombre} no puede tener más de una cabeza de serie designada.`,
           );
         }
       }
     }
 
-    for (const z of zonas) {
-      const marcadas = z.parejas.filter((p) => p.es_cabeza_serie);
-      if (marcadas.length > 1) {
-        throw new Error(
-          `La ${z.nombre} no puede tener más de una cabeza de serie designada.`,
-        );
-      }
-    }
-
     const { data: gruposPrevios } = await supabaseAdmin
       .from("grupos")
-      .select("id, grupo_parejas(inscripcion_id)")
+      .select("id, nombre_grupo, grupo_parejas(inscripcion_id)")
       .eq("torneo_id", torneoId);
 
     const firmaParejas = (ids: string[]) => [...ids].sort().join("|");
@@ -955,6 +979,65 @@ export class CompetenciaService {
         ),
       ]),
     );
+
+    const zonaPorInscripcionAntes = new Map<string, string>();
+    for (const g of gruposPrevios || []) {
+      const nombreZona =
+        g.nombre_grupo ||
+        zonas.find((z) => z.id === g.id)?.nombre ||
+        "Zona";
+      for (const gp of g.grupo_parejas || []) {
+        zonaPorInscripcionAntes.set(String(gp.inscripcion_id), nombreZona);
+      }
+    }
+
+    const movimientos: string[] = [];
+    for (const z of zonas) {
+      for (const p of z.parejas) {
+        const antes = zonaPorInscripcionAntes.get(p.id);
+        if (antes && antes !== z.nombre) {
+          movimientos.push(
+            `${nombresPorId.get(p.id) || "Pareja"}: ${antes} → ${z.nombre}`,
+          );
+        }
+      }
+    }
+
+    const cabezasDetalle: string[] = [];
+    for (const z of zonas) {
+      const cabezaId = validarCabezasSerie
+        ? z.parejas.find((p) => cabezaFlags.get(p.id))?.id
+        : z.parejas.find((p) => p.es_cabeza_serie)?.id;
+      if (cabezaId) {
+        cabezasDetalle.push(
+          `${z.nombre}: ${nombresPorId.get(cabezaId) || "Pareja"}`,
+        );
+      }
+    }
+
+    const resolucionesTxt =
+      resolucionesCabezasSerie
+        ?.map((r) => {
+          const zona = zonas.find((z) => z.id === r.grupo_id);
+          const nombre = nombresPorId.get(r.cabeza_inscripcion_id);
+          if (!zona || !nombre) return null;
+          return `${zona.nombre} → ${nombre}`;
+        })
+        .filter((t): t is string => Boolean(t)) ?? [];
+
+    const resumenAuditoria = [
+      movimientos.length
+        ? `Movimientos: ${movimientos.join("; ")}`
+        : null,
+      cabezasDetalle.length
+        ? `Cabezas de serie: ${cabezasDetalle.join("; ")}`
+        : null,
+      resolucionesTxt.length
+        ? `Cabeza elegida en conflicto: ${resolucionesTxt.join("; ")}`
+        : null,
+    ]
+      .filter((t): t is string => Boolean(t))
+      .join(" · ") || "Distribución de zonas actualizada.";
 
     // 1. Guardar la nueva distribución de parejas para cada zona
     for (const z of zonas) {
@@ -973,7 +1056,9 @@ export class CompetenciaService {
         grupo_id: z.id,
         inscripcion_id: p.id,
         seed: idx + 1,
-        es_cabeza_serie: Boolean(p.es_cabeza_serie),
+        es_cabeza_serie: validarCabezasSerie
+          ? Boolean(cabezaFlags.get(p.id))
+          : Boolean(p.es_cabeza_serie),
       }));
 
       if (toInsert.length > 0) {
@@ -1011,18 +1096,27 @@ export class CompetenciaService {
       accion: "guardar_zonas_completo",
       entidad_afectada: torneoId,
       detalles: {
+        resumen: resumenAuditoria,
         zonas_actualizadas: zonas.map((z) => ({
           grupo_id: z.id,
           nombre: z.nombre,
           parejas: z.parejas.map((p) => p.id),
         })),
         motivo: motivo,
-        cabezas_serie_por_grupo: zonas.map((z) => ({
-          grupo_id: z.id,
-          nombre: z.nombre,
-          cabeza_inscripcion_id:
-            z.parejas.find((p) => p.es_cabeza_serie)?.id ?? null,
-        })),
+        movimientos_zonas: movimientos,
+        cabezas_serie_por_grupo: zonas.map((z) => {
+          const cabezaId = validarCabezasSerie
+            ? z.parejas.find((p) => cabezaFlags.get(p.id))?.id
+            : z.parejas.find((p) => p.es_cabeza_serie)?.id;
+          return {
+            grupo_id: z.id,
+            nombre: z.nombre,
+            cabeza_inscripcion_id: cabezaId ?? null,
+            cabeza_nombre: cabezaId
+              ? nombresPorId.get(cabezaId) ?? null
+              : null,
+          };
+        }),
         resoluciones_cabezas_serie: resolucionesCabezasSerie ?? [],
       },
     });

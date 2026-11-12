@@ -108,6 +108,22 @@ export function retiroConBye(
 }
 
 /** Quita a la pareja de un partido al que ya había avanzado, sin regalarle el bye al otro lado. */
+/** Reemplaza la pareja de un lado pendiente (sin borrar al rival). */
+export function reemplazarParejaEnLado(
+  partido: PartidoEditable,
+  lado: LadoLlave,
+  inscripcionId: string,
+): ParchePartido {
+  if (partidoConResultadoReal(partido)) {
+    throw new Error(
+      "La pareja ya jugó un partido de la llave. No se puede mover.",
+    );
+  }
+  const equipoAId = lado === "a" ? inscripcionId : partido.equipoAId;
+  const equipoBId = lado === "b" ? inscripcionId : partido.equipoBId;
+  return estadoTrasAsignar(partido, equipoAId, equipoBId);
+}
+
 export function limpiarSlot(
   partido: PartidoEditable,
   lado: LadoLlave,

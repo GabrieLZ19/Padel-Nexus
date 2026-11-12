@@ -3,7 +3,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { limpiarSlot, type PartidoEditable } from "../src/utils/edicionLlaveMenores.ts";
+import {
+  limpiarSlot,
+  reemplazarParejaEnLado,
+  type PartidoEditable,
+} from "../src/utils/edicionLlaveMenores.ts";
 import { LlaveConflictoError } from "../src/utils/edicionLlaveDuplicados.ts";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -31,6 +35,23 @@ describe("TOR-16 editar llave sin duplicar parejas", () => {
     assert.equal(parche.estado, "Programado");
   });
 
+  it("reemplazarParejaEnLado permite intercambio en slot pendiente", () => {
+    const partido: PartidoEditable = {
+      id: "m3",
+      ronda: "OCTAVOS",
+      orden: 2,
+      equipoAId: "pareja-rival",
+      equipoBId: "pareja-entrante",
+      ganador: null,
+      set1A: null,
+      set1B: null,
+    };
+    const parche = reemplazarParejaEnLado(partido, "b", "pareja-desplazada");
+    assert.equal(parche.equipoAId, "pareja-rival");
+    assert.equal(parche.equipoBId, "pareja-desplazada");
+    assert.equal(parche.estado, "Programado");
+  });
+
   it("limpiarSlot rechaza mover pareja con resultado", () => {
     const partido: PartidoEditable = {
       id: "m2",
@@ -52,6 +73,12 @@ describe("TOR-16 editar llave sin duplicar parejas", () => {
       svc.indexOf("static async gestionarParejaLlave"),
     );
     assert.match(bloque, /liberarParejasDuplicadasEnLlave/);
+  });
+
+  it("liberar duplicados intercambia parejas cuando hay desplazado", () => {
+    const fuente = fuenteApi("src/utils/edicionLlaveDuplicados.ts");
+    assert.match(fuente, /reemplazarParejaEnLado/);
+    assert.match(fuente, /intercambiados/);
   });
 
   it("controlador devuelve 409 ante conflicto de llave", () => {

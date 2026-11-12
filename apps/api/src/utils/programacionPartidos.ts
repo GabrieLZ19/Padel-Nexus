@@ -724,6 +724,11 @@ function buscarSlotIndividual(
   notBefore: { fecha: string; startMin: number }[] = [],
   descansoMinutos?: number,
   descansoModo?: ModoDescanso,
+  opcionesDependencia?: {
+    ordenPartido?: number;
+    todos?: PartidoProgramable[];
+    dependentsByMatchNo?: Map<number, number[]>;
+  },
 ): SlotProgramacion | null {
   for (const slot of slots) {
     const wall =
@@ -763,12 +768,48 @@ function buscarSlotIndividual(
     ) {
       continue;
     }
+    const orden = opcionesDependencia?.ordenPartido;
+    if (
+      orden != null &&
+      Number.isFinite(orden) &&
+      opcionesDependencia?.todos &&
+      opcionesDependencia.dependentsByMatchNo
+    ) {
+      if (
+        !slotRespetaDependientesProgramados(
+          orden,
+          wall.fecha,
+          startMin,
+          opcionesDependencia.todos,
+          opcionesDependencia.dependentsByMatchNo,
+          duracionMinutos,
+          descansoMinutos,
+          descansoModo,
+        )
+      ) {
+        continue;
+      }
+    }
     return slot;
   }
   return null;
 }
 
-/** Cruces que alimentan un matchNo (winnerTo → destino). */
+/** Inverso de feeders: fuente → destinos que dependen de su resultado. */
+export function buildDependentsByMatchNo(
+  feedersByMatchNo: Map<number, number[]>,
+): Map<number, number[]> {
+  const map = new Map<number, number[]>();
+  for (const [dest, sources] of feedersByMatchNo) {
+    for (const src of sources) {
+      const list = map.get(src) || [];
+      list.push(dest);
+      map.set(src, list);
+    }
+  }
+  return map;
+}
+
 export function buildFeedersByMatchNo(
   edges: ReadonlyArray<{ matchNo: number; winnerTo: number | null }>,
 ): Map<number, number[]> {
@@ -881,6 +922,79 @@ function notBeforeDesdeFeeders(
   return out;
 }
 
+function minInicioDespuesDePartido(
+  fecha: string,
+  startMin: number,
+  duracionMinutos: number,
+  descansoMinutos?: number,
+  descansoModo?: ModoDescanso,
+): { fecha: string; startMin: number } {
+  const descansoMin =
+    descansoModo === "entre_inicios_240"
+      ? 240
+      : (descansoMinutos ??
+        (descansoModo
+          ? minutosDeModoDescanso(descansoModo)
+          : FAP_DESCANSO_MINUTOS_TRAS_FIN));
+
+  let nextStart: number;
+  if (descansoModo === "entre_inicios_240") {
+    nextStart = startMin + 240;
+  } else {
+    nextStart = startMin + duracionMinutos + descansoMin;
+  }
+
+  let nextFecha = normalizarFecha(fecha);
+  if (nextStart >= 24 * 60) {
+    nextStart -= 24 * 60;
+    const [y, m, d] = nextFecha.split("-").map(Number);
+    const next = new Date(y, m - 1, d + 1);
+    nextFecha = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+  }
+  return { fecha: nextFecha, startMin: nextStart };
+}
+
+/** No ubicar un partido si algún cruce dependiente ya tiene horario incompatible. */
+function slotRespetaDependientesProgramados(
+  orden: number,
+  fecha: string,
+  startMin: number,
+  todos: PartidoProgramable[],
+  dependentsByMatchNo: Map<number, number[]>,
+  duracionMinutos: number,
+  descansoMinutos?: number,
+  descansoModo?: ModoDescanso,
+): boolean {
+  const dependents = dependentsByMatchNo.get(orden) || [];
+  if (!dependents.length) return true;
+
+  const minDestino = minInicioDespuesDePartido(
+    fecha,
+    startMin,
+    duracionMinutos,
+    descansoMinutos,
+    descansoModo,
+  );
+
+  for (const depOrden of dependents) {
+    const dep = todos.find(
+      (p) => Number(p.orden) === depOrden && p.fecha_partido && p.cancha_asignada,
+    );
+    if (!dep) continue;
+    const parsed = parseFechaPartidoIso(String(dep.fecha_partido));
+    if (!parsed) continue;
+
+    if (
+      parsed.fecha < minDestino.fecha ||
+      (parsed.fecha === minDestino.fecha &&
+        parsed.startMin < minDestino.startMin)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function seedHistorialDesdePartidos(
   partidos: PartidoProgramable[],
   historial: Map<string, PartidoParejaHistorial[]>,
@@ -985,11 +1099,30 @@ export function asignarHorariosAPartidos(
   const descansoMinutos = opciones?.descansoMinutos;
   const descansoModo = opciones?.descansoModo;
   const feedersByMatchNo = opciones?.feedersByMatchNo || new Map();
+  const dependentsByMatchNo = buildDependentsByMatchNo(feedersByMatchNo);
   const permitirSinEquipos = opciones?.permitirSinEquipos === true;
   const notBeforeExtra = opciones?.notBeforeExtra || [];
   const limitarAIds = opciones?.limitarAIds;
   const ocupados = new Set(ocupadosIniciales || []);
   const historial = new Map<string, PartidoParejaHistorial[]>();
+
+  const opcionesDependenciaPara = (
+    partido: PartidoProgramable,
+  ):
+    | {
+        ordenPartido: number;
+        todos: PartidoProgramable[];
+        dependentsByMatchNo: Map<number, number[]>;
+      }
+    | undefined => {
+    const orden = Number(partido.orden);
+    if (!Number.isFinite(orden) || orden <= 0) return undefined;
+    return {
+      ordenPartido: orden,
+      todos: partidos,
+      dependentsByMatchNo,
+    };
+  };
 
   seedHistorialDesdePartidos(partidos, historial, ocupados, duracionMinutos);
 
@@ -1026,6 +1159,7 @@ export function asignarHorariosAPartidos(
         notBefore,
         descansoMinutos,
         descansoModo,
+        opcionesDependenciaPara(item.partido),
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -1238,6 +1372,7 @@ export function asignarHorariosAPartidos(
       notBefore,
       descansoMinutos,
       descansoModo,
+      opcionesDependenciaPara(item.partido),
     );
     if (!slot) continue;
     asignarSlotAPartido(
@@ -1658,8 +1793,8 @@ export function evaluateProgramacionIssues(
         ) {
           issues.push({
             partido_id: id,
-            severity: "wait",
-            message: "Debe jugarse después de su partido de origen",
+            severity: "bad",
+            message: `Orden de llave inválido: debe jugarse después del partido de origen #${depOrden}`,
           });
         } else if (
           fp.fecha === parsed.fecha &&
