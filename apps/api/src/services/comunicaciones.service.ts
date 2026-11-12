@@ -17,6 +17,10 @@ import {
   orBusquedaContactosAdmin,
   terminoIlikePostgrest,
 } from "../utils/postgrestBusqueda";
+import {
+  emailContactoVisible,
+  presentarPerfilContacto,
+} from "../utils/contactoPresentacion";
 import { NotificacionService } from "./notificacion.service";
 import {
   ComunicacionesCanalesService,
@@ -31,7 +35,9 @@ import {
   ComunicacionesMetricasService,
   metricasVacias,
   normalizarMetricasCampana,
+  registrarResultadoCanal,
   sumarEntrega,
+  sumarOmitidoConMotivo,
   type ComunicacionesCanal,
 } from "./comunicaciones-metricas.service";
 
@@ -206,17 +212,20 @@ export class ComunicacionesService {
       throw new Error(`Error al buscar contactos: ${error.message}`);
     }
 
-    return (data || []).map((p) => ({
-      id: p.id,
-      nombre: p.nombre,
-      apellido: p.apellido,
-      email: p.email,
-      dni: p.dni,
-      rol: p.rol,
-      lugar_residencia: p.lugar_residencia,
-      club_id: p.club_id,
-      avatar_url: p.avatar_url ?? null,
-    }));
+    return (data || []).map((p) => {
+      const v = presentarPerfilContacto(p);
+      return {
+        id: v.id,
+        nombre: v.nombre,
+        apellido: v.apellido,
+        email: v.email,
+        dni: v.dni,
+        rol: v.rol,
+        lugar_residencia: v.lugar_residencia,
+        club_id: v.club_id,
+        avatar_url: v.avatar_url ?? null,
+      };
+    });
   }
 
   static async listarListas(ownerId: string) {
@@ -288,7 +297,7 @@ export class ComunicacionesService {
             perfil_id: perfilId,
             nombre: perfil?.nombre ?? null,
             apellido: perfil?.apellido ?? null,
-            email: perfil?.email ?? null,
+            email: emailContactoVisible(perfil?.email),
             avatar_url: perfil?.avatar_url ?? null,
           };
         });
@@ -580,7 +589,10 @@ export class ComunicacionesService {
         filtros_usados: filtros,
         action_url: actionUrl,
         canales,
-        metricas: metricasVacias(),
+        metricas: {
+          ...metricasVacias(),
+          entidad_remitente: etiquetaEntidad,
+        },
         total_destinatarios: audiencia.total,
         total_enviados: 0,
       })
@@ -601,7 +613,10 @@ export class ComunicacionesService {
     };
 
     let totalEnviados = 0;
-    let metricas = metricasVacias();
+    let metricas: ReturnType<typeof metricasVacias> = {
+      ...metricasVacias(),
+      entidad_remitente: etiquetaEntidad,
+    };
     const destinatarioRows: Array<{
       campana_id: string;
       usuario_id: string;
@@ -641,7 +656,7 @@ export class ComunicacionesService {
                     canal: "in_app",
                   });
                 } else {
-                  metricas = sumarEntrega(metricas, "in_app", false);
+                  metricas = sumarOmitidoConMotivo(metricas, "in_app", "prefs");
                   filas.push({
                     campana_id: campana.id,
                     usuario_id: usuarioId,
@@ -650,7 +665,7 @@ export class ComunicacionesService {
                   });
                 }
               } catch {
-                metricas = sumarEntrega(metricas, "in_app", false);
+                metricas = sumarOmitidoConMotivo(metricas, "in_app", "error");
                 filas.push({
                   campana_id: campana.id,
                   usuario_id: usuarioId,
@@ -672,11 +687,7 @@ export class ComunicacionesService {
                   gestionarUrl,
                 },
               );
-              metricas = sumarEntrega(
-                metricas,
-                "email",
-                ComunicacionesCanalesService.resultadoEsExito(resultado),
-              );
+              metricas = registrarResultadoCanal(metricas, "email", resultado);
               filas.push({
                 campana_id: campana.id,
                 usuario_id: usuarioId,
@@ -694,10 +705,10 @@ export class ComunicacionesService {
                   titulo,
                   mensaje,
                 );
-              metricas = sumarEntrega(
+              metricas = registrarResultadoCanal(
                 metricas,
                 "whatsapp",
-                ComunicacionesCanalesService.resultadoEsExito(resultado),
+                resultado,
               );
               filas.push({
                 campana_id: campana.id,

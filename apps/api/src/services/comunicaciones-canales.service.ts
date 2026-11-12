@@ -6,8 +6,14 @@ import {
   urlGestionarNotificaciones,
 } from "../utils/resendConfig";
 import type { ComunicacionesCanal } from "./comunicaciones-metricas.service";
+import { emailContactoVisible } from "../utils/contactoPresentacion";
 
-type ResultadoCanal = "enviado" | "omitido_prefs" | "omitido_sin_dato" | "omitido_config" | "error";
+import {
+  estadoDestinatarioCampana,
+  type ResultadoCanalEntrega,
+} from "../utils/comunicacionesOmitidos";
+
+type ResultadoCanal = ResultadoCanalEntrega;
 
 interface PerfilContacto {
   email: string | null;
@@ -41,7 +47,7 @@ export class ComunicacionesCanalesService {
   ): Promise<ResultadoCanal> {
     const prefs = perfil?.preferencias_notificacion;
     if (prefs?.email === false) return "omitido_prefs";
-    const destino = (perfil?.email || "").trim();
+    const destino = emailContactoVisible(perfil?.email);
     if (!destino) return "omitido_sin_dato";
 
     const apiKey = process.env.RESEND_API_KEY;
@@ -138,12 +144,8 @@ export class ComunicacionesCanalesService {
     return resultado === "enviado";
   }
 
-  static estadoDestinatario(
-    resultado: ResultadoCanal,
-  ): "enviado" | "omitido_prefs" | "error" {
-    if (resultado === "enviado") return "enviado";
-    if (resultado === "error") return "error";
-    return "omitido_prefs";
+  static estadoDestinatario(resultado: ResultadoCanal) {
+    return estadoDestinatarioCampana(resultado);
   }
 }
 

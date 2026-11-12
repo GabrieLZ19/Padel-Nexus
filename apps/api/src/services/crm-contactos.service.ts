@@ -8,6 +8,7 @@ import {
   orBusquedaContactosAdmin,
   terminoIlikePostgrest,
 } from "../utils/postgrestBusqueda";
+import { presentarPerfilContacto } from "../utils/contactoPresentacion";
 
 export type FiltroContactoCrm = "todos" | "con_licencia" | "sin_licencia";
 
@@ -93,7 +94,9 @@ export class CrmContactosService {
     }
 
     const rows = (data || []).map((perfil) =>
-      normalizarPerfilLicencias(perfil as Record<string, unknown>),
+      presentarPerfilContacto(
+        normalizarPerfilLicencias(perfil as Record<string, unknown>),
+      ),
     );
 
     return {

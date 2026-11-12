@@ -28,8 +28,13 @@ const PROVINCIAS_ARG = [
   "Tucumán",
 ];
 
-function coincideProvinciaArg(valor: string): string | null {
-  const norm = normalizarProvincia(valor);
+/** Forma canónica (acentos y capitalización) para las 24 provincias argentinas. */
+export function provinciaCanonicaArgentina(
+  valor?: string | null,
+): string | null {
+  const raw = String(valor || "").trim();
+  if (!raw) return null;
+  const norm = normalizarProvincia(raw);
   const hit = PROVINCIAS_ARG.find(
     (p) => normalizarProvincia(p) === norm,
   );
@@ -63,13 +68,13 @@ export function provinciaParaRanking(
   if (lr) {
     const porSigla = siglas.get(lr.toUpperCase());
     if (porSigla) return porSigla;
-    const canon = coincideProvinciaArg(lr);
+    const canon = provinciaCanonicaArgentina(lr);
     if (canon) return canon;
     if (lr.length > 5 || /\s/.test(lr)) return lr;
   }
   const club = (clubProvincia || "").trim();
   if (club) {
-    const canon = coincideProvinciaArg(club);
+    const canon = provinciaCanonicaArgentina(club);
     return canon || club;
   }
   return "";

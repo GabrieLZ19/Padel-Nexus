@@ -12,6 +12,7 @@ import {
   resolverProvinciaDesdePlanilla,
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
+import { provinciaCanonicaArgentina } from "../utils/provinciaRanking";
 import {
   coincideEmailPreinscripcion,
   coincideUltimos4Telefono,
@@ -601,7 +602,9 @@ export class PerfilService {
       .eq("dni", dni)
       .maybeSingle();
 
-    const provinciaPlanilla = resolverProvinciaDesdePlanilla(fila);
+    const provinciaRaw = resolverProvinciaDesdePlanilla(fila);
+    const provinciaPlanilla =
+      provinciaCanonicaArgentina(provinciaRaw) ?? provinciaRaw;
 
     if (existente) {
       const patch: Record<string, unknown> = {};
