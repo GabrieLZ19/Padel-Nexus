@@ -1,6 +1,19 @@
 /** Debe coincidir con RESERVA_PENDIENTE_RETENCION_MINUTOS del API. */
 const RESERVA_PENDIENTE_RETENCION_MINUTOS = 20;
 
+/** Debe coincidir con RESERVA_MOTIVO_PAGO_VENCIDO del API. */
+export const RESERVA_MOTIVO_PAGO_VENCIDO = "Plazo de pago vencido";
+
+export function esReservaVencidaPorPago(reserva: {
+  estado_reserva?: string | null;
+  motivo_cancelacion?: string | null;
+}): boolean {
+  return (
+    (reserva.estado_reserva || "").toLowerCase() === "cancelada" &&
+    (reserva.motivo_cancelacion || "").trim() === RESERVA_MOTIVO_PAGO_VENCIDO
+  );
+}
+
 export type ReservaConPlazoPago = {
   retiene_hasta?: string | null;
   created_at?: string | null;

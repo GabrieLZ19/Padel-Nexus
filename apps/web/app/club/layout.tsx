@@ -211,12 +211,17 @@ export default function ClubLayout({
               </span>
             </div>
           </div>
-          <button
-            onClick={() => setMobileMenuOpen(false)}
-            className="lg:hidden p-2 rounded-full text-gray-400 hover:text-white"
-          >
-            <X className="size-5" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <div className="hidden lg:flex">
+              <NotificationCenter />
+            </div>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="lg:hidden p-2 rounded-full text-gray-400 hover:text-white"
+            >
+              <X className="size-5" />
+            </button>
+          </div>
         </div>
 
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-1">

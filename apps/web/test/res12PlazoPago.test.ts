@@ -33,5 +33,7 @@ describe("RES-12 UI plazo de pago", () => {
     );
     assert.match(checkout, /ReservaPlazoPagoBanner/);
     assert.match(mis, /ReservaPlazoPagoBanner/);
+    assert.match(mis, /esReservaVencidaPorPago/);
+    assert.match(mis, /Vencida/);
   });
 });

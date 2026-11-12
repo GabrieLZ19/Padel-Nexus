@@ -48,6 +48,7 @@ export function LlaveAltaParejaPanel({
   const [letraPrioridad, setLetraPrioridad] = useState("");
   const [guardando, setGuardando] = useState(false);
 
+  const categoriaDef = (categoriaTorneo || "").trim();
   const mostrarDatosJ1 = identificadorPareceDni(j1);
   const mostrarDatosJ2 = identificadorPareceDni(j2);
 
@@ -60,10 +61,11 @@ export function LlaveAltaParejaPanel({
     telefono: string,
   ) => {
     if (!identificadorPareceDni(identificador)) return undefined;
+    const cat = categoria.trim() || categoriaDef;
     const payload = {
       nombre: nombre.trim(),
       apellido: apellido.trim(),
-      ...(categoria.trim() ? { categoria_padel: categoria.trim() } : {}),
+      ...(cat ? { categoria_padel: cat } : {}),
       ...(nacimiento.trim() ? { fecha_nacimiento: nacimiento.trim() } : {}),
       ...(telefono.trim() ? { telefono: telefono.trim() } : {}),
     };

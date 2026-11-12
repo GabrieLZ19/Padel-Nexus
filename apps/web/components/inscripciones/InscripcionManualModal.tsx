@@ -67,6 +67,7 @@ export default function InscripcionManualModal({
   });
 
   const esNacional = /nacional/i.test(String(torneo.alcance || ""));
+  const categoriaTorneo = (torneo.categoria || "").trim();
   const gratuito =
     typeof torneo.es_gratis === "boolean"
       ? torneo.es_gratis
@@ -84,10 +85,11 @@ export default function InscripcionManualModal({
     telefono: string,
   ) => {
     if (!identificadorPareceDni(identificador)) return undefined;
+    const cat = categoria.trim() || categoriaTorneo;
     const payload = {
       nombre: nombre.trim(),
       apellido: apellido.trim(),
-      ...(categoria.trim() ? { categoria_padel: categoria.trim() } : {}),
+      ...(cat ? { categoria_padel: cat } : {}),
       ...(nacimiento.trim() ? { fecha_nacimiento: nacimiento.trim() } : {}),
       ...(telefono.trim() ? { telefono: telefono.trim() } : {}),
     };
@@ -268,7 +270,10 @@ export default function InscripcionManualModal({
                     className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-3"
                   >
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      Si el DNI no tiene cuenta: nombre y apellido *
+                      Ficha provisional jugador 1: nombre y apellido *
+                      {categoriaTorneo
+                        ? ` · categoría por defecto ${categoriaTorneo}`
+                        : ""}
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                       <input
@@ -289,7 +294,11 @@ export default function InscripcionManualModal({
                     <div className="grid grid-cols-3 gap-2">
                       <input
                         type="text"
-                        placeholder="Categoría"
+                        placeholder={
+                          categoriaTorneo
+                            ? `Categoría (def. ${categoriaTorneo})`
+                            : "Categoría *"
+                        }
                         className="w-full bg-[#111] border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-chartreuse/50"
                         value={j1Categoria}
                         onChange={(e) => setJ1Categoria(e.target.value)}
@@ -336,7 +345,10 @@ export default function InscripcionManualModal({
                     className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-3"
                   >
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      Si el DNI no tiene cuenta: nombre y apellido *
+                      Ficha provisional jugador 2: nombre y apellido *
+                      {categoriaTorneo
+                        ? ` · categoría por defecto ${categoriaTorneo}`
+                        : ""}
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                       <input
@@ -357,7 +369,11 @@ export default function InscripcionManualModal({
                     <div className="grid grid-cols-3 gap-2">
                       <input
                         type="text"
-                        placeholder="Categoría"
+                        placeholder={
+                          categoriaTorneo
+                            ? `Categoría (def. ${categoriaTorneo})`
+                            : "Categoría *"
+                        }
                         className="w-full bg-[#111] border border-white/5 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-chartreuse/50"
                         value={j2Categoria}
                         onChange={(e) => setJ2Categoria(e.target.value)}

@@ -36,6 +36,7 @@ import { EscribirAlClubButton } from "@/components/reservas/EscribirAlClubButton
 import { formatMontoArs } from "@/utils/formatMonto";
 import { ReservaPlazoPagoBanner } from "@/components/reservas/ReservaPlazoPagoBanner";
 import { descripcionModalCancelarReserva } from "@/utils/politicaCancelacionReserva";
+import { esReservaVencidaPorPago } from "@/utils/reservaPlazoPago";
 
 interface ReservaUsuario {
   id: string;
@@ -322,9 +323,12 @@ export default function MisReservasPage() {
             const cancha = turno?.canchas;
             const club = cancha?.clubes;
 
+            const isVencidaPago = esReservaVencidaPorPago(reserva);
             const isConfirmed = reserva.estado_reserva === "confirmada";
-            const isPending = reserva.estado_reserva === "pendiente";
-            const isCancelled = reserva.estado_reserva === "cancelada";
+            const isPending =
+              reserva.estado_reserva === "pendiente" && !isVencidaPago;
+            const isCancelled =
+              reserva.estado_reserva === "cancelada" && !isVencidaPago;
 
             const isPaid = reserva.estado_pago === "completado";
             const isPayPending =
@@ -402,15 +406,33 @@ export default function MisReservasPage() {
                           ? "bg-green-500/10 text-green-400 border border-green-500/20"
                           : isPending
                             ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
-                            : "bg-red-500/10 text-red-400 border border-red-500/20"
+                            : isVencidaPago
+                              ? "bg-orange-500/10 text-orange-300 border border-orange-500/25"
+                              : "bg-red-500/10 text-red-400 border border-red-500/20"
                       }`}
                     >
                       {isConfirmed && <CheckCircle2 className="w-3 h-3" />}
                       {isPending && <AlertTriangle className="w-3 h-3" />}
+                      {isVencidaPago && <Clock className="w-3 h-3" />}
                       {isCancelled && <XCircle className="w-3 h-3" />}
-                      {reserva.estado_reserva}
+                      {isVencidaPago
+                        ? "Vencida"
+                        : isConfirmed
+                          ? "Confirmada"
+                          : isPending
+                            ? "Pendiente"
+                            : isCancelled
+                              ? "Cancelada"
+                              : reserva.estado_reserva}
                     </span>
                   </div>
+
+                  {isVencidaPago && (
+                    <p className="text-xs text-orange-200/90 bg-orange-500/10 border border-orange-500/20 rounded-xl px-3 py-2">
+                      El plazo para pagar terminó y el turno quedó liberado para
+                      otros jugadores.
+                    </p>
+                  )}
 
                   {isCancelled && reserva.motivo_cancelacion?.trim() && (
                     <p className="text-xs text-gray-400 bg-white/5 border border-white/10 rounded-xl px-3 py-2">

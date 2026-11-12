@@ -338,11 +338,17 @@ export default function CheckoutPage() {
   if (!reserva) {
     return (
       <main className="min-h-screen pt-24 flex flex-col items-center justify-center gap-4">
-        <h2 className="text-xl font-semibold text-gray-400">
+        <h2 className="text-xl font-semibold text-gray-400 text-center max-w-md px-4">
           {plazoVencido
             ? "El plazo para pagar venció"
             : "Reserva no encontrada"}
         </h2>
+        {plazoVencido ? (
+          <p className="text-sm text-gray-500 text-center max-w-md px-4">
+            El turno ya no está reservado. La encontrás en Mis reservas como
+            vencida.
+          </p>
+        ) : null}
         <Link
           href="/reservar"
           className="text-brand-chartreuse hover:underline"

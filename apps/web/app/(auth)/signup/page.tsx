@@ -375,7 +375,7 @@ export default function SignUpPage() {
       );
       setPreinscripcionMsg(
         resultado.mensaje ||
-          "Encontramos una ficha con este DNI. Confirmá tu identidad para continuar.",
+          "Encontramos tus datos cargados por tu club o asociación. Confirmá tu identidad para continuar.",
       );
     } catch {
       // Sin preinscripción: flujo normal de registro
