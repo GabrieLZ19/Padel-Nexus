@@ -33,6 +33,8 @@ export function ConflictosPanel({
   const activos = issues.filter((i) => i.severity !== "ok");
   if (activos.length === 0) return null;
 
+  const graves = activos.filter((i) => i.severity === "bad").length;
+
   const partidoMap = new Map(partidos.map((p) => [p.id, p]));
 
   return (
@@ -48,7 +50,10 @@ export function ConflictosPanel({
       >
         <AlertTriangle className="size-4 shrink-0" />
         <span className="min-w-0 flex-1 text-xs font-semibold">
-          {activos.length} conflicto(s) o advertencia(s). No bloquean el guardado.
+          {activos.length} conflicto(s) o advertencia(s).
+          {graves > 0
+            ? ` ${graves} bloquean la publicación.`
+            : " No bloquean el guardado."}
         </span>
         <ChevronDown
           className={`size-3.5 shrink-0 transition-transform ${

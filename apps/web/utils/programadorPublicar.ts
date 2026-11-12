@@ -21,6 +21,10 @@ export function motivoPublicacionBloqueada(
     const n = board.summary.pendientes;
     return `Faltan ${n} partido${n === 1 ? "" : "s"} sin horario. Asignalos en la grilla, en «Pendientes» o con «Asignar automáticamente».`;
   }
+  const graves = board.issues.filter((i) => i.severity === "bad");
+  if (graves.length > 0) {
+    return `Hay ${graves.length} conflicto(s) grave(s) en la programación (orden de llave, canchas o descanso). Corregilos en las alertas antes de publicar.`;
+  }
   return null;
 }
 

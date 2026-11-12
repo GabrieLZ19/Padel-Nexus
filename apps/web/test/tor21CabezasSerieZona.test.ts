@@ -5,8 +5,10 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   cabezaPorMejorRanking,
+  idsCabezasGlobalesDesdeZonas,
   resolverCabezasEnZona,
   zonaConMultiplesCabezas,
+  zonaConMultiplesCabezasRanking,
 } from "../utils/cabezasSerieZonas.ts";
 import type { ParejaDrag, ZonaDrag } from "../components/torneos/DragDropPairing";
 
@@ -61,6 +63,48 @@ describe("TOR-21 cabezas de serie en editor de zonas", () => {
     );
   });
 
+  it("detecta dos del top ranking en la misma zona", () => {
+    const zonas: ZonaDrag[] = [
+      {
+        id: "z1",
+        nombre: "Zona D",
+        parejas: [
+          {
+            id: "top1",
+            jugador1_nombre: "A",
+            jugador2_nombre: "B",
+            seed: 1,
+            puntos_ranking: 500,
+          },
+          {
+            id: "top2",
+            jugador1_nombre: "C",
+            jugador2_nombre: "D",
+            seed: 2,
+            puntos_ranking: 400,
+          },
+        ],
+      },
+      {
+        id: "z2",
+        nombre: "Zona B",
+        parejas: [
+          {
+            id: "p3",
+            jugador1_nombre: "E",
+            jugador2_nombre: "F",
+            seed: 1,
+            puntos_ranking: 50,
+          },
+        ],
+      },
+    ];
+    const globales = idsCabezasGlobalesDesdeZonas(zonas);
+    const c = zonaConMultiplesCabezasRanking(zonas, globales);
+    assert.ok(c);
+    assert.equal(c?.zona.nombre, "Zona D");
+  });
+
   it("BracketEditor confirma conflicto y persiste al guardar", () => {
     const editor = readFileSync(
       path.join(RAIZ, "components/torneos/BracketEditor.tsx"),
@@ -68,5 +112,8 @@ describe("TOR-21 cabezas de serie en editor de zonas", () => {
     );
     assert.match(editor, /Dos cabezas de serie en la misma zona/);
     assert.match(editor, /es_cabeza_serie/);
+    assert.match(editor, /Elegí la pareja/);
+    assert.match(editor, /validarCabezasSerie \? "ON" : "OFF"/);
+    assert.match(editor, /abrirModalConflictoRanking/);
   });
 });

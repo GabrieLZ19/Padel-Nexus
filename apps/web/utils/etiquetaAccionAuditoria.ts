@@ -1,4 +1,5 @@
 const ETIQUETAS: Record<string, string> = {
+  guardar_zonas_completo: "Guardar zonas",
   cambio_pareja_llave: "Cambio de pareja",
   alta_pareja_edicion_llave: "Alta de pareja (llave)",
   override_rival_partido: "Cambio de pareja",

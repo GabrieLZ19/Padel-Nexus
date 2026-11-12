@@ -57,6 +57,24 @@ describe("TOR-4 publicar bloqueado con explicación", () => {
     assert.equal(motivoPublicacionBloqueada(board), null);
   });
 
+  it("bloquea publicar si hay conflictos graves (orden de llave)", () => {
+    const board = boardBase({
+      issues: [
+        {
+          partido_id: "p1",
+          severity: "bad",
+          message: "Orden de llave inválido",
+        },
+      ],
+      summary: { total: 4, asignados: 4, pendientes: 0, advertencias: 1 },
+    });
+    assert.equal(puedePublicarProgramacion(board), false);
+    assert.match(
+      motivoPublicacionBloqueada(board)!,
+      /conflicto\(s\) grave\(s\)/,
+    );
+  });
+
   it("la top bar muestra el motivo de bloqueo en pantalla", () => {
     const fuente = readFileSync(
       path.join(RAIZ, "components/torneos/programador/ProgramadorTopBar.tsx"),

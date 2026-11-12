@@ -20,6 +20,7 @@ export interface FeedbackModalProps {
   inputLabel?: string;
   showSelect?: boolean;
   selectLabel?: string;
+  selectPlaceholder?: string;
   selectOptions?: { value: string; label: string }[];
   onConfirm?: (inputValue?: string, selectValue?: string) => void;
 }
@@ -40,6 +41,7 @@ export default function FeedbackModal({
   inputLabel = "Valor",
   showSelect = false,
   selectLabel = "Método",
+  selectPlaceholder = "Seleccioná el método",
   selectOptions = [],
 }: FeedbackModalProps) {
   // Guard defensivo: si onClose es undefined, usar noop seguro
@@ -164,7 +166,7 @@ export default function FeedbackModal({
                     <CustomDropdown
                       value={selectValue}
                       onChange={setSelectValue}
-                      placeholder="Seleccioná el método"
+                      placeholder={selectPlaceholder}
                       options={selectOptions}
                       haciaArriba
                     />
@@ -201,7 +203,11 @@ export default function FeedbackModal({
             <div className="flex flex-col gap-3">
               {onConfirm && (
                 <button
-                  disabled={isLoading || (showInput && !inputValue.trim())}
+                  disabled={
+                    isLoading ||
+                    (showInput && !inputValue.trim()) ||
+                    (showSelect && selectOptions.length > 0 && !selectValue)
+                  }
                   onClick={() => onConfirm(inputValue, selectValue)}
                   className={`w-full py-4 rounded-xl font-bold text-[15px] transition-all ${btnClass} disabled:opacity-50 flex items-center justify-center gap-2`}
                 >

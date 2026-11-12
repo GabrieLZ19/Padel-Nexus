@@ -35,8 +35,10 @@ import FeedbackModal, {
 import {
   cabezaPorMejorRanking,
   etiquetaParejaCorta,
+  idsCabezasGlobalesDesdeZonas,
   resolverCabezasEnZona,
   zonaConMultiplesCabezas,
+  zonaConMultiplesCabezasRanking,
 } from "@/utils/cabezasSerieZonas";
 import { MatchCard } from "./MatchCard";
 import { FapBracketDiagram, type FapMatrixMatch } from "./FapBracketDiagram";
@@ -172,6 +174,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   const [isSiembraEditing, setIsSiembraEditing] = useState(false);
   const [selectedMatchToEdit, setSelectedMatchToEdit] =
     useState<Partido | null>(null);
+  const [matchEditBaseline, setMatchEditBaseline] = useState<{
+    equipo_a_id: string | null;
+    equipo_b_id: string | null;
+  } | null>(null);
   const [showMatchEditModal, setShowMatchEditModal] = useState(false);
   const [modificacionNoDestructiva, setModificacionNoDestructiva] =
     useState(true);
@@ -577,6 +583,28 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     }
   }, [activeView, torneoId, firmaResultadosPartidos]);
 
+  const abrirModalConflictoRanking = useCallback(
+    (
+      conflicto: NonNullable<ReturnType<typeof zonaConMultiplesCabezasRanking>>,
+    ) => {
+      const nombres = conflicto.candidatos.map((p) => etiquetaParejaCorta(p)).join(" y ");
+      setModalCabezaConflicto({
+        isOpen: true,
+        type: "warning",
+        title: "No se puede guardar con esta disposición",
+        description: `Con la validación activa, ${conflicto.zona.nombre} no puede tener a la vez a ${nombres} (son parejas del top del ranking). Mové al menos una a otra zona o desactivá la validación de cabezas de serie antes de guardar.`,
+        cancelText: "Deshacer movimiento",
+        showSelect: false,
+        onConfirm: undefined,
+        onClose: () => {
+          setZonas(zonasAntesConflictoRef.current);
+          setModalCabezaConflicto((prev) => ({ ...prev, isOpen: false }));
+        },
+      });
+    },
+    [],
+  );
+
   const abrirModalConflictoCabezas = useCallback(
     (nextZonas: ZonaDrag[], conflicto: NonNullable<ReturnType<typeof zonaConMultiplesCabezas>>) => {
       const defaultId = cabezaPorMejorRanking(conflicto.candidatos);
@@ -589,6 +617,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         cancelText: "Deshacer movimiento",
         showSelect: true,
         selectLabel: "Cabeza de serie en la zona",
+        selectPlaceholder: "Elegí la pareja",
         selectOptions: conflicto.candidatos.map((p) => ({
           value: p.id,
           label: `${etiquetaParejaCorta(p)} · ${p.puntos_ranking ?? 0} pts ranking`,
@@ -621,15 +650,33 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     (next: ZonaDrag[] | ((prev: ZonaDrag[]) => ZonaDrag[])) => {
       setZonas((prev) => {
         const resolved = typeof next === "function" ? next(prev) : next;
-        const conflicto = zonaConMultiplesCabezas(resolved);
-        if (conflicto && isEditing) {
+        if (!isEditing) return resolved;
+
+        const cabezasGlobales = idsCabezasGlobalesDesdeZonas(resolved);
+        const conflictoRanking =
+          validarCabezasSerie &&
+          zonaConMultiplesCabezasRanking(resolved, cabezasGlobales);
+        const conflictoRotulo = zonaConMultiplesCabezas(resolved);
+
+        if (conflictoRanking || conflictoRotulo) {
           zonasAntesConflictoRef.current = prev;
-          queueMicrotask(() => abrirModalConflictoCabezas(resolved, conflicto));
+          queueMicrotask(() => {
+            if (conflictoRanking) {
+              abrirModalConflictoRanking(conflictoRanking);
+            } else if (conflictoRotulo) {
+              abrirModalConflictoCabezas(resolved, conflictoRotulo);
+            }
+          });
         }
         return resolved;
       });
     },
-    [abrirModalConflictoCabezas, isEditing],
+    [
+      abrirModalConflictoCabezas,
+      abrirModalConflictoRanking,
+      isEditing,
+      validarCabezasSerie,
+    ],
   );
 
   const handleMovePareja = (
@@ -673,6 +720,27 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         inputPlaceholder: "Ej: Se reubicó por ranking/incompatibilidad",
         onConfirm: async (motivo?: string) => {
           if (!motivo) return;
+          if (validarCabezasSerie) {
+            const cabezasGlobales = idsCabezasGlobalesDesdeZonas(zonas);
+            const conflictoRanking = zonaConMultiplesCabezasRanking(
+              zonas,
+              cabezasGlobales,
+            );
+            if (conflictoRanking) {
+              const nombres = conflictoRanking.candidatos
+                .map((p) => etiquetaParejaCorta(p))
+                .join(" y ");
+              setFeedbackModal({
+                isOpen: true,
+                type: "error",
+                title: "Validación de cabezas de serie",
+                description: `${conflictoRanking.zona.nombre} tiene a ${nombres} en la misma zona. Con la validación activa tenés que separarlas en zonas distintas o desactivar la validación.`,
+                onClose: () =>
+                  setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+              });
+              return;
+            }
+          }
           try {
             setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
             await TorneosService.guardarZonas(torneoId, {
@@ -1097,23 +1165,51 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         (p.equipo_a_id === inscripcionId || p.equipo_b_id === inscripcionId),
     );
 
+  const etiquetaParejaLlave = (id: string | null): string => {
+    if (!id) return "La pareja actual";
+    const opt = inscripcionOptions.find((o) => o.value === id);
+    if (!opt?.label) return "La pareja actual";
+    return opt.label.replace(/\s*·\s*En llave.*$/i, "").trim();
+  };
+
   const mensajesTrasladoPareja = (
     equipoAId: string | null,
     equipoBId: string | null,
     partidoId: string,
+    baseline: { equipo_a_id: string | null; equipo_b_id: string | null } | null,
   ): string[] => {
     const avisos: string[] = [];
-    for (const id of [equipoAId, equipoBId]) {
-      if (!id) continue;
-      const origen = partidoQueOcupaPareja(id, partidoId);
-      if (!origen) continue;
-      const num =
-        numerosPartido.get(origen.id) ?? origen.orden ?? null;
-      avisos.push(
-        num != null
-          ? `La pareja deja de figurar en el partido #${num}.`
-          : "La pareja deja de figurar en otro cruce de la llave.",
-      );
+    const lados: { prev: string | null; next: string | null }[] = [
+      { prev: baseline?.equipo_a_id ?? null, next: equipoAId ?? null },
+      { prev: baseline?.equipo_b_id ?? null, next: equipoBId ?? null },
+    ];
+    const numDest = numerosPartido.get(partidoId) ?? null;
+
+    for (const { prev, next } of lados) {
+      if (!next || next === prev) continue;
+      const origen = partidoQueOcupaPareja(next, partidoId);
+      if (!origen) {
+        if (prev) {
+          avisos.push(
+            `${etiquetaParejaLlave(prev)} quedará fuera de la llave: no proviene de otro cruce para intercambiar.`,
+          );
+        }
+        continue;
+      }
+      const numOrigen = numerosPartido.get(origen.id) ?? origen.orden ?? null;
+      if (prev) {
+        avisos.push(
+          numOrigen != null && numDest != null
+            ? `Se intercambiarán las parejas: ${etiquetaParejaLlave(prev)} pasa al partido #${numOrigen} y la elegida ocupa el #${numDest}.`
+            : `Se intercambiarán las parejas entre estos dos cruces.`,
+        );
+      } else {
+        avisos.push(
+          numOrigen != null
+            ? `La pareja deja de figurar en el partido #${numOrigen}; el otro lado de ese cruce puede quedar Libre.`
+            : "La pareja deja de figurar en otro cruce de la llave.",
+        );
+      }
     }
     return avisos;
   };
@@ -1129,6 +1225,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     descartarPendientesModalLlave();
     setShowMatchEditModal(false);
     setSelectedMatchToEdit(null);
+    setMatchEditBaseline(null);
     setMatchEditMotivo("");
   };
 
@@ -1190,6 +1287,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       descartarPendientesModalLlave();
       setShowMatchEditModal(false);
       setSelectedMatchToEdit(null);
+      setMatchEditBaseline(null);
       setMatchEditMotivo("");
       onRefresh?.();
       sileo.success({
@@ -1280,6 +1378,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       selectedMatchToEdit.equipo_a_id ?? null,
       selectedMatchToEdit.equipo_b_id ?? null,
       selectedMatchToEdit.id,
+      matchEditBaseline,
     );
 
     if (traslados.length > 0) {
@@ -1615,9 +1714,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     />
                   </button>
                   <span
-                    className={`text-xs font-black w-6 text-center ${validarCabezasSerie ? "text-brand-chartreuse" : "text-brand-ayuda"}`}
+                    className={`text-xs font-black w-8 text-center tabular-nums ${validarCabezasSerie ? "text-brand-chartreuse" : "text-brand-ayuda"}`}
                   >
-                    ON
+                    {validarCabezasSerie ? "ON" : "OFF"}
                   </span>
                 </div>
               </div>
@@ -1875,6 +1974,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   interactive={puedeEditarLlave}
                   onMatchClick={(pToEdit, opciones) => {
                     setSelectedMatchToEdit({ ...pToEdit });
+                    setMatchEditBaseline({
+                      equipo_a_id: pToEdit.equipo_a_id ?? null,
+                      equipo_b_id: pToEdit.equipo_b_id ?? null,
+                    });
                     setMatchEditSlotFocus(opciones?.slotFocus ?? "a");
                     setMatchEditMotivo("");
                     setShowMatchEditModal(true);
@@ -1944,6 +2047,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                                 }
                                 onEditSelect={(pToEdit) => {
                                   setSelectedMatchToEdit({ ...pToEdit });
+                                  setMatchEditBaseline({
+                                    equipo_a_id: pToEdit.equipo_a_id ?? null,
+                                    equipo_b_id: pToEdit.equipo_b_id ?? null,
+                                  });
                                   setMatchEditMotivo("");
                                   setMatchEditSlotFocus("a");
                                   setShowMatchEditModal(true);

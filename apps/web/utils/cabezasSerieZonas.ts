@@ -41,3 +41,32 @@ export function cabezaPorMejorRanking(candidatos: ParejaDrag[]): string {
   );
   return ordenadas[0]?.id ?? candidatos[0]!.id;
 }
+
+/** Top K del ranking dentro del torneo (K = cantidad de zonas). */
+export function idsCabezasGlobalesDesdeZonas(zonas: ZonaDrag[]): Set<string> {
+  const porId = new Map<string, number>();
+  for (const z of zonas) {
+    for (const p of z.parejas) {
+      if (!porId.has(p.id)) {
+        porId.set(p.id, p.puntos_ranking ?? 0);
+      }
+    }
+  }
+  const k = Math.max(0, zonas.length);
+  const ordenadas = [...porId.entries()].sort((a, b) => b[1] - a[1]);
+  return new Set(ordenadas.slice(0, k).map(([id]) => id));
+}
+
+/** Con validación de ranking activa: dos o más del top K en la misma zona. */
+export function zonaConMultiplesCabezasRanking(
+  zonas: ZonaDrag[],
+  cabezasGlobales: Set<string>,
+): { zona: ZonaDrag; candidatos: ParejaDrag[] } | null {
+  for (const z of zonas) {
+    const candidatos = z.parejas.filter((p) => cabezasGlobales.has(p.id));
+    if (candidatos.length > 1) {
+      return { zona: z, candidatos };
+    }
+  }
+  return null;
+}

@@ -16,5 +16,7 @@ describe("TOR-16 BracketEditor evita duplicar parejas", () => {
     assert.match(editor, /parejasBloqueadasEnLlave/);
     assert.match(editor, /Confirmar movimiento/);
     assert.match(editor, /status === 409/);
+    assert.match(editor, /intercambiar/);
+    assert.match(editor, /matchEditBaseline/);
   });
 });
