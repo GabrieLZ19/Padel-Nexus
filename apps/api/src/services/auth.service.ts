@@ -12,8 +12,11 @@ import { LegalService } from "./legal.service";
 import { capitalizarNombre } from "../utils/formatoTexto";
 import {
   buildRecuperacionRedirectUrl,
+  esErrorUsuarioInexistenteRecuperacion,
   mensajeErrorSupabaseAuth,
+  mensajeFallbackRecuperacionCorreo,
 } from "../utils/authError";
+import { enviarCorreoRecuperacionResend } from "../utils/recuperacionPasswordEmail";
 import type { ResponsableInput } from "./menores.service";
 
 // DTO para el registro unificado FAP
@@ -402,25 +405,71 @@ export class AuthService {
       throw new Error("El correo electrónico es obligatorio.");
     }
 
-    const redirectTo = buildRecuperacionRedirectUrl(env.FRONTEND_URL);
+    const redirectTo =
+      env.RECUPERACION_PASSWORD_REDIRECT_URL ||
+      buildRecuperacionRedirectUrl(env.FRONTEND_URL);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(correo, {
-      redirectTo,
-    });
-
-    if (error) {
-      const detalle = mensajeErrorSupabaseAuth(
-        error,
-        "No pudimos enviar el correo de recuperación. Revisá que el enlace de restablecimiento esté habilitado en la plataforma.",
-      );
-      throw new Error(detalle);
-    }
-
-    return {
+    const mensajeExito = {
       exito: true,
       mensaje:
         "Si el correo está registrado, te enviamos un enlace para restablecer la clave.",
     };
+
+    const tieneResend = Boolean(process.env.RESEND_API_KEY?.trim());
+
+    if (tieneResend) {
+      await AuthService.enviarRecuperacionConResend(correo, redirectTo);
+      return mensajeExito;
+    }
+
+    const { error: errorReset } = await supabase.auth.resetPasswordForEmail(
+      correo,
+      { redirectTo },
+    );
+
+    if (!errorReset) {
+      return mensajeExito;
+    }
+
+    const detalle = mensajeErrorSupabaseAuth(
+      errorReset,
+      mensajeFallbackRecuperacionCorreo(),
+    );
+    throw new Error(detalle);
+  }
+
+  private static async enviarRecuperacionConResend(
+    correo: string,
+    redirectTo: string,
+  ): Promise<void> {
+    const { data: linkData, error: linkError } =
+      await supabaseAdmin.auth.admin.generateLink({
+        type: "recovery",
+        email: correo,
+        options: { redirectTo },
+      });
+
+    if (linkError) {
+      if (esErrorUsuarioInexistenteRecuperacion(linkError)) {
+        return;
+      }
+      const detalle = mensajeErrorSupabaseAuth(
+        linkError,
+        mensajeFallbackRecuperacionCorreo(),
+      );
+      throw new Error(detalle);
+    }
+
+    const actionLink = linkData?.properties?.action_link;
+    if (!actionLink) {
+      throw new Error(mensajeFallbackRecuperacionCorreo());
+    }
+
+    if (!process.env.RESEND_API_KEY?.trim()) {
+      throw new Error(mensajeFallbackRecuperacionCorreo());
+    }
+
+    await enviarCorreoRecuperacionResend(correo, actionLink);
   }
 
   /**

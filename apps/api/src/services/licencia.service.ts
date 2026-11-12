@@ -18,10 +18,11 @@ import { fechaLatina } from "../utils/fechaArgentina";
 import { enmascararDni } from "../utils/enmascararDni";
 import {
   aplicarEstadoEfectivoLicencia,
-  estadoEfectivoLicencia,
   fechaVencimientoPasada,
   jugadorCoincideEstadoLicencia,
   normalizarPerfilLicencias,
+  resolverEstadoLicenciaPublica,
+  type EstadoLicenciaPublica,
 } from "../utils/estadoLicencia";
 import { fechaHoyArgentina } from "../utils/fechaArgentina";
 import {
@@ -35,11 +36,7 @@ import {
   textoInstruccionesPagoLicencia,
 } from "../utils/licenciaPago";
 
-export type EstadoLicenciaPublica =
-  | "activa"
-  | "vencida"
-  | "suspendida"
-  | "no_valida";
+export type { EstadoLicenciaPublica };
 
 export type VerificacionLicenciaPublica = {
   valida: boolean;
@@ -53,27 +50,6 @@ export type VerificacionLicenciaPublica = {
   fecha_vencimiento_texto: string | null;
   mensaje: string | null;
 };
-
-function resolverEstadoLicenciaPublica(
-  estadoDb: string | null | undefined,
-  fechaVencimiento: string | null | undefined,
-): { estado: EstadoLicenciaPublica; valida: boolean } {
-  const efectivo = estadoEfectivoLicencia(estadoDb, fechaVencimiento);
-
-  if (efectivo === "Suspendida") {
-    return { estado: "suspendida", valida: false };
-  }
-  if (efectivo === "Pendiente" || efectivo === "Rechazada") {
-    return { estado: "no_valida", valida: false };
-  }
-  if (efectivo === "Vencida") {
-    return { estado: "vencida", valida: false };
-  }
-  if (efectivo === "Activa") {
-    return { estado: "activa", valida: true };
-  }
-  return { estado: "no_valida", valida: false };
-}
 
 function respuestaLicenciaNoValida(
   mensaje = "Licencia no válida.",
@@ -505,14 +481,98 @@ export class LicenciaService {
     const { data, error } = await supabaseAdmin
       .from("licencias")
       .select(
-        "estado, nro_licencia, fecha_vencimiento, perfiles(nombre, apellido)",
+        "estado, nro_licencia, fecha_vencimiento, perfiles!fk_licencias_usuario(nombre, apellido)",
       )
       .eq("usuario_id", usuario_id)
-      .single();
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     if (error || !data) throw new Error("Licencia no encontrada");
 
     return aplicarEstadoEfectivoLicencia(data);
+  }
+
+  private static async obtenerLicenciaParaVerificacionPublica(
+    uid: string,
+    licenciaId?: string | null,
+  ): Promise<{
+    id: string;
+    usuario_id: string;
+    estado: string | null;
+    nro_licencia: string | null;
+    fecha_vencimiento: string | null;
+    perfiles:
+      | { nombre?: string | null; apellido?: string | null; dni?: string | null }
+      | null;
+  } | null> {
+    const selectConPerfil =
+      "id, usuario_id, estado, nro_licencia, fecha_vencimiento, perfiles!fk_licencias_usuario(nombre, apellido, dni)";
+
+    let query = supabaseAdmin.from("licencias").select(selectConPerfil);
+    if (licenciaId) {
+      query = query
+        .eq("id", String(licenciaId).trim())
+        .eq("usuario_id", uid);
+    } else {
+      query = query
+        .eq("usuario_id", uid)
+        .order("created_at", { ascending: false })
+        .limit(1);
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (!error && data && String(data.usuario_id) === uid) {
+      const perfilRaw = data.perfiles as
+        | { nombre?: string | null; apellido?: string | null; dni?: string | null }
+        | { nombre?: string | null; apellido?: string | null; dni?: string | null }[]
+        | null;
+      const perfil = Array.isArray(perfilRaw) ? perfilRaw[0] : perfilRaw;
+      return {
+        id: String(data.id),
+        usuario_id: String(data.usuario_id),
+        estado: data.estado ?? null,
+        nro_licencia: data.nro_licencia ?? null,
+        fecha_vencimiento: data.fecha_vencimiento ?? null,
+        perfiles: perfil ?? null,
+      };
+    }
+
+    let queryBase = supabaseAdmin
+      .from("licencias")
+      .select("id, usuario_id, estado, nro_licencia, fecha_vencimiento");
+    if (licenciaId) {
+      queryBase = queryBase
+        .eq("id", String(licenciaId).trim())
+        .eq("usuario_id", uid);
+    } else {
+      queryBase = queryBase
+        .eq("usuario_id", uid)
+        .order("created_at", { ascending: false })
+        .limit(1);
+    }
+
+    const { data: licenciaSola, error: errorSola } =
+      await queryBase.maybeSingle();
+    if (errorSola || !licenciaSola || String(licenciaSola.usuario_id) !== uid) {
+      return null;
+    }
+
+    const { data: perfilSolo } = await supabaseAdmin
+      .from("perfiles")
+      .select("nombre, apellido, dni")
+      .eq("id", uid)
+      .maybeSingle();
+
+    return {
+      id: String(licenciaSola.id),
+      usuario_id: String(licenciaSola.usuario_id),
+      estado: licenciaSola.estado ?? null,
+      nro_licencia: licenciaSola.nro_licencia ?? null,
+      fecha_vencimiento: licenciaSola.fecha_vencimiento ?? null,
+      perfiles: perfilSolo ?? null,
+    };
   }
 
   /**
@@ -527,34 +587,17 @@ export class LicenciaService {
       return respuestaLicenciaNoValida("Identificador de jugador no válido.");
     }
 
-    let query = supabaseAdmin
-      .from("licencias")
-      .select(
-        "id, usuario_id, estado, nro_licencia, fecha_vencimiento, perfiles:usuario_id(nombre, apellido, dni)",
+    const data =
+      await LicenciaService.obtenerLicenciaParaVerificacionPublica(
+        uid,
+        licenciaId,
       );
 
-    if (licenciaId) {
-      query = query.eq("id", String(licenciaId).trim());
-    } else {
-      query = query.eq("usuario_id", uid).order("created_at", { ascending: false });
-    }
-
-    const { data, error } = await query.maybeSingle();
-
-    if (error || !data) {
+    if (!data) {
       return respuestaLicenciaNoValida();
     }
 
-    if (String(data.usuario_id) !== uid) {
-      return respuestaLicenciaNoValida();
-    }
-
-    const perfilRaw = data.perfiles as
-      | { nombre?: string | null; apellido?: string | null; dni?: string | null }
-      | { nombre?: string | null; apellido?: string | null; dni?: string | null }[]
-      | null;
-    const perfil = Array.isArray(perfilRaw) ? perfilRaw[0] : perfilRaw;
-
+    const perfil = data.perfiles;
     const nombre = perfil?.nombre?.trim() || null;
     const apellido = perfil?.apellido?.trim() || null;
     const titular =
@@ -672,15 +715,27 @@ export class LicenciaService {
     // 4. Emitir notificaciones para otros cambios de estado
     if (estado === "Activa" && estadoPrevio !== "Activa") {
       const vence = fechaLatina(data.fecha_vencimiento);
+      const datosSolPago = (data.datos_solicitud || {}) as Record<
+        string,
+        unknown
+      >;
+      const montoPendiente = montoLicenciaDesdeSolicitud(datosSolPago);
+      const pagoPendiente =
+        String(datosSolPago.estado_pago || "") === "pendiente" &&
+        montoPendiente > 0;
+      const avisoPago = pagoPendiente
+        ? ` Completá el pago de $${montoPendiente.toLocaleString("es-AR")} desde Mi panel.`
+        : "";
       await NotificacionService.crearNotificacion({
         usuario_id,
         titulo: "Licencia Aprobada",
-        mensaje: `¡Felicidades! Tu licencia N° ${data.nro_licencia} fue aprobada. Vence el ${vence}. Ya podés ver tu carnet digital.`,
+        mensaje: `¡Felicidades! Tu licencia N° ${data.nro_licencia} fue aprobada. Vence el ${vence}. Ya podés ver tu carnet digital.${avisoPago}`,
         tipo: "success",
         metadata: {
           nro_licencia: data.nro_licencia,
           licencia_id: data.id,
           fecha_vencimiento: data.fecha_vencimiento,
+          estado_pago: datosSolPago.estado_pago ?? null,
         },
       });
     } else if (estado === "Suspendida" && estadoPrevio === "Activa") {
