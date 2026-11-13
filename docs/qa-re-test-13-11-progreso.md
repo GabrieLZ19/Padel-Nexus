@@ -49,10 +49,42 @@ Tickets: ENT-26, ENT-21, ENT-27, ENT-29.
 - `textoRepresentacionDesdeLicencia`: «Según tu licencia en trámite» vs activa
 - Tests: `apps/web/test/ent29LicenciaCopy.test.ts`, `apps/api/test/ent29LicenciaCotizacionTransferencia.test.ts`
 
-## Lote 3 — SIGUIENTE
+## Lote 3 — COMPLETADO (13/11/2026)
 
-TOR-5, TOR-32, TOR-35, TOR-6 (ver plan en Cursor). Orden: DB / FK partidos -> backend torneo.service + programacionPartidos -> frontend BracketEditor / Paso7Cierre.
+Commits: `6edadd3` (back), `2b65108` (front).
+
+Tickets: TOR-5, TOR-32, TOR-35, TOR-6.
+
+### TOR-5 — COMPLETADO (13/11/2026)
+
+- Migración: `supabase/migrations/20261113220000_tor5_partidos_fk_torneo_unica.sql` (aplicada en Supabase; elimina `partidos_torneo_id_fkey` duplicada)
+- `procesarResultadoYAvance` y `actualizarPartido`: embed `torneos!fk_partidos_torneo(...)` + `throw` si falla la lectura previa (`previoError` / `partidoHorarioError`)
+- `BracketEditor`: firma de marcadores ampliada (set3 / W.O.) para refrescar pestaña Auditoría
+- Tests: `apps/api/test/tor5CorregirResultadoAuditoria.test.ts`, `apps/web/test/tor5CorregirResultadoAuditoria.test.ts`, `apps/api/test/tor5PartidosFkRegresion.test.ts`
+
+### TOR-32 — COMPLETADO (13/11/2026)
+
+- `seleccionarPartidosLlaveParaAutoprogramar`: con `programacion_estado === "publicado"` no mueve cancha/fecha existentes; solo autoprograma cruces nuevos sin horario
+- Si el horario publicado queda en conflicto tras el avance, la API devuelve `avisos_programacion_publicada` y Paso Resultados muestra `sileo.warning`
+- Tests: `apps/api/test/tor32ProgramacionPublicada.test.ts`, `apps/web/test/tor32ProgramacionPublicada.test.ts`
+
+### TOR-35 — COMPLETADO (13/11/2026)
+
+- `configuracionPuntosInicial()` con `puntos_activados: true` al crear torneo
+- `inferirPuntosActivados` / ranking vinculado: default activo en Paso Cierre si no hay valor explícito en DB
+- Aviso `avisos_ranking` al cargar la final sin puntos; Paso Resultados muestra warning
+- `POST /torneos/:id/activar-puntos-ranking` con motivo, auditoría y `recalcularPuntosTorneoFinalizado`
+- UI Paso Cierre: banner + botón post-cierre en torneos finalizados
+- Tests: `apps/api/test/tor35PuntosRankingCierre.test.ts`, `apps/web/test/tor35PuntosCierreUi.test.ts`
+
+### TOR-6 — COMPLETADO (13/11/2026)
+
+- Puntos de torneos Local/Privado en `rankings.alcance = Local` vía `alcanceRankingDesdeTorneo`
+- Jugadores de planilla no excluidos del ranking público (`esJugadorDePrueba` + `ranking_provisional`)
+- `GET /rankings/:id`: calcula `posicion_actual` por alcance/categoría (`resolverPosicionEnRanking`)
+- Ficha pública: posición sin query params; alcance Local como «Ranking del club»; scope por registro principal
+- Tests: `apps/api/test/tor6RankingClub.test.ts`, `apps/web/test/tor6FichaPlanillaRanking.test.ts`
 
 ## Lotes 4–8 — PENDIENTE
 
-Ver plan completo en Cursor.
+Siguiente: **Lote 4** (TOR-28, TOR-24, TOR-23, TOR-22, TOR-21, TOR-36, TOR-16). Ver plan en Cursor.
