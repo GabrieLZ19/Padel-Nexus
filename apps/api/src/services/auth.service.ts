@@ -18,6 +18,10 @@ import {
 } from "../utils/authError";
 import { enviarCorreoRecuperacionResend } from "../utils/recuperacionPasswordEmail";
 import type { ResponsableInput } from "./menores.service";
+import {
+  metodosVerificacionPreinscripcion,
+} from "../utils/preinscripcionVerificacion";
+import { consumirTokenActivacionPreinscripcion } from "../utils/preinscripcionTokenActivacion";
 
 // DTO para el registro unificado FAP
 export interface RegistroDTO {
@@ -36,6 +40,8 @@ export interface RegistroDTO {
   acepta_tyc?: boolean;
   acepta_privacidad?: boolean;
   responsable?: ResponsableInput;
+  /** Obligatorio al activar una ficha provisoria con métodos de verificación (PUB-19). */
+  verification_token?: string;
 }
 
 export class AuthService {
@@ -164,7 +170,7 @@ export class AuthService {
 
     const { data: preinscripto } = await supabaseAdmin
       .from("perfiles")
-      .select("id, email, pendiente_activacion")
+      .select("id, email, pendiente_activacion, telefono")
       .eq("dni", dniLimpio)
       .maybeSingle();
 
@@ -174,10 +180,39 @@ export class AuthService {
         esEmailPlaceholderPlanilla(preinscripto.email));
 
     if (cuentaPlanillaPendienteApp) {
+      const fichaParaMetodos = {
+        telefono: preinscripto.telefono,
+        email: preinscripto.email,
+      };
+      const metodos = metodosVerificacionPreinscripcion(fichaParaMetodos);
+
+      if (metodos.length === 0) {
+        throw new Error(
+          "No podés activar esta ficha sin verificación. Contactá a tu entidad para que complete el teléfono o email en tu ficha.",
+        );
+      }
+
+      const tokenActivacion = String(datos.verification_token || "").trim();
+      if (!tokenActivacion) {
+        throw new Error(
+          "Debés verificar tu identidad (teléfono o email de la ficha) antes de completar el registro.",
+        );
+      }
+
+      const { perfilId: perfilIdToken } =
+        await consumirTokenActivacionPreinscripcion(dniLimpio, tokenActivacion);
+
+      if (perfilIdToken !== preinscripto.id) {
+        throw new Error("Token de verificación inválido o vencido.");
+      }
+
       const emailFinal = datos.email?.trim() || preinscripto.email;
       if (!emailFinal) {
         throw new Error("El correo electrónico es obligatorio para activar la cuenta.");
       }
+
+      const telefonoFinal =
+        datos.telefono?.trim() || preinscripto.telefono || undefined;
 
       const { error: updateAuthError } =
         await supabaseAdmin.auth.admin.updateUserById(preinscripto.id, {
@@ -204,7 +239,7 @@ export class AuthService {
             email: emailFinal,
             nombre: nombreCapitalizado,
             apellido: apellidoCapitalizado,
-            telefono: datos.telefono,
+            telefono: telefonoFinal,
             lugar_residencia: datos.lugar_residencia,
             categoria_padel: datos.categoria_padel,
             lado_preferido: datos.lado_preferido,

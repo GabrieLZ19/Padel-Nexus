@@ -7,24 +7,42 @@ const buckets = new Map<string, Bucket>();
 function resolverIpCliente(req: Request): string {
   const forwarded = req.headers["x-forwarded-for"];
   if (typeof forwarded === "string" && forwarded.length > 0) {
-    return forwarded.split(",")[0]?.trim() || "unknown";
+    const partes = forwarded
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (partes.length > 0) {
+      return partes[partes.length - 1] || req.ip || "unknown";
+    }
   }
   if (Array.isArray(forwarded) && forwarded[0]) {
-    return forwarded[0].split(",")[0]?.trim() || "unknown";
+    const partes = String(forwarded[0])
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (partes.length > 0) {
+      return partes[partes.length - 1] || req.ip || "unknown";
+    }
   }
   return req.ip || req.socket.remoteAddress || "unknown";
+}
+
+export function resolverIpClienteDesdeRequest(req: Request): string {
+  return resolverIpCliente(req);
 }
 
 export function crearRateLimiter(opciones: {
   windowMs: number;
   max: number;
   clave?: string;
+  extraBucketKey?: (req: Request) => string | null;
 }) {
-  const { windowMs, max, clave = "default" } = opciones;
+  const { windowMs, max, clave = "default", extraBucketKey } = opciones;
 
   return (req: Request, res: Response, next: NextFunction): void => {
     const ip = resolverIpCliente(req);
-    const bucketKey = `${clave}:${ip}`;
+    const extra = extraBucketKey?.(req);
+    const bucketKey = extra ? `${clave}:${extra}:${ip}` : `${clave}:${ip}`;
     const ahora = Date.now();
     const bucket = buckets.get(bucketKey);
 

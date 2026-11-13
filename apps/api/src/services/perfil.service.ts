@@ -19,6 +19,12 @@ import {
   metodosVerificacionPreinscripcion,
   type MetodoVerificacionPreinscripcion,
 } from "../utils/preinscripcionVerificacion";
+import {
+  assertDniNoBloqueadoPreinscripcion,
+  registrarIntentoFallidoPreinscripcion,
+  reiniciarIntentosPreinscripcion,
+} from "../utils/preinscripcionBloqueo";
+import { emitirTokenActivacionPreinscripcion } from "../utils/preinscripcionTokenActivacion";
 import { randomBytes } from "crypto";
 import { esVisibleEnSitioPublico } from "../utils/datoPrueba";
 import { capitalizarNombre, normalizarNombrePerfil } from "../utils/formatoTexto";
@@ -440,6 +446,7 @@ export class PerfilService {
    * Consulta anónima: indica si hay ficha pendiente sin exponer PII (PUB-18).
    */
   static async consultarPreinscripcionPorDni(dni: string) {
+    await assertDniNoBloqueadoPreinscripcion(dni);
     const data = await PerfilService.obtenerFichaPreinscripcionPorDni(dni);
     if (!data) {
       return { encontrado: false as const };
@@ -482,8 +489,10 @@ export class PerfilService {
       email?: string;
     },
   ) {
+    await assertDniNoBloqueadoPreinscripcion(dni);
     const data = await PerfilService.obtenerFichaPreinscripcionPorDni(dni);
     if (!data) {
+      await registrarIntentoFallidoPreinscripcion(dni);
       throw new Error("Los datos de verificación no coinciden.");
     }
 
@@ -510,13 +519,23 @@ export class PerfilService {
     }
 
     if (!verificado) {
+      await registrarIntentoFallidoPreinscripcion(dni);
       throw new Error("Los datos de verificación no coinciden.");
     }
+
+    await reiniciarIntentosPreinscripcion(dni);
+    const { token, expires_at } = await emitirTokenActivacionPreinscripcion({
+      dni,
+      perfilId: String(data.id),
+      metodo: payload.metodo,
+    });
 
     return {
       encontrado: true as const,
       pendiente_activacion: true as const,
       perfil: PerfilService.perfilPublicableDesdeFicha(data),
+      verification_token: token,
+      verification_token_expires_at: expires_at,
     };
   }
 

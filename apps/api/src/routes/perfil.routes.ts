@@ -9,13 +9,27 @@ const rateLimitPreinscripcion = crearRateLimiter({
   clave: "preinscripcion",
   windowMs: 15 * 60 * 1000,
   max: 60,
+  extraBucketKey: (req) => {
+    const dni = String(req.params.dni || "").replace(/\D/g, "");
+    return dni || null;
+  },
+});
+
+const rateLimitRegistro = crearRateLimiter({
+  clave: "registro",
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  extraBucketKey: (req) => {
+    const dni = String(req.body?.dni || "").replace(/\D/g, "");
+    return dni || null;
+  },
 });
 
 // ==========================================
 // ENDPOINTS PÚBLICOS (Sin Token)
 // ==========================================
 router.post("/login", PerfilController.login);
-router.post("/registro", PerfilController.registro);
+router.post("/registro", rateLimitRegistro, PerfilController.registro);
 router.post("/recuperar-password", PerfilController.solicitarRecuperarPassword);
 router.get(
   "/preinscripcion/:dni",

@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import { supabaseAdmin } from "../config/supabase";
 import { LicenciaClubService } from "../services/licenciaClub.service";
+import {
+  evaluarAdminClubAccesoLicencia,
+  evaluarParametrosLicenciaClub,
+} from "../utils/licenciaClubAcceso";
 
 async function clubIdAsignadoAlUsuario(userId: string): Promise<string | null> {
   const { data: perfil } = await supabaseAdmin
@@ -26,18 +30,17 @@ async function validarLecturaLicenciaClub(
   clubId: string,
   licenciaId: string,
 ): Promise<{ status: number; error: string } | null> {
-  if (!clubId || !licenciaId) {
-    return { status: 400, error: "Club y licencia son obligatorios." };
-  }
+  const paramsInvalidos = evaluarParametrosLicenciaClub(clubId, licenciaId);
+  if (paramsInvalidos) return paramsInvalidos;
 
   if (req.user?.rol === "admin_club" && req.user.id) {
     const clubUsuario = await clubIdAsignadoAlUsuario(req.user.id);
-    if (String(clubUsuario || "") !== clubId) {
-      return {
-        status: 403,
-        error: "No podés ver la licencia de otro club.",
-      };
-    }
+    const denegado = evaluarAdminClubAccesoLicencia({
+      rol: req.user.rol,
+      clubIdEnUrl: clubId,
+      clubIdDelPerfil: clubUsuario,
+    });
+    if (denegado) return denegado;
   }
 
   const pertenece = await LicenciaClubService.licenciaPerteneceAClub(
@@ -62,10 +65,15 @@ export const LicenciaClubController = {
       }
       if (req.user?.rol === "admin_club" && req.user.id) {
         const clubUsuario = await clubIdAsignadoAlUsuario(req.user.id);
-        if (String(clubUsuario || "") !== clubId) {
+        const denegado = evaluarAdminClubAccesoLicencia({
+          rol: req.user.rol,
+          clubIdEnUrl: clubId,
+          clubIdDelPerfil: clubUsuario,
+        });
+        if (denegado) {
           return res
-            .status(403)
-            .json({ exito: false, error: "No podés ver la licencia de otro club." });
+            .status(denegado.status)
+            .json({ exito: false, error: denegado.error });
         }
       }
       let licencia = await LicenciaClubService.obtenerPorClubId(clubId);

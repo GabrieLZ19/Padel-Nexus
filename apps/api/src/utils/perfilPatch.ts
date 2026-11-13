@@ -6,7 +6,11 @@ export function buildPerfilUpdatePatch(
   values: Record<string, unknown>,
 ): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(values).filter(([, value]) => value !== undefined),
+    Object.entries(values).filter(([key, value]) => {
+      if (value === undefined) return false;
+      if (key === "telefono" && String(value).trim() === "") return false;
+      return true;
+    }),
   );
 }
 
