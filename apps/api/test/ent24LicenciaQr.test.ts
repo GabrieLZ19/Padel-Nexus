@@ -25,9 +25,10 @@ describe("ENT-24 licencia pendiente y QR público", () => {
     );
   });
 
-  it("no expone identidad de menor si el carné no es válido", () => {
-    assert.equal(exponeIdentidadVerificacionPublica(false, true), false);
+  it("no expone identidad de menor en consulta pública aunque esté vigente", () => {
+    assert.equal(exponeIdentidadVerificacionPublica(true, false), false);
     assert.equal(exponeIdentidadVerificacionPublica(true, true), true);
+    assert.equal(exponeIdentidadVerificacionPublica(false, false), true);
   });
 
   it("listado CRM muestra pago pendiente y verificar en trámite", () => {

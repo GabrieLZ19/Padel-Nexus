@@ -25,7 +25,11 @@ export const verificarLicenciaPublica = async (
     const licenciaId =
       typeof req.query.licencia === "string" ? req.query.licencia : undefined;
 
-    const data = await LicenciaService.verificarPublica(usuario_id, licenciaId);
+    const data = await LicenciaService.verificarPublica(
+      usuario_id,
+      licenciaId,
+      req.user ? { rol: req.user.rol } : null,
+    );
     return res.status(200).json({ exito: true, data });
   } catch (error: unknown) {
     const message =

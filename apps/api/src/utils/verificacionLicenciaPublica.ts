@@ -23,11 +23,14 @@ export function mensajeVerificacionLicenciaPublica(
   return "Licencia no válida.";
 }
 
+/**
+ * En consultas públicas (QR / verificar sin rol CRM) no se expone titular ni DNI de menores,
+ * aunque el carné esté vigente. Con sesión fiscal/club/organizador, `consultaAutorizada`.
+ */
 export function exponeIdentidadVerificacionPublica(
-  valida: boolean,
   esMenor: boolean | null | undefined,
+  consultaAutorizada = false,
 ): boolean {
-  if (valida) return true;
-  if (esMenor) return false;
+  if (esMenor) return consultaAutorizada;
   return true;
 }

@@ -13,11 +13,13 @@ import {
   descripcionVigenciaLicencia,
   periodoDesdeFecha,
 } from "../utils/licenciaConfig";
+import { esRolAccesoCrm } from "../constants/roles";
 import { resumirLicenciasPorJugador } from "../utils/resumenLicencias";
 import { fechaLatina } from "../utils/fechaArgentina";
 import { enmascararDni } from "../utils/enmascararDni";
 import {
   aplicarEstadoEfectivoLicencia,
+  estadoEfectivoLicencia,
   jugadorCoincideEstadoLicencia,
   normalizarEstadoAlmacenadoLicencia,
   reconciliarEstadoAlmacenadoConVencimiento,
@@ -56,6 +58,8 @@ export type VerificacionLicenciaPublica = {
   fecha_vencimiento: string | null;
   fecha_vencimiento_texto: string | null;
   mensaje: string | null;
+  /** True si el titular es menor y la consulta no es de personal autorizado. */
+  identidad_reservada_menor: boolean;
 };
 
 function respuestaLicenciaNoValida(
@@ -72,6 +76,7 @@ function respuestaLicenciaNoValida(
     fecha_vencimiento: null,
     fecha_vencimiento_texto: null,
     mensaje,
+    identidad_reservada_menor: false,
   };
 }
 
@@ -641,6 +646,7 @@ export class LicenciaService {
   static async verificarPublica(
     usuarioId: string,
     licenciaId?: string | null,
+    actor?: { rol?: string | null } | null,
   ): Promise<VerificacionLicenciaPublica> {
     const uid = String(usuarioId || "").trim();
     if (!uid) {
@@ -668,10 +674,13 @@ export class LicenciaService {
       ? String(data.fecha_vencimiento)
       : null;
 
+    const esMenor = perfil?.es_menor === true;
+    const consultaAutorizada = esRolAccesoCrm(actor?.rol);
     const mostrarIdentidad = exponeIdentidadVerificacionPublica(
-      valida,
-      perfil?.es_menor,
+      esMenor,
+      consultaAutorizada,
     );
+    const identidadReservadaMenor = esMenor && !mostrarIdentidad;
     const nombre = mostrarIdentidad
       ? perfil?.nombre?.trim() || null
       : null;
@@ -697,6 +706,7 @@ export class LicenciaService {
         estado,
         data.datos_solicitud,
       ),
+      identidad_reservada_menor: identidadReservadaMenor,
     };
   }
 
@@ -792,6 +802,16 @@ export class LicenciaService {
     const estadoPrevio = licenciaPrevia.estado;
     const estadoSolicitado = normalizarEstadoAlmacenadoLicencia(estado);
     const estadoPreviaNorm = normalizarEstadoAlmacenadoLicencia(estadoPrevio);
+    const estadoEfectivoPrevio = estadoEfectivoLicencia(
+      licenciaPrevia.estado,
+      licenciaPrevia.fecha_vencimiento,
+    );
+    const esAprobacionInicial =
+      estadoSolicitado === "Activa" && estadoPreviaNorm === "Pendiente";
+    const esReactivacion =
+      estadoSolicitado === "Activa" &&
+      estadoEfectivoPrevio !== "Activa" &&
+      estadoEfectivoPrevio !== "Pendiente";
     const usuario_id = licenciaPrevia.usuario_id;
     let data = { ...licenciaPrevia, estado };
 
@@ -858,8 +878,8 @@ export class LicenciaService {
       };
     }
 
-    if (estado === "Activa" && estadoPrevio !== "Activa") {
-      // Activación real: registrar la fecha de emisión y calcular vencimiento
+    if (esAprobacionInicial || esReactivacion) {
+      // Alta inicial o reactivación: emisión y vigencia según configuración
       updateData.fecha_emision = new Date().toISOString().split("T")[0];
       updateData.fecha_vencimiento = fechaVencimiento;
     } else if (fechaVencimientoOverride) {
@@ -889,7 +909,7 @@ export class LicenciaService {
     data = aplicarEstadoEfectivoLicencia(updatedData);
 
     // 4. Emitir notificaciones para otros cambios de estado
-    if (estado === "Activa" && estadoPrevio !== "Activa") {
+    if (esAprobacionInicial) {
       const vence = fechaLatina(data.fecha_vencimiento);
       const datosSolPago = (data.datos_solicitud || {}) as Record<
         string,
@@ -912,6 +932,30 @@ export class LicenciaService {
           licencia_id: data.id,
           fecha_vencimiento: data.fecha_vencimiento,
           estado_pago: datosSolPago.estado_pago ?? null,
+        },
+      });
+    } else if (esReactivacion) {
+      await LicenciaService.registrarAuditoriaLicencia(
+        id,
+        contexto?.adminId,
+        "reactivar_licencia",
+        {
+          estado_previo: estadoEfectivoPrevio,
+          estado_nuevo: "Activa",
+          nro_licencia: data.nro_licencia,
+          usuario_id,
+        },
+      );
+      const vence = fechaLatina(data.fecha_vencimiento);
+      await NotificacionService.crearNotificacion({
+        usuario_id,
+        titulo: "Licencia reactivada",
+        mensaje: `Tu licencia N° ${data.nro_licencia} fue reactivada. Vence el ${vence}. Ya podés usar tu carnet digital.`,
+        tipo: "success",
+        metadata: {
+          nro_licencia: data.nro_licencia,
+          licencia_id: data.id,
+          fecha_vencimiento: data.fecha_vencimiento,
         },
       });
     } else if (
@@ -941,22 +985,6 @@ export class LicenciaService {
           motivo: motivoSuspension,
         },
       });
-    } else if (
-      estadoSolicitado === "Activa" &&
-      estadoPreviaNorm !== "Activa" &&
-      estadoPreviaNorm !== "Pendiente"
-    ) {
-      await LicenciaService.registrarAuditoriaLicencia(
-        id,
-        contexto?.adminId,
-        "reactivar_licencia",
-        {
-          estado_previo: estadoPrevio,
-          estado_nuevo: "Activa",
-          nro_licencia: data.nro_licencia,
-          usuario_id,
-        },
-      );
     }
 
     const fechaAnteriorNorm = String(licenciaPrevia.fecha_vencimiento || "").split(
@@ -1182,6 +1210,7 @@ export class LicenciaService {
         club_id: params.club_id || null,
       });
 
+    const transferencia = resolverDatosTransferenciaLicencia(config);
     return {
       precio_anual: Number(config.precioAnual || 0),
       precio_mensual: Number(config.precioMensual || 0),
@@ -1192,6 +1221,8 @@ export class LicenciaService {
       vigencia_modo: config.vigenciaModo,
       descripcion_vigencia: descripcionVigenciaLicencia(config),
       origen: config.origen,
+      transferencia_disponible:
+        transferenciaLicenciaDisponible(transferencia),
     };
   }
 
@@ -1530,6 +1561,16 @@ export class LicenciaService {
       if (pagoError.code === "23505") {
         throw new Error(
           `Ya existe un pago registrado para el período ${periodo}.`,
+        );
+      }
+      if (
+        pagoError.code === "23514" &&
+        String(pagoError.message).includes("licencia_pagos_periodo_check")
+      ) {
+        throw new Error(
+          esMensual
+            ? "El período no es válido. Para licencias mensuales usá el formato AAAA-MM (ej. 2026-11)."
+            : "El período no es válido. Para licencias anuales usá el año AAAA (ej. 2026).",
         );
       }
       throw new Error(pagoError.message);

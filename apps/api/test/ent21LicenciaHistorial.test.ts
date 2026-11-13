@@ -15,6 +15,11 @@ describe("ENT-21 · historial de licencia", () => {
     assert.match(svc, /reactivar_licencia/);
     assert.match(svc, /cambiar_vencimiento_licencia/);
     assert.match(svc, /admin_nombre/);
+    assert.match(svc, /esReactivacion/);
+    assert.match(svc, /esAprobacionInicial/);
+    assert.match(svc, /estadoEfectivoPrevio/);
+    assert.match(svc, /titulo: "Licencia reactivada"/);
+    assert.match(svc, /titulo: "Licencia aprobada"/);
   });
 
   it("fecha latina con hora en util backend", () => {
