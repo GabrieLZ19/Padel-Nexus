@@ -25,6 +25,7 @@ export interface VerificacionLicenciaPublica {
   fecha_vencimiento: string | null;
   fecha_vencimiento_texto: string | null;
   mensaje: string | null;
+  identidad_reservada_menor?: boolean;
 }
 
 export const SitioPublicoService = {

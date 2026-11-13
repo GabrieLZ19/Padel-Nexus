@@ -385,8 +385,9 @@ export default function LicenciaModal({
                   {formatMontoLicenciaArs(montoCotizado)}
                 </p>
                 <p className="text-[11px] text-gray-400 mt-1">
-                  Podés abonar con Mercado Pago o por transferencia después de
-                  enviar la solicitud.
+                  {cotizacion?.transferencia_disponible
+                    ? "Podés abonar con Mercado Pago o por transferencia después de enviar la solicitud."
+                    : "Por ahora el pago es con Mercado Pago después de enviar la solicitud."}
                 </p>
               </div>
             ) : null}

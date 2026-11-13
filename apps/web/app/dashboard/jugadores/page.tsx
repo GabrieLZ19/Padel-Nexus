@@ -224,10 +224,10 @@ export default function JugadoresLicenciasPage() {
       setFeedback({
         isOpen: true,
         title:
-          nuevoEstado === "Activa" ? "Licencia aprobada" : "Licencia suspendida",
+          nuevoEstado === "Activa" ? "Licencia reactivada" : "Licencia suspendida",
         description:
           nuevoEstado === "Activa"
-            ? "La licencia ha sido activada con éxito."
+            ? "La licencia volvió a estado activo."
             : "La licencia quedó suspendida. El jugador puede reactivarse cuando corresponda.",
         type: nuevoEstado === "Activa" ? "success" : "info",
       });

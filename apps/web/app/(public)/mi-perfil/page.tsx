@@ -44,6 +44,7 @@ import { licenciasComoArray } from "@/utils/licenciasArray";
 import {
   representacionesProvincialMiPerfil,
   etiquetaRepresentacionProvincialConFallback,
+  textoRepresentacionDesdeLicencia,
 } from "@/utils/representacionProvincialMiPerfil";
 
 const Skeleton = ({ className }: { className?: string }) => (
@@ -97,8 +98,8 @@ export default function PlayerDashboard() {
     [profile?.afiliaciones, profile?.licencias],
   );
 
-  const representacionDesdeLicencia = useMemo(
-    () => representacionesProvinciales.some((r) => r.desde_licencia),
+  const textoRepresentacionLicencia = useMemo(
+    () => textoRepresentacionDesdeLicencia(representacionesProvinciales),
     [representacionesProvinciales],
   );
 
@@ -396,10 +397,9 @@ export default function PlayerDashboard() {
                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-2">
                       Representación provincial ({representacionesProvinciales.length})
                     </p>
-                    {representacionDesdeLicencia ? (
+                    {textoRepresentacionLicencia ? (
                       <p className="text-[10px] text-gray-500 mb-2 text-center leading-snug">
-                        Según tu licencia activa (sin afiliación provincial
-                        aparte).
+                        {textoRepresentacionLicencia}
                       </p>
                     ) : null}
                     <div className="flex flex-wrap justify-center gap-1.5 max-h-24 overflow-y-auto pr-1 mb-3 w-full">

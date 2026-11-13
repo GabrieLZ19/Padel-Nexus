@@ -86,6 +86,11 @@
   text-transform: none;
 }
 
+/* ENT-26: toasts por encima de FeedbackModal (z-[200]) */
+[data-sileo-viewport] {
+  z-index: 300;
+}
+
 html.light {
   color-scheme: light;
   --color-brand-black: #f1f5f9; /* Slate 100 - soft, low-brightness background */

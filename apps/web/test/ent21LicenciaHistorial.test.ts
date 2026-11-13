@@ -26,5 +26,6 @@ describe("ENT-21 · historial y UX de licencia en CRM", () => {
     assert.match(listado, /inputMinLength=\{3\}/);
     assert.match(listado, /reactivarLicencia/);
     assert.match(listado, /¿Reactivar licencia\?/);
+    assert.match(listado, /Licencia reactivada/);
   });
 });

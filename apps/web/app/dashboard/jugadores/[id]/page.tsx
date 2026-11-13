@@ -119,6 +119,16 @@ export default function PerfilJugadorAdminPage() {
             description: "La fecha de vencimiento fue guardada.",
           });
         }
+      } else if (nuevoEstado === "Activa" && previo !== "Pendiente") {
+        sileo.success({
+          title: "Licencia reactivada",
+          description: "La licencia volvió a estado activo.",
+        });
+      } else if (nuevoEstado === "Suspendida") {
+        sileo.success({
+          title: "Licencia suspendida",
+          description: "El jugador recibirá una notificación con el motivo.",
+        });
       }
       await fetchPerfil(true);
       if (currentLicencia?.id) {

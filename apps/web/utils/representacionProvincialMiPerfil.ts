@@ -67,3 +67,23 @@ export function etiquetaRepresentacionProvincialConFallback(
 ): string {
   return etiquetaRepresentacionProvincial(item);
 }
+
+/** Aviso bajo badges cuando la asociación se infiere de la licencia, no de afiliación. */
+export function textoRepresentacionDesdeLicencia(
+  items: RepresentacionProvincialItem[],
+): string | null {
+  const inferidos = items.filter((r) => r.desde_licencia);
+  if (inferidos.length === 0) return null;
+
+  const hayPendiente = inferidos.some(
+    (r) => (r.estado || "").toLowerCase() === "pendiente",
+  );
+  const hayActiva = inferidos.some(
+    (r) => (r.estado || "").toLowerCase() === "activa",
+  );
+
+  if (hayPendiente && !hayActiva) {
+    return "Según tu licencia en trámite (sin afiliación provincial aparte).";
+  }
+  return "Según tu licencia activa (sin afiliación provincial aparte).";
+}

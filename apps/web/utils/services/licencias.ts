@@ -78,6 +78,7 @@ export interface LicenciaCotizacion {
   moneda: string;
   nombre_carne?: string | null;
   descripcion_vigencia?: string;
+  transferencia_disponible?: boolean;
 }
 
 export interface LicenciaPreferenciaPago {

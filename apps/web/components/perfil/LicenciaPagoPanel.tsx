@@ -186,24 +186,23 @@ export default function LicenciaPagoPanel({
         {procesando ? "Procesando..." : "Pagar con Mercado Pago"}
       </button>
 
-      {transferenciaDisponible !== false ? (
+      {transferenciaDisponible === false ? (
+        <p className="text-[11px] text-gray-500 text-center px-2 leading-snug">
+          Por ahora el pago es con Mercado Pago.
+        </p>
+      ) : null}
+
+      {transferenciaDisponible === true ? (
         <button
           type="button"
           onClick={() => void mostrarTransferencia()}
-          disabled={procesando || transferenciaDisponible === null}
+          disabled={procesando}
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-brand-white/15 bg-brand-white/5 text-brand-white text-xs font-bold hover:bg-brand-white/10 transition-colors cursor-pointer disabled:opacity-50"
         >
           <Building2 className="size-3.5 text-brand-chartreuse" />
-          {transferenciaDisponible === null
-            ? "Cargando datos..."
-            : "Ver datos para transferencia"}
+          Ver datos para transferencia
         </button>
-      ) : (
-        <p className="text-[11px] text-gray-500 text-center px-2 leading-snug">
-          El pago por transferencia no está habilitado: la federación debe cargar
-          alias o CBU en Jugadores → Configuración.
-        </p>
-      )}
+      ) : null}
 
       {(instrucciones || alias || cbu || referencia) && (
         <div className="rounded-xl border border-brand-white/10 bg-brand-black/50 p-3 space-y-2.5 text-xs text-gray-300">

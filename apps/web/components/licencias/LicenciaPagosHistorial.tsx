@@ -10,6 +10,19 @@ import { etiquetaPeriodoLicencia } from "@/utils/licenciaPago";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { sileo } from "sileo";
 
+function mensajeErrorApi(err: unknown, fallback: string): string {
+  const e = err as {
+    message?: string;
+    response?: { data?: { error?: string; message?: string } };
+  };
+  return (
+    e.response?.data?.error ||
+    e.response?.data?.message ||
+    e.message ||
+    fallback
+  );
+}
+
 interface LicenciaPagosHistorialProps {
   licenciaId: string;
   /** Si true, muestra el botón para registrar pago manual. */
@@ -42,11 +55,9 @@ export function LicenciaPagosHistorial({
       const data = await LicenciasService.listarPagos(licenciaId);
       setPagos(data);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
       sileo.error({
         title: "Pagos",
-        description:
-          e?.response?.data?.error || "No se pudo cargar el historial.",
+        description: mensajeErrorApi(err, "No se pudo cargar el historial."),
       });
     } finally {
       setLoading(false);
@@ -68,10 +79,9 @@ export function LicenciaPagosHistorial({
       setConfirmOpen(false);
       await cargar();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
       sileo.error({
         title: "Error",
-        description: e?.response?.data?.error || "No se pudo registrar el pago.",
+        description: mensajeErrorApi(err, "No se pudo registrar el pago."),
       });
     } finally {
       setSaving(false);

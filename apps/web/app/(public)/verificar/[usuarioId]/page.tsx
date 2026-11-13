@@ -131,6 +131,13 @@ export default function VerificarCredencialPage() {
             </div>
 
             <dl className="space-y-4 border-t border-white/10 pt-6">
+              {dato.identidad_reservada_menor ? (
+                <p className="text-sm text-gray-400 leading-snug border border-white/10 rounded-xl px-3 py-2.5 bg-black/30">
+                  Titular menor de edad: nombre y documento solo visibles para
+                  personal autorizado (fiscal, club u organizador) con sesión
+                  iniciada.
+                </p>
+              ) : null}
               {dato.titular ? (
                 <div>
                   <dt className="text-xs uppercase tracking-wider text-gray-500 font-bold">
