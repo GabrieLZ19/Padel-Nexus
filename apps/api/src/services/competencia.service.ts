@@ -523,7 +523,9 @@ export class CompetenciaService {
       throw new Error(`Error al obtener zonas: ${error.message}`);
     }
 
-    if (!grupos) return [];
+    if (!grupos) {
+      return { zonas: [], cabezas_ranking_globales: [] as string[] };
+    }
 
     // Calcular cabezas de serie
     const { data: inscripciones } = await supabaseAdmin
@@ -647,7 +649,10 @@ export class CompetenciaService {
       }),
     }));
 
-    return gruposConClub;
+    return {
+      zonas: gruposConClub,
+      cabezas_ranking_globales: [...cabezasDeSerieIds],
+    };
   }
 
   /**
@@ -699,8 +704,20 @@ export class CompetenciaService {
     if (errIns) throw new Error(`Error insertando pareja: ${errIns.message}`);
 
     // 3. Re-generar los partidos para ambos grupos afectados
-    await CompetenciaService.regenerarPartidosDeGrupo(torneoId, grupoOrigenId, origenGrupo.nombre_grupo);
-    await CompetenciaService.regenerarPartidosDeGrupo(torneoId, grupoDestinoId, destinoGrupo.nombre_grupo);
+    await CompetenciaService.regenerarPartidosDeGrupo(
+      torneoId,
+      grupoOrigenId,
+      origenGrupo.nombre_grupo,
+    );
+    await CompetenciaService.regenerarPartidosDeGrupo(
+      torneoId,
+      grupoDestinoId,
+      destinoGrupo.nombre_grupo,
+    );
+    const { sincronizarLlaveTrasCambioZonas } = await import(
+      "../utils/playoffAvance"
+    );
+    await sincronizarLlaveTrasCambioZonas(torneoId);
 
     // 4. Registrar auditoría
     await supabaseAdmin.from("logs_auditoria").insert({
@@ -790,17 +807,13 @@ export class CompetenciaService {
       pushIfNew(1, parejas[0].inscripcion_id, parejas[3].inscripcion_id);
       pushIfNew(2, parejas[1].inscripcion_id, parejas[2].inscripcion_id);
 
-      const ordenTrasBorrado = new Set<number>();
-      for (const m of existentes || []) {
-        if (m.ganador) {
-          if (m.orden != null) ordenTrasBorrado.add(m.orden);
-          continue;
-        }
-        if (pendientesIds.includes(m.id)) continue;
-        if (m.orden != null) ordenTrasBorrado.add(m.orden);
-      }
+      const ordenesTrasBorrarPendientes = new Set(
+        (existentes || [])
+          .filter((m) => !pendientesIds.includes(m.id) && m.orden != null)
+          .map((m) => m.orden as number),
+      );
 
-      if (!ordenTrasBorrado.has(3)) {
+      if (!ordenesTrasBorrarPendientes.has(3)) {
         partidos.push({
           torneo_id: torneoId,
           ronda: nombreGrupo,
@@ -808,7 +821,7 @@ export class CompetenciaService {
           estado_partido: "Pendiente Ganadores",
         });
       }
-      if (!ordenTrasBorrado.has(4)) {
+      if (!ordenesTrasBorrarPendientes.has(4)) {
         partidos.push({
           torneo_id: torneoId,
           ronda: nombreGrupo,
@@ -1071,6 +1084,8 @@ export class CompetenciaService {
       }
     }
 
+    const zonasRegeneradas: string[] = [];
+
     // 2. Regenerar fixture solo en zonas cuya composición cambió
     for (const z of zonas) {
       const firmaNueva = firmaParejas(z.parejas.map((p) => p.id));
@@ -1078,6 +1093,7 @@ export class CompetenciaService {
       if (firmaAnterior !== undefined && firmaAnterior === firmaNueva) {
         continue;
       }
+      zonasRegeneradas.push(z.nombre);
       await CompetenciaService.regenerarPartidosDeGrupo(
         torneoId,
         z.id,
@@ -1085,10 +1101,15 @@ export class CompetenciaService {
       );
     }
 
+    const { completarPartidosFaltantesTorneo } = await import(
+      "../utils/zonaFixtureRepair"
+    );
+    const fixtureReparado = await completarPartidosFaltantesTorneo(torneoId);
+
     const { sincronizarLlaveTrasCambioZonas } = await import(
       "../utils/playoffAvance"
     );
-    await sincronizarLlaveTrasCambioZonas(torneoId);
+    const llave = await sincronizarLlaveTrasCambioZonas(torneoId);
 
     // 3. Registrar auditoría única
     await supabaseAdmin.from("logs_auditoria").insert({
@@ -1121,6 +1142,49 @@ export class CompetenciaService {
       },
     });
 
-    return { exito: true, mensaje: "Distribución de zonas guardada exitosamente" };
+    return {
+      exito: true,
+      mensaje: "Distribución de zonas guardada exitosamente",
+      zonas_regeneradas: zonasRegeneradas,
+      fixture_reparado: fixtureReparado,
+      llave,
+    };
+  }
+
+  /**
+   * Repara fixtures de zona incompletos (p. ej. falta partido 3/4 en zona de 4)
+   * y re-sincroniza plazas FAP en la llave.
+   */
+  static async repararFixtureZonasTorneo(
+    torneoId: string,
+    adminId: string,
+    motivo?: string,
+  ) {
+    const { completarPartidosFaltantesTorneo } = await import(
+      "../utils/zonaFixtureRepair"
+    );
+    const fixtureReparado = await completarPartidosFaltantesTorneo(torneoId);
+    const { sincronizarLlaveTrasCambioZonas } = await import(
+      "../utils/playoffAvance"
+    );
+    const llave = await sincronizarLlaveTrasCambioZonas(torneoId);
+
+    await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: adminId,
+      accion: "reparar_fixture_zonas",
+      entidad_afectada: torneoId,
+      detalles: {
+        motivo: motivo?.trim() || "Reparación manual de fixtures de zona",
+        fixture_reparado: fixtureReparado,
+        llave,
+      },
+    });
+
+    return {
+      exito: true,
+      mensaje: "Fixtures de zona y llave re-sincronizados.",
+      fixture_reparado: fixtureReparado,
+      llave,
+    };
   }
 }

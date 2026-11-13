@@ -2426,6 +2426,7 @@ export class TorneoService {
     equipoBId: string | null,
     motivo: string,
     adminId: string,
+    opciones?: import("../types/altaLlavePartido").OpcionesAltaEnActualizarEquipos,
   ) {
     // 1. Validar que el partido existe
     const { data: partido, error } = await supabaseAdmin
@@ -2442,6 +2443,35 @@ export class TorneoService {
     const prevB = partido.equipo_b_id;
     let nextA: string | null = equipoAId;
     let nextB: string | null = equipoBId;
+    const inscripcionesCreadas: string[] = [];
+
+    try {
+    if (opciones?.altaLadoA) {
+      const { LlaveAltaParejaService } = await import(
+        "./llaveAltaPareja.service"
+      );
+      const creada = await LlaveAltaParejaService.ejecutarAltaDesdePayload({
+        torneoDestinoId: partido.torneo_id,
+        adminId,
+        motivo,
+        payload: opciones.altaLadoA,
+      });
+      nextA = creada.id;
+      inscripcionesCreadas.push(creada.id);
+    }
+    if (opciones?.altaLadoB) {
+      const { LlaveAltaParejaService } = await import(
+        "./llaveAltaPareja.service"
+      );
+      const creada = await LlaveAltaParejaService.ejecutarAltaDesdePayload({
+        torneoDestinoId: partido.torneo_id,
+        adminId,
+        motivo,
+        payload: opciones.altaLadoB,
+      });
+      nextB = creada.id;
+      inscripcionesCreadas.push(creada.id);
+    }
 
     const { PromocionMenoresService } = await import(
       "./promocionMenores.service"
@@ -2456,21 +2486,61 @@ export class TorneoService {
       normalizarRonda(partido.ronda || ""),
     );
     if (esLlave) {
-      await liberarParejasDuplicadasEnLlave(
-        partido.torneo_id,
-        partido.id,
-        prevA,
-        prevB,
-        equipoAId,
-        equipoBId,
+      const { esEliminatoriaDirecta } = await import("../utils/formatoTorneo");
+      const { resolveFapPlantillaPairCount } = await import(
+        "../utils/fapPlantillaTorneo"
       );
+      const { getFapBracketForPairCount } = await import(
+        "../utils/fapBracketMatrices"
+      );
+      const { validarCambioEquiposConMatrizFap } = await import(
+        "../utils/edicionLlaveFap"
+      );
+      const { data: torneoFmt } = await supabaseAdmin
+        .from("torneos")
+        .select("formato")
+        .eq("id", partido.torneo_id)
+        .maybeSingle();
+      if (torneoFmt && !esEliminatoriaDirecta(torneoFmt.formato)) {
+        const pairCount = await resolveFapPlantillaPairCount(
+          partido.torneo_id,
+        );
+        const matrix = getFapBracketForPairCount(pairCount);
+        const spec = matrix?.find((m) => m.matchNo === partido.orden);
+        if (spec) {
+          validarCambioEquiposConMatrizFap(
+            spec,
+            prevA,
+            prevB,
+            nextA,
+            nextB,
+          );
+        }
+      }
+
+      const { cambiosAuditoria: cambiosLlaveSecundarios } =
+        await liberarParejasDuplicadasEnLlave(
+          partido.torneo_id,
+          partido.id,
+          prevA,
+          prevB,
+          nextA,
+          nextB,
+        );
+      for (const cambio of cambiosLlaveSecundarios) {
+        await registrarAuditoriaCambioParejaPartido({
+          ...cambio,
+          motivo,
+          adminId,
+        });
+      }
     }
     if (!esLlave) {
       const { error: updateZona } = await supabaseAdmin
         .from("partidos")
         .update({
-          equipo_a_id: equipoAId,
-          equipo_b_id: equipoBId,
+          equipo_a_id: nextA,
+          equipo_b_id: nextB,
           ganador: null,
           set1_a: null,
           set1_b: null,
@@ -2478,8 +2548,6 @@ export class TorneoService {
         })
         .eq("id", partidoId);
       if (updateZona) throw new Error(updateZona.message);
-      nextA = equipoAId;
-      nextB = equipoBId;
     } else {
     const parche = await PromocionMenoresService.editarLados(
       partido.torneo_id,
@@ -2493,8 +2561,8 @@ export class TorneoService {
         set1A: partido.set1_a,
         set1B: partido.set1_b,
       },
-      equipoAId,
-      equipoBId,
+      nextA,
+      nextB,
     );
 
     const { error: updateError } = await supabaseAdmin
@@ -2530,6 +2598,19 @@ export class TorneoService {
       motivo,
       adminId,
     });
+    } catch (error) {
+      if (inscripcionesCreadas.length > 0) {
+        const { InscripcionService } = await import("./inscripcion.service");
+        for (const inscripcionId of inscripcionesCreadas) {
+          try {
+            await InscripcionService.cancelarInscripcion(inscripcionId);
+          } catch {
+            /* mejor esfuerzo */
+          }
+        }
+      }
+      throw error;
+    }
   }
 
   /**

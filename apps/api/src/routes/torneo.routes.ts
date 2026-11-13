@@ -17,6 +17,7 @@ import {
   getLlaveMatriz,
   moverParejaOverride,
   guardarZonasOverride,
+  repararFixtureZonas,
   getAuditoriaByTorneo,
   obtenerSedesTorneo,
   guardarSedesTorneo,
@@ -195,6 +196,11 @@ router.put(
   "/:id/guardar-zonas",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   guardarZonasOverride,
+);
+router.post(
+  "/:id/reparar-fixture-zonas",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  repararFixtureZonas,
 );
 router.get(
   "/:id/zonas/:nombreZona/posiciones",

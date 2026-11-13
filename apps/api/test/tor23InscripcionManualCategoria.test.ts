@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { categoriaRequeridaDelTorneo } from "../src/utils/categoriaTorneo.ts";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -30,5 +31,20 @@ describe("TOR-23 inscripción manual — categoría y fichas huérfanas", () => 
     );
     assert.match(llave, /revertirFichaProvisionalInscripcion/);
     assert.match(llave, /usarFallbackPlanilla5: false/);
+    assert.match(llave, /categoriaRequeridaDelTorneo/);
+    assert.match(llave, /assertCategoria/);
+    assert.match(inscripcion, /categoriaRequeridaDelTorneo/);
+  });
+
+  it("la categoría requerida es el nivel del torneo, no la familia", () => {
+    assert.equal(
+      categoriaRequeridaDelTorneo({ nivel: "7ª", categoria: "Libres" }),
+      "7ª",
+    );
+    assert.equal(
+      categoriaRequeridaDelTorneo({ nivel: "  ", categoria: "Libres" }),
+      "Libres",
+    );
+    assert.equal(categoriaRequeridaDelTorneo({ nivel: null, categoria: null }), null);
   });
 });

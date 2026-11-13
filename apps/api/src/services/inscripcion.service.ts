@@ -31,6 +31,7 @@ import {
 } from "../utils/inscripcionPlanilla";
 import { esModalidadIndividual } from "../utils/modalidad";
 import { etiquetaCategoriaInscripcion } from "../utils/categoriaInscripcion";
+import { categoriaRequeridaDelTorneo } from "../utils/categoriaTorneo";
 
 interface RegistroInscripcionDTO {
   torneoId: string;
@@ -847,8 +848,7 @@ export class InscripcionService {
       );
     }
 
-    const categoriaTorneo =
-      (torneo.categoria && String(torneo.categoria).trim()) || null;
+    const categoriaTorneo = categoriaRequeridaDelTorneo(torneo);
     const optsPlanilla = {
       categoriaFallback: categoriaTorneo,
       usarFallbackPlanilla5: false as const,

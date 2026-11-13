@@ -137,14 +137,28 @@ export async function zonasGrupalesCompletas(
   );
 }
 
-export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
+export type ResumenSincLlaveFap = {
+  semillas_invalidadas: string[];
+  semillas_actualizadas: string[];
+  semillas_pendientes: string[];
+};
+
+const resumenVacio = (): ResumenSincLlaveFap => ({
+  semillas_invalidadas: [],
+  semillas_actualizadas: [],
+  semillas_pendientes: [],
+});
+
+export async function avanzarJugadoresALlaves(
+  torneoId: string,
+): Promise<ResumenSincLlaveFap> {
   const { data: grupos } = await supabaseAdmin
     .from("grupos")
     .select("id, nombre_grupo, grupo_parejas(inscripcion_id)")
     .eq("torneo_id", torneoId)
     .order("nombre_grupo");
 
-  if (!grupos || grupos.length === 0) return;
+  if (!grupos || grupos.length === 0) return resumenVacio();
 
   const { resolveFapPlantillaPairCount } = await import("./fapPlantillaTorneo");
   const nParejas = await resolveFapPlantillaPairCount(torneoId);
@@ -153,7 +167,7 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
     console.error(
       `[playoffAvance] Sin matriz FAP para ${nParejas} parejas (torneo ${torneoId})`,
     );
-    return;
+    return resumenVacio();
   }
 
   const qualifiedPairs: QualifiedPair[] = [];
@@ -208,11 +222,13 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
     .in("ronda", [...PLAYOFF_RONDAS])
     .order("orden", { ascending: true });
 
-  if (!playoffMatches || playoffMatches.length === 0) return;
+  if (!playoffMatches || playoffMatches.length === 0) return resumenVacio();
 
   const countsByZone = buildZonePairCountsByLetter(grupos);
   const byOrden = new Map(playoffMatches.map((p) => [p.orden, p]));
   const fills = fillLeafSidesFromQualified(matrix, qualifiedMap);
+  const semillasInvalidadas: string[] = [];
+  const semillasActualizadas: string[] = [];
 
   for (const fill of fills) {
     const partido = byOrden.get(fill.matchNo);
@@ -220,6 +236,9 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
 
     const matrixMatch = matrix.find((m) => m.matchNo === fill.matchNo);
     if (!matrixMatch) continue;
+
+    const prevA = partido.equipo_a_id;
+    const prevB = partido.equipo_b_id;
 
     const equipo_a_id = matrixMatch.a.startsWith("W")
       ? partido.equipo_a_id
@@ -232,10 +251,30 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
         ? fill.equipo_b_id
         : null;
 
-    if (
-      equipo_a_id === partido.equipo_a_id &&
-      equipo_b_id === partido.equipo_b_id
-    ) {
+    if (!matrixMatch.a.startsWith("W")) {
+      if (prevA && equipo_a_id === null) {
+        semillasInvalidadas.push(matrixMatch.a);
+      } else if (
+        prevA !== equipo_a_id &&
+        equipo_a_id &&
+        isSeedRefValidForZoneComposition(matrixMatch.a, countsByZone)
+      ) {
+        semillasActualizadas.push(matrixMatch.a);
+      }
+    }
+    if (!matrixMatch.b.startsWith("W")) {
+      if (prevB && equipo_b_id === null) {
+        semillasInvalidadas.push(matrixMatch.b);
+      } else if (
+        prevB !== equipo_b_id &&
+        equipo_b_id &&
+        isSeedRefValidForZoneComposition(matrixMatch.b, countsByZone)
+      ) {
+        semillasActualizadas.push(matrixMatch.b);
+      }
+    }
+
+    if (equipo_a_id === prevA && equipo_b_id === prevB) {
       continue;
     }
 
@@ -257,6 +296,12 @@ export async function avanzarJugadoresALlaves(torneoId: string): Promise<void> {
     "./programacionPartidos"
   );
   await programarPartidosLlavePendientes(torneoId);
+
+  return {
+    semillas_invalidadas: [...new Set(semillasInvalidadas)],
+    semillas_actualizadas: [...new Set(semillasActualizadas)],
+    semillas_pendientes: missing,
+  };
 }
 
 export async function sincronizarClasificadosALlave(
@@ -287,7 +332,7 @@ export async function sincronizarClasificadosALlave(
  */
 export async function sincronizarLlaveTrasCambioZonas(
   torneoId: string,
-): Promise<void> {
+): Promise<ResumenSincLlaveFap> {
   await avanzarPartidosInternosTodasLasZonasCuatro(torneoId);
 
   const { data: playoffMatches } = await supabaseAdmin
@@ -297,7 +342,7 @@ export async function sincronizarLlaveTrasCambioZonas(
     .in("ronda", [...PLAYOFF_RONDAS])
     .limit(1);
 
-  if (!playoffMatches || playoffMatches.length === 0) return;
+  if (!playoffMatches || playoffMatches.length === 0) return resumenVacio();
 
-  await avanzarJugadoresALlaves(torneoId);
+  return avanzarJugadoresALlaves(torneoId);
 }

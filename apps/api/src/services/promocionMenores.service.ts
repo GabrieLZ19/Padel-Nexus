@@ -20,6 +20,7 @@ import {
   type ParchePartido,
   type PartidoEditable,
 } from "../utils/edicionLlaveMenores";
+import { estadoTrasAsignarConMatrizFap } from "../utils/edicionLlaveFap";
 
 type FilaPartido = {
   id: string;
@@ -187,7 +188,18 @@ export class PromocionMenoresService {
     equipoAId: string | null,
     equipoBId: string | null,
   ): Promise<ParchePartido> {
-    const parche = estadoTrasAsignar(partido, equipoAId, equipoBId);
+    const { resolveFapPlantillaPairCount } = await import(
+      "../utils/fapPlantillaTorneo"
+    );
+    const pairCount = await resolveFapPlantillaPairCount(torneoId);
+    const matrix = getFapBracketForPairCount(pairCount);
+    const spec = matrix?.find((m) => m.matchNo === partido.orden);
+    const parche = estadoTrasAsignarConMatrizFap(
+      partido,
+      equipoAId,
+      equipoBId,
+      spec ?? undefined,
+    );
     const llave = (await partidosDeLlave(torneoId)).map(aEditable);
     const misma = llave.filter(
       (item) => normalizarRonda(item.ronda) === normalizarRonda(partido.ronda),

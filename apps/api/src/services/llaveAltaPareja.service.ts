@@ -4,6 +4,8 @@ import {
   PerfilService,
   type DatosAltaJugadorManual,
 } from "./perfil.service";
+import { categoriaRequeridaDelTorneo } from "../utils/categoriaTorneo";
+import { assertCategoria } from "../utils/inscripcionElegibilidad";
 
 export type ParejaExternaLlave = {
   inscripcion_origen_id: string;
@@ -192,15 +194,62 @@ async function insertarInscripcionLlave(datos: {
 }
 
 export class LlaveAltaParejaService {
+  static async ejecutarAltaDesdePayload(datos: {
+    torneoDestinoId: string;
+    adminId: string;
+    motivo: string;
+    payload:
+      | {
+          modo: "externa";
+          inscripcion_origen_id: string;
+          letra_prioridad?: string;
+        }
+      | {
+          modo: "manual";
+          jugador1_identificador: string;
+          jugador2_identificador?: string;
+          jugador1_datos?: DatosAltaJugadorManual;
+          jugador2_datos?: DatosAltaJugadorManual;
+          letra_prioridad?: string;
+        };
+  }): Promise<{ id: string }> {
+    const { motivo, adminId, torneoDestinoId, payload } = datos;
+    if (payload.modo === "externa") {
+      const row = await LlaveAltaParejaService.importarParejaDesdeOtroTorneo({
+        torneoDestinoId,
+        inscripcionOrigenId: payload.inscripcion_origen_id,
+        motivo,
+        adminId,
+        letraPrioridad: payload.letra_prioridad,
+      });
+      return { id: row.id };
+    }
+    const row = await LlaveAltaParejaService.altaParejaPorIdentificadores({
+      torneoDestinoId,
+      jugador1Identificador: payload.jugador1_identificador,
+      jugador2Identificador: payload.jugador2_identificador,
+      jugador1Datos: payload.jugador1_datos,
+      jugador2Datos: payload.jugador2_datos,
+      motivo,
+      adminId,
+      letraPrioridad: payload.letra_prioridad,
+    });
+    return { id: row.id };
+  }
+
   static async buscarParejasExternas(
     torneoDestinoId: string,
     query: string,
-  ): Promise<ParejaExternaLlave[]> {
+  ): Promise<{
+    resultados: ParejaExternaLlave[];
+    excluidas_en_torneo: number;
+  }> {
+    const vacio = { resultados: [] as ParejaExternaLlave[], excluidas_en_torneo: 0 };
     const q = query.trim();
-    if (q.length < 2) return [];
+    if (q.length < 2) return vacio;
 
     const { torneoIds } = await cargarTorneosBusqueda(torneoDestinoId);
-    if (torneoIds.length === 0) return [];
+    if (torneoIds.length === 0) return vacio;
 
     type FilaIns = {
       id: string;
@@ -210,14 +259,26 @@ export class LlaveAltaParejaService {
       jugador1_nombre: string | null;
       jugador2_nombre: string | null;
       torneos:
-        | { nombre: string | null; categoria: string | null }
-        | { nombre: string | null; categoria: string | null }[]
+        | {
+            nombre: string | null;
+            categoria: string | null;
+            nivel: string | null;
+          }
+        | {
+            nombre: string | null;
+            categoria: string | null;
+            nivel: string | null;
+          }[]
         | null;
     };
 
     const torneoDeFila = (
       fila: FilaIns,
-    ): { nombre: string | null; categoria: string | null } | null => {
+    ): {
+      nombre: string | null;
+      categoria: string | null;
+      nivel: string | null;
+    } | null => {
       const rel = fila.torneos;
       if (!rel) return null;
       if (Array.isArray(rel)) return rel[0] || null;
@@ -240,7 +301,7 @@ export class LlaveAltaParejaService {
         const { data, error } = await supabaseAdmin
           .from("inscripciones")
           .select(
-            "id, torneo_id, usuario_id, usuario2_id, jugador1_nombre, jugador2_nombre, torneos ( nombre, categoria )",
+            "id, torneo_id, usuario_id, usuario2_id, jugador1_nombre, jugador2_nombre, torneos ( nombre, categoria, nivel )",
           )
           .in("torneo_id", torneoIds)
           .or(orUsuarios)
@@ -253,7 +314,7 @@ export class LlaveAltaParejaService {
       const { data, error } = await supabaseAdmin
         .from("inscripciones")
         .select(
-          "id, torneo_id, usuario_id, usuario2_id, jugador1_nombre, jugador2_nombre, torneos ( nombre, categoria )",
+          "id, torneo_id, usuario_id, usuario2_id, jugador1_nombre, jugador2_nombre, torneos ( nombre, categoria, nivel )",
         )
         .in("torneo_id", torneoIds)
         .or(
@@ -271,7 +332,10 @@ export class LlaveAltaParejaService {
       const etiquetaPareja = j2 && j2 !== "-" ? `${j1} / ${j2}` : j1;
       const torneoMeta = torneoDeFila(fila);
       const torneoNombre = torneoMeta?.nombre || "Otro torneo";
-      const cat = torneoMeta?.categoria || null;
+      const cat = categoriaRequeridaDelTorneo({
+        nivel: torneoMeta?.nivel,
+        categoria: torneoMeta?.categoria,
+      });
 
       const yaEnTorneo = await jugadoresYaEnTorneo(
         torneoDestinoId,
@@ -296,7 +360,12 @@ export class LlaveAltaParejaService {
       });
     }
 
-    return filasMapeadas;
+    const excluidasEnTorneo = filasMapeadas.filter(
+      (f) => f.bloqueada_en_torneo,
+    ).length;
+  const visibles = filasMapeadas.filter((f) => !f.bloqueada_en_torneo);
+
+    return { resultados: visibles, excluidas_en_torneo: excluidasEnTorneo };
   }
 
   static async importarParejaDesdeOtroTorneo(datos: {
@@ -352,13 +421,16 @@ export class LlaveAltaParejaService {
     adminId: string;
     letraPrioridad?: string;
   }) {
-    const { data: torneoMeta } = await supabaseAdmin
+    const { data: torneoMeta, error: errTorneo } = await supabaseAdmin
       .from("torneos")
-      .select("categoria")
+      .select(
+        "id, fecha, nivel, categoria, validar_edad, reglas_arbitraje",
+      )
       .eq("id", datos.torneoDestinoId)
       .maybeSingle();
-    const categoriaTorneo =
-      (torneoMeta?.categoria && String(torneoMeta.categoria).trim()) || null;
+    if (errTorneo) throw new Error(errTorneo.message);
+    if (!torneoMeta) throw new Error("Torneo no encontrado.");
+    const categoriaTorneo = categoriaRequeridaDelTorneo(torneoMeta);
 
     const optsPlanilla = {
       categoriaFallback: categoriaTorneo,
@@ -402,6 +474,15 @@ export class LlaveAltaParejaService {
         if (resJ2.creado) fichasCreadas.push(resJ2.id);
         j2 = resJ2;
         j2Creado = resJ2.creado;
+      }
+
+      assertCategoria(
+        { id: resJ1.id, ...resJ1 },
+        torneoMeta,
+        "Jugador 1",
+      );
+      if (j2) {
+        assertCategoria({ id: j2.id, ...j2 }, torneoMeta, "Jugador 2");
       }
 
       const j1Nombre = formatNombreCompleto(resJ1.apellido, resJ1.nombre);

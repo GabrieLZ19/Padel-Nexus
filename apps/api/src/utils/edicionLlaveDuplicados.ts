@@ -61,6 +61,21 @@ function aPartidoEditable(fila: FilaPartidoLlave): PartidoEditable {
  * Antes de asignar una pareja a otro cruce, la libera del slot pendiente donde
  * ya figuraba (no destructivo: no toca partidos con resultado real).
  */
+export type CambioSecundarioLlaveAuditoria = {
+  partido: {
+    id: string;
+    torneo_id: string;
+    ronda: string;
+    orden: number | null;
+    equipo_a_id: string | null;
+    equipo_b_id: string | null;
+  };
+  prevA: string | null;
+  prevB: string | null;
+  nextA: string | null;
+  nextB: string | null;
+};
+
 export async function liberarParejasDuplicadasEnLlave(
   torneoId: string,
   partidoId: string,
@@ -68,7 +83,10 @@ export async function liberarParejasDuplicadasEnLlave(
   prevB: string | null,
   nextA: string | null,
   nextB: string | null,
-): Promise<string[]> {
+): Promise<{
+  partidoIds: string[];
+  cambiosAuditoria: CambioSecundarioLlaveAuditoria[];
+}> {
   const cambios: { prev: string | null; next: string | null }[] = [
     { prev: prevA, next: nextA },
     { prev: prevB, next: nextB },
@@ -77,7 +95,9 @@ export async function liberarParejasDuplicadasEnLlave(
   const hayTraslado = cambios.some(
     (c) => c.next && c.next !== c.prev,
   );
-  if (!hayTraslado) return [];
+  if (!hayTraslado) {
+    return { partidoIds: [], cambiosAuditoria: [] };
+  }
 
   const { data: matches, error } = await supabaseAdmin
     .from("partidos")
@@ -91,6 +111,7 @@ export async function liberarParejasDuplicadasEnLlave(
 
   const filas = (matches || []) as FilaPartidoLlave[];
   const afectados: string[] = [];
+  const cambiosAuditoria: CambioSecundarioLlaveAuditoria[] = [];
   const intercambiados = new Set<string>();
 
   const persistirParche = async (
@@ -110,6 +131,26 @@ export async function liberarParejasDuplicadasEnLlave(
       .eq("id", filaId);
     if (updErr) throw new Error(updErr.message);
     afectados.push(filaId);
+  };
+
+  const registrarCambioAuditoria = (
+    fila: FilaPartidoLlave,
+    parche: ReturnType<typeof limpiarSlot>,
+  ) => {
+    cambiosAuditoria.push({
+      partido: {
+        id: fila.id,
+        torneo_id: torneoId,
+        ronda: fila.ronda,
+        orden: fila.orden,
+        equipo_a_id: fila.equipo_a_id,
+        equipo_b_id: fila.equipo_b_id,
+      },
+      prevA: fila.equipo_a_id,
+      prevB: fila.equipo_b_id,
+      nextA: parche.equipoAId,
+      nextB: parche.equipoBId,
+    });
   };
 
   for (const { prev, next } of cambios) {
@@ -135,6 +176,7 @@ export async function liberarParejasDuplicadasEnLlave(
           ladoOrigen,
           prev,
         );
+        registrarCambioAuditoria(origen, parche);
         await persistirParche(origen.id, parche);
         intercambiados.add(next);
         continue;
@@ -166,9 +208,13 @@ export async function liberarParejasDuplicadasEnLlave(
         throw new LlaveConflictoError(msg);
       }
 
+      registrarCambioAuditoria(fila, parche);
       await persistirParche(fila.id, parche);
     }
   }
 
-  return [...new Set(afectados)];
+  return {
+    partidoIds: [...new Set(afectados)],
+    cambiosAuditoria,
+  };
 }

@@ -622,7 +622,14 @@ export const actualizarEquiposPartido = async (
 ): Promise<Response> => {
   try {
     const { partido_id } = req.params;
-    const { equipo_a_id, equipo_b_id, motivo } = req.body;
+    const { equipo_a_id, equipo_b_id, motivo, alta_lado_a, alta_lado_b } =
+      req.body as {
+        equipo_a_id?: string | null;
+        equipo_b_id?: string | null;
+        motivo?: string;
+        alta_lado_a?: import("../types/altaLlavePartido").AltaLlaveEnPartidoInput;
+        alta_lado_b?: import("../types/altaLlavePartido").AltaLlaveEnPartidoInput;
+      };
     const { data: partidoEquipos } = await supabaseAdmin
       .from("partidos")
       .select("torneo_id")
@@ -638,7 +645,17 @@ export const actualizarEquiposPartido = async (
     if (!motivo?.trim()) {
       return res.status(400).json({ message: "El motivo es obligatorio" });
     }
-    await TorneoService.actualizarEquiposPartido(partido_id, equipo_a_id ?? null, equipo_b_id ?? null, motivo, admin_id);
+    await TorneoService.actualizarEquiposPartido(
+      partido_id,
+      equipo_a_id ?? null,
+      equipo_b_id ?? null,
+      motivo,
+      admin_id,
+      {
+        altaLadoA: alta_lado_a,
+        altaLadoB: alta_lado_b,
+      },
+    );
     return res.status(200).json({ message: "Rivales actualizados exitosamente" });
   } catch (error: unknown) {
     const err = error as { statusCode?: number; message?: string };
@@ -698,11 +715,11 @@ export const buscarParejasLlaveExternas = async (
     const { LlaveAltaParejaService } = await import(
       "../services/llaveAltaPareja.service"
     );
-    const resultados = await LlaveAltaParejaService.buscarParejasExternas(
+    const busqueda = await LlaveAltaParejaService.buscarParejasExternas(
       torneoId,
       q,
     );
-    return res.status(200).json({ resultados });
+    return res.status(200).json(busqueda);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error";
     return res.status(400).json({ message });
@@ -967,6 +984,31 @@ export const guardarZonasOverride = async (
     return res
       .status(400)
       .json({ message: "Error al guardar zonas", error: error.message });
+  }
+};
+
+export const repararFixtureZonas = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const torneoId = req.params.id;
+    const admin_id = req.user?.id;
+    if (!admin_id) {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+    const motivo =
+      typeof req.body?.motivo === "string" ? req.body.motivo : undefined;
+    const resultado = await CompetenciaService.repararFixtureZonasTorneo(
+      torneoId,
+      admin_id,
+      motivo,
+    );
+    return res.status(200).json(resultado);
+  } catch (error: any) {
+    return res
+      .status(400)
+      .json({ message: "Error al reparar fixtures", error: error.message });
   }
 };
 

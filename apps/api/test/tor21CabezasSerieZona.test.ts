@@ -55,5 +55,7 @@ describe("TOR-21 cabezas de serie por zona", () => {
       svc.slice(svc.indexOf("static async guardarZonas")),
       /reglamento FAP/,
     );
+
+    assert.match(svc, /cabezas_ranking_globales/);
   });
 });

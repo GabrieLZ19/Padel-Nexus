@@ -14,6 +14,8 @@ describe("TOR-22 alta de pareja en edición de llave", () => {
     );
     assert.match(svc, /ALTA_PAREJA_EDICION_LLAVE/);
     assert.match(svc, /buscarParejasExternas/);
+    assert.match(svc, /excluidas_en_torneo/);
+    assert.match(svc, /ejecutarAltaDesdePayload/);
     assert.match(svc, /importarParejaDesdeOtroTorneo/);
     assert.match(svc, /bloqueada_en_torneo/);
     assert.match(svc, /categoriaTorneo/);
@@ -26,5 +28,18 @@ describe("TOR-22 alta de pareja en edición de llave", () => {
     assert.match(routes, /llave\/buscar-parejas/);
     assert.match(routes, /llave\/alta-pareja/);
     assert.match(routes, /admin_club/);
+
+    const torneoSvc = readFileSync(
+      path.join(RAIZ, "src/services/torneo.service.ts"),
+      "utf8",
+    );
+    assert.match(torneoSvc, /ejecutarAltaDesdePayload/);
+    assert.match(torneoSvc, /altaLadoA/);
+
+    const ctrl = readFileSync(
+      path.join(RAIZ, "src/controllers/torneo.controller.ts"),
+      "utf8",
+    );
+    assert.match(ctrl, /alta_lado_a/);
   });
 });
