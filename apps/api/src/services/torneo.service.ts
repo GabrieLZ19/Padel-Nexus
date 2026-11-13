@@ -38,10 +38,13 @@ import { mismaProvincia } from "../utils/alcanceCuenta";
 import { formatoTorneoSoportaGeneracionCuadro } from "../constants/torneoFormato";
 import { esEliminatoriaDirecta } from "../utils/formatoTorneo";
 import {
-  alcanceRankingDesdeTorneo,
+  configuracionPuntosInicial,
+  inferirPuntosActivados,
   tablaPuntosDesdeConfig,
   type ConfigPuntosTorneo,
 } from "../utils/rankingTorneo";
+import { otorgarPuntosPorPartidoRanking } from "../utils/otorgarPuntosPartidoTorneo";
+import { recalcularPuntosTorneoFinalizado } from "../utils/recalcularPuntosTorneoFinalizado";
 import {
   numeroVisiblePartidoTorneo,
   partidoYaTeniaResultado,
@@ -1041,6 +1044,7 @@ export class TorneoService {
           hora_inicio_jornada: datos.hora_inicio_jornada || "08:00",
           reglas_arbitraje: (datos as any).reglas_arbitraje || null,
           dias_juego: diasJuego,
+          configuracion_puntos: configuracionPuntosInicial(),
         },
       ])
       .select()
@@ -1983,8 +1987,13 @@ export class TorneoService {
     esLesion?: boolean,
     motivo?: string,
     adminId?: string,
-  ) {
-    const { data: previo } = await supabaseAdmin
+  ): Promise<{
+    avisos_programacion_publicada: string[];
+    avisos_ranking: string[];
+  }> {
+    const avisosProgramacionPublicada: string[] = [];
+    const avisosRanking: string[] = [];
+    const { data: previo, error: previoError } = await supabaseAdmin
       .from("partidos")
       .select(`
         id,
@@ -2005,10 +2014,15 @@ export class TorneoService {
         es_injustificado_wo,
         es_lesion,
         estado_partido,
-        torneos(estado)
+        torneos!fk_partidos_torneo(estado)
       `)
       .eq("id", partidoId)
       .maybeSingle();
+    if (previoError) {
+      throw new Error(
+        `No se pudo cargar el partido previo a la corrección: ${previoError.message}`,
+      );
+    }
     const yaTeniaResultado = partidoYaTeniaResultado(previo);
     const estadoPrevio = (
       previo?.torneos as { estado?: string } | { estado?: string }[] | null
@@ -2124,11 +2138,6 @@ export class TorneoService {
       console.warn("Error al emitir websocket partido_actualizado:", e);
     }
 
-    const perdedorId =
-      ganadorId === partido.equipo_a_id
-        ? partido.equipo_b_id
-        : partido.equipo_a_id;
-
     const { data: torneoInfo } = await supabaseAdmin
       .from("torneos")
       .select(
@@ -2138,163 +2147,35 @@ export class TorneoService {
       .single();
 
     if (torneoInfo && !yaTeniaResultado) {
-      const configP = torneoInfo.configuracion_puntos as
-        | ConfigPuntosTorneo
-        | null
-        | undefined;
-      const TABLA_PUNTOS = tablaPuntosDesdeConfig(configP);
-
-      const clubEmbed = torneoInfo.clubes as { provincia?: string } | null;
-      const alcanceRanking = alcanceRankingDesdeTorneo(torneoInfo.alcance);
-      const provinciaJurisdiccion = clubEmbed?.provincia ?? null;
-
-      const otorgarPuntosAInscripcion = async (
-        inscripcionId: string | null,
-        puntos: number,
-        esGanador: boolean,
-      ) => {
-        if (!inscripcionId || puntos <= 0) return;
-        const { data: ins } = await supabaseAdmin
-          .from("inscripciones")
-          .select("usuario_id, usuario2_id")
-          .eq("id", inscripcionId)
-          .single();
-        if (!ins) return;
-
-        const ids = [ins.usuario_id, ins.usuario2_id].filter(Boolean);
-        for (const uid of ids) {
-          const { data: rank } = await supabaseAdmin
-            .from("rankings")
-            .select("id, puntos, pj, pg")
-            .eq("usuario_id", uid)
-            .eq("categoria", torneoInfo.nivel)
-            .eq("alcance", alcanceRanking)
-            .maybeSingle();
-
-          const pAnt = rank?.puntos || 0;
-          const pjAnt = rank?.pj || 0;
-          const pgAnt = rank?.pg || 0;
-
-          const { error: rankError } = await supabaseAdmin
-            .from("rankings")
-            .upsert(
-              {
-                ...(rank?.id ? { id: rank.id } : {}),
-                usuario_id: uid,
-                categoria: torneoInfo.nivel,
-                rama: torneoInfo.categoria,
-                alcance: alcanceRanking,
-                provincia_jurisdiccion: provinciaJurisdiccion,
-                puntos: pAnt + puntos,
-                pj: pjAnt + 1,
-                pg: esGanador ? pgAnt + 1 : pgAnt,
-              },
-              { onConflict: "id" },
-            );
-
-          if (rankError) {
-            console.error(
-              `Error al actualizar ranking para usuario ${uid}:`,
-              rankError,
-            );
-            throw new Error(
-              `Error al actualizar ranking: ${rankError.message}`,
-            );
-          }
-
-          const { error: histError } = await supabaseAdmin
-            .from("historial_ranking")
-            .insert([
-              {
-                usuario_id: uid,
-                torneo_id: partido.torneo_id,
-                puntos_anteriores: pAnt,
-                puntos_nuevos: pAnt + puntos,
-                ronda: partido.ronda ?? null,
-              },
-            ]);
-          if (histError) {
-            console.error(
-              `Error al insertar historial de ranking para usuario ${uid}:`,
-              histError,
-            );
-            throw new Error(
-              `Error al insertar historial de ranking: ${histError.message}`,
-            );
-          }
-        }
-      };
-
-      if (TABLA_PUNTOS) {
-        const rondaNormalizada = partido.ronda.toUpperCase().trim();
-
-        if (rondaNormalizada.startsWith("ZONA")) {
-          const ptsZona = Number(configP?.puntos_zona) || 0;
-          if (ptsZona > 0) {
-            await otorgarPuntosAInscripcion(ganadorId, ptsZona, true);
-            await otorgarPuntosAInscripcion(perdedorId, ptsZona, false);
-          }
-        } else {
-          const puntosRonda = TABLA_PUNTOS[rondaNormalizada];
-          let puntosGanadorNetos = puntosRonda?.ganador || 0;
-          let puntosPerdedorNetos = puntosRonda?.perdedor || 0;
-
-          if (puntosRonda) {
-            const SECUENCIA_RONDAS = [
-              "32AVOS",
-              "16AVOS",
-              "PRELIMINARES",
-              "OCTAVOS",
-              "CUARTOS",
-              "SEMIS",
-              "FINAL",
-            ];
-            const idxRonda = SECUENCIA_RONDAS.indexOf(rondaNormalizada);
-            let rondaAnterior: string | null = null;
-
-            if (idxRonda > 0) {
-              for (let i = idxRonda - 1; i >= 0; i--) {
-                const rondaCandidata = SECUENCIA_RONDAS[i];
-                const { data: prevMatches } = await supabaseAdmin
-                  .from("partidos")
-                  .select("id")
-                  .eq("torneo_id", partido.torneo_id)
-                  .eq("ronda", rondaCandidata)
-                  .limit(1);
-
-                if (prevMatches && prevMatches.length > 0) {
-                  rondaAnterior = rondaCandidata;
-                  break;
-                }
-              }
-            }
-
-            if (rondaAnterior) {
-              const puntosRondaAnterior = TABLA_PUNTOS[rondaAnterior];
-              if (puntosRondaAnterior) {
-                puntosGanadorNetos = Math.max(
-                  0,
-                  puntosRonda.ganador - puntosRondaAnterior.ganador,
-                );
-                puntosPerdedorNetos = Math.max(
-                  0,
-                  puntosRonda.perdedor - puntosRondaAnterior.ganador,
-                );
-              }
-            }
-          }
-
-          await otorgarPuntosAInscripcion(
-            perdedorId,
-            puntosPerdedorNetos,
-            false,
-          );
-          await otorgarPuntosAInscripcion(ganadorId, puntosGanadorNetos, true);
-        }
-      }
+      await otorgarPuntosPorPartidoRanking(
+        {
+          id: partido.id,
+          torneo_id: partido.torneo_id,
+          ronda: partido.ronda,
+          ganador: ganadorId,
+          equipo_a_id: partido.equipo_a_id,
+          equipo_b_id: partido.equipo_b_id,
+        },
+        torneoInfo,
+        ganadorId,
+      );
     }
 
     if (partido.ronda.toUpperCase() === "FINAL") {
+      if (!yaTeniaResultado && torneoInfo) {
+        const configP = torneoInfo.configuracion_puntos as
+          | ConfigPuntosTorneo
+          | null
+          | undefined;
+        if (
+          !inferirPuntosActivados(configP, torneoInfo.alcance) ||
+          !tablaPuntosDesdeConfig(configP)
+        ) {
+          avisosRanking.push(
+            "El torneo quedó finalizado sin puntos de ranking activos. Los jugadores no sumaron puntos. Podés activarlos después desde el paso Cierre, con motivo de auditoría.",
+          );
+        }
+      }
       await supabaseAdmin
         .from("torneos")
         .update({ estado: FAP_ESTADOS_TORNEO.FINALIZADO })
@@ -2429,7 +2310,12 @@ export class TorneoService {
         const { programarPartidosLlavePendientes } = await import(
           "../utils/programacionPartidos"
         );
-        await programarPartidosLlavePendientes(partido.torneo_id);
+        const progLlave = await programarPartidosLlavePendientes(
+          partido.torneo_id,
+        );
+        avisosProgramacionPublicada.push(
+          ...progLlave.avisos_programacion_publicada,
+        );
       }
     }
 
@@ -2454,6 +2340,80 @@ export class TorneoService {
         }
       }
     }
+
+    return {
+      avisos_programacion_publicada: [...new Set(avisosProgramacionPublicada)],
+      avisos_ranking: [...new Set(avisosRanking)],
+    };
+  }
+
+  static async activarPuntosRankingPostCierre(
+    torneoId: string,
+    adminId: string,
+    motivo: string,
+  ) {
+    const motivoLimpio = motivo?.trim();
+    if (!motivoLimpio) {
+      throw new Error(
+        "Debés indicar un motivo para activar puntos después del cierre.",
+      );
+    }
+
+    const { data: torneo, error } = await supabaseAdmin
+      .from("torneos")
+      .select("id, estado, configuracion_puntos")
+      .eq("id", torneoId)
+      .single();
+
+    if (error || !torneo) throw new Error("Torneo no encontrado.");
+    if (torneo.estado !== FAP_ESTADOS_TORNEO.FINALIZADO) {
+      throw new Error(
+        "Solo podés activar puntos retroactivos en torneos finalizados.",
+      );
+    }
+
+    const configActual = (torneo.configuracion_puntos ||
+      {}) as ConfigPuntosTorneo;
+    if (configActual.puntos_activados) {
+      throw new Error("Los puntos de ranking ya están activados en este torneo.");
+    }
+
+    const configNueva: ConfigPuntosTorneo = {
+      ...configuracionPuntosInicial(),
+      ...configActual,
+      puntos_activados: true,
+    };
+
+    const { error: updError } = await supabaseAdmin
+      .from("torneos")
+      .update({ configuracion_puntos: configNueva })
+      .eq("id", torneoId);
+    if (updError) throw new Error(updError.message);
+
+    const partidosProcesados =
+      await recalcularPuntosTorneoFinalizado(torneoId);
+
+    await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: adminId,
+      accion: "activar_puntos_ranking_post_cierre",
+      entidad_afectada: `torneo_id: ${torneoId}`,
+      detalles: {
+        torneo_id: torneoId,
+        motivo: motivoLimpio,
+        partidos_procesados: partidosProcesados,
+      },
+    });
+
+    const { data: actualizado } = await supabaseAdmin
+      .from("torneos")
+      .select("*")
+      .eq("id", torneoId)
+      .single();
+
+    return {
+      torneo: actualizado,
+      partidos_procesados: partidosProcesados,
+    };
   }
 
   static async sincronizarClasificadosALlave(torneoId: string): Promise<boolean> {
@@ -3029,11 +2989,19 @@ export class TorneoService {
 
     if (cambiaHorario) {
       // Traemos el estado de programacion del torneo del partido
-      const { data: partido } = await supabaseAdmin
-        .from("partidos")
-        .select("torneo_id, torneos(programacion_estado)")
-        .eq("id", partidoId)
-        .maybeSingle();
+      const { data: partido, error: partidoHorarioError } =
+        await supabaseAdmin
+          .from("partidos")
+          .select(
+            "torneo_id, torneos!fk_partidos_torneo(programacion_estado)",
+          )
+          .eq("id", partidoId)
+          .maybeSingle();
+      if (partidoHorarioError) {
+        throw new Error(
+          `No se pudo validar la programación del torneo: ${partidoHorarioError.message}`,
+        );
+      }
 
       const programacionEstado =
         (partido?.torneos as { programacion_estado?: string } | null)

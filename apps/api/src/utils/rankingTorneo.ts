@@ -19,6 +19,41 @@ export type ConfigPuntosTorneo = {
   puntos_final?: number;
 };
 
+/** Todo torneo competitivo del wizard tiene ranking vinculado por alcance/nivel. */
+export function torneoVinculaRanking(alcance?: string | null): boolean {
+  const valor = String(alcance || "").trim().toLowerCase();
+  if (!valor) return true;
+  return valor !== "clasificatorio";
+}
+
+export function configuracionPuntosInicial(): ConfigPuntosTorneo {
+  return {
+    puntos_activados: true,
+    puntos_campeon: 1000,
+    puntos_final: 600,
+    puntos_semis: 360,
+    puntos_cuartos: 180,
+    puntos_octavos: 90,
+    puntos_16avos: 45,
+    puntos_32avos: 0,
+    puntos_zona: 0,
+  };
+}
+
+export function inferirPuntosActivados(
+  config: ConfigPuntosTorneo | Record<string, unknown> | null | undefined,
+  alcance?: string | null,
+): boolean {
+  if (
+    config &&
+    typeof config === "object" &&
+    typeof config.puntos_activados === "boolean"
+  ) {
+    return config.puntos_activados;
+  }
+  return torneoVinculaRanking(alcance);
+}
+
 export function tablaPuntosDesdeConfig(
   config: ConfigPuntosTorneo | null | undefined,
 ): Record<string, { ganador: number; perdedor: number }> | null {

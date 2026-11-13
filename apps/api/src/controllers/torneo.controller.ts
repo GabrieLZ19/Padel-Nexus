@@ -327,6 +327,38 @@ export const updateTorneo = async (
   }
 };
 
+export const activarPuntosRankingPostCierre = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const torneoId = req.params.id;
+    const negado = await negarAlcance(req, torneoId, "editar");
+    if (negado) return res.status(403).json({ message: negado });
+
+    const motivo =
+      typeof req.body?.motivo === "string" ? req.body.motivo.trim() : "";
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Sesión requerida." });
+    }
+
+    const data = await TorneoService.activarPuntosRankingPostCierre(
+      torneoId,
+      userId,
+      motivo,
+    );
+    return res.status(200).json({
+      message: "Puntos de ranking activados y recalculados.",
+      ...data,
+    });
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error ? error.message : "No se pudieron activar los puntos.";
+    return res.status(400).json({ message: msg });
+  }
+};
+
 export const deleteTorneo = async (
   req: Request,
   res: Response,
@@ -550,7 +582,7 @@ export const actualizarResultado = async (
       }
     }
 
-    await TorneoService.procesarResultadoYAvance(
+    const resultado = await TorneoService.procesarResultadoYAvance(
       partido_id,
       finalGanadorId,
       finalSet1A,
@@ -568,6 +600,14 @@ export const actualizarResultado = async (
     );
     return res.status(200).json({
       message: "Resultado cargado y estadísticas distribuidas con éxito",
+      avisos_programacion_publicada:
+        resultado.avisos_programacion_publicada.length > 0
+          ? resultado.avisos_programacion_publicada
+          : undefined,
+      avisos_ranking:
+        resultado.avisos_ranking.length > 0
+          ? resultado.avisos_ranking
+          : undefined,
     });
   } catch (error: any) {
     return res

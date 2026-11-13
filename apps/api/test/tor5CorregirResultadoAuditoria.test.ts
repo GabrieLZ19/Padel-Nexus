@@ -87,6 +87,17 @@ describe("TOR-5 corrección de resultado en auditoría", () => {
     );
   });
 
+  it("desambigua FK partidos->torneos y no ignora previoError", () => {
+    const svc = readFileSync(
+      path.join(RAIZ, "src/services/torneo.service.ts"),
+      "utf8",
+    );
+    assert.match(svc, /torneos!fk_partidos_torneo\(estado\)/);
+    assert.match(svc, /torneos!fk_partidos_torneo\(programacion_estado\)/);
+    assert.match(svc, /previoError/);
+    assert.match(svc, /partidoHorarioError/);
+  });
+
   it("insert de corregir_resultado centralizado con resumen y entidad legacy", () => {
     const util = readFileSync(
       path.join(RAIZ, "src/utils/auditoriaTorneo.ts"),

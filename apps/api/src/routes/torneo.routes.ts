@@ -6,6 +6,7 @@ import {
   agruparTorneos,
   replicarTorneo,
   updateTorneo,
+  activarPuntosRankingPostCierre,
   deleteTorneo,
   actualizarResultado,
   actualizarEquiposPartido,
@@ -95,6 +96,11 @@ router.put(
   "/:id",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   updateTorneo,
+);
+router.post(
+  "/:id/activar-puntos-ranking",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  activarPuntosRankingPostCierre,
 );
 router.put(
   "/:id/banner",

@@ -1474,14 +1474,67 @@ export async function programarPartidosConDisponibilidad(
   });
 }
 
+export interface ResultadoProgramarLlavePendientes {
+  updated: number;
+  avisos_programacion_publicada: string[];
+}
+
+export interface PartidoLlaveAutoprogramable {
+  id: string;
+  orden?: number | null;
+  equipo_a_id?: string | null;
+  equipo_b_id?: string | null;
+  estado_partido?: string | null;
+  cancha_asignada?: string | null;
+  fecha_partido?: string | null;
+}
+
+/**
+ * TOR-32: con programación publicada no se mueven horarios ya asignados;
+ * solo se autoprograman cruces nuevos sin cancha/hora y se avisa conflicto.
+ */
+export function seleccionarPartidosLlaveParaAutoprogramar(
+  partidos: PartidoLlaveAutoprogramable[],
+  opts: {
+    programacionPublicada: boolean;
+    violaHorarioPublicado: (p: PartidoLlaveAutoprogramable) => boolean;
+  },
+): {
+  pendientes: PartidoLlaveAutoprogramable[];
+  avisos_programacion_publicada: string[];
+} {
+  const avisos_programacion_publicada: string[] = [];
+  const pendientes = partidos.filter((p) => {
+    if (!p.equipo_a_id || !p.equipo_b_id) return false;
+    if (String(p.estado_partido || "").toLowerCase().includes("pendiente")) {
+      return false;
+    }
+    const sinHorario = !p.cancha_asignada || !p.fecha_partido;
+    if (sinHorario) return true;
+    if (opts.programacionPublicada) {
+      if (opts.violaHorarioPublicado(p)) {
+        const etiqueta =
+          p.orden != null ? `partido #${p.orden}` : "un partido de llave";
+        avisos_programacion_publicada.push(
+          `El ${etiqueta} mantiene su horario publicado, pero puede haber conflicto de orden de llave o descanso. Revisalo en el programador (Nueva edición).`,
+        );
+      }
+      return false;
+    }
+    return opts.violaHorarioPublicado(p);
+  });
+  return { pendientes, avisos_programacion_publicada };
+}
+
 /**
  * Programa partidos de llave que ya tienen ambos equipos y aún no tienen cancha/hora.
  * También reprograma si el horario existente viola descanso de pareja o dependencia
- * de cruces (ej. final al mismo tiempo que la semi que la alimenta).
+ * de cruces (ej. final al mismo tiempo que la semi que la alimenta), salvo con
+ * programación ya publicada (TOR-32).
  */
 export async function programarPartidosLlavePendientes(
   torneoId: string,
-): Promise<number> {
+): Promise<ResultadoProgramarLlavePendientes> {
   const PLAYOFF = [
     "PRELIMINARES",
     "OCTAVOS",
@@ -1501,13 +1554,16 @@ export async function programarPartidosLlavePendientes(
     .eq("torneo_id", torneoId)
     .in("ronda", PLAYOFF);
 
-  if (!partidos?.length) return 0;
+  if (!partidos?.length) {
+    return { updated: 0, avisos_programacion_publicada: [] };
+  }
 
   const { data: torneo } = await supabaseAdmin
     .from("torneos")
-    .select("formato")
+    .select("formato, programacion_estado")
     .eq("id", torneoId)
     .maybeSingle();
+  const programacionPublicada = torneo?.programacion_estado === "publicado";
 
   const { esEliminatoriaDirecta } = await import("./formatoTorneo");
   let feedersByMatchNo: Map<number, number[]>;
@@ -1585,18 +1641,19 @@ export async function programarPartidosLlavePendientes(
     return false;
   };
 
-  const pendientes = partidos.filter((p) => {
-    if (!p.equipo_a_id || !p.equipo_b_id) return false;
-    if (String(p.estado_partido || "").toLowerCase().includes("pendiente")) {
-      return false;
-    }
-    if (!p.cancha_asignada || !p.fecha_partido) return true;
-    return violaFeederODescanso(p as PartidoProgramable);
-  });
-  if (!pendientes.length) return 0;
+  const { pendientes, avisos_programacion_publicada } =
+    seleccionarPartidosLlaveParaAutoprogramar(partidos, {
+      programacionPublicada,
+      violaHorarioPublicado: (p) =>
+        violaFeederODescanso(p as PartidoProgramable),
+    });
+  if (!pendientes.length) {
+    return { updated: 0, avisos_programacion_publicada };
+  }
 
-  // Limpiar horarios inválidos para reasignar
+  // Limpiar horarios inválidos para reasignar (nunca con programación publicada).
   for (const p of pendientes) {
+    if (programacionPublicada) continue;
     if (p.cancha_asignada || p.fecha_partido) {
       await supabaseAdmin
         .from("partidos")
@@ -1646,7 +1703,7 @@ export async function programarPartidosLlavePendientes(
       .eq("id", pendientes[i].id);
     updated++;
   }
-  return updated;
+  return { updated, avisos_programacion_publicada };
 }
 
 /**

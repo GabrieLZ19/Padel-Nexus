@@ -155,11 +155,48 @@ export class RankingService {
 
     historial = await enriquecerHistorialConRonda(usuarioId, historial);
 
-    return (rankingsResult.data ?? []).map((row) => ({
-      ...row,
-      ranking_provisional: rankingProvisional,
-      historial_ranking: historial,
-    }));
+    const filas = rankingsResult.data ?? [];
+    return await Promise.all(
+      filas.map(async (row) => {
+        const sexo = (row.perfiles as { sexo?: string | null } | null)?.sexo;
+        const rama = normalizarRama(sexo);
+        const posicion_actual = await RankingService.resolverPosicionEnRanking(
+          usuarioId,
+          String(row.alcance || "Provincial"),
+          String(row.categoria),
+          rama,
+        );
+        return {
+          ...row,
+          ranking_provisional: rankingProvisional,
+          historial_ranking: historial,
+          posicion_actual,
+        };
+      }),
+    );
+  }
+
+  /** Posición en tabla global para el mismo alcance y categoría (ficha sin query). */
+  static async resolverPosicionEnRanking(
+    usuarioId: string,
+    alcance: string,
+    categoria: string,
+    rama?: RamaRanking | null,
+  ): Promise<number | null> {
+    const global = await RankingService.obtenerRankingGlobal({
+      alcance,
+      categoria,
+      rama: rama ?? undefined,
+      limit: 500,
+    });
+    const hit = global.find((j) => j.usuario_id === usuarioId);
+    if (!hit) return null;
+    const pos = Number(
+      (hit as { posicion_actual?: number }).posicion_actual ?? 0,
+    );
+    if (pos > 0) return pos;
+    const idx = global.findIndex((j) => j.usuario_id === usuarioId);
+    return idx >= 0 ? idx + 1 : null;
   }
 
   /**
