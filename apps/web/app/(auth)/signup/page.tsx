@@ -73,6 +73,12 @@ export default function SignUpPage() {
     useState(false);
   const [errorVerificacionPreinscripcion, setErrorVerificacionPreinscripcion] =
     useState<string | null>(null);
+  const [verificationToken, setVerificationToken] = useState<string | null>(
+    null,
+  );
+  const [fichaPendienteSinMetodos, setFichaPendienteSinMetodos] =
+    useState(false);
+  const [fichaPendienteActiva, setFichaPendienteActiva] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<{
     nombre?: string;
@@ -225,6 +231,22 @@ export default function SignUpPage() {
       return;
     }
 
+    if (fichaPendienteSinMetodos) {
+      setError(
+        "Esta ficha no tiene teléfono ni email para verificar. Contactá a tu entidad antes de activar la cuenta.",
+      );
+      setLoading(false);
+      return;
+    }
+
+    if (fichaPendienteActiva && metodosPreinscripcion.length > 0 && !verificationToken) {
+      setError(
+        "Debés verificar tu identidad con el teléfono o email de la ficha antes de registrarte.",
+      );
+      setLoading(false);
+      return;
+    }
+
     try {
       const data = await PerfilService.registrarUsuario({
         email,
@@ -251,6 +273,7 @@ export default function SignUpPage() {
               vinculo: respVinculo.trim(),
             }
           : undefined,
+        verification_token: verificationToken || undefined,
       });
 
       if (data.exito) {
@@ -334,6 +357,9 @@ export default function SignUpPage() {
     setPreinscripcionRequiereVerificacion(false);
     setMetodosPreinscripcion([]);
     setErrorVerificacionPreinscripcion(null);
+    setVerificationToken(null);
+    setFichaPendienteSinMetodos(false);
+    setFichaPendienteActiva(false);
     try {
       const resultado = await PerfilService.buscarPreinscripcionPorDni(dniLimpio);
       if (!resultado.encontrado) return;
@@ -348,6 +374,8 @@ export default function SignUpPage() {
 
       const metodos = resultado.metodos_disponibles ?? [];
       setMetodosPreinscripcion(metodos);
+      setFichaPendienteActiva(true);
+      setFichaPendienteSinMetodos(metodos.length === 0);
       setPreinscripcionRequiereVerificacion(
         Boolean(resultado.verificacion_requerida && metodos.length > 0),
       );
@@ -407,6 +435,7 @@ export default function SignUpPage() {
       if (!resultado.perfil) return;
 
       aplicarPerfilPreinscripcion(resultado.perfil);
+      setVerificationToken(resultado.verification_token ?? null);
       setPreinscripcionRequiereVerificacion(false);
       setPreinscripcionMsg(
         "Datos verificados. Completá email y contraseña para activar tu cuenta en la App.",

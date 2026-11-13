@@ -38,6 +38,7 @@ export interface RegistroPayload {
     telefono: string;
     vinculo: string;
   };
+  verification_token?: string;
 }
 
 export interface RegistroResponse {
@@ -287,12 +288,16 @@ export const PerfilService = {
     encontrado: boolean;
     pendiente_activacion?: boolean;
     perfil?: Partial<RegistroPayload>;
+    verification_token?: string;
+    verification_token_expires_at?: string;
   }> {
     const response = await api.post<{
       exito: boolean;
       encontrado: boolean;
       pendiente_activacion?: boolean;
       perfil?: Partial<RegistroPayload>;
+      verification_token?: string;
+      verification_token_expires_at?: string;
     }>(`/perfil/preinscripcion/${encodeURIComponent(dni)}/verificar`, payload);
     return response.data;
   },
