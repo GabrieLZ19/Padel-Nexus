@@ -4,6 +4,8 @@ Documento de seguimiento alineado con el plan en Cursor (`re-test_13-11_correcti
 
 ## Lote 1 — COMPLETADO
 
+Commits: `c2eed1e` (back), `8763351` (front).
+
 Tickets: PUB-19, PUB-18 (rate limit), PUB-15.
 
 - Migración: `supabase/migrations/20261113200000_pub19_preinscripcion_activacion.sql`
