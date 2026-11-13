@@ -85,6 +85,33 @@ Tickets: TOR-5, TOR-32, TOR-35, TOR-6.
 - Ficha pública: posición sin query params; alcance Local como «Ranking del club»; scope por registro principal
 - Tests: `apps/api/test/tor6RankingClub.test.ts`, `apps/web/test/tor6FichaPlanillaRanking.test.ts`
 
-## Lotes 4–8 — PENDIENTE
+## Lote 4 — COMPLETADO (13/11/2026)
 
-Siguiente: **Lote 4** (TOR-28, TOR-24, TOR-23, TOR-22, TOR-21, TOR-36, TOR-16). Ver plan en Cursor.
+Commits:
+
+- `5017990` — `fix(back): torneos lote 4 re-test 13/11 (llave, zonas, alta en partido)`
+- `e98e940` — `fix(front): torneos lote 4 re-test 13/11 (editor llave, zonas, intercambio)`
+
+Tickets: TOR-23, TOR-28, TOR-24, TOR-22, TOR-21, TOR-36, TOR-16.
+
+### TOR-23 / TOR-28 / TOR-24 (back + front)
+
+- Categoría por `torneo.nivel` en alta de llave e inscripción manual
+- Validación FAP `W*` en edición de llave; sin bye automático si rival pendiente
+- `guardarZonas` sincroniza llave, repara fixture de zona, resumen en auditoría
+- Endpoint `POST /torneos/:id/reparar-fixture-zonas`
+- Tests: `tor23InscripcionManualCategoria`, `tor28EdicionLlaveFap`, `tor24GuardarZonas`
+
+### TOR-22 / TOR-21 / TOR-36 / TOR-16 (back + front)
+
+- Alta de pareja al guardar partido (`alta_lado_a/b`); búsqueda con `excluidas_en_torneo` y debounce
+- Cabezas de serie: `cabezas_ranking_globales` en GET zonas; avisos si validación impide guardar
+- Etiquetas llave: `Por definir` vs `Libre`; auditoría de cruces secundarios en swap
+- `trasladoParejaLlave` + modal «Confirmar intercambio»
+- Tests: `tor22*`, `tor21*`, `tor36*`, `tor16*`
+
+Pendiente: re-test manual del Lote 4. Siguiente: **Lote 5** (TOR-27, TOR-34, TOR-4, TOR-33).
+
+## Lotes 5–8 — PENDIENTE
+
+Ver plan en Cursor (`re-test_13-11_correction_plan`).
