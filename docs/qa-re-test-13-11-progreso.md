@@ -17,6 +17,10 @@ Tickets: PUB-19, PUB-18 (rate limit), PUB-15.
 
 ## Lote 2 — COMPLETADO (13/11/2026)
 
+Commits: `d12a9bb` (back), `fce6268` (front).
+
+Tickets: ENT-26, ENT-21, ENT-27, ENT-29.
+
 ### ENT-26 — COMPLETADO (13/11/2026)
 
 - Migración: `supabase/migrations/20261113210000_ent26_licencia_pagos_periodo_anual.sql` (aplicada en Supabase)
@@ -45,6 +49,10 @@ Tickets: PUB-19, PUB-18 (rate limit), PUB-15.
 - `textoRepresentacionDesdeLicencia`: «Según tu licencia en trámite» vs activa
 - Tests: `apps/web/test/ent29LicenciaCopy.test.ts`, `apps/api/test/ent29LicenciaCotizacionTransferencia.test.ts`
 
-## Lotes 3–8 — PENDIENTE
+## Lote 3 — SIGUIENTE
+
+TOR-5, TOR-32, TOR-35, TOR-6 (ver plan en Cursor). Orden: DB / FK partidos -> backend torneo.service + programacionPartidos -> frontend BracketEditor / Paso7Cierre.
+
+## Lotes 4–8 — PENDIENTE
 
 Ver plan completo en Cursor.
