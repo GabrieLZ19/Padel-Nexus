@@ -13,6 +13,8 @@ import {
 
 function labelAlcance(alcance?: string | null): string {
   switch (alcance) {
+    case "Local":
+      return "Ranking del club";
     case "Provincial":
       return "Ranking provincial";
     case "Nacional":

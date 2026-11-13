@@ -13,6 +13,10 @@ import type { OnTorneoUpdated, RegisterSaveHandler } from "./types";
 import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 import { textoRectora } from "@/utils/textosRectora";
 import { useSiglaRectora } from "@/utils/useSiglaRectora";
+import {
+  inferirPuntosActivados,
+  torneoVinculaRanking,
+} from "@/utils/puntosTorneo";
 
 interface Paso5CierreProps {
   torneo: Torneo;
@@ -75,9 +79,12 @@ export const Paso5Cierre = ({
   // Parsear puntos iniciales
   const rawPuntos = torneo.configuracion_puntos || {};
   const rawProvincia = rawPuntos.puntos_provincia || {};
-  const [puntosActivados, setPuntosActivados] = useState(
-    rawPuntos.puntos_activados || false
+  const rankingVinculado = torneoVinculaRanking(torneo.alcance);
+  const [puntosActivados, setPuntosActivados] = useState(() =>
+    inferirPuntosActivados(rawPuntos, torneo.alcance),
   );
+  const [activandoPuntosPostCierre, setActivandoPuntosPostCierre] =
+    useState(false);
   const [puntosCampeon, setPuntosCampeon] = useState(
     rawPuntos.puntos_campeon ?? 1000
   );
@@ -141,6 +148,72 @@ export const Paso5Cierre = ({
   );
   
   const [guardandoConfig, setGuardandoConfig] = useState(false);
+
+  const estadoFinalizado = estadoNorm === "finalizado";
+
+  useEffect(() => {
+    setPuntosActivados(
+      inferirPuntosActivados(torneo.configuracion_puntos, torneo.alcance),
+    );
+  }, [torneo.configuracion_puntos, torneo.alcance]);
+
+  const solicitarActivarPuntosPostCierre = () => {
+    if (readOnly || puntosActivados || !estadoFinalizado) return;
+    setFeedbackModal({
+      isOpen: true,
+      type: "warning",
+      title: "Activar puntos de ranking",
+      description:
+        "El torneo ya finalizó sin puntos activos. Se recalcularán los puntos de todos los partidos con resultado según la tabla configurada. Indicá el motivo para auditoría.",
+      confirmText: "Activar y recalcular",
+      cancelText: "Cancelar",
+      showInput: true,
+      inputLabel: "Motivo del cambio",
+      inputPlaceholder: "Ej: Se omitió activar puntos al cierre del torneo",
+      onConfirm: async (motivo?: string) => {
+        if (!motivo?.trim()) return;
+        try {
+          setActivandoPuntosPostCierre(true);
+          setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+          const data = await TorneosService.activarPuntosRankingPostCierre(
+            torneoId,
+            motivo.trim(),
+          );
+          setPuntosActivados(true);
+          onTorneoUpdated?.(data.torneo);
+          triggerRefresh();
+          setFeedbackModal({
+            isOpen: true,
+            type: "success",
+            title: "Puntos activados",
+            description: `Se procesaron ${data.partidos_procesados} partido(s) y se actualizó el ranking.`,
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+          sileo.success({
+            title: "Ranking actualizado",
+            description: `${data.partidos_procesados} partido(s) con puntos recalculados.`,
+          });
+        } catch (e: unknown) {
+          const msg =
+            e instanceof Error
+              ? e.message
+              : "No se pudieron activar los puntos.";
+          setFeedbackModal({
+            isOpen: true,
+            type: "error",
+            title: "Error",
+            description: msg,
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        } finally {
+          setActivandoPuntosPostCierre(false);
+        }
+      },
+      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+    });
+  };
 
   const handleSaveConfig = async (options?: {
     silent?: boolean;
@@ -501,6 +574,31 @@ export const Paso5Cierre = ({
         </div>
       </div>
 
+      {rankingVinculado && !puntosActivados ? (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100/90">
+          <p className="font-bold text-amber-200 mb-1">
+            Ranking vinculado sin puntos activos
+          </p>
+          <p className="text-amber-100/80 leading-relaxed">
+            {estadoFinalizado
+              ? "Este torneo finalizó sin sumar puntos al ranking. Podés activarlos con recálculo retroactivo (requiere motivo de auditoría)."
+              : "Con el interruptor desactivado, los resultados no sumarán puntos aunque el torneo tenga ranking vinculado. Al cargar la final verás un aviso si el torneo cierra sin puntos."}
+          </p>
+          {estadoFinalizado && !readOnly ? (
+            <button
+              type="button"
+              onClick={solicitarActivarPuntosPostCierre}
+              disabled={activandoPuntosPostCierre || guardandoConfig}
+              className="mt-3 inline-flex items-center rounded-xl border border-amber-400/40 bg-amber-500/20 px-4 py-2 text-xs font-bold text-amber-100 hover:bg-amber-500/30 disabled:opacity-50 cursor-pointer"
+            >
+              {activandoPuntosPostCierre
+                ? "Procesando..."
+                : "Activar puntos y recalcular ranking"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* CONFIGURACIÓN Y ASIGNACIÓN DE PUNTOS */}
       <div className="border-t border-white/10 pt-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -510,6 +608,9 @@ export const Paso5Cierre = ({
             </h4>
             <p className="text-[11px] text-gray-400 mt-1">
               Habilitá el otorgamiento de puntaje del ranking a los competidores según la ronda alcanzada.
+              {rankingVinculado
+                ? " Por defecto queda activado para torneos con ranking vinculado."
+                : ""}
             </p>
           </div>
           <div

@@ -128,6 +128,21 @@ export const TorneosService = {
     return response.data;
   },
 
+  async activarPuntosRankingPostCierre(
+    torneoId: string,
+    motivo: string,
+  ): Promise<{
+    message: string;
+    torneo: Torneo;
+    partidos_procesados: number;
+  }> {
+    const response = await api.post(
+      `/torneos/${torneoId}/activar-puntos-ranking`,
+      { motivo },
+    );
+    return response.data;
+  },
+
   async delete(id: string): Promise<void> {
     await api.delete(`/torneos/${id}`);
   },

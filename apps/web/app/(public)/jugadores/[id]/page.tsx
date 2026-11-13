@@ -126,6 +126,12 @@ export default function FichaJugadorPublicaPage() {
     categoriaQuery,
   );
 
+  const posicionResuelta =
+    posicionQuery ??
+    (registroPrincipal?.posicion_actual != null
+      ? String(registroPrincipal.posicion_actual)
+      : null);
+
   if (!perfil && !registroPrincipal) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 px-6">
@@ -204,9 +210,9 @@ export default function FichaJugadorPublicaPage() {
                   <User className="size-10" />
                 )}
               </div>
-              {posicionQuery ? (
+              {posicionResuelta ? (
                 <span className="absolute -bottom-1 -right-1 rounded-xl border border-brand-chartreuse bg-brand-black px-2.5 py-1 text-xs font-black text-brand-chartreuse">
-                  #{posicionQuery}
+                  #{posicionResuelta}
                 </span>
               ) : null}
             </div>
@@ -307,8 +313,8 @@ export default function FichaJugadorPublicaPage() {
             <JugadorPublicoRankingSection
               registros={registrosRanking}
               principal={registroPrincipal}
-              posicion={posicionQuery}
-              scope={scopeQuery}
+              posicion={posicionResuelta}
+              scope={scopeQuery ?? registroPrincipal?.alcance ?? null}
             />
           </div>
 

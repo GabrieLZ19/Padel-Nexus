@@ -531,13 +531,21 @@ export const PasoResultados = ({
   ) => {
     try {
       setGuardandoPartidoId(partidoId);
-      await TorneosService.actualizarResultado(partidoId, {
+      const resultado = await TorneosService.actualizarResultado(partidoId, {
         ganador_id: ganadorId,
         ...scorePayload,
       });
 
       setPartidoEnCorreccion(null);
       triggerRefresh();
+
+      const avisos = Array.isArray(
+        (resultado as { avisos_programacion_publicada?: string[] })
+          ?.avisos_programacion_publicada,
+      )
+        ? (resultado as { avisos_programacion_publicada: string[] })
+            .avisos_programacion_publicada
+        : [];
 
       sileo.success({
         title: scorePayload.motivo?.trim()
@@ -547,6 +555,25 @@ export const PasoResultados = ({
           ? "El cambio quedó en auditoría (Paso 7 Cuadros > pestaña Auditoría)."
           : "El marcador quedó guardado.",
       });
+
+      if (avisos.length > 0) {
+        sileo.warning({
+          title: "Revisar horarios publicados",
+          description: avisos[0],
+        });
+      }
+
+      const avisosRanking = Array.isArray(
+        (resultado as { avisos_ranking?: string[] })?.avisos_ranking,
+      )
+        ? (resultado as { avisos_ranking: string[] }).avisos_ranking
+        : [];
+      if (avisosRanking.length > 0) {
+        sileo.warning({
+          title: "Torneo finalizado sin puntos",
+          description: avisosRanking[0],
+        });
+      }
     } catch (error: any) {
       const apiMsg =
         error?.response?.data?.message ||

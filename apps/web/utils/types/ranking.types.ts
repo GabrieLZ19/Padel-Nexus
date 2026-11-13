@@ -14,7 +14,7 @@ export interface RankingJugador {
   pj: number;
   pg: number;
   tendencia: number;
-  alcance: "Provincial" | "Nacional" | "Global";
+  alcance: "Local" | "Provincial" | "Nacional" | "Global";
   provincia_jurisdiccion?: string | null;
 
   // Propiedades opcionales / mapeadas
@@ -50,6 +50,7 @@ export interface RankingPerfilJugador {
   id: string;
   usuario_id: string;
   puntos: number;
+  posicion_actual?: number | null;
   ranking_provisional?: boolean;
   categoria: string;
   rama?: string | null;
