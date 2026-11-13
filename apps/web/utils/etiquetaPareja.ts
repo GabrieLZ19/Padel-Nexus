@@ -6,6 +6,18 @@ export const POR_DEFINIR = "Por definir";
 /** Hueco de un bye real: el otro lado avanza sin partido. */
 export const LIBRE = "Libre";
 
+/** Etiqueta para un lado vacío en llave (TOR-36). */
+export function etiquetaSlotVacioLlave(opts: {
+  origen?: string | null;
+  /** True solo en pase directo real (un rival asignado, el otro hueco sin depender de Gan. #N). */
+  esByeInferido?: boolean;
+}): string {
+  const origen = String(opts.origen || "").trim();
+  if (origen) return POR_DEFINIR;
+  if (opts.esByeInferido) return LIBRE;
+  return POR_DEFINIR;
+}
+
 const PARTICULAS = new Set(["de", "del", "la", "las", "los", "y", "e"]);
 
 export function esAlcanceNacional(alcance?: string | null): boolean {

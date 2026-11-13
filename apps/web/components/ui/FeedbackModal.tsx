@@ -42,8 +42,8 @@ export default function FeedbackModal({
   inputType = "text",
   inputLabel = "Valor",
   showSelect = false,
-  selectLabel = "Método",
-  selectPlaceholder = "Seleccioná el método",
+  selectLabel = "Cabeza de serie",
+  selectPlaceholder = "Elegí la pareja",
   selectOptions = [],
   inputMinLength = 1,
 }: FeedbackModalProps) {

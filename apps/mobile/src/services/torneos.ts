@@ -64,11 +64,14 @@ export const TorneosService = {
 
   async getZonas(torneoId: string): Promise<GrupoZonaTorneo[]> {
     try {
-      const response = await api.get<GrupoZonaTorneo[] | { data: GrupoZonaTorneo[] }>(
-        `/torneos/${torneoId}/zonas`,
-      );
+      const response = await api.get<
+        | GrupoZonaTorneo[]
+        | { data: GrupoZonaTorneo[] }
+        | { zonas: GrupoZonaTorneo[]; cabezas_ranking_globales?: string[] }
+      >(`/torneos/${torneoId}/zonas`);
       const payload = response.data;
       if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload.zonas)) return payload.zonas;
       return Array.isArray(payload.data) ? payload.data : [];
     } catch {
       return [];

@@ -12,11 +12,12 @@ describe("TOR-16 BracketEditor evita duplicar parejas", () => {
       path.join(RAIZ, "components/torneos/BracketEditor.tsx"),
       "utf8",
     );
-    assert.match(editor, /mensajesTrasladoPareja/);
+    assert.match(editor, /mensajesTrasladoParejaLlave/);
     assert.match(editor, /parejasBloqueadasEnLlave/);
     assert.match(editor, /Confirmar movimiento/);
+    assert.match(editor, /Confirmar intercambio/);
     assert.match(editor, /status === 409/);
-    assert.match(editor, /intercambiar/);
+    assert.match(editor, /Intercambiar parejas en la llave/);
     assert.match(editor, /matchEditBaseline/);
   });
 });

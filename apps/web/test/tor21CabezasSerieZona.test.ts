@@ -115,5 +115,7 @@ describe("TOR-21 cabezas de serie en editor de zonas", () => {
     assert.match(editor, /Elegí la pareja/);
     assert.match(editor, /validarCabezasSerie \? "ON" : "OFF"/);
     assert.match(editor, /abrirModalConflictoRanking/);
+    assert.match(editor, /cabezasRankingGlobales/);
+    assert.match(editor, /bloqueaPorRanking/);
   });
 });

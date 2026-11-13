@@ -29,6 +29,7 @@ import {
   esIdInscripcionPendiente,
   type AltaLlavePreparada,
 } from "./llaveAltaParejaTypes";
+import { mensajesTrasladoParejaLlave } from "@/utils/trasladoParejaLlave";
 import FeedbackModal, {
   FeedbackModalProps,
 } from "@/components/ui/FeedbackModal";
@@ -42,6 +43,7 @@ import {
 } from "@/utils/cabezasSerieZonas";
 import { MatchCard } from "./MatchCard";
 import { FapBracketDiagram, type FapMatrixMatch } from "./FapBracketDiagram";
+import { ladoSlotBloqueadoPorMatriz } from "@/utils/edicionLlaveFap";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { sileo } from "sileo";
 import {
@@ -181,7 +183,23 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   const [showMatchEditModal, setShowMatchEditModal] = useState(false);
   const [modificacionNoDestructiva, setModificacionNoDestructiva] =
     useState(true);
+  const claveValidarCabezas = `pn-validar-cabezas-${torneoId}`;
   const [validarCabezasSerie, setValidarCabezasSerie] = useState(true);
+
+  useEffect(() => {
+    if (typeof sessionStorage === "undefined") return;
+    const guardado = sessionStorage.getItem(claveValidarCabezas);
+    if (guardado === "0") setValidarCabezasSerie(false);
+    if (guardado === "1") setValidarCabezasSerie(true);
+  }, [claveValidarCabezas]);
+
+  useEffect(() => {
+    if (typeof sessionStorage === "undefined") return;
+    sessionStorage.setItem(claveValidarCabezas, validarCabezasSerie ? "1" : "0");
+  }, [validarCabezasSerie, claveValidarCabezas]);
+  const [cabezasRankingGlobales, setCabezasRankingGlobales] = useState<
+    Set<string>
+  >(new Set());
   const [auditoriaLogs, setAuditoriaLogs] = useState<any[]>([]);
   const [loadingAuditoria, setLoadingAuditoria] = useState(false);
 
@@ -237,7 +255,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   const loadZonas = async () => {
     try {
       setLoading(true);
-      const data = await TorneosService.getZonas(torneoId);
+      const { zonas: data, cabezas_ranking_globales } =
+        await TorneosService.getZonas(torneoId);
+      setCabezasRankingGlobales(new Set(cabezas_ranking_globales));
       const formattedZonas: ZonaDrag[] = data.map((grupo: any) => ({
         id: grupo.id,
         nombre: grupo.nombre_grupo,
@@ -605,14 +625,34 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     [],
   );
 
+  const cabezasGlobalesParaValidacion = useCallback(
+    (zonasActuales: ZonaDrag[]) =>
+      cabezasRankingGlobales.size > 0
+        ? cabezasRankingGlobales
+        : idsCabezasGlobalesDesdeZonas(zonasActuales),
+    [cabezasRankingGlobales],
+  );
+
   const abrirModalConflictoCabezas = useCallback(
-    (nextZonas: ZonaDrag[], conflicto: NonNullable<ReturnType<typeof zonaConMultiplesCabezas>>) => {
+    (
+      nextZonas: ZonaDrag[],
+      conflicto: NonNullable<ReturnType<typeof zonaConMultiplesCabezas>>,
+      cabezasGlobales: Set<string>,
+    ) => {
       const defaultId = cabezaPorMejorRanking(conflicto.candidatos);
+      const topsEnZona = conflicto.candidatos.filter((p) =>
+        cabezasGlobales.has(p.id),
+      );
+      const bloqueaPorRanking =
+        validarCabezasSerie && topsEnZona.length > 1;
+      const avisoRanking = bloqueaPorRanking
+        ? " Con la validación activa no podés guardar mientras dos parejas del top del ranking compartan la misma zona: mové al menos una a otra zona o desactivá la validación. Elegir el rótulo no alcanza en ese caso."
+        : "";
       setModalCabezaConflicto({
         isOpen: true,
         type: "warning",
         title: "Dos cabezas de serie en la misma zona",
-        description: `${conflicto.zona.nombre} concentró más de una cabeza de serie. Elegí cuál conserva el rótulo; el resto lo pierde en esta zona. Quedará registrado al guardar los cambios.`,
+        description: `${conflicto.zona.nombre} concentró más de una cabeza de serie. Elegí cuál conserva el rótulo; el resto lo pierde en esta zona.${bloqueaPorRanking ? "" : " Quedará registrado al guardar los cambios."}${avisoRanking}`,
         confirmText: "Confirmar",
         cancelText: "Deshacer movimiento",
         showSelect: true,
@@ -643,7 +683,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         },
       });
     },
-    [],
+    [validarCabezasSerie],
   );
 
   const aplicarZonasYRevisarCabezas = useCallback(
@@ -652,7 +692,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         const resolved = typeof next === "function" ? next(prev) : next;
         if (!isEditing) return resolved;
 
-        const cabezasGlobales = idsCabezasGlobalesDesdeZonas(resolved);
+        const cabezasGlobales = cabezasGlobalesParaValidacion(resolved);
         const conflictoRanking =
           validarCabezasSerie &&
           zonaConMultiplesCabezasRanking(resolved, cabezasGlobales);
@@ -664,7 +704,11 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             if (conflictoRanking) {
               abrirModalConflictoRanking(conflictoRanking);
             } else if (conflictoRotulo) {
-              abrirModalConflictoCabezas(resolved, conflictoRotulo);
+              abrirModalConflictoCabezas(
+                resolved,
+                conflictoRotulo,
+                cabezasGlobales,
+              );
             }
           });
         }
@@ -674,6 +718,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     [
       abrirModalConflictoCabezas,
       abrirModalConflictoRanking,
+      cabezasGlobalesParaValidacion,
       isEditing,
       validarCabezasSerie,
     ],
@@ -705,6 +750,97 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     });
   };
 
+  const formatearResumenLlaveZonas = (data: {
+    zonas_regeneradas?: string[];
+    llave?: {
+      semillas_invalidadas?: string[];
+      semillas_actualizadas?: string[];
+      semillas_pendientes?: string[];
+    };
+    fixture_reparado?: Array<{ nombre_grupo: string; insertados: number }>;
+  }): string => {
+    const partes: string[] = [];
+    if (data.zonas_regeneradas?.length) {
+      partes.push(
+        `Fixture recalculado en: ${data.zonas_regeneradas.join(", ")}.`,
+      );
+    }
+    const f = data.fixture_reparado?.filter((z) => z.insertados > 0) ?? [];
+    if (f.length) {
+      partes.push(
+        `Se completaron partidos faltantes en ${f.map((z) => z.nombre_grupo).join(", ")}.`,
+      );
+    }
+    const ll = data.llave;
+    if (ll?.semillas_invalidadas?.length) {
+      partes.push(
+        `Llave: se quitaron plazas que ya no aplican (${ll.semillas_invalidadas.join(", ")}).`,
+      );
+    }
+    if (ll?.semillas_actualizadas?.length) {
+      partes.push(
+        `Llave actualizada: ${ll.semillas_actualizadas.join(", ")}.`,
+      );
+    }
+    if (ll?.semillas_pendientes?.length) {
+      partes.push(
+        `Plazas sin clasificado aún: ${ll.semillas_pendientes.join(", ")}.`,
+      );
+    }
+    return partes.length
+      ? partes.join(" ")
+      : "La disposición de las zonas y los partidos se actualizaron exitosamente.";
+  };
+
+  const handleRepararFixtureZonas = () => {
+    setFeedbackModal({
+      isOpen: true,
+      type: "warning",
+      title: "Reparar fixtures de zona",
+      description:
+        "Completará partidos faltantes (por ejemplo partidos 3 y 4 en zonas de 4 parejas) sin borrar resultados ya cargados, y volverá a sincronizar la llave FAP.",
+      confirmText: "Reparar",
+      cancelText: "Cancelar",
+      showInput: true,
+      inputLabel: "Motivo (auditoría)",
+      inputPlaceholder: "Ej: Faltaban partidos 3/4 tras edición previa",
+      onConfirm: async (motivo?: string) => {
+        if (!motivo?.trim()) return;
+        try {
+          setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+          const data = await TorneosService.repararFixtureZonas(
+            torneoId,
+            motivo.trim(),
+          );
+          setFeedbackModal({
+            isOpen: true,
+            type: "success",
+            title: "Fixture reparado",
+            description: formatearResumenLlaveZonas(data),
+            onClose: () => {
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
+              onRefresh?.();
+            },
+          });
+        } catch (error: unknown) {
+          const e = error as { response?: { data?: { error?: string } } };
+          setFeedbackModal({
+            isOpen: true,
+            type: "error",
+            title: "No se pudo reparar",
+            description:
+              e.response?.data?.error ||
+              "Error al reparar fixtures de zona.",
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        }
+      },
+      onClose: () =>
+        setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+    });
+  };
+
   const handleGuardarCambios = () => {
     if (isEditing) {
       setFeedbackModal({
@@ -721,7 +857,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         onConfirm: async (motivo?: string) => {
           if (!motivo) return;
           if (validarCabezasSerie) {
-            const cabezasGlobales = idsCabezasGlobalesDesdeZonas(zonas);
+            const cabezasGlobales = cabezasGlobalesParaValidacion(zonas);
             const conflictoRanking = zonaConMultiplesCabezasRanking(
               zonas,
               cabezasGlobales,
@@ -743,7 +879,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           }
           try {
             setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
-            await TorneosService.guardarZonas(torneoId, {
+            const guardado = await TorneosService.guardarZonas(torneoId, {
               zonas: zonas.map((z) => ({
                 id: z.id,
                 nombre: z.nombre,
@@ -762,8 +898,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               isOpen: true,
               type: "success",
               title: "Cambios Guardados",
-              description:
-                "La disposición de las zonas y los partidos se actualizaron exitosamente.",
+              description: formatearResumenLlaveZonas(guardado),
               onClose: () => {
                 setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
                 onRefresh?.();
@@ -1097,6 +1232,27 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     return `${m[1]}º ${m[2].toUpperCase()}`;
   };
 
+  const matrizPartidoEnEdicion = React.useMemo(() => {
+    if (!selectedMatchToEdit || !usaPlantillaFap) return null;
+    const orden = Number(selectedMatchToEdit.orden);
+    if (!Number.isFinite(orden)) return null;
+    return fapMatrixByOrden.get(orden) ?? null;
+  }, [selectedMatchToEdit, usaPlantillaFap, fapMatrixByOrden]);
+
+  const slotLadoReservadoGanador = (slot: "a" | "b"): boolean => {
+    if (!matrizPartidoEnEdicion) return false;
+    const ref =
+      slot === "a" ? matrizPartidoEnEdicion.a : matrizPartidoEnEdicion.b;
+    return ladoSlotBloqueadoPorMatriz(ref);
+  };
+
+  const etiquetaLadoReservado = (slot: "a" | "b"): string | null => {
+    if (!matrizPartidoEnEdicion) return null;
+    const ref =
+      slot === "a" ? matrizPartidoEnEdicion.a : matrizPartidoEnEdicion.b;
+    return ladoSlotBloqueadoPorMatriz(ref) ? formatFapSide(ref) : null;
+  };
+
   const cabezasSerieIds = React.useMemo(() => {
     const ids = new Set<string>();
     for (const zona of zonas) {
@@ -1155,16 +1311,6 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     return base;
   }, [inscripciones, firstRoundTeams, inscripcionesExtraLlave]);
 
-  const partidoQueOcupaPareja = (
-    inscripcionId: string,
-    excluirPartidoId: string,
-  ) =>
-    playoffPartidos.find(
-      (p) =>
-        p.id !== excluirPartidoId &&
-        (p.equipo_a_id === inscripcionId || p.equipo_b_id === inscripcionId),
-    );
-
   const etiquetaParejaLlave = (id: string | null): string => {
     if (!id) return "La pareja actual";
     const opt = inscripcionOptions.find((o) => o.value === id);
@@ -1172,47 +1318,21 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     return opt.label.replace(/\s*·\s*En llave.*$/i, "").trim();
   };
 
-  const mensajesTrasladoPareja = (
+  const resolverMensajesTrasladoPareja = (
     equipoAId: string | null,
     equipoBId: string | null,
     partidoId: string,
     baseline: { equipo_a_id: string | null; equipo_b_id: string | null } | null,
-  ): string[] => {
-    const avisos: string[] = [];
-    const lados: { prev: string | null; next: string | null }[] = [
-      { prev: baseline?.equipo_a_id ?? null, next: equipoAId ?? null },
-      { prev: baseline?.equipo_b_id ?? null, next: equipoBId ?? null },
-    ];
-    const numDest = numerosPartido.get(partidoId) ?? null;
-
-    for (const { prev, next } of lados) {
-      if (!next || next === prev) continue;
-      const origen = partidoQueOcupaPareja(next, partidoId);
-      if (!origen) {
-        if (prev) {
-          avisos.push(
-            `${etiquetaParejaLlave(prev)} quedará fuera de la llave: no proviene de otro cruce para intercambiar.`,
-          );
-        }
-        continue;
-      }
-      const numOrigen = numerosPartido.get(origen.id) ?? origen.orden ?? null;
-      if (prev) {
-        avisos.push(
-          numOrigen != null && numDest != null
-            ? `Se intercambiarán las parejas: ${etiquetaParejaLlave(prev)} pasa al partido #${numOrigen} y la elegida ocupa el #${numDest}.`
-            : `Se intercambiarán las parejas entre estos dos cruces.`,
-        );
-      } else {
-        avisos.push(
-          numOrigen != null
-            ? `La pareja deja de figurar en el partido #${numOrigen}; el otro lado de ese cruce puede quedar Libre.`
-            : "La pareja deja de figurar en otro cruce de la llave.",
-        );
-      }
-    }
-    return avisos;
-  };
+  ) =>
+    mensajesTrasladoParejaLlave({
+      equipoAId,
+      equipoBId,
+      partidoId,
+      baseline,
+      partidosLlave: playoffPartidos,
+      etiquetaPareja: etiquetaParejaLlave,
+      numeroPartido: (id) => numerosPartido.get(id) ?? null,
+    });
 
   const descartarPendientesModalLlave = () => {
     setInscripcionesExtraLlave((prev) =>
@@ -1229,11 +1349,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     setMatchEditMotivo("");
   };
 
-  const resolverIdInscripcionParaGuardar = async (
+  const resolverLadoParaGuardarPartido = (
     id: string | null | undefined,
-  ): Promise<string | null> => {
-    if (!id) return null;
-    if (!esIdInscripcionPendiente(id)) return id;
+  ): {
+    equipoId: string | null;
+    alta?: AltaLlavePreparada["payload"];
+  } => {
+    if (!id) return { equipoId: null };
+    if (!esIdInscripcionPendiente(id)) return { equipoId: id };
 
     const pendiente = altasPendientesLlave[id];
     if (!pendiente) {
@@ -1241,48 +1364,25 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         "La alta de pareja pendiente ya no está disponible. Volvé a prepararla.",
       );
     }
-
-    const motivo = matchEditMotivo.trim();
-    const inscripcion = await TorneosService.altaParejaLlave(torneoId, {
-      ...pendiente.payload,
-      motivo,
-    } as Parameters<typeof TorneosService.altaParejaLlave>[1]);
-
-    setAltasPendientesLlave((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    setInscripcionesExtraLlave((prev) =>
-      prev.map((p) =>
-        p.value === id
-          ? {
-              value: inscripcion.id,
-              label: pendiente.label,
-              name1: pendiente.name1,
-              name2: pendiente.name2 || "",
-            }
-          : p,
-      ),
-    );
-
-    return inscripcion.id;
+    return { equipoId: null, alta: pendiente.payload };
   };
 
   const ejecutarGuardarMatchEdit = async () => {
     if (!selectedMatchToEdit) return;
     try {
       setMatchEditBusy(true);
-      const equipoAId = await resolverIdInscripcionParaGuardar(
+      const ladoA = resolverLadoParaGuardarPartido(
         selectedMatchToEdit.equipo_a_id,
       );
-      const equipoBId = await resolverIdInscripcionParaGuardar(
+      const ladoB = resolverLadoParaGuardarPartido(
         selectedMatchToEdit.equipo_b_id,
       );
       await TorneosService.actualizarEquiposPartido(selectedMatchToEdit.id, {
-        equipo_a_id: equipoAId || null,
-        equipo_b_id: equipoBId || null,
+        equipo_a_id: ladoA.equipoId,
+        equipo_b_id: ladoB.equipoId,
         motivo: matchEditMotivo.trim(),
+        ...(ladoA.alta ? { alta_lado_a: ladoA.alta } : {}),
+        ...(ladoB.alta ? { alta_lado_b: ladoB.alta } : {}),
       });
       descartarPendientesModalLlave();
       setShowMatchEditModal(false);
@@ -1322,6 +1422,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     slot: "a" | "b",
     newId: string,
   ) => {
+    if (newId && slotLadoReservadoGanador(slot)) {
+      sileo.warning({
+        title: "Lado reservado",
+        description:
+          "Ese lado corresponde al ganador de otro cruce. No podés asignar una pareja ahí; esperá el resultado o editá solo el pase directo / clasificado.",
+      });
+      return;
+    }
     const found = inscripcionOptions.find((o) => o.value === newId);
     setSelectedMatchToEdit((prev) => {
       if (!prev) return prev;
@@ -1356,6 +1464,35 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       return;
     }
 
+    const baseA = matchEditBaseline?.equipo_a_id ?? null;
+    const baseB = matchEditBaseline?.equipo_b_id ?? null;
+    const nextA = selectedMatchToEdit.equipo_a_id ?? null;
+    const nextB = selectedMatchToEdit.equipo_b_id ?? null;
+    if (matrizPartidoEnEdicion) {
+      if (slotLadoReservadoGanador("a") && nextA !== baseA) {
+        setFeedbackModal({
+          isOpen: true,
+          type: "warning",
+          title: "Lado A reservado",
+          description: `Este cruce espera ${etiquetaLadoReservado("a") ?? "un ganador previo"} en el lado A. No podés reemplazarlo con una pareja manual.`,
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+        return;
+      }
+      if (slotLadoReservadoGanador("b") && nextB !== baseB) {
+        setFeedbackModal({
+          isOpen: true,
+          type: "warning",
+          title: "Lado B reservado",
+          description: `Este cruce espera ${etiquetaLadoReservado("b") ?? "un ganador previo"} en el lado B. No podés reemplazarlo con una pareja manual.`,
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+        return;
+      }
+    }
+
     for (const id of [
       selectedMatchToEdit.equipo_a_id,
       selectedMatchToEdit.equipo_b_id,
@@ -1374,20 +1511,27 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       }
     }
 
-    const traslados = mensajesTrasladoPareja(
+    const traslado = resolverMensajesTrasladoPareja(
       selectedMatchToEdit.equipo_a_id ?? null,
       selectedMatchToEdit.equipo_b_id ?? null,
       selectedMatchToEdit.id,
       matchEditBaseline,
     );
 
-    if (traslados.length > 0) {
+    if (traslado.avisos.length > 0) {
+      const cierre = traslado.hayParejaFuera
+        ? " Revisá el aviso antes de confirmar: alguien puede quedar sin cruce."
+        : " El cambio queda auditado.";
       setFeedbackModal({
         isOpen: true,
-        type: "warning",
-        title: "Mover pareja en la llave",
-        description: `${traslados.join(" ")} El cambio queda auditado.`,
-        confirmText: "Confirmar movimiento",
+        type: traslado.hayParejaFuera ? "error" : "warning",
+        title: traslado.hayIntercambio
+          ? "Intercambiar parejas en la llave"
+          : "Mover pareja en la llave",
+        description: `${traslado.avisos.join(" ")}${cierre}`,
+        confirmText: traslado.hayIntercambio
+          ? "Confirmar intercambio"
+          : "Confirmar movimiento",
         cancelText: "Cancelar",
         onConfirm: () => {
           setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
@@ -1408,7 +1552,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         <div>
           <h3 className="font-extrabold text-xl sm:text-2xl text-brand-white tracking-tight uppercase">
             EDITOR DE LLAVES — {torneo?.nombre || "TORNEO"} ·{" "}
-            {etiquetaCategoria(torneo?.categoria) || "CATEGORÍA"}
+            {etiquetaCategoria(torneo?.nivel) ||
+              etiquetaCategoria(torneo?.categoria) ||
+              "CATEGORÍA"}
           </h3>
           <p className="text-gray-400 text-sm mt-1">
             {isEliminatoriaDirecta
@@ -1693,7 +1839,16 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 <Printer className="size-4 text-gray-400" /> Publicar zonas
               </button>
 
-        
+              {puedeEditarZonas && zonas.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleRepararFixtureZonas}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-all"
+                >
+                  <RefreshCw className="size-4 text-gray-400" />
+                  Reparar fixture
+                </button>
+              )}
             </div>
             {puedeEditarZonas && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
@@ -1701,9 +1856,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 id="btn-validar-cabezas"
                 className="flex items-center justify-between w-full sm:w-auto px-4 py-2.5 border border-brand-chartreuse/10 rounded-2xl bg-white/5 transition-all relative gap-4"
               >
-                <span className="text-sm font-semibold text-gray-300">
-                  Validación de cabezas de serie
-                </span>
+                <div className="min-w-0">
+                  <span className="text-sm font-semibold text-gray-300 block">
+                    Validación de cabezas de serie
+                  </span>
+                  <span className="text-[10px] text-brand-ayuda leading-snug block mt-0.5">
+                    Se recuerda en esta sesión del navegador mientras editás zonas.
+                  </span>
+                </div>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setValidarCabezasSerie(!validarCabezasSerie)}
@@ -2304,10 +2464,18 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 </button>
               </div>
 
-              <LlaveAltaParejaPanel
+              {slotLadoReservadoGanador(matchEditSlotFocus) ? (
+                <p className="text-xs text-amber-200/90 bg-amber-500/10 border border-amber-400/30 rounded-xl px-3 py-2.5">
+                  El lado seleccionado está reservado para{" "}
+                  {etiquetaLadoReservado(matchEditSlotFocus) ?? "un ganador previo"}
+                  . Usá «Alta para lado A/B» solo en un pase directo o clasificado,
+                  no en un hueco de ganador.
+                </p>
+              ) : (
+                <LlaveAltaParejaPanel
                 torneoId={torneoId}
                 esNacional={/nacional/i.test(String(torneo?.alcance || ""))}
-                categoriaTorneo={torneo?.categoria}
+                categoriaTorneo={torneo?.nivel || torneo?.categoria}
                 motivoAuditoria={matchEditMotivo}
                 slotDestino={matchEditSlotFocus}
                 onInscripcionPreparada={(datos) => {
@@ -2330,13 +2498,15 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   applyInscripcionToSlot(matchEditSlotFocus, datos.tempId);
                 }}
               />
+              )}
 
               <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-3 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <label className="text-xs font-black uppercase tracking-wider text-sky-400">
                     Lado A
                   </label>
-                  {selectedMatchToEdit.equipo_a_id && (
+                  {selectedMatchToEdit.equipo_a_id &&
+                    !slotLadoReservadoGanador("a") && (
                     <button
                       type="button"
                       onClick={() => applyInscripcionToSlot("a", "")}
@@ -2346,6 +2516,12 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     </button>
                   )}
                 </div>
+                {slotLadoReservadoGanador("a") ? (
+                  <p className="text-sm text-gray-400">
+                    {etiquetaLadoReservado("a")} — se completa al cargar el
+                    resultado del partido previo.
+                  </p>
+                ) : (
                 <CustomDropdown
                   value={selectedMatchToEdit.equipo_a_id || ""}
                   onChange={(newId) => applyInscripcionToSlot("a", newId)}
@@ -2366,6 +2542,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   ]}
                   placeholder="Seleccionar pareja A..."
                 />
+                )}
               </div>
 
               <div className="rounded-xl border border-white/10 bg-[#0a0a0a] p-3 space-y-3">
@@ -2373,7 +2550,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   <label className="text-xs font-black uppercase tracking-wider text-sky-400">
                     Lado B
                   </label>
-                  {selectedMatchToEdit.equipo_b_id && (
+                  {selectedMatchToEdit.equipo_b_id &&
+                    !slotLadoReservadoGanador("b") && (
                     <button
                       type="button"
                       onClick={() => applyInscripcionToSlot("b", "")}
@@ -2383,6 +2561,12 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     </button>
                   )}
                 </div>
+                {slotLadoReservadoGanador("b") ? (
+                  <p className="text-sm text-gray-400">
+                    {etiquetaLadoReservado("b")} — se completa al cargar el
+                    resultado del partido previo.
+                  </p>
+                ) : (
                 <CustomDropdown
                   value={selectedMatchToEdit.equipo_b_id || ""}
                   onChange={(newId) => applyInscripcionToSlot("b", newId)}
@@ -2403,6 +2587,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   ]}
                   placeholder="Seleccionar pareja B..."
                 />
+                )}
               </div>
 
             </div>

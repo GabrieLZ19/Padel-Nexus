@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Search, UserPlus } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { identificadorPareceDni } from "@/utils/identificadorJugadorManual";
@@ -11,7 +11,7 @@ type ModoAlta = "externa" | "manual";
 
 type ResultadoBusqueda = Awaited<
   ReturnType<typeof TorneosService.buscarParejasLlaveExternas>
->[number];
+>["resultados"][number];
 
 export function LlaveAltaParejaPanel({
   torneoId,
@@ -31,6 +31,8 @@ export function LlaveAltaParejaPanel({
   const [modo, setModo] = useState<ModoAlta>("externa");
   const [busqueda, setBusqueda] = useState("");
   const [resultados, setResultados] = useState<ResultadoBusqueda[]>([]);
+  const [excluidasEnTorneo, setExcluidasEnTorneo] = useState(0);
+  const [busquedaEjecutada, setBusquedaEjecutada] = useState(false);
   const [buscando, setBuscando] = useState(false);
   const [seleccionExterna, setSeleccionExterna] = useState("");
   const [j1, setJ1] = useState("");
@@ -69,7 +71,15 @@ export function LlaveAltaParejaPanel({
       ...(nacimiento.trim() ? { fecha_nacimiento: nacimiento.trim() } : {}),
       ...(telefono.trim() ? { telefono: telefono.trim() } : {}),
     };
-    if (!payload.nombre && !payload.apellido) return undefined;
+    if (
+      !payload.nombre &&
+      !payload.apellido &&
+      !payload.categoria_padel &&
+      !payload.fecha_nacimiento &&
+      !payload.telefono
+    ) {
+      return undefined;
+    }
     return payload;
   };
 
@@ -96,22 +106,35 @@ export function LlaveAltaParejaPanel({
     const q = busqueda.trim();
     if (q.length < 2) {
       setResultados([]);
+      setExcluidasEnTorneo(0);
+      setBusquedaEjecutada(false);
       return;
     }
     setBuscando(true);
     try {
-      const lista = await TorneosService.buscarParejasLlaveExternas(
-        torneoId,
-        q,
-      );
-      setResultados(lista);
+      const data = await TorneosService.buscarParejasLlaveExternas(torneoId, q);
+      setResultados(data.resultados);
+      setExcluidasEnTorneo(data.excluidas_en_torneo);
+      setBusquedaEjecutada(true);
     } catch {
       setResultados([]);
+      setExcluidasEnTorneo(0);
+      setBusquedaEjecutada(true);
       sileo.error({ title: "No se pudo buscar parejas en otros torneos." });
     } finally {
       setBuscando(false);
     }
   }, [busqueda, torneoId]);
+
+  useEffect(() => {
+    if (modo !== "externa") return;
+    const q = busqueda.trim();
+    if (q.length < 2) return;
+    const timer = window.setTimeout(() => {
+      void ejecutarBusqueda();
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [busqueda, modo, ejecutarBusqueda]);
 
   const prepararAlta = () => {
     if (!validarMotivo()) return;
@@ -290,6 +313,13 @@ export function LlaveAltaParejaPanel({
               <Search className="size-4" />
             </button>
           </div>
+          {excluidasEnTorneo > 0 ? (
+            <p className="text-[10px] text-amber-400/90 px-1">
+              {excluidasEnTorneo === 1
+                ? "1 pareja ya está en este torneo y no se muestra en la lista."
+                : `${excluidasEnTorneo} parejas ya están en este torneo y no se muestran en la lista.`}
+            </p>
+          ) : null}
           <div className="max-h-36 overflow-y-auto space-y-1">
             {resultados.length === 0 ? (
               <p className="text-[11px] text-brand-ayuda px-1">
@@ -297,7 +327,9 @@ export function LlaveAltaParejaPanel({
                   ? "Escribí al menos 2 caracteres."
                   : buscando
                     ? "Buscando…"
-                    : "Sin resultados en el club o grupo."}
+                    : !busquedaEjecutada
+                      ? "La búsqueda se ejecuta al escribir o al pulsar buscar."
+                      : "Sin resultados en el club o grupo."}
               </p>
             ) : (
               resultados.map((row) => (

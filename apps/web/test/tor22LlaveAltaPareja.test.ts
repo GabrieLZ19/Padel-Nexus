@@ -23,6 +23,8 @@ describe("TOR-22 editor de llaves: otra categoría o DNI", () => {
     assert.match(panel, /Alta por DNI/);
     assert.match(panel, /Preparar/);
     assert.match(panel, /guardar el partido/);
+    assert.match(panel, /excluidasEnTorneo/);
+    assert.match(panel, /busquedaEjecutada/);
 
     const diagrama = readFileSync(
       path.join(RAIZ, "components/torneos/FapBracketDiagram.tsx"),
@@ -36,6 +38,11 @@ describe("TOR-22 editor de llaves: otra categoría o DNI", () => {
       "utf8",
     );
     assert.match(svc, /buscarParejasLlaveExternas/);
-    assert.match(svc, /altaParejaLlave/);
+    assert.match(svc, /excluidas_en_torneo/);
+    assert.match(svc, /alta_lado_a/);
+
+    assert.doesNotMatch(editor, /resolverIdInscripcionParaGuardar/);
+    assert.match(editor, /alta_lado_a/);
+    assert.match(editor, /resolverLadoParaGuardarPartido/);
   });
 });

@@ -166,8 +166,13 @@ export const FiscalPanelService = {
   },
 
   async getZonas(torneoId: string): Promise<any[]> {
-    const res = await api.get<any[]>(`/fiscal-panel/torneos/${torneoId}/zonas`);
-    return res.data || [];
+    const res = await api.get<
+      | any[]
+      | { zonas: any[]; cabezas_ranking_globales?: string[] }
+    >(`/fiscal-panel/torneos/${torneoId}/zonas`);
+    const raw = res.data;
+    if (Array.isArray(raw)) return raw;
+    return raw?.zonas ?? [];
   },
 
   async getLlaveMatriz(torneoId: string): Promise<{

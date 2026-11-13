@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from "react";
 import { Partido } from "@/utils/types";
 import { PairDisplay, esAlcanceNacional } from "@/components/torneos/PairDisplay";
-import { LIBRE, POR_DEFINIR } from "@/utils/etiquetaPareja";
+import { etiquetaSlotVacioLlave } from "@/utils/etiquetaPareja";
 import { PlayerAvatar } from "@/components/torneos/MatchTeamBox";
 import {
   etiquetaEstadoPartidoLlave,
@@ -115,7 +115,7 @@ export const MatchCard = ({
           <div className="flex items-center gap-2 min-h-[2.25rem]">
             <PlayerAvatar src={null} size="md" />
             <p className="text-xs font-medium text-brand-ayuda italic">
-              {esBye && !origen ? LIBRE : POR_DEFINIR}
+              {etiquetaSlotVacioLlave({ origen, esByeInferido: esBye })}
             </p>
           </div>
         ) : (

@@ -164,7 +164,7 @@ export default function ZonaParejasPanel({
 
   const cargar = useCallback(async () => {
     try {
-      const data = await TorneosService.getZonas(torneoId);
+      const { zonas: data } = await TorneosService.getZonas(torneoId);
       setZonas(leerZonas(data));
     } catch {
       setZonas([]);

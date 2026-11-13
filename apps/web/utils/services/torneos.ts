@@ -204,9 +204,22 @@ export const TorneosService = {
     return response.data;
   },
 
-  async getZonas(torneoId: string) {
-    const response = await api.get(`/torneos/${torneoId}/zonas`);
-    return response.data;
+  async getZonas(torneoId: string): Promise<{
+    zonas: Array<Record<string, unknown>>;
+    cabezas_ranking_globales: string[];
+  }> {
+    const response = await api.get<
+      | Array<Record<string, unknown>>
+      | { zonas: Array<Record<string, unknown>>; cabezas_ranking_globales?: string[] }
+    >(`/torneos/${torneoId}/zonas`);
+    const raw = response.data;
+    if (Array.isArray(raw)) {
+      return { zonas: raw, cabezas_ranking_globales: [] };
+    }
+    return {
+      zonas: raw.zonas ?? [],
+      cabezas_ranking_globales: raw.cabezas_ranking_globales ?? [],
+    };
   },
 
   async getLlaveMatriz(torneoId: string): Promise<{
@@ -282,9 +295,31 @@ export const TorneosService = {
         grupo_id: string;
         cabeza_inscripcion_id: string;
       }[];
-    }
+    },
   ) {
     const response = await api.put(`/torneos/${torneoId}/guardar-zonas`, payload);
+    return response.data as {
+      exito: boolean;
+      mensaje: string;
+      zonas_regeneradas?: string[];
+      fixture_reparado?: Array<{
+        nombre_grupo: string;
+        insertados: number;
+        ordenes: number[];
+      }>;
+      llave?: {
+        semillas_invalidadas: string[];
+        semillas_actualizadas: string[];
+        semillas_pendientes: string[];
+      };
+    };
+  },
+
+  async repararFixtureZonas(torneoId: string, motivo?: string) {
+    const response = await api.post(
+      `/torneos/${torneoId}/reparar-fixture-zonas`,
+      { motivo },
+    );
     return response.data;
   },
 
@@ -339,7 +374,13 @@ export const TorneosService = {
 
   async actualizarEquiposPartido(
     partidoId: string,
-    payload: { equipo_a_id: string | null; equipo_b_id: string | null; motivo: string },
+    payload: {
+      equipo_a_id: string | null;
+      equipo_b_id: string | null;
+      motivo: string;
+      alta_lado_a?: import("@/components/torneos/llaveAltaParejaTypes").AltaLlavePendientePayload;
+      alta_lado_b?: import("@/components/torneos/llaveAltaParejaTypes").AltaLlavePendientePayload;
+    },
   ) {
     const response = await api.put(`/torneos/partidos/${partidoId}/equipos`, payload);
     return response.data;
@@ -412,10 +453,11 @@ export const TorneosService = {
         bloqueada_en_torneo?: boolean;
         motivo_bloqueo?: string;
       }>;
+      excluidas_en_torneo: number;
     }>(`/torneos/${torneoId}/llave/buscar-parejas`, {
       params: { q },
     });
-    return response.data.resultados;
+    return response.data;
   },
 
   async altaParejaLlave(

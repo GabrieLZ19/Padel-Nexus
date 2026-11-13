@@ -85,7 +85,9 @@ export default function TorneoDetallePage() {
 
     Promise.all([
       TorneosService.getPartidos(torneoId, { sincronizar: false }),
-      TorneosService.getZonas(torneoId).catch(() => []),
+      TorneosService.getZonas(torneoId)
+        .then((r) => r.zonas)
+        .catch(() => []),
       TorneosService.getLlaveMatriz(torneoId).catch(() => null),
     ])
       .then(([partidosData, zonasData, matrizData]) => {
@@ -117,7 +119,7 @@ export default function TorneoDetallePage() {
           (p) => isMounted && setPartidos(p || []),
         );
         TorneosService.getZonas(torneoId)
-          .then((z) => isMounted && setZonas(z || []))
+          .then((r) => isMounted && setZonas(r.zonas || []))
           .catch(() => undefined);
       }, 1200);
     };
