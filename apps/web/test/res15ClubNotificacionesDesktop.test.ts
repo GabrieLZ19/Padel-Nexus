@@ -7,6 +7,17 @@ import { fileURLToPath } from "node:url";
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("RES-15 panel club: notificaciones en desktop", () => {
+  it("NotificationCenter renderiza el panel con portal y posición fixed", () => {
+    const fuente = readFileSync(
+      path.join(RAIZ, "components/notificaciones/NotificationCenter.tsx"),
+      "utf8",
+    );
+    assert.match(fuente, /createPortal/);
+    assert.match(fuente, /dropdownAnchor/);
+    assert.match(fuente, /document\.body/);
+    assert.match(fuente, /position:\s*"|className="fixed z-\[250\]"/);
+  });
+
   it("NotificationCenter visible en lg (sidebar) además del header móvil", () => {
     const layout = readFileSync(
       path.join(RAIZ, "app/club/layout.tsx"),

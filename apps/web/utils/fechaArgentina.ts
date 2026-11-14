@@ -127,3 +127,29 @@ export function formatMarcaTiempoNotificacion(
   const [, mes, dia] = fecha.split("-");
   return `${dia}/${mes} ${hora}`;
 }
+
+export function fechaCalendarioArgentinaDesdeIso(
+  iso: string,
+  ahora: Date = new Date(),
+): string {
+  const instante = new Date(iso);
+  if (Number.isNaN(instante.getTime())) return "";
+  void ahora;
+  return partesEnArgentina(instante).fecha;
+}
+
+/** Separador de día en hilos de chat: Hoy, Ayer o dd/mm/aaaa. */
+export function formatSeparadorDiaChat(
+  iso?: string | null,
+  ahora: Date = new Date(),
+): string {
+  if (!iso) return "";
+  const fecha = fechaCalendarioArgentinaDesdeIso(iso, ahora);
+  if (!fecha) return "";
+  const hoy = fechaHoyArgentina(ahora);
+  const ayer = restarDiasCalendario(hoy, -1);
+  if (fecha === hoy) return "Hoy";
+  if (fecha === ayer) return "Ayer";
+  const [anio, mes, dia] = fecha.split("-");
+  return `${dia}/${mes}/${anio}`;
+}

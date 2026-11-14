@@ -21,12 +21,12 @@ import { isAxiosError } from "axios";
 import { PerfilService } from "@/utils/services/perfil";
 import { useProfileStore } from "@/store/useProfileStore";
 import { destinoPostLogin } from "@/utils/auth/roles";
-
-function safeRedirectPath(raw: string | null): string | null {
-  if (!raw) return null;
-  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
-  return raw;
-}
+import {
+  guardarRedirectPostLogin,
+  resolveDestinoTrasLogin,
+  safeRedirectFragment,
+  safeRedirectPath,
+} from "@/utils/auth/postLoginRedirect";
 
 function AuthPageContent() {
   const [email, setEmail] = useState("");
@@ -39,6 +39,7 @@ function AuthPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = safeRedirectPath(searchParams.get("redirect"));
+  const redirectFragment = safeRedirectFragment(searchParams.get("fragment"));
   const { setProfile } = useProfileStore();
 
   // Cargar email guardado si existe "Recordarme"
@@ -72,7 +73,13 @@ function AuthPageContent() {
 
         setProfile(data.usuario);
 
-        router.push(redirectTo || destinoPostLogin(data.usuario.rol));
+        router.push(
+          resolveDestinoTrasLogin(
+            redirectTo,
+            redirectFragment,
+            destinoPostLogin(data.usuario.rol),
+          ),
+        );
       } else {
         setError("No se pudo procesar la sesión. Formato inválido.");
       }
@@ -94,6 +101,10 @@ function AuthPageContent() {
     setLoading(true);
     setError(null);
     try {
+      guardarRedirectPostLogin({
+        path: redirectTo,
+        fragment: redirectFragment,
+      });
       await PerfilService.loginConGoogle();
     } catch {
       setError("No se pudo iniciar el canal de autenticación con Google. ");

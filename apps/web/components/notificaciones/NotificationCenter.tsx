@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -27,6 +28,41 @@ export default function NotificationCenter() {
   const { profile } = useProfileStore();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notificacion[]>([]);
+  const [portalReady, setPortalReady] = useState(false);
+  const [dropdownAnchor, setDropdownAnchor] = useState<{
+    top: number;
+    right: number;
+  } | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const ubicarDropdown = useCallback(() => {
+    const boton = rootRef.current?.querySelector("button");
+    if (!boton) return;
+    const rect = boton.getBoundingClientRect();
+    setDropdownAnchor({
+      top: rect.bottom + 12,
+      right: window.innerWidth - rect.right,
+    });
+  }, []);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setDropdownAnchor(null);
+      return;
+    }
+    ubicarDropdown();
+    const onReubicar = () => ubicarDropdown();
+    window.addEventListener("resize", onReubicar);
+    window.addEventListener("scroll", onReubicar, true);
+    return () => {
+      window.removeEventListener("resize", onReubicar);
+      window.removeEventListener("scroll", onReubicar, true);
+    };
+  }, [isOpen, ubicarDropdown]);
 
   const isMarketplacePromo = (notif: Notificacion) =>
     notif.metadata?.origen === "marketplace_promo";
@@ -160,11 +196,175 @@ export default function NotificationCenter() {
 
   if (!profile) return null;
 
+  const panelDropdown = (
+    <div
+      className="w-80 md:w-96 bg-brand-black/96 backdrop-blur-md border border-brand-white/10 rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.6)] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+      role="dialog"
+      aria-label="Notificaciones"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-brand-white/5">
+        <div className="flex items-center gap-2">
+          <Bell className="size-4 text-brand-chartreuse" />
+          <h3 className="text-sm font-bold text-brand-white">Notificaciones</h3>
+          {unreadCount > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-brand-chartreuse/10 text-brand-chartreuse text-[10px] font-bold border border-brand-chartreuse/20 shadow-[0_0_6px_rgba(163,230,53,0.3)]">
+              {unreadCount} nuevas
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {unreadCount > 0 && (
+            <button
+              onClick={handleMarkAllAsRead}
+              className="text-[11px] text-brand-chartreuse hover:text-brand-chartreuse/80 flex items-center gap-1 cursor-pointer bg-transparent border-0 transition-colors"
+            >
+              <CheckCheck className="size-3.5" />
+              Marcar leídas
+            </button>
+          )}
+          <button
+            onClick={() => setIsOpen(false)}
+            className="text-gray-500 hover:text-brand-white bg-transparent border-0 cursor-pointer transition-colors"
+            type="button"
+            aria-label="Cerrar notificaciones"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Lista de notificaciones */}
+      <div className="max-h-[360px] overflow-y-auto divide-y divide-brand-white/4 scrollbar-thin scrollbar-thumb-brand-white/10 scrollbar-track-transparent">
+        {notifications.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-brand-white/5 flex items-center justify-center">
+              <Bell className="size-5 text-gray-600 stroke-[1.5]" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-400">Todo al día</p>
+              <p className="text-xs text-gray-600 mt-0.5">
+                No tenés notificaciones pendientes.
+              </p>
+            </div>
+          </div>
+        ) : (
+          notifications.map((notif) => {
+            const styles = getTypeStyles(notif);
+            const tieneLink = Boolean(notif.metadata?.action_url);
+            return (
+              <div
+                key={notif.id}
+                onClick={() => handleNotificationClick(notif)}
+                className={`relative flex gap-3 px-4 py-3.5 transition-all duration-150 group ${
+                  tieneLink ? "cursor-pointer" : "cursor-default"
+                } ${
+                  notif.leido
+                    ? "opacity-60 hover:opacity-80 hover:bg-brand-white/2"
+                    : `${styles.bg} hover:brightness-110`
+                }`}
+              >
+                {!notif.leido && (
+                  <div
+                    className={`absolute left-0 top-2 bottom-2 w-0.5 rounded-r ${styles.accent}`}
+                  />
+                )}
+                <div className="mt-0.5">{styles.icon}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 mb-0.5">
+                    <span className="text-[13px] font-semibold text-brand-white leading-snug">
+                      {notif.titulo}
+                    </span>
+                    <span className="text-[10px] text-gray-600 shrink-0 mt-0.5 whitespace-nowrap">
+                      {formatMarcaTiempoNotificacion(notif.created_at)}
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-gray-400 leading-relaxed whitespace-pre-line">
+                    {notif.mensaje}
+                  </p>
+                  {isMarketplacePromo(notif) && notif.metadata?.nombre_tienda && (
+                    <p className="text-[11px] text-gray-500 mt-1.5">
+                      Enviado desde ·{" "}
+                      <span className="text-brand-chartreuse/90 font-medium">
+                        {notif.metadata.nombre_tienda}
+                      </span>
+                    </p>
+                  )}
+                  {isComunicacionesCampana(notif) && (
+                    <p className="text-[11px] text-gray-500 mt-1.5">
+                      Comunicación institucional
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between mt-2">
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide ${styles.badge}`}
+                    >
+                      {styles.label}
+                    </span>
+                    <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                      {tieneLink && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-brand-chartreuse">
+                          <ExternalLink className="size-3" />
+                          Abrir
+                        </span>
+                      )}
+                      {!notif.leido && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMarkAsRead(notif.id);
+                          }}
+                          title="Marcar como leída"
+                          type="button"
+                          className="p-1 rounded-md bg-brand-white/5 hover:bg-brand-chartreuse/20 text-brand-chartreuse transition-colors cursor-pointer border-0"
+                        >
+                          <Check className="size-3" />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => handleDelete(notif.id, e)}
+                        title="Eliminar"
+                        type="button"
+                        className="p-1 rounded-md bg-brand-white/5 hover:bg-rose-500/20 text-gray-500 hover:text-rose-400 transition-colors cursor-pointer border-0"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {notifications.length > 0 && (
+        <div className="px-4 py-2.5 border-t border-brand-white/5 text-center">
+          <p className="text-[10px] text-gray-600">
+            {notifications.length === 1
+              ? "1 notificación en total"
+              : `${notifications.length} notificaciones en total`}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className="relative">
+    <div className="relative" ref={rootRef}>
       {/* Trigger — Campana */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        type="button"
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        onClick={() => {
+          if (isOpen) {
+            setIsOpen(false);
+            return;
+          }
+          ubicarDropdown();
+          setIsOpen(true);
+        }}
         className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all duration-300 relative cursor-pointer ${
           isOpen
             ? "border-brand-chartreuse/40 bg-brand-chartreuse/10 text-brand-chartreuse"
@@ -185,171 +385,28 @@ export default function NotificationCenter() {
         )}
       </button>
 
-      {/* Panel flotante */}
-      {isOpen && (
-        <>
-          {/* Overlay */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setIsOpen(false)}
-          />
-
-          {/* Dropdown */}
-          <div className="absolute right-0 mt-3 w-80 md:w-96 bg-brand-black/96 backdrop-blur-md border border-brand-white/10 rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.6)] z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-brand-white/5">
-              <div className="flex items-center gap-2">
-                <Bell className="size-4 text-brand-chartreuse" />
-                <h3 className="text-sm font-bold text-brand-white">
-                  Notificaciones
-                </h3>
-                {unreadCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-brand-chartreuse/10 text-brand-chartreuse text-[10px] font-bold border border-brand-chartreuse/20 shadow-[0_0_6px_rgba(163,230,53,0.3)]">
-                    {unreadCount} nuevas
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {unreadCount > 0 && (
-                  <button
-                    onClick={handleMarkAllAsRead}
-                    className="text-[11px] text-brand-chartreuse hover:text-brand-chartreuse/80 flex items-center gap-1 cursor-pointer bg-transparent border-0 transition-colors"
-                  >
-                    <CheckCheck className="size-3.5" />
-                    Marcar leídas
-                  </button>
-                )}
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-gray-500 hover:text-brand-white bg-transparent border-0 cursor-pointer transition-colors"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
+      {isOpen &&
+        portalReady &&
+        dropdownAnchor &&
+        createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[240]"
+              onClick={() => setIsOpen(false)}
+              aria-hidden
+            />
+            <div
+              className="fixed z-[250]"
+              style={{
+                top: dropdownAnchor.top,
+                right: dropdownAnchor.right,
+              }}
+            >
+              {panelDropdown}
             </div>
-
-            {/* Lista de notificaciones */}
-            <div className="max-h-[360px] overflow-y-auto divide-y divide-brand-white/4 scrollbar-thin scrollbar-thumb-brand-white/10 scrollbar-track-transparent">
-              {notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 px-4 text-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-brand-white/5 flex items-center justify-center">
-                    <Bell className="size-5 text-gray-600 stroke-[1.5]" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-400">
-                      Todo al día
-                    </p>
-                    <p className="text-xs text-gray-600 mt-0.5">
-                      No tenés notificaciones pendientes.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                notifications.map((notif) => {
-                  const styles = getTypeStyles(notif);
-                  const tieneLink = Boolean(notif.metadata?.action_url);
-                  return (
-                    <div
-                      key={notif.id}
-                      onClick={() => handleNotificationClick(notif)}
-                      className={`relative flex gap-3 px-4 py-3.5 transition-all duration-150 group ${
-                        tieneLink ? "cursor-pointer" : "cursor-default"
-                      } ${
-                        notif.leido
-                          ? "opacity-60 hover:opacity-80 hover:bg-brand-white/2"
-                          : `${styles.bg} hover:brightness-110`
-                      }`}
-                    >
-                      {/* Indicador de no leído */}
-                      {!notif.leido && (
-                        <div
-                          className={`absolute left-0 top-2 bottom-2 w-0.5 rounded-r ${styles.accent}`}
-                        />
-                      )}
-
-                      {/* Icono */}
-                      <div className="mt-0.5">{styles.icon}</div>
-
-                      {/* Contenido */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-0.5">
-                          <span className="text-[13px] font-semibold text-brand-white leading-snug">
-                            {notif.titulo}
-                          </span>
-                          <span className="text-[10px] text-gray-600 shrink-0 mt-0.5 whitespace-nowrap">
-                            {formatMarcaTiempoNotificacion(notif.created_at)}
-                          </span>
-                        </div>
-                        <p className="text-[12px] text-gray-400 leading-relaxed whitespace-pre-line">
-                          {notif.mensaje}
-                        </p>
-                        {isMarketplacePromo(notif) && notif.metadata?.nombre_tienda && (
-                          <p className="text-[11px] text-gray-500 mt-1.5">
-                            Enviado desde ·{" "}
-                            <span className="text-brand-chartreuse/90 font-medium">
-                              {notif.metadata.nombre_tienda}
-                            </span>
-                          </p>
-                        )}
-                        {isComunicacionesCampana(notif) && (
-                          <p className="text-[11px] text-gray-500 mt-1.5">
-                            Comunicación institucional
-                          </p>
-                        )}
-                        <div className="flex items-center justify-between mt-2">
-                          <span
-                            className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide ${styles.badge}`}
-                          >
-                            {styles.label}
-                          </span>
-                          <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                            {tieneLink && (
-                              <span className="inline-flex items-center gap-0.5 text-[10px] text-brand-chartreuse">
-                                <ExternalLink className="size-3" />
-                                Abrir
-                              </span>
-                            )}
-                            {!notif.leido && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleMarkAsRead(notif.id);
-                                }}
-                                title="Marcar como leída"
-                                className="p-1 rounded-md bg-brand-white/5 hover:bg-brand-chartreuse/20 text-brand-chartreuse transition-colors cursor-pointer border-0"
-                              >
-                                <Check className="size-3" />
-                              </button>
-                            )}
-                            <button
-                              onClick={(e) => handleDelete(notif.id, e)}
-                              title="Eliminar"
-                              className="p-1 rounded-md bg-brand-white/5 hover:bg-rose-500/20 text-gray-500 hover:text-rose-400 transition-colors cursor-pointer border-0"
-                            >
-                              <Trash2 className="size-3" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Footer */}
-            {notifications.length > 0 && (
-              <div className="px-4 py-2.5 border-t border-brand-white/5 text-center">
-                <p className="text-[10px] text-gray-600">
-                  {notifications.length === 1
-                    ? "1 notificación en total"
-                    : `${notifications.length} notificaciones en total`}
-                </p>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+          </>,
+          document.body,
+        )}
     </div>
   );
 }

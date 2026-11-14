@@ -164,6 +164,14 @@ function nombrePersona(u: {
   return full || u.email || u.dni || "Sin nombre";
 }
 
+const CAMPANA_CANAL_WHATSAPP_HABILITADO = false;
+
+function etiquetaRolAudiencia(rol?: string | null): string {
+  if (!rol) return "";
+  if (rol === "usuario") return "Jugador";
+  return rol;
+}
+
 export default function ComunicacionesPanel() {
   const { profile } = useProfileStore();
   const rol = profile?.rol || "";
@@ -214,6 +222,9 @@ export default function ComunicacionesPanel() {
 
   const toggleCanalEnvio = (canal: ComunicacionesCanal) => {
     if (canal === "email" && !campanaEmailHabilitado) {
+      return;
+    }
+    if (canal === "whatsapp" && !CAMPANA_CANAL_WHATSAPP_HABILITADO) {
       return;
     }
     setCanalesEnvio((prev) => {
@@ -401,9 +412,13 @@ export default function ComunicacionesPanel() {
         const cfg = await ComunicacionesService.obtenerConfig();
         if (!ignore) {
           setCampanaEmailHabilitado(cfg.campana_email_habilitado);
-          if (!cfg.campana_email_habilitado) {
-            setCanalesEnvio((prev) => prev.filter((c) => c !== "email"));
-          }
+          setCanalesEnvio((prev) =>
+            prev.filter(
+              (c) =>
+                c !== "whatsapp" &&
+                (cfg.campana_email_habilitado ? true : c !== "email"),
+            ),
+          );
         }
       } catch {
         if (!ignore) setCampanaEmailHabilitado(false);
@@ -868,7 +883,7 @@ export default function ComunicacionesPanel() {
       type: "warning",
       title: "¿Enviar campaña?",
       description: total
-        ? `Destinatarios: ${total}. Canales: ${etiquetasCanalesLegibles(canalesEnvio)}. El aviso in-app se guarda en el centro de notificaciones aunque el push esté desactivado.`
+        ? `Destinatarios: ${total}. Canales: ${etiquetasCanalesLegibles(canalesEnvio)}. El aviso in-app respeta las preferencias de notificación de cada jugador.`
         : "Vas a enviar la campaña a la audiencia seleccionada. Recomendamos previsualizar antes.",
       confirmText: "Enviar ahora",
       cancelText: "Cancelar",
@@ -1533,22 +1548,23 @@ export default function ComunicacionesPanel() {
                   ] as const
                 ).map(({ id, label, Icon }) => {
                   const active = canalesEnvio.includes(id);
-                  const emailDeshabilitado =
-                    id === "email" && !campanaEmailHabilitado;
+                  const canalDeshabilitado =
+                    (id === "email" && !campanaEmailHabilitado) ||
+                    (id === "whatsapp" && !CAMPANA_CANAL_WHATSAPP_HABILITADO);
                   return (
                     <button
                       key={id}
                       type="button"
-                      disabled={emailDeshabilitado}
+                      disabled={canalDeshabilitado}
                       onClick={() => toggleCanalEnvio(id)}
                       className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-colors ${
-                        emailDeshabilitado
+                        canalDeshabilitado
                           ? "cursor-not-allowed opacity-45 border-brand-white/5 bg-brand-black/20 text-gray-600"
                           : "cursor-pointer"
                       } ${
-                        active && !emailDeshabilitado
+                        active && !canalDeshabilitado
                           ? "border-brand-chartreuse/50 bg-brand-chartreuse/10 text-brand-chartreuse"
-                          : !emailDeshabilitado
+                          : !canalDeshabilitado
                             ? "border-brand-white/10 bg-brand-black/40 text-gray-400 hover:border-brand-white/20"
                             : ""
                       }`}
@@ -1560,10 +1576,9 @@ export default function ComunicacionesPanel() {
                 })}
               </div>
               <p className="text-[11px] text-gray-500">
-                In-app muestra el aviso en la plataforma. El correo en campañas
-                permanece desactivado hasta ampliar la cuota de envío institucional;
-                recuperación de clave y avisos vitales siguen por mail.
-                WhatsApp todavía no está disponible para campañas.
+                In-app muestra el aviso en la plataforma según preferencias de
+                cada jugador. Por mail solo sale la recuperación de contraseña.
+                WhatsApp no está habilitado para campañas.
               </p>
             </div>
 
@@ -1605,7 +1620,7 @@ export default function ComunicacionesPanel() {
                 className="w-full px-4 py-3 rounded-xl bg-brand-black border border-brand-white/10 text-sm text-brand-white placeholder:text-gray-600 focus:outline-none focus:border-brand-chartreuse/50"
               />
               <p className="text-[11px] text-gray-500">
-                Podés pegar una ruta interna (`/ranking`) o la URL completa del
+                Podés pegar una ruta interna como /ranking o la URL completa del
                 sitio; si es de Padel Nexus se abre dentro de la app.
               </p>
             </div>
@@ -1687,7 +1702,7 @@ export default function ComunicacionesPanel() {
                           className="text-xs text-gray-400 truncate"
                         >
                           {nombrePersona(s)}
-                          {s.rol ? ` · ${s.rol}` : ""}
+                          {s.rol ? ` · ${etiquetaRolAudiencia(s.rol)}` : ""}
                         </li>
                       ))}
                     </ul>
@@ -1884,7 +1899,11 @@ export default function ComunicacionesPanel() {
                               {nombrePersona(u)}
                             </span>
                             <span className="block truncate text-[10px] text-gray-500">
-                              {[u.email, u.dni ? `DNI ${u.dni}` : null, u.rol]
+                              {[
+                                u.email,
+                                u.dni ? `DNI ${u.dni}` : null,
+                                u.rol ? etiquetaRolAudiencia(u.rol) : null,
+                              ]
                                 .filter(Boolean)
                                 .join(" · ")}
                             </span>

@@ -492,20 +492,25 @@ export default function ProfileSettings() {
                 {
                   key: "push" as const,
                   label: "En la plataforma y push",
+                  ariaLabel:
+                    "Recibir notificaciones en la plataforma y avisos push",
                   Icon: Bell,
                 },
                 {
                   key: "email" as const,
                   label: "Email",
+                  ariaLabel:
+                    "Recibir notificaciones por correo electrónico",
                   Icon: Mail,
                 },
                 {
                   key: "whatsapp" as const,
                   label: "WhatsApp",
+                  ariaLabel: "Recibir notificaciones por WhatsApp",
                   Icon: MessageCircle,
                 },
               ] as const
-            ).map(({ key, label, Icon }) => (
+            ).map(({ key, label, ariaLabel, Icon }) => (
               <label
                 key={key}
                 className="flex items-center justify-between gap-4 rounded-2xl border border-brand-white/10 bg-brand-black/30 px-4 py-3 cursor-pointer"
@@ -516,6 +521,9 @@ export default function ProfileSettings() {
                 </span>
                 <input
                   type="checkbox"
+                  role="switch"
+                  aria-checked={Boolean(prefs[key])}
+                  aria-label={ariaLabel}
                   className="size-5 accent-[#c8f542] cursor-pointer"
                   checked={Boolean(prefs[key])}
                   disabled={prefSaving}

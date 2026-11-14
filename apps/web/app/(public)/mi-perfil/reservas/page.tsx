@@ -555,6 +555,15 @@ export default function MisReservasPage() {
                       clubId={club.id}
                       clubNombre={club.nombre}
                       redirectPath="/mi-perfil/reservas"
+                      contextoReserva={{
+                        clubNombre: club.nombre,
+                        cancha: cancha?.nombre,
+                        fecha: formatFecha(reserva.fecha_reserva),
+                        hora:
+                          turno?.hora_inicio && turno?.hora_fin
+                            ? `${formatHora(turno.hora_inicio)}–${formatHora(turno.hora_fin)}`
+                            : formatHora(turno?.hora_inicio),
+                      }}
                       className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/15 text-sm font-bold text-white hover:border-brand-chartreuse/40 hover:text-brand-chartreuse transition-colors cursor-pointer disabled:opacity-50"
                     />
                   )}

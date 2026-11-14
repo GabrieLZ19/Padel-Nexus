@@ -46,9 +46,6 @@
     var(--soporte-fab-inset-bottom) + var(--soporte-fab-size) + 1.25rem +
       env(safe-area-inset-bottom, 0px)
   );
-  --soporte-fab-clearance-right: calc(
-    var(--soporte-fab-inset-x) + var(--soporte-fab-size) + 0.5rem
-  );
 }
 
 @media (max-width: 639px) {
@@ -58,16 +55,9 @@
   }
 }
 
-/** Margen en sitio público para no tapar contenido con el chat flotante (PUB-8). */
+/** Margen inferior en sitio público para el FAB de soporte (PUB-8 / ENZO-3). Sin padding lateral. */
 .public-content-soporte-fab-safe {
   padding-bottom: var(--soporte-fab-clearance-bottom);
-  padding-right: var(--soporte-fab-clearance-right);
-}
-
-@media (min-width: 640px) {
-  .public-content-soporte-fab-safe {
-    padding-right: 0;
-  }
 }
 
 .soporte-fab-anchor {

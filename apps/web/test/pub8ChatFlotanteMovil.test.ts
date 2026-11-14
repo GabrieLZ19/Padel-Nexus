@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("PUB-8 chat flotante en móvil", () => {
-  it("layout público reserva margen para la burbuja", () => {
+  it("layout público reserva margen inferior para la burbuja (ENZO-3: sin franja lateral)", () => {
     const layout = readFileSync(
       path.join(RAIZ, "app/(public)/layout.tsx"),
       "utf8",
@@ -15,7 +15,12 @@ describe("PUB-8 chat flotante en móvil", () => {
     const css = readFileSync(path.join(RAIZ, "app/globals.css"), "utf8");
     assert.match(layout, /public-content-soporte-fab-safe/);
     assert.match(css, /--soporte-fab-clearance-bottom/);
-    assert.match(css, /--soporte-fab-clearance-right/);
+    assert.doesNotMatch(css, /--soporte-fab-clearance-right/);
+    const bloqueFabSafe = css.match(
+      /\.public-content-soporte-fab-safe\s*\{[^}]+\}/,
+    );
+    assert.ok(bloqueFabSafe, "debe existir .public-content-soporte-fab-safe");
+    assert.doesNotMatch(bloqueFabSafe![0], /padding-right/);
   });
 
   it("SoporteChat ancla con safe area y modo compacto al scroll", () => {

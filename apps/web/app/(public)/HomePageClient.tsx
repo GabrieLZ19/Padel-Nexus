@@ -77,7 +77,7 @@ export default function HomePageClient() {
   };
 
   return (
-    <div className="min-h-screen w-full max-w-[100vw] bg-brand-black text-brand-white font-sans selection:bg-brand-chartreuse selection:text-brand-black relative overflow-x-clip">
+    <div className="w-full min-w-0 bg-brand-black text-brand-white font-sans selection:bg-brand-chartreuse selection:text-brand-black relative overflow-x-clip">
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         {/* El destello verde oliva/musgo de la esquina superior derecha */}
         <div className="absolute -top-32 right-0 h-80 w-[min(100vw,28rem)] rounded-full bg-brand-moss opacity-20 blur-[100px] sm:-top-50 sm:-right-20 sm:h-162.5 sm:w-162.5 sm:blur-[140px]" />
@@ -86,7 +86,7 @@ export default function HomePageClient() {
         <div className="absolute top-[20%] left-0 h-72 w-72 -translate-x-1/2 rounded-full bg-brand-chartreuse opacity-5 blur-[120px] sm:-left-50 sm:h-137.5 sm:w-137.5 sm:translate-x-0 sm:blur-[160px]" />
       </div>
       {/* --- HERO SECTION --- */}
-      <main className="relative z-10 mx-auto grid max-w-[1600px] grid-cols-1 items-start gap-8 px-6 pt-8 pb-12 sm:px-10 sm:pt-10 sm:pb-16 lg:grid-cols-2 lg:gap-12 xl:pt-12">
+      <main className="relative z-10 mx-auto grid w-full min-w-0 max-w-[1600px] grid-cols-1 items-start gap-8 px-4 pt-8 pb-12 sm:px-6 sm:pt-10 sm:pb-16 md:px-10 lg:grid-cols-2 lg:gap-12 xl:pt-12">
         <div className="w-full min-w-0 max-w-xl space-y-5 sm:space-y-6">
           <h1 className="text-balance text-[2.35rem] font-extrabold leading-[1.05] tracking-tight sm:text-5xl xl:text-[3.25rem] xl:leading-[1.02] 2xl:text-7xl">
             El ecosistema del pádel, en una sola plataforma
@@ -161,7 +161,7 @@ export default function HomePageClient() {
       </main>
 
       {/* --- WIDGETS INTEGRADOS (Torneos y Ranking) --- */}
-      <section className="max-w-[1600px] mx-auto px-6 sm:px-10 py-16 grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10">
+      <section className="mx-auto w-full min-w-0 max-w-[1600px] px-4 sm:px-6 md:px-10 py-16 grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10">
         <div className="lg:col-span-2 space-y-6">
           <h2 className="text-2xl font-bold">Próximos Torneos</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -266,7 +266,7 @@ export default function HomePageClient() {
       {/* --- SECCIÓN METRICAS / STATS DEL FOOTER --- */}
       {cifras ? (
         <section className="border-t border-brand-white/5 bg-[#0d0d0d] relative z-10">
-          <div className="max-w-[1600px] mx-auto px-6 sm:px-10 py-12 sm:py-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 text-center divide-y divide-brand-white/5 sm:divide-y-0 sm:divide-x divide-solid">
+          <div className="mx-auto w-full min-w-0 max-w-[1600px] px-4 sm:px-6 md:px-10 py-12 sm:py-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 text-center divide-y divide-brand-white/5 sm:divide-y-0 sm:divide-x divide-solid">
             {(
               [
                 ["Jugadores", cifras.jugadores],

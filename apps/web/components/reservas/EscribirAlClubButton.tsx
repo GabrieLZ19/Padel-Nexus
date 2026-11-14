@@ -4,13 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, MessageSquare } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
-import { useIniciarChatClub } from "@/hooks/useIniciarChatClub";
+import {
+  useIniciarChatClub,
+  type ContextoReservaParaChat,
+} from "@/hooks/useIniciarChatClub";
 
 type EscribirAlClubButtonProps = {
   clubId: string;
   clubNombre?: string;
   className?: string;
   redirectPath?: string;
+  contextoReserva?: ContextoReservaParaChat;
 };
 
 export function EscribirAlClubButton({
@@ -18,6 +22,7 @@ export function EscribirAlClubButton({
   clubNombre,
   className = "",
   redirectPath,
+  contextoReserva,
 }: EscribirAlClubButtonProps) {
   const router = useRouter();
   const { profile } = useProfileStore();
@@ -33,7 +38,12 @@ export function EscribirAlClubButton({
     }
     setAbriendo(true);
     try {
-      await iniciarChatConClub(clubId);
+      await iniciarChatConClub(clubId, {
+        clubNombre: contextoReserva?.clubNombre ?? clubNombre,
+        cancha: contextoReserva?.cancha,
+        fecha: contextoReserva?.fecha,
+        hora: contextoReserva?.hora,
+      });
     } finally {
       setAbriendo(false);
     }

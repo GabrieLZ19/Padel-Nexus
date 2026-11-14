@@ -7,6 +7,11 @@ import { useProfileStore } from "@/store/useProfileStore";
 import { PerfilService } from "@/utils/services/perfil";
 import { getSupabaseBrowserClient } from "@/utils/supabase/client";
 import { destinoPostLogin } from "@/utils/auth/roles";
+import {
+  leerRedirectPostLogin,
+  limpiarRedirectPostLogin,
+  resolveDestinoTrasLogin,
+} from "@/utils/auth/postLoginRedirect";
 
 type AuthStatus = "loading" | "success" | "error";
 
@@ -88,8 +93,16 @@ export default function OAuthCallbackPage() {
             `¡Bienvenido, ${data.usuario.nombre || "Jugador"}! Conexión exitosa.`,
           );
 
+          const pendiente = leerRedirectPostLogin();
+          limpiarRedirectPostLogin();
+          const destino = resolveDestinoTrasLogin(
+            pendiente?.path ?? null,
+            pendiente?.fragment ?? null,
+            destinoPostLogin(data.usuario.rol),
+          );
+
           setTimeout(() => {
-            router.push(destinoPostLogin(data.usuario.rol));
+            router.push(destino);
           }, 1400);
         } else {
           setStatus("error");

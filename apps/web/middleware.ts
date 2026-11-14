@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { esRolAccesoCrm } from "@/utils/auth/roles";
+import { buildMiddlewareLoginRedirect } from "@/utils/auth/postLoginRedirect";
 
 export function middleware(request: NextRequest) {
   const token = request.cookies.get("padel_token")?.value;
@@ -22,9 +23,10 @@ export function middleware(request: NextRequest) {
     (isPlayerRoute || isMensajesRoute || isDashboardRoute || isClubRoute)
   ) {
     const loginUrl = new URL("/login", request.url);
-    if (isMensajesRoute) {
-      loginUrl.searchParams.set("redirect", pathname + request.nextUrl.search);
-    }
+    loginUrl.searchParams.set(
+      "redirect",
+      buildMiddlewareLoginRedirect(pathname, request.nextUrl.search),
+    );
     return NextResponse.redirect(loginUrl);
   }
 

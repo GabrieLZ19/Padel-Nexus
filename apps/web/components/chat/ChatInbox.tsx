@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import {
   MessageSquare,
   Search,
@@ -25,7 +25,13 @@ import { useChat } from "@/hooks/useChat";
 import { useProfileStore } from "@/store/useProfileStore";
 import { sileo } from "sileo";
 import type { ChatConversacion, ChatMensaje } from "@/utils/types";
-import ChatMessageBubble from "@/components/chat/ChatMessageBubble";
+import ChatMessageBubble, {
+  ChatSeparadorDia,
+} from "@/components/chat/ChatMessageBubble";
+import {
+  fechaCalendarioArgentinaDesdeIso,
+  formatSeparadorDiaChat,
+} from "@/utils/fechaArgentina";
 import ChatParticipantesBar from "@/components/chat/ChatParticipantesBar";
 import NuevoGrupoModal from "@/components/chat/NuevoGrupoModal";
 import {
@@ -116,6 +122,10 @@ export default function ChatInbox({
   const deepLinkConvId = searchParams.get("c");
   const deepLinkClubId = searchParams.get("club");
   const tabParam = searchParams.get("tab");
+  const refClub = searchParams.get("ref_club");
+  const refCancha = searchParams.get("ref_cancha");
+  const refFecha = searchParams.get("ref_fecha");
+  const refHora = searchParams.get("ref_hora");
 
   const {
     joinConversation,
@@ -148,6 +158,7 @@ export default function ChatInbox({
   const activeConvRef = useRef<ChatConversacion | null>(null);
   const mensajesFetchGenRef = useRef(0);
   const deepLinkResolvingRef = useRef(false);
+  const refPrefillReservaDone = useRef(false);
   const [resolviendoDeepLink, setResolviendoDeepLink] = useState(false);
 
   const fetchConversaciones = useCallback(async () => {
@@ -323,6 +334,35 @@ export default function ChatInbox({
     loading,
     tabParam,
     selectConversacion,
+  ]);
+
+  const tieneReferenciaReserva = Boolean(
+    refClub || refCancha || refFecha || refHora,
+  );
+  const textoReferenciaReserva = [refClub, refCancha, refFecha, refHora]
+    .filter((v): v is string => Boolean(v?.trim()))
+    .map((v) => v.trim())
+    .join(" · ");
+
+  useEffect(() => {
+    refPrefillReservaDone.current = false;
+  }, [activeConv?.id, refClub, refCancha, refFecha, refHora]);
+
+  useEffect(() => {
+    if (!activeConv || refPrefillReservaDone.current) return;
+    if (!tieneReferenciaReserva || !textoReferenciaReserva) return;
+    if (mensajes.length > 0) return;
+    refPrefillReservaDone.current = true;
+    setInputMsg((prev) =>
+      prev.trim()
+        ? prev
+        : `Hola, consulto por mi reserva (${textoReferenciaReserva}). `,
+    );
+  }, [
+    activeConv,
+    tieneReferenciaReserva,
+    textoReferenciaReserva,
+    mensajes.length,
   ]);
 
   const handleContactarAdministracion = useCallback(async () => {
@@ -572,6 +612,7 @@ export default function ChatInbox({
     const roles: Record<string, string> = {
       superadmin: "Super Admin",
       admin: "Admin",
+      admin_club: "Club",
       admin_federacion: "Federación",
       admin_provincial: "Provincial",
       usuario: "Jugador",
@@ -1122,6 +1163,23 @@ export default function ChatInbox({
                 </Link>
               )}
 
+              {activeConv.tipo !== "partido" &&
+                activeConv.tipo !== "grupo" &&
+                tieneReferenciaReserva &&
+                textoReferenciaReserva && (
+                  <div className="shrink-0 mx-3 md:mx-4 lg:mx-6 mt-2 md:mt-3 flex items-start gap-2.5 rounded-xl md:rounded-2xl border border-brand-chartreuse/25 bg-brand-chartreuse/5 p-2.5 md:p-3">
+                    <Calendar className="size-4 md:size-5 text-brand-chartreuse shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-brand-chartreuse">
+                        Reserva de referencia
+                      </p>
+                      <p className="text-xs md:text-sm text-brand-white font-medium mt-0.5 leading-snug">
+                        {textoReferenciaReserva}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
               <div
                 ref={messagesContainerRef}
                 onScroll={handleScroll}
@@ -1146,24 +1204,40 @@ export default function ChatInbox({
                   </button>
                 )}
 
-                {mensajes.map((msg) => {
-                  const esMio = msg.remitente_id === profile?.id;
-                  const esGrupo = esConversacionGrupo(activeConv.tipo);
-                  return (
-                    <ChatMessageBubble
-                      key={msg.id}
-                      mensaje={msg}
-                      esMio={esMio}
-                      participante={resolverParticipanteMensaje(msg.remitente_id)}
-                      esGrupo={esGrupo}
-                      onMensajePrivado={(userId) => {
-                        void handleMensajePrivado(userId);
-                      }}
-                      formatTime={formatMessageTime}
-                      showReadReceipt
-                    />
-                  );
-                })}
+                {(() => {
+                  let ultimoDia: string | null = null;
+                  return mensajes.map((msg) => {
+                    const esMio = msg.remitente_id === profile?.id;
+                    const esGrupo = esConversacionGrupo(activeConv.tipo);
+                    const diaClave = fechaCalendarioArgentinaDesdeIso(
+                      msg.created_at,
+                    );
+                    const mostrarSeparador =
+                      diaClave && diaClave !== ultimoDia;
+                    if (mostrarSeparador) ultimoDia = diaClave;
+                    const etiquetaDia = formatSeparadorDiaChat(msg.created_at);
+                    return (
+                      <Fragment key={msg.id}>
+                        {mostrarSeparador && etiquetaDia ? (
+                          <ChatSeparadorDia etiqueta={etiquetaDia} />
+                        ) : null}
+                        <ChatMessageBubble
+                          mensaje={msg}
+                          esMio={esMio}
+                          participante={resolverParticipanteMensaje(
+                            msg.remitente_id,
+                          )}
+                          esGrupo={esGrupo}
+                          onMensajePrivado={(userId) => {
+                            void handleMensajePrivado(userId);
+                          }}
+                          formatTime={formatMessageTime}
+                          showReadReceipt
+                        />
+                      </Fragment>
+                    );
+                  });
+                })()}
 
                 {typingUsers.size > 0 && (
                   <div className="flex justify-start">

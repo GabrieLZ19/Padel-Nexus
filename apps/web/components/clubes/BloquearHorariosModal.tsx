@@ -8,6 +8,7 @@ import { ClubesService } from "@/utils/services/clubes";
 import {
   ETIQUETA_TIPO_BLOQUEO,
 } from "@/utils/bloqueoDisponibilidad";
+import { fechaHoyArgentina } from "@/utils/fechaArgentina";
 import type {
   BloqueoDisponibilidad,
   BloqueoTipo,
@@ -75,10 +76,11 @@ export function BloquearHorariosModal({
   const loadBloqueos = useCallback(async () => {
     setLoadingList(true);
     try {
+      const vigentesDesde = fechaHoyArgentina();
       const list =
         mode === "admin" && clubId
-          ? await ClubesService.getBloqueos(clubId)
-          : await ClubPanelService.getBloqueos();
+          ? await ClubesService.getBloqueos(clubId, { desde: vigentesDesde })
+          : await ClubPanelService.getBloqueos({ desde: vigentesDesde });
       setBloqueos(list);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "No se pudieron cargar los bloqueos";

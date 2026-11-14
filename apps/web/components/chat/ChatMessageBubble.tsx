@@ -9,6 +9,22 @@ import {
 } from "./chatParticipants";
 import type { ChatMensaje } from "@/utils/types";
 
+export function ChatSeparadorDia({ etiqueta }: { etiqueta: string }) {
+  return (
+    <div
+      className="flex items-center gap-3 py-1.5 w-full"
+      role="separator"
+      aria-label={etiqueta}
+    >
+      <div className="flex-1 h-px bg-brand-white/10" />
+      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 shrink-0">
+        {etiqueta}
+      </span>
+      <div className="flex-1 h-px bg-brand-white/10" />
+    </motion.div>
+  );
+}
+
 type Props = {
   mensaje: ChatMensaje;
   esMio: boolean;

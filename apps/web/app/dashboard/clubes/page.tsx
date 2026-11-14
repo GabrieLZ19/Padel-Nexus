@@ -320,15 +320,18 @@ export default function GestionClubesPage() {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                  <div className="flex flex-wrap items-start gap-1.5 mb-1">
                     <h3
-                      className="font-bold text-lg text-white truncate"
+                      className="font-bold text-lg text-white truncate min-w-0"
                       title={clubEtiquetaListado(club)}
                     >
                       {club.nombre}
                     </h3>
                     {club.estado === "Activo" && (
-                      <CheckCircle2 className="size-4 shrink-0 text-brand-chartreuse" />
+                      <CheckCircle2
+                        className="size-4 shrink-0 self-start mt-1 text-brand-chartreuse"
+                        aria-hidden
+                      />
                     )}
                   </div>
                   <span
@@ -345,9 +348,12 @@ export default function GestionClubesPage() {
                     )}
                     {soloSede ? "Sede registrada" : "Adherido reservas"}
                   </span>
-                  <div className="flex items-start gap-1 text-sm text-gray-400 mt-2">
-                    <MapPin className="size-3.5 shrink-0 mt-0.5" />
-                    <span>
+                  <div className="flex items-start gap-1.5 text-sm text-gray-400 mt-2">
+                    <MapPin
+                      className="size-3.5 shrink-0 self-start mt-0.5 text-gray-500"
+                      aria-hidden
+                    />
+                    <span className="min-w-0 leading-snug">
                       {club.localidad ? `${club.localidad}, ` : ""}
                       {club.provincia || "Sin ubicación"}
                     </span>
