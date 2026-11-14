@@ -5,6 +5,8 @@ import { ClubesService } from "@/utils/services/clubes";
 import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
 import { FederacionesService, Federacion } from "@/utils/services/federaciones";
 import { Torneo, Club } from "@/utils/types";
+import { clubEtiquetaListado } from "@/utils/types/club.types";
+import { mensajeErrorApi } from "@/utils/mensajeErrorApi";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import {
   Calendar,
@@ -434,10 +436,10 @@ export const Paso1Datos = ({
         title: "Club creado y asignado",
         description: `${nuevoClub.nombre} fue registrado y seleccionado como centro de cómputos.`,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       sileo.error({
         title: "Error al crear club",
-        description: err?.message || "No se pudo registrar el club.",
+        description: mensajeErrorApi(err, "No se pudo registrar el club."),
       });
     } finally {
       setCreandoClub(false);
@@ -597,10 +599,10 @@ export const Paso1Datos = ({
         });
       }
       return true;
-    } catch (e: any) {
+    } catch (e: unknown) {
       sileo.error({
         title: "Error al guardar",
-        description: e.message || "No se pudieron guardar los cambios.",
+        description: mensajeErrorApi(e, "No se pudieron guardar los cambios."),
       });
       return false;
     } finally {
@@ -760,7 +762,7 @@ export const Paso1Datos = ({
                     : []),
                   ...clubs.map((c) => ({
                     value: String(c.id),
-                    label: `${c.nombre}${c.provincia ? ` (${c.provincia})` : ""}`,
+                    label: clubEtiquetaListado(c),
                   })),
                   {
                     value: "__alta_club__",

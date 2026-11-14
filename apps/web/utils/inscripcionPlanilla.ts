@@ -14,7 +14,14 @@ export interface FilaPlanillaInscripcion {
   email?: string;
   telefono?: string;
   direccion?: string;
+  localidadResidencia?: string;
+  provinciaResidencia?: string;
 }
+
+export const ARCHIVO_PLANTILLA_FEDERACION_NACIONAL =
+  "PLANILLA - FED NACIONAL.xls";
+export const ARCHIVO_PLANTILLA_CLUB_ASOC_PROVINCIAL =
+  "PLANILLA - CLUB - ASOC PCIAL.xls";
 
 export interface ParsePlanillaResult {
   tipo: TipoPlanillaInscripcion;
@@ -83,7 +90,32 @@ function parseFechaPlanilla(valor: unknown): string | undefined {
 function detectarTipoPlanilla(headerRow: string[]): TipoPlanillaInscripcion {
   const joined = headerRow.join(" ").toUpperCase();
   if (joined.includes("LETRA")) return "fap";
+  if (joined.includes("PAREJAS")) return "general";
   return "general";
+}
+
+export function parseLocalidadProvinciaCelda(valor: unknown): {
+  localidad?: string;
+  provincia?: string;
+} {
+  const raw = normalizarTexto(valor);
+  if (!raw) return {};
+
+  const parts = raw
+    .split("|")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (parts.length >= 2) {
+    return {
+      localidad: parts[0],
+      provincia: parts[parts.length - 1],
+    };
+  }
+  if (parts.length === 1) {
+    return { provincia: parts[0] };
+  }
+  return {};
 }
 
 function indiceColumna(headerRow: string[], patron: RegExp): number {
@@ -110,7 +142,7 @@ export function parsearFilasPlanilla(matrix: unknown[][]): ParsePlanillaResult {
   }
 
   const tipo = detectarTipoPlanilla(headerRow);
-  const idxLetraOrden = indiceColumna(headerRow, /LETRA|ORDEN/);
+  const idxLetraOrden = indiceColumna(headerRow, /LETRA|ORDEN|PAREJAS/);
   const idxAsociacion = indiceColumna(headerRow, /ASOCIACI/);
   const idxNombre = indiceColumna(headerRow, /APELLIDO|NOMBRE/);
   const idxDni = indiceColumna(headerRow, /DNI/);
@@ -119,6 +151,10 @@ export function parsearFilasPlanilla(matrix: unknown[][]): ParsePlanillaResult {
   const idxEmail = indiceColumna(headerRow, /EMAIL|CORREO|MAIL/);
   const idxTelefono = indiceColumna(headerRow, /TELEFONO|TEL/);
   const idxDireccion = indiceColumna(headerRow, /DIRECC/);
+  const idxLocalidadProvincia = indiceColumna(
+    headerRow,
+    /LCOALIDAD|LOCALIDAD.*PROVINCIA/,
+  );
 
   const filas: FilaPlanillaInscripcion[] = [];
   /** En planillas FAP, LETRA/ASOCIACIÓN suelen venir solo en la 1ª fila de la pareja. */
@@ -146,6 +182,24 @@ export function parsearFilasPlanilla(matrix: unknown[][]): ParsePlanillaResult {
         : undefined;
     if (asociacionRaw) ultimaAsociacion = asociacionRaw;
 
+    const { localidad, provincia } =
+      idxLocalidadProvincia >= 0
+        ? parseLocalidadProvinciaCelda(row[idxLocalidadProvincia])
+        : {};
+
+    let direccion =
+      idxDireccion >= 0
+        ? normalizarTexto(row[idxDireccion]) || undefined
+        : undefined;
+
+    if (!direccion && (localidad || provincia)) {
+      if (localidad && provincia) {
+        direccion = `${localidad}, ${provincia}`;
+      } else {
+        direccion = localidad || provincia;
+      }
+    }
+
     filas.push({
       fila: r + 1,
       letraOrden: letraRaw || ultimaLetra,
@@ -166,10 +220,9 @@ export function parsearFilasPlanilla(matrix: unknown[][]): ParsePlanillaResult {
         idxTelefono >= 0
           ? normalizarTexto(row[idxTelefono]) || undefined
           : undefined,
-      direccion:
-        idxDireccion >= 0
-          ? normalizarTexto(row[idxDireccion]) || undefined
-          : undefined,
+      direccion,
+      localidadResidencia: localidad,
+      provinciaResidencia: provincia,
     });
   }
 
@@ -202,9 +255,10 @@ export function urlPlantillaInscripcion(torneo: {
   asociacion?: string | null;
 }): string {
   const esFap = usarPlanillaInscripcionFap(torneo);
-  return esFap
-    ? "/plantillas/inscripciones/planilla-fap-arg.xls"
-    : "/plantillas/inscripciones/planilla-generales.xls";
+  const archivo = esFap
+    ? ARCHIVO_PLANTILLA_FEDERACION_NACIONAL
+    : ARCHIVO_PLANTILLA_CLUB_ASOC_PROVINCIAL;
+  return `/plantillas/inscripciones/${encodeURIComponent(archivo)}`;
 }
 
 export function nombrePlantillaInscripcion(torneo: {
@@ -214,8 +268,8 @@ export function nombrePlantillaInscripcion(torneo: {
 }): string {
   const esFap = usarPlanillaInscripcionFap(torneo);
   return esFap
-    ? "Planilla de Inscripciones FAP ARG.xls"
-    : "Planilla de Inscripciones Generales.xls";
+    ? "Planilla de inscripción · Federación Nacional.xls"
+    : "Planilla de inscripción · Clubes y asociaciones.xls";
 }
 
 /** Cuentas creadas al importar planilla (sin mail personal del jugador). */
@@ -244,7 +298,9 @@ export function etiquetaTipoPlanillaInscripcion(torneo: {
   reglamento?: string | null;
   asociacion?: string | null;
 }): string {
-  return usarPlanillaInscripcionFap(torneo) ? "FAP ARG" : "Generales";
+  return usarPlanillaInscripcionFap(torneo)
+    ? "Federación Nacional"
+    : "Clubes y asociaciones";
 }
 
 export function descargarPlantillaInscripcion(torneo: {

@@ -34,6 +34,26 @@ export interface Club {
   created_at?: string;
   torneos_count?: number; // Virtual
   licencia_federativa?: LicenciaClubResumenListado | null;
+  /** false: sede registrada (torneos), sin listado en /reservar */
+  es_adherido?: boolean;
+  creado_por_club_id?: string | null;
+  creado_por_entidad_id?: string | null;
+}
+
+export function clubEtiquetaListado(
+  club: Pick<Club, "nombre" | "provincia" | "es_adherido">,
+): string {
+  const base = `${club.nombre}${club.provincia ? ` (${club.provincia})` : ""}`;
+  if (club.es_adherido === false) {
+    return `${base} · Sede registrada`;
+  }
+  return base;
+}
+
+export function esClubSoloSede(
+  club: Pick<Club, "es_adherido"> | null | undefined,
+): boolean {
+  return club?.es_adherido === false;
 }
 
 export interface ClubCercano extends Club {

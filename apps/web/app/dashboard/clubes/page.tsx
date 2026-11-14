@@ -3,9 +3,22 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Building2, MapPin, CheckCircle2, Plus } from "lucide-react";
+import {
+  Building2,
+  MapPin,
+  CheckCircle2,
+  Plus,
+  Globe,
+  Landmark,
+} from "lucide-react";
 import { ClubesService } from "../../../utils/services/clubes";
 import { Club, FormClubState } from "../../../utils/types";
+import {
+  esClubSoloSede,
+  clubEtiquetaListado,
+} from "../../../utils/types/club.types";
+import { mensajeErrorApi } from "../../../utils/mensajeErrorApi";
+import { useProfileStore } from "../../../store/useProfileStore";
 
 import FeedbackModal, {
   FeedbackModalProps,
@@ -28,9 +41,16 @@ const ESTADO_INICIAL: FormClubState = {
 };
 
 export default function GestionClubesPage() {
+  const profile = useProfileStore((s) => s.profile);
+  const puedePromoverAdherido =
+    profile?.rol === "superadmin" ||
+    profile?.rol === "admin_federacion" ||
+    profile?.rol === "admin_provincial";
+
   const [clubes, setClubes] = useState<Club[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [promoviendoId, setPromoviendoId] = useState<string | null>(null);
 
   const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
     isOpen: false,
@@ -49,7 +69,7 @@ export default function GestionClubesPage() {
   // Carga inicial
   useEffect(() => {
     let isMounted = true;
-    ClubesService.getAll()
+    ClubesService.getAll({ page: 1, limit: 200 })
       .then((response) => {
         // Recibimos el objeto de respuesta
         if (isMounted) {
@@ -120,8 +140,7 @@ export default function GestionClubesPage() {
         });
       })
       .catch((error) => {
-        const mensajeError =
-          error.response?.data?.message || error.message || "Error desconocido";
+        const mensajeError = mensajeErrorApi(error, "Error desconocido");
 
         setFeedbackModal({
           isOpen: true,
@@ -174,12 +193,60 @@ export default function GestionClubesPage() {
               title: "Hubo un problema",
               description:
                 "No pudimos eliminar el club. Detalle: " +
-                  error.response?.data?.message ||
-                error.message ||
-                "Desconocido",
+                mensajeErrorApi(error, "Desconocido"),
               onClose: () =>
                 setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
             });
+          });
+      },
+    });
+  };
+
+  const adheridosCount = clubes.filter((c) => !esClubSoloSede(c)).length;
+  const sedesCount = clubes.filter((c) => esClubSoloSede(c)).length;
+
+  const handlePromoverAdherido = (club: Club) => {
+    if (!puedePromoverAdherido || !esClubSoloSede(club)) return;
+
+    setFeedbackModal({
+      isOpen: true,
+      type: "warning",
+      title: "Promover a club adherido",
+      description: `"${club.nombre}" pasará a la red pública de reservas (/reservar). Confirmá solo si el complejo opera reservas online.`,
+      confirmText: "Promover",
+      cancelText: "Cancelar",
+      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      onConfirm: () => {
+        setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+        setPromoviendoId(club.id);
+        ClubesService.promoverAdherido(club.id)
+          .then(() => {
+            setFeedbackModal({
+              isOpen: true,
+              type: "success",
+              title: "Club adherido",
+              description: `${club.nombre} ya figura en la red de reservas.`,
+              onClose: () =>
+                setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+            });
+            setRefreshKey((prev) => prev + 1);
+          })
+          .catch((error) => {
+            setFeedbackModal({
+              isOpen: true,
+              type: "error",
+              title: "No se pudo promover",
+              description: mensajeErrorApi(
+                error,
+                "Revisá los datos del club e intentá de nuevo.",
+              ),
+              onClose: () =>
+                setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+            });
+          })
+          .finally(() => {
+            setPromoviendoId(null);
+            setFeedbackModal((prev) => ({ ...prev, isLoading: false }));
           });
       },
     });
@@ -191,12 +258,12 @@ export default function GestionClubesPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
         <div>
           <h1 className="text-3xl font-bold text-white tracking-tight">
-            Clubes adheridos
+            Clubes y sedes
           </h1>
           <p className="text-gray-400 mt-1">
-            {clubes.length} clubes en la red ·{" "}
+            {adheridosCount} adheridos (reservas) · {sedesCount} sedes
+            registradas ·{" "}
             {clubes.filter((c) => c.estado === "Pendiente").length} pendientes
-            de aprobación
           </p>
         </div>
 
@@ -227,28 +294,63 @@ export default function GestionClubesPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {clubes.map((club) => (
+          {clubes.map((club) => {
+            const soloSede = esClubSoloSede(club);
+            return (
             <div
               key={club.id}
-              className="bg-[#111111] rounded-2xl border border-white/5 p-6 flex flex-col justify-between hover:border-white/10 transition-colors"
+              className={`bg-[#111111] rounded-2xl border p-6 flex flex-col justify-between transition-colors ${
+                soloSede
+                  ? "border-sky-500/25 hover:border-sky-500/40"
+                  : "border-white/5 hover:border-white/10"
+              }`}
             >
               <div className="flex gap-4 items-start">
-                <div className="w-14 h-14 rounded-xl bg-brand-chartreuse/10 border border-brand-chartreuse/20 text-brand-chartreuse flex items-center justify-center shrink-0">
-                  <Building2 className="size-7" />
+                <div
+                  className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 border ${
+                    soloSede
+                      ? "bg-sky-500/10 border-sky-500/25 text-sky-300"
+                      : "bg-brand-chartreuse/10 border-brand-chartreuse/20 text-brand-chartreuse"
+                  }`}
+                >
+                  {soloSede ? (
+                    <Landmark className="size-7" />
+                  ) : (
+                    <Building2 className="size-7" />
+                  )}
                 </div>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <h3 className="font-bold text-lg text-white">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                    <h3
+                      className="font-bold text-lg text-white truncate"
+                      title={clubEtiquetaListado(club)}
+                    >
                       {club.nombre}
                     </h3>
                     {club.estado === "Activo" && (
-                      <CheckCircle2 className="size-4 text-brand-chartreuse" />
+                      <CheckCircle2 className="size-4 shrink-0 text-brand-chartreuse" />
                     )}
                   </div>
-                  <div className="flex items-center gap-1 text-sm text-gray-400">
-                    <MapPin className="size-3.5" />
-                    {club.localidad ? `${club.localidad}, ` : ""}
-                    {club.provincia || "Sin ubicación"}
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                      soloSede
+                        ? "bg-sky-500/15 text-sky-200"
+                        : "bg-brand-chartreuse/10 text-brand-chartreuse"
+                    }`}
+                  >
+                    {soloSede ? (
+                      <Landmark className="size-3 shrink-0" aria-hidden />
+                    ) : (
+                      <Globe className="size-3 shrink-0" aria-hidden />
+                    )}
+                    {soloSede ? "Sede registrada" : "Adherido reservas"}
+                  </span>
+                  <div className="flex items-start gap-1 text-sm text-gray-400 mt-2">
+                    <MapPin className="size-3.5 shrink-0 mt-0.5" />
+                    <span>
+                      {club.localidad ? `${club.localidad}, ` : ""}
+                      {club.provincia || "Sin ubicación"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -321,16 +423,35 @@ export default function GestionClubesPage() {
                   >
                     Canchas
                   </Link>
-                  <Link
-                    href={`/dashboard/clubes/${club.id}/reservas`}
-                    className="flex items-center justify-center py-2 px-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-colors border border-white/5 text-center"
-                  >
-                    Agenda
-                  </Link>
+                  {soloSede ? (
+                    <span className="flex items-center justify-center py-2 px-3 bg-white/5 text-gray-500 rounded-xl text-xs font-bold border border-white/5 text-center">
+                      Sin reservas web
+                    </span>
+                  ) : (
+                    <Link
+                      href={`/dashboard/clubes/${club.id}/reservas`}
+                      className="flex items-center justify-center py-2 px-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold transition-colors border border-white/5 text-center"
+                    >
+                      Agenda
+                    </Link>
+                  )}
                 </div>
+                {soloSede && puedePromoverAdherido ? (
+                  <button
+                    type="button"
+                    onClick={() => handlePromoverAdherido(club)}
+                    disabled={promoviendoId === club.id}
+                    className="w-full mt-2 py-2.5 rounded-xl text-xs font-bold border border-sky-500/30 text-sky-200 hover:bg-sky-500/10 transition-colors disabled:opacity-50"
+                  >
+                    {promoviendoId === club.id
+                      ? "Promoviendo..."
+                      : "Promover a adherido (reservas)"}
+                  </button>
+                ) : null}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

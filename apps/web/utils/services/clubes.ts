@@ -36,6 +36,15 @@ export const ClubesService = {
     await api.delete(`/clubes/${id}`);
   },
 
+  async promoverAdherido(id: string | number): Promise<Club> {
+    const response = await api.patch<{
+      exito?: boolean;
+      data?: Club;
+      message?: string;
+    }>(`/clubes/${id}/promover-adherido`);
+    return (response.data?.data || response.data) as Club;
+  },
+
   async getCanchas(clubId: string | number): Promise<any[]> {
     const response = await api.get<any>(`/clubes/${clubId}/canchas`);
     return response.data?.data || [];

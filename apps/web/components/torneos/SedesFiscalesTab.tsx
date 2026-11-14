@@ -11,6 +11,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { Club } from "@/utils/types";
+import { clubEtiquetaListado } from "@/utils/types/club.types";
+import { mensajeErrorApi } from "@/utils/mensajeErrorApi";
 import type { Torneo } from "@/utils/types";
 import CustomDropdown from "../ui/CustomDropdown";
 import { ClubesService } from "@/utils/services/clubes";
@@ -211,7 +213,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
     () =>
       selectedClubs.map((c) => ({
         value: String(c.id),
-        label: c.nombre,
+        label: clubEtiquetaListado(c),
       })),
     [selectedClubs],
   );
@@ -365,7 +367,10 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       console.error(e);
       sileo.error({
         title: "Error",
-        description: "No se pudieron guardar las canchas del torneo.",
+        description: mensajeErrorApi(
+          e,
+          "No se pudieron guardar las canchas del torneo.",
+        ),
       });
     } finally {
       setSaving(false);
@@ -563,10 +568,10 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
             ? `${canchasCreadas} cancha(s) listas. Ya podés agregarlo como sede.`
             : `Club listo (${canchasCreadas}/${cantidadCanchas} canchas). Revisá el detalle del club.`,
       });
-    } catch {
+    } catch (err) {
       sileo.error({
         title: "Error",
-        description: "No se pudo crear el club.",
+        description: mensajeErrorApi(err, "No se pudo crear el club."),
       });
     } finally {
       setCreandoClub(false);
@@ -585,6 +590,13 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       onRefresh?.();
     } catch (e) {
       console.error(e);
+      sileo.error({
+        title: "Error al adicionar sede",
+        description: mensajeErrorApi(
+          e,
+          "No se pudo guardar la sede en el torneo.",
+        ),
+      });
     } finally {
       setSaving(false);
     }
@@ -615,6 +627,10 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       onRefresh?.();
     } catch (e) {
       console.error(e);
+      sileo.error({
+        title: "Error al quitar sede",
+        description: mensajeErrorApi(e, "No se pudo actualizar las sedes."),
+      });
     } finally {
       setSaving(false);
     }
@@ -799,7 +815,10 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                 onChange={setNewClubId}
                 options={clubs
                   .filter((c) => !selectedClubs.some((sc) => sc.id === c.id))
-                  .map((c) => ({ value: String(c.id), label: c.nombre }))}
+                  .map((c) => ({
+                    value: String(c.id),
+                    label: clubEtiquetaListado(c),
+                  }))}
                 placeholder="Buscar club para agregar como sede..."
                 disabled={readOnly}
               />
