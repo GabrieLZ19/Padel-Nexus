@@ -1,16 +1,10 @@
 import type { Metadata } from "next";
 import { Toaster } from "sileo";
+import { rootMetadata } from "@/utils/siteMetadata";
 import { SILEO_TOAST_DURATION_MS, sileoToastStyles } from "@/utils/sileoStyles";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: {
-    default: "Padel Nexus",
-    template: "%s · Padel Nexus",
-  },
-  description:
-    "Torneos, ranking oficial, reservas de canchas y marketplace de pádel en un solo lugar.",
-};
+export const metadata: Metadata = rootMetadata();
 
 export default function RootLayout({
   children,

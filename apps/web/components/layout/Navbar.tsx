@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useProfileStore } from "@/store/useProfileStore";
+import { cerrarSesionCliente } from "@/utils/auth/sesionBff";
 import { PARTIDOS_ABIERTOS } from "@/utils/constants/partidosAbiertos";
 import { useCartStore } from "@/store/useCartStore";
 import { ChatService } from "@/utils/services/chat";
@@ -111,13 +112,7 @@ export default function Navbar() {
   };
 
   const handleLogout = () => {
-    // 1. Borramos de forma efectiva las cookies de sesión para Next.js Middleware y Axios
-    document.cookie =
-      "padel_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    document.cookie =
-      "padel_user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
-    // 2. Limpiamos el estado global de la app
+    void cerrarSesionCliente();
     clearProfile();
     setIsDropdownOpen(false);
     setIsMenuOpen(false);

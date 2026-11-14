@@ -39,6 +39,7 @@ import { ChatService } from "@/utils/services/chat";
 import { mostrarToastNotificacion } from "@/utils/notificacionesToast";
 import { getMenuItemsPorRol } from "@/utils/constants/menuPermissions";
 import SuperadminSidebarNav from "@/components/layout/SuperadminSidebarNav";
+import { cerrarSesionCliente } from "@/utils/auth/sesionBff";
 
 export default function DashboardLayout({
   children,
@@ -100,8 +101,7 @@ export default function DashboardLayout({
 
   const handleLogout = useCallback(() => {
     clearProfile();
-    document.cookie = "padel_token=; path=/; max-age=0;";
-    document.cookie = "padel_user_role=; path=/; max-age=0;";
+    void cerrarSesionCliente();
     setMobileMenuOpen(false);
     setLoading(false);
 

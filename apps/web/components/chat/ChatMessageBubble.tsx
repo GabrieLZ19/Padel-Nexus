@@ -21,7 +21,7 @@ export function ChatSeparadorDia({ etiqueta }: { etiqueta: string }) {
         {etiqueta}
       </span>
       <div className="flex-1 h-px bg-brand-white/10" />
-    </motion.div>
+    </div>
   );
 }
 

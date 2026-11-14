@@ -27,6 +27,7 @@ import NotificationCenter from "@/components/notificaciones/NotificationCenter";
 import { useSocket } from "@/hooks/useSocket";
 import { ChatService } from "@/utils/services/chat";
 import { mostrarToastNotificacion } from "@/utils/notificacionesToast";
+import { cerrarSesionCliente } from "@/utils/auth/sesionBff";
 
 export default function ClubLayout({
   children,
@@ -81,8 +82,7 @@ export default function ClubLayout({
 
   const handleLogout = useCallback(() => {
     clearProfile();
-    document.cookie = "padel_token=; path=/; max-age=0;";
-    document.cookie = "padel_user_role=; path=/; max-age=0;";
+    void cerrarSesionCliente();
     setMobileMenuOpen(false);
     router.replace("/login");
   }, [clearProfile, router]);

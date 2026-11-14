@@ -231,8 +231,36 @@ Pendiente: re-test manual (notificaciones club desktop, portada ~360px, redirect
 - Desde Mis reservas: query `ref_*` + banner + borrador del mensaje.
 - Test: `apps/web/test/res19ChatReservas.test.ts`.
 
-## Lote 8 — SIGUIENTE
+## Lote 8 — en curso
 
 Tickets: PUB-22, PUB-20, PUB-21, PUB-16, App 1.0.0.
+
+### PUB-20 (redirect Netlify apex → www)
+
+- **Estado:** OMITIDO — hosting Netlify ya no está en uso.
+
+### PUB-21 (SEO: OG, robots, sitemap, títulos)
+
+- **Estado:** COMPLETADO en código.
+- `utils/siteMetadata.ts`: `rootMetadata`, Open Graph, Twitter, `metadataBase`, iconos.
+- `app/robots.ts`, `app/sitemap.ts`, `app/icon.svg`.
+- Layouts: forgot-password, update-password, verificar/[usuarioId], jugadores/[id] (`generateMetadata` con nombre público).
+- Test: `apps/web/test/pub21SeoOpenGraph.test.ts`.
+
+### PUB-16 (historial_ranking.ronda legacy)
+
+- **Estado:** COMPLETADO en código y migración aplicada en Supabase.
+- Migración: `20261113230000_pub16_corregir_historial_ronda.sql` (empareja movimientos por orden cronológico vs instancias de partido; desambiguados → NULL).
+- Runtime: `historialRankingRonda.ts` prioriza instancia temprana en empates de timestamp.
+- Tests: `apps/api/test/pub16HistorialRonda.test.ts`.
+- Caso QA Wayne (torneo 6 parejas): `SEMIS` + `FINAL` en lugar de doble `FINAL`.
+
+### PUB-22 (BFF HttpOnly + proxy)
+
+- **Estado:** COMPLETADO en código (pendiente deploy y re-test manual en producción).
+- Route Handlers: `app/api/auth/session/route.ts` (POST/DELETE), `app/api/proxy/[...path]/route.ts`.
+- Cliente: `utils/api.ts` usa `/api/proxy`; login/callback/update-password vía `establecerSesionCliente`; logout vía `cerrarSesionCliente`.
+- `padel_token` HttpOnly; `padel_user_role` legible para middleware/UI.
+- Test: `apps/web/test/pub22BffHttpOnly.test.ts`.
 
 Plan: [re-test_13-11_correction_plan.md](re-test_13-11_correction_plan.md) y plan completo en Cursor (`re-test_13-11_correction_plan`).

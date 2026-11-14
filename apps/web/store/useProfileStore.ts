@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { cerrarSesionCliente } from "@/utils/auth/sesionBff";
 import { PerfilService } from "@/utils/services/perfil";
 import { tieneSesionCliente } from "@/utils/session";
 import { Perfil } from "@/utils/types";
@@ -29,10 +30,8 @@ export const useProfileStore = create<ProfileStore>((set) => ({
         return true;
       }
 
-      // Si es null, el backend retornó un 401 (No autorizado). Limpiamos cookies de sesión.
       if (typeof window !== "undefined") {
-        document.cookie = "padel_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-        document.cookie = "padel_user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        await cerrarSesionCliente();
       }
       set({ profile: null });
       return false;

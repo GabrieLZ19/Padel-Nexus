@@ -27,6 +27,7 @@ import {
   safeRedirectFragment,
   safeRedirectPath,
 } from "@/utils/auth/postLoginRedirect";
+import { establecerSesionCliente } from "@/utils/auth/sesionBff";
 
 function AuthPageContent() {
   const [email, setEmail] = useState("");
@@ -68,8 +69,11 @@ function AuthPageContent() {
           localStorage.removeItem("padel_remember_email");
         }
 
-        document.cookie = `padel_token=${data.token}; path=/; max-age=${rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24}`;
-        document.cookie = `padel_user_role=${data.usuario.rol}; path=/; max-age=${rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24}`;
+        await establecerSesionCliente({
+          token: data.token,
+          role: data.usuario.rol,
+          rememberMe,
+        });
 
         setProfile(data.usuario);
 

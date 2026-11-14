@@ -12,6 +12,7 @@ import {
 import { isAxiosError } from "axios";
 import { PerfilService } from "@/utils/services/perfil";
 import { getSupabaseBrowserClient } from "@/utils/supabase/client";
+import { establecerSesionCliente } from "@/utils/auth/sesionBff";
 
 export default function UpdatePasswordPage() {
   const [password, setPassword] = useState("");
@@ -38,7 +39,10 @@ export default function UpdatePasswordPage() {
           setError("El enlace de recuperación no es válido o ya venció.");
           return;
         }
-        document.cookie = `padel_token=${data.session.access_token}; path=/; max-age=3600; SameSite=Lax`;
+        await establecerSesionCliente({
+          token: data.session.access_token,
+          rememberMe: false,
+        });
         setSessionReady(true);
         return;
       }
@@ -57,7 +61,10 @@ export default function UpdatePasswordPage() {
             setError("El enlace de recuperación no es válido o ya venció.");
             return;
           }
-          document.cookie = `padel_token=${accessToken}; path=/; max-age=3600; SameSite=Lax`;
+          await establecerSesionCliente({
+            token: accessToken,
+            rememberMe: false,
+          });
           setSessionReady(true);
           return;
         }
@@ -65,7 +72,10 @@ export default function UpdatePasswordPage() {
 
       const { data: sessionData } = await supabase.auth.getSession();
       if (sessionData.session?.access_token) {
-        document.cookie = `padel_token=${sessionData.session.access_token}; path=/; max-age=3600; SameSite=Lax`;
+        await establecerSesionCliente({
+          token: sessionData.session.access_token,
+          rememberMe: false,
+        });
         setSessionReady(true);
         return;
       }

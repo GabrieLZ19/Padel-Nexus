@@ -12,6 +12,7 @@ import {
   limpiarRedirectPostLogin,
   resolveDestinoTrasLogin,
 } from "@/utils/auth/postLoginRedirect";
+import { establecerSesionCliente } from "@/utils/auth/sesionBff";
 
 type AuthStatus = "loading" | "success" | "error";
 
@@ -64,9 +65,10 @@ export default function OAuthCallbackPage() {
         const data = await PerfilService.verificarTokenGoogle(accessToken);
 
         if (data.exito && data.usuario) {
-          // Guardamos las cookies de sesión
-          document.cookie = `padel_token=${data.token}; path=/; max-age=${60 * 60 * 24}`;
-          document.cookie = `padel_user_role=${data.usuario.rol}; path=/; max-age=${60 * 60 * 24}`;
+          await establecerSesionCliente({
+            token: data.token,
+            role: data.usuario.rol,
+          });
 
           const isFromMobileApp =
             searchParams.get("from") === "mobile" ||

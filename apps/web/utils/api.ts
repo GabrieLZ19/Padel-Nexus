@@ -1,8 +1,15 @@
 import axios from "axios";
-import { getSessionToken } from "./session";
+import { cerrarSesionCliente } from "./auth/sesionBff";
+
+function resolveBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    return "/api/proxy";
+  }
+  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+}
 
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api",
+  baseURL: resolveBaseUrl(),
   withCredentials: true,
 });
 
@@ -13,28 +20,14 @@ if (typeof window !== "undefined") {
   fetch(healthUrl, { mode: "no-cors" }).catch(() => {});
 }
 
-// Interceptor optimizado para leer la cookie de sesión nativa
-api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = getSessionToken();
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return config;
-});
-
 // Interceptor para redireccionar automáticamente al login en caso de 401 (Sesión vencida)
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response && error.response.status === 401) {
       if (typeof window !== "undefined") {
-        // Limpiar cookies de sesión
-        document.cookie = "padel_token=; path=/; max-age=0;";
-        document.cookie = "padel_user_role=; path=/; max-age=0;";
+        await cerrarSesionCliente();
 
-        // Redirigir a login indicando que la sesión expiró SOLAMENTE si está en un área privada
         const path = window.location.pathname;
         const isAreaPrivada =
           path.startsWith("/dashboard") ||

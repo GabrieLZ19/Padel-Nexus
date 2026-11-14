@@ -39,14 +39,9 @@ export const useSocket = (onNotificationReceived?: (notif: any) => void) => {
       });
 
       socketInstance.on("connect", () => {
-        console.log("🔌 Conectado al servidor WebSocket");
         if (profile?.id) {
           socketInstance?.emit("join_room", profile.id);
         }
-      });
-
-      socketInstance.on("disconnect", () => {
-        console.log("🔌 Desconectado de WebSocket");
       });
     } else {
       if (socketInstance.connected) {
@@ -54,15 +49,13 @@ export const useSocket = (onNotificationReceived?: (notif: any) => void) => {
       }
     }
 
-    const handleNuevaNotificacion = (notif: any) => {
-      console.log("📬 Nueva notificación recibida por socket:", notif);
+    const handleNuevaNotificacion = (notif: unknown) => {
       if (callbackRef.current) {
         callbackRef.current(notif);
       }
     };
 
-    const handleChatNotificacion = (data: any) => {
-      console.log("💬 Notificación de chat recibida:", data);
+    const handleChatNotificacion = (data: unknown) => {
       // Disparar un evento custom para que otros componentes puedan escucharlo
       if (typeof window !== "undefined") {
         window.dispatchEvent(
@@ -71,22 +64,19 @@ export const useSocket = (onNotificationReceived?: (notif: any) => void) => {
       }
     };
 
-    const handleTorneoActualizado = (data: any) => {
-      console.log("🏆 Notificación de torneo en curso recibida por WebSocket:", data);
+    const handleTorneoActualizado = (data: unknown) => {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("torneo_actualizado", { detail: data }));
       }
     };
 
-    const handlePartidoActualizado = (data: any) => {
-      console.log("⚡ Notificación de marcador actualizado por WebSocket:", data);
+    const handlePartidoActualizado = (data: unknown) => {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("partido_actualizado", { detail: data }));
       }
     };
 
-    const handleBracketActualizado = (data: any) => {
-      console.log("🔀 Notificación de avance de cuadro por WebSocket:", data);
+    const handleBracketActualizado = (data: unknown) => {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("bracket_actualizado", { detail: data }));
       }

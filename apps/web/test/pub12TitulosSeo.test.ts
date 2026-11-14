@@ -9,7 +9,12 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 describe("PUB-12 títulos por página", () => {
   it("layout raíz usa plantilla de título", () => {
     const layout = readFileSync(path.join(RAIZ, "app/layout.tsx"), "utf8");
-    assert.match(layout, /template: "%s · Padel Nexus"/);
+    const meta = readFileSync(
+      path.join(RAIZ, "utils/siteMetadata.ts"),
+      "utf8",
+    );
+    assert.match(layout, /rootMetadata\(\)/);
+    assert.match(meta, /template: `%s · \$\{SITE_NAME\}`/);
   });
 
   it("rutas públicas QA tienen metadata de segmento", () => {
