@@ -12,6 +12,7 @@ import {
   cargarContextoProgramacion,
   duracionParaFase,
   evaluateProgramacionIssues,
+  validarAsignacionHorarioPartido,
   finWallClockTrasPartidos,
   generarSlotsDesdeSedesYVentana,
   minutosAHoraStrPublic,
@@ -216,8 +217,10 @@ export class ProgramacionService {
 
       const dur = duracionParaFase(contexto.duracionMinutos, "llave");
       const slots = slotsDesdeContexto(contexto, dur);
+      const durZona = duracionParaFase(contexto.duracionMinutos, "zonas");
       asignarHorariosAPartidos(llaveDrafts, slots, ocupadosDespuesZonas, {
         duracionMinutos: dur,
+        duracionZonaMinutos: durZona,
         feedersByMatchNo,
         permitirSinEquipos: true,
       });
@@ -535,7 +538,7 @@ export class ProgramacionService {
       supabaseAdmin
         .from("torneos")
         .select(
-          "id, nombre, programacion_estado, programacion_publicada_en, duracion_partido_minutos, descanso_modo, estado",
+          "id, nombre, programacion_estado, programacion_publicada_en, duracion_partido_minutos, descanso_modo, estado, alcance",
         )
         .eq("id", torneoId)
         .maybeSingle(),
@@ -701,9 +704,11 @@ export class ProgramacionService {
     }));
     const issues = evaluateProgramacionIssues(drafts, {
       duracionMinutos: duracion,
+      duracionZonaMinutos: duracionParaFase(duracion, "zonas"),
       descansoMinutos: descanso,
       descansoModo,
       fechaInicio: contexto.fecha,
+      alcanceTorneo: torneo.alcance ?? null,
       feedersByMatchNo: feeders,
     });
 
@@ -737,6 +742,7 @@ export class ProgramacionService {
         partidos: partidos.length,
         duracionMinutos: duracion,
         jornadas: Math.min(4, Math.max(1, dias.length || opciones.jornadas || 1)),
+        canchasActuales: canchasMap.size,
       }),
       dias,
       canchas: [...canchasMap.values()],
@@ -756,7 +762,7 @@ export class ProgramacionService {
 
   /**
    * Asigna o mueve un partido a un slot. Marca horario_bloqueado=true.
-   * Issues no bloquean el persist.
+   * Rechaza conflictos graves (orden de llave, cancha, descanso).
    */
   static async asignar(
     torneoId: string,
@@ -770,7 +776,9 @@ export class ProgramacionService {
   ): Promise<ProgramacionBoard> {
     const { data: torneo } = await supabaseAdmin
       .from("torneos")
-      .select("id, programacion_estado")
+      .select(
+        "id, programacion_estado, duracion_partido_minutos, descanso_modo, fecha",
+      )
       .eq("id", torneoId)
       .maybeSingle();
     if (!torneo) throw new Error("Torneo no encontrado");
@@ -795,6 +803,48 @@ export class ProgramacionService {
     const fechaIso = String(payload.fecha_iso || "").trim();
     if (!cancha || !fechaIso) {
       throw new Error("cancha_label y fecha_iso son obligatorios");
+    }
+
+    const { data: todosPartidosDb } = await supabaseAdmin
+      .from("partidos")
+      .select(
+        "id, ronda, orden, equipo_a_id, equipo_b_id, estado_partido, cancha_asignada, fecha_partido",
+      )
+      .eq("torneo_id", torneoId);
+
+    const duracion = Number(torneo.duracion_partido_minutos || 90);
+    const descansoModo = esModoDescanso(torneo.descanso_modo)
+      ? torneo.descanso_modo
+      : "tras_fin_60";
+    const descansoMinutos = minutosDeModoDescanso(descansoModo);
+    const todosProg: PartidoProgramable[] = (todosPartidosDb || []).map((p) => ({
+      id: p.id,
+      ronda: p.ronda || "",
+      orden: p.orden || undefined,
+      equipo_a_id: p.equipo_a_id,
+      equipo_b_id: p.equipo_b_id,
+      estado_partido: p.estado_partido || "Programado",
+      cancha_asignada: p.cancha_asignada,
+      fecha_partido: p.fecha_partido,
+    }));
+    const feeders = await ProgramacionService.feedersForTorneo(torneoId);
+
+    const conflicto = validarAsignacionHorarioPartido(
+      todosProg,
+      payload.partido_id,
+      cancha,
+      fechaIso,
+      {
+        duracionMinutos: duracion,
+        duracionZonaMinutos: duracionParaFase(duracion, "zonas"),
+        descansoMinutos,
+        descansoModo,
+        feedersByMatchNo: feeders,
+        fechaInicio: torneo.fecha ?? null,
+      },
+    );
+    if (conflicto) {
+      throw new Error(conflicto);
     }
 
     const update: Record<string, unknown> = {
@@ -927,8 +977,11 @@ export class ProgramacionService {
         slots = [...slotsDelDia, ...slotsOtros];
       }
 
+      const durZona = duracionParaFase(duracion, "zonas");
+      const finZonaOpts = { descansoMinutos, descansoModo };
       asignarHorariosAPartidos(todosProg, slots, ocupados, {
         duracionMinutos: duracion,
+        duracionZonaMinutos: durZona,
         descansoMinutos,
         descansoModo,
         feedersByMatchNo: feeders,
@@ -937,7 +990,8 @@ export class ProgramacionService {
         limitarAIds: targetIds,
         notBeforeExtra: finWallClockTrasPartidos(
           todosProg.filter((p) => /^ZONA\s+/i.test(String(p.ronda || ""))),
-          duracion,
+          durZona,
+          finZonaOpts,
         ),
       });
 
@@ -1140,7 +1194,9 @@ export class ProgramacionService {
   ): Promise<ProgramacionBoard> {
     const { data: torneo } = await supabaseAdmin
       .from("torneos")
-      .select("id, programacion_estado, duracion_partido_minutos, descanso_modo")
+      .select(
+        "id, programacion_estado, duracion_partido_minutos, descanso_modo, alcance, fecha",
+      )
       .eq("id", torneoId)
       .maybeSingle();
     if (!torneo) throw new Error("Torneo no encontrado");
@@ -1213,6 +1269,16 @@ export class ProgramacionService {
       ? minutosDeModoDescanso(descansoModo)
       : (opciones.descansoMinutos ?? 60);
 
+    const fechaInicio =
+      contexto.fecha ?? (torneo.fecha ? String(torneo.fecha) : null);
+    const alcanceTorneo = torneo.alcance ?? null;
+    const metaProgramacion = {
+      fechaInicio,
+      alcanceTorneo,
+      descansoMinutos,
+      descansoModo,
+    };
+
     const distribucion: DistribucionProgramacion = esDistribucionProgramacion(
       opciones.distribucion,
     )
@@ -1246,19 +1312,22 @@ export class ProgramacionService {
         );
         if (previosDrafts.length) {
           const ordenadosPrevios = ordenDeAsignacion(previosDrafts, "continua");
-          asignarHorariosAPartidos(
-            ordenadosPrevios,
-            slotsPrevios.length ? slotsPrevios : allSlots,
-            ocupados,
-            {
-              duracionMinutos: duracion,
-              descansoMinutos,
-              descansoModo,
-              feedersByMatchNo: feeders,
-              permitirSinEquipos: true,
-              distribucion: "continua",
-            },
-          );
+        asignarHorariosAPartidos(
+          ordenadosPrevios,
+          slotsPrevios.length ? slotsPrevios : allSlots,
+          ocupados,
+          {
+            duracionMinutos: duracion,
+            duracionZonaMinutos: duracionParaFase(duracion, "zonas"),
+            descansoMinutos,
+            descansoModo,
+            fechaInicio: metaProgramacion.fechaInicio,
+            alcanceTorneo: metaProgramacion.alcanceTorneo,
+            feedersByMatchNo: feeders,
+            permitirSinEquipos: true,
+            distribucion: "continua",
+          },
+        );
         }
 
         const ocupadosDespues = buildOcupadosDesdePartidos(
@@ -1285,8 +1354,11 @@ export class ProgramacionService {
             ocupadosDespues,
             {
               duracionMinutos: duracion,
+              duracionZonaMinutos: duracionParaFase(duracion, "zonas"),
               descansoMinutos,
               descansoModo,
+              fechaInicio: metaProgramacion.fechaInicio,
+              alcanceTorneo: metaProgramacion.alcanceTorneo,
               feedersByMatchNo: feeders,
               permitirSinEquipos: true,
               distribucion: "continua",
@@ -1303,8 +1375,11 @@ export class ProgramacionService {
             for (const k of ocupados) ocupadosFin.add(k);
             asignarHorariosAPartidos(aunSinAsignar, allSlots, ocupadosFin, {
               duracionMinutos: duracion,
+              duracionZonaMinutos: duracionParaFase(duracion, "zonas"),
               descansoMinutos,
               descansoModo,
+              fechaInicio: metaProgramacion.fechaInicio,
+              alcanceTorneo: metaProgramacion.alcanceTorneo,
               feedersByMatchNo: feeders,
               permitirSinEquipos: true,
               distribucion: "continua",
@@ -1315,8 +1390,11 @@ export class ProgramacionService {
         const ordenados = ordenDeAsignacion(drafts, "continua");
         asignarHorariosAPartidos(ordenados, allSlots, ocupados, {
           duracionMinutos: duracion,
+          duracionZonaMinutos: duracionParaFase(duracion, "zonas"),
           descansoMinutos,
           descansoModo,
+          fechaInicio: metaProgramacion.fechaInicio,
+          alcanceTorneo: metaProgramacion.alcanceTorneo,
           feedersByMatchNo: feeders,
           permitirSinEquipos: true,
           distribucion: "continua",
@@ -1344,6 +1422,8 @@ export class ProgramacionService {
             duracionMinutos: dur,
             descansoMinutos,
             descansoModo,
+            fechaInicio: metaProgramacion.fechaInicio,
+            alcanceTorneo: metaProgramacion.alcanceTorneo,
           },
         );
 
@@ -1364,6 +1444,8 @@ export class ProgramacionService {
               duracionMinutos: dur,
               descansoMinutos,
               descansoModo,
+              fechaInicio: metaProgramacion.fechaInicio,
+              alcanceTorneo: metaProgramacion.alcanceTorneo,
             },
           );
         }
@@ -1387,9 +1469,12 @@ export class ProgramacionService {
             (d) => !esRondaCampeonato(d.ronda),
           );
 
+          const durZona = duracionParaFase(duracion, "zonas");
+          const finZonaOpts = { descansoMinutos, descansoModo };
           const notBeforeTrasZonas = finWallClockTrasPartidos(
             zonasDrafts,
-            dur,
+            durZona,
+            finZonaOpts,
           );
 
           // 1. Rondas previas de llave (16avos, Octavos, Cuartos) en días previos (ej. Sábado)
@@ -1403,8 +1488,11 @@ export class ProgramacionService {
               ocupadosDespues,
               {
                 duracionMinutos: dur,
+                duracionZonaMinutos: durZona,
                 descansoMinutos,
                 descansoModo,
+                fechaInicio: metaProgramacion.fechaInicio,
+                alcanceTorneo: metaProgramacion.alcanceTorneo,
                 feedersByMatchNo: feeders,
                 permitirSinEquipos: true,
                 notBeforeExtra: notBeforeTrasZonas,
@@ -1435,8 +1523,11 @@ export class ProgramacionService {
               ocupadosDespues,
               {
                 duracionMinutos: dur,
+                duracionZonaMinutos: durZona,
                 descansoMinutos,
                 descansoModo,
+                fechaInicio: metaProgramacion.fechaInicio,
+                alcanceTorneo: metaProgramacion.alcanceTorneo,
                 feedersByMatchNo: feeders,
                 permitirSinEquipos: true,
                 notBeforeExtra: notBeforeTrasZonas,
@@ -1454,8 +1545,11 @@ export class ProgramacionService {
               for (const k of ocupados) ocupadosFin.add(k);
               asignarHorariosAPartidos(aunSinAsignar, allSlotsLlave, ocupadosFin, {
                 duracionMinutos: dur,
+                duracionZonaMinutos: durZona,
                 descansoMinutos,
                 descansoModo,
+                fechaInicio: metaProgramacion.fechaInicio,
+                alcanceTorneo: metaProgramacion.alcanceTorneo,
                 feedersByMatchNo: feeders,
                 permitirSinEquipos: true,
                 notBeforeExtra: notBeforeTrasZonas,
@@ -1464,17 +1558,26 @@ export class ProgramacionService {
             }
           }
         } else {
+          const durZona = duracionParaFase(duracion, "zonas");
+          const finZonaOpts = { descansoMinutos, descansoModo };
           asignarHorariosAPartidos(
             ordenDeAsignacion(llaveDrafts, "zonas_primero"),
             allSlotsLlave,
             ocupadosDespues,
             {
               duracionMinutos: dur,
+              duracionZonaMinutos: durZona,
               descansoMinutos,
               descansoModo,
+              fechaInicio: metaProgramacion.fechaInicio,
+              alcanceTorneo: metaProgramacion.alcanceTorneo,
               feedersByMatchNo: feeders,
               permitirSinEquipos: true,
-              notBeforeExtra: finWallClockTrasPartidos(zonasDrafts, dur),
+              notBeforeExtra: finWallClockTrasPartidos(
+                zonasDrafts,
+                durZona,
+                finZonaOpts,
+              ),
             },
           );
         }

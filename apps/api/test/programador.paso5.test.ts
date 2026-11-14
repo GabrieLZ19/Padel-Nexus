@@ -4,6 +4,7 @@ import {
   asignarHorariosAPartidos,
   buildFeedersEliminatoriaDirecta,
   evaluateProgramacionIssues,
+  validarAsignacionHorarioPartido,
   generarSlotsDesdeSedesYVentana,
   parseFechaPartidoIsoPublic,
   type DisponibilidadTorneo,
@@ -11,6 +12,7 @@ import {
 } from "../src/utils/programacionPartidos";
 import {
   clasificacionSuperaLimite,
+  limiteClasificacion11EsObligatorio,
   esRondaCampeonato,
   etiquetaRondaProgramador,
   evaluarDescansoInsuficiente,
@@ -137,8 +139,43 @@ describe("programador paso 5", () => {
     });
     assert.equal(sugerencia.canchas, 2);
     assert.equal(sugerencia.horas, 20);
-    assert.match(sugerencia.mensaje, /2 canchas/);
-    assert.match(sugerencia.mensaje, /20 horas/);
+    assert.match(sugerencia.mensaje, /26 partidos/);
+    assert.match(sugerencia.mensaje, /2 cancha/);
+
+    const conCanchas = sugerirCanchasYHoras({
+      partidos: 26,
+      duracionMinutos: 90,
+      jornadas: 1,
+      canchasActuales: 2,
+    });
+    assert.match(conCanchas.mensaje, /adelantá el inicio|franjas/i);
+  });
+
+  it("TOR-4 — límite 11:00 es advertencia en torneo local", () => {
+    assert.equal(limiteClasificacion11EsObligatorio("Local"), false);
+    assert.equal(limiteClasificacion11EsObligatorio("Provincial"), true);
+
+    const aviso = evaluateProgramacionIssues(
+      [
+        {
+          id: "z-late",
+          ronda: "ZONA A",
+          orden: 1,
+          cancha_asignada: "Club - 1",
+          fecha_partido: "2026-10-11T13:30:00.000Z",
+          estado_partido: "Programado",
+        },
+      ],
+      {
+        duracionMinutos: 90,
+        fechaInicio: "2026-10-10",
+        alcanceTorneo: "Local",
+      },
+    );
+    assert.equal(
+      aviso.some((i) => i.severity === "wait" && i.message.includes("11:00")),
+      true,
+    );
   });
 
   it("asigna zonas antes que la llave, y la llave en orden de instancia", () => {
@@ -177,7 +214,8 @@ describe("programador paso 5", () => {
     const zonaMin = parseFechaPartidoIsoPublic(String(zona.fecha_partido))?.startMin;
     const octavosMin = parseFechaPartidoIsoPublic(String(octavos.fecha_partido))?.startMin;
     assert.equal(zonaMin, 8 * 60);
-    assert.equal(octavosMin, 8 * 60 + 90);
+    // Fin de zona (90′) + descanso 60′; el siguiente slot de grilla cae a las 11:00
+    assert.equal(octavosMin, 11 * 60);
 
     const llave: PartidoProgramable[] = [
       { id: "cuartos", ronda: "CUARTOS", orden: 1, estado_partido: "Programado" },
@@ -613,6 +651,15 @@ describe("programador paso 5", () => {
           clubes: { nombre: "Club QA" },
           canchas: { nombre: "1" },
         } as DisponibilidadTorneo,
+        {
+          club_id: "c1",
+          cancha_id: "ca2",
+          fecha: "2026-11-09",
+          hora_inicio: "09:30:00",
+          hora_fin: "23:59:59",
+          clubes: { nombre: "Club QA" },
+          canchas: { nombre: "2" },
+        } as DisponibilidadTorneo,
       ],
       dias: ["2026-11-09"],
       duracionMinutos: 90,
@@ -628,7 +675,12 @@ describe("programador paso 5", () => {
             cancha_asignada: "Club QA — 1",
             fecha_partido: "2026-11-09T09:30:00-03:00",
           }
-        : {}),
+        : orden === 2
+          ? {
+              cancha_asignada: "Club QA — 2",
+              fecha_partido: "2026-11-09T09:30:00-03:00",
+            }
+          : {}),
     }));
     const semi: PartidoProgramable = {
       id: "s1",
@@ -799,16 +851,143 @@ describe("programador paso 5", () => {
       t4.fecha > t1.fecha ||
         (t4.fecha === t1.fecha && t4.startMin > t1.startMin),
     );
-    // Llave después de terminar las zonas
-    const finZonas = Math.max(
-      t3.startMin + (t3.fecha === t4.fecha ? 0 : 0),
-      t4.startMin,
+    // Llave después de terminar las zonas + descanso 120
+    const finUltimaZona = Math.max(
+      (t3?.startMin ?? 0) + 90,
+      (t4?.startMin ?? 0) + 90,
     );
     if (to.fecha === t3.fecha && to.fecha === t4.fecha) {
-      assert.ok(to.startMin >= finZonas + 90);
+      assert.ok(to.startMin >= finUltimaZona + 120);
     } else {
       assert.ok(to.fecha >= t3.fecha);
     }
+  });
+
+  it("TOR-34 — respeta descanso entre última zona del clasificado y su primer partido de llave", () => {
+    const slots = generarSlotsDesdeSedesYVentana({
+      canchas: [
+        {
+          club_id: "club-1",
+          cancha_id: "c1",
+          fecha: "2026-12-01",
+          hora_inicio: "08:00:00",
+          hora_fin: "23:59:59",
+          clubes: { nombre: "Club" },
+          canchas: { nombre: "1" },
+        },
+      ],
+      dias: ["2026-12-01"],
+      duracionMinutos: 90,
+    });
+
+    const partidos: PartidoProgramable[] = [
+      {
+        id: "z-fin",
+        ronda: "ZONA A",
+        orden: 4,
+        equipo_a_id: "p1",
+        equipo_b_id: "p2",
+        estado_partido: "Programado",
+      },
+      {
+        id: "oct",
+        ronda: "OCTAVOS",
+        orden: 17,
+        equipo_a_id: "p1",
+        equipo_b_id: "p9",
+        estado_partido: "Programado",
+      },
+    ];
+
+    partidos[0].cancha_asignada = "Club — 1";
+    partidos[0].fecha_partido = "2026-12-01T11:00:00-03:00";
+
+    asignarHorariosAPartidos(partidos, slots, new Set(), {
+      duracionMinutos: 90,
+      duracionZonaMinutos: 75,
+      descansoModo: "tras_fin_60",
+      permitirSinEquipos: true,
+      limitarAIds: new Set(["oct"]),
+    });
+
+    const inicioLlave = parseFechaPartidoIsoPublic(
+      String(partidos[1].fecha_partido),
+    );
+    // 11:00 + 75′ de zona + 60′ de descanso => 13:15
+    assert.ok(inicioLlave);
+    assert.ok(inicioLlave.startMin >= 13 * 60 + 15);
+
+    const issues = evaluateProgramacionIssues(partidos, {
+      duracionMinutos: 90,
+      duracionZonaMinutos: 75,
+      descansoModo: "tras_fin_60",
+    });
+    assert.equal(
+      issues.some((i) => i.message.includes("último partido de zona")),
+      false,
+    );
+
+    partidos[1].fecha_partido = "2026-12-01T12:00:00-03:00";
+    const mal = evaluateProgramacionIssues(partidos, {
+      duracionMinutos: 90,
+      duracionZonaMinutos: 75,
+      descansoModo: "tras_fin_60",
+    });
+    assert.ok(
+      mal.some(
+        (i) =>
+          i.severity === "bad" &&
+          (i.message.includes("último partido de zona") ||
+            i.message.includes("Descanso insuficiente")),
+      ),
+    );
+  });
+
+  it("TOR-4 — auto-asignación no programa semi sin feeder previo", () => {
+    const cancha: DisponibilidadTorneo = {
+      club_id: "club-1",
+      cancha_id: "c1",
+      fecha: "2026-12-20",
+      hora_inicio: "11:00:00",
+      hora_fin: "23:59:59",
+      clubes: { nombre: "QA Club" },
+      canchas: { nombre: "1" },
+    };
+    const slots = generarSlotsDesdeSedesYVentana({
+      canchas: [cancha, { ...cancha, cancha_id: "c2", canchas: { nombre: "2" } }],
+      dias: ["2026-12-20"],
+      duracionMinutos: 90,
+    });
+    const feeders = new Map<number, number[]>([[25, [23]]]);
+    const cuarto: PartidoProgramable = {
+      id: "c23",
+      ronda: "CUARTOS",
+      orden: 23,
+      estado_partido: "Programado",
+    };
+    const semi: PartidoProgramable = {
+      id: "s25",
+      ronda: "SEMIS",
+      orden: 25,
+      estado_partido: "Programado",
+    };
+  // Orden invertido en el array para simular el bug histórico (semi antes que cuarto).
+    const partidos = [semi, cuarto];
+    asignarHorariosAPartidos(partidos, slots, new Set(), {
+      duracionMinutos: 90,
+      descansoModo: "tras_fin_120",
+      feedersByMatchNo: feeders,
+      permitirSinEquipos: true,
+      distribucion: "continua",
+    });
+    assert.ok(cuarto.fecha_partido);
+    assert.ok(semi.fecha_partido);
+    const t23 = parseFechaPartidoIsoPublic(String(cuarto.fecha_partido))!;
+    const t25 = parseFechaPartidoIsoPublic(String(semi.fecha_partido))!;
+    assert.ok(
+      t25.fecha > t23.fecha ||
+        (t25.fecha === t23.fecha && t25.startMin >= t23.startMin + 90 + 120),
+    );
   });
 
   it("TOR-4 — asignación continua en domingo ubica cuartos y luego semis (2 canchas)", () => {
@@ -918,6 +1097,37 @@ describe("programador paso 5", () => {
     const llave = issues.filter((i) => i.message.includes("Orden de llave"));
     assert.equal(llave.length, 1);
     assert.equal(llave[0]?.severity, "bad");
+  });
+
+  it("TOR-27 — validarAsignacionHorarioPartido rechaza cuarto después de la semi dependiente", () => {
+    const cuarto: PartidoProgramable = {
+      id: "c23",
+      ronda: "CUARTOS",
+      orden: 23,
+      estado_partido: "Programado",
+    };
+    const semi: PartidoProgramable = {
+      id: "s25",
+      ronda: "SEMIS",
+      orden: 25,
+      estado_partido: "Programado",
+      cancha_asignada: "QA Club — 1",
+      fecha_partido: "2026-12-20T11:00:00-03:00",
+    };
+    const feeders = new Map<number, number[]>([[25, [23]]]);
+
+    const msg = validarAsignacionHorarioPartido(
+      [cuarto, semi],
+      "c23",
+      "QA Club — 1",
+      "2026-12-20T12:30:00-03:00",
+      {
+        duracionMinutos: 90,
+        descansoModo: "tras_fin_120",
+        feedersByMatchNo: feeders,
+      },
+    );
+    assert.match(String(msg), /Orden de llave/);
   });
 });
 

@@ -4,6 +4,7 @@ import {
   esRondaCampeonato,
   esRondaDeZona,
   evaluarDescansoInsuficiente,
+  limiteClasificacion11EsObligatorio,
   minutosDeModoDescanso,
   minutosDesdeHora,
   ordenRondaProgramador,
@@ -715,6 +716,21 @@ function buscarOlaSimultanea(
   return null;
 }
 
+function feedersListosParaProgramar(
+  partido: PartidoProgramable,
+  todos: PartidoProgramable[],
+  feedersByMatchNo: Map<number, number[]>,
+): boolean {
+  const orden = Number(partido.orden);
+  if (!Number.isFinite(orden) || orden <= 0) return true;
+  const feeders = feedersByMatchNo.get(orden) || [];
+  if (!feeders.length) return true;
+  return feeders.every((fOrden) => {
+    const feeder = todos.find((p) => Number(p.orden) === fOrden);
+    return Boolean(feeder?.fecha_partido && feeder?.cancha_asignada);
+  });
+}
+
 function buscarSlotIndividual(
   slots: SlotProgramacion[],
   ocupados: Set<string>,
@@ -728,6 +744,11 @@ function buscarSlotIndividual(
     ordenPartido?: number;
     todos?: PartidoProgramable[];
     dependentsByMatchNo?: Map<number, number[]>;
+  },
+  validacionZona?: {
+    ronda?: string;
+    fechaInicio?: string | null;
+    respetarLimiteClasificacion?: boolean;
   },
 ): SlotProgramacion | null {
   for (const slot of slots) {
@@ -755,6 +776,19 @@ function buscarSlotIndividual(
       }
     }
     if (tooEarly) continue;
+    if (
+      validacionZona?.respetarLimiteClasificacion &&
+      validacionZona.fechaInicio &&
+      esRondaZona(validacionZona.ronda) &&
+      clasificacionSuperaLimiteLocal({
+        fechaInicio: validacionZona.fechaInicio,
+        fechaPartido: wall.fecha,
+        startMin,
+        duracionMinutos,
+      })
+    ) {
+      continue;
+    }
     if (
       !parejasPueden(
         historial,
@@ -1052,10 +1086,16 @@ export function buildOcupadosDesdePartidos(
  * - descanso FAP (1 h tras fin estimado; 4 h / 6 h si 3 partidos el mismo día)
  * - zona de 4: oleadas simultáneas (1vs4+2vs3, luego GvsG+PvsP)
  */
+export type FinWallClockOpciones = {
+  descansoMinutos?: number;
+  descansoModo?: ModoDescanso;
+};
+
 /** Fin estimado (wall-clock) de partidos ya asignados, para notBefore de fases posteriores. */
 export function finWallClockTrasPartidos(
   partidos: PartidoProgramable[],
   duracionMinutos: number,
+  opciones?: FinWallClockOpciones,
 ): { fecha: string; startMin: number }[] {
   const duracion = Math.max(30, duracionMinutos || 75);
   const out: { fecha: string; startMin: number }[] = [];
@@ -1063,12 +1103,84 @@ export function finWallClockTrasPartidos(
     if (!p.fecha_partido) continue;
     const parsed = parseFechaPartidoIso(String(p.fecha_partido));
     if (!parsed) continue;
-    out.push({
-      fecha: parsed.fecha,
-      startMin: parsed.startMin + duracion,
-    });
+    if (opciones) {
+      out.push(
+        minInicioDespuesDePartido(
+          parsed.fecha,
+          parsed.startMin,
+          duracion,
+          opciones.descansoMinutos,
+          opciones.descansoModo,
+        ),
+      );
+    } else {
+      out.push({
+        fecha: parsed.fecha,
+        startMin: parsed.startMin + duracion,
+      });
+    }
   }
   return out;
+}
+
+/** Mínimo inicio de llave según el último partido de zona de cada pareja ya programada. */
+function notBeforeDesdeUltimaZonaPorEquipos(
+  partido: PartidoProgramable,
+  todos: PartidoProgramable[],
+  duracionZonaMinutos: number,
+  descansoMinutos?: number,
+  descansoModo?: ModoDescanso,
+): { fecha: string; startMin: number }[] {
+  if (esRondaZona(partido.ronda)) return [];
+  const equipos = equiposDePartido(partido);
+  if (!equipos.length) return [];
+
+  const out: { fecha: string; startMin: number }[] = [];
+  const duracion = Math.max(30, duracionZonaMinutos || 75);
+
+  for (const eq of equipos) {
+    let ultimo: { fecha: string; startMin: number } | null = null;
+    let ultimoFin = -1;
+
+    for (const p of todos) {
+      if (!esRondaZona(p.ronda)) continue;
+      if (!equiposDePartido(p).includes(eq)) continue;
+      if (!p.fecha_partido) continue;
+      const parsed = parseFechaPartidoIso(String(p.fecha_partido));
+      if (!parsed) continue;
+
+      const finEnDia = parsed.startMin + duracion;
+      const finRank =
+        new Date(`${parsed.fecha}T00:00:00`).getTime() + finEnDia * 60_000;
+      if (!ultimo || finRank > ultimoFin) {
+        ultimo = parsed;
+        ultimoFin = finRank;
+      }
+    }
+
+    if (ultimo) {
+      out.push(
+        minInicioDespuesDePartido(
+          ultimo.fecha,
+          ultimo.startMin,
+          duracion,
+          descansoMinutos,
+          descansoModo,
+        ),
+      );
+    }
+  }
+  return out;
+}
+
+function partidoAntesDeInstante(
+  parsed: { fecha: string; startMin: number },
+  min: { fecha: string; startMin: number },
+): boolean {
+  return (
+    parsed.fecha < min.fecha ||
+    (parsed.fecha === min.fecha && parsed.startMin < min.startMin)
+  );
 }
 
 export function asignarHorariosAPartidos(
@@ -1089,6 +1201,10 @@ export function asignarHorariosAPartidos(
     distribucion?: DistribucionProgramacion;
     /** No asignar antes de estos instantes (p. ej. fin de todas las zonas). */
     notBeforeExtra?: { fecha: string; startMin: number }[];
+    /** Duración de partidos de zona (p. ej. 75′) al calcular descanso hacia la llave. */
+    duracionZonaMinutos?: number;
+    fechaInicio?: string | null;
+    alcanceTorneo?: string | null;
     /** Solo agenda estos IDs (el resto del array alimenta feeders/ocupación). */
     limitarAIds?: Set<string>;
   },
@@ -1102,6 +1218,24 @@ export function asignarHorariosAPartidos(
   const dependentsByMatchNo = buildDependentsByMatchNo(feedersByMatchNo);
   const permitirSinEquipos = opciones?.permitirSinEquipos === true;
   const notBeforeExtra = opciones?.notBeforeExtra || [];
+  const duracionZonaMinutos =
+    opciones?.duracionZonaMinutos ?? duracionMinutos;
+  const finTrasZonaOpciones: FinWallClockOpciones = {
+    descansoMinutos,
+    descansoModo,
+  };
+  const fechaInicio = opciones?.fechaInicio ?? null;
+  const respetarLimiteClasificacion = limiteClasificacion11EsObligatorio(
+    opciones?.alcanceTorneo,
+  );
+  const validacionZonaPara = (ronda?: string) =>
+    respetarLimiteClasificacion
+      ? {
+          ronda,
+          fechaInicio,
+          respetarLimiteClasificacion: true as const,
+        }
+      : undefined;
   const limitarAIds = opciones?.limitarAIds;
   const ocupados = new Set(ocupadosIniciales || []);
   const historial = new Map<string, PartidoParejaHistorial[]>();
@@ -1141,8 +1275,11 @@ export function asignarHorariosAPartidos(
     });
     for (const item of secuencia) {
       if (partidos[item.index].fecha_partido) continue;
+      if (!feedersListosParaProgramar(item.partido, partidos, feedersByMatchNo)) {
+        continue;
+      }
       const ids = equiposDePartido(item.partido);
-      const notBefore = notBeforeDesdeFeeders(
+      let notBefore = notBeforeDesdeFeeders(
         item.partido,
         partidos,
         feedersByMatchNo,
@@ -1150,6 +1287,23 @@ export function asignarHorariosAPartidos(
         descansoMinutos,
         descansoModo,
       );
+      if (!esRondaZona(item.partido.ronda)) {
+        notBefore = [
+          ...finWallClockTrasPartidos(
+            partidos.filter((p) => esRondaZona(p.ronda)),
+            duracionZonaMinutos,
+            finTrasZonaOpciones,
+          ),
+          ...notBeforeDesdeUltimaZonaPorEquipos(
+            item.partido,
+            partidos,
+            duracionZonaMinutos,
+            descansoMinutos,
+            descansoModo,
+          ),
+          ...notBefore,
+        ];
+      }
       const slot = buscarSlotIndividual(
         slots,
         ocupados,
@@ -1160,6 +1314,7 @@ export function asignarHorariosAPartidos(
         descansoMinutos,
         descansoModo,
         opcionesDependenciaPara(item.partido),
+        validacionZonaPara(item.partido.ronda),
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -1298,6 +1453,8 @@ export function asignarHorariosAPartidos(
         [],
         descansoMinutos,
         descansoModo,
+        undefined,
+        validacionZonaPara(item.partido.ronda),
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -1321,6 +1478,8 @@ export function asignarHorariosAPartidos(
         [],
         descansoMinutos,
         descansoModo,
+        undefined,
+        validacionZonaPara(item.partido.ronda),
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -1340,20 +1499,31 @@ export function asignarHorariosAPartidos(
     return (a.partido.orden || 0) - (b.partido.orden || 0);
   });
 
-  // La llave no puede empezar antes de que terminen las zonas del mismo lote.
+  // La llave no puede empezar antes de que terminen las zonas (+ descanso FAP).
   const notBeforeTrasZonas = [
     ...notBeforeExtra,
     ...finWallClockTrasPartidos(
       partidos.filter((p) => esRondaZona(p.ronda)),
-      duracionMinutos,
+      duracionZonaMinutos,
+      finTrasZonaOpciones,
     ),
   ];
 
   for (const item of restoOrdenado) {
     if (partidos[item.index].fecha_partido) continue;
+    if (!feedersListosParaProgramar(item.partido, partidos, feedersByMatchNo)) {
+      continue;
+    }
     const ids = equiposDePartido(item.partido);
     const notBefore = [
       ...notBeforeTrasZonas,
+      ...notBeforeDesdeUltimaZonaPorEquipos(
+        item.partido,
+        partidos,
+        duracionZonaMinutos,
+        descansoMinutos,
+        descansoModo,
+      ),
       ...notBeforeDesdeFeeders(
         item.partido,
         partidos,
@@ -1373,6 +1543,7 @@ export function asignarHorariosAPartidos(
       descansoMinutos,
       descansoModo,
       opcionesDependenciaPara(item.partido),
+      validacionZonaPara(item.partido.ronda),
     );
     if (!slot) continue;
     asignarSlotAPartido(
@@ -1794,13 +1965,19 @@ export function evaluateProgramacionIssues(
   partidos: PartidoProgramable[],
   opciones: {
     duracionMinutos: number;
+    duracionZonaMinutos?: number;
     descansoMinutos?: number;
     descansoModo?: ModoDescanso;
     fechaInicio?: string | null;
+    alcanceTorneo?: string | null;
     feedersByMatchNo?: Map<number, number[]>;
   },
 ): ProgramacionIssue[] {
   const duracion = Math.max(30, opciones.duracionMinutos || 90);
+  const duracionZona = Math.max(
+    30,
+    opciones.duracionZonaMinutos ?? duracion,
+  );
   const descanso =
     opciones.descansoMinutos ??
     (opciones.descansoModo
@@ -1934,12 +2111,58 @@ export function evaluateProgramacionIssues(
         duracionMinutos: duracion,
       })
     ) {
+      const esClubUOrganizadorLocal = !limiteClasificacion11EsObligatorio(
+        opciones.alcanceTorneo,
+      );
       issues.push({
         partido_id: id,
-        severity: "bad",
-        message:
-          "La clasificación debe terminar a las 11:00 del día siguiente al inicio del torneo",
+        severity: esClubUOrganizadorLocal ? "wait" : "bad",
+        message: esClubUOrganizadorLocal
+          ? "Recomendación FAP: la clasificación debería terminar a las 11:00 del día siguiente al inicio (torneo local)."
+          : "La clasificación debe terminar a las 11:00 del día siguiente al inicio del torneo",
       });
+    }
+
+    if (!esRondaZona(p.ronda) && equipos.length > 0) {
+      let faltaDescansoZona = false;
+      for (const eq of equipos) {
+        let ultimo: { fecha: string; startMin: number } | null = null;
+        let ultimoFin = -1;
+        for (const prev of partidos) {
+          if (!esRondaZona(prev.ronda)) continue;
+          if (!equiposDePartido(prev).includes(eq)) continue;
+          if (!prev.fecha_partido) continue;
+          const fp = parseFechaPartidoIso(String(prev.fecha_partido));
+          if (!fp) continue;
+          const finRank =
+            new Date(`${fp.fecha}T00:00:00`).getTime() +
+            (fp.startMin + duracionZona) * 60_000;
+          if (!ultimo || finRank > ultimoFin) {
+            ultimo = fp;
+            ultimoFin = finRank;
+          }
+        }
+        if (!ultimo) continue;
+        const minInicio = minInicioDespuesDePartido(
+          ultimo.fecha,
+          ultimo.startMin,
+          duracionZona,
+          opciones.descansoMinutos,
+          opciones.descansoModo,
+        );
+        if (partidoAntesDeInstante(parsed, minInicio)) {
+          faltaDescansoZona = true;
+          break;
+        }
+      }
+      if (faltaDescansoZona) {
+        issues.push({
+          partido_id: id,
+          severity: "bad",
+          message:
+            "Descanso insuficiente desde el último partido de zona del clasificado",
+        });
+      }
     }
   }
 
@@ -1950,7 +2173,116 @@ export function evaluateProgramacionIssues(
     const prev = byId.get(issue.partido_id);
     if (!prev || rank(issue.severity) > rank(prev.severity)) {
       byId.set(issue.partido_id, issue);
+    } else if (
+      prev &&
+      issue.severity === "bad" &&
+      prev.severity === "bad" &&
+      issue.message.includes("último partido de zona")
+    ) {
+      byId.set(issue.partido_id, issue);
     }
   }
   return [...byId.values()];
+}
+
+/**
+ * Valida una asignación manual (drag / slot) antes de persistir.
+ * Bloquea orden de llave inválido y conflictos graves del partido objetivo.
+ */
+export function validarAsignacionHorarioPartido(
+  partidos: PartidoProgramable[],
+  partidoId: string,
+  canchaLabel: string,
+  fechaIso: string,
+  opciones: {
+    duracionMinutos: number;
+    duracionZonaMinutos?: number;
+    descansoMinutos?: number;
+    descansoModo?: ModoDescanso;
+    feedersByMatchNo?: Map<number, number[]>;
+    fechaInicio?: string | null;
+  },
+): string | null {
+  const cancha = String(canchaLabel || "").trim();
+  const fecha = String(fechaIso || "").trim();
+  if (!cancha || !fecha) return "cancha_label y fecha_iso son obligatorios";
+
+  const targetId = String(partidoId);
+  const target = partidos.find(
+    (p) => String((p as { id?: string }).id) === targetId,
+  );
+  if (!target) return "Partido no encontrado";
+
+  const parsed = parseFechaPartidoIso(fecha);
+  if (!parsed) return "Fecha/hora inválida";
+
+  const duracion = Math.max(30, opciones.duracionMinutos || 90);
+  const descanso =
+    opciones.descansoMinutos ??
+    (opciones.descansoModo
+      ? minutosDeModoDescanso(opciones.descansoModo)
+      : FAP_DESCANSO_MINUTOS_TRAS_FIN);
+  const feeders = opciones.feedersByMatchNo || new Map<number, number[]>();
+  const dependents = buildDependentsByMatchNo(feeders);
+
+  const orden = Number(target.orden);
+  const draft = partidos.map((p) =>
+    String((p as { id?: string }).id) === targetId
+      ? {
+          ...p,
+          cancha_asignada: cancha,
+          fecha_partido: fecha,
+        }
+      : p,
+  );
+
+  if (Number.isFinite(orden) && orden > 0) {
+    for (const depOrden of feeders.get(orden) || []) {
+      const feeder = draft.find((x) => Number(x.orden) === depOrden);
+      if (!feeder?.fecha_partido) continue;
+      const fp = parseFechaPartidoIso(String(feeder.fecha_partido));
+      if (!fp) continue;
+      const minInicio = minInicioDespuesDePartido(
+        fp.fecha,
+        fp.startMin,
+        duracion,
+        descanso,
+        opciones.descansoModo,
+      );
+      if (
+        parsed.fecha < minInicio.fecha ||
+        (parsed.fecha === minInicio.fecha && parsed.startMin < minInicio.startMin)
+      ) {
+        return `Orden de llave inválido: debe jugarse después del partido de origen #${depOrden}`;
+      }
+    }
+
+    if (
+      !slotRespetaDependientesProgramados(
+        orden,
+        parsed.fecha,
+        parsed.startMin,
+        draft,
+        dependents,
+        duracion,
+        descanso,
+        opciones.descansoModo,
+      )
+    ) {
+      return "Orden de llave inválido: un cruce posterior ya está programado antes de este horario";
+    }
+  }
+
+  const issues = evaluateProgramacionIssues(draft, {
+    duracionMinutos: duracion,
+    duracionZonaMinutos: opciones.duracionZonaMinutos ?? duracion,
+    descansoMinutos: descanso,
+    descansoModo: opciones.descansoModo,
+    fechaInicio: opciones.fechaInicio,
+    feedersByMatchNo: feeders,
+  });
+  const grave = issues.find(
+    (i) => i.partido_id === targetId && i.severity === "bad",
+  );
+  return grave?.message ?? null;
 }

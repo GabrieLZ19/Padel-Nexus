@@ -176,6 +176,26 @@ export function clasificacionSuperaLimiteLocal(input: {
   return fin > limite.getTime();
 }
 
+/**
+ * FAP estricto en torneos oficiales; en locales/privados/regional es recomendación (wait).
+ */
+export function limiteClasificacion11EsObligatorio(
+  alcance?: string | null,
+): boolean {
+  const a = String(alcance || "")
+    .trim()
+    .toLowerCase();
+  if (
+    a === "local" ||
+    a === "privado" ||
+    a === "regional" ||
+    a === "clasificatorio"
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function clasificacionSuperaLimite(
   fechaInicio: string,
   fechaPartidoIso: string,
@@ -198,10 +218,12 @@ export function sugerirCanchasYHoras(input: {
   partidos: number;
   duracionMinutos: number;
   jornadas: number;
+  canchasActuales?: number;
 }): { canchas: number; horas: number; mensaje: string } {
   const partidos = Math.max(0, Math.floor(input.partidos));
   const duracion = Math.max(30, input.duracionMinutos || 90);
   const jornadas = Math.min(4, Math.max(1, Math.floor(input.jornadas) || 1));
+  const canchasActuales = Math.max(0, Math.floor(input.canchasActuales ?? 0));
   if (partidos === 0) {
     return {
       canchas: 0,
@@ -212,11 +234,27 @@ export function sugerirCanchasYHoras(input: {
   const ocupacion = partidos * duracion;
   // Primera jornada: 08:00 hasta las 11:00 del día siguiente (27 h).
   // Cada jornada extra suma la grilla de 08:00 a 00:00 (16 h).
-  const ventana = 27 * 60 + (jornadas - 1) * 16 * 60;
-  const canchas = Math.max(1, Math.ceil(ocupacion / ventana));
-  const horas = Math.max(1, Math.ceil(ocupacion / canchas / 60));
-  const mensaje = `Con ${partidos} partidos y turnos de ${duracion} min, necesitás como mínimo ${canchas} cancha${canchas === 1 ? "" : "s"} y ${horas} hora${horas === 1 ? "" : "s"}.`;
-  return { canchas, horas, mensaje };
+  const ventanaMin = 27 * 60 + (jornadas - 1) * 16 * 60;
+  const canchas = Math.max(1, Math.ceil(ocupacion / ventanaMin));
+  const horasPorCancha = Math.max(1, Math.ceil(ocupacion / canchas / 60));
+  const ventanaHorasPorCancha = Math.max(1, Math.floor(ventanaMin / 60 / canchas));
+
+  let mensaje: string;
+  const base = `${partidos} partidos de ${duracion} min en ${jornadas} jornada${jornadas === 1 ? "" : "s"}`;
+
+  if (canchasActuales > 0 && canchasActuales < canchas) {
+    const faltan = canchas - canchasActuales;
+    mensaje = `${base}: sumá ${faltan} cancha${faltan === 1 ? "" : "s"} en Sedes y disponibilidad, o pasá a ${Math.min(4, jornadas + 1)} jornadas. Referencia: ${canchas} cancha${canchas === 1 ? "" : "s"} y ~${horasPorCancha} h de turnos por sede.`;
+  } else if (horasPorCancha > ventanaHorasPorCancha) {
+    const extra = horasPorCancha - ventanaHorasPorCancha;
+    mensaje = `${base}: adelantá el inicio o extendé el cierre del día más cargado (~${extra} h más), o activá una jornada adicional. Alternativa: ${canchas} cancha${canchas === 1 ? "" : "s"} activas en paralelo.`;
+  } else if (canchasActuales > canchas) {
+    mensaje = `${base}: con ${canchasActuales} cancha${canchasActuales === 1 ? "" : "s"} alcanza; revisá franjas horarias si queda algún partido sin slot.`;
+  } else {
+    mensaje = `${base}: alcanza con ${canchas} cancha${canchas === 1 ? "" : "s"} y franjas de ~${ventanaHorasPorCancha} h por sede (${horasPorCancha} h de turnos jugables).`;
+  }
+
+  return { canchas, horas: horasPorCancha, mensaje };
 }
 
 export function ordenDeAsignacion<
