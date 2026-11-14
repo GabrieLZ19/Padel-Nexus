@@ -64,10 +64,10 @@ describe("ENT-7 canales y metricas de campaña (feature 20.0)", () => {
     assert.match(resendCfg, /RESEND_CAMPANA_EMAIL_HABILITADO/);
   });
 
-  it("envio expone canales, forzarInApp y endpoints de retencion", () => {
+  it("envio expone canales y endpoints de retencion (ENT-25: sin forzar in-app)", () => {
     const envio = fuente("apps/api/src/services/comunicaciones.service.ts");
     assert.match(envio, /canales/);
-    assert.match(envio, /forzarInApp: true/);
+    assert.doesNotMatch(envio, /forzarInApp:\s*true/);
 
     const notif = fuente("apps/api/src/services/notificacion.service.ts");
     assert.match(notif, /forzarInApp/);

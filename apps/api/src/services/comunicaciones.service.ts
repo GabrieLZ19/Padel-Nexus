@@ -643,7 +643,6 @@ export class ComunicacionesService {
                   mensaje,
                   tipo: "info",
                   metadata,
-                  forzarInApp: true,
                 });
 
                 if (notif) {

@@ -28,6 +28,7 @@ import {
   type CanchaResumenClub,
   type FiltrosListadoClubesReserva,
 } from "../utils/filtrosClubReserva";
+import { fechaHoyArgentina } from "../utils/fechaArgentina";
 
 export interface CrearClubDTO {
   nombre: string;
@@ -1723,10 +1724,12 @@ export class ClubService {
       .order("fecha_inicio", { ascending: false })
       .order("hora_inicio", { ascending: true });
 
-    if (opts?.soloActivos !== false) {
+    const soloActivos = opts?.soloActivos !== false;
+    if (soloActivos) {
       q = q.eq("activo", true);
-    }
-    if (opts?.desde) {
+      const desdeVigencia = opts?.desde ?? fechaHoyArgentina();
+      q = q.gte("fecha_fin", desdeVigencia);
+    } else if (opts?.desde) {
       q = q.gte("fecha_fin", opts.desde);
     }
     if (opts?.hasta) {

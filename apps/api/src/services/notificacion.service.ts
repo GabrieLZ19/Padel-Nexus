@@ -10,7 +10,7 @@ export class NotificacionService {
     mensaje: string;
     tipo?: "info" | "success" | "warning" | "error";
     metadata?: Record<string, any>;
-    /** Campañas institucionales: siempre crean aviso in-app aunque push esté desactivado. */
+    /** Solo avisos críticos de sistema; campañas y flujos masivos respetan preferencias push. */
     forzarInApp?: boolean;
   }) {
     const {
