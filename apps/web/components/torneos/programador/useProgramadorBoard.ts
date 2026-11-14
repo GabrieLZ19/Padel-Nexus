@@ -308,7 +308,11 @@ export function useProgramadorBoard(torneoId: string) {
         scheduleBoardSync();
       } catch (e: unknown) {
         if (prev) setBoard(prev);
-        sileo.error({ title: apiErrorMessage(e, "No se pudo asignar") });
+        const msg = apiErrorMessage(e, "No se pudo asignar");
+        sileo.error({
+          title: "No se pudo asignar",
+          description: msg,
+        });
       }
     },
     [isReadOnly, torneoId, scheduleBoardSync],

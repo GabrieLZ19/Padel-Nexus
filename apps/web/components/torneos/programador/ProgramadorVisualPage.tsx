@@ -59,6 +59,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
   const [confirmPublicar, setConfirmPublicar] = useState(false);
   const [confirmEdicion, setConfirmEdicion] = useState(false);
   const [confirmLimpiar, setConfirmLimpiar] = useState(false);
+  const [quitarPartido, setQuitarPartido] = useState<BoardPartido | null>(null);
   const [sedesAbiertas, setSedesAbiertas] = useState(false);
   const [highlightedPartidoId, setHighlightedPartidoId] = useState<
     string | null
@@ -222,7 +223,10 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
               day={activeDay}
               readOnly={isReadOnly}
               highlightedPartidoId={highlightedPartidoId}
-              onRemove={(id) => void desasignar(id)}
+              onRemove={(id) => {
+                const partido = board.partidos.find((p) => p.id === id);
+                if (partido) setQuitarPartido(partido);
+              }}
               partidoEnSlot={partidoEnSlot}
               issueByPartido={issueByPartido}
             />
@@ -257,6 +261,25 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
         onConfirm={() => {
           setConfirmPublicar(false);
           void publicar();
+        }}
+      />
+
+      <FeedbackModal
+        isOpen={Boolean(quitarPartido)}
+        onClose={() => setQuitarPartido(null)}
+        type="warning"
+        title="¿Quitar de la grilla?"
+        description={
+          quitarPartido
+            ? `${quitarPartido.label} vuelve a Pendientes. El cambio se guarda al instante en el servidor; no hace falta «Guardar borrador».`
+            : ""
+        }
+        confirmText="Quitar"
+        cancelText="Cancelar"
+        onConfirm={() => {
+          const id = quitarPartido?.id;
+          setQuitarPartido(null);
+          if (id) void desasignar(id);
         }}
       />
 

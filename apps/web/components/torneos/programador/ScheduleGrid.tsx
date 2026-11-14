@@ -2,7 +2,7 @@
 
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, GripVertical, X } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import type {
   BoardPartido,
@@ -73,60 +73,68 @@ function BookingCard({
       ref={setRefs}
       id={`booking-card-${partido.id}`}
       style={style}
-      className={`prog-booking relative h-full min-h-[52px] rounded-lg border p-1.5 text-left ${severityClass(
+      className={`prog-booking relative flex h-full min-h-[52px] flex-col rounded-lg border p-1.5 text-left ${severityClass(
         issue?.severity,
-      )} ${highlighted ? "outline outline-2 outline-offset-1 outline-brand-chartreuse" : ""} ${
-        !readOnly ? "cursor-grab active:cursor-grabbing" : ""
-      }`}
+      )} ${highlighted ? "outline outline-2 outline-offset-1 outline-brand-chartreuse" : ""}`}
       title={issue?.message || partido.label}
-      {...listeners}
-      {...attributes}
     >
-      {hasIssue ? (
-        <AlertTriangle
-          className={`absolute left-0.5 top-0.5 size-3 ${
-            issue.severity === "bad" ? "text-red-400" : "text-amber-300"
-          }`}
-          aria-hidden
-        />
-      ) : null}
-      {!readOnly && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="absolute right-0.5 top-0.5 rounded p-0.5 text-gray-400 hover:bg-black/30 hover:text-white cursor-pointer"
-          aria-label="Quitar de la grilla"
-        >
-          <X className="size-3" />
-        </button>
-      )}
-      <p
-        className={`pr-4 text-[10px] font-bold uppercase opacity-80 ${
-          hasIssue ? "pl-4" : ""
-        }`}
-      >
-        {partido.ronda_etiqueta || partido.ronda}
-      </p>
-      <p className="line-clamp-2 text-[11px] font-semibold leading-tight">
-        {partido.label_a}
-      </p>
-      <p className="text-[10px] opacity-70">vs</p>
-      <p className="line-clamp-2 text-[11px] font-semibold leading-tight">
-        {partido.label_b}
-      </p>
-      {hasIssue ? (
-        <p
-          className={`mt-1 text-[9px] leading-tight line-clamp-2 ${
-            issue.severity === "bad" ? "text-red-300" : "text-amber-200"
-          }`}
-        >
-          {issue.message}
+      <div className="relative z-20 mb-0.5 flex shrink-0 items-center gap-0.5 border-b border-white/10 pb-0.5">
+        {!readOnly ? (
+          <button
+            type="button"
+            className="touch-none shrink-0 cursor-grab rounded p-0.5 text-gray-500 hover:bg-black/20 hover:text-white active:cursor-grabbing"
+            aria-label="Arrastrar para mover de horario"
+            {...listeners}
+            {...attributes}
+          >
+            <GripVertical className="size-3.5" aria-hidden />
+          </button>
+        ) : null}
+        {hasIssue ? (
+          <AlertTriangle
+            className={`size-3 shrink-0 ${
+              issue.severity === "bad" ? "text-red-400" : "text-amber-300"
+            }`}
+            aria-hidden
+          />
+        ) : null}
+        <p className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase opacity-80">
+          {partido.ronda_etiqueta || partido.ronda}
         </p>
-      ) : null}
+        {!readOnly ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="relative z-30 shrink-0 cursor-pointer rounded p-0.5 text-gray-400 hover:bg-black/30 hover:text-white"
+            aria-label="Quitar de la grilla"
+            title="Quitar horario y devolver a Pendientes"
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
+      <div className="min-h-0 min-w-0 flex-1">
+        <p className="line-clamp-2 text-[11px] font-semibold leading-tight">
+          {partido.label_a}
+        </p>
+        <p className="text-[10px] opacity-70">vs</p>
+        <p className="line-clamp-2 text-[11px] font-semibold leading-tight">
+          {partido.label_b}
+        </p>
+        {hasIssue ? (
+          <p
+            className={`mt-1 line-clamp-2 text-[9px] leading-tight ${
+              issue.severity === "bad" ? "text-red-300" : "text-amber-200"
+            }`}
+          >
+            {issue.message}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
