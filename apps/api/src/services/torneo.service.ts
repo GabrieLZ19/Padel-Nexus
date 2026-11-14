@@ -1066,6 +1066,29 @@ export class TorneoService {
 
     if (cuadroError)
       throw new Error(`Error al inicializar el cuadro: ${cuadroError.message}`);
+
+    if (torneo.club_id) {
+      const { inicializarSedesTorneoOrganizador } = await import(
+        "../utils/inicializarSedesTorneoOrganizador"
+      );
+      await inicializarSedesTorneoOrganizador(
+        {
+          id: torneo.id,
+          club_id: torneo.club_id,
+          fecha: torneo.fecha,
+          fecha_fin: (torneo as { fecha_fin?: string | null }).fecha_fin,
+          dias_juego: torneo.dias_juego as string[] | null,
+          categoria: torneo.categoria,
+        },
+        String(torneo.club_id),
+      ).catch((err: unknown) => {
+        console.error(
+          "No se pudo inicializar sedes/disponibilidad del organizador:",
+          err,
+        );
+      });
+    }
+
     return torneo;
   }
 

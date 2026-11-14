@@ -11,7 +11,14 @@ export interface FilaPlanillaInscripcion {
   email?: string;
   telefono?: string;
   direccion?: string;
+  localidadResidencia?: string;
+  provinciaResidencia?: string;
 }
+
+export const ARCHIVO_PLANTILLA_FEDERACION_NACIONAL =
+  "PLANILLA - FED NACIONAL.xls";
+export const ARCHIVO_PLANTILLA_CLUB_ASOC_PROVINCIAL =
+  "PLANILLA - CLUB - ASOC PCIAL.xls";
 
 export interface ParsePlanillaResult {
   tipo: TipoPlanillaInscripcion;
@@ -97,7 +104,33 @@ function parseFechaPlanilla(valor: unknown): string | undefined {
 function detectarTipoPlanilla(headerRow: string[]): TipoPlanillaInscripcion {
   const joined = headerRow.join(" ").toUpperCase();
   if (joined.includes("LETRA")) return "fap";
+  if (joined.includes("PAREJAS")) return "general";
   return "general";
+}
+
+/** Columna `LOCALIDAD | PROVINCIA` (tolerando typo `LCOALIDAD`). */
+export function parseLocalidadProvinciaCelda(valor: unknown): {
+  localidad?: string;
+  provincia?: string;
+} {
+  const raw = normalizarTexto(valor);
+  if (!raw) return {};
+
+  const parts = raw
+    .split("|")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (parts.length >= 2) {
+    return {
+      localidad: parts[0],
+      provincia: parts[parts.length - 1],
+    };
+  }
+  if (parts.length === 1) {
+    return { provincia: parts[0] };
+  }
+  return {};
 }
 
 function indiceColumna(headerRow: string[], patron: RegExp): number {
@@ -127,7 +160,7 @@ export function parsearFilasPlanilla(
   }
 
   const tipo = detectarTipoPlanilla(headerRow);
-  const idxLetraOrden = indiceColumna(headerRow, /LETRA|ORDEN/);
+  const idxLetraOrden = indiceColumna(headerRow, /LETRA|ORDEN|PAREJAS/);
   const idxAsociacion = indiceColumna(headerRow, /ASOCIACI/);
   const idxNombre = indiceColumna(headerRow, /APELLIDO|NOMBRE/);
   const idxDni = indiceColumna(headerRow, /DNI/);
@@ -136,6 +169,10 @@ export function parsearFilasPlanilla(
   const idxEmail = indiceColumna(headerRow, /EMAIL|CORREO|MAIL/);
   const idxTelefono = indiceColumna(headerRow, /TELEFONO|TEL/);
   const idxDireccion = indiceColumna(headerRow, /DIRECC/);
+  const idxLocalidadProvincia = indiceColumna(
+    headerRow,
+    /LCOALIDAD|LOCALIDAD.*PROVINCIA/,
+  );
 
   const filas: FilaPlanillaInscripcion[] = [];
   /** En planillas FAP, LETRA/ASOCIACIÓN suelen venir solo en la 1ª fila de la pareja. */
@@ -163,6 +200,24 @@ export function parsearFilasPlanilla(
         : undefined;
     if (asociacionRaw) ultimaAsociacion = asociacionRaw;
 
+    const { localidad, provincia } =
+      idxLocalidadProvincia >= 0
+        ? parseLocalidadProvinciaCelda(row[idxLocalidadProvincia])
+        : {};
+
+    let direccion =
+      idxDireccion >= 0
+        ? normalizarTexto(row[idxDireccion]) || undefined
+        : undefined;
+
+    if (!direccion && (localidad || provincia)) {
+      if (localidad && provincia) {
+        direccion = `${localidad}, ${provincia}`;
+      } else {
+        direccion = localidad || provincia;
+      }
+    }
+
     filas.push({
       fila: r + 1,
       letraOrden: letraRaw || ultimaLetra,
@@ -183,10 +238,9 @@ export function parsearFilasPlanilla(
         idxTelefono >= 0
           ? normalizarTexto(row[idxTelefono]) || undefined
           : undefined,
-      direccion:
-        idxDireccion >= 0
-          ? normalizarTexto(row[idxDireccion]) || undefined
-          : undefined,
+      direccion,
+      localidadResidencia: localidad,
+      provinciaResidencia: provincia,
     });
   }
 
@@ -239,6 +293,12 @@ export function sanitizarFilaPlanillaInscripcion(
     direccion: fila.direccion
       ? sanearValorCeldaPlanilla(fila.direccion)
       : undefined,
+    localidadResidencia: fila.localidadResidencia
+      ? sanearValorCeldaPlanilla(fila.localidadResidencia)
+      : undefined,
+    provinciaResidencia: fila.provinciaResidencia
+      ? sanearValorCeldaPlanilla(fila.provinciaResidencia)
+      : undefined,
   };
 }
 
@@ -260,7 +320,12 @@ export function agruparFilasEnParejas(
   return grupos;
 }
 
-export { parseNombreCompleto, normalizarDni, resolverProvinciaDesdePlanilla, esResidenciaPlaceholder };
+export {
+  parseNombreCompleto,
+  normalizarDni,
+  resolverProvinciaDesdePlanilla,
+  esResidenciaPlaceholder,
+};
 
 function esResidenciaPlaceholder(valor?: string | null): boolean {
   const v = String(valor || "")
@@ -270,8 +335,8 @@ function esResidenciaPlaceholder(valor?: string | null): boolean {
 }
 
 /**
- * Provincia para denominación nacional: SOLO columna ASOCIACIÓN de la planilla.
- * No inventar ni usar DIRECCIÓN. Si viene vacía, el caller usa lugar_residencia existente.
+ * Provincia/residencia: ASOCIACIÓN (nacional) o `LOCALIDAD | PROVINCIA` (clubes)
+ * cuando no hay asociación ni DIRECCIÓN usable.
  */
 function resolverProvinciaDesdePlanilla(
   fila: FilaPlanillaInscripcion,
@@ -279,6 +344,14 @@ function resolverProvinciaDesdePlanilla(
   const asociacion = String(fila.asociacion || "")
     .trim()
     .replace(/\s+/g, " ");
-  if (!asociacion || esResidenciaPlaceholder(asociacion)) return null;
-  return asociacion;
+  if (asociacion && !esResidenciaPlaceholder(asociacion)) return asociacion;
+
+  const provinciaLoc = String(fila.provinciaResidencia || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (provinciaLoc && !esResidenciaPlaceholder(provinciaLoc)) {
+    return provinciaLoc;
+  }
+
+  return null;
 }

@@ -192,6 +192,8 @@ export class ReservaService {
     clubId: string,
     fecha: string,
   ): Promise<SlotDisponible[]> {
+    await ClubService.assertClubReservablePublico(clubId);
+
     // Calcular el día de la semana (0=Domingo, 1=Lunes, ..., 6=Sábado)
     const fechaDate = new Date(fecha + "T12:00:00Z");
     const diaSemana = fechaDate.getUTCDay();
@@ -352,6 +354,7 @@ export class ReservaService {
 
     const clubId = (turno.canchas as { club_id?: string } | null)?.club_id;
     if (clubId) {
+      await ClubService.assertClubReservablePublico(clubId);
       const bloqueo = await ClubService.slotEstaBloqueado(
         clubId,
         turno.cancha_id,

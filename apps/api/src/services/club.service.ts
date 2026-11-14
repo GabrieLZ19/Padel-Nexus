@@ -47,9 +47,16 @@ export interface CrearClubDTO {
   suscripcion_sin_comisiones?: boolean;
   pago_transferencia_habilitado?: boolean;
   pago_efectivo_habilitado?: boolean;
+  es_adherido?: boolean;
+  creado_por_club_id?: string | null;
+  creado_por_entidad_id?: string | null;
 }
 
 export type ActualizarClubDTO = Partial<CrearClubDTO>;
+
+export type ContextoCrearClub =
+  | { modo: "federacion" }
+  | { modo: "sede_admin_club"; clubPadreId: string };
 
 export interface ClubCercano {
   id: string;
@@ -196,6 +203,41 @@ async function resolverCoordenadas(
 
 
 export class ClubService {
+  /** Bloquea reservas y ficha publica para sedes no adheridas. */
+  static async assertClubReservablePublico(clubId: string): Promise<void> {
+    const { data, error } = await supabaseAdmin
+      .from("clubes")
+      .select("estado, es_adherido")
+      .eq("id", clubId)
+      .maybeSingle();
+
+    if (error || !data) {
+      throw new Error("Club no encontrado.");
+    }
+    if (data.estado !== "Activo" || data.es_adherido !== true) {
+      throw new Error("Este club no está disponible para reservas online.");
+    }
+  }
+
+  static async promoverClubAAdherido(id: string) {
+    const actual = await ClubService.obtenerClubPorId(id);
+    if ((actual as { es_adherido?: boolean }).es_adherido === true) {
+      return actual;
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("clubes")
+      .update({ es_adherido: true })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`No se pudo promover el club a adherido: ${error.message}`);
+    }
+    return data;
+  }
+
   /**
    * Busca clubes cercanos a una coordenada dada usando la función RPC de Haversine.
    */
@@ -324,7 +366,8 @@ export class ClubService {
     let query = supabaseAdmin
       .from("clubes")
       .select("*, canchas(tipo_suelo, techada, activa)")
-      .eq("estado", "Activo");
+      .eq("estado", "Activo")
+      .eq("es_adherido", true);
     query = ClubService.aplicarFiltrosNombreProvincia(query, filtros);
 
     const { data, error } = await query;
@@ -376,6 +419,7 @@ export class ClubService {
           .from("clubes")
           .select("*, canchas(tipo_suelo, techada, activa)")
           .eq("estado", "Activo")
+          .eq("es_adherido", true)
           .in("id", chunk);
         query = ClubService.aplicarFiltrosNombreProvincia(query, filtros);
         const { data, error } = await query;
@@ -388,6 +432,7 @@ export class ClubService {
       .from("clubes")
       .select("*, canchas(tipo_suelo, techada, activa)")
       .eq("estado", "Activo")
+      .eq("es_adherido", true)
       .or("latitud.is.null,longitud.is.null");
     querySinCoords = ClubService.aplicarFiltrosNombreProvincia(
       querySinCoords,
@@ -598,20 +643,59 @@ export class ClubService {
     };
   }
 
-  static async crearClub(datos: CrearClubDTO) {
+  static async crearClub(
+    datos: CrearClubDTO,
+    contexto: ContextoCrearClub = { modo: "federacion" },
+  ) {
     const cantidadCanchas = Math.max(0, Number(datos.canchas) || 0);
-    const suscripcion = Boolean(datos.suscripcion_sin_comisiones);
 
-    // Auto-vincular asociación de la provincia si no vino especificada
+    let esAdherido = datos.es_adherido ?? true;
+    let creadoPorClubId: string | null = datos.creado_por_club_id ?? null;
+    let creadoPorEntidadId: string | null = datos.creado_por_entidad_id ?? null;
+    let suscripcion = Boolean(datos.suscripcion_sin_comisiones);
+    let pagoTransferencia = Boolean(datos.pago_transferencia_habilitado);
+    let pagoEfectivo = Boolean(datos.pago_efectivo_habilitado);
+
     let asociacionId = datos.asociacion_id || null;
-    if (!asociacionId && datos.provincia) {
+    let provincia = datos.provincia;
+    let localidad = datos.localidad;
+
+    if (contexto.modo === "sede_admin_club") {
+      const padre = (await ClubService.obtenerClubPorId(
+        contexto.clubPadreId,
+      )) as Record<string, unknown>;
+      const asocPadre = padre.asociacion_id;
+      esAdherido = false;
+      creadoPorClubId = contexto.clubPadreId;
+      creadoPorEntidadId =
+        creadoPorEntidadId ||
+        (typeof asocPadre === "string" ? asocPadre : null) ||
+        null;
+      suscripcion = false;
+      pagoTransferencia = false;
+      pagoEfectivo = false;
+      if (!asociacionId && typeof asocPadre === "string") {
+        asociacionId = asocPadre;
+      }
+      if (!provincia?.trim() && typeof padre.provincia === "string") {
+        provincia = padre.provincia;
+      }
+      if (!localidad?.trim() && typeof padre.localidad === "string") {
+        localidad = padre.localidad;
+      }
+    } else if (creadoPorEntidadId == null && asociacionId) {
+      creadoPorEntidadId = asociacionId;
+    }
+
+  // Auto-vincular asociación de la provincia si no vino especificada
+    if (!asociacionId && provincia) {
       try {
         const { data: asociaciones } = await supabaseAdmin
           .from("asociaciones")
           .select("id, provincia");
         if (asociaciones && asociaciones.length > 0) {
           const match = asociaciones.find((a) =>
-            mismaProvincia(a.provincia, datos.provincia),
+            mismaProvincia(a.provincia, provincia),
           );
           if (match) {
             asociacionId = match.id;
@@ -639,8 +723,8 @@ export class ClubService {
       const coords = await resolverCoordenadas(
         datos.direccion,
         datos.codigo_postal,
-        datos.localidad,
-        datos.provincia,
+        localidad,
+        provincia,
       );
       if (coords) {
         latitudFinal = coords.latitud;
@@ -653,18 +737,19 @@ export class ClubService {
       .insert([
         {
           ...datos,
+          provincia,
+          localidad,
           asociacion_id: asociacionId,
           latitud: latitudFinal,
           longitud: longitudFinal,
           canchas: cantidadCanchas,
           estado: datos.estado || "Activo",
+          es_adherido: esAdherido,
+          creado_por_club_id: creadoPorClubId,
+          creado_por_entidad_id: creadoPorEntidadId,
           suscripcion_sin_comisiones: suscripcion,
-          pago_transferencia_habilitado: suscripcion
-            ? Boolean(datos.pago_transferencia_habilitado)
-            : false,
-          pago_efectivo_habilitado: suscripcion
-            ? Boolean(datos.pago_efectivo_habilitado)
-            : false,
+          pago_transferencia_habilitado: suscripcion ? pagoTransferencia : false,
+          pago_efectivo_habilitado: suscripcion ? pagoEfectivo : false,
         },
       ])
       .select()
@@ -707,6 +792,9 @@ export class ClubService {
 
   static async actualizarClub(id: string, datos: ActualizarClubDTO) {
     const payload: ActualizarClubDTO = { ...datos };
+    delete payload.es_adherido;
+    delete payload.creado_por_club_id;
+    delete payload.creado_por_entidad_id;
     if (payload.canchas !== undefined) {
       payload.canchas = Number(payload.canchas) || 0;
     }

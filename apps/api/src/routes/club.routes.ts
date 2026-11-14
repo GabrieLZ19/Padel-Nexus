@@ -5,6 +5,7 @@ import {
   createClub,
   updateClub,
   deleteClub,
+  promoverClubAdherido,
   getCanchasPorClub,
   createCancha,
   updateCancha,
@@ -23,6 +24,14 @@ const router = Router();
 
 // El listado y la ficha se leen sin sesión. Reservar un turno sigue pidiendo cuenta.
 router.get("/", optionalAuthenticate, getAllClubes);
+
+router.patch(
+  "/:id/promover-adherido",
+  authenticate,
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  promoverClubAdherido,
+);
+
 router.get("/:id", optionalAuthenticate, limitarClubAProvincia, getClubById);
 router.get(
   "/:id/canchas",
@@ -36,7 +45,12 @@ router.use("/:id", authenticate, limitarClubAProvincia);
 router.post(
   "/",
   authenticate,
-  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  authorize([
+    "superadmin",
+    "admin_federacion",
+    "admin_provincial",
+    "admin_club",
+  ]),
   createClub,
 );
 

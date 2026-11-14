@@ -148,8 +148,26 @@ Tickets: TOR-27, TOR-34, TOR-4, TOR-33.
 - `ProgramadorVisualPage`: `FeedbackModal` al quitar — aclara que se persiste al instante y no requiere «Guardar borrador»
 - Test: `apps/web/test/tor33ScheduleGrid.test.ts`
 
-**Lote 5 — COMPLETADO** (TOR-27, TOR-34, TOR-4, TOR-33). Siguiente: **Lote 6** (CLI-2, CLI-1).
+**Lote 5 — COMPLETADO** (TOR-27, TOR-34, TOR-4, TOR-33).
 
-## Lotes 6–8 — PENDIENTE
+## Lote 6 — COMPLETADO (13/11/2026) — CLI-2, CLI-1
+
+### CLI-2 (canchas/sedes vs adheridos)
+
+- Migraciones: `cli2_clubes_adherido_sedes`, `cli2_buscar_clubes_cercanos_adheridos`
+- Backend: sedes `admin_club`, filtro `/reservar`, `promover-adherido`, init `torneo_sedes` + disponibilidad
+- Front: dashboard clubes, errores API Paso1/Sedes
+- Tests: `apps/api/test/cli2ClubesAdheridoSede.test.ts`
+
+### CLI-1 (planillas oficiales)
+
+- Plantillas en `apps/web/public/plantillas/inscripciones/`: `PLANILLA - FED NACIONAL.xls`, `PLANILLA - CLUB - ASOC PCIAL.xls`
+- Parser: columna `PAREJAS`, `LCOALIDAD | PROVINCIA`, residencia en `lugar_residencia` vía `resolverProvinciaDesdePlanilla`
+- Descarga: nombres legibles «Planilla de inscripción · …»
+- Tests: `apps/api/test/cli1PlanillaOficial.test.ts`, `apps/web/test/cli1PlanillaUrls.test.ts`
+
+Siguiente: **Lote 7** (ENZO, ENT, RES).
+
+## Lotes 7–8 — PENDIENTE
 
 Ver plan en Cursor (`re-test_13-11_correction_plan`).
