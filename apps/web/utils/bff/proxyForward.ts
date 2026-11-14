@@ -17,7 +17,12 @@ function filterRequestHeaders(incoming: Headers): Headers {
   const out = new Headers();
   incoming.forEach((value, key) => {
     const lower = key.toLowerCase();
-    if (HOP_BY_HOP.has(lower) || lower === "host" || lower === "content-length") {
+    if (
+      HOP_BY_HOP.has(lower) ||
+      lower === "host" ||
+      lower === "content-length" ||
+      lower === "accept-encoding"
+    ) {
       return;
     }
     out.set(key, value);
@@ -29,7 +34,12 @@ function filterResponseHeaders(upstream: Headers): Headers {
   const out = new Headers();
   upstream.forEach((value, key) => {
     const lower = key.toLowerCase();
-    if (HOP_BY_HOP.has(lower) || lower === "set-cookie") {
+    if (
+      HOP_BY_HOP.has(lower) ||
+      lower === "set-cookie" ||
+      lower === "content-encoding" ||
+      lower === "content-length"
+    ) {
       return;
     }
     out.set(key, value);

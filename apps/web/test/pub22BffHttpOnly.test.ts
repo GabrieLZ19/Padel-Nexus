@@ -28,6 +28,8 @@ describe("PUB-22 BFF HttpOnly y proxy", () => {
     );
     assert.match(proxy, /Authorization/);
     assert.match(proxy, /padel_token/);
+    assert.match(proxy, /content-encoding/);
+    assert.match(proxy, /accept-encoding/);
     assert.match(
       readFileSync(path.join(RAIZ, "app/api/proxy/[...path]/route.ts"), "utf8"),
       /forwardToApiUpstream/,
