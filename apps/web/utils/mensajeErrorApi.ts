@@ -8,8 +8,10 @@ export function mensajeErrorApi(err: unknown, fallback: string): string {
       | string
       | undefined;
     if (typeof data === "string" && data.trim()) return data.trim();
-    const msg = data?.message || data?.error;
-    if (typeof msg === "string" && msg.trim()) return msg.trim();
+    if (data && typeof data === "object") {
+      const msg = data.message || data.error;
+      if (typeof msg === "string" && msg.trim()) return msg.trim();
+    }
   }
   if (err instanceof Error && err.message.trim()) return err.message.trim();
   return fallback;

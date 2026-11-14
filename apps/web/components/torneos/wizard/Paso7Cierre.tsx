@@ -174,7 +174,7 @@ export const Paso5Cierre = ({
         if (!motivo?.trim()) return;
         try {
           setActivandoPuntosPostCierre(true);
-          setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+          setFeedbackModal((prev: any) => ({ ...prev, isLoading: true }));
           const data = await TorneosService.activarPuntosRankingPostCierre(
             torneoId,
             motivo.trim(),
@@ -188,7 +188,7 @@ export const Paso5Cierre = ({
             title: "Puntos activados",
             description: `Se procesaron ${data.partidos_procesados} partido(s) y se actualizó el ranking.`,
             onClose: () =>
-              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+              setFeedbackModal((prev: any) => ({ ...prev, isOpen: false })),
           });
           sileo.success({
             title: "Ranking actualizado",
@@ -205,13 +205,13 @@ export const Paso5Cierre = ({
             title: "Error",
             description: msg,
             onClose: () =>
-              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+              setFeedbackModal((prev: any) => ({ ...prev, isOpen: false })),
           });
         } finally {
           setActivandoPuntosPostCierre(false);
         }
       },
-      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      onClose: () => setFeedbackModal((prev: any) => ({ ...prev, isOpen: false })),
     });
   };
 
