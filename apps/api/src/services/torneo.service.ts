@@ -43,7 +43,10 @@ import {
   tablaPuntosDesdeConfig,
   type ConfigPuntosTorneo,
 } from "../utils/rankingTorneo";
-import { otorgarPuntosPorPartidoRanking } from "../utils/otorgarPuntosPartidoTorneo";
+import {
+  otorgarPuntosPorPartidoRanking,
+  type TorneoInfoPuntos,
+} from "../utils/otorgarPuntosPartidoTorneo";
 import { recalcularPuntosTorneoFinalizado } from "../utils/recalcularPuntosTorneoFinalizado";
 import {
   numeroVisiblePartidoTorneo,
@@ -2179,7 +2182,7 @@ export class TorneoService {
           equipo_a_id: partido.equipo_a_id,
           equipo_b_id: partido.equipo_b_id,
         },
-        torneoInfo,
+        torneoInfo as TorneoInfoPuntos,
         ganadorId,
       );
     }

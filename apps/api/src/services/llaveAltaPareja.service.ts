@@ -476,13 +476,9 @@ export class LlaveAltaParejaService {
         j2Creado = resJ2.creado;
       }
 
-      assertCategoria(
-        { id: resJ1.id, ...resJ1 },
-        torneoMeta,
-        "Jugador 1",
-      );
+      assertCategoria(resJ1, torneoMeta, "Jugador 1");
       if (j2) {
-        assertCategoria({ id: j2.id, ...j2 }, torneoMeta, "Jugador 2");
+        assertCategoria(j2, torneoMeta, "Jugador 2");
       }
 
       const j1Nombre = formatNombreCompleto(resJ1.apellido, resJ1.nombre);
