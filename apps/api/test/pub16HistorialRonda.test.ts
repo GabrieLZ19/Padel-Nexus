@@ -28,6 +28,28 @@ describe("PUB-16 historial ranking — ronda", () => {
     assert.match(fuente, /ronda:\s*partido\.ronda/);
   });
 
+  it("migración corrige backfill FINAL por orden de instancias", () => {
+    const sql = readFileSync(
+      path.join(
+        REPO,
+        "supabase/migrations/20261113230000_pub16_corregir_historial_ronda.sql",
+      ),
+      "utf8",
+    );
+    assert.match(sql, /emparejados/);
+    assert.match(sql, /ambiguo/);
+    assert.match(sql, /puntos_zona/);
+    assert.match(sql, /ORDER BY fase_zona, fase_llave, orden ASC/);
+  });
+
+  it("enriquecimiento runtime prioriza instancia temprana en empate", () => {
+    const fuente = readFileSync(
+      path.join(RAIZ, "api/src/utils/historialRankingRonda.ts"),
+      "utf8",
+    );
+    assert.match(fuente, /deltaTiempo \* 1e6 \+ orden/);
+  });
+
   it("API expone ronda al listar historial", () => {
     const fuente = readFileSync(
       path.join(RAIZ, "api/src/services/ranking.service.ts"),

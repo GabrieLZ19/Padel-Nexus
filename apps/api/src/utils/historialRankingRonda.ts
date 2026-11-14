@@ -76,7 +76,7 @@ export async function enriquecerHistorialConRonda<T extends FilaHistorial>(
         ? Math.abs(tPartido - tHist)
         : Number.POSITIVE_INFINITY;
       const orden = Number(p.orden) || 0;
-      const score = deltaTiempo * 1e6 - orden;
+      const score = deltaTiempo * 1e6 + orden;
       if (score < mejorScore) {
         mejorScore = score;
         elegido = p;
