@@ -110,8 +110,46 @@ Tickets: TOR-23, TOR-28, TOR-24, TOR-22, TOR-21, TOR-36, TOR-16.
 - `trasladoParejaLlave` + modal «Confirmar intercambio»
 - Tests: `tor22*`, `tor21*`, `tor36*`, `tor16*`
 
-Pendiente: re-test manual del Lote 4. Siguiente: **Lote 5** (TOR-27, TOR-34, TOR-4, TOR-33).
+Pendiente: re-test manual del Lote 4.
 
-## Lotes 5–8 — PENDIENTE
+## Lote 5 — COMPLETADO (13/11/2026)
+
+Commits: `e8056a2` (back), `1571ea7` (front).
+
+Tickets: TOR-27, TOR-34, TOR-4, TOR-33.
+
+### TOR-27 — COMPLETADO (13/11/2026)
+
+- `validarAsignacionHorarioPartido` antes de persistir en `PUT .../programacion/asignar` (orden de llave feeders + dependientes + conflictos graves del partido)
+- Publicar ya bloqueaba `severity === "bad"`; la grilla sigue marcando conflictos vía `evaluateProgramacionIssues`
+- Auto / «Cargar en la grilla» ya respetaba feeders (`slotRespetaDependientesProgramados`)
+- Toast con descripción al rechazar drop manual inválido
+- Tests: `apps/api/test/programador.paso5.test.ts` (TOR-27)
+
+### TOR-34 — COMPLETADO (13/11/2026)
+
+- `finWallClockTrasPartidos` suma `descanso_modo` al fin de zona (no solo el fin del partido)
+- `notBeforeDesdeUltimaZonaPorEquipos` por pareja clasificada en auto-asignar y modo continuo
+- `evaluateProgramacionIssues` marca conflicto grave si la llave arranca antes del descanso post-zona
+- Duración de zona (`duracionParaFase` zonas) separada de la de llave en los cálculos
+- Tests: `apps/api/test/programador.paso5.test.ts` (TOR-34)
+
+### TOR-4 — COMPLETADO (13/11/2026)
+
+- Auto-asignación: no programa cruces de llave hasta que sus feeders tienen horario (evita 25/26 con semis en 11:00)
+- Regla 11:00: bloqueo (`bad`) en torneos provinciales/nacionales; advertencia (`wait`) en local/privado/regional/clasificatorio
+- El asignador omite slots de zona que violan las 11:00 cuando la regla es obligatoria (oficial)
+- `sugerirCanchasYHoras`: mensaje accionable (canchas extra, jornadas, adelantar inicio / extender cierre)
+- Tests: `programador.paso5.test.ts` (TOR-4)
+
+### TOR-33 — COMPLETADO (13/11/2026)
+
+- `ScheduleGrid`: cabecera con asa de arrastre (`GripVertical`), título truncado y botón × con `z-30` (sin drag en toda la tarjeta)
+- `ProgramadorVisualPage`: `FeedbackModal` al quitar — aclara que se persiste al instante y no requiere «Guardar borrador»
+- Test: `apps/web/test/tor33ScheduleGrid.test.ts`
+
+**Lote 5 — COMPLETADO** (TOR-27, TOR-34, TOR-4, TOR-33). Siguiente: **Lote 6** (CLI-2, CLI-1).
+
+## Lotes 6–8 — PENDIENTE
 
 Ver plan en Cursor (`re-test_13-11_correction_plan`).
