@@ -152,6 +152,8 @@ Tickets: TOR-27, TOR-34, TOR-4, TOR-33.
 
 ## Lote 6 — COMPLETADO (13/11/2026) — CLI-2, CLI-1
 
+Commits: `437731e` (back), `246ea3c` (front).
+
 ### CLI-2 (canchas/sedes vs adheridos)
 
 - Migraciones: `cli2_clubes_adherido_sedes`, `cli2_buscar_clubes_cercanos_adheridos`
