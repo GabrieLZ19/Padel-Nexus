@@ -30,6 +30,10 @@ import {
   hydrateTorneoRestrictions,
 } from "@/utils/inscripcionElegibilidad";
 import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
+import {
+  montoInscripcionPublico,
+  plazasInscripcionPublico,
+} from "@/utils/inscripcionMonto";
 import { InscripcionPagoActions } from "@/components/torneos/InscripcionPagoActions";
 import { inscripcionRequierePagoOnline } from "@/utils/inscripcionPago";
 import type { Inscripcion } from "@/utils/types";
@@ -97,6 +101,22 @@ export default function InscripcionModal({
   const { profile } = useProfileStore();
 
   const isIndividual = esModalidadIndividual(torneo.modalidad);
+  const plazasInscripcion = useMemo(
+    () =>
+      plazasInscripcionPublico({
+        modalidad: torneo.modalidad,
+        tieneCompanero: !isIndividual && email2.includes("@"),
+      }),
+    [torneo.modalidad, isIndividual, email2],
+  );
+  const montoInscripcionTotal = useMemo(
+    () =>
+      montoInscripcionPublico(
+        Number(torneo.precio_inscripcion || 0),
+        plazasInscripcion,
+      ),
+    [torneo.precio_inscripcion, plazasInscripcion],
+  );
   const checks = useMemo(
     () => buildChecksElegibilidadJ1(torneo, profile),
     [torneo, profile],
@@ -189,7 +209,7 @@ export default function InscripcionModal({
         usuario2_email: isIndividual ? null : email2,
         jugador1_nombre: jugador1Nombre,
         jugador2_nombre: isIndividual ? "-" : jugador2Nombre || "",
-        monto: Number(torneo.precio_inscripcion),
+        monto: montoInscripcionTotal,
       })) as Inscripcion;
 
       setInscripcionCreada(creada);
@@ -401,18 +421,24 @@ export default function InscripcionModal({
                     <div className="flex items-end justify-between gap-3">
                       <div>
                         <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                          Total
+                          Total estimado
                         </p>
                         <p className="text-2xl font-black text-brand-chartreuse tabular-nums leading-none mt-0.5">
-                          $
-                          {Number(torneo.precio_inscripcion).toLocaleString(
-                            "es-AR",
-                          )}
+                          ${montoInscripcionTotal.toLocaleString("es-AR")}
                         </p>
+                        {plazasInscripcion > 1 ? (
+                          <p className="text-[10px] text-gray-500 mt-1">
+                            {plazasInscripcion} plazas × $
+                            {Number(torneo.precio_inscripcion).toLocaleString(
+                              "es-AR",
+                            )}{" "}
+                            c/u
+                          </p>
+                        ) : null}
                       </div>
                       <p className="text-[10px] text-gray-500 text-right max-w-[9.5rem] leading-snug">
-                        {Number(torneo.precio_inscripcion) > 0 && !torneo.es_gratis
-                          ? "Pagá con Mercado Pago al confirmar."
+                        {montoInscripcionTotal > 0 && !torneo.es_gratis
+                          ? "Un solo pago en Mercado Pago por todas las plazas. Puede incluir cargo por servicio."
                           : "Sin costo o validación manual por el organizador."}
                       </p>
                     </div>

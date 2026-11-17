@@ -33,6 +33,7 @@ import { importarPlanillaConProgreso } from "@/utils/planillaImportProgress";
 import { PlanillaImportProgressBar } from "@/components/inscripciones/PlanillaImportProgressBar";
 import type { PlanillaImportProgressState } from "@/components/inscripciones/PlanillaImportProgressBar";
 import { esModalidadIndividual } from "@/utils/formatFecha";
+import { TorneoSaldoPadelNexus } from "@/components/torneos/TorneoSaldoPadelNexus";
 
 function apiErrorMessage(error: unknown, fallback: string): string {
   const e = error as {
@@ -260,7 +261,9 @@ export const Paso4Jugadores = ({
   };
 
   return (
-    <div className="bg-[#111111] rounded-3xl border border-white/5 overflow-hidden shadow-xl">
+    <div className="space-y-4">
+      {!gratuito ? <TorneoSaldoPadelNexus torneoId={torneoId} /> : null}
+      <div className="bg-[#111111] rounded-3xl border border-white/5 overflow-hidden shadow-xl">
       {/* Cabecera y botones de acción */}
       <div className="p-6 border-b border-white/5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-black/20">
         <h3 className="font-bold text-white flex items-center gap-2">
@@ -521,6 +524,7 @@ export const Paso4Jugadores = ({
           torneo={torneo}
         />
       )}
+      </div>
     </div>
   );
 };

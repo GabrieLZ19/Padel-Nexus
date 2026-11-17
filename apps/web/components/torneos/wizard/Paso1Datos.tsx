@@ -1126,7 +1126,7 @@ export const Paso1Datos = ({
               {!esGratis && (
                 <div>
                   <label className="text-xs text-brand-ayuda font-bold uppercase tracking-wider block mb-2">
-                    Precio por Pareja / Jugador ($)
+                    Precio por plaza / jugador ($)
                   </label>
                   <input
                     type="number"

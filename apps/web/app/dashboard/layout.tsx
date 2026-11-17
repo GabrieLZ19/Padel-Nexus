@@ -30,6 +30,8 @@ import {
   Scale,
   Megaphone,
   Network,
+  CreditCard,
+  Banknote,
 } from "lucide-react";
 import CanchaIcon from "@/components/icons/CanchaIcon";
 import { useProfileStore } from "@/store/useProfileStore";
@@ -209,6 +211,22 @@ export default function DashboardLayout({
     },
     { name: "Chat interno", icon: MessageSquare, href: "/dashboard/chat", badge: chatNoLeidos },
     { name: "Gestión de Usuarios", icon: UserCog, href: "/dashboard/usuarios" },
+    {
+      name: "Fees plataforma",
+      icon: CreditCard,
+      href: "/dashboard/platform-fees",
+    },
+    {
+      name: "Cargos servicio",
+      icon: CreditCard,
+      href: "/dashboard/cargos-servicio",
+    },
+    { name: "Finanzas", icon: CreditCard, href: "/dashboard/finanzas" },
+    {
+      name: "Liquidaciones",
+      icon: Banknote,
+      href: "/dashboard/liquidaciones",
+    },
   ];
 
   // Filtrar menú según el rol del usuario autenticado

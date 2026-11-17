@@ -50,6 +50,13 @@ export function InscripcionPagoActions({
     try {
       const pref = await InscripcionesService.crearPreferenciaMp(inscripcionId);
       onPagoIniciado?.();
+      if (Number(pref.cargo_servicio) > 0 && pref.modo_fee === "sumar") {
+        const plazas = pref.plazas && pref.plazas > 1 ? ` (${pref.plazas} plazas)` : "";
+        sileo.info({
+          title: "Checkout Mercado Pago",
+          description: `Total $${Number(pref.monto).toLocaleString("es-AR")}${plazas}: inscripción + cargo por servicio $${Number(pref.cargo_servicio).toLocaleString("es-AR")}.`,
+        });
+      }
       const checkout = pref.initPoint || pref.sandboxInitPoint;
       if (!checkout) {
         sileo.error({
@@ -72,11 +79,11 @@ export function InscripcionPagoActions({
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       <p className={`text-gray-400 ${compact ? "text-xs" : "text-sm"}`}>
-        Tu inscripción está pendiente de pago (
-        <span className="text-white font-semibold tabular-nums">
-          ${Number(monto).toLocaleString("es-AR")}
+        Tu inscripción está pendiente de pago. Podés abonar con Mercado Pago (un
+        solo checkout por todas las plazas).
+        <span className="block mt-1 text-white font-semibold tabular-nums">
+          Subtotal inscripción: ${Number(monto).toLocaleString("es-AR")}
         </span>
-        ). Podés abonar con Mercado Pago.
       </p>
       <button
         type="button"

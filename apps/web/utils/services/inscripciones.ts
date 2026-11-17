@@ -51,6 +51,11 @@ export type PreferenciaInscripcionMp = {
   initPoint: string | null;
   sandboxInitPoint: string | null;
   monto: number;
+  monto_bruto?: number;
+  cargo_servicio?: number;
+  modo_fee?: "absorber" | "sumar";
+  plazas?: number;
+  precio_por_plaza?: number;
   moneda: string;
   inscripcionId: string;
   torneoId: string;
