@@ -90,3 +90,64 @@ export function numerosVisiblesDePartidos(
 
   return map;
 }
+
+export type PartidoNumerable = {
+  id: string;
+  ronda?: string | null;
+  orden?: number | null;
+};
+
+export function prepararMapaNumerosVisibles(
+  partidos: Array<{
+    id?: string;
+    ronda?: string | null;
+    orden?: number | null;
+  }>,
+  inicioLlave?: number,
+): Map<string, number> {
+  const lista: PartidoNumerable[] = [];
+  for (const p of partidos) {
+    if (!p.id) continue;
+    lista.push({
+      id: String(p.id),
+      ronda: p.ronda,
+      orden: p.orden,
+    });
+  }
+  return numerosVisiblesDePartidos(lista, inicioLlave);
+}
+
+export function numeroVisibleEnTorneo(
+  partido: { id?: string; orden?: number | null },
+  mapa: Map<string, number>,
+): number | null {
+  if (partido.id) {
+    const visible = mapa.get(String(partido.id));
+    if (visible != null) return visible;
+  }
+  return null;
+}
+
+/** Traduce `orden` interno (match no) al número visible en grilla/llave. */
+export function numeroVisiblePorOrdenInterno(
+  ordenInterno: number,
+  partidos: Array<{ id?: string; orden?: number | null }>,
+  mapa: Map<string, number>,
+): number {
+  const feeder = partidos.find((x) => Number(x.orden) === ordenInterno);
+  if (feeder?.id) {
+    const visible = mapa.get(String(feeder.id));
+    if (visible != null) return visible;
+  }
+  return ordenInterno;
+}
+
+export function textoPartidoNumerado(
+  partido: { id?: string; orden?: number | null },
+  mapa: Map<string, number>,
+): string {
+  const visible = numeroVisibleEnTorneo(partido, mapa);
+  if (visible != null) return `partido #${visible}`;
+  if (partido.orden != null) return `partido #${partido.orden}`;
+  return "un partido de llave";
+}

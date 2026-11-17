@@ -10,6 +10,7 @@ import {
   FAP_REGLAS,
 } from "../constants/fap";
 import {
+  aplicaDenominacionNacional,
   enrichInscripcionDenominacion,
   etiquetaInstitucion,
 } from "../utils/denominacionNacional";
@@ -101,7 +102,25 @@ async function marcarDescalificacionesDeZona(
   }
 }
 
-function mapInscripcionPartido(ins: Record<string, unknown>) {
+function nombreClubInscripcion(
+  enriched: ReturnType<typeof enrichInscripcionDenominacion>,
+  club1: string | null | undefined,
+  club2: string | null | undefined,
+  alcanceTorneo?: string | null,
+): string | null {
+  if (aplicaDenominacionNacional(alcanceTorneo)) {
+    const etiqueta = etiquetaInstitucion(enriched);
+    return etiqueta === "Sin denominación" ? null : etiqueta;
+  }
+  const clubs = [club1, club2].filter(Boolean) as string[];
+  if (clubs.length) return clubs.join(" / ");
+  return club1 || club2 || null;
+}
+
+function mapInscripcionPartido(
+  ins: Record<string, unknown>,
+  alcanceTorneo?: string | null,
+) {
   const perfiles = ins.perfiles as
     | {
         avatar_url?: string | null;
@@ -122,19 +141,21 @@ function mapInscripcionPartido(ins: Record<string, unknown>) {
   const club1 = perfiles?.clubes?.nombre;
   const club2 = perfilesJ2?.clubes?.nombre;
 
-  const enriched = enrichInscripcionDenominacion({
-    letra_prioridad: ins.letra_prioridad as string | null | undefined,
-    usuario_id: ins.usuario_id as string | null | undefined,
-    usuario2_id: ins.usuario2_id as string | null | undefined,
-    perfiles: perfiles ?? null,
-    perfiles_jugador2: perfilesJ2 ?? null,
-  });
+  const enriched = enrichInscripcionDenominacion(
+    {
+      letra_prioridad: ins.letra_prioridad as string | null | undefined,
+      usuario_id: ins.usuario_id as string | null | undefined,
+      usuario2_id: ins.usuario2_id as string | null | undefined,
+      perfiles: perfiles ?? null,
+      perfiles_jugador2: perfilesJ2 ?? null,
+    },
+    alcanceTorneo,
+  );
 
   return {
     jugador1_nombre: (ins.jugador1_nombre as string | null) ?? null,
     jugador2_nombre: (ins.jugador2_nombre as string | null) ?? null,
-    // Institución / Club = provincia + letra (denominación nacional).
-    clubName: etiquetaInstitucion(enriched),
+    clubName: nombreClubInscripcion(enriched, club1, club2, alcanceTorneo),
     club1: club1 || null,
     club2: club2 || null,
     avatar_j1: perfiles?.avatar_url || null,
@@ -1478,6 +1499,13 @@ export class TorneoService {
   }
 
   static async obtenerInscripciones(id: string) {
+    const { data: torneoRow } = await supabaseAdmin
+      .from("torneos")
+      .select("alcance")
+      .eq("id", id)
+      .maybeSingle();
+    const alcanceTorneo = torneoRow?.alcance ?? null;
+
     const { data, error } = await supabaseAdmin
       .from("inscripciones")
       .select(
@@ -1505,7 +1533,10 @@ export class TorneoService {
     if (error) throw new Error(error.message);
 
     return (data || []).map((ins: Record<string, unknown>) => {
-      const enriched = enrichInscripcionDenominacion(ins as Parameters<typeof enrichInscripcionDenominacion>[0]);
+      const enriched = enrichInscripcionDenominacion(
+        ins as Parameters<typeof enrichInscripcionDenominacion>[0],
+        alcanceTorneo,
+      );
       return {
         ...ins,
         provincia: enriched.provincia,
@@ -1518,6 +1549,13 @@ export class TorneoService {
     id: string,
     opciones?: { sincronizarLlave?: boolean },
   ) {
+    const { data: torneoRow } = await supabaseAdmin
+      .from("torneos")
+      .select("alcance")
+      .eq("id", id)
+      .maybeSingle();
+    const alcanceTorneo = torneoRow?.alcance ?? null;
+
     if (opciones?.sincronizarLlave) {
       try {
         const poblada = await sincronizarClasificadosALlave(id);
@@ -1588,7 +1626,7 @@ export class TorneoService {
 
     const insMap = new Map<string, ReturnType<typeof mapInscripcionPartido>>();
     (inscripciones || []).forEach((ins: Record<string, unknown>) => {
-      insMap.set(String(ins.id), mapInscripcionPartido(ins));
+      insMap.set(String(ins.id), mapInscripcionPartido(ins, alcanceTorneo));
     });
 
     const formateados = (partidos || []).map((p) => {

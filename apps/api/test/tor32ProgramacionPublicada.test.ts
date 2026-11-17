@@ -37,7 +37,7 @@ describe("TOR-32 horarios publicados al cargar resultado", () => {
     assert.equal(pendientes.length, 1);
     assert.equal(pendientes[0].id, "b");
     assert.equal(avisos_programacion_publicada.length, 1);
-    assert.match(avisos_programacion_publicada[0], /partido #19/);
+    assert.match(avisos_programacion_publicada[0], /partido #1/);
   });
 
   it("sin programación publicada sigue marcando horarios inválidos para reprogramar", () => {

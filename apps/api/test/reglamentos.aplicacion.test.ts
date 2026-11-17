@@ -85,7 +85,11 @@ describe("reglamentos FAP y APA se aplican", () => {
     const apa = { alcance: "Provincial", reglamento: "APA" };
     const fap = { alcance: "Provincial", reglamento: "FAP" };
     assert.equal(usarPlanillaInscripcionFap(apa), false);
-    assert.equal(usarPlanillaInscripcionFap(fap), true);
+    assert.equal(usarPlanillaInscripcionFap(fap), false);
+    assert.equal(
+      usarPlanillaInscripcionFap({ alcance: "Nacional", reglamento: "FAP" }),
+      true,
+    );
     assert.equal(esTorneoContextoFederacion(apa, "admin_club"), false);
     assert.equal(esTorneoContextoFederacion(fap, "admin_club"), true);
   });

@@ -6,6 +6,10 @@ import { supabaseAdmin } from "../config/supabase";
 import sharp from "sharp";
 import { esRolAccesoCrm, esRolAdministrativo } from "../constants/roles";
 import { esTorneoDePrueba } from "../utils/datoPrueba";
+import {
+  jugadorInscriptoEnTorneo,
+  puedeVerTorneoFueraDelSitioPublico,
+} from "../utils/accesoTorneoPublico";
 import { AlcanceCuentaService } from "../services/alcanceCuenta.service";
 import { decidirAlcanceTorneo, type AccionSobreTorneo } from "../utils/alcanceCuenta";
 import { completarScorePorLesion } from "../utils/scoreLesion";
@@ -171,7 +175,13 @@ export const getTorneoById = async (
 ): Promise<Response> => {
   try {
     const data = await TorneoService.obtenerPorId(req.params.id);
-    if (!esRolAccesoCrm(req.user?.rol) && esTorneoDePrueba(data)) {
+    const torneoEsPrueba = esTorneoDePrueba(data);
+    const esCrm = esRolAccesoCrm(req.user?.rol);
+    let inscripto = false;
+    if (!esCrm && torneoEsPrueba && req.user?.id) {
+      inscripto = await jugadorInscriptoEnTorneo(req.params.id, req.user.id);
+    }
+    if (!puedeVerTorneoFueraDelSitioPublico(esCrm, torneoEsPrueba, inscripto)) {
       return res.status(404).json({ message: "Torneo no encontrado." });
     }
     const cuenta = await AlcanceCuentaService.resolver(req.user);

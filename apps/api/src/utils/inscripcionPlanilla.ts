@@ -108,7 +108,24 @@ function detectarTipoPlanilla(headerRow: string[]): TipoPlanillaInscripcion {
   return "general";
 }
 
-/** Columna `LOCALIDAD | PROVINCIA` (tolerando typo `LCOALIDAD`). */
+function partesLocalidadProvincia(raw: string): string[] {
+  if (raw.includes("|")) {
+    return raw
+      .split("|")
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }
+  const coma = raw.indexOf(",");
+  if (coma >= 0) {
+    const localidad = raw.slice(0, coma).trim();
+    const provincia = raw.slice(coma + 1).trim();
+    if (localidad && provincia) return [localidad, provincia];
+  }
+  const trimmed = raw.trim();
+  return trimmed ? [trimmed] : [];
+}
+
+/** Columna `LOCALIDAD | PROVINCIA` (tolerando typo `LCOALIDAD` en planillas viejas). */
 export function parseLocalidadProvinciaCelda(valor: unknown): {
   localidad?: string;
   provincia?: string;
@@ -116,10 +133,7 @@ export function parseLocalidadProvinciaCelda(valor: unknown): {
   const raw = normalizarTexto(valor);
   if (!raw) return {};
 
-  const parts = raw
-    .split("|")
-    .map((p) => p.trim())
-    .filter(Boolean);
+  const parts = partesLocalidadProvincia(raw);
 
   if (parts.length >= 2) {
     return {

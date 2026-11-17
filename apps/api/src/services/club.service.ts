@@ -30,6 +30,15 @@ import {
 } from "../utils/filtrosClubReserva";
 import { fechaHoyArgentina } from "../utils/fechaArgentina";
 
+export function normalizarNombreClub(nombre: string): string {
+  return String(nombre || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/\s+/g, " ");
+}
+
 export interface CrearClubDTO {
   nombre: string;
   provincia: string;
@@ -544,12 +553,32 @@ export class ClubService {
     return resultados.filter((c): c is ClubCercano => c != null);
   }
 
+  static async buscarClubDuplicado(
+    provincia: string,
+    nombre: string,
+  ): Promise<{ id: string; nombre: string } | null> {
+    const clave = normalizarNombreClub(nombre);
+    if (!clave) return null;
+    const { data, error } = await supabaseAdmin
+      .from("clubes")
+      .select("id, nombre, provincia");
+    if (error) throw new Error(error.message);
+    for (const row of data || []) {
+      if (!mismaProvincia(row.provincia, provincia)) continue;
+      if (normalizarNombreClub(String(row.nombre || "")) === clave) {
+        return { id: String(row.id), nombre: String(row.nombre) };
+      }
+    }
+    return null;
+  }
+
   static async obtenerClubesPaginados(
     page: number,
     limit: number,
     search?: string,
     provincia?: string,
     clubIds?: string[],
+    opciones?: { busquedaEnLocalidad?: boolean },
   ) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
@@ -562,7 +591,15 @@ export class ClubService {
       )
       .range(from, to);
 
-    if (search) query = query.ilike("nombre", `%${search}%`);
+    const termino = search?.trim();
+    if (termino) {
+      const patron = `%${termino}%`;
+      if (opciones?.busquedaEnLocalidad) {
+        query = query.or(`nombre.ilike.${patron},localidad.ilike.${patron}`);
+      } else {
+        query = query.ilike("nombre", patron);
+      }
+    }
     if (clubIds) {
       if (clubIds.length === 0) return { data: [], total: 0 };
       query = query.in("id", clubIds);
@@ -733,6 +770,16 @@ export class ClubService {
       }
     }
 
+    const duplicado = await ClubService.buscarClubDuplicado(
+      provincia,
+      datos.nombre,
+    );
+    if (duplicado) {
+      throw new Error(
+        `DUPLICADO_CLUB: Ya existe un club o sede llamado "${duplicado.nombre}" en ${provincia}.`,
+      );
+    }
+
     const { data, error } = await supabaseAdmin
       .from("clubes")
       .insert([
@@ -758,8 +805,11 @@ export class ClubService {
 
     if (error) throw new Error(`Error al crear el club: ${error.message}`);
 
-    // Crear filas reales en `canchas` (el contador de UI usa canchas(count), no solo la columna)
-    if (data?.id) {
+    if (
+      data?.id &&
+      contexto.modo !== "sede_admin_club" &&
+      esAdherido !== false
+    ) {
       const { LicenciaClubService } = await import("./licenciaClub.service");
       await LicenciaClubService.asegurarLicenciaParaClub(
         data.id,

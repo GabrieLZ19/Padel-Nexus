@@ -1,5 +1,10 @@
 import { supabaseAdmin } from "../config/supabase";
 import {
+  numeroVisiblePorOrdenInterno,
+  prepararMapaNumerosVisibles,
+  textoPartidoNumerado,
+} from "./numerosVisiblesPartido";
+import {
   clasificacionSuperaLimiteLocal,
   esRondaCampeonato,
   esRondaDeZona,
@@ -1758,6 +1763,7 @@ export interface ResultadoProgramarLlavePendientes {
 
 export interface PartidoLlaveAutoprogramable {
   id: string;
+  ronda?: string | null;
   orden?: number | null;
   equipo_a_id?: string | null;
   equipo_b_id?: string | null;
@@ -1775,12 +1781,27 @@ export function seleccionarPartidosLlaveParaAutoprogramar(
   opts: {
     programacionPublicada: boolean;
     violaHorarioPublicado: (p: PartidoLlaveAutoprogramable) => boolean;
+    /** Zonas + llave para numeración continua (#1…#N) en avisos. */
+    partidosNumeracion?: Array<{
+      id: string;
+      ronda?: string | null;
+      orden?: number | null;
+    }>;
   },
 ): {
   pendientes: PartidoLlaveAutoprogramable[];
   avisos_programacion_publicada: string[];
 } {
   const avisos_programacion_publicada: string[] = [];
+  const mapaVisible = prepararMapaNumerosVisibles(
+    opts.partidosNumeracion?.length
+      ? opts.partidosNumeracion
+      : partidos.map((p) => ({
+          id: p.id,
+          ronda: p.ronda,
+          orden: p.orden,
+        })),
+  );
   const pendientes = partidos.filter((p) => {
     if (!p.equipo_a_id || !p.equipo_b_id) return false;
     if (String(p.estado_partido || "").toLowerCase().includes("pendiente")) {
@@ -1790,8 +1811,7 @@ export function seleccionarPartidosLlaveParaAutoprogramar(
     if (sinHorario) return true;
     if (opts.programacionPublicada) {
       if (opts.violaHorarioPublicado(p)) {
-        const etiqueta =
-          p.orden != null ? `partido #${p.orden}` : "un partido de llave";
+        const etiqueta = textoPartidoNumerado(p, mapaVisible);
         avisos_programacion_publicada.push(
           `El ${etiqueta} mantiene su horario publicado, pero puede haber conflicto de orden de llave o descanso. Revisalo en el programador (Nueva edición).`,
         );
@@ -1923,6 +1943,11 @@ export async function programarPartidosLlavePendientes(
       programacionPublicada,
       violaHorarioPublicado: (p) =>
         violaFeederODescanso(p as PartidoProgramable),
+      partidosNumeracion: todosProg.map((p) => ({
+        id: String((p as { id?: string }).id || ""),
+        ronda: p.ronda,
+        orden: p.orden,
+      })).filter((p) => p.id),
     });
   if (!pendientes.length) {
     return { updated: 0, avisos_programacion_publicada };
@@ -2092,6 +2117,7 @@ export function evaluateProgramacionIssues(
       : FAP_DESCANSO_MINUTOS_TRAS_FIN);
   const feeders = opciones.feedersByMatchNo || new Map<number, number[]>();
   const issues: ProgramacionIssue[] = [];
+  const mapaVisible = prepararMapaNumerosVisibles(partidos);
 
   const assigned = partidos.filter(
     (p) => p.cancha_asignada && p.fecha_partido,
@@ -2132,10 +2158,15 @@ export function evaluateProgramacionIssues(
           fp.fecha > parsed.fecha ||
           (fp.fecha === parsed.fecha && fp.startMin >= parsed.startMin)
         ) {
+          const origenVisible = numeroVisiblePorOrdenInterno(
+            depOrden,
+            partidos,
+            mapaVisible,
+          );
           issues.push({
             partido_id: id,
             severity: "bad",
-            message: `Orden de llave inválido: debe jugarse después del partido de origen #${depOrden}`,
+            message: `Orden de llave inválido: debe jugarse después del partido de origen #${origenVisible}`,
           });
         } else if (
           fp.fecha === parsed.fecha &&
@@ -2331,6 +2362,7 @@ export function validarAsignacionHorarioPartido(
       : FAP_DESCANSO_MINUTOS_TRAS_FIN);
   const feeders = opciones.feedersByMatchNo || new Map<number, number[]>();
   const dependents = buildDependentsByMatchNo(feeders);
+  const mapaVisible = prepararMapaNumerosVisibles(partidos);
 
   const orden = Number(target.orden);
   const draft = partidos.map((p) =>
@@ -2360,7 +2392,12 @@ export function validarAsignacionHorarioPartido(
         parsed.fecha < minInicio.fecha ||
         (parsed.fecha === minInicio.fecha && parsed.startMin < minInicio.startMin)
       ) {
-        return `Orden de llave inválido: debe jugarse después del partido de origen #${depOrden}`;
+        const origenVisible = numeroVisiblePorOrdenInterno(
+          depOrden,
+          partidos,
+          mapaVisible,
+        );
+        return `Orden de llave inválido: debe jugarse después del partido de origen #${origenVisible}`;
       }
     }
 

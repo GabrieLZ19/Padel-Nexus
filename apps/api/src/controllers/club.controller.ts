@@ -111,12 +111,14 @@ export const getAllClubes = async (
   try {
     const {
       page = "1",
-      limit = "10",
+      limit,
       search,
+      q,
       provincia,
       lat,
       lng,
       ordenar,
+      scope,
     } = req.query;
 
     // Listado completo ordenado por cercanía (sin filtrar por radio)
@@ -149,8 +151,19 @@ export const getAllClubes = async (
       return res.status(200).json({ exito: true, data, total: data.length });
     }
 
-    const pageNum = parseInt(page as string, 10);
-    const limitNum = parseInt(limit as string, 10);
+    const pageNum = parseInt(page as string, 10) || 1;
+    const scopeTorneo = scope === "torneo_sedes";
+    const limitDefault = scopeTorneo ? 150 : 10;
+    const limitNum = Math.min(
+      200,
+      Math.max(1, parseInt(String(limit || limitDefault), 10) || limitDefault),
+    );
+    const searchTerm =
+      typeof q === "string" && q.trim()
+        ? q.trim()
+        : typeof search === "string"
+          ? search
+          : undefined;
     const cuenta = await AlcanceCuentaService.resolver(req.user);
     let provinciaFiltro = provincia as string | undefined;
     let clubIds: string[] | undefined;
@@ -177,9 +190,10 @@ export const getAllClubes = async (
     const resultado = await ClubService.obtenerClubesPaginados(
       pageNum,
       limitNum,
-      search as string | undefined,
+      searchTerm,
       provinciaFiltro,
       clubIds,
+      { busquedaEnLocalidad: scopeTorneo || Boolean(searchTerm) },
     );
 
     return res.status(200).json({ exito: true, ...resultado, aviso: cuenta.aviso });
@@ -321,6 +335,14 @@ export const createClub = async (
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";
+    if (message.startsWith("DUPLICADO_CLUB:")) {
+      const texto = message.replace(/^DUPLICADO_CLUB:\s*/, "");
+      return res.status(409).json({
+        exito: false,
+        error: texto,
+        message: texto,
+      });
+    }
     return res.status(400).json({ exito: false, error: message, message });
   }
 };

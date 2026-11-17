@@ -3,6 +3,7 @@ import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "../constants/fap";
 import { getFapBracketForPairCount } from "../utils/fapBracketMatrices";
 import { roundNameForMatchNo } from "../utils/fapBracketTypes";
 import {
+  aplicaDenominacionNacional,
   enrichInscripcionDenominacion,
   etiquetaInstitucion,
 } from "../utils/denominacionNacional";
@@ -478,6 +479,13 @@ export class CompetenciaService {
    * Obtiene la estructura de zonas con parejas y sus seeds.
    */
   static async obtenerZonas(torneoId: string) {
+    const { data: torneoRow } = await supabaseAdmin
+      .from("torneos")
+      .select("alcance")
+      .eq("id", torneoId)
+      .maybeSingle();
+    const alcanceTorneo = torneoRow?.alcance ?? null;
+
     const { data: grupos, error } = await supabaseAdmin
       .from("grupos")
       .select(
@@ -626,10 +634,19 @@ export class CompetenciaService {
           ? puntosPorId.get(gp.inscripcion_id) ?? 0
           : 0;
 
-        const enriched = enrichInscripcionDenominacion(gp.inscripciones || {});
+        const enriched = enrichInscripcionDenominacion(
+          gp.inscripciones || {},
+          alcanceTorneo,
+        );
 
-        // Institución / Club en zonas FAP = provincia + letra (ej. "NEUQUÉN A").
-        const clubName = etiquetaInstitucion(enriched);
+        const club1Nombre = club1 || null;
+        const club2Nombre = club2 || null;
+        const clubName = aplicaDenominacionNacional(alcanceTorneo)
+          ? etiquetaInstitucion(enriched)
+          : [club1Nombre, club2Nombre].filter(Boolean).join(" / ") ||
+            club1Nombre ||
+            club2Nombre ||
+            null;
 
         return {
           ...gp,

@@ -89,6 +89,13 @@ describe("CLI-1 planillas oficiales FAP / clubes", () => {
     );
   });
 
+  it("parseLocalidadProvinciaCelda tolera coma", () => {
+    assert.deepEqual(parseLocalidadProvinciaCelda("Plottier, Neuquén"), {
+      localidad: "Plottier",
+      provincia: "Neuquén",
+    });
+  });
+
   it("planilla nacional conserva LETRA y ASOCIACIÓN", () => {
     const matrix = [
       [

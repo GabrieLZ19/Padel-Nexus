@@ -78,22 +78,36 @@ export function etiquetaInstitucion(opts: {
   return "Sin denominación";
 }
 
-export function enrichInscripcionDenominacion(ins: {
-  letra_prioridad?: string | null;
-  usuario_id?: string | null;
-  usuario2_id?: string | null;
-  perfiles?: { lugar_residencia?: string | null } | null;
-  perfiles_jugador2?: { lugar_residencia?: string | null } | null;
-}) {
+export function aplicaDenominacionNacional(
+  alcanceTorneo?: string | null,
+): boolean {
+  const alcance = String(alcanceTorneo || "").trim().toLowerCase();
+  if (!alcance || alcance === "local") return false;
+  return /nacional/i.test(alcance);
+}
+
+export function enrichInscripcionDenominacion(
+  ins: {
+    letra_prioridad?: string | null;
+    usuario_id?: string | null;
+    usuario2_id?: string | null;
+    perfiles?: { lugar_residencia?: string | null } | null;
+    perfiles_jugador2?: { lugar_residencia?: string | null } | null;
+  },
+  alcanceTorneo?: string | null,
+) {
   const provincia =
     ins.perfiles?.lugar_residencia?.trim() ||
     ins.perfiles_jugador2?.lugar_residencia?.trim() ||
     null;
   const letra = ins.letra_prioridad ?? null;
+  const usarDenominacion = aplicaDenominacionNacional(alcanceTorneo);
   return {
     provincia,
     letra_prioridad: letra,
-    denominacion_nacional: buildDenominacionNacional(provincia, letra),
+    denominacion_nacional: usarDenominacion
+      ? buildDenominacionNacional(provincia, letra)
+      : null,
     usuario_id: ins.usuario_id ?? null,
     usuario2_id: ins.usuario2_id ?? null,
   };

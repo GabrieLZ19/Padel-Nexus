@@ -1052,8 +1052,9 @@ export class InscripcionService {
           motivo:
             motivo ||
             "Importación masiva desde planilla oficial de inscripciones.",
-          letraPrioridad:
-            grupo.j1.letraOrden || grupo.j2?.letraOrden || undefined,
+          letraPrioridad: esTorneoNacional(torneo)
+            ? grupo.j1.letraOrden || grupo.j2?.letraOrden || undefined
+            : undefined,
         });
 
         inscripcionesOk++;
