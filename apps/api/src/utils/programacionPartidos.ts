@@ -5,8 +5,10 @@ import {
   esRondaDeZona,
   evaluarDescansoInsuficiente,
   limiteClasificacion11EsObligatorio,
+  esModoDescanso,
   minutosDeModoDescanso,
   minutosDesdeHora,
+  ordenDeAsignacion,
   ordenRondaProgramador,
   type DistribucionProgramacion,
   type ModoDescanso,
@@ -1643,6 +1645,107 @@ export async function programarPartidosConDisponibilidad(
     feedersByMatchNo: opciones?.feedersByMatchNo,
     permitirSinEquipos: opciones?.permitirSinEquipos,
   });
+}
+
+/**
+ * TOR-42: al generar cuadros, programar la llave con las mismas reglas que
+ * «Asignar automáticamente» (descanso tras zonas, feeders, último día de juego).
+ */
+export async function programarLlaveInicialTrasZonasFap(
+  torneoId: string,
+  partidosZona: PartidoProgramable[],
+  playoffPartidos: PartidoProgramable[],
+  feedersByMatchNo: Map<number, number[]>,
+): Promise<void> {
+  if (!playoffPartidos.length) return;
+
+  const [{ data: torneo }, contexto] = await Promise.all([
+    supabaseAdmin
+      .from("torneos")
+      .select("duracion_partido_minutos, descanso_modo, alcance, fecha")
+      .eq("id", torneoId)
+      .maybeSingle(),
+    cargarContextoProgramacion(torneoId),
+  ]);
+
+  if (!contexto.disponibilidad.length) return;
+
+  const descansoModo = esModoDescanso(torneo?.descanso_modo)
+    ? torneo.descanso_modo
+    : undefined;
+  const descansoMinutos = descansoModo
+    ? minutosDeModoDescanso(descansoModo)
+    : 60;
+  const duracionConfig = contexto.duracionMinutos;
+  const durZona = duracionParaFase(duracionConfig, "zonas");
+  const durLlave = duracionParaFase(duracionConfig, "llave");
+  const finZonaOpts = { descansoMinutos, descansoModo };
+  const notBeforeTrasZonas = finWallClockTrasPartidos(
+    partidosZona,
+    durZona,
+    finZonaOpts,
+  );
+
+  const dias = resolverDiasProgramacion({
+    fecha: contexto.fecha,
+    fecha_fin: contexto.fecha_fin,
+    dias_juego: contexto.dias_juego,
+    disponibilidad: contexto.disponibilidad,
+  });
+  const tieneMultiplesDias = dias.length >= 2;
+  const ultimoDia = tieneMultiplesDias ? dias[dias.length - 1] : null;
+
+  const slots = generarSlotsDesdeSedesYVentana({
+    canchas: contexto.disponibilidad,
+    dias,
+    duracionMinutos: durLlave,
+  });
+  const ocupados = buildOcupadosDesdePartidos(partidosZona);
+  const fechaInicio =
+    contexto.fecha ?? (torneo?.fecha ? String(torneo.fecha) : null);
+  const alcanceTorneo = torneo?.alcance ?? null;
+
+  const opcionesLlave = {
+    duracionMinutos: durLlave,
+    duracionZonaMinutos: durZona,
+    descansoMinutos,
+    descansoModo,
+    fechaInicio,
+    alcanceTorneo,
+    feedersByMatchNo,
+    permitirSinEquipos: true as const,
+    notBeforeExtra: notBeforeTrasZonas,
+  };
+
+  if (tieneMultiplesDias && ultimoDia) {
+    const slotsCampeonato = slots.filter((s) => s.fecha === ultimoDia);
+    asignarHorariosAPartidos(
+      ordenDeAsignacion(playoffPartidos, "continua"),
+      slotsCampeonato.length ? slotsCampeonato : slots,
+      ocupados,
+      { ...opcionesLlave, distribucion: "continua" as DistribucionProgramacion },
+    );
+    const sinHorario = playoffPartidos.filter(
+      (p) => !p.cancha_asignada || !p.fecha_partido,
+    );
+    if (sinHorario.length) {
+      const ocupadosFin = buildOcupadosDesdePartidos([
+        ...partidosZona,
+        ...playoffPartidos.filter((p) => p.cancha_asignada && p.fecha_partido),
+      ]);
+      asignarHorariosAPartidos(sinHorario, slots, ocupadosFin, {
+        ...opcionesLlave,
+        distribucion: "continua",
+      });
+    }
+  } else {
+    asignarHorariosAPartidos(
+      ordenDeAsignacion(playoffPartidos, "zonas_primero"),
+      slots,
+      ocupados,
+      opcionesLlave,
+    );
+  }
 }
 
 export interface ResultadoProgramarLlavePendientes {

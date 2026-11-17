@@ -13,7 +13,7 @@ import {
 } from "../utils/horariosZona";
 import {
   buildFeedersByMatchNo,
-  buildOcupadosDesdePartidos,
+  programarLlaveInicialTrasZonasFap,
   programarPartidosConDisponibilidad,
   type PartidoProgramable,
 } from "../utils/programacionPartidos";
@@ -258,9 +258,9 @@ export class CompetenciaService {
 
     // 5. PERSISTENCIA EN BASE DE DATOS
     const partidosZonaFase: PartidoProgramable[] = [];
-    let correlativoZona = 1;
 
     for (const zona of zonas) {
+      let ordenEnZona = 1;
       // Crear el Grupo
       const { data: grupoInsertado } = await supabaseAdmin
         .from("grupos")
@@ -290,7 +290,7 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: correlativoZona++,
+          orden: ordenEnZona++,
           equipo_a_id: p[0].inscripcionId,
           equipo_b_id: p[1].inscripcionId,
           estado_partido: "Programado",
@@ -300,7 +300,7 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: correlativoZona++,
+          orden: ordenEnZona++,
           equipo_a_id: p[0].inscripcionId,
           equipo_b_id: p[1].inscripcionId,
           estado_partido: "Programado",
@@ -308,7 +308,7 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: correlativoZona++,
+          orden: ordenEnZona++,
           equipo_a_id: p[1].inscripcionId,
           equipo_b_id: p[2].inscripcionId,
           estado_partido: "Programado",
@@ -316,7 +316,7 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: correlativoZona++,
+          orden: ordenEnZona++,
           equipo_a_id: p[0].inscripcionId,
           equipo_b_id: p[2].inscripcionId,
           estado_partido: "Programado",
@@ -326,7 +326,7 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: correlativoZona++,
+          orden: ordenEnZona++,
           equipo_a_id: p[0].inscripcionId,
           equipo_b_id: p[3].inscripcionId,
           estado_partido: "Programado",
@@ -334,7 +334,7 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: correlativoZona++,
+          orden: ordenEnZona++,
           equipo_a_id: p[1].inscripcionId,
           equipo_b_id: p[2].inscripcionId,
           estado_partido: "Programado",
@@ -345,13 +345,13 @@ export class CompetenciaService {
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: correlativoZona++,
+          orden: ordenEnZona++,
           estado_partido: "Pendiente Ganadores",
         }); // G1 vs G2
         partidos.push({
           torneo_id: torneoId,
           ronda: zona.nombre,
-          orden: correlativoZona++,
+          orden: ordenEnZona++,
           estado_partido: "Pendiente Perdedores",
         }); // P1 vs P2
       } else {
@@ -361,7 +361,7 @@ export class CompetenciaService {
             partidos.push({
               torneo_id: torneoId,
               ronda: zona.nombre,
-              orden: correlativoZona++,
+              orden: ordenEnZona++,
               equipo_a_id: p[i].inscripcionId,
               equipo_b_id: p[j].inscripcionId,
               estado_partido: "Programado",
@@ -402,14 +402,13 @@ export class CompetenciaService {
         // que el scheduler no pise los slots. Usamos `permitirSinEquipos`
         // porque en este punto los equipos de la llave son null (dependen
         // de los clasificados de las zonas).
-        const ocupadosZonas = buildOcupadosDesdePartidos(partidosZonaFase);
         const feedersByMatchNo = buildFeedersByMatchNo(fapMatrix);
-        await programarPartidosConDisponibilidad(torneoId, playoffPartidos, {
-          fase: "llave",
-          ocupados: ocupadosZonas,
+        await programarLlaveInicialTrasZonasFap(
+          torneoId,
+          partidosZonaFase,
+          playoffPartidos,
           feedersByMatchNo,
-          permitirSinEquipos: true,
-        });
+        );
         await supabaseAdmin.from("partidos").insert(playoffPartidos);
       }
     } else {
@@ -1101,10 +1100,15 @@ export class CompetenciaService {
       );
     }
 
-    const { completarPartidosFaltantesTorneo } = await import(
-      "../utils/zonaFixtureRepair"
-    );
-    const fixtureReparado = await completarPartidosFaltantesTorneo(torneoId);
+    const {
+      completarPartidosFaltantesTorneo,
+      deduplicarPartidosPendientesTorneo,
+    } = await import("../utils/zonaFixtureRepair");
+    await deduplicarPartidosPendientesTorneo(torneoId);
+    const fixtureReparado =
+      zonasRegeneradas.length > 0
+        ? await completarPartidosFaltantesTorneo(torneoId, zonasRegeneradas)
+        : [];
 
     const { sincronizarLlaveTrasCambioZonas } = await import(
       "../utils/playoffAvance"

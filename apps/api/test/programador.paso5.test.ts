@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 import {
   asignarHorariosAPartidos,
   buildFeedersEliminatoriaDirecta,
+  buildOcupadosDesdePartidos,
   evaluateProgramacionIssues,
+  finWallClockTrasPartidos,
   validarAsignacionHorarioPartido,
   generarSlotsDesdeSedesYVentana,
   parseFechaPartidoIsoPublic,
@@ -1128,6 +1130,81 @@ describe("programador paso 5", () => {
       },
     );
     assert.match(String(msg), /Orden de llave/);
+  });
+
+  it("TOR-42 — octavo inicial no cae el sábado antes del último partido de zona", () => {
+    const canchaBase: DisponibilidadTorneo = {
+      club_id: "club-1",
+      cancha_id: "c1",
+      hora_inicio: "08:00:00",
+      hora_fin: "23:59:59",
+      clubes: { nombre: "QA Club" },
+      canchas: { nombre: "1" },
+    };
+    const slots = generarSlotsDesdeSedesYVentana({
+      canchas: [
+        { ...canchaBase, fecha: "2026-12-12" },
+        { ...canchaBase, fecha: "2026-12-13", cancha_id: "c2" },
+      ],
+      dias: ["2026-12-12", "2026-12-13"],
+      duracionMinutos: 90,
+    });
+    const zonas: PartidoProgramable[] = [
+      {
+        id: "z16",
+        ronda: "ZONA E",
+        orden: 16,
+        equipo_a_id: "p17",
+        equipo_b_id: "p18",
+        estado_partido: "Programado",
+        cancha_asignada: "QA Club — 1",
+        fecha_partido: "2026-12-12T20:00:00-03:00",
+      },
+    ];
+    const octavo: PartidoProgramable[] = [
+      {
+        id: "o18",
+        ronda: "OCTAVOS",
+        orden: 18,
+        estado_partido: "Programado",
+      },
+    ];
+    const durZona = 75;
+    const notBefore = finWallClockTrasPartidos(zonas, durZona, {
+      descansoModo: "tras_fin_60",
+    });
+    const slotsDomingo = slots.filter((s) => s.fecha === "2026-12-13");
+
+    asignarHorariosAPartidos(ordenDeAsignacion(octavo, "continua"), slotsDomingo, buildOcupadosDesdePartidos(zonas), {
+      duracionMinutos: 90,
+      duracionZonaMinutos: durZona,
+      descansoModo: "tras_fin_60",
+      descansoMinutos: 60,
+      permitirSinEquipos: true,
+      notBeforeExtra: notBefore,
+      distribucion: "continua",
+    });
+
+    assert.ok(octavo[0].fecha_partido);
+    const inicio = parseFechaPartidoIsoPublic(String(octavo[0].fecha_partido));
+    assert.ok(inicio);
+    assert.equal(inicio.fecha, "2026-12-13");
+    assert.ok(inicio.startMin >= 8 * 60);
+
+    const issues = evaluateProgramacionIssues([...zonas, ...octavo], {
+      duracionMinutos: 90,
+      duracionZonaMinutos: durZona,
+      descansoModo: "tras_fin_60",
+    });
+    assert.equal(
+      issues.some(
+        (i) =>
+          i.severity === "bad" &&
+          (i.message.includes("último partido de zona") ||
+            i.message.includes("Descanso insuficiente")),
+      ),
+      false,
+    );
   });
 });
 
