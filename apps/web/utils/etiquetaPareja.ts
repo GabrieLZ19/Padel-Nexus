@@ -18,6 +18,39 @@ export function etiquetaSlotVacioLlave(opts: {
   return POR_DEFINIR;
 }
 
+/** Etiqueta «Gan. #N» del partido alimentador (TOR-36, vista llave pública). */
+export function etiquetaAlimentadorPartido(
+  feeder: { id: string; orden?: number | null } | undefined | null,
+  numerosPorPartidoId: Map<string, number>,
+): string | null {
+  if (!feeder || String(feeder.id).startsWith("empty-")) return null;
+  const visible = numerosPorPartidoId.get(feeder.id);
+  const n = visible ?? feeder.orden;
+  if (n == null || !Number.isFinite(Number(n))) return null;
+  return `Gan. #${n}`;
+}
+
+/** Orígenes A/B por posición en el cuadro eliminatorio estándar. */
+export function origenesAlimentadoresEliminatoria(
+  matchIndex: number,
+  partidosRondaAnterior:
+    | Array<{ id: string; orden?: number | null }>
+    | undefined,
+  numerosPorPartidoId: Map<string, number>,
+): { origenA: string | null; origenB: string | null } {
+  const prev = partidosRondaAnterior ?? [];
+  return {
+    origenA: etiquetaAlimentadorPartido(
+      prev[matchIndex * 2],
+      numerosPorPartidoId,
+    ),
+    origenB: etiquetaAlimentadorPartido(
+      prev[matchIndex * 2 + 1],
+      numerosPorPartidoId,
+    ),
+  };
+}
+
 const PARTICULAS = new Set(["de", "del", "la", "las", "los", "y", "e"]);
 
 export function esAlcanceNacional(alcance?: string | null): boolean {

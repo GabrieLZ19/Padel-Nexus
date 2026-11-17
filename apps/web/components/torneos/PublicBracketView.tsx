@@ -7,7 +7,10 @@ import {
   PairDisplay,
   esAlcanceNacional,
 } from "@/components/torneos/PairDisplay";
-import { LIBRE, POR_DEFINIR } from "@/utils/etiquetaPareja";
+import {
+  etiquetaSlotVacioLlave,
+  origenesAlimentadoresEliminatoria,
+} from "@/utils/etiquetaPareja";
 import {
   etiquetaRondaLlave,
   numerosVisiblesDePartidos,
@@ -68,6 +71,7 @@ function BracketTeamRow({
   alcanceNacional,
   won,
   emptyLabel,
+  origen,
 }: {
   j1?: string | null;
   j2?: string | null;
@@ -81,6 +85,7 @@ function BracketTeamRow({
   alcanceNacional?: boolean;
   won?: boolean;
   emptyLabel?: string;
+  origen?: string | null;
 }) {
   const empty = !j1 && !j2 && !denominacion && !provincia;
 
@@ -93,8 +98,14 @@ function BracketTeamRow({
       {empty ? (
         <>
           <span className="size-7 rounded-full border border-dashed border-white/15 shrink-0" />
-          <p className="text-xs sm:text-[13px] font-medium truncate leading-tight text-gray-600 italic">
-            {emptyLabel || POR_DEFINIR}
+          <p
+            className={`text-xs sm:text-[13px] font-medium truncate leading-tight italic ${
+              origen?.trim()
+                ? "text-brand-chartreuse/90 not-italic font-bold"
+                : "text-gray-600"
+            }`}
+          >
+            {emptyLabel}
           </p>
         </>
       ) : (
@@ -126,11 +137,15 @@ function BracketMatchCell({
   width,
   alcanceNacional,
   numero,
+  origenA,
+  origenB,
 }: {
   partido: Partido;
   width: number;
   alcanceNacional?: boolean;
   numero?: number;
+  origenA?: string | null;
+  origenB?: string | null;
 }) {
   const isA =
     partido.ganador === partido.equipo_a_id && partido.ganador != null;
@@ -138,16 +153,28 @@ function BracketMatchCell({
     partido.ganador === partido.equipo_b_id && partido.ganador != null;
   const finalizado = partido.ganador != null;
   const hasA = Boolean(
-    partido.equipo_a_j1 || partido.equipo_a_j2 || partido.equipo_a_denominacion,
+    partido.equipo_a_j1 ||
+      partido.equipo_a_j2 ||
+      partido.equipo_a_denominacion ||
+      partido.equipo_a_id,
   );
   const hasB = Boolean(
-    partido.equipo_b_j1 || partido.equipo_b_j2 || partido.equipo_b_denominacion,
+    partido.equipo_b_j1 ||
+      partido.equipo_b_j2 ||
+      partido.equipo_b_denominacion ||
+      partido.equipo_b_id,
   );
-  // BYE: uno de los dos lados existe y el otro no. El equipo que existe pasa
-  // directo. No hay score que mostrar; marcamos visualmente el ganador.
-  const esByeA = hasA && !hasB;
-  const esByeB = hasB && !hasA;
-  const esBye = esByeA || esByeB;
+  const origenAStr = String(origenA || "").trim();
+  const origenBStr = String(origenB || "").trim();
+  const huecoABye = !hasA && hasB && !origenAStr;
+  const huecoBBye = !hasB && hasA && !origenBStr;
+  const victoriaByeA = hasA && !hasB && !origenBStr;
+  const victoriaByeB = hasB && !hasA && !origenAStr;
+  const esBye = (victoriaByeA || victoriaByeB) && !finalizado;
+  const labelA =
+    origenAStr || etiquetaSlotVacioLlave({ esByeInferido: huecoABye });
+  const labelB =
+    origenBStr || etiquetaSlotVacioLlave({ esByeInferido: huecoBBye });
   const scoreA = [partido.set1_a, partido.set2_a, partido.set3_a]
     .filter((v) => v != null)
     .join("-");
@@ -193,18 +220,19 @@ function BracketMatchCell({
             provincia={partido.equipo_a_provincia}
             letra={partido.equipo_a_letra_prioridad}
             alcanceNacional={alcanceNacional}
-            won={isA || esByeA}
-            emptyLabel={esByeB ? LIBRE : POR_DEFINIR}
+            won={isA || victoriaByeA}
+            emptyLabel={labelA}
+            origen={origenAStr || null}
           />
         </div>
         <div
           className={`w-9 shrink-0 flex items-center justify-center border-l border-brand-input text-xs font-black tabular-nums ${
-            isA || esByeA
+            isA || victoriaByeA
               ? "text-brand-chartreuse bg-brand-chartreuse/10"
               : "text-gray-500"
           }`}
         >
-          {esByeA ? "→" : scoreA || "–"}
+          {victoriaByeA ? "→" : scoreA || "–"}
         </div>
       </div>
       {/* Fila equipo B */}
@@ -221,18 +249,19 @@ function BracketMatchCell({
             provincia={partido.equipo_b_provincia}
             letra={partido.equipo_b_letra_prioridad}
             alcanceNacional={alcanceNacional}
-            won={isB || esByeB}
-            emptyLabel={esByeA ? LIBRE : POR_DEFINIR}
+            won={isB || victoriaByeB}
+            emptyLabel={labelB}
+            origen={origenBStr || null}
           />
         </div>
         <div
           className={`w-9 shrink-0 flex items-center justify-center border-l border-brand-input text-xs font-black tabular-nums ${
-            isB || esByeB
+            isB || victoriaByeB
               ? "text-brand-chartreuse bg-brand-chartreuse/10"
               : "text-gray-500"
           }`}
         >
-          {esByeB ? "→" : scoreB || "–"}
+          {victoriaByeB ? "→" : scoreB || "–"}
         </div>
       </div>
       {/* Franja inferior: fecha · cancha · hora (solo si hay dato y no es BYE) */}
@@ -469,20 +498,32 @@ export default function PublicBracketView({
                   {round.label}
                 </p>
                 <div className="relative" style={{ height: columnHeight }}>
-                  {round.matches.map((match, matchIdx) => (
-                    <div
-                      key={match.id}
-                      className="absolute left-0 -translate-y-1/2"
-                      style={{ top: (centers[matchIdx] ?? 0) - HEADER_H }}
-                    >
-                      <BracketMatchCell
-                        partido={match}
-                        width={cardW}
-                        alcanceNacional={nacional}
-                        numero={numeros.get(match.id)}
-                      />
-                    </div>
-                  ))}
+                  {round.matches.map((match, matchIdx) => {
+                    const prevMatches =
+                      roundIdx > 0 ? roundsData[roundIdx - 1]?.matches : undefined;
+                    const { origenA, origenB } =
+                      origenesAlimentadoresEliminatoria(
+                        matchIdx,
+                        prevMatches,
+                        numeros,
+                      );
+                    return (
+                      <div
+                        key={match.id}
+                        className="absolute left-0 -translate-y-1/2"
+                        style={{ top: (centers[matchIdx] ?? 0) - HEADER_H }}
+                      >
+                        <BracketMatchCell
+                          partido={match}
+                          width={cardW}
+                          alcanceNacional={nacional}
+                          numero={numeros.get(match.id)}
+                          origenA={origenA}
+                          origenB={origenB}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

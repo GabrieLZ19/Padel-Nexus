@@ -4,7 +4,7 @@ import {
   LIBRE,
   POR_DEFINIR,
   etiquetaParejaVisible,
-} from "../utils/etiquetaPareja";
+} from "../utils/etiquetaPareja.ts";
 
 describe("etiqueta de pareja", () => {
   it("en un nacional une provincia, letra y apellidos", () => {

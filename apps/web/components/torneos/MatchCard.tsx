@@ -48,8 +48,10 @@ export const MatchCard = ({
   const hasB = Boolean(
     partido.equipo_b_j1 || partido.equipo_b_j2 || partido.equipo_b_id,
   );
-  const slotAEsBye = !hasA && hasB && !finalizado;
-  const slotBEsBye = !hasB && hasA && !finalizado;
+  const slotAEsBye =
+    !hasA && hasB && !finalizado && !String(origenEquipoA || "").trim();
+  const slotBEsBye =
+    !hasB && hasA && !finalizado && !String(origenEquipoB || "").trim();
 
   const formatMeta = () => {
     const parts: string[] = [];

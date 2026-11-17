@@ -12,6 +12,7 @@ import { esTorneoContextoFederacion } from "../../utils/constants/fapApaRules";
 import { esModalidadParejas } from "../../utils/formatFecha";
 import type { RolUsuario } from "../../utils/types/user.types";
 import { identificadorPareceDni } from "../../utils/identificadorJugadorManual";
+import { categoriaRequeridaDelTorneo } from "../../utils/categoriaTorneo";
 
 interface InscripcionManualModalProps {
   isOpen: boolean;
@@ -67,7 +68,11 @@ export default function InscripcionManualModal({
   });
 
   const esNacional = /nacional/i.test(String(torneo.alcance || ""));
-  const categoriaTorneo = (torneo.categoria || "").trim();
+  const categoriaTorneo =
+    categoriaRequeridaDelTorneo({
+      nivel: torneo.nivel,
+      categoria: torneo.categoria,
+    }) || "";
   const gratuito =
     typeof torneo.es_gratis === "boolean"
       ? torneo.es_gratis

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { categoriaRequeridaDelTorneo } from "../utils/categoriaTorneo.ts";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -12,7 +13,7 @@ describe("TOR-23 inscripción manual UI", () => {
       path.join(RAIZ, "components/inscripciones/InscripcionManualModal.tsx"),
       "utf8",
     );
-    assert.match(modal, /categoriaTorneo/);
+    assert.match(modal, /categoriaRequeridaDelTorneo/);
     assert.match(modal, /Categoría \(def\./);
     assert.match(modal, /Ficha provisional jugador 1/);
     assert.match(modal, /Ficha provisional jugador 2/);
@@ -23,6 +24,17 @@ describe("TOR-23 inscripción manual UI", () => {
     );
     assert.match(llave, /categoriaDef/);
     assert.match(llave, /categoria_padel: cat/);
+  });
+
+  it("categoriaRequeridaDelTorneo prioriza nivel sobre familia", () => {
+    assert.equal(
+      categoriaRequeridaDelTorneo({ nivel: "7ª", categoria: "Libres" }),
+      "7ª",
+    );
+    assert.equal(
+      categoriaRequeridaDelTorneo({ nivel: "  ", categoria: "Libres" }),
+      "Libres",
+    );
   });
 
   it("signup menciona club o asociación", () => {
