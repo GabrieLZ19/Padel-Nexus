@@ -1,9 +1,11 @@
 import { Server, Socket } from "socket.io";
 import { Server as HttpServer } from "http";
 import { ChatService } from "./chat.service";
-
-// Mapa de socketId → userId para evitar suplantación
-const socketUserMap = new Map<string, string>();
+import {
+  extraerTokenSocket,
+  usuarioIdVerificadoSocket,
+  verificarUsuarioDesdeToken,
+} from "../utils/socketAuth";
 
 export class SocketService {
   private static io: Server | null = null;
@@ -16,66 +18,80 @@ export class SocketService {
       },
     });
 
-    this.io.on("connection", (socket: Socket) => {
-      console.log(`🔌 Cliente conectado a Socket.io: ${socket.id}`);
+    this.io.use(async (socket, next) => {
+      const token = extraerTokenSocket(socket);
+      if (!token) {
+        return next(new Error("auth_required"));
+      }
+      const usuarioId = await verificarUsuarioDesdeToken(token);
+      if (!usuarioId) {
+        return next(new Error("auth_invalid"));
+      }
+      socket.data.usuarioId = usuarioId;
+      next();
+    });
 
-      // El cliente se une a una sala específica de su usuario_id para notificaciones personales
-      socket.on("join_room", (usuarioId: string) => {
-        if (usuarioId) {
-          socket.join(usuarioId);
-          socketUserMap.set(socket.id, usuarioId);
-          console.log(`👤 Usuario ${usuarioId} se unió a su sala de notificaciones`);
-        }
+    this.io.on("connection", (socket: Socket) => {
+      const userId = usuarioIdVerificadoSocket(socket);
+      if (!userId) {
+        socket.disconnect(true);
+        return;
+      }
+
+      console.log(`Socket.io: cliente conectado ${socket.id} (usuario ${userId})`);
+      socket.join(userId);
+
+      // Re-join idempotente; el userId del cliente se ignora (PUB-25).
+      socket.on("join_room", () => {
+        const verifiedId = usuarioIdVerificadoSocket(socket);
+        if (!verifiedId) return;
+        socket.join(verifiedId);
+        console.log(`Socket.io: usuario ${verifiedId} en sala de notificaciones`);
       });
 
-      // ── Chat: Unirse a sala de conversación ──────────────────────────
       socket.on("join_conversation", async (conversacionId: string) => {
-        const userId = socketUserMap.get(socket.id);
-        if (!userId || !conversacionId) return;
+        const verifiedId = usuarioIdVerificadoSocket(socket);
+        if (!verifiedId || !conversacionId) return;
 
         const sala = `chat:${conversacionId}`;
         socket.join(sala);
-        console.log(`💬 Usuario ${userId} se unió a la sala ${sala}`);
+        console.log(`Socket.io: usuario ${verifiedId} en sala ${sala}`);
       });
 
-      // ── Chat: Abandonar sala de conversación ────────────────────────
       socket.on("leave_conversation", (conversacionId: string) => {
         const sala = `chat:${conversacionId}`;
         socket.leave(sala);
-        console.log(`💬 Socket ${socket.id} abandonó la sala ${sala}`);
+        console.log(`Socket.io: socket ${socket.id} salió de ${sala}`);
       });
 
-      // ── Chat: Enviar mensaje ────────────────────────────────────────
       socket.on(
         "send_message",
         async (data: { conversacion_id: string; contenido: string }) => {
-          const userId = socketUserMap.get(socket.id);
-          if (!userId || !data.conversacion_id || !data.contenido?.trim()) return;
+          const verifiedId = usuarioIdVerificadoSocket(socket);
+          if (!verifiedId || !data.conversacion_id || !data.contenido?.trim()) {
+            return;
+          }
 
           try {
-            // 1. Persistir el mensaje
             const mensaje = await ChatService.enviarMensaje(
               data.conversacion_id,
-              userId,
+              verifiedId,
               data.contenido,
             );
 
             const sala = `chat:${data.conversacion_id}`;
 
-            // 2. Emitir a la sala de la conversación
             this.emitirASala(sala, "new_message", mensaje);
 
-            // 3. Notificar al destinatario si no está en la sala activa
             const destinatarios = await ChatService.obtenerDestinatarios(
               data.conversacion_id,
-              userId,
+              verifiedId,
             );
 
             for (const destId of destinatarios) {
               const socketsEnSala = await this.obtenerSocketsEnSala(sala);
               const destSockets = await this.obtenerSocketsEnSala(destId);
 
-              // Si el destinatario NO tiene sockets en la sala del chat
               const destEstaEnSala = socketsEnSala.some((sid) =>
                 destSockets.includes(sid),
               );
@@ -92,7 +108,7 @@ export class SocketService {
               }
             }
           } catch (err) {
-            console.error("🚨 Error al enviar mensaje por socket:", err);
+            console.error("Socket.io: error al enviar mensaje", err);
             socket.emit("chat_error", {
               error: "No se pudo enviar el mensaje.",
             });
@@ -100,32 +116,30 @@ export class SocketService {
         },
       );
 
-      // ── Chat: Typing indicators ─────────────────────────────────────
       socket.on("typing", (data: { conversacion_id: string }) => {
-        const userId = socketUserMap.get(socket.id);
-        if (!userId || !data.conversacion_id) return;
+        const verifiedId = usuarioIdVerificadoSocket(socket);
+        if (!verifiedId || !data.conversacion_id) return;
 
         const sala = `chat:${data.conversacion_id}`;
         socket.to(sala).emit("user_typing", {
           conversacion_id: data.conversacion_id,
-          usuario_id: userId,
+          usuario_id: verifiedId,
         });
       });
 
       socket.on("stop_typing", (data: { conversacion_id: string }) => {
-        const userId = socketUserMap.get(socket.id);
-        if (!userId || !data.conversacion_id) return;
+        const verifiedId = usuarioIdVerificadoSocket(socket);
+        if (!verifiedId || !data.conversacion_id) return;
 
         const sala = `chat:${data.conversacion_id}`;
         socket.to(sala).emit("user_stop_typing", {
           conversacion_id: data.conversacion_id,
-          usuario_id: userId,
+          usuario_id: verifiedId,
         });
       });
 
       socket.on("disconnect", () => {
-        socketUserMap.delete(socket.id);
-        console.log(`🔌 Cliente desconectado de Socket.io: ${socket.id}`);
+        console.log(`Socket.io: cliente desconectado ${socket.id}`);
       });
     });
 
@@ -139,21 +153,21 @@ export class SocketService {
     return this.io;
   }
 
-  static emitirAPersona(usuarioId: string, event: string, data: any) {
+  static emitirAPersona(usuarioId: string, event: string, data: unknown) {
     if (this.io) {
       this.io.to(usuarioId).emit(event, data);
-      console.log(`📡 Emitido evento "${event}" a la sala del usuario: ${usuarioId}`);
+      console.log(`Socket.io: evento "${event}" a usuario ${usuarioId}`);
     }
   }
 
-  static emitirATodos(event: string, data: any) {
+  static emitirATodos(event: string, data: unknown) {
     if (this.io) {
       this.io.emit(event, data);
-      console.log(`📡 Emitido evento "${event}" a todos los usuarios`);
+      console.log(`Socket.io: evento "${event}" broadcast`);
     }
   }
 
-  static emitirASala(sala: string, event: string, data: any) {
+  static emitirASala(sala: string, event: string, data: unknown) {
     if (this.io) {
       this.io.to(sala).emit(event, data);
     }
