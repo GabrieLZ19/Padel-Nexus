@@ -2545,6 +2545,10 @@ export class TorneoService {
       const { validarCambioEquiposConMatrizFap } = await import(
         "../utils/edicionLlaveFap"
       );
+      const {
+        planificarMaterializacionByeConSemilla,
+        planificarMaterializacionByeFap,
+      } = await import("../utils/fapByeMaterializacion");
       const { data: torneoFmt } = await supabaseAdmin
         .from("torneos")
         .select("formato")
@@ -2556,7 +2560,120 @@ export class TorneoService {
         );
         const matrix = getFapBracketForPairCount(pairCount);
         const spec = matrix?.find((m) => m.matchNo === partido.orden);
-        if (spec) {
+        const altaLado = opciones?.altaLadoA
+          ? ("a" as const)
+          : opciones?.altaLadoB
+            ? ("b" as const)
+            : undefined;
+        let omitirValidacionMatriz = false;
+        if (spec && matrix && altaLado) {
+          const planBye =
+            planificarMaterializacionByeFap(
+              spec,
+              partido.orden,
+              matrix,
+              prevA,
+              prevB,
+              nextA,
+              nextB,
+              altaLado,
+            ) ??
+            (opciones?.semillaFap
+              ? planificarMaterializacionByeConSemilla(
+                  opciones.semillaFap,
+                  partido.orden,
+                  matrix,
+                  prevA,
+                  prevB,
+                  nextA,
+                  nextB,
+                  altaLado,
+                )
+              : null);
+
+          if (planBye) {
+            omitirValidacionMatriz = true;
+            const entradaA =
+              planBye.ladoClasificado === "a"
+                ? planBye.inscripcionClasificada
+                : planBye.inscripcionRival;
+            const entradaB =
+              planBye.ladoClasificado === "b"
+                ? planBye.inscripcionClasificada
+                : planBye.inscripcionRival;
+
+            if (!planBye.mismoPartidoEntrada) {
+              const { data: filaEntrada } = await supabaseAdmin
+                .from("partidos")
+                .select(
+                  "id, ronda, orden, equipo_a_id, equipo_b_id, ganador, set1_a, set1_b",
+                )
+                .eq("torneo_id", partido.torneo_id)
+                .eq("orden", planBye.partidoEntradaOrden)
+                .maybeSingle();
+              if (!filaEntrada) {
+                throw new Error(
+                  "No se encontró el partido de entrada para armar el cruce del pase directo.",
+                );
+              }
+              const parcheEntrada =
+                await PromocionMenoresService.editarLados(
+                  partido.torneo_id,
+                  {
+                    id: filaEntrada.id,
+                    ronda: filaEntrada.ronda,
+                    orden: filaEntrada.orden,
+                    equipoAId: filaEntrada.equipo_a_id,
+                    equipoBId: filaEntrada.equipo_b_id,
+                    ganador: filaEntrada.ganador,
+                    set1A: filaEntrada.set1_a,
+                    set1B: filaEntrada.set1_b,
+                  },
+                  entradaA,
+                  entradaB,
+                );
+              await supabaseAdmin
+                .from("partidos")
+                .update({
+                  equipo_a_id: parcheEntrada.equipoAId,
+                  equipo_b_id: parcheEntrada.equipoBId,
+                  ganador: parcheEntrada.ganador,
+                  set1_a: parcheEntrada.set1A,
+                  set1_b: parcheEntrada.set1B,
+                  estado_partido: parcheEntrada.estado,
+                })
+                .eq("id", filaEntrada.id);
+              await registrarAuditoriaCambioParejaPartido({
+                partido: {
+                  id: filaEntrada.id,
+                  torneo_id: partido.torneo_id,
+                  ronda: filaEntrada.ronda,
+                  orden: filaEntrada.orden,
+                  equipo_a_id: filaEntrada.equipo_a_id,
+                  equipo_b_id: filaEntrada.equipo_b_id,
+                },
+                prevA: filaEntrada.equipo_a_id,
+                prevB: filaEntrada.equipo_b_id,
+                nextA: parcheEntrada.equipoAId,
+                nextB: parcheEntrada.equipoBId,
+                motivo: `${motivo} (materialización cruce pase directo)`,
+                adminId,
+              });
+            }
+
+            nextA = planBye.mismoPartidoEntrada
+              ? entradaA
+              : planBye.ladoDestinoALimpiar === "a"
+                ? null
+                : prevA;
+            nextB = planBye.mismoPartidoEntrada
+              ? entradaB
+              : planBye.ladoDestinoALimpiar === "b"
+                ? null
+                : prevB;
+          }
+        }
+        if (spec && !omitirValidacionMatriz) {
           validarCambioEquiposConMatrizFap(
             spec,
             prevA,

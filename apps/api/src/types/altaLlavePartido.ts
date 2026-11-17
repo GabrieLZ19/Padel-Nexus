@@ -28,4 +28,6 @@ export type AltaLlaveEnPartidoInput =
 export type OpcionesAltaEnActualizarEquipos = {
   altaLadoA?: AltaLlaveEnPartidoInput;
   altaLadoB?: AltaLlaveEnPartidoInput;
+  /** Semilla FAP del pase directo (p. ej. 1A) al dar de alta un rival. */
+  semillaFap?: string;
 };

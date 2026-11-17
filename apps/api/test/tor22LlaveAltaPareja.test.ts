@@ -35,6 +35,7 @@ describe("TOR-22 alta de pareja en edición de llave", () => {
     );
     assert.match(torneoSvc, /ejecutarAltaDesdePayload/);
     assert.match(torneoSvc, /altaLadoA/);
+    assert.match(torneoSvc, /planificarMaterializacionByeFap/);
 
     const ctrl = readFileSync(
       path.join(RAIZ, "src/controllers/torneo.controller.ts"),

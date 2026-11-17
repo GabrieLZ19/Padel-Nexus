@@ -622,14 +622,21 @@ export const actualizarEquiposPartido = async (
 ): Promise<Response> => {
   try {
     const { partido_id } = req.params;
-    const { equipo_a_id, equipo_b_id, motivo, alta_lado_a, alta_lado_b } =
-      req.body as {
-        equipo_a_id?: string | null;
-        equipo_b_id?: string | null;
-        motivo?: string;
-        alta_lado_a?: import("../types/altaLlavePartido").AltaLlaveEnPartidoInput;
-        alta_lado_b?: import("../types/altaLlavePartido").AltaLlaveEnPartidoInput;
-      };
+    const {
+      equipo_a_id,
+      equipo_b_id,
+      motivo,
+      alta_lado_a,
+      alta_lado_b,
+      semilla_fap,
+    } = req.body as {
+      equipo_a_id?: string | null;
+      equipo_b_id?: string | null;
+      motivo?: string;
+      alta_lado_a?: import("../types/altaLlavePartido").AltaLlaveEnPartidoInput;
+      alta_lado_b?: import("../types/altaLlavePartido").AltaLlaveEnPartidoInput;
+      semilla_fap?: string;
+    };
     const { data: partidoEquipos } = await supabaseAdmin
       .from("partidos")
       .select("torneo_id")
@@ -654,6 +661,7 @@ export const actualizarEquiposPartido = async (
       {
         altaLadoA: alta_lado_a,
         altaLadoB: alta_lado_b,
+        semillaFap: semilla_fap?.trim() || undefined,
       },
     );
     return res.status(200).json({ message: "Rivales actualizados exitosamente" });

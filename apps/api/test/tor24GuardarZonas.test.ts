@@ -7,11 +7,27 @@ import {
   buildValidLeafSeedRefs,
   buildZonePairCountsByLetter,
   isSeedRefValidForZoneComposition,
+  listSemillasPendientesFap,
 } from "../src/utils/fapZoneSeeds";
+import { buildQualifiedMap } from "../src/utils/fapBracketPlacement";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("TOR-24 guardar zonas y llave", () => {
+  it("semillas_pendientes excluye plazas invalidadas por tamano de zona", () => {
+    const counts = new Map([
+      ["A", 4],
+      ["B", 2],
+    ]);
+    const pendientes = listSemillasPendientesFap(
+      ["1A", "2B", "1B"],
+      buildQualifiedMap([]),
+      counts,
+    );
+    assert.ok(pendientes.includes("1B"));
+    assert.ok(!pendientes.includes("2B"));
+  });
+
   it("2º B deja de aplicar cuando la zona B tiene 2 parejas", () => {
     const counts = buildZonePairCountsByLetter([
       { nombre_grupo: "Zona A", grupo_parejas: [{}, {}, {}, {}] as { inscripcion_id: string }[] },
@@ -47,5 +63,6 @@ describe("TOR-24 guardar zonas y llave", () => {
     );
     assert.match(src, /isSeedRefValidForZoneComposition/);
     assert.match(src, /sincronizarLlaveTrasCambioZonas/);
+    assert.match(src, /zonasCompletas\.get\(g\.nombre_grupo\)/);
   });
 });

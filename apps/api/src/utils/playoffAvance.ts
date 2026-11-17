@@ -12,7 +12,9 @@ import {
 import type { QualifiedPair } from "./fapBracketTypes";
 import {
   buildZonePairCountsByLetter,
+  equipoEnSlotDesdeClasificado,
   isSeedRefValidForZoneComposition,
+  listSemillasPendientesFap,
 } from "./fapZoneSeeds";
 
 /** @deprecated Prefer matriz FAP por cantidad de parejas. */
@@ -121,20 +123,50 @@ export async function avanzarPartidosInternosTodasLasZonasCuatro(
   }
 }
 
-export async function zonasGrupalesCompletas(
+type PartidoZonaMin = {
+  ronda?: string | null;
+  ganador?: string | null;
+  equipo_a_id?: string | null;
+  equipo_b_id?: string | null;
+};
+
+export function zonaFixtureCompleto(matches: PartidoZonaMin[]): boolean {
+  if (matches.length === 0) return false;
+  return matches.every((p) => !partidoZonaPendiente(p));
+}
+
+/** Mapa nombre de zona -> todas sus partidas de zona están jugados. */
+export async function mapZonasGrupalesCompletas(
   torneoId: string,
-): Promise<boolean> {
+): Promise<Map<string, boolean>> {
   const { data: allGroupMatches } = await supabaseAdmin
     .from("partidos")
     .select("id, ronda, ganador, equipo_a_id, equipo_b_id")
     .eq("torneo_id", torneoId)
     .ilike("ronda", "Zona %");
 
-  if (!allGroupMatches || allGroupMatches.length === 0) return false;
+  const byRonda = new Map<string, PartidoZonaMin[]>();
+  for (const p of allGroupMatches || []) {
+    const ronda = (p.ronda || "").trim();
+    if (!ronda) continue;
+    const list = byRonda.get(ronda) ?? [];
+    list.push(p);
+    byRonda.set(ronda, list);
+  }
 
-  return (
-    allGroupMatches.filter((p) => partidoZonaPendiente(p)).length === 0
-  );
+  const out = new Map<string, boolean>();
+  for (const [ronda, matches] of byRonda) {
+    out.set(ronda, zonaFixtureCompleto(matches));
+  }
+  return out;
+}
+
+export async function zonasGrupalesCompletas(
+  torneoId: string,
+): Promise<boolean> {
+  const byZona = await mapZonasGrupalesCompletas(torneoId);
+  if (byZona.size === 0) return false;
+  return [...byZona.values()].every(Boolean);
 }
 
 export type ResumenSincLlaveFap = {
@@ -149,9 +181,20 @@ const resumenVacio = (): ResumenSincLlaveFap => ({
   semillas_pendientes: [],
 });
 
+export type OpcionesAvanzarJugadoresALlave = {
+  /** Si false, no asigna horarios de llave (p. ej. tras guardar zonas). */
+  programarLlavePendiente?: boolean;
+  /** Si false, no fuerza estado_partido Programado al rellenar lados. */
+  marcarPartidosProgramados?: boolean;
+};
+
 export async function avanzarJugadoresALlaves(
   torneoId: string,
+  opciones: OpcionesAvanzarJugadoresALlave = {},
 ): Promise<ResumenSincLlaveFap> {
+  const programarLlave = opciones.programarLlavePendiente !== false;
+  const marcarProgramados = opciones.marcarPartidosProgramados !== false;
+
   const { data: grupos } = await supabaseAdmin
     .from("grupos")
     .select("id, nombre_grupo, grupo_parejas(inscripcion_id)")
@@ -171,10 +214,15 @@ export async function avanzarJugadoresALlaves(
   }
 
   const qualifiedPairs: QualifiedPair[] = [];
+  const zonasCompletas = await mapZonasGrupalesCompletas(torneoId);
 
   for (const g of grupos) {
     const parejasEnZona = g.grupo_parejas?.length || 0;
     if (parejasEnZona === 0) continue;
+
+    if (!zonasCompletas.get(g.nombre_grupo)) {
+      continue;
+    }
 
     const cupo = clasificadosPorZona(parejasEnZona);
     const tabla = await ClasificacionService.calcularPosicionesZona(
@@ -208,7 +256,12 @@ export async function avanzarJugadoresALlaves(
 
   const qualifiedMap = buildQualifiedMap(qualifiedPairs);
   const requiredSeeds = listLeafSeeds(matrix);
-  const missing = requiredSeeds.filter((s) => !qualifiedMap.has(s));
+  const countsByZone = buildZonePairCountsByLetter(grupos);
+  const missing = listSemillasPendientesFap(
+    requiredSeeds,
+    qualifiedMap,
+    countsByZone,
+  );
   if (missing.length > 0) {
     console.warn(
       `[playoffAvance] Faltan clasificados para slots FAP ${missing.join(", ")} (torneo ${torneoId})`,
@@ -224,7 +277,6 @@ export async function avanzarJugadoresALlaves(
 
   if (!playoffMatches || playoffMatches.length === 0) return resumenVacio();
 
-  const countsByZone = buildZonePairCountsByLetter(grupos);
   const byOrden = new Map(playoffMatches.map((p) => [p.orden, p]));
   const fills = fillLeafSidesFromQualified(matrix, qualifiedMap);
   const semillasInvalidadas: string[] = [];
@@ -240,16 +292,18 @@ export async function avanzarJugadoresALlaves(
     const prevA = partido.equipo_a_id;
     const prevB = partido.equipo_b_id;
 
-    const equipo_a_id = matrixMatch.a.startsWith("W")
-      ? partido.equipo_a_id
-      : isSeedRefValidForZoneComposition(matrixMatch.a, countsByZone)
-        ? fill.equipo_a_id
-        : null;
-    const equipo_b_id = matrixMatch.b.startsWith("W")
-      ? partido.equipo_b_id
-      : isSeedRefValidForZoneComposition(matrixMatch.b, countsByZone)
-        ? fill.equipo_b_id
-        : null;
+    const equipo_a_id = equipoEnSlotDesdeClasificado(
+      matrixMatch.a,
+      fill.equipo_a_id,
+      countsByZone,
+      partido.equipo_a_id,
+    );
+    const equipo_b_id = equipoEnSlotDesdeClasificado(
+      matrixMatch.b,
+      fill.equipo_b_id,
+      countsByZone,
+      partido.equipo_b_id,
+    );
 
     if (!matrixMatch.a.startsWith("W")) {
       if (prevA && equipo_a_id === null) {
@@ -278,11 +332,17 @@ export async function avanzarJugadoresALlaves(
       continue;
     }
 
-    const patch: Record<string, any> = {
+    const patch: Record<string, unknown> = {
       equipo_a_id,
       equipo_b_id,
     };
-    if (!partido.ganador && partido.estado_partido !== "Finalizado") {
+    if (
+      marcarProgramados &&
+      !partido.ganador &&
+      partido.estado_partido !== "Finalizado" &&
+      equipo_a_id &&
+      equipo_b_id
+    ) {
       patch.estado_partido = "Programado";
     }
 
@@ -292,10 +352,12 @@ export async function avanzarJugadoresALlaves(
       .eq("id", partido.id);
   }
 
-  const { programarPartidosLlavePendientes } = await import(
-    "./programacionPartidos"
-  );
-  await programarPartidosLlavePendientes(torneoId);
+  if (programarLlave) {
+    const { programarPartidosLlavePendientes } = await import(
+      "./programacionPartidos"
+    );
+    await programarPartidosLlavePendientes(torneoId);
+  }
 
   return {
     semillas_invalidadas: [...new Set(semillasInvalidadas)],
@@ -322,7 +384,10 @@ export async function sincronizarClasificadosALlave(
   if (!playoffMatches || playoffMatches.length === 0) return false;
 
   // Si ya hay alguna hoja rellena, igual re-sincronizamos con FAP (idempotente en lados W*).
-  await avanzarJugadoresALlaves(torneoId);
+  await avanzarJugadoresALlaves(torneoId, {
+    programarLlavePendiente: true,
+    marcarPartidosProgramados: true,
+  });
   return true;
 }
 
@@ -344,5 +409,8 @@ export async function sincronizarLlaveTrasCambioZonas(
 
   if (!playoffMatches || playoffMatches.length === 0) return resumenVacio();
 
-  return avanzarJugadoresALlaves(torneoId);
+  return avanzarJugadoresALlaves(torneoId, {
+    programarLlavePendiente: false,
+    marcarPartidosProgramados: false,
+  });
 }

@@ -53,3 +53,28 @@ export function isSeedRefValidForZoneComposition(
   const maxPos = clasificadosPorZona(count);
   return parsed.pos >= 1 && parsed.pos <= maxPos;
 }
+
+/** Plazas FAP sin clasificado que siguen aplicando con la composición actual de zonas. */
+export function listSemillasPendientesFap(
+  requiredLeafSeeds: string[],
+  qualified: Map<string, string>,
+  countsByZone: Map<string, number>,
+): string[] {
+  return requiredLeafSeeds.filter(
+    (seed) =>
+      isSeedRefValidForZoneComposition(seed, countsByZone) &&
+      !qualified.has(seed),
+  );
+}
+
+/** Resuelve el equipo en un lado de hoja FAP según matriz, clasificado y tamaño de zona. */
+export function equipoEnSlotDesdeClasificado(
+  ref: string,
+  fillEquipoId: string | null | undefined,
+  countsByZone: Map<string, number>,
+  equipoActual: string | null | undefined,
+): string | null {
+  if (ref.startsWith("W")) return equipoActual ?? null;
+  if (!isSeedRefValidForZoneComposition(ref, countsByZone)) return null;
+  return fillEquipoId ?? null;
+}
