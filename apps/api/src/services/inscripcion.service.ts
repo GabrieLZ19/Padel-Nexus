@@ -12,6 +12,12 @@ import {
   FAP_ESTADOS_PAGO,
 } from "../constants/fap";
 import { NotificacionService } from "./notificacion.service";
+import { PlatformFeeService } from "./platformFee.service";
+import {
+  montoInscripcionDesdePrecioTorneo,
+  plazasInscripcionDesdeContexto,
+  precioUnitarioDesdeMonto,
+} from "../utils/inscripcionMonto";
 import {
   assertCategoria,
   assertEdad,
@@ -162,7 +168,7 @@ export class InscripcionService {
     const { data: torneo, error } = await supabaseAdmin
       .from("torneos")
       .select(
-        "id, fecha, fecha_cierre_inscripcion, nivel, alcance, categoria, rama, validar_edad, cupos_maximos, cupos_actuales, estado, reglas_arbitraje, club_id, asociacion_id",
+        "id, fecha, fecha_cierre_inscripcion, nivel, alcance, categoria, rama, validar_edad, cupos_maximos, cupos_actuales, estado, reglas_arbitraje, club_id, asociacion_id, modalidad, precio_inscripcion",
       )
       .eq("id", torneoId)
       .single();
@@ -625,6 +631,17 @@ export class InscripcionService {
       throw new Error("El torneo ha alcanzado el límite máximo de cupos.");
     }
 
+    const plazas = plazasInscripcionDesdeContexto({
+      modalidad: torneo.modalidad,
+      jugador2Id,
+      jugador2Email,
+      jugador2Nombre,
+    });
+    const montoFinal = montoInscripcionDesdePrecioTorneo(
+      Number(torneo.precio_inscripcion ?? monto),
+      plazas,
+    );
+
     // 10. INSERCIÓN
     const { data: inscripcionInsertada, error: errInsert } = await supabaseAdmin
       .from("inscripciones")
@@ -635,7 +652,7 @@ export class InscripcionService {
           usuario2_id: jugador2Id,
           jugador1_nombre: jugador1Nombre,
           jugador2_nombre: jugador2Nombre,
-          monto,
+          monto: montoFinal,
           estado_pago: FAP_ESTADOS_PAGO.PENDIENTE,
           tipo: "Inscripción torneo",
           letra_prioridad: letraPrioridad
@@ -926,6 +943,16 @@ export class InscripcionService {
       const j1Nombre = formatNombreCompleto(j1.apellido, j1.nombre);
       const j2Nombre = j2 ? formatNombreCompleto(j2.apellido, j2.nombre) : "-";
 
+      const plazasManual = plazasInscripcionDesdeContexto({
+        modalidad: torneo.modalidad,
+        jugador2Id: j2?.id,
+        jugador2Identificador: jugador2Identificador,
+      });
+      const montoInscripcion = montoInscripcionDesdePrecioTorneo(
+        Number(torneo.precio_inscripcion ?? monto),
+        plazasManual,
+      );
+
       const { data: inscripcionInsertada, error: errInsert } = await supabaseAdmin
         .from("inscripciones")
         .insert([
@@ -935,7 +962,7 @@ export class InscripcionService {
             usuario2_id: j2 ? j2.id : null,
             jugador1_nombre: j1Nombre,
             jugador2_nombre: j2Nombre,
-            monto,
+            monto: montoInscripcion,
             estado_pago: estadoPago,
             tipo: "Inscripción torneo",
             letra_prioridad: letraPrioridad?.trim().toUpperCase() || null,
@@ -954,6 +981,15 @@ export class InscripcionService {
         .from("torneos")
         .update({ cupos_actuales: (torneo.cupos_actuales || 0) + 1 })
         .eq("id", torneoId);
+
+      if (estadoPago === FAP_ESTADOS_PAGO.CONFIRMADO && montoInscripcion > 0) {
+        const origenFee =
+          (metodoPago || "").toLowerCase() === "planilla" ? "planilla" : "manual";
+        await PlatformFeeService.registrarFeeInscripcionOffPlatform(
+          inscripcionInsertada.id,
+          origenFee,
+        );
+      }
 
       await supabaseAdmin.from("logs_auditoria").insert({
         usuario_id_admin: adminId,
@@ -1020,8 +1056,12 @@ export class InscripcionService {
       .single();
 
     const modalidadTorneo = modalidad || torneoCompleto?.modalidad;
-    const monto = Number(torneoCompleto?.precio_inscripcion || 0);
+    const precioPlaza = Number(torneoCompleto?.precio_inscripcion || 0);
     const individual = esModalidadIndividual(modalidadTorneo);
+    const monto = montoInscripcionDesdePrecioTorneo(
+      precioPlaza,
+      individual ? 1 : 2,
+    );
 
     const grupos: Array<{
       j1: FilaPlanillaInscripcion;
@@ -1162,17 +1202,28 @@ export class InscripcionService {
       mobileParams: { inscripcion_id: inscripcionId, torneo_id: torneoId },
     });
 
+    const org = await PlatformFeeService.resolverOrgDesdeTorneo(torneoId);
+    const unidades = PlatformFeeService.countPlazasInscripcion(
+      inscripcion.usuario2_id,
+    );
+    const breakdown = await PlatformFeeService.calcularCheckout(
+      "inscripciones",
+      org,
+      monto,
+      unidades,
+    );
+    const precioPorPlaza = precioUnitarioDesdeMonto(monto, unidades);
+    const mpItems = PlatformFeeService.buildMpItemsInscripcion({
+      inscripcionId,
+      torneoNombre,
+      precioPorPlaza,
+      plazas: unidades,
+      breakdown,
+    });
+
     const response = await preference.create({
       body: {
-        items: [
-          {
-            id: inscripcionId,
-            title: `Inscripción: ${torneoNombre}`,
-            quantity: 1,
-            unit_price: monto,
-            currency_id: "ARS",
-          },
-        ],
+        items: mpItems,
         back_urls: backUrls,
         auto_return: backUrls.success.startsWith("https://")
           ? "approved"
@@ -1192,7 +1243,12 @@ export class InscripcionService {
         response.sandbox_init_point,
       ),
       sandboxInitPoint: response.sandbox_init_point,
-      monto,
+      monto: breakdown.montoTotal,
+      monto_bruto: breakdown.montoBruto,
+      cargo_servicio: breakdown.montoFee,
+      modo_fee: breakdown.modo,
+      plazas: unidades,
+      precio_por_plaza: precioPorPlaza,
       moneda: "ARS",
       inscripcionId,
       torneoId,
@@ -1243,6 +1299,13 @@ export class InscripcionService {
       actualizada,
       paymentId,
     );
+
+    await PlatformFeeService.registrarFeeInscripcionOnline(
+      inscripcionId,
+      paymentId,
+      monto,
+    );
+
     return actualizada;
   }
 

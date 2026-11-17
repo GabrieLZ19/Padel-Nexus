@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../config/supabase";
 import { FAP_ESTADOS_LICENCIA, FAP_ESTADOS_PAGO } from "../constants/fap";
 import { NotificacionService } from "./notificacion.service";
+import { PlatformFeeService } from "./platformFee.service";
 
 interface ProcesarPagoManualDTO {
   entidadTipo: "inscripcion" | "licencia";
@@ -52,6 +53,13 @@ export class PagoService {
     if (errUpdate || !entidadActualizada) {
       throw new Error(
         `Error al actualizar el estado financiero: ${errUpdate?.message}`,
+      );
+    }
+
+    if (datos.entidadTipo === "inscripcion" && datos.monto > 0) {
+      await PlatformFeeService.registrarFeeInscripcionOffPlatform(
+        datos.entidadId,
+        "manual",
       );
     }
 

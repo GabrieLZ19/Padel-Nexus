@@ -882,6 +882,32 @@ export class MarketplaceService {
       mobileParams: { orden_id: ordenId },
     });
 
+    const subtotal = (
+      orden as { items: Array<{ cantidad: number; precio_unitario: number }> }
+    ).items.reduce(
+      (acc, item) => acc + Number(item.precio_unitario) * item.cantidad,
+      0,
+    );
+    const { PlatformFeeService } = await import("./platformFee.service");
+    const { data: vendedorSample } = await supabaseAdmin
+      .from("marketplace_items_orden")
+      .select("vendedor_id")
+      .eq("orden_id", ordenId)
+      .limit(1)
+      .maybeSingle();
+    const org = vendedorSample?.vendedor_id
+      ? ({
+          org_tipo: "club" as const,
+          org_id: vendedorSample.vendedor_id,
+        })
+      : ({ org_tipo: "federacion" as const, org_id: ordenId });
+    const breakdown = await PlatformFeeService.calcularCheckout(
+      "marketplace",
+      org,
+      subtotal,
+      1,
+    );
+
     const mpItems = (orden as any).items.map((item: any) => ({
       id: item.producto?.id || "producto",
       title: item.producto?.nombre || "Producto Padel Nexus",
@@ -889,6 +915,15 @@ export class MarketplaceService {
       unit_price: Number(item.precio_unitario),
       currency_id: "ARS",
     }));
+    if (breakdown.discriminadoEnCheckout && breakdown.montoFee > 0) {
+      mpItems.push({
+        id: `orden-${ordenId}-fee`,
+        title: "Cargo por servicio Padel Nexus",
+        quantity: 1,
+        unit_price: breakdown.montoFee,
+        currency_id: "ARS",
+      });
+    }
 
     const response = await preference.create({
       body: {
@@ -970,6 +1005,29 @@ export class MarketplaceService {
             .eq("id", vendedorId);
         }
       }
+    }
+
+    try {
+      const { PlatformFeeService } = await import("./platformFee.service");
+      const subtotal = Number(orden.total || 0);
+      const vendedorId = items?.[0]?.vendedor_id;
+      const org = vendedorId
+        ? { org_tipo: "club" as const, org_id: vendedorId }
+        : { org_tipo: "federacion" as const, org_id: ordenId };
+      const modo = await PlatformFeeService.resolverModoOrg(org, "marketplace");
+      await PlatformFeeService.registrarMovimientoFee({
+        canal: "marketplace",
+        org,
+        entidadTipo: "marketplace_orden",
+        entidadId: ordenId,
+        montoBruto: subtotal,
+        modo,
+        origen: "mp_online",
+        mpPaymentId,
+        online: true,
+      });
+    } catch (feeErr) {
+      console.error("Fee marketplace MP:", feeErr);
     }
 
     await supabaseAdmin.from("logs_auditoria").insert({

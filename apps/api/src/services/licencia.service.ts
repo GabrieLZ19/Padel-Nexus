@@ -1395,17 +1395,26 @@ export class LicenciaService {
       mobileParams: { licencia_id: licenciaId },
     });
 
+    const { PlatformFeeService } = await import("./platformFee.service");
+    const org = await PlatformFeeService.resolverOrgDesdeLicencia(licenciaId);
+    const breakdown = await PlatformFeeService.calcularCheckout(
+      "licencias",
+      org,
+      precio,
+      1,
+    );
+    const mpItems = PlatformFeeService.buildMpItems(
+      {
+        id: licenciaId,
+        title: `Licencia FAP ${licencia.nro_licencia}`,
+        unit_price: precio,
+      },
+      breakdown,
+    );
+
     const response = await preference.create({
       body: {
-        items: [
-          {
-            id: licenciaId,
-            title: `Licencia FAP ${licencia.nro_licencia}`,
-            quantity: 1,
-            unit_price: precio,
-            currency_id: "ARS",
-          },
-        ],
+        items: mpItems,
         back_urls: backUrls,
         auto_return: backUrls.success.startsWith("https://")
           ? "approved"
@@ -1524,6 +1533,32 @@ export class LicenciaService {
       tipo: "info",
       metadata: { licencia_id: data.id },
     }).catch(() => undefined);
+
+    try {
+      const { PlatformFeeService } = await import("./platformFee.service");
+      const org = await PlatformFeeService.resolverOrgDesdeLicencia(licenciaId);
+      const modo = await PlatformFeeService.resolverModoOrg(org, "licencias");
+      const bruto =
+        monto ??
+        Number(
+          (datos.monto_pagado as number | undefined) ??
+            datos.precio_anual ??
+            0,
+        );
+      await PlatformFeeService.registrarMovimientoFee({
+        canal: "licencias",
+        org,
+        entidadTipo: "licencia",
+        entidadId: licenciaId,
+        montoBruto: bruto,
+        modo,
+        origen: "mp_online",
+        mpPaymentId: paymentId,
+        online: true,
+      });
+    } catch (feeErr) {
+      console.error("Fee licencia MP:", feeErr);
+    }
 
     return {
       ...data,

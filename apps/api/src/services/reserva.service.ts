@@ -830,17 +830,27 @@ export class ReservaService {
       mobileParams: { reserva_id: id },
     });
 
+    const { PlatformFeeService } = await import("./platformFee.service");
+    const org = await PlatformFeeService.resolverOrgDesdeClub(club.id);
+    const precioTurno = Number(turnos.precio);
+    const breakdown = await PlatformFeeService.calcularCheckout(
+      "reservas",
+      org,
+      precioTurno,
+      1,
+    );
+    const mpItems = PlatformFeeService.buildMpItems(
+      {
+        id: turnos.id,
+        title: `Reserva: ${cancha.nombre} - ${club.nombre}`,
+        unit_price: precioTurno,
+      },
+      breakdown,
+    );
+
     const response = await preference.create({
       body: {
-        items: [
-          {
-            id: turnos.id,
-            title: `Reserva: ${cancha.nombre} - ${club.nombre}`,
-            quantity: 1,
-            unit_price: Number(turnos.precio),
-            currency_id: "ARS",
-          },
-        ],
+        items: mpItems,
         back_urls: backUrls,
         auto_return: backUrls.success.startsWith("https://")
           ? "approved"
@@ -911,6 +921,38 @@ export class ReservaService {
 
     if (pagoError)
       throw new Error(`Error al registrar el pago: ${pagoError.message}`);
+
+    try {
+      const { data: reservaCtx } = await supabaseAdmin
+        .from("reservas")
+        .select("id, turnos ( canchas ( club_id ) )")
+        .eq("id", reservaId)
+        .maybeSingle();
+      const turnos = reservaCtx?.turnos as
+        | { canchas?: { club_id?: string } }
+        | { canchas?: { club_id?: string } }[]
+        | null;
+      const canchas = Array.isArray(turnos) ? turnos[0]?.canchas : turnos?.canchas;
+      const clubId = canchas?.club_id;
+      if (clubId) {
+        const { PlatformFeeService } = await import("./platformFee.service");
+        const org = await PlatformFeeService.resolverOrgDesdeClub(clubId);
+        const modo = await PlatformFeeService.resolverModoOrg(org, "reservas");
+        await PlatformFeeService.registrarMovimientoFee({
+          canal: "reservas",
+          org,
+          entidadTipo: "reserva",
+          entidadId: reservaId,
+          montoBruto: monto,
+          modo,
+          origen: "mp_online",
+          mpPaymentId: referenciaPago,
+          online: true,
+        });
+      }
+    } catch (feeErr) {
+      console.error("Fee reserva MP:", feeErr);
+    }
 
     // Disparar notificaciones en segundo plano por WebSocket y DB
     this.enviarNotificacionesPago(reservaId, monto);

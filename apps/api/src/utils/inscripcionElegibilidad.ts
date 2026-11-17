@@ -44,6 +44,8 @@ export type TorneoElegibilidad = {
   reglas_arbitraje?: unknown;
   club_id?: string | null;
   asociacion_id?: string | null;
+  modalidad?: string | null;
+  precio_inscripcion?: number | null;
 };
 
 /** Torneo del circuito nacional FAP (alcance o nivel legacy). */
