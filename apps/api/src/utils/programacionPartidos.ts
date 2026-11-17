@@ -1291,6 +1291,7 @@ export function asignarHorariosAPartidos(
       );
       if (!esRondaZona(item.partido.ronda)) {
         notBefore = [
+          ...notBeforeExtra,
           ...finWallClockTrasPartidos(
             partidos.filter((p) => esRondaZona(p.ronda)),
             duracionZonaMinutos,
@@ -1305,6 +1306,8 @@ export function asignarHorariosAPartidos(
           ),
           ...notBefore,
         ];
+      } else if (notBeforeExtra.length) {
+        notBefore = [...notBeforeExtra, ...notBefore];
       }
       const slot = buscarSlotIndividual(
         slots,

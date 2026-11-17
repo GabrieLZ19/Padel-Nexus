@@ -115,6 +115,23 @@ describe("TOR-3 descanso e inicio por día persisten en programador", () => {
     assert.doesNotMatch(src, /\.eq\("fecha", fecha\)/);
   });
 
+  it("auto-asignar usa contexto completo del torneo con limitarAIds (TOR-4)", () => {
+    const svc = fuenteApi("src/services/programacion.service.ts");
+    const bloque = svc.slice(
+      svc.indexOf("static async autoAsignar"),
+      svc.indexOf("static async persistirConfigProgramacion"),
+    );
+    assert.match(bloque, /limitarAIds:\s*limitarIdsDePartidos/);
+    assert.doesNotMatch(
+      bloque,
+      /asignarHorariosAPartidos\(\s*ordenadosLlave,/,
+    );
+    assert.doesNotMatch(
+      bloque,
+      /asignarHorariosAPartidos\(\s*aunSinAsignar,/,
+    );
+  });
+
   it("asignar lote respeta descanso persistido y feeders de llave", () => {
     const svc = fuenteApi("src/services/programacion.service.ts");
     const bloque = svc.slice(
