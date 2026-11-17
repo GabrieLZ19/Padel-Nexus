@@ -15,6 +15,44 @@ type TorneoSedeSeed = {
 };
 
 /**
+ * CLI-2: torneos de club creados antes del seed automatico — sede + disponibilidad
+ * base si `torneo_canchas_disponibilidad` esta vacia (idempotente).
+ */
+export async function asegurarDisponibilidadOrganizadorSiVacia(
+  torneoId: string,
+): Promise<boolean> {
+  const { count: dispPrevias, error: countError } = await supabaseAdmin
+    .from("torneo_canchas_disponibilidad")
+    .select("id", { count: "exact", head: true })
+    .eq("torneo_id", torneoId);
+
+  if (countError) throw new Error(countError.message);
+  if (dispPrevias && dispPrevias > 0) return false;
+
+  const { data: torneo, error: torneoError } = await supabaseAdmin
+    .from("torneos")
+    .select("id, club_id, fecha, fecha_fin, dias_juego, categoria")
+    .eq("id", torneoId)
+    .maybeSingle();
+
+  if (torneoError) throw new Error(torneoError.message);
+  if (!torneo?.club_id) return false;
+
+  await inicializarSedesTorneoOrganizador(
+    {
+      id: torneo.id,
+      club_id: torneo.club_id,
+      fecha: torneo.fecha,
+      fecha_fin: torneo.fecha_fin,
+      dias_juego: (torneo.dias_juego as string[] | null) ?? null,
+      categoria: torneo.categoria,
+    },
+    String(torneo.club_id),
+  );
+  return true;
+}
+
+/**
  * Tras crear un torneo de club: sede organizadora + disponibilidad base por cancha activa.
  */
 export async function inicializarSedesTorneoOrganizador(

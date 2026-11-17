@@ -1186,6 +1186,7 @@ export class ClubService {
         fecha_reserva,
         estado_pago,
         estado_reserva,
+        motivo_cancelacion,
         created_at,
         perfiles(id, nombre, apellido, email, telefono),
         turnos(

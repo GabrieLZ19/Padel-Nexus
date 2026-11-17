@@ -1573,6 +1573,16 @@ export async function cargarContextoProgramacion(torneoId: string): Promise<{
   fecha_fin: string | null;
   dias_juego: string[] | null;
 }> {
+  const { asegurarDisponibilidadOrganizadorSiVacia } = await import(
+    "./inicializarSedesTorneoOrganizador"
+  );
+  await asegurarDisponibilidadOrganizadorSiVacia(torneoId).catch((err) => {
+    console.error(
+      "CLI-2: no se pudo reparar disponibilidad al cargar programacion:",
+      err,
+    );
+  });
+
   const [{ data: torneo }, { data: disponibilidad }] = await Promise.all([
     supabaseAdmin
       .from("torneos")

@@ -41,5 +41,5 @@ function extractEmailFromFromHeader(from?: string | null): string | null {
 
 export function urlGestionarNotificaciones(): string {
   const base = (env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
-  return `${base}/mi-perfil/ajustes#notificaciones`;
+  return `${base}/mi-perfil/ajustes?seccion=notificaciones`;
 }

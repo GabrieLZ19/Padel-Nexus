@@ -3161,6 +3161,18 @@ export class TorneoService {
   }
 
   static async obtenerSedes(torneoId: string) {
+    const { asegurarDisponibilidadOrganizadorSiVacia } = await import(
+      "../utils/inicializarSedesTorneoOrganizador"
+    );
+    await asegurarDisponibilidadOrganizadorSiVacia(torneoId).catch(
+      (err: unknown) => {
+        console.error(
+          "CLI-2: no se pudo reparar sedes/disponibilidad del organizador:",
+          err,
+        );
+      },
+    );
+
     const { data, error } = await supabaseAdmin
       .from("torneo_sedes")
       .select("club_id, clubes(*, canchas(count))")
@@ -3208,6 +3220,18 @@ export class TorneoService {
   }
 
   static async obtenerCanchasDisponibilidad(torneoId: string) {
+    const { asegurarDisponibilidadOrganizadorSiVacia } = await import(
+      "../utils/inicializarSedesTorneoOrganizador"
+    );
+    await asegurarDisponibilidadOrganizadorSiVacia(torneoId).catch(
+      (err: unknown) => {
+        console.error(
+          "CLI-2: no se pudo reparar disponibilidad del organizador:",
+          err,
+        );
+      },
+    );
+
     const { data, error } = await supabaseAdmin
       .from("torneo_canchas_disponibilidad")
       .select("*, canchas(*), clubes(*)")

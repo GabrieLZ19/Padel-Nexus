@@ -24,6 +24,30 @@ describe("CLI-2 clubes adheridos vs sedes", () => {
     assert.match(src, /inicializarSedesTorneoOrganizador/);
   });
 
+  it("CLI-2 remanente: repara disponibilidad vacia al leer sedes o programador", () => {
+    const initSrc = readFileSync(
+      path.join(RAIZ, "src/utils/inicializarSedesTorneoOrganizador.ts"),
+      "utf8",
+    );
+    assert.match(initSrc, /asegurarDisponibilidadOrganizadorSiVacia/);
+    assert.match(
+      initSrc,
+      /if \(dispPrevias && dispPrevias > 0\) return false/,
+    );
+
+    const torneoSrc = readFileSync(
+      path.join(RAIZ, "src/services/torneo.service.ts"),
+      "utf8",
+    );
+    assert.match(torneoSrc, /asegurarDisponibilidadOrganizadorSiVacia/);
+
+    const progSrc = readFileSync(
+      path.join(RAIZ, "src/utils/programacionPartidos.ts"),
+      "utf8",
+    );
+    assert.match(progSrc, /asegurarDisponibilidadOrganizadorSiVacia/);
+  });
+
   it("expone promover a adherido para federacion", () => {
     const routes = readFileSync(
       path.join(RAIZ, "src/routes/club.routes.ts"),
