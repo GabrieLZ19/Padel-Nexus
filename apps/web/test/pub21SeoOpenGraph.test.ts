@@ -27,6 +27,29 @@ describe("PUB-21 SEO Open Graph y sitemap", () => {
     assert.match(robots, /disallow/);
     assert.match(sitemap, /RUTAS_PUBLICAS/);
     assert.match(sitemap, /getSiteUrl/);
+    assert.match(sitemap, /\/terminos/);
+    assert.match(sitemap, /\/privacidad/);
+  });
+
+  it("URL de sitio prioriza env y dominio play en produccion", () => {
+    const util = readFileSync(
+      path.join(RAIZ, "utils/siteMetadata.ts"),
+      "utf8",
+    );
+    assert.match(util, /NEXT_PUBLIC_SITE_URL/);
+    assert.match(util, /play\.padelnexus\.app/);
+    assert.doesNotMatch(util, /VERCEL_URL/);
+  });
+
+  it("rutas legales con layout de titulo propio (PUB-23)", () => {
+    for (const [rel, titulo] of [
+      ["(public)/terminos/layout.tsx", "Términos y condiciones"],
+      ["(public)/privacidad/layout.tsx", "Política de privacidad"],
+    ] as const) {
+      const file = readFileSync(path.join(RAIZ, "app", rel), "utf8");
+      assert.match(file, /pageMetadata/);
+      assert.ok(file.includes(titulo), `debe incluir ${titulo}`);
+    }
   });
 
   it("rutas QA con layout de titulo propio", () => {
@@ -61,5 +84,10 @@ describe("PUB-21 SEO Open Graph y sitemap", () => {
       "utf8",
     );
     assert.match(meta, /LogoAccessory/);
+    const favicon = path.join(RAIZ, "public/favicon.ico");
+    assert.ok(
+      readFileSync(favicon).byteLength > 0,
+      "public/favicon.ico debe existir",
+    );
   });
 });

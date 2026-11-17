@@ -16,5 +16,7 @@ describe("ENZO-3 portada móvil", () => {
     assert.match(home, /min-w-0 flex-1/);
     assert.match(home, /px-4/);
     assert.doesNotMatch(home, /max-w-\[80/);
+    assert.match(home, /placeholder="Torneos, clubes o jugadores"/);
+    assert.match(home, /text-sm.*sm:text-base/);
   });
 });

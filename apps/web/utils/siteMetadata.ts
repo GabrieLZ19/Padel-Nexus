@@ -5,6 +5,9 @@ export const SITE_NAME = "Padel Nexus";
 export const SITE_DEFAULT_DESCRIPTION =
   "Torneos, ranking oficial, reservas de canchas y marketplace de pádel en un solo lugar.";
 
+/** Dominio público de la app (sin barra final). Configurar `NEXT_PUBLIC_SITE_URL` en cada entorno. */
+export const SITE_URL_PRODUCTION_DEFAULT = "https://play.padelnexus.app";
+
 const OG_IMAGE_PATH = "/brand/LogoHorizontal.svg";
 
 export function getSiteUrl(): string {
@@ -12,11 +15,7 @@ export function getSiteUrl(): string {
   if (fromEnv) {
     return fromEnv.replace(/\/$/, "");
   }
-  const vercel = process.env.VERCEL_URL?.trim();
-  if (vercel) {
-    return `https://${vercel.replace(/\/$/, "")}`;
-  }
-  return "https://www.padelnexus.app";
+  return SITE_URL_PRODUCTION_DEFAULT;
 }
 
 function fullTitle(pageTitle?: string): string {

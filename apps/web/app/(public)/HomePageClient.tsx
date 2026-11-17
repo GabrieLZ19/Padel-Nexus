@@ -105,10 +105,11 @@ export default function HomePageClient() {
               <Search className="size-5 shrink-0 text-gray-500" aria-hidden />
               <input
                 type="search"
-                placeholder="Buscá torneos, clubes o jugadores"
+                placeholder="Torneos, clubes o jugadores"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="min-w-0 flex-1 border-none bg-transparent text-base text-brand-white placeholder:text-gray-500 focus:outline-none sm:text-base"
+                className="min-w-0 flex-1 border-none bg-transparent text-sm text-brand-white placeholder:text-gray-500 focus:outline-none sm:text-base"
+                aria-label="Buscar torneos, clubes o jugadores"
               />
             </label>
             <button

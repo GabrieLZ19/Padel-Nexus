@@ -27,3 +27,17 @@ export async function cerrarSesionCliente(): Promise<void> {
     credentials: "same-origin",
   }).catch(() => {});
 }
+
+/** Token de sesión para Socket.IO (lectura server-side de `padel_token` HttpOnly). */
+export async function obtenerTokenSocketCliente(): Promise<string | null> {
+  const res = await fetch("/api/auth/socket-token", {
+    method: "GET",
+    credentials: "same-origin",
+  });
+  if (!res.ok) {
+    return null;
+  }
+  const body = (await res.json().catch(() => null)) as { token?: string } | null;
+  const token = body?.token?.trim();
+  return token && token !== "undefined" && token !== "null" ? token : null;
+}

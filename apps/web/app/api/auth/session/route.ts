@@ -6,6 +6,7 @@ import {
   sessionCookieOptions,
   SESSION_COOKIE_PATH,
 } from "@/utils/bff/cookieOptions";
+import { validateSessionToken } from "@/utils/bff/validateSessionToken";
 
 type SessionBody = {
   token?: string;
@@ -26,20 +27,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Token requerido" }, { status: 400 });
   }
 
+  const verified = await validateSessionToken(token);
+  if (!verified) {
+    return NextResponse.json(
+      { error: "Token inválido o expirado" },
+      { status: 401 },
+    );
+  }
+
   const maxAge = body.rememberMe
     ? MAX_AGE_SESSION_REMEMBER
     : MAX_AGE_SESSION_DEFAULT;
 
   const response = NextResponse.json({ exito: true });
   response.cookies.set("padel_token", token, sessionCookieOptions(maxAge));
-
-  if (body.role) {
-    response.cookies.set(
-      "padel_user_role",
-      body.role,
-      roleCookieOptions(maxAge),
-    );
-  }
+  response.cookies.set(
+    "padel_user_role",
+    verified.role,
+    roleCookieOptions(maxAge),
+  );
 
   return response;
 }

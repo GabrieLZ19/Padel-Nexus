@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { useProfileStore } from "@/store/useProfileStore";
+import { obtenerTokenSocketCliente } from "@/utils/auth/sesionBff";
 
 let socketInstance: Socket | null = null;
 
@@ -10,7 +11,12 @@ let socketInstance: Socket | null = null;
  */
 export const getSocketInstance = (): Socket | null => socketInstance;
 
-export const useSocket = (onNotificationReceived?: (notif: any) => void) => {
+const socketBaseUrl = (): string =>
+  process.env.NEXT_PUBLIC_SOCKET_URL ||
+  process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
+  "http://localhost:4000";
+
+export const useSocket = (onNotificationReceived?: (notif: unknown) => void) => {
   const { profile } = useProfileStore();
   const callbackRef = useRef(onNotificationReceived);
 
@@ -27,36 +33,13 @@ export const useSocket = (onNotificationReceived?: (notif: any) => void) => {
       return;
     }
 
-    const socketUrl =
-      process.env.NEXT_PUBLIC_SOCKET_URL ||
-      process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
-      "http://localhost:4000";
-
-    if (!socketInstance) {
-      socketInstance = io(socketUrl, {
-        withCredentials: true,
-        transports: ["websocket"],
-      });
-
-      socketInstance.on("connect", () => {
-        if (profile?.id) {
-          socketInstance?.emit("join_room", profile.id);
-        }
-      });
-    } else {
-      if (socketInstance.connected) {
-        socketInstance.emit("join_room", profile.id);
-      }
-    }
+    let cancelled = false;
 
     const handleNuevaNotificacion = (notif: unknown) => {
-      if (callbackRef.current) {
-        callbackRef.current(notif);
-      }
+      callbackRef.current?.(notif);
     };
 
     const handleChatNotificacion = (data: unknown) => {
-      // Disparar un evento custom para que otros componentes puedan escucharlo
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent("chat_notification", { detail: data }),
@@ -82,19 +65,61 @@ export const useSocket = (onNotificationReceived?: (notif: any) => void) => {
       }
     };
 
-    socketInstance.on("nueva_notificacion", handleNuevaNotificacion);
-    socketInstance.on("chat_notification", handleChatNotificacion);
-    socketInstance.on("torneo_actualizado", handleTorneoActualizado);
-    socketInstance.on("partido_actualizado", handlePartidoActualizado);
-    socketInstance.on("bracket_actualizado", handleBracketActualizado);
+    const attachHandlers = (socket: Socket) => {
+      socket.on("nueva_notificacion", handleNuevaNotificacion);
+      socket.on("chat_notification", handleChatNotificacion);
+      socket.on("torneo_actualizado", handleTorneoActualizado);
+      socket.on("partido_actualizado", handlePartidoActualizado);
+      socket.on("bracket_actualizado", handleBracketActualizado);
+    };
+
+    const detachHandlers = (socket: Socket) => {
+      socket.off("nueva_notificacion", handleNuevaNotificacion);
+      socket.off("chat_notification", handleChatNotificacion);
+      socket.off("torneo_actualizado", handleTorneoActualizado);
+      socket.off("partido_actualizado", handlePartidoActualizado);
+      socket.off("bracket_actualizado", handleBracketActualizado);
+    };
+
+    void (async () => {
+      const token = await obtenerTokenSocketCliente();
+      if (cancelled || !token) {
+        return;
+      }
+
+      if (!socketInstance) {
+        socketInstance = io(socketBaseUrl(), {
+          withCredentials: true,
+          transports: ["websocket"],
+          auth: { token },
+        });
+
+        socketInstance.on("connect", () => {
+          socketInstance?.emit("join_room");
+        });
+
+        socketInstance.on("connect_error", () => {
+          if (socketInstance) {
+            socketInstance.disconnect();
+            socketInstance = null;
+          }
+        });
+      } else {
+        socketInstance.auth = { token };
+        if (socketInstance.connected) {
+          socketInstance.emit("join_room");
+        } else {
+          socketInstance.connect();
+        }
+      }
+
+      attachHandlers(socketInstance);
+    })();
 
     return () => {
+      cancelled = true;
       if (socketInstance) {
-        socketInstance.off("nueva_notificacion", handleNuevaNotificacion);
-        socketInstance.off("chat_notification", handleChatNotificacion);
-        socketInstance.off("torneo_actualizado", handleTorneoActualizado);
-        socketInstance.off("partido_actualizado", handlePartidoActualizado);
-        socketInstance.off("bracket_actualizado", handleBracketActualizado);
+        detachHandlers(socketInstance);
       }
     };
   }, [profile?.id]);
