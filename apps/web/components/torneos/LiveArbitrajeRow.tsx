@@ -92,7 +92,12 @@ export const LiveArbitrajeRow = ({
   const [esLesion, setEsLesion] = useState<boolean>(
     (partido as any).es_lesion || false,
   );
-  const [ganadorWo, setGanadorWo] = useState<"A" | "B">("A");
+  const [ganadorWo, setGanadorWo] = useState<"A" | "B" | null>(() => {
+    if ((partido as { es_wo?: boolean }).es_wo && !(partido as { es_lesion?: boolean }).es_lesion && partido.ganador) {
+      return partido.ganador === partido.equipo_a_id ? "A" : "B";
+    }
+    return null;
+  });
   const [parejaAbandona, setParejaAbandona] = useState<"A" | "B" | null>(() => {
     if ((partido as any).es_lesion && partido.ganador) {
       return partido.ganador === partido.equipo_a_id ? "B" : "A";
@@ -189,6 +194,10 @@ export const LiveArbitrajeRow = ({
     }
 
     if (esWo && !esLesion) {
+      if (!ganadorWo) {
+        onError("Indicá qué pareja se presentó antes de finalizar el W.O.");
+        return;
+      }
       const ganadorId =
         ganadorWo === "A" ? partido.equipo_a_id : partido.equipo_b_id;
       if (!ganadorId) {
@@ -541,33 +550,79 @@ export const LiveArbitrajeRow = ({
 
       <div className="min-w-0 flex-1">
         {esWo && !esLesion ? (
-          <div className="space-y-1">
+          <div className="space-y-2">
             <p className="text-right text-xs font-bold text-amber-300">
-              Sin inicio · 6-0 6-0
+              W.O. sin juego · Marcador 6-0 6-0
+            </p>
+            <p className="text-right text-xs font-semibold text-gray-300">
+              ¿Qué pareja se presentó?
             </p>
             {(
               [
                 ["A", etiquetaLado("a")] as const,
                 ["B", etiquetaLado("b")] as const,
               ]
-            ).map(([lado, nombre]) => (
-              <div key={lado} className="flex items-center gap-2">
-                <p className="min-w-0 flex-1 truncate text-right text-xs font-bold text-white">
-                  {nombre}
+            ).map(([lado, nombre]) => {
+              const rival: "A" | "B" = lado === "A" ? "B" : "A";
+              const sePresento = ganadorWo === lado;
+              const noSePresento = ganadorWo === rival;
+              return (
+                <div key={lado} className="flex flex-wrap items-center justify-end gap-1.5">
+                  <p
+                    className={`min-w-0 flex-1 truncate text-right text-xs font-bold ${
+                      sePresento
+                        ? "text-brand-chartreuse"
+                        : noSePresento
+                          ? "text-gray-500 line-through"
+                          : "text-white"
+                    }`}
+                  >
+                    {nombre}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setGanadorWo(lado)}
+                    className={`h-7 shrink-0 cursor-pointer rounded-md px-2.5 text-[11px] font-bold ${
+                      sePresento
+                        ? "bg-brand-chartreuse text-brand-black ring-1 ring-brand-chartreuse/80"
+                        : "border border-white/15 text-gray-300 hover:border-brand-chartreuse/40"
+                    }`}
+                  >
+                    Se presentó
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGanadorWo(rival)}
+                    className={`h-7 shrink-0 cursor-pointer rounded-md px-2.5 text-[11px] font-bold ${
+                      noSePresento
+                        ? "bg-red-600/90 text-white ring-1 ring-red-400/60"
+                        : "border border-white/15 text-gray-400 hover:border-red-400/40 hover:text-red-300"
+                    }`}
+                  >
+                    No se presentó
+                  </button>
+                </div>
+              );
+            })}
+            {ganadorWo ? (
+              <div
+                className="rounded-md border border-brand-chartreuse/40 bg-brand-chartreuse/10 px-2.5 py-2 text-right text-[11px] leading-snug"
+                role="status"
+              >
+                <p className="font-black text-brand-chartreuse">
+                  Ganador por W.O.:{" "}
+                  {ganadorWo === "A" ? etiquetaLado("a") : etiquetaLado("b")}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setGanadorWo(lado)}
-                  className={`h-7 w-24 shrink-0 cursor-pointer rounded-md text-xs font-bold ${
-                    ganadorWo === lado
-                      ? "bg-brand-chartreuse text-brand-black"
-                      : "border border-white/15 text-gray-300"
-                  }`}
-                >
-                  Presente
-                </button>
+                <p className="mt-0.5 font-semibold text-gray-300">
+                  No se presentó:{" "}
+                  {ganadorWo === "A" ? etiquetaLado("b") : etiquetaLado("a")}
+                </p>
               </div>
-            ))}
+            ) : (
+              <p className="text-right text-[11px] font-semibold text-amber-300/90">
+                Elegí una pareja antes de finalizar.
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-1.5">
@@ -700,6 +755,9 @@ export const LiveArbitrajeRow = ({
                 if (!e.target.checked) {
                   setEsLesion(false);
                   setParejaAbandona(null);
+                  setGanadorWo(null);
+                } else if (!esLesion) {
+                  setGanadorWo(null);
                 }
               }}
               className="accent-brand-chartreuse rounded"
@@ -727,7 +785,9 @@ export const LiveArbitrajeRow = ({
         <button
           type="button"
           onClick={handleFinalizar}
-          disabled={isSaving}
+          disabled={
+            isSaving || (esWo && !esLesion && ganadorWo === null)
+          }
           className="inline-flex h-7 cursor-pointer items-center justify-center gap-1 rounded-md bg-brand-chartreuse px-2.5 text-xs font-black text-brand-black hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : null}

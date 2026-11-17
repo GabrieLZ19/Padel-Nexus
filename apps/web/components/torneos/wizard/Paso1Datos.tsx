@@ -268,7 +268,11 @@ export const Paso1Datos = ({
   useEffect(() => {
     let isMounted = true;
     Promise.all([
-      ClubesService.getAll().catch(() => ({ data: [], total: 0 })),
+      ClubesService.getAll({
+        page: 1,
+        limit: 150,
+        scope: "torneo_sedes",
+      }).catch(() => ({ data: [], total: 0 })),
       AsociacionesService.getAll().catch(() => []),
       FederacionesService.getAll().catch(() => []),
     ]).then(([clubesRes, asocsRes, fedsRes]) => {
@@ -393,7 +397,7 @@ export const Paso1Datos = ({
   ]);
 
   const handleCrearClubRapido = async () => {
-    if (readOnly) return;
+    if (readOnly || creandoClub) return;
     const nombre = altaClubForm.nombre.trim();
     if (!nombre) {
       sileo.warning({
@@ -741,6 +745,7 @@ export const Paso1Datos = ({
               </div>
             ) : (
               <CustomDropdown
+                buscable
                 value={editSede}
                 onChange={(valor) => {
                   if (valor === "__alta_club__") {

@@ -20,6 +20,8 @@ export interface CustomDropdownProps {
   className?: string;
   /** Alto de barra (paginación, filtros). El resto de los formularios sigue en el tamaño de campo. */
   compacto?: boolean;
+  /** Filtro por texto dentro del menú (combobox). */
+  buscable?: boolean;
 }
 
 export default function CustomDropdown({
@@ -32,8 +34,10 @@ export default function CustomDropdown({
   hasError = false,
   className = "",
   compacto = false,
+  buscable = false,
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [filtro, setFiltro] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const listId = useId();
@@ -53,12 +57,19 @@ export default function CustomDropdown({
 
   useEffect(() => {
     if (!isOpen) return;
+    setFiltro("");
     const selected = options.findIndex((opt) => opt.value === value);
     setActiveIndex(selected >= 0 ? selected : 0);
   }, [isOpen, options, value]);
 
+  const opcionesVisibles = buscable && filtro.trim()
+    ? options.filter((opt) =>
+        opt.label.toLowerCase().includes(filtro.trim().toLowerCase()),
+      )
+    : options;
+
   const elegir = (index: number) => {
-    const opcion = options[index];
+    const opcion = opcionesVisibles[index];
     if (!opcion) return;
     onChange(opcion.value);
     setIsOpen(false);
@@ -73,9 +84,9 @@ export default function CustomDropdown({
         return;
       }
       setActiveIndex((indice) => {
-        if (options.length === 0) return 0;
+        if (opcionesVisibles.length === 0) return 0;
         return event.key === "ArrowDown"
-          ? Math.min(options.length - 1, indice + 1)
+          ? Math.min(opcionesVisibles.length - 1, indice + 1)
           : Math.max(0, indice - 1);
       });
       return;
@@ -87,7 +98,7 @@ export default function CustomDropdown({
     }
     if (event.key === "End") {
       event.preventDefault();
-      setActiveIndex(Math.max(0, options.length - 1));
+      setActiveIndex(Math.max(0, opcionesVisibles.length - 1));
       return;
     }
     if (event.key === "Enter" || event.key === " ") {
@@ -168,13 +179,29 @@ export default function CustomDropdown({
             role="listbox"
             aria-label={placeholder}
           >
-            {options.length === 0 ? (
+            {buscable ? (
+              <div className="p-2 border-b border-white/10 sticky top-0 bg-brand-card z-10">
+                <input
+                  type="search"
+                  value={filtro}
+                  onChange={(e) => {
+                    setFiltro(e.target.value);
+                    setActiveIndex(0);
+                  }}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="Buscar…"
+                  className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-xs text-white placeholder:text-brand-ayuda outline-none focus:border-brand-chartreuse/50"
+                  aria-label="Filtrar opciones"
+                />
+              </div>
+            ) : null}
+            {opcionesVisibles.length === 0 ? (
               <div className="p-4 text-sm text-brand-ayuda text-center">
                 No hay opciones disponibles
               </div>
             ) : (
               <div className="py-1">
-                {options.map((opt, index) => {
+                {opcionesVisibles.map((opt, index) => {
                   const isSelected = value === opt.value;
                   const activo = index === activeIndex;
                   return (

@@ -94,6 +94,23 @@ function detectarTipoPlanilla(headerRow: string[]): TipoPlanillaInscripcion {
   return "general";
 }
 
+function partesLocalidadProvincia(raw: string): string[] {
+  if (raw.includes("|")) {
+    return raw
+      .split("|")
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }
+  const coma = raw.indexOf(",");
+  if (coma >= 0) {
+    const localidad = raw.slice(0, coma).trim();
+    const provincia = raw.slice(coma + 1).trim();
+    if (localidad && provincia) return [localidad, provincia];
+  }
+  const trimmed = raw.trim();
+  return trimmed ? [trimmed] : [];
+}
+
 export function parseLocalidadProvinciaCelda(valor: unknown): {
   localidad?: string;
   provincia?: string;
@@ -101,10 +118,7 @@ export function parseLocalidadProvinciaCelda(valor: unknown): {
   const raw = normalizarTexto(valor);
   if (!raw) return {};
 
-  const parts = raw
-    .split("|")
-    .map((p) => p.trim())
-    .filter(Boolean);
+  const parts = partesLocalidadProvincia(raw);
 
   if (parts.length >= 2) {
     return {
@@ -303,16 +317,24 @@ export function etiquetaTipoPlanillaInscripcion(torneo: {
     : "Clubes y asociaciones";
 }
 
-export function descargarPlantillaInscripcion(torneo: {
+export async function descargarPlantillaInscripcion(torneo: {
   alcance?: string | null;
   reglamento?: string | null;
   asociacion?: string | null;
-}) {
+}): Promise<void> {
   const url = urlPlantillaInscripcion(torneo);
+  const nombre = nombrePlantillaInscripcion(torneo);
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error("No se pudo descargar la planilla de inscripción.");
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.href = url;
-  link.download = nombrePlantillaInscripcion(torneo);
+  link.href = objectUrl;
+  link.download = nombre;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(objectUrl);
 }

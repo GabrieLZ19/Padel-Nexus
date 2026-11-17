@@ -258,7 +258,11 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
     const loadData = async () => {
       try {
         const [resClubsAll, sedes, disp, torneo] = await Promise.all([
-          ClubesService.getAll(),
+          ClubesService.getAll({
+            page: 1,
+            limit: 150,
+            scope: "torneo_sedes",
+          }),
           TorneosService.getSedes(torneoId),
           TorneosService.getCanchasDisponibilidad(torneoId),
           torneoInicial
@@ -514,7 +518,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   };
 
   const handleCrearClubRapido = async () => {
-    if (readOnly) return;
+    if (readOnly || creandoClub) return;
     if (!altaClubForm.nombre.trim() || !altaClubForm.localidad.trim()) {
       sileo.warning({
         title: "Datos incompletos",
@@ -813,6 +817,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
               <CustomDropdown
                 value={newClubId}
                 onChange={setNewClubId}
+                buscable
                 options={clubs
                   .filter((c) => !selectedClubs.some((sc) => sc.id === c.id))
                   .map((c) => ({

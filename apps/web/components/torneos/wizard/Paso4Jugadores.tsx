@@ -24,6 +24,7 @@ import {
   PairDisplay,
   esAlcanceNacional,
 } from "@/components/torneos/PairDisplay";
+import { sileo } from "sileo";
 import {
   descargarPlantillaInscripcion,
   leerPlanillaDesdeArchivo,
@@ -112,12 +113,20 @@ export const Paso4Jugadores = ({
       ? "El fixture ya está generado. Podés revisar parejas y confirmar pagos pendientes. Para agregar o dar de baja parejas se debe regenerar el cuadro."
       : null;
 
-  const handleDescargarPlantilla = () => {
-    descargarPlantillaInscripcion({
-      alcance: torneo.alcance,
-      reglamento: (torneo as { reglamento?: string }).reglamento,
-      asociacion: (torneo as { asociacion?: string }).asociacion,
-    });
+  const handleDescargarPlantilla = async () => {
+    try {
+      await descargarPlantillaInscripcion({
+        alcance: torneo.alcance,
+        reglamento: (torneo as { reglamento?: string }).reglamento,
+        asociacion: (torneo as { asociacion?: string }).asociacion,
+      });
+    } catch (error: unknown) {
+      const msg =
+        error instanceof Error
+          ? error.message
+          : "No se pudo descargar la planilla.";
+      sileo.error({ title: "Error", description: msg });
+    }
   };
 
   const handleSubirPlanilla = async (e: React.ChangeEvent<HTMLInputElement>) => {

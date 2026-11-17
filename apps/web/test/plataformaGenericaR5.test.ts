@@ -31,6 +31,14 @@ describe("R5: Plataforma genérica sin FAP forzado", () => {
       usarPlanillaInscripcionFap({ alcance: "Nacional", reglamento: "FAP" }),
       true,
     );
+    assert.equal(
+      usarPlanillaInscripcionFap({ alcance: "Provincial", reglamento: "FAP" }),
+      false,
+    );
+    assert.equal(
+      usarPlanillaInscripcionFap({ alcance: "Local", reglamento: "FAP" }),
+      false,
+    );
   });
 
   it("el alta de jugador en signup/page.tsx no tiene referencias fijas a FAP", () => {

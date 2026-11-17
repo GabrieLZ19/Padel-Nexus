@@ -36,6 +36,7 @@ import {
   etiquetaTipoPlanillaInscripcion,
   leerPlanillaDesdeArchivo,
 } from "@/utils/inscripcionPlanilla";
+import { sileo } from "sileo";
 import { importarPlanillaConProgreso } from "@/utils/planillaImportProgress";
 import { PlanillaImportProgressBar } from "@/components/inscripciones/PlanillaImportProgressBar";
 import type { PlanillaImportProgressState } from "@/components/inscripciones/PlanillaImportProgressBar";
@@ -103,13 +104,21 @@ export default function GestionInscripcionesPage() {
   const [importProgress, setImportProgress] =
     useState<PlanillaImportProgressState | null>(null);
 
-  const handleDescargarPlantilla = () => {
+  const handleDescargarPlantilla = async () => {
     if (!selectedTorneo) return;
-    descargarPlantillaInscripcion({
-      alcance: selectedTorneo.alcance,
-      reglamento: (selectedTorneo as { reglamento?: string }).reglamento,
-      asociacion: (selectedTorneo as { asociacion?: string }).asociacion,
-    });
+    try {
+      await descargarPlantillaInscripcion({
+        alcance: selectedTorneo.alcance,
+        reglamento: (selectedTorneo as { reglamento?: string }).reglamento,
+        asociacion: (selectedTorneo as { asociacion?: string }).asociacion,
+      });
+    } catch (error: unknown) {
+      const msg =
+        error instanceof Error
+          ? error.message
+          : "No se pudo descargar la planilla.";
+      sileo.error({ title: "Error", description: msg });
+    }
   };
 
   const handleSubirPlanilla = async (e: React.ChangeEvent<HTMLInputElement>) => {

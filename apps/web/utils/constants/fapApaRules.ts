@@ -608,8 +608,7 @@ export function usarPlanillaInscripcionFap(torneo: {
     .trim()
     .toUpperCase();
   if (regl === "APA" || regl === "AMATEUR") return false;
-  if (/nacional/i.test(String(torneo.alcance || ""))) return true;
-  return regl === "FAP";
+  return /nacional/i.test(String(torneo.alcance || "").trim());
 }
 
 // Valor especial para opción "crear categoría/nivel personalizado"
