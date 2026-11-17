@@ -3,7 +3,10 @@ import { MarketplaceService } from "../services/marketplace.service";
 import { MarketplaceEntityAuthService } from "../services/marketplace-entity-auth.service";
 import type { EntidadMarketplaceTipo } from "../constants/marketplace";
 import { MercadoPagoConfig, Payment } from "mercadopago";
-import { getMercadoPagoAccessToken } from "../config/mercadopago";
+import {
+  getMercadoPagoAccessToken,
+  verifyMercadoPagoWebhookSignature,
+} from "../config/mercadopago";
 
 function parseEntidadRef(req: Request): {
   entidad_tipo: EntidadMarketplaceTipo;
@@ -251,6 +254,10 @@ export class MarketplaceController {
 
   static async webhookMercadoPago(req: Request, res: Response) {
     try {
+      if (!verifyMercadoPagoWebhookSignature(req)) {
+        return res.status(401).send("Invalid webhook signature");
+      }
+
       const { type, data } = req.body;
 
       if (type === "payment") {

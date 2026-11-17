@@ -4,6 +4,7 @@ import {
   buildMercadoPagoBackUrls,
   getMercadoPagoAccessToken,
   isMercadoPagoConfigured,
+  mercadoPagoNotificationUrl,
   resolveMercadoPagoInitPoint,
 } from "../config/mercadopago";
 import { esHorarioReservaPasado } from "../utils/fechaArgentina";
@@ -845,7 +846,9 @@ export class ReservaService {
           ? "approved"
           : undefined,
         external_reference: id,
-        notification_url: `${process.env.BACKEND_URL || "http://localhost:4000"}/api/reservas/webhook/mercadopago`,
+        notification_url: mercadoPagoNotificationUrl(
+          "/api/reservas/webhook/mercadopago",
+        ),
         expiration_date_from: ahoraMp.toISOString(),
         expiration_date_to: retieneHastaMp,
       },

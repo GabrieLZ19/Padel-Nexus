@@ -4,6 +4,7 @@ import {
   buildMercadoPagoBackUrls,
   getMercadoPagoAccessToken,
   isMercadoPagoConfigured,
+  mercadoPagoNotificationUrl,
   resolveMercadoPagoInitPoint,
 } from "../config/mercadopago";
 import { NotificacionService } from "./notificacion.service";
@@ -1388,8 +1389,6 @@ export class LicenciaService {
 
     const mpClient = new MercadoPagoConfig({ accessToken: token! });
     const preference = new Preference(mpClient);
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:4000";
-
     const backUrls = buildMercadoPagoBackUrls({
       mobile: options?.mobile,
       webPath: "/mi-perfil",
@@ -1412,7 +1411,9 @@ export class LicenciaService {
           ? "approved"
           : undefined,
         external_reference: `licencia:${licenciaId}`,
-        notification_url: `${backendUrl}/api/licencias/webhook/mercadopago`,
+        notification_url: mercadoPagoNotificationUrl(
+          "/api/licencias/webhook/mercadopago",
+        ),
       },
     });
 
@@ -1433,6 +1434,41 @@ export class LicenciaService {
       transferencia_disponible,
       ...transferencia,
     };
+  }
+
+  /**
+   * Acredita el pago al recibir notificación de Mercado Pago (webhook).
+   * Idempotente si el pago ya estaba registrado.
+   */
+  static async confirmarPagoLicenciaDesdeWebhook(
+    licenciaId: string,
+    paymentId: string,
+    monto?: number,
+  ) {
+    const { data: licencia, error } = await supabaseAdmin
+      .from("licencias")
+      .select("id, usuario_id, datos_solicitud")
+      .eq("id", licenciaId)
+      .maybeSingle();
+
+    if (error || !licencia) {
+      console.warn(
+        `Webhook MP licencia: no se encontró licencia id=${licenciaId}`,
+      );
+      return null;
+    }
+
+    const previos = (licencia.datos_solicitud || {}) as Record<string, unknown>;
+    if (previos.estado_pago === "pagado") {
+      return licencia;
+    }
+
+    return LicenciaService.confirmarPagoLicencia(
+      licenciaId,
+      licencia.usuario_id,
+      paymentId,
+      monto,
+    );
   }
 
   static async confirmarPagoLicencia(

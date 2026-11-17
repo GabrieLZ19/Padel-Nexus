@@ -1,3 +1,6 @@
+import crypto from "crypto";
+import type { Request } from "express";
+
 /**
  * Fuente única del access token de Mercado Pago.
  * En .env del API usar MP_ACCESS_TOKEN (mismo nombre que reservas).
@@ -76,4 +79,97 @@ export function buildMercadoPagoBackUrls(options: {
 
 export function isMobileClient(headerValue?: string | null): boolean {
   return (headerValue || "").toLowerCase() === "mobile";
+}
+
+/**
+ * Clave secreta de Webhooks (MP > Tus integraciones > Webhooks).
+ * Variable: MP_WEBHOOK_SECRET
+ */
+export function getMercadoPagoWebhookSecret(): string | undefined {
+  const secret =
+    process.env.MP_WEBHOOK_SECRET?.trim() ||
+    process.env.MERCADOPAGO_WEBHOOK_SECRET?.trim();
+  return secret || undefined;
+}
+
+export function mercadoPagoNotificationUrl(apiPath: string): string {
+  const base = (process.env.BACKEND_URL || "http://localhost:4000").replace(
+    /\/$/,
+    "",
+  );
+  const path = apiPath.startsWith("/") ? apiPath : `/${apiPath}`;
+  return `${base}${path}`;
+}
+
+export type MercadoPagoEntidadRef =
+  | { canal: "inscripcion"; id: string }
+  | { canal: "licencia"; id: string }
+  | { canal: "reserva"; id: string }
+  | { canal: "desconocido"; id: string };
+
+export function parseMercadoPagoExternalReference(
+  externalReference: string,
+): MercadoPagoEntidadRef {
+  const ref = externalReference.trim();
+  if (ref.startsWith("inscripcion:")) {
+    return { canal: "inscripcion", id: ref.slice("inscripcion:".length) };
+  }
+  if (ref.startsWith("licencia:")) {
+    return { canal: "licencia", id: ref.slice("licencia:".length) };
+  }
+  if (ref.includes(":")) {
+    return { canal: "desconocido", id: ref };
+  }
+  return { canal: "reserva", id: ref };
+}
+
+/**
+ * Valida x-signature según documentación de Mercado Pago (HMAC SHA256).
+ * Con MP configurado, exige MP_WEBHOOK_SECRET (evita simular pagos sin firma).
+ */
+export function verifyMercadoPagoWebhookSignature(req: Request): boolean {
+  const secret = getMercadoPagoWebhookSecret();
+  if (!secret) {
+    return !isMercadoPagoConfigured();
+  }
+
+  const xSignature = req.headers["x-signature"];
+  if (typeof xSignature !== "string" || !xSignature) return false;
+
+  let ts = "";
+  let v1 = "";
+  for (const segment of xSignature.split(",")) {
+    const trimmed = segment.trim();
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq);
+    const value = trimmed.slice(eq + 1);
+    if (key === "ts") ts = value;
+    if (key === "v1") v1 = value;
+  }
+  if (!ts || !v1) return false;
+
+  const queryDataId = req.query["data.id"];
+  const bodyDataId = req.body?.data?.id;
+  const rawDataId =
+    (typeof queryDataId === "string" ? queryDataId : undefined) ??
+    (bodyDataId != null ? String(bodyDataId) : undefined);
+
+  const xRequestId = req.headers["x-request-id"];
+  const manifestParts: string[] = [];
+  if (rawDataId) {
+    manifestParts.push(`id:${rawDataId.toLowerCase()}`);
+  }
+  if (typeof xRequestId === "string" && xRequestId) {
+    manifestParts.push(`request-id:${xRequestId}`);
+  }
+  manifestParts.push(`ts:${ts}`);
+  const manifest = `${manifestParts.join(";")};`;
+
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(manifest)
+    .digest("hex");
+
+  return expected === v1;
 }

@@ -1,5 +1,11 @@
 import { Request, Response } from "express";
+import { MercadoPagoConfig, Payment } from "mercadopago";
+import {
+  getMercadoPagoAccessToken,
+  verifyMercadoPagoWebhookSignature,
+} from "../config/mercadopago";
 import { InscripcionService } from "../services/inscripcion.service";
+import { acreditarPagoMercadoPago } from "../services/mercadopagoWebhook.service";
 import type { FilaPlanillaInscripcion } from "../utils/inscripcionPlanilla";
 import { AlcanceCuentaService } from "../services/alcanceCuenta.service";
 import { supabaseAdmin } from "../config/supabase";
@@ -271,6 +277,129 @@ export const importarPlanillaInscripciones = async (
       error instanceof Error ? error.message : "Error desconocido";
     return res.status(400).json({
       message: "No se pudo importar la planilla.",
+      error: message,
+    });
+  }
+};
+
+export const webhookMercadoPagoInscripcion = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    if (!verifyMercadoPagoWebhookSignature(req)) {
+      return res.status(401).send("Invalid webhook signature");
+    }
+
+    const { type, action } = req.body;
+    const topic = req.query.topic || req.body.topic;
+    const paymentId =
+      req.body.data?.id || req.query.id || req.query["data.id"];
+
+    const isPaymentNotification =
+      type === "payment" ||
+      topic === "payment" ||
+      action === "payment.created" ||
+      action === "payment.updated";
+
+    if (isPaymentNotification && paymentId) {
+      const token = getMercadoPagoAccessToken();
+      if (token) {
+        const mpClient = new MercadoPagoConfig({ accessToken: token });
+        const paymentClient = new Payment(mpClient);
+        const paymentDetails = await paymentClient.get({
+          id: Number(paymentId),
+        });
+
+        if (
+          paymentDetails.status === "approved" &&
+          paymentDetails.external_reference
+        ) {
+          const monto = paymentDetails.transaction_amount ?? 0;
+          await acreditarPagoMercadoPago(
+            String(paymentDetails.external_reference),
+            String(paymentId),
+            monto,
+          );
+        }
+      }
+    }
+
+    return res.status(200).send("OK");
+  } catch (error: unknown) {
+    console.error("Error en Webhook Mercado Pago (inscripciones):", error);
+    return res.status(200).send("OK");
+  }
+};
+
+export const crearPreferenciaPagoInscripcion = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    const usuarioId = req.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ message: "No autorizado." });
+    }
+    const mobile = (req.get("x-padel-client") || "").toLowerCase() === "mobile";
+    const data = await InscripcionService.crearPreferenciaPago(
+      req.params.id,
+      usuarioId,
+      { mobile },
+    );
+    return res.status(200).json({ exito: true, data });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    return res.status(400).json({
+      message: "No se pudo iniciar el pago de la inscripción.",
+      error: message,
+    });
+  }
+};
+
+export const confirmarRetornoPagoInscripcion = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    const usuarioId = req.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ message: "No autorizado." });
+    }
+    const paymentId = req.body?.payment_id as string | undefined;
+    if (!paymentId) {
+      return res.status(400).json({
+        message: "Se requiere el payment_id de Mercado Pago.",
+      });
+    }
+
+    const token = getMercadoPagoAccessToken();
+    let monto: number | undefined;
+    if (token) {
+      const mpClient = new MercadoPagoConfig({ accessToken: token });
+      const paymentClient = new Payment(mpClient);
+      const paymentDetails = await paymentClient.get({ id: Number(paymentId) });
+      if (paymentDetails.status !== "approved") {
+        return res.status(400).json({
+          message: `El pago no está aprobado. Estado: ${paymentDetails.status}`,
+        });
+      }
+      monto = paymentDetails.transaction_amount ?? undefined;
+    }
+
+    const data = await InscripcionService.confirmarPagoInscripcionRetorno(
+      req.params.id,
+      usuarioId,
+      paymentId,
+      monto,
+    );
+    return res.status(200).json({ exito: true, data });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    return res.status(400).json({
+      message: "No se pudo confirmar el pago de la inscripción.",
       error: message,
     });
   }

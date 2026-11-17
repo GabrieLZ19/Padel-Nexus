@@ -1,3 +1,11 @@
+import { MercadoPagoConfig, Preference } from "mercadopago";
+import {
+  buildMercadoPagoBackUrls,
+  getMercadoPagoAccessToken,
+  isMercadoPagoConfigured,
+  mercadoPagoNotificationUrl,
+  resolveMercadoPagoInitPoint,
+} from "../config/mercadopago";
 import { supabaseAdmin } from "../config/supabase";
 import {
   FAP_ESTADOS_LICENCIA,
@@ -1075,5 +1083,222 @@ export class InscripcionService {
       totalFilas: filas.length,
       torneoId: torneo.id,
     };
+  }
+
+  static async assertUsuarioPuedePagarInscripcion(
+    inscripcionId: string,
+    usuarioId: string,
+  ) {
+    const { data, error } = await supabaseAdmin
+      .from("inscripciones")
+      .select(
+        "id, usuario_id, usuario2_id, monto, estado_pago, torneo_id, torneos(nombre, precio_inscripcion, es_gratis)",
+      )
+      .eq("id", inscripcionId)
+      .single();
+
+    if (error || !data) throw new Error("Inscripción no encontrada.");
+
+    const esTitular =
+      data.usuario_id === usuarioId || data.usuario2_id === usuarioId;
+    if (!esTitular) {
+      throw new Error("No tenés permiso para pagar esta inscripción.");
+    }
+
+    if (data.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO) {
+      throw new Error("Esta inscripción ya está paga.");
+    }
+
+    const torneoRaw = data.torneos as
+      | { nombre?: string; precio_inscripcion?: number; es_gratis?: boolean }
+      | { nombre?: string; precio_inscripcion?: number; es_gratis?: boolean }[]
+      | null;
+    const torneo = Array.isArray(torneoRaw) ? torneoRaw[0] : torneoRaw;
+
+    if (torneo?.es_gratis) {
+      throw new Error("Este torneo no requiere pago.");
+    }
+
+    const monto =
+      Number(data.monto) > 0
+        ? Number(data.monto)
+        : Number(torneo?.precio_inscripcion || 0);
+
+    if (monto <= 0) {
+      throw new Error("Monto de inscripción inválido.");
+    }
+
+    return {
+      inscripcion: data,
+      torneoNombre: torneo?.nombre || "Torneo",
+      monto,
+      torneoId: data.torneo_id as string,
+    };
+  }
+
+  static async crearPreferenciaPago(
+    inscripcionId: string,
+    usuarioId: string,
+    options?: { mobile?: boolean },
+  ) {
+    const { inscripcion, torneoNombre, monto, torneoId } =
+      await InscripcionService.assertUsuarioPuedePagarInscripcion(
+        inscripcionId,
+        usuarioId,
+      );
+
+    const token = getMercadoPagoAccessToken();
+    if (!isMercadoPagoConfigured()) {
+      throw new Error(
+        "Mercado Pago no está configurado. Contactá a la organización del torneo.",
+      );
+    }
+
+    const mpClient = new MercadoPagoConfig({ accessToken: token! });
+    const preference = new Preference(mpClient);
+    const backUrls = buildMercadoPagoBackUrls({
+      mobile: options?.mobile,
+      webPath: `/torneos/${torneoId}`,
+      mobileParams: { inscripcion_id: inscripcionId, torneo_id: torneoId },
+    });
+
+    const response = await preference.create({
+      body: {
+        items: [
+          {
+            id: inscripcionId,
+            title: `Inscripción: ${torneoNombre}`,
+            quantity: 1,
+            unit_price: monto,
+            currency_id: "ARS",
+          },
+        ],
+        back_urls: backUrls,
+        auto_return: backUrls.success.startsWith("https://")
+          ? "approved"
+          : undefined,
+        external_reference: `inscripcion:${inscripcionId}`,
+        notification_url: mercadoPagoNotificationUrl(
+          "/api/inscripciones/webhook/mercadopago",
+        ),
+      },
+    });
+
+    return {
+      preferenceId: response.id,
+      initPoint: resolveMercadoPagoInitPoint(
+        token!,
+        response.init_point,
+        response.sandbox_init_point,
+      ),
+      sandboxInitPoint: response.sandbox_init_point,
+      monto,
+      moneda: "ARS",
+      inscripcionId,
+      torneoId,
+    };
+  }
+
+  static async confirmarPagoInscripcionDesdeWebhook(
+    inscripcionId: string,
+    paymentId: string,
+    monto?: number,
+  ) {
+    const { data, error } = await supabaseAdmin
+      .from("inscripciones")
+      .select("id, estado_pago")
+      .eq("id", inscripcionId)
+      .maybeSingle();
+
+    if (error || !data) {
+      console.warn(
+        `Webhook MP inscripción: no se encontró inscripción id=${inscripcionId}`,
+      );
+      return null;
+    }
+
+    if (data.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO) {
+      return data;
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      estado_pago: FAP_ESTADOS_PAGO.CONFIRMADO,
+    };
+    if (monto != null && monto > 0) {
+      updatePayload.monto = monto;
+    }
+
+    const { data: actualizada, error: updError } = await supabaseAdmin
+      .from("inscripciones")
+      .update(updatePayload)
+      .eq("id", inscripcionId)
+      .select("*, torneos(nombre)")
+      .single();
+
+    if (updError || !actualizada) {
+      throw new Error("No se pudo confirmar el pago de la inscripción.");
+    }
+
+    await InscripcionService.notificarInscripcionConfirmada(
+      actualizada,
+      paymentId,
+    );
+    return actualizada;
+  }
+
+  private static async notificarInscripcionConfirmada(
+    inscripcion: {
+      id: string;
+      usuario_id?: string | null;
+      torneo_id?: string | null;
+      torneos?: { nombre?: string } | { nombre?: string }[] | null;
+    },
+    paymentId?: string,
+  ) {
+    if (!inscripcion.usuario_id) return;
+
+    const torneoNombre =
+      (Array.isArray(inscripcion.torneos)
+        ? inscripcion.torneos[0]?.nombre
+        : inscripcion.torneos?.nombre) || "el torneo";
+
+    await NotificacionService.crearNotificacion({
+      usuario_id: inscripcion.usuario_id,
+      titulo: "Inscripción confirmada",
+      mensaje: `Tu pago fue acreditado. Ya estás habilitado en ${torneoNombre}.`,
+      tipo: "success",
+      metadata: {
+        tipo: "inscripcion",
+        inscripcion_id: inscripcion.id,
+        torneo_id: inscripcion.torneo_id,
+        ...(paymentId ? { mp_payment_id: paymentId } : {}),
+      },
+    }).catch((err) =>
+      console.error("Error al notificar confirmación MP inscripción:", err),
+    );
+  }
+
+  static async confirmarPagoInscripcionRetorno(
+    inscripcionId: string,
+    usuarioId: string,
+    paymentId: string,
+    monto?: number,
+  ) {
+    const { data, error } = await supabaseAdmin
+      .from("inscripciones")
+      .select("id, usuario_id, usuario2_id")
+      .eq("id", inscripcionId)
+      .single();
+    if (error || !data) throw new Error("Inscripción no encontrada.");
+    const esTitular =
+      data.usuario_id === usuarioId || data.usuario2_id === usuarioId;
+    if (!esTitular) {
+      throw new Error("No tenés permiso para confirmar este pago.");
+    }
+    return InscripcionService.confirmarPagoInscripcionDesdeWebhook(
+      inscripcionId,
+      paymentId,
+      monto,
+    );
   }
 }

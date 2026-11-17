@@ -7,11 +7,19 @@ import {
   createInscripcionManual,
   importarPlanillaInscripciones,
   getElegibilidadInscripcion,
+  webhookMercadoPagoInscripcion,
+  crearPreferenciaPagoInscripcion,
+  confirmarRetornoPagoInscripcion,
 } from "../controllers/inscripcion.controller";
 import { authenticate, authorize } from "../middleware/auth";
 import { ROLES_ADMINISTRATIVOS } from "../constants/roles";
 
 const router = Router();
+
+router.post(
+  "/webhook/mercadopago",
+  webhookMercadoPagoInscripcion,
+);
 
 router.use(authenticate);
 
@@ -24,6 +32,9 @@ router.get(
 );
 
 router.post("/", createInscripcion);
+
+router.post("/:id/preferencia-mp", crearPreferenciaPagoInscripcion);
+router.post("/:id/confirmar-retorno", confirmarRetornoPagoInscripcion);
 
 router.post(
   "/manual",

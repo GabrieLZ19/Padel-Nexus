@@ -4,6 +4,7 @@ import {
   buildMercadoPagoBackUrls,
   getMercadoPagoAccessToken,
   isMercadoPagoConfigured,
+  mercadoPagoNotificationUrl,
   resolveMercadoPagoInitPoint,
 } from "../config/mercadopago";
 import {
@@ -875,9 +876,6 @@ export class MarketplaceService {
     const mpClient = new MercadoPagoConfig({ accessToken: token! });
     const preference = new Preference(mpClient);
 
-    const backendUrl =
-      process.env.BACKEND_URL || "http://localhost:4000";
-
     const backUrls = buildMercadoPagoBackUrls({
       mobile: options?.mobile,
       webPath: "/marketplace/checkout",
@@ -900,7 +898,9 @@ export class MarketplaceService {
           ? "approved"
           : undefined,
         external_reference: ordenId,
-        notification_url: `${backendUrl}/api/marketplace/webhook/mercadopago`,
+        notification_url: mercadoPagoNotificationUrl(
+          "/api/marketplace/webhook/mercadopago",
+        ),
       },
     });
 

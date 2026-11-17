@@ -4,7 +4,13 @@ import { authenticate, authorize } from "../middleware/auth";
 
 const router = Router();
 
-// Todas las rutas de licencias requieren autenticación base
+// Webhook Mercado Pago (sin sesión; IPN desde servidores de MP)
+router.post(
+  "/webhook/mercadopago",
+  LicenciasController.webhookMercadoPago,
+);
+
+// Resto de rutas: autenticación obligatoria
 router.use(authenticate);
 
 // --- Rutas Administrativas (Protegidas con roles específicos FAP) ---

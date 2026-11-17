@@ -928,7 +928,9 @@ export class TorneoService {
   static async obtenerPorId(id: string) {
     const { data, error } = await supabaseAdmin
       .from("torneos")
-      .select(`*, clubes!club_id(nombre, provincia), asociaciones!asociacion_id(nombre, sigla, provincia), inscripciones(usuario_id)`)
+      .select(
+        `*, clubes!club_id(nombre, provincia), asociaciones!asociacion_id(nombre, sigla, provincia), inscripciones(id, usuario_id, usuario2_id, estado_pago, monto)`,
+      )
       .eq("id", id)
       .single();
 

@@ -1,4 +1,10 @@
 import { Request, Response } from "express";
+import { MercadoPagoConfig, Payment } from "mercadopago";
+import {
+  getMercadoPagoAccessToken,
+  verifyMercadoPagoWebhookSignature,
+} from "../config/mercadopago";
+import { acreditarPagoMercadoPago } from "../services/mercadopagoWebhook.service";
 import { LicenciaService } from "../services/licencia.service";
 import { LicenciaOrganizacionService } from "../services/licenciaOrganizacion.service";
 
@@ -408,6 +414,57 @@ export const LicenciasController = {
           ? error.message
           : "Error al iniciar el pago de la licencia.";
       return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * POST /api/licencias/webhook/mercadopago
+   * Notificaciones IPN/Webhook de Mercado Pago (sin autenticación de usuario).
+   */
+  async webhookMercadoPago(req: Request, res: Response): Promise<Response> {
+    try {
+      if (!verifyMercadoPagoWebhookSignature(req)) {
+        return res.status(401).send("Invalid webhook signature");
+      }
+
+      const { type, action } = req.body;
+      const topic = req.query.topic || req.body.topic;
+      const paymentId =
+        req.body.data?.id || req.query.id || req.query["data.id"];
+
+      const isPaymentNotification =
+        type === "payment" ||
+        topic === "payment" ||
+        action === "payment.created" ||
+        action === "payment.updated";
+
+      if (isPaymentNotification && paymentId) {
+        const token = getMercadoPagoAccessToken();
+        if (token) {
+          const mpClient = new MercadoPagoConfig({ accessToken: token });
+          const paymentClient = new Payment(mpClient);
+          const paymentDetails = await paymentClient.get({
+            id: Number(paymentId),
+          });
+
+          if (
+            paymentDetails.status === "approved" &&
+            paymentDetails.external_reference
+          ) {
+            const monto = paymentDetails.transaction_amount ?? 0;
+            await acreditarPagoMercadoPago(
+              String(paymentDetails.external_reference),
+              String(paymentId),
+              monto,
+            );
+          }
+        }
+      }
+
+      return res.status(200).send("OK");
+    } catch (error: unknown) {
+      console.error("Error en Webhook Mercado Pago (licencias):", error);
+      return res.status(200).send("OK");
     }
   },
 

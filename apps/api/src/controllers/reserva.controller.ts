@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import { ReservaService } from "../services/reserva.service";
 import { MercadoPagoConfig, Payment } from "mercadopago";
+import { verifyMercadoPagoWebhookSignature } from "../config/mercadopago";
+import { acreditarPagoMercadoPago } from "../services/mercadopagoWebhook.service";
 import { supabaseAdmin } from "../config/supabase";
 
 export const ReservasController = {
@@ -233,6 +235,10 @@ export const ReservasController = {
    */
   async webhookMercadoPago(req: Request, res: Response) {
     try {
+      if (!verifyMercadoPagoWebhookSignature(req)) {
+        return res.status(401).send("Invalid webhook signature");
+      }
+
       const { type, action } = req.body;
       const topic = req.query.topic || req.body.topic;
       const paymentId = req.body.data?.id || req.query.id || req.query["data.id"];
@@ -250,12 +256,13 @@ export const ReservasController = {
         const paymentClient = new Payment(mpClient);
         const paymentDetails = await paymentClient.get({ id: Number(paymentId) });
 
-        if (paymentDetails.status === "approved") {
-          const reservaId = paymentDetails.external_reference;
+        if (paymentDetails.status === "approved" && paymentDetails.external_reference) {
           const monto = paymentDetails.transaction_amount || 0;
-          if (reservaId) {
-            await ReservaService.confirmarPagoPorId(reservaId, monto, "MercadoPago", String(paymentId));
-          }
+          await acreditarPagoMercadoPago(
+            String(paymentDetails.external_reference),
+            String(paymentId),
+            monto,
+          );
         }
       }
 
