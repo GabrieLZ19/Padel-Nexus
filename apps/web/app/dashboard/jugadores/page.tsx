@@ -22,6 +22,7 @@ import FeedbackModal from "@/components/ui/FeedbackModal";
 import Pagination from "@/components/ui/Pagination";
 import { ConfigLicenciasPanel } from "@/components/licencias/ConfigLicenciasPanel";
 import { LicenciaJugadorCard } from "@/components/licencias/LicenciaJugadorCard";
+import type { OnPagoRegistradoLicencia } from "@/components/licencias/LicenciaPagosHistorial";
 import { useProfileStore } from "@/store/useProfileStore";
 import { PAGE_SIZE_JUGADORES } from "@/utils/jugadoresListado";
 import JugadoresContactosPanel from "@/components/crm/JugadoresContactosPanel";
@@ -213,6 +214,26 @@ export default function JugadoresLicenciasPage() {
     setReactivarLicencia({ id: licenciaId, nombre });
   };
 
+  const handlePagoRegistrado: OnPagoRegistradoLicencia = useCallback(
+    ({ licencia, fecha_vencimiento }) => {
+      setLicencias((prev) =>
+        prev.map((jugador) => {
+          const arr = licenciasComoArray(jugador.licencias);
+          const idx = arr.findIndex((l) => l.id === licencia.id);
+          if (idx < 0) return jugador;
+          const next = [...arr];
+          next[idx] = {
+            ...next[idx],
+            ...licencia,
+            fecha_vencimiento,
+          };
+          return { ...jugador, licencias: next };
+        }),
+      );
+    },
+    [],
+  );
+
   const handleCambiarEstadoRapido = async (
     licenciaId: string,
     nuevoEstado: "Activa" | "Suspendida",
@@ -228,7 +249,7 @@ export default function JugadoresLicenciasPage() {
         description:
           nuevoEstado === "Activa"
             ? "La licencia volvió a estado activo."
-            : "La licencia quedó suspendida. El jugador puede reactivarse cuando corresponda.",
+            : "La licencia quedó suspendida. Podés reactivarla cuando corresponda.",
         type: nuevoEstado === "Activa" ? "success" : "info",
       });
       await fetchLicencias(true, page, search, filtroActivo);
@@ -546,6 +567,7 @@ export default function JugadoresLicenciasPage() {
                     onDarDeBaja={(licenciaId) =>
                       pedirDarDeBaja(licenciaId, nombreJugadorListado(jugador))
                     }
+                    onPagoRegistrado={handlePagoRegistrado}
                     savingFecha={savingFecha}
                   />
                 );
@@ -623,6 +645,7 @@ export default function JugadoresLicenciasPage() {
                             nombreJugadorListado(jugador),
                           )
                         }
+                        onPagoRegistrado={handlePagoRegistrado}
                         savingFecha={savingFecha}
                       />
                     );

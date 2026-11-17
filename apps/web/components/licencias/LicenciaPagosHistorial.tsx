@@ -6,6 +6,7 @@ import {
   LicenciasService,
   type LicenciaPago,
 } from "@/utils/services/licencias";
+import type { Licencia } from "@/utils/types";
 import { etiquetaPeriodoLicencia } from "@/utils/licenciaPago";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { sileo } from "sileo";
@@ -23,6 +24,11 @@ function mensajeErrorApi(err: unknown, fallback: string): string {
   );
 }
 
+export type OnPagoRegistradoLicencia = (payload: {
+  licencia: Licencia;
+  fecha_vencimiento: string;
+}) => void | Promise<void>;
+
 interface LicenciaPagosHistorialProps {
   licenciaId: string;
   /** Si true, muestra el botón para registrar pago manual. */
@@ -30,6 +36,7 @@ interface LicenciaPagosHistorialProps {
   /** Abre el listado de una vez, para la fila expandida de la tabla. */
   siempreAbierto?: boolean;
   frecuenciaPago?: "anual" | "mensual";
+  onPagoRegistrado?: OnPagoRegistradoLicencia;
 }
 
 /**
@@ -41,6 +48,7 @@ export function LicenciaPagosHistorial({
   puedeRegistrar = true,
   siempreAbierto = false,
   frecuenciaPago = "mensual",
+  onPagoRegistrado,
 }: LicenciaPagosHistorialProps) {
   const esAnual = frecuenciaPago === "anual";
   const [open, setOpen] = useState(siempreAbierto);
@@ -71,13 +79,19 @@ export function LicenciaPagosHistorial({
   const registrar = async () => {
     setSaving(true);
     try {
-      await LicenciasService.registrarPago(licenciaId, { metodo: "manual" });
+      const resultado = await LicenciasService.registrarPago(licenciaId, {
+        metodo: "manual",
+      });
       sileo.success({
         title: "Pago registrado",
         description: "La vigencia de la licencia se actualizó.",
       });
       setConfirmOpen(false);
       await cargar();
+      await onPagoRegistrado?.({
+        licencia: resultado.licencia,
+        fecha_vencimiento: resultado.fecha_vencimiento,
+      });
     } catch (err: unknown) {
       sileo.error({
         title: "Error",

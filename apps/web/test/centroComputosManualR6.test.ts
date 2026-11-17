@@ -61,6 +61,25 @@ describe("R6: Centro de cómputos con ingreso manual y alta rápida", () => {
     assert.match(fuente, /centro_computos_manual:\s*centroComputosManual/);
   });
 
+  it("TOR-41: alta rápida preserva organizador y evita doble envío", () => {
+    const fuente = readFileSync(
+      path.join(RAIZ, "components/torneos/wizard/Paso1Datos.tsx"),
+      "utf8",
+    );
+    assert.match(fuente, /clubOrganizadorId/);
+    assert.match(fuente, /preservarOrganizador/);
+    assert.match(fuente, /guardarSedes\(torneoId/);
+    assert.match(
+      fuente,
+      /if \(readOnly \|\| creandoClub\) return/,
+    );
+    const sedesFuente = readFileSync(
+      path.join(RAIZ, "components/torneos/SedesFiscalesTab.tsx"),
+      "utf8",
+    );
+    assert.match(sedesFuente, /disabled=\{readOnly \|\| creandoClub\}/);
+  });
+
   it("P1: ingreso manual no anula club_id del organizador", () => {
     const fuente = readFileSync(
       path.join(RAIZ, "components/torneos/wizard/Paso1Datos.tsx"),

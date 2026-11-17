@@ -838,9 +838,12 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setShowAltaClub((v) => !v)}
-              disabled={readOnly}
-              className="bg-white/5 border border-white/10 text-white px-4 py-2.5 rounded-xl font-black text-xs cursor-pointer"
+              onClick={() => {
+                if (creandoClub) return;
+                setShowAltaClub((v) => !v);
+              }}
+              disabled={readOnly || creandoClub}
+              className="bg-white/5 border border-white/10 text-white px-4 py-2.5 rounded-xl font-black text-xs cursor-pointer disabled:opacity-40"
             >
               <Plus className="size-3.5 inline mr-1" />
               Alta club
@@ -976,10 +979,14 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
                   <button
                     type="button"
                     onClick={() => void handleCrearClubRapido()}
-                    disabled={creandoClub}
+                    disabled={
+                      creandoClub ||
+                      !altaClubForm.nombre.trim() ||
+                      !altaClubForm.localidad.trim()
+                    }
                     className="w-full bg-brand-chartreuse text-brand-black rounded-xl font-black text-xs uppercase py-2.5 cursor-pointer disabled:opacity-40"
                   >
-                    {creandoClub ? "Creando…" : "Crear y listar"}
+                    {creandoClub ? "Creando..." : "Crear y listar"}
                   </button>
                 </div>
               </div>

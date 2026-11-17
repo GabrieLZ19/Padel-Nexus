@@ -147,6 +147,14 @@ export const Paso1Datos = ({
   const profile = useProfileStore((s) => s.profile);
   const userRole = (profile?.rol || "admin") as RolUsuario;
 
+  const clubOrganizadorId = (): string | null => {
+    if (torneo.club_id) return String(torneo.club_id);
+    if (esRolClub(userRole) && profile?.club_id) {
+      return String(profile.club_id);
+    }
+    return null;
+  };
+
   // Información General
   const [editNombre, setEditNombre] = useState(torneo.nombre || "");
   const [editSede, setEditSede] = useState(torneo.club_id || "");
@@ -424,9 +432,44 @@ export const Paso1Datos = ({
       }
 
       setClubs((prev) => [...prev, nuevoClub]);
-      setEditSede(String(nuevoClub.id));
-      setModoManualSede(false);
-      setManualSede("");
+
+      const organizadorId = clubOrganizadorId();
+      const nuevoId = String(nuevoClub.id);
+      const preservarOrganizador = Boolean(
+        organizadorId && nuevoId !== organizadorId,
+      );
+
+      if (preservarOrganizador && organizadorId) {
+        try {
+          const sedes = await TorneosService.getSedes(torneoId);
+          const ids = new Set<string>(
+            (Array.isArray(sedes) ? sedes : []).map((s: { id: string }) =>
+              String(s.id),
+            ),
+          );
+          ids.add(organizadorId);
+          ids.add(nuevoId);
+          await TorneosService.guardarSedes(torneoId, [...ids]);
+        } catch (err) {
+          console.error("No se pudo vincular el club nuevo como sede:", err);
+        }
+        setEditSede(organizadorId);
+        setModoManualSede(false);
+        setManualSede("");
+        sileo.success({
+          title: "Club creado",
+          description: `${nuevoClub.nombre} quedó registrado y agregado como sede del torneo. El organizador no cambió.`,
+        });
+      } else {
+        setEditSede(nuevoId);
+        setModoManualSede(false);
+        setManualSede("");
+        sileo.success({
+          title: "Club creado y asignado",
+          description: `${nuevoClub.nombre} fue registrado y seleccionado como centro de cómputos.`,
+        });
+      }
+
       setShowAltaClub(false);
       setAltaClubForm({
         nombre: "",
@@ -436,10 +479,6 @@ export const Paso1Datos = ({
         canchas: 2,
       });
       setErroresCampo((prev) => ({ ...prev, sede: undefined }));
-      sileo.success({
-        title: "Club creado y asignado",
-        description: `${nuevoClub.nombre} fue registrado y seleccionado como centro de cómputos.`,
-      });
     } catch (err: unknown) {
       sileo.error({
         title: "Error al crear club",
@@ -542,17 +581,25 @@ export const Paso1Datos = ({
           : orgParsed.asociacionId;
 
       const rawReglasPrev = ((torneo as any).reglas_arbitraje || {}) as Record<string, any>;
-      const centroComputosManual =
+      const clubIdPreservado = clubOrganizadorId();
+      let centroComputosManual: string | null =
         modoManualSede && manualSede.trim() ? manualSede.trim() : null;
-      // club_id ancla ownership/sede del organizador; el centro manual es solo informativo.
-      const clubIdPreservado =
-        torneo.club_id ||
-        (esRolClub(userRole) ? profile?.club_id || null : null);
       let clubIdFinal: string | null;
       if (modoManualSede) {
         clubIdFinal = clubIdPreservado;
+      } else if (
+        clubIdPreservado &&
+        editSede &&
+        editSede !== clubIdPreservado
+      ) {
+        clubIdFinal = clubIdPreservado;
+        const centroClub = clubs.find((c) => String(c.id) === editSede);
+        if (centroClub) {
+          centroComputosManual = clubEtiquetaListado(centroClub);
+        }
       } else if (editSede) {
         clubIdFinal = editSede;
+        centroComputosManual = null;
       } else if (esRolClub(userRole)) {
         clubIdFinal = clubIdPreservado;
       } else {
@@ -706,8 +753,12 @@ export const Paso1Datos = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowAltaClub((v) => !v)}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-brand-chartreuse hover:underline cursor-pointer"
+                  onClick={() => {
+                    if (creandoClub) return;
+                    setShowAltaClub((v) => !v);
+                  }}
+                  disabled={creandoClub}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-brand-chartreuse hover:underline cursor-pointer disabled:opacity-40 disabled:no-underline"
                 >
                   <Plus className="size-3" />
                   {showAltaClub ? "Cerrar alta" : "Alta club"}
@@ -715,11 +766,13 @@ export const Paso1Datos = ({
                 <span className="text-white/20">·</span>
                 <button
                   type="button"
+                  disabled={creandoClub}
                   onClick={() => {
+                    if (creandoClub) return;
                     setModoManualSede((v) => !v);
                     setShowAltaClub(false);
                   }}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-gray-300 hover:text-white cursor-pointer"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-gray-300 hover:text-white cursor-pointer disabled:opacity-40"
                 >
                   <Pencil className="size-3" />
                   {modoManualSede ? "Elegir club" : "Ingreso manual"}
@@ -799,8 +852,12 @@ export const Paso1Datos = ({
                   </span>
                   <button
                     type="button"
-                    onClick={() => setShowAltaClub(false)}
-                    className="text-gray-400 hover:text-white text-xs cursor-pointer"
+                    onClick={() => {
+                      if (creandoClub) return;
+                      setShowAltaClub(false);
+                    }}
+                    disabled={creandoClub}
+                    className="text-gray-400 hover:text-white text-xs cursor-pointer disabled:opacity-40"
                   >
                     <X className="size-3.5" />
                   </button>

@@ -3,6 +3,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import {
+  normalizarDestinoConSeccion,
+  resolveDestinoTrasLogin,
+} from "../utils/auth/postLoginRedirect.ts";
+
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("ENT-28 redirect tras login", () => {
@@ -48,5 +53,37 @@ describe("ENT-28 redirect tras login", () => {
     assert.match(login, /guardarRedirectPostLogin/);
     assert.match(callback, /leerRedirectPostLogin/);
     assert.match(callback, /resolveDestinoTrasLogin/);
+  });
+
+  it("convierte fragmento #notificaciones en ?seccion= para ajustes", () => {
+    assert.equal(
+      normalizarDestinoConSeccion("/mi-perfil/ajustes#notificaciones"),
+      "/mi-perfil/ajustes?seccion=notificaciones",
+    );
+    assert.equal(
+      resolveDestinoTrasLogin(
+        "/mi-perfil/ajustes",
+        "notificaciones",
+        "/",
+      ),
+      "/mi-perfil/ajustes?seccion=notificaciones",
+    );
+    assert.equal(
+      resolveDestinoTrasLogin(
+        "/mi-perfil/ajustes?seccion=notificaciones",
+        null,
+        "/",
+      ),
+      "/mi-perfil/ajustes?seccion=notificaciones",
+    );
+  });
+
+  it("ajustes acepta seccion=notificaciones en query", () => {
+    const page = readFileSync(
+      path.join(RAIZ, "app/(public)/mi-perfil/ajustes/page.tsx"),
+      "utf8",
+    );
+    assert.match(page, /SECCION_AJUSTES_NOTIFICACIONES/);
+    assert.match(page, /searchParams\.get\("seccion"\)/);
   });
 });

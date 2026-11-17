@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { Licencia, Perfil } from "@/utils/types";
 import { LicenciaVencimientoEditor } from "./LicenciaVencimientoEditor";
-import { LicenciaPagosHistorial } from "./LicenciaPagosHistorial";
+import {
+  LicenciaPagosHistorial,
+  type OnPagoRegistradoLicencia,
+} from "./LicenciaPagosHistorial";
 import { MenuPuntos, type ItemMenuPuntos } from "@/components/ui/MenuPuntos";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import {
@@ -27,6 +30,7 @@ interface LicenciaJugadorCardProps {
   onValidar: () => void;
   onCambiarEstado: (licenciaId: string, estado: "Activa" | "Suspendida") => void;
   onDarDeBaja?: (licenciaId: string) => void;
+  onPagoRegistrado?: OnPagoRegistradoLicencia;
   savingFecha?: boolean;
 }
 
@@ -73,6 +77,7 @@ export function LicenciaJugadorCard({
   onValidar,
   onCambiarEstado,
   onDarDeBaja,
+  onPagoRegistrado,
   savingFecha,
 }: LicenciaJugadorCardProps) {
   const router = useRouter();
@@ -217,6 +222,7 @@ export function LicenciaJugadorCard({
             licenciaId={licencia.id}
             siempreAbierto
             frecuenciaPago={licenciaFrecuenciaPago(licencia)}
+            onPagoRegistrado={onPagoRegistrado}
           />
         ) : null}
       </article>
@@ -263,6 +269,7 @@ export function LicenciaJugadorCard({
               licenciaId={licencia.id}
               siempreAbierto
               frecuenciaPago={licenciaFrecuenciaPago(licencia)}
+              onPagoRegistrado={onPagoRegistrado}
             />
           </td>
         </tr>

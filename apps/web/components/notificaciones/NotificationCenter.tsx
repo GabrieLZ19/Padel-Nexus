@@ -22,6 +22,8 @@ import { useSocket } from "@/hooks/useSocket";
 import { useProfileStore } from "@/store/useProfileStore";
 import { mostrarToastNotificacion } from "@/utils/notificacionesToast";
 import { formatMarcaTiempoNotificacion } from "@/utils/fechaArgentina";
+import { computeNotificationDropdownPosition } from "@/utils/notificationDropdownPosition";
+import type { NotificationDropdownAnchor } from "@/utils/notificationDropdownPosition";
 
 export default function NotificationCenter() {
   const router = useRouter();
@@ -29,20 +31,17 @@ export default function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notificacion[]>([]);
   const [portalReady, setPortalReady] = useState(false);
-  const [dropdownAnchor, setDropdownAnchor] = useState<{
-    top: number;
-    right: number;
-  } | null>(null);
+  const [dropdownAnchor, setDropdownAnchor] =
+    useState<NotificationDropdownAnchor | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const ubicarDropdown = useCallback(() => {
     const boton = rootRef.current?.querySelector("button");
     if (!boton) return;
     const rect = boton.getBoundingClientRect();
-    setDropdownAnchor({
-      top: rect.bottom + 12,
-      right: window.innerWidth - rect.right,
-    });
+    setDropdownAnchor(
+      computeNotificationDropdownPosition(rect, window.innerWidth),
+    );
   }, []);
 
   useEffect(() => {
@@ -399,7 +398,9 @@ export default function NotificationCenter() {
               className="fixed z-[250]"
               style={{
                 top: dropdownAnchor.top,
-                right: dropdownAnchor.right,
+                ...(dropdownAnchor.left != null
+                  ? { left: dropdownAnchor.left }
+                  : { right: dropdownAnchor.right }),
               }}
             >
               {panelDropdown}

@@ -168,7 +168,7 @@ export default function LicenciaPagoPanel({
         <p className="text-[11px] text-gray-400 mt-1 leading-snug">
           {licenciaAprobada
             ? "Tu licencia ya está aprobada; completá este pago para regularizar el alta."
-            : "Completá el pago para que la federación pueda revisar tu solicitud."}
+            : "Podés pagar ahora o después de que la federación apruebe tu solicitud."}
         </p>
       </div>
 

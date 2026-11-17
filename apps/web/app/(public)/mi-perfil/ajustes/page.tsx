@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { PerfilService } from "@/utils/services/perfil";
 import { Perfil } from "@/utils/types";
@@ -26,6 +27,7 @@ import { LADOS_PADEL, PROVINCIAS_ARG } from "@/utils/constants/padelConfig";
 import { toDateInputValue } from "@/utils/dateUtils";
 import { validateNombre, validateDni, validateTelefono } from "@/utils/validation";
 import { toastError, toastExito } from "@/utils/sileoToast";
+import { SECCION_AJUSTES_NOTIFICACIONES } from "@/utils/auth/postLoginRedirect";
 
 export const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-white/5 rounded-2xl ${className}`} />
@@ -48,6 +50,7 @@ function normalizePrefs(
 }
 
 export default function ProfileSettings() {
+  const searchParams = useSearchParams();
   const [profile, setProfile] = useState<Perfil | null>(null);
   const [saving, setSaving] = useState(false);
   const [pedidoAbierto, setPedidoAbierto] = useState(false);
@@ -80,11 +83,13 @@ export default function ProfileSettings() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.location.hash === "#notificaciones") {
-      const el = document.getElementById("notificaciones");
-      el?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [profile]);
+    const porQuery =
+      searchParams.get("seccion") === SECCION_AJUSTES_NOTIFICACIONES;
+    const porHash = window.location.hash === `#${SECCION_AJUSTES_NOTIFICACIONES}`;
+    if (!porQuery && !porHash) return;
+    const el = document.getElementById(SECCION_AJUSTES_NOTIFICACIONES);
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [profile, searchParams]);
 
   const updatePref = async (
     key: keyof PreferenciasNotificacion,

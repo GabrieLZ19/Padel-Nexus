@@ -23,6 +23,7 @@ import Pagination from "@/components/ui/Pagination";
 import FeedbackModal, { type FeedbackModalProps } from "@/components/ui/FeedbackModal";
 import { formatFechaCalendario } from "@/utils/formatFecha";
 import { resumenBloqueoAgenda } from "@/utils/bloqueoDisponibilidad";
+import { esReservaVencidaPorPago } from "@/utils/reservaPlazoPago";
 
 type VistaReservas = "lista" | "agenda";
 
@@ -62,6 +63,13 @@ const ETIQUETA_PAGO: Record<string, string> = {
   rechazado: "Pago rechazado",
   cancelado: "Sin cobro",
 };
+
+function etiquetaEstadoReserva(
+  reserva: Pick<ReservaClubFila, "estado_reserva" | "motivo_cancelacion">,
+): string {
+  if (esReservaVencidaPorPago(reserva)) return "Vencida (sin pago)";
+  return ETIQUETA_RESERVA[reserva.estado_reserva] || reserva.estado_reserva;
+}
 
 export default function ClubReservasPage() {
   const hoy = hoyLocal();
@@ -410,7 +418,7 @@ function FilaReserva({
         ${Number(turno?.precio || 0).toLocaleString("es-AR")}
       </td>
       <td className="whitespace-nowrap px-3 py-2 text-xs">
-        <span className="font-bold">{ETIQUETA_RESERVA[reserva.estado_reserva] || reserva.estado_reserva}</span>
+        <span className="font-bold">{etiquetaEstadoReserva(reserva)}</span>
         <span className="ml-2 text-gray-500">{ETIQUETA_PAGO[reserva.estado_pago] || reserva.estado_pago}</span>
       </td>
       <td className="whitespace-nowrap px-3 py-1.5">

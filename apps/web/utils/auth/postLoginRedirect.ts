@@ -1,5 +1,50 @@
 const SESSION_KEY = "padel_post_login_redirect";
 
+/** Coincide con `id="notificaciones"` en ajustes de perfil. */
+export const SECCION_AJUSTES_NOTIFICACIONES = "notificaciones";
+
+const RUTA_AJUSTES_PERFIL = "/mi-perfil/ajustes";
+
+function splitPathAndSearch(pathWithSearch: string): {
+  path: string;
+  search: string;
+} {
+  const q = pathWithSearch.indexOf("?");
+  if (q < 0) return { path: pathWithSearch, search: "" };
+  return {
+    path: pathWithSearch.slice(0, q),
+    search: pathWithSearch.slice(q + 1),
+  };
+}
+
+/**
+ * Tras login, los hashes no sobreviven al middleware: usamos query ?seccion= para
+ * scroll en ajustes (ENT-28). También convierte #notificaciones legado.
+ */
+export function normalizarDestinoConSeccion(destino: string): string {
+  const hashIndex = destino.indexOf("#");
+  const pathWithSearch = hashIndex >= 0 ? destino.slice(0, hashIndex) : destino;
+  const hash = hashIndex >= 0 ? destino.slice(hashIndex + 1) : null;
+  const { path, search } = splitPathAndSearch(pathWithSearch);
+  if (path !== RUTA_AJUSTES_PERFIL) return destino;
+
+  const params = new URLSearchParams(search);
+  const seccionDesdeQuery = params.get("seccion");
+  const seccionDesdeHash =
+    hash && safeRedirectFragment(hash) === SECCION_AJUSTES_NOTIFICACIONES
+      ? SECCION_AJUSTES_NOTIFICACIONES
+      : null;
+  const seccion = seccionDesdeQuery || seccionDesdeHash;
+
+  if (seccion !== SECCION_AJUSTES_NOTIFICACIONES) {
+    return hashIndex >= 0 ? pathWithSearch : destino;
+  }
+
+  params.set("seccion", SECCION_AJUSTES_NOTIFICACIONES);
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
+}
+
 export type PostLoginRedirectPendiente = {
   path: string | null;
   fragment: string | null;
@@ -63,8 +108,8 @@ export function resolveDestinoTrasLogin(
   fallback: string,
 ): string {
   const conFragmento = applyRedirectFragment(redirectPath, fragment);
-  if (conFragmento) return conFragmento;
-  return fallback;
+  const base = conFragmento || fallback;
+  return normalizarDestinoConSeccion(base);
 }
 
 export function guardarRedirectPostLogin(pendiente: PostLoginRedirectPendiente): void {

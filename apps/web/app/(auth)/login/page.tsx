@@ -40,8 +40,21 @@ function AuthPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = safeRedirectPath(searchParams.get("redirect"));
-  const redirectFragment = safeRedirectFragment(searchParams.get("fragment"));
+  const redirectFragmentFromQuery = safeRedirectFragment(
+    searchParams.get("fragment"),
+  );
+  const [redirectFragmentFromHash, setRedirectFragmentFromHash] = useState<
+    string | null
+  >(null);
+  const redirectFragment = redirectFragmentFromQuery ?? redirectFragmentFromHash;
   const { setProfile } = useProfileStore();
+
+  useEffect(() => {
+    const frag = safeRedirectFragment(
+      window.location.hash.replace(/^#/, ""),
+    );
+    if (frag) setRedirectFragmentFromHash(frag);
+  }, []);
 
   // Cargar email guardado si existe "Recordarme"
   useEffect(() => {

@@ -15,6 +15,7 @@ export interface ReservaClubFila {
   fecha_reserva: string;
   estado_pago: string;
   estado_reserva: string;
+  motivo_cancelacion?: string | null;
   perfiles?: {
     nombre?: string | null;
     apellido?: string | null;
