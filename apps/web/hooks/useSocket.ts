@@ -16,7 +16,9 @@ const socketBaseUrl = (): string =>
   process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") ||
   "http://localhost:4000";
 
-export const useSocket = (onNotificationReceived?: (notif: unknown) => void) => {
+export const useSocket = <T = unknown>(
+  onNotificationReceived?: (notif: T) => void,
+) => {
   const { profile } = useProfileStore();
   const callbackRef = useRef(onNotificationReceived);
 
@@ -36,7 +38,7 @@ export const useSocket = (onNotificationReceived?: (notif: unknown) => void) => 
     let cancelled = false;
 
     const handleNuevaNotificacion = (notif: unknown) => {
-      callbackRef.current?.(notif);
+      callbackRef.current?.(notif as T);
     };
 
     const handleChatNotificacion = (data: unknown) => {

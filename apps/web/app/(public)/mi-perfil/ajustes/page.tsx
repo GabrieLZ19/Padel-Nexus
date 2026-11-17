@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { PerfilService } from "@/utils/services/perfil";
@@ -49,7 +49,7 @@ function normalizePrefs(
   };
 }
 
-export default function ProfileSettings() {
+function ProfileSettingsContent() {
   const searchParams = useSearchParams();
   const [profile, setProfile] = useState<Perfil | null>(null);
   const [saving, setSaving] = useState(false);
@@ -624,5 +624,20 @@ export default function ProfileSettings() {
       />
 
     </div>
+  );
+}
+
+export default function ProfileSettings() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-3xl mx-auto p-5 md:p-10 space-y-6">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      }
+    >
+      <ProfileSettingsContent />
+    </Suspense>
   );
 }

@@ -178,8 +178,15 @@ export default function PlayerDashboard() {
 
   // Refrescar el perfil en tiempo real cuando cambia el estado de una licencia
   const handleSocketNotif = useCallback(
-    (notif: { titulo: string }) => {
-      if (LICENSE_RELATED_TITLES.includes(notif.titulo)) {
+    (notif: unknown) => {
+      const titulo =
+        typeof notif === "object" &&
+        notif !== null &&
+        "titulo" in notif &&
+        typeof (notif as { titulo: unknown }).titulo === "string"
+          ? (notif as { titulo: string }).titulo
+          : null;
+      if (titulo && LICENSE_RELATED_TITLES.includes(titulo)) {
         fetchProfile();
       }
     },

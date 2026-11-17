@@ -329,6 +329,7 @@ export function FapBracketDiagram({
       matchNodes,
       headers,
       numeros,
+      partidoDe,
       width: anchoLienzoLlave(maxCol + 1),
       height: HEADER_H + PAD_Y * 2 + Math.max(leaves.length, 1) * SLOT,
     };
@@ -671,7 +672,7 @@ export function FapBracketDiagram({
                 if (!interactive || !onMatchClick || !p) return;
                 const entry = entryMatchForLeaf(matches, bye.leaf);
                 const partidoEdicion = entry
-                  ? partidoDe(entry.matchNo) ?? p
+                  ? layout.partidoDe(entry.matchNo) ?? p
                   : p;
                 const slotFocus = entry
                   ? entry.side === "a"
