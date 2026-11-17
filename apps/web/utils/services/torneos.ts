@@ -380,6 +380,7 @@ export const TorneosService = {
       motivo: string;
       alta_lado_a?: import("@/components/torneos/llaveAltaParejaTypes").AltaLlavePendientePayload;
       alta_lado_b?: import("@/components/torneos/llaveAltaParejaTypes").AltaLlavePendientePayload;
+      semilla_fap?: string;
     },
   ) {
     const response = await api.put(`/torneos/partidos/${partidoId}/equipos`, payload);

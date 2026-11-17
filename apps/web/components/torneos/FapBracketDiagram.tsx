@@ -48,7 +48,7 @@ type Props = {
   interactive?: boolean;
   onMatchClick?: (
     partido: Partido,
-    opciones?: { slotFocus?: "a" | "b" },
+    opciones?: { slotFocus?: "a" | "b"; semillaFap?: string },
   ) => void;
   /** Vista pública / mobile: zoom inicial más bajo y tipografía compacta. */
   compact?: boolean;
@@ -669,7 +669,19 @@ export function FapBracketDiagram({
 
               const abrirEdicionBye = () => {
                 if (!interactive || !onMatchClick || !p) return;
-                onMatchClick(p, { slotFocus: side });
+                const entry = entryMatchForLeaf(matches, bye.leaf);
+                const partidoEdicion = entry
+                  ? partidoDe(entry.matchNo) ?? p
+                  : p;
+                const slotFocus = entry
+                  ? entry.side === "a"
+                    ? "b"
+                    : "a"
+                  : side;
+                onMatchClick(partidoEdicion, {
+                  slotFocus,
+                  semillaFap: bye.leaf,
+                });
               };
 
               return (

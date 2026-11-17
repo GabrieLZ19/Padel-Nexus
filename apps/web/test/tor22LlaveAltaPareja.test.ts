@@ -32,6 +32,9 @@ describe("TOR-22 editor de llaves: otra categoría o DNI", () => {
     );
     assert.match(diagrama, /Editar/);
     assert.match(diagrama, /slotFocus/);
+    assert.match(diagrama, /semillaFap/);
+    assert.match(editor, /semilla_fap/);
+    assert.match(editor, /matchEditSemillaFap/);
 
     const svc = readFileSync(
       path.join(RAIZ, "utils/services/torneos.ts"),

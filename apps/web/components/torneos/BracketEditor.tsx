@@ -52,6 +52,11 @@ import {
 } from "@/utils/constants/fapApaRules";
 import { generarPdfZonas } from "@/utils/grillaPdf";
 import { textoClasificacionZonas, zonaGrupoCompleta } from "@/utils/clasificacionZonas";
+import {
+  buildZonePairCountsFromZonas,
+  equipoIdVisibleEnSlotFap,
+} from "@/utils/fapZoneSeeds";
+import { formatearResumenTrasGuardarZonas } from "@/utils/resumenLlaveZonas";
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import {
   etiquetaRondaLlave,
@@ -239,6 +244,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   });
   const [matchEditMotivo, setMatchEditMotivo] = useState("");
   const [matchEditSlotFocus, setMatchEditSlotFocus] = useState<"a" | "b">("a");
+  const [matchEditSemillaFap, setMatchEditSemillaFap] = useState<string | null>(
+    null,
+  );
   const [inscripcionesExtraLlave, setInscripcionesExtraLlave] = useState<
     Array<{
       value: string;
@@ -750,48 +758,6 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     });
   };
 
-  const formatearResumenLlaveZonas = (data: {
-    zonas_regeneradas?: string[];
-    llave?: {
-      semillas_invalidadas?: string[];
-      semillas_actualizadas?: string[];
-      semillas_pendientes?: string[];
-    };
-    fixture_reparado?: Array<{ nombre_grupo: string; insertados: number }>;
-  }): string => {
-    const partes: string[] = [];
-    if (data.zonas_regeneradas?.length) {
-      partes.push(
-        `Fixture recalculado en: ${data.zonas_regeneradas.join(", ")}.`,
-      );
-    }
-    const f = data.fixture_reparado?.filter((z) => z.insertados > 0) ?? [];
-    if (f.length) {
-      partes.push(
-        `Se completaron partidos faltantes en ${f.map((z) => z.nombre_grupo).join(", ")}.`,
-      );
-    }
-    const ll = data.llave;
-    if (ll?.semillas_invalidadas?.length) {
-      partes.push(
-        `Llave: se quitaron plazas que ya no aplican (${ll.semillas_invalidadas.join(", ")}).`,
-      );
-    }
-    if (ll?.semillas_actualizadas?.length) {
-      partes.push(
-        `Llave actualizada: ${ll.semillas_actualizadas.join(", ")}.`,
-      );
-    }
-    if (ll?.semillas_pendientes?.length) {
-      partes.push(
-        `Plazas sin clasificado aún: ${ll.semillas_pendientes.join(", ")}.`,
-      );
-    }
-    return partes.length
-      ? partes.join(" ")
-      : "La disposición de las zonas y los partidos se actualizaron exitosamente.";
-  };
-
   const handleRepararFixtureZonas = () => {
     setFeedbackModal({
       isOpen: true,
@@ -816,7 +782,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             isOpen: true,
             type: "success",
             title: "Fixture reparado",
-            description: formatearResumenLlaveZonas(data),
+            description: formatearResumenTrasGuardarZonas(data, zonas),
             onClose: () => {
               setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
               onRefresh?.();
@@ -898,7 +864,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               isOpen: true,
               type: "success",
               title: "Cambios Guardados",
-              description: formatearResumenLlaveZonas(guardado),
+              description: formatearResumenTrasGuardarZonas(guardado, zonas),
               onClose: () => {
                 setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
                 onRefresh?.();
@@ -1138,6 +1104,42 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
   const usaPlantillaFap = !isEliminatoriaDirecta && fapMatrixByOrden.size > 0;
 
+  const countsByZoneFap = React.useMemo(
+    () => buildZonePairCountsFromZonas(zonas),
+    [zonas],
+  );
+
+  const partidoLlaveParaVista = React.useCallback(
+    (p: Partido): Partido => {
+      if (!usaPlantillaFap || fapMatrixByOrden.size === 0) return p;
+      const matrix = fapMatrixByOrden.get(Number(p.orden));
+      if (!matrix) return p;
+      const equipo_a_id = equipoIdVisibleEnSlotFap(
+        matrix.a,
+        p.equipo_a_id,
+        countsByZoneFap,
+      );
+      const equipo_b_id = equipoIdVisibleEnSlotFap(
+        matrix.b,
+        p.equipo_b_id,
+        countsByZoneFap,
+      );
+      if (
+        equipo_a_id === p.equipo_a_id &&
+        equipo_b_id === p.equipo_b_id
+      ) {
+        return p;
+      }
+      return { ...p, equipo_a_id, equipo_b_id };
+    },
+    [usaPlantillaFap, fapMatrixByOrden, countsByZoneFap],
+  );
+
+  const partidosDiagramaFap = React.useMemo(
+    () => partidos.map((p) => partidoLlaveParaVista(p)),
+    [partidos, partidoLlaveParaVista],
+  );
+
   const inscripcionesConfirmadas = React.useMemo(
     () =>
       inscripciones.filter((ins) => ins.estado_pago === "Confirmado").length,
@@ -1347,6 +1349,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     setSelectedMatchToEdit(null);
     setMatchEditBaseline(null);
     setMatchEditMotivo("");
+    setMatchEditSemillaFap(null);
   };
 
   const resolverLadoParaGuardarPartido = (
@@ -1383,6 +1386,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         motivo: matchEditMotivo.trim(),
         ...(ladoA.alta ? { alta_lado_a: ladoA.alta } : {}),
         ...(ladoB.alta ? { alta_lado_b: ladoB.alta } : {}),
+        ...(matchEditSemillaFap ? { semilla_fap: matchEditSemillaFap } : {}),
       });
       descartarPendientesModalLlave();
       setShowMatchEditModal(false);
@@ -1422,7 +1426,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     slot: "a" | "b",
     newId: string,
   ) => {
-    if (newId && slotLadoReservadoGanador(slot)) {
+    if (newId && slotLadoReservadoGanador(slot) && !matchEditSemillaFap) {
       sileo.warning({
         title: "Lado reservado",
         description:
@@ -1468,7 +1472,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     const baseB = matchEditBaseline?.equipo_b_id ?? null;
     const nextA = selectedMatchToEdit.equipo_a_id ?? null;
     const nextB = selectedMatchToEdit.equipo_b_id ?? null;
-    if (matrizPartidoEnEdicion) {
+    if (matrizPartidoEnEdicion && !matchEditSemillaFap) {
       if (slotLadoReservadoGanador("a") && nextA !== baseA) {
         setFeedbackModal({
           isOpen: true,
@@ -2126,7 +2130,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 <FapBracketDiagram
                   matches={fapMatrixMatches}
                   // Lista completa: la numeración visible cuenta zonas + llave (CUA-01 / P4).
-                  partidos={partidos}
+                  partidos={partidosDiagramaFap}
                   inicioNumeracion={partidosZona.length + 1}
                   pairCount={fapPairCount ?? undefined}
                   alcance={torneo?.alcance}
@@ -2139,6 +2143,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                       equipo_b_id: pToEdit.equipo_b_id ?? null,
                     });
                     setMatchEditSlotFocus(opciones?.slotFocus ?? "a");
+                    setMatchEditSemillaFap(opciones?.semillaFap ?? null);
                     setMatchEditMotivo("");
                     setShowMatchEditModal(true);
                   }}
@@ -2157,7 +2162,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                       </h3>
                       <div className="flex flex-col flex-1 justify-around gap-10">
                         {getRoundMatches(ronda.id, ronda.required).map(
-                          (partido, i) => (
+                          (partido, i) => {
+                            const partidoVista = partidoLlaveParaVista(partido);
+                            return (
                             <div
                               key={partido.id}
                               className={`relative flex flex-col justify-center ${
@@ -2167,14 +2174,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                               } ${rondaIndex > 0 ? "pl-7" : "pl-1"}`}
                             >
                               <MatchCard
-                                partido={partido}
+                                partido={partidoVista}
                                 isInteractive={puedeEditarLlave}
                                 numeroVisible={numerosPartido.get(partido.id)}
                                 alcance={torneo?.alcance}
                                 origenEquipoA={
-                                  partido.equipo_a_id
+                                  partidoVista.equipo_a_id
                                     ? origenPorInscripcion.get(
-                                        String(partido.equipo_a_id),
+                                        String(partidoVista.equipo_a_id),
                                       ) || null
                                     : formatFapSide(
                                         fapMatrixByOrden.get(
@@ -2183,9 +2190,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                                       )
                                 }
                                 origenEquipoB={
-                                  partido.equipo_b_id
+                                  partidoVista.equipo_b_id
                                     ? origenPorInscripcion.get(
-                                        String(partido.equipo_b_id),
+                                        String(partidoVista.equipo_b_id),
                                       ) || null
                                     : formatFapSide(
                                         fapMatrixByOrden.get(
@@ -2194,15 +2201,15 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                                       )
                                 }
                                 esCabezaSerieA={
-                                  !!partido.equipo_a_id &&
+                                  !!partidoVista.equipo_a_id &&
                                   cabezasSerieIds.has(
-                                    String(partido.equipo_a_id),
+                                    String(partidoVista.equipo_a_id),
                                   )
                                 }
                                 esCabezaSerieB={
-                                  !!partido.equipo_b_id &&
+                                  !!partidoVista.equipo_b_id &&
                                   cabezasSerieIds.has(
-                                    String(partido.equipo_b_id),
+                                    String(partidoVista.equipo_b_id),
                                   )
                                 }
                                 onEditSelect={(pToEdit) => {
@@ -2231,7 +2238,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                                 </>
                               )}
                             </div>
-                          ),
+                            );
+                          },
                         )}
                       </div>
                     </div>
@@ -2464,7 +2472,15 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 </button>
               </div>
 
-              {slotLadoReservadoGanador(matchEditSlotFocus) ? (
+              {matchEditSemillaFap ? (
+                <p className="text-xs text-sky-200/90 bg-sky-500/10 border border-sky-400/30 rounded-xl px-3 py-2.5">
+                  Pase directo de {formatFapSide(matchEditSemillaFap)}: prepará
+                  el rival con «Alta para lado A/B» y guardá para crear el cruce
+                  en el octavo correspondiente.
+                </p>
+              ) : null}
+              {slotLadoReservadoGanador(matchEditSlotFocus) &&
+              !matchEditSemillaFap ? (
                 <p className="text-xs text-amber-200/90 bg-amber-500/10 border border-amber-400/30 rounded-xl px-3 py-2.5">
                   El lado seleccionado está reservado para{" "}
                   {etiquetaLadoReservado(matchEditSlotFocus) ?? "un ganador previo"}
