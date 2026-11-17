@@ -1,0 +1,151 @@
+{
+  "redirects": [
+    {
+      "source": "/index.html",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/callback/:path*",
+      "destination": "https://play.padelnexus.app/callback/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/club/:path*",
+      "destination": "https://play.padelnexus.app/club/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/consentimiento-parental/:path*",
+      "destination": "https://play.padelnexus.app/consentimiento-parental/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard/:path*",
+      "destination": "https://play.padelnexus.app/dashboard/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/forgot-password/:path*",
+      "destination": "https://play.padelnexus.app/forgot-password/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/jugadores/:path*",
+      "destination": "https://play.padelnexus.app/jugadores/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/login/:path*",
+      "destination": "https://play.padelnexus.app/login/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/marketplace/:path*",
+      "destination": "https://play.padelnexus.app/marketplace/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/mensajes/:path*",
+      "destination": "https://play.padelnexus.app/mensajes/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/mi-perfil/:path*",
+      "destination": "https://play.padelnexus.app/mi-perfil/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/partidos/:path*",
+      "destination": "https://play.padelnexus.app/partidos/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/privacidad/:path*",
+      "destination": "https://play.padelnexus.app/privacidad/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/privacidad-menores/:path*",
+      "destination": "https://play.padelnexus.app/privacidad-menores/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/ranking/:path*",
+      "destination": "https://play.padelnexus.app/ranking/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/reservar/:path*",
+      "destination": "https://play.padelnexus.app/reservar/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/signup/:path*",
+      "destination": "https://play.padelnexus.app/signup/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/terminos/:path*",
+      "destination": "https://play.padelnexus.app/terminos/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/torneos/:path*",
+      "destination": "https://play.padelnexus.app/torneos/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/update-password/:path*",
+      "destination": "https://play.padelnexus.app/update-password/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/verificar/:path*",
+      "destination": "https://play.padelnexus.app/verificar/:path*",
+      "permanent": true
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)\\.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    },
+    {
+      "source": "/assets/fonts/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000"
+        }
+      ]
+    }
+  ]
+}
