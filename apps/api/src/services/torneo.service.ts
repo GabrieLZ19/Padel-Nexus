@@ -2173,18 +2173,41 @@ export class TorneoService {
       .single();
 
     if (torneoInfo && !yaTeniaResultado) {
-      await otorgarPuntosPorPartidoRanking(
-        {
-          id: partido.id,
-          torneo_id: partido.torneo_id,
-          ronda: partido.ronda,
-          ganador: ganadorId,
-          equipo_a_id: partido.equipo_a_id,
-          equipo_b_id: partido.equipo_b_id,
-        },
-        torneoInfo as TorneoInfoPuntos,
-        ganadorId,
-      );
+      try {
+        await otorgarPuntosPorPartidoRanking(
+          {
+            id: partido.id,
+            torneo_id: partido.torneo_id,
+            ronda: partido.ronda,
+            ganador: ganadorId,
+            equipo_a_id: partido.equipo_a_id,
+            equipo_b_id: partido.equipo_b_id,
+          },
+          torneoInfo as TorneoInfoPuntos,
+          ganadorId,
+        );
+      } catch (puntosError) {
+        if (previo) {
+          await supabaseAdmin
+            .from("partidos")
+            .update({
+              ganador: previo.ganador,
+              set1_a: previo.set1_a,
+              set1_b: previo.set1_b,
+              set2_a: previo.set2_a,
+              set2_b: previo.set2_b,
+              set3_a: previo.set3_a,
+              set3_b: previo.set3_b,
+              es_supertiebreak: Boolean(previo.es_supertiebreak),
+              es_wo: Boolean(previo.es_wo),
+              es_injustificado_wo: Boolean(previo.es_injustificado_wo),
+              es_lesion: Boolean(previo.es_lesion),
+              estado_partido: previo.estado_partido,
+            })
+            .eq("id", partidoId);
+        }
+        throw puntosError;
+      }
     }
 
     if (partido.ronda.toUpperCase() === "FINAL") {

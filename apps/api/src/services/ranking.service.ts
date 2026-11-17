@@ -430,29 +430,29 @@ export class RankingService {
   static async actualizarPuntosJugador(datos: ActualizarPuntosDTO) {
     const alcanceFinal = datos.alcance || "Provincial";
 
-    // Buscamos si ya tiene una billetera existente en esa categoría y alcance
     const { data: rankingActual } = await supabaseAdmin
       .from("rankings")
-      .select("id, puntos")
+      .select("id, puntos, alcance, provincia_jurisdiccion")
       .eq("usuario_id", datos.usuarioId)
       .eq("categoria", datos.categoria)
-      .eq("alcance", alcanceFinal)
       .maybeSingle();
 
     const puntosAnteriores = rankingActual?.puntos || 0;
     const nuevosPuntos = puntosAnteriores + datos.puntosASumar;
 
-    // Actualizamos o insertamos de forma segura con un upsert reglamentario
     const { error: rankError } = await supabaseAdmin.from("rankings").upsert(
       {
         ...(rankingActual?.id ? { id: rankingActual.id } : {}),
         usuario_id: datos.usuarioId,
         puntos: nuevosPuntos,
         categoria: datos.categoria,
-        alcance: alcanceFinal,
-        provincia_jurisdiccion: datos.provinciaJurisdiccion || null,
+        alcance: rankingActual?.alcance ?? alcanceFinal,
+        provincia_jurisdiccion:
+          datos.provinciaJurisdiccion ??
+          rankingActual?.provincia_jurisdiccion ??
+          null,
       },
-      { onConflict: "id" }, // Usamos la clave primaria por seguridad de restricciones
+      { onConflict: "usuario_id,categoria" },
     );
 
     if (rankError) {

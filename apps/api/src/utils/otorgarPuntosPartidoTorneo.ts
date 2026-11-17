@@ -93,12 +93,14 @@ export async function otorgarPuntosPorPartidoRanking(
 
     const ids = [ins.usuario_id, ins.usuario2_id].filter(Boolean);
     for (const uid of ids) {
+      const categoriaNivel = String(torneoInfo.nivel || "").trim();
+      if (!categoriaNivel) continue;
+
       const { data: rank } = await supabaseAdmin
         .from("rankings")
-        .select("id, puntos, pj, pg")
+        .select("id, puntos, pj, pg, alcance, provincia_jurisdiccion")
         .eq("usuario_id", uid)
-        .eq("categoria", torneoInfo.nivel)
-        .eq("alcance", alcanceRanking)
+        .eq("categoria", categoriaNivel)
         .maybeSingle();
 
       const pAnt = rank?.puntos || 0;
@@ -109,15 +111,16 @@ export async function otorgarPuntosPorPartidoRanking(
         {
           ...(rank?.id ? { id: rank.id } : {}),
           usuario_id: uid,
-          categoria: torneoInfo.nivel,
+          categoria: categoriaNivel,
           rama: torneoInfo.categoria,
-          alcance: alcanceRanking,
-          provincia_jurisdiccion: provinciaJurisdiccion,
+          alcance: rank?.alcance ?? alcanceRanking,
+          provincia_jurisdiccion:
+            provinciaJurisdiccion ?? rank?.provincia_jurisdiccion ?? null,
           puntos: pAnt + puntos,
           pj: pjAnt + 1,
           pg: esGanador ? pgAnt + 1 : pgAnt,
         },
-        { onConflict: "id" },
+        { onConflict: "usuario_id,categoria" },
       );
 
       if (rankError) {
