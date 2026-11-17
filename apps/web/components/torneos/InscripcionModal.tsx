@@ -30,6 +30,9 @@ import {
   hydrateTorneoRestrictions,
 } from "@/utils/inscripcionElegibilidad";
 import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
+import { InscripcionPagoActions } from "@/components/torneos/InscripcionPagoActions";
+import { inscripcionRequierePagoOnline } from "@/utils/inscripcionPago";
+import type { Inscripcion } from "@/utils/types";
 
 interface InscripcionModalProps {
   isOpen: boolean;
@@ -82,6 +85,9 @@ export default function InscripcionModal({
     [torneoRaw],
   );
   const [step, setStep] = useState<"form" | "success">("form");
+  const [inscripcionCreada, setInscripcionCreada] = useState<Inscripcion | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [email2, setEmail2] = useState("");
   const [checkingJ2, setCheckingJ2] = useState(false);
@@ -177,15 +183,16 @@ export default function InscripcionModal({
 
     setLoading(true);
     try {
-      await InscripcionesService.inscribir({
+      const creada = (await InscripcionesService.inscribir({
         torneo_id: torneo.id,
         usuario_id: profile.id,
         usuario2_email: isIndividual ? null : email2,
         jugador1_nombre: jugador1Nombre,
         jugador2_nombre: isIndividual ? "-" : jugador2Nombre || "",
         monto: Number(torneo.precio_inscripcion),
-      });
+      })) as Inscripcion;
 
+      setInscripcionCreada(creada);
       router.refresh();
       setStep("success");
     } catch (error: unknown) {
@@ -216,6 +223,7 @@ export default function InscripcionModal({
 
   const handleClose = () => {
     setStep("form");
+    setInscripcionCreada(null);
     setEmail2("");
     setChecksJ2([]);
     setJugador2Nombre(null);
@@ -403,7 +411,9 @@ export default function InscripcionModal({
                         </p>
                       </div>
                       <p className="text-[10px] text-gray-500 text-right max-w-[9.5rem] leading-snug">
-                        El admin valida el pago después.
+                        {Number(torneo.precio_inscripcion) > 0 && !torneo.es_gratis
+                          ? "Pagá con Mercado Pago al confirmar."
+                          : "Sin costo o validación manual por el organizador."}
                       </p>
                     </div>
                     <button
@@ -433,18 +443,55 @@ export default function InscripcionModal({
                   <h2 className="text-2xl font-black text-white mb-2">
                     ¡Inscripción enviada!
                   </h2>
-                  <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                  <p className="text-gray-400 text-sm leading-relaxed mb-5">
                     Tu solicitud para{" "}
                     <span className="text-white font-semibold">
                       {torneo.nombre}
                     </span>{" "}
-                    fue recibida. Te avisamos cuando confirmen el pago.
+                    fue recibida.
+                    {inscripcionCreada &&
+                    inscripcionRequierePagoOnline({
+                      esGratis: torneo.es_gratis,
+                      monto: inscripcionCreada.monto,
+                      precioInscripcion: torneo.precio_inscripcion,
+                      estadoPago: inscripcionCreada.estado_pago,
+                    })
+                      ? " Completá el pago para quedar habilitado."
+                      : " Te avisamos si hace falta algún paso más."}
                   </p>
+                  {inscripcionCreada &&
+                  inscripcionRequierePagoOnline({
+                    esGratis: torneo.es_gratis,
+                    monto: inscripcionCreada.monto,
+                    precioInscripcion: torneo.precio_inscripcion,
+                    estadoPago: inscripcionCreada.estado_pago,
+                  }) ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="w-full text-left mb-4"
+                    >
+                      <InscripcionPagoActions
+                        inscripcionId={inscripcionCreada.id}
+                        monto={Number(inscripcionCreada.monto)}
+                        estadoPago={inscripcionCreada.estado_pago}
+                        esGratis={torneo.es_gratis}
+                        precioInscripcion={torneo.precio_inscripcion}
+                      />
+                    </motion.div>
+                  ) : null}
                   <button
                     onClick={handleClose}
                     className="w-full bg-white/5 hover:bg-white/10 text-white py-3.5 rounded-xl font-bold transition-all cursor-pointer"
                   >
-                    Entendido
+                    {inscripcionCreada &&
+                    inscripcionRequierePagoOnline({
+                      esGratis: torneo.es_gratis,
+                      monto: inscripcionCreada.monto,
+                      estadoPago: inscripcionCreada.estado_pago,
+                    })
+                      ? "Pagar después"
+                      : "Entendido"}
                   </button>
                 </div>
               )}

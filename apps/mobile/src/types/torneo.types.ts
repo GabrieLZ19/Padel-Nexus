@@ -31,5 +31,11 @@ export interface Torneo {
   hora_inicio_jornada?: string | null;
   banners?: string[];
   clubes?: TorneoClub | null;
-  inscripciones?: { usuario_id?: string; usuario2_id?: string }[];
+  inscripciones?: {
+    id?: string;
+    usuario_id?: string;
+    usuario2_id?: string;
+    estado_pago?: string;
+    monto?: number;
+  }[];
 }

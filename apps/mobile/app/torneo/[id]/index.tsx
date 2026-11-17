@@ -27,6 +27,8 @@ import {
   hrefTorneoInscripcion,
   hrefTorneoZonas,
 } from "@/src/lib/navigation";
+import { InscripcionesService } from "@/src/services/inscripciones";
+import { abrirCheckoutMercadoPago } from "@/src/services/pagos";
 import { TorneosService } from "@/src/services/torneos";
 import { useAuthStore } from "@/src/stores/authStore";
 import type { PartidoTorneo } from "@/src/types/competencia.types";
@@ -62,6 +64,7 @@ export default function TorneoDetalleScreen() {
   const [partidos, setPartidos] = useState<PartidoTorneo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pagando, setPagando] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -88,12 +91,41 @@ export default function TorneoDetalleScreen() {
   );
 
   const abierto = torneo ? esTorneoInscripcionAbierta(torneo.estado) : false;
-  const yaInscripto = Boolean(
-    usuario?.id &&
-      torneo?.inscripciones?.some(
-        (i) => i.usuario_id === usuario.id || i.usuario2_id === usuario.id,
-      ),
+  const miInscripcion = torneo?.inscripciones?.find(
+    (i) => i.usuario_id === usuario?.id || i.usuario2_id === usuario?.id,
   );
+  const yaInscripto = Boolean(miInscripcion);
+  const pagoPendiente =
+    Boolean(miInscripcion?.id) &&
+    (miInscripcion?.estado_pago || "").toLowerCase() === "pendiente" &&
+    Number(miInscripcion?.monto ?? torneo?.precio_inscripcion ?? 0) > 0;
+
+  async function onPagarInscripcion() {
+    if (!miInscripcion?.id) return;
+    setPagando(true);
+    setError(null);
+    try {
+      const preferencia = await InscripcionesService.crearPreferenciaMp(
+        miInscripcion.id,
+      );
+      const resultado = await abrirCheckoutMercadoPago(preferencia);
+      if (resultado.tipo === "exito") {
+        await InscripcionesService.confirmarRetornoMp(
+          miInscripcion.id,
+          resultado.paymentId ?? `mobile-inscripcion-${Date.now()}`,
+        );
+        await load();
+      } else if (resultado.tipo === "fallo") {
+        setError("El pago no se completó.");
+      }
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "No se pudo iniciar el pago.",
+      );
+    } finally {
+      setPagando(false);
+    }
+  }
   const categoria = [torneo?.nivel, torneo?.categoria].filter(Boolean).join(" ");
   const hora = formatTime(torneo?.hora_inicio_jornada);
   const { zonas: partidosZonas, cuadro: partidosCuadro } = separarPartidosPorFase(partidos);
@@ -320,15 +352,22 @@ export default function TorneoDetalleScreen() {
         <View className="w-[52%]">
           <Button
             label={
-              yaInscripto
-                ? "Ya inscripto"
-                : abierto
-                  ? "Inscribirme"
-                  : "Ver cuadro"
+              pagoPendiente
+                ? "Pagar inscripción"
+                : yaInscripto
+                  ? "Ya inscripto"
+                  : abierto
+                    ? "Inscribirme"
+                    : "Ver cuadro"
             }
-            disabled={yaInscripto}
+            loading={pagando}
+            disabled={yaInscripto && !pagoPendiente}
             trailingIcon="arrow-right"
             onPress={() => {
+              if (pagoPendiente) {
+                void onPagarInscripcion();
+                return;
+              }
               if (yaInscripto || !abierto) {
                 router.push(hrefTorneoCuadro(torneo.id));
                 return;

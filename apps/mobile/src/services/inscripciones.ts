@@ -1,7 +1,10 @@
 import { isAxiosError } from "axios";
 
 import { api } from "@/src/services/api";
+import type { PreferenciaMercadoPago } from "@/src/services/pagos";
 import type { ElegibilidadInscripcion } from "@/src/types/competencia.types";
+
+type ApiResponse<T> = { exito?: boolean; data: T };
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (isAxiosError(error)) {
@@ -46,11 +49,43 @@ export const InscripcionesService = {
     monto: number;
   }) {
     try {
-      const response = await api.post("/inscripciones", data);
+      const response = await api.post<{ id: string }>("/inscripciones", data);
       return response.data;
     } catch (error: unknown) {
       throw new Error(
         getErrorMessage(error, "No se pudo completar la inscripción."),
+      );
+    }
+  },
+
+  async crearPreferenciaMp(
+    inscripcionId: string,
+  ): Promise<PreferenciaMercadoPago> {
+    try {
+      const response = await api.post<ApiResponse<PreferenciaMercadoPago>>(
+        `/inscripciones/${inscripcionId}/preferencia-mp`,
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      throw new Error(
+        getErrorMessage(error, "No se pudo iniciar el pago de la inscripción."),
+      );
+    }
+  },
+
+  async confirmarRetornoMp(
+    inscripcionId: string,
+    paymentId: string,
+  ): Promise<unknown> {
+    try {
+      const response = await api.post<ApiResponse<unknown>>(
+        `/inscripciones/${inscripcionId}/confirmar-retorno`,
+        { payment_id: paymentId },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      throw new Error(
+        getErrorMessage(error, "No se pudo confirmar el pago de la inscripción."),
       );
     }
   },

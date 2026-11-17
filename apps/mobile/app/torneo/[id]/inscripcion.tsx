@@ -21,6 +21,7 @@ import {
 } from "@/src/lib/format";
 import { hrefTorneoDetalle } from "@/src/lib/navigation";
 import { InscripcionesService } from "@/src/services/inscripciones";
+import { abrirCheckoutMercadoPago } from "@/src/services/pagos";
 import { TorneosService } from "@/src/services/torneos";
 import { useAuthStore } from "@/src/stores/authStore";
 import type { ElegibilidadInscripcion } from "@/src/types/competencia.types";
@@ -118,7 +119,7 @@ export default function InscripcionScreen() {
     setError(null);
     setSuccess(null);
     try {
-      await InscripcionesService.inscribir({
+      const creada = await InscripcionesService.inscribir({
         torneo_id: id,
         usuario_id: usuario.id,
         usuario2_email: emailCompanero.trim() || elegibilidad?.jugador2?.email,
@@ -127,8 +128,34 @@ export default function InscripcionScreen() {
           elegibilidad?.jugador2?.nombre || emailCompanero.trim(),
         monto,
       });
-      setSuccess("Inscripción enviada. Revisá el estado de pago en Mis torneos.");
-      setTimeout(() => router.replace(hrefTorneoDetalle(id)), 900);
+
+      const requierePago = monto > 0 && !torneo.es_gratis;
+      if (requierePago && creada.id) {
+        const preferencia = await InscripcionesService.crearPreferenciaMp(
+          creada.id,
+        );
+        const resultado = await abrirCheckoutMercadoPago(preferencia);
+        if (resultado.tipo === "exito") {
+          await InscripcionesService.confirmarRetornoMp(
+            creada.id,
+            resultado.paymentId ?? `mobile-inscripcion-${Date.now()}`,
+          );
+          setSuccess("Inscripción confirmada. Tu pago fue acreditado.");
+        } else if (resultado.tipo === "pendiente") {
+          setSuccess(
+            "Inscripción registrada. Cuando apruebe el pago quedarás habilitado.",
+          );
+        } else if (resultado.tipo === "fallo") {
+          setError("El pago no se completó. Podés pagar desde el detalle del torneo.");
+        } else {
+          setSuccess(
+            "Inscripción registrada. Completá el pago desde el torneo cuando quieras.",
+          );
+        }
+      } else {
+        setSuccess("Inscripción enviada.");
+      }
+      setTimeout(() => router.replace(hrefTorneoDetalle(id)), 1200);
     } catch (err: unknown) {
       setError(
         err instanceof Error ? err.message : "No se pudo confirmar la inscripción.",

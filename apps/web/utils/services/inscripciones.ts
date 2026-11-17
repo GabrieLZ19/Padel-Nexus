@@ -46,6 +46,16 @@ export type ElegibilidadResponse = {
   checks_j2: CheckElegibilidadApi[];
 };
 
+export type PreferenciaInscripcionMp = {
+  preferenceId: string | null;
+  initPoint: string | null;
+  sandboxInitPoint: string | null;
+  monto: number;
+  moneda: string;
+  inscripcionId: string;
+  torneoId: string;
+};
+
 export const InscripcionesService = {
   async getAll(): Promise<Inscripcion[]> {
     const response = await api.get<PaginatedInscripciones | Inscripcion[]>(
@@ -174,5 +184,24 @@ export const InscripcionesService = {
   },
   async eliminar(id: string | number): Promise<void> {
     await api.delete(`/inscripciones/${id}`);
+  },
+  async crearPreferenciaMp(
+    inscripcionId: string,
+  ): Promise<PreferenciaInscripcionMp> {
+    const response = await api.post<{
+      exito: boolean;
+      data: PreferenciaInscripcionMp;
+    }>(`/inscripciones/${inscripcionId}/preferencia-mp`);
+    return response.data.data;
+  },
+  async confirmarRetornoMp(
+    inscripcionId: string,
+    paymentId: string,
+  ): Promise<Inscripcion> {
+    const response = await api.post<{ exito: boolean; data: Inscripcion }>(
+      `/inscripciones/${inscripcionId}/confirmar-retorno`,
+      { payment_id: paymentId },
+    );
+    return response.data.data;
   },
 };

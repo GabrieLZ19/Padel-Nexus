@@ -8,6 +8,8 @@ import {
   type PanelJugador,
 } from "@/utils/services/perfil";
 import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
+import { InscripcionPagoActions } from "@/components/torneos/InscripcionPagoActions";
+import { inscripcionRequierePagoOnline } from "@/utils/inscripcionPago";
 
 function pagoDe(inscripcion: PanelJugador["inscripciones"][number]) {
   if (inscripcion.sinCosto) return "Sin costo";
@@ -56,32 +58,53 @@ export default function MisTorneosPage() {
       ) : null}
 
       <ul className="space-y-3">
-        {panel?.inscripciones.map((inscripcion) => (
-          <li key={inscripcion.id}>
-            <Link
-              href={`/torneos/${inscripcion.torneoId}?vista=llaves`}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-brand-card px-4 py-3 hover:border-brand-chartreuse/40"
+        {panel?.inscripciones.map((inscripcion) => {
+          const pendientePago = inscripcionRequierePagoOnline({
+            esGratis: inscripcion.sinCosto,
+            monto: inscripcion.monto,
+            estadoPago: inscripcion.estadoPago,
+          });
+          return (
+            <li
+              key={inscripcion.id}
+              className="rounded-2xl border border-white/10 bg-brand-card px-4 py-3 space-y-3"
             >
-              <div className="min-w-0">
-                <p className="font-bold text-brand-white truncate">
-                  {inscripcion.torneoNombre}
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {etiquetaNivelYCategoria(inscripcion.nivel, inscripcion.categoria) ||
-                    "Sin categoría"}
-                  {" · "}
-                  {inscripcion.estadoTorneo || "Sin estado"}
-                  {" · "}
-                  {pagoDe(inscripcion)}
-                  {inscripcion.sinCosto
-                    ? ""
-                    : ` · $${inscripcion.monto.toLocaleString("es-AR")}`}
-                </p>
-              </div>
-              <ChevronRight className="size-4 shrink-0 text-gray-500" />
-            </Link>
-          </li>
-        ))}
+              <Link
+                href={`/torneos/${inscripcion.torneoId}?vista=llaves`}
+                className="flex items-center justify-between gap-3 hover:opacity-90"
+              >
+                <div className="min-w-0">
+                  <p className="font-bold text-brand-white truncate">
+                    {inscripcion.torneoNombre}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {etiquetaNivelYCategoria(
+                      inscripcion.nivel,
+                      inscripcion.categoria,
+                    ) || "Sin categoría"}
+                    {" · "}
+                    {inscripcion.estadoTorneo || "Sin estado"}
+                    {" · "}
+                    {pagoDe(inscripcion)}
+                    {inscripcion.sinCosto
+                      ? ""
+                      : ` · $${inscripcion.monto.toLocaleString("es-AR")}`}
+                  </p>
+                </div>
+                <ChevronRight className="size-4 shrink-0 text-gray-500" />
+              </Link>
+              {pendientePago ? (
+                <InscripcionPagoActions
+                  inscripcionId={inscripcion.id}
+                  monto={inscripcion.monto}
+                  estadoPago={inscripcion.estadoPago}
+                  esGratis={inscripcion.sinCosto}
+                  compact
+                />
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
     </main>
   );

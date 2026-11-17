@@ -18,7 +18,11 @@ import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 import { textoRectora } from "@/utils/textosRectora";
 import { useSiglaRectora } from "@/utils/useSiglaRectora";
 import InscripcionModal from "@/components/torneos/InscripcionModal";
+import { InscripcionPagoActions } from "@/components/torneos/InscripcionPagoActions";
 import { useProfileStore } from "@/store/useProfileStore";
+import { InscripcionesService } from "@/utils/services/inscripciones";
+import { inscripcionRequierePagoOnline } from "@/utils/inscripcionPago";
+import { sileo } from "sileo";
 import { MatchCard } from "@/components/torneos/MatchCard";
 import { TablaPosicionesZona } from "@/components/torneos/TablaPosicionesZona";
 import PublicBracketView from "@/components/torneos/PublicBracketView";
@@ -63,9 +67,82 @@ export default function TorneoDetallePage() {
 
   const { profile } = useProfileStore();
 
-  const isAlreadyEnrolled =
-    profile &&
-    torneo?.inscripciones?.some((ins) => ins.usuario_id === profile.id);
+  const miInscripcion =
+    profile && torneo?.inscripciones
+      ? torneo.inscripciones.find(
+          (ins) =>
+            ins.usuario_id === profile.id || ins.usuario2_id === profile.id,
+        )
+      : undefined;
+
+  const isAlreadyEnrolled = Boolean(miInscripcion);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const payment =
+      params.get("payment") ||
+      params.get("status") ||
+      params.get("collection_status");
+    const inscripcionId = params.get("inscripcion_id");
+    const paymentId =
+      params.get("payment_id") || params.get("collection_id") || "";
+
+    if (
+      !inscripcionId ||
+      (payment !== "success" && payment !== "approved")
+    ) {
+      if (payment === "failure" || payment === "rejected") {
+        sileo.error({
+          title: "Pago no completado",
+          description: "Podés reintentar desde esta página o Mis torneos.",
+        });
+        params.delete("payment");
+        params.delete("status");
+        params.delete("collection_status");
+        const qs = params.toString();
+        window.history.replaceState(
+          {},
+          "",
+          qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
+        );
+      }
+      return;
+    }
+
+    const idPago = paymentId || `web-inscripcion-${Date.now()}`;
+    void InscripcionesService.confirmarRetornoMp(inscripcionId, idPago)
+      .then(() => {
+        sileo.success({
+          title: "Pago acreditado",
+          description: "Tu inscripción quedó confirmada.",
+        });
+        setRefreshKey((k) => k + 1);
+      })
+      .catch(() => {
+        sileo.error({
+          title: "No se pudo confirmar el pago",
+          description:
+            "Si el monto se debitó, guardá el comprobante y contactá al organizador.",
+        });
+      })
+      .finally(() => {
+        params.delete("payment");
+        params.delete("status");
+        params.delete("collection_status");
+        params.delete("payment_id");
+        params.delete("collection_id");
+        params.delete("inscripcion_id");
+        params.delete("torneo_id");
+        params.delete("external_reference");
+        const qs = params.toString();
+        window.history.replaceState(
+          {},
+          "",
+          qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
+        );
+      });
+  }, [torneoId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -192,7 +269,7 @@ export default function TorneoDetallePage() {
       return;
     }
     if (isAlreadyEnrolled) {
-      router.push("/mis-inscripciones");
+      router.push("/mi-perfil/torneos");
       return;
     }
     const checks = buildChecksElegibilidadJ1(torneo!, profile);
@@ -309,6 +386,25 @@ export default function TorneoDetallePage() {
         </button>
 
         {/* Hero compacto */}
+        {!isAbierto &&
+        miInscripcion?.id &&
+        inscripcionRequierePagoOnline({
+          esGratis: torneo.es_gratis,
+          monto: miInscripcion.monto,
+          precioInscripcion: torneo.precio_inscripcion,
+          estadoPago: miInscripcion.estado_pago,
+        }) ? (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 mb-6">
+            <InscripcionPagoActions
+              inscripcionId={miInscripcion.id}
+              monto={Number(miInscripcion.monto)}
+              estadoPago={miInscripcion.estado_pago}
+              esGratis={torneo.es_gratis}
+              precioInscripcion={torneo.precio_inscripcion}
+            />
+          </div>
+        ) : null}
+
         <header className="rounded-2xl border border-white/8 bg-[#0f0f0f] p-5 lg:p-7 mb-6 relative overflow-hidden">
           <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(ellipse_at_top_right,rgba(203,254,1,0.08),transparent_60%)] pointer-events-none" />
           <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-5">
@@ -580,13 +676,43 @@ export default function TorneoDetallePage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <CreditCard className="size-3.5 text-brand-chartreuse shrink-0" />
-                    Pago validado por admin
+                    {Number(torneo.precio_inscripcion || 0) > 0 &&
+                    !torneo.es_gratis
+                      ? "Mercado Pago u opción manual"
+                      : "Sin costo de inscripción"}
                   </li>
                 </ul>
+                {miInscripcion &&
+                miInscripcion.id &&
+                inscripcionRequierePagoOnline({
+                  esGratis: torneo.es_gratis,
+                  monto: miInscripcion.monto,
+                  precioInscripcion: torneo.precio_inscripcion,
+                  estadoPago: miInscripcion.estado_pago,
+                }) ? (
+                  <InscripcionPagoActions
+                    inscripcionId={miInscripcion.id}
+                    monto={Number(miInscripcion.monto)}
+                    estadoPago={miInscripcion.estado_pago}
+                    esGratis={torneo.es_gratis}
+                    precioInscripcion={torneo.precio_inscripcion}
+                    compact
+                    onPagoIniciado={() => undefined}
+                  />
+                ) : null}
                 <button
                   onClick={handleInscripcion}
                   disabled={isDisabled}
-                  className={`w-full py-3 rounded-xl font-bold text-sm transition-all cursor-pointer ${btnClass}`}
+                  className={`w-full py-3 rounded-xl font-bold text-sm transition-all cursor-pointer ${btnClass} ${
+                    miInscripcion &&
+                    inscripcionRequierePagoOnline({
+                      esGratis: torneo.es_gratis,
+                      monto: miInscripcion.monto,
+                      estadoPago: miInscripcion.estado_pago,
+                    })
+                      ? "mt-3"
+                      : ""
+                  }`}
                 >
                   {btnText}
                 </button>
