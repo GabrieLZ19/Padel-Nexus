@@ -93,10 +93,12 @@ function slotsDesdeContexto(
 }
 
 /** TOR-4: feeders y descansos deben ver todo el torneo; solo limitar quién se asigna. */
-function limitarIdsDePartidos(
-  partidos: Array<{ id: string | number }>,
-): Set<string> {
-  return new Set(partidos.map((p) => String(p.id)));
+function limitarIdsDePartidos(partidos: PartidoProgramable[]): Set<string> {
+  const ids = new Set<string>();
+  for (const p of partidos) {
+    if (p.id != null) ids.add(String(p.id));
+  }
+  return ids;
 }
 
 export interface PartidoProgramado {

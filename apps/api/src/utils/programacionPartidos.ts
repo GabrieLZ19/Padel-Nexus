@@ -1991,6 +1991,7 @@ export async function programarPartidosLlavePendientes(
     .map((p) => ({ ...p }));
   const drafts: PartidoProgramable[] = pendientes.map((p) => ({
     ...p,
+    ronda: p.ronda ?? undefined,
     orden: p.orden ?? undefined,
     cancha_asignada: null,
     fecha_partido: null,
