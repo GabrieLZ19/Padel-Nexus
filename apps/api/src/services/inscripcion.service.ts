@@ -780,6 +780,67 @@ export class InscripcionService {
     return data;
   }
 
+  /**
+   * Elimina una inscripción creada al editar la llave cuando falla la asignación (TOR-50).
+   * No aplica assertPasoJugadoresEditable: el torneo suele estar Programado o En curso.
+   */
+  static async revertirInscripcionAltaLlave(
+    id: string,
+    fichasProvisorias?: string[],
+  ): Promise<void> {
+    const { data: inscripcion, error: fetchError } = await supabaseAdmin
+      .from("inscripciones")
+      .select("torneo_id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (fetchError || !inscripcion) return;
+
+    try {
+      await PlatformFeeService.anularFeesPorInscripcion(id);
+    } catch {
+      /* mejor esfuerzo */
+    }
+
+    await supabaseAdmin
+      .from("partidos")
+      .update({ equipo_a_id: null })
+      .eq("equipo_a_id", id);
+    await supabaseAdmin
+      .from("partidos")
+      .update({ equipo_b_id: null })
+      .eq("equipo_b_id", id);
+    await supabaseAdmin
+      .from("partidos")
+      .update({ ganador: null })
+      .eq("ganador", id);
+
+    const { error: delError } = await supabaseAdmin
+      .from("inscripciones")
+      .delete()
+      .eq("id", id);
+
+    if (!delError) {
+      const { data: torneo } = await supabaseAdmin
+        .from("torneos")
+        .select("cupos_actuales")
+        .eq("id", inscripcion.torneo_id)
+        .maybeSingle();
+
+      if (torneo) {
+        const actuales = Number(torneo.cupos_actuales ?? 0);
+        await supabaseAdmin
+          .from("torneos")
+          .update({ cupos_actuales: Math.max(0, actuales - 1) })
+          .eq("id", inscripcion.torneo_id);
+      }
+    }
+
+    if (fichasProvisorias?.length) {
+      await revertirFichasProvisionalInscripcion(fichasProvisorias);
+    }
+  }
+
   static async cancelarInscripcion(id: string) {
     const { data: inscripcion, error: fetchError } = await supabaseAdmin
       .from("inscripciones")

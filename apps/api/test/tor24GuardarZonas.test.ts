@@ -54,6 +54,7 @@ describe("TOR-24 guardar zonas y llave", () => {
     assert.match(svc, /ordenesTrasBorrarPendientes/);
     assert.match(svc, /completarPartidosFaltantesTorneo/);
     assert.match(svc, /repararFixtureZonasTorneo/);
+    assert.match(svc, /aplicarDesprogramacionZonaTrasCambioTorneo/);
   });
 
   it("playoffAvance invalida semillas de hoja segun tamano de zona", () => {

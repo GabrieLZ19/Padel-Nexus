@@ -711,6 +711,10 @@ export class ProgramacionService {
       cancha_asignada: p.cancha_asignada,
       fecha_partido: p.fecha_partido,
     }));
+    const matrixFap =
+      pairCount && !esEliminatoriaDirecta(torneo.formato)
+        ? getFapBracketForPairCount(pairCount)
+        : undefined;
     const issues = evaluateProgramacionIssues(drafts, {
       duracionMinutos: duracion,
       duracionZonaMinutos: duracionParaFase(duracion, "zonas"),
@@ -719,6 +723,7 @@ export class ProgramacionService {
       fechaInicio: contexto.fecha,
       alcanceTorneo: torneo.alcance ?? null,
       feedersByMatchNo: feeders,
+      matrixFap: matrixFap ?? undefined,
     });
 
     const asignados = partidos.filter((p) => p.assigned).length;

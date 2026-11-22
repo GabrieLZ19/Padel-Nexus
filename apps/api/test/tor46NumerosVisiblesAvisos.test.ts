@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { LlaveConflictoError } from "../src/utils/edicionLlaveDuplicados.ts";
+import { validarCambioEquiposConMatrizFap } from "../src/utils/edicionLlaveFap.ts";
+import { crearResolverNumeroVisibleLlave } from "../src/utils/numerosVisiblesPartido.ts";
 import {
   evaluateProgramacionIssues,
   seleccionarPartidosLlaveParaAutoprogramar,
@@ -71,5 +74,33 @@ describe("TOR-46 numeros visibles en avisos de programacion", () => {
     assert.ok(orden);
     assert.match(orden!.message, /#20/);
     assert.doesNotMatch(orden!.message, /#57/);
+  });
+
+  it("validarCambioEquiposConMatrizFap cita # visible del origen W*, no matchNo interno", () => {
+    const partidosNumeracion = torneoConZonas.map((p) => ({
+      id: p.id,
+      ronda: p.ronda,
+      orden: p.orden,
+    }));
+    const resolver = crearResolverNumeroVisibleLlave(partidosNumeracion);
+    assert.throws(
+      () =>
+        validarCambioEquiposConMatrizFap(
+          { matchNo: 19, a: "1A", b: "W50" },
+          "p-clas",
+          null,
+          "p-clas",
+          "pareja-nueva",
+          resolver,
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof LlaveConflictoError);
+        const msg = (err as Error).message;
+        assert.match(msg, /partido #17/);
+        assert.doesNotMatch(msg, /matriz/);
+        assert.doesNotMatch(msg, /#50\b/);
+        return true;
+      },
+    );
   });
 });

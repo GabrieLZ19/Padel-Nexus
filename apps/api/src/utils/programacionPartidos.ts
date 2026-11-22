@@ -18,6 +18,7 @@ import {
   type DistribucionProgramacion,
   type ModoDescanso,
 } from "./programadorReglas";
+import { detectarLlaveAntesFinZonaAlimentadora } from "./programacionZonaLlave";
 
 export interface PartidoProgramable {
   id?: string;
@@ -2114,6 +2115,8 @@ export function evaluateProgramacionIssues(
     fechaInicio?: string | null;
     alcanceTorneo?: string | null;
     feedersByMatchNo?: Map<number, number[]>;
+    /** Matriz FAP para conflictos llave vs fin de zona (TOR-48). */
+    matrixFap?: readonly import("./fapBracketTypes").FapBracketMatch[];
   },
 ): ProgramacionIssue[] {
   const duracion = Math.max(30, opciones.duracionMinutos || 90);
@@ -2312,6 +2315,30 @@ export function evaluateProgramacionIssues(
             "Descanso insuficiente desde el último partido de zona del clasificado",
         });
       }
+    }
+  }
+
+  if (
+    opciones.matrixFap?.length &&
+    opciones.feedersByMatchNo &&
+    opciones.feedersByMatchNo.size > 0
+  ) {
+    const conflictos = detectarLlaveAntesFinZonaAlimentadora(
+      partidos,
+      opciones.matrixFap,
+      opciones.feedersByMatchNo,
+      {
+        duracionZonaMinutos: duracionZona,
+        descansoMinutos: descanso,
+        descansoModo: opciones.descansoModo,
+      },
+    );
+    for (const c of conflictos) {
+      issues.push({
+        partido_id: c.partido_llave_id,
+        severity: "bad",
+        message: c.message,
+      });
     }
   }
 

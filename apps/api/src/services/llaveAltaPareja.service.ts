@@ -212,7 +212,7 @@ export class LlaveAltaParejaService {
           jugador2_datos?: DatosAltaJugadorManual;
           letra_prioridad?: string;
         };
-  }): Promise<{ id: string }> {
+  }): Promise<{ id: string; fichas_provisorias: string[] }> {
     const { motivo, adminId, torneoDestinoId, payload } = datos;
     if (payload.modo === "externa") {
       const row = await LlaveAltaParejaService.importarParejaDesdeOtroTorneo({
@@ -222,7 +222,7 @@ export class LlaveAltaParejaService {
         adminId,
         letraPrioridad: payload.letra_prioridad,
       });
-      return { id: row.id };
+      return { id: row.id, fichas_provisorias: [] };
     }
     const row = await LlaveAltaParejaService.altaParejaPorIdentificadores({
       torneoDestinoId,
@@ -234,7 +234,10 @@ export class LlaveAltaParejaService {
       adminId,
       letraPrioridad: payload.letra_prioridad,
     });
-    return { id: row.id };
+    return {
+      id: row.id,
+      fichas_provisorias: row.fichas_provisorias ?? [],
+    };
   }
 
   static async buscarParejasExternas(
@@ -484,7 +487,7 @@ export class LlaveAltaParejaService {
       const j1Nombre = formatNombreCompleto(resJ1.apellido, resJ1.nombre);
       const j2Nombre = j2 ? formatNombreCompleto(j2.apellido, j2.nombre) : "-";
 
-      return await insertarInscripcionLlave({
+      const inscripcion = await insertarInscripcionLlave({
         torneoId: datos.torneoDestinoId,
         adminId: datos.adminId,
         motivo: datos.motivo,
@@ -500,6 +503,7 @@ export class LlaveAltaParejaService {
           jugador2_ficha_creada: j2 ? j2Creado : false,
         },
       });
+      return { ...inscripcion, fichas_provisorias: fichasCreadas };
     } catch (error) {
       for (const id of fichasCreadas) {
         try {

@@ -2532,7 +2532,31 @@ export class TorneoService {
     const prevB = partido.equipo_b_id;
     let nextA: string | null = equipoAId;
     let nextB: string | null = equipoBId;
-    const inscripcionesCreadas: string[] = [];
+    const altasCreadasRollBack: {
+      inscripcionId: string;
+      fichasProvisorias: string[];
+    }[] = [];
+    let resolverNumeroVisibleLlave:
+      | ((matchNoMatriz: number) => number)
+      | undefined;
+    const asegurarResolverVisibleLlave = async () => {
+      if (resolverNumeroVisibleLlave) return resolverNumeroVisibleLlave;
+      const { crearResolverNumeroVisibleLlave } = await import(
+        "../utils/numerosVisiblesPartido"
+      );
+      const { data: filasNumeracion } = await supabaseAdmin
+        .from("partidos")
+        .select("id, ronda, orden")
+        .eq("torneo_id", partido.torneo_id);
+      resolverNumeroVisibleLlave = crearResolverNumeroVisibleLlave(
+        (filasNumeracion || []).map((f) => ({
+          id: String(f.id),
+          ronda: f.ronda,
+          orden: f.orden,
+        })),
+      );
+      return resolverNumeroVisibleLlave;
+    };
 
     try {
     const { PromocionMenoresService } = await import(
@@ -2608,6 +2632,35 @@ export class TorneoService {
       }
     }
 
+    if (
+      esLlave &&
+      fapMatrixLoaded?.length &&
+      (altaLadoAInput || altaLadoBInput)
+    ) {
+      const specAlta = fapMatrixLoaded.find(
+        (m) => m.matchNo === fapMatchNoOrden,
+      );
+      if (specAlta) {
+        const { prevalidarAltaEnSlotLlaveFap } = await import(
+          "../utils/edicionLlaveFap"
+        );
+        const resolverVisible = await asegurarResolverVisibleLlave();
+        prevalidarAltaEnSlotLlaveFap(
+          specAlta,
+          fapMatchNoOrden,
+          fapMatrixLoaded,
+          prevA,
+          prevB,
+          nextA,
+          nextB,
+          Boolean(altaLadoAInput),
+          Boolean(altaLadoBInput),
+          semillaFapEfectiva,
+          resolverVisible,
+        );
+      }
+    }
+
     if (altaLadoAInput) {
       const { LlaveAltaParejaService } = await import(
         "./llaveAltaPareja.service"
@@ -2619,7 +2672,10 @@ export class TorneoService {
         payload: altaLadoAInput,
       });
       nextA = creada.id;
-      inscripcionesCreadas.push(creada.id);
+      altasCreadasRollBack.push({
+        inscripcionId: creada.id,
+        fichasProvisorias: creada.fichas_provisorias,
+      });
     }
     if (altaLadoBInput) {
       const { LlaveAltaParejaService } = await import(
@@ -2632,7 +2688,10 @@ export class TorneoService {
         payload: altaLadoBInput,
       });
       nextB = creada.id;
-      inscripcionesCreadas.push(creada.id);
+      altasCreadasRollBack.push({
+        inscripcionId: creada.id,
+        fichasProvisorias: creada.fichas_provisorias,
+      });
     }
     const { liberarParejasDuplicadasEnLlave } = await import(
       "../utils/edicionLlaveDuplicados"
@@ -2778,12 +2837,14 @@ export class TorneoService {
           }
         }
         if (spec && !omitirValidacionMatriz) {
+          const resolverVisible = await asegurarResolverVisibleLlave();
           validarCambioEquiposConMatrizFap(
             spec,
             prevA,
             prevB,
             nextA,
             nextB,
+            resolverVisible,
           );
         }
       }
@@ -2869,11 +2930,14 @@ export class TorneoService {
       adminId,
     });
     } catch (error) {
-      if (inscripcionesCreadas.length > 0) {
+      if (altasCreadasRollBack.length > 0) {
         const { InscripcionService } = await import("./inscripcion.service");
-        for (const inscripcionId of inscripcionesCreadas) {
+        for (const alta of altasCreadasRollBack) {
           try {
-            await InscripcionService.cancelarInscripcion(inscripcionId);
+            await InscripcionService.revertirInscripcionAltaLlave(
+              alta.inscripcionId,
+              alta.fichasProvisorias,
+            );
           } catch {
             /* mejor esfuerzo */
           }

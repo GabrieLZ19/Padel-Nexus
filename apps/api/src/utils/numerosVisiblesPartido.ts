@@ -151,3 +151,16 @@ export function textoPartidoNumerado(
   if (partido.orden != null) return `partido #${partido.orden}`;
   return "un partido de llave";
 }
+
+/** TOR-46: traduce matchNo FAP (W50) al número visible en CRM/grilla. */
+export function crearResolverNumeroVisibleLlave(
+  partidos: Array<{
+    id: string;
+    ronda?: string | null;
+    orden?: number | null;
+  }>,
+): (matchNoMatriz: number) => number {
+  const mapa = prepararMapaNumerosVisibles(partidos);
+  return (matchNoMatriz: number) =>
+    numeroVisiblePorOrdenInterno(matchNoMatriz, partidos, mapa);
+}

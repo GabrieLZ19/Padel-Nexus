@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../config/supabase";
 import { FAP_ESTADOS_PAGO, FAP_ESTADOS_TORNEO } from "../constants/fap";
 import { getFapBracketForPairCount } from "../utils/fapBracketMatrices";
+import { esEliminatoriaDirecta } from "../utils/formatoTorneo";
 import { roundNameForMatchNo } from "../utils/fapBracketTypes";
 import {
   aplicaDenominacionNacional,
@@ -1133,6 +1134,44 @@ export class CompetenciaService {
     );
     const llave = await sincronizarLlaveTrasCambioZonas(torneoId);
 
+    let zonas_desprogramadas_conflicto_llave: string[] = [];
+    if (zonasRegeneradas.length > 0) {
+      const { data: torneoProg } = await supabaseAdmin
+        .from("torneos")
+        .select(
+          "duracion_partido_minutos, descanso_minutos, descanso_modo, formato",
+        )
+        .eq("id", torneoId)
+        .maybeSingle();
+      if (torneoProg && !esEliminatoriaDirecta(torneoProg.formato)) {
+        const { aplicarDesprogramacionZonaTrasCambioTorneo } = await import(
+          "../utils/programacionZonaLlave"
+        );
+        const { duracionParaFase } = await import("../utils/programacionPartidos");
+        const { esModoDescanso, minutosDeModoDescanso } = await import(
+          "../utils/programadorReglas",
+        );
+        const duracionBase = Number(
+          torneoProg.duracion_partido_minutos || 90,
+        );
+        const modo = esModoDescanso(torneoProg.descanso_modo)
+          ? torneoProg.descanso_modo
+          : undefined;
+        zonas_desprogramadas_conflicto_llave =
+          await aplicarDesprogramacionZonaTrasCambioTorneo(
+            torneoId,
+            zonasRegeneradas,
+            {
+              duracionZonaMinutos: duracionParaFase(duracionBase, "zonas"),
+              descansoMinutos: modo
+                ? minutosDeModoDescanso(modo)
+                : Number(torneoProg.descanso_minutos || 60),
+              descansoModo: modo,
+            },
+          );
+      }
+    }
+
     // 3. Registrar auditoría única
     await supabaseAdmin.from("logs_auditoria").insert({
       usuario_id_admin: adminId,
@@ -1161,6 +1200,7 @@ export class CompetenciaService {
           };
         }),
         resoluciones_cabezas_serie: resolucionesCabezasSerie ?? [],
+        zonas_desprogramadas_conflicto_llave,
       },
     });
 
@@ -1170,6 +1210,7 @@ export class CompetenciaService {
       zonas_regeneradas: zonasRegeneradas,
       fixture_reparado: fixtureReparado,
       llave,
+      zonas_desprogramadas_conflicto_llave,
     };
   }
 
