@@ -21,6 +21,7 @@ import {
   Moon,
   ShoppingBag,
   Megaphone,
+  CreditCard,
 } from "lucide-react";
 import { useProfileStore } from "@/store/useProfileStore";
 import NotificationCenter from "@/components/notificaciones/NotificationCenter";
@@ -141,6 +142,11 @@ export default function ClubLayout({
     { name: "Canchas", icon: Grid, href: "/club/canchas" },
     { name: "Reservas", icon: Calendar, href: "/club/reservas" },
     { name: "Marketplace", icon: ShoppingBag, href: "/club/marketplace" },
+    {
+      name: "Cargo por servicio",
+      icon: CreditCard,
+      href: "/club/cargos-servicio",
+    },
     { name: "Comunicaciones", icon: Megaphone, href: "/club/comunicaciones" },
     { name: "Chat interno", icon: MessageSquare, href: "/club/chat", badge: chatNoLeidos },
     { name: "Configuración", icon: Settings, href: "/club/configuracion" },

@@ -89,7 +89,10 @@ export default function ConfirmarPagoModal({
           <div className="p-6 flex flex-col gap-5">
             <div className="bg-brand-chartreuse/5 border border-brand-chartreuse/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
               <p className="text-sm text-gray-400 mb-1">
-                Monto de la inscripción
+                Total de la inscripción
+              </p>
+              <p className="text-[10px] text-gray-500 mb-2">
+                Incluye todas las plazas (precio configurado por jugador).
               </p>
               <div className="flex items-center text-3xl font-black text-brand-chartreuse">
                 <span className="text-xl mr-1 text-brand-chartreuse/60">$</span>

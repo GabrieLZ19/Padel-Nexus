@@ -32,6 +32,10 @@ import {
 } from "@/components/torneos/FapBracketDiagram";
 import { esModalidadIndividual, formatFechaCalendario, labelModalidad } from "@/utils/formatFecha";
 import {
+  ETIQUETA_PRECIO_POR_JUGADOR,
+  textoTotalParejaOpcional,
+} from "@/utils/inscripcionMonto";
+import {
   allChecksPassed,
   buildChecksElegibilidadJ1,
   isInscripcionTemporalmenteAbierta,
@@ -656,11 +660,27 @@ export default function TorneoDetallePage() {
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">
                   Inscripción
                 </p>
-                <p className="text-3xl font-black text-brand-chartreuse tabular-nums mb-4">
+                <p className="text-3xl font-black text-brand-chartreuse tabular-nums">
                   {Number(torneo.precio_inscripcion || 0) === 0
                     ? "Gratis"
                     : `$${Number(torneo.precio_inscripcion || 0).toLocaleString("es-AR")}`}
                 </p>
+                {Number(torneo.precio_inscripcion || 0) > 0 ? (
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                    {ETIQUETA_PRECIO_POR_JUGADOR}
+                  </p>
+                ) : null}
+                {(() => {
+                  const lineaPareja = textoTotalParejaOpcional(
+                    Number(torneo.precio_inscripcion || 0),
+                    isIndividual,
+                  );
+                  return lineaPareja ? (
+                    <p className="text-xs text-gray-400 mb-4">{lineaPareja}</p>
+                  ) : (
+                    <div className="mb-4" />
+                  );
+                })()}
                 <ul className="space-y-2.5 mb-5 text-xs text-gray-400">
                   <li className="flex items-center gap-2">
                     {isIndividual ? (
@@ -668,7 +688,9 @@ export default function TorneoDetallePage() {
                     ) : (
                       <Users className="size-3.5 text-brand-chartreuse shrink-0" />
                     )}
-                    {isIndividual ? "Individual" : "Por pareja"}
+                    {isIndividual
+                      ? `Individual · ${ETIQUETA_PRECIO_POR_JUGADOR.toLowerCase()}`
+                      : ETIQUETA_PRECIO_POR_JUGADOR}
                   </li>
                   <li className="flex items-center gap-2">
                     <ShieldCheck className="size-3.5 text-brand-chartreuse shrink-0" />

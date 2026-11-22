@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { montoInscripcionSugeridoDesdeTorneo } from "@/utils/inscripcionMonto";
 import {
   useNumeroPaso,
   usePasosOcultos,
@@ -363,8 +364,15 @@ export const Paso4Jugadores = ({
                               setPagoModal({
                                 isOpen: true,
                                 inscripcionId: String(ins.id),
-                                montoDefecto: Number(
-                                  ins.monto || torneo.precio_inscripcion || 0,
+                                montoDefecto: montoInscripcionSugeridoDesdeTorneo(
+                                  {
+                                    precioPorJugador: Number(
+                                      torneo.precio_inscripcion || 0,
+                                    ),
+                                    modalidad: torneo.modalidad,
+                                    tieneJugador2: Boolean(ins.usuario2_id),
+                                    montoGuardado: ins.monto,
+                                  },
                                 ),
                                 isLoading: false,
                               });

@@ -33,6 +33,8 @@ import { esModalidadIndividual, labelModalidad } from "@/utils/formatFecha";
 import {
   montoInscripcionPublico,
   plazasInscripcionPublico,
+  textoDesglosePorJugador,
+  ETIQUETA_PRECIO_POR_JUGADOR,
 } from "@/utils/inscripcionMonto";
 import { InscripcionPagoActions } from "@/components/torneos/InscripcionPagoActions";
 import { inscripcionRequierePagoOnline } from "@/utils/inscripcionPago";
@@ -426,19 +428,27 @@ export default function InscripcionModal({
                         <p className="text-2xl font-black text-brand-chartreuse tabular-nums leading-none mt-0.5">
                           ${montoInscripcionTotal.toLocaleString("es-AR")}
                         </p>
-                        {plazasInscripcion > 1 ? (
-                          <p className="text-[10px] text-gray-500 mt-1">
-                            {plazasInscripcion} plazas × $
-                            {Number(torneo.precio_inscripcion).toLocaleString(
-                              "es-AR",
-                            )}{" "}
-                            c/u
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          {ETIQUETA_PRECIO_POR_JUGADOR}: $
+                          {Number(torneo.precio_inscripcion || 0).toLocaleString(
+                            "es-AR",
+                          )}
+                        </p>
+                        {textoDesglosePorJugador(
+                          Number(torneo.precio_inscripcion || 0),
+                          plazasInscripcion,
+                        ) ? (
+                          <p className="text-[10px] text-gray-500 mt-0.5">
+                            {textoDesglosePorJugador(
+                              Number(torneo.precio_inscripcion || 0),
+                              plazasInscripcion,
+                            )}
                           </p>
                         ) : null}
                       </div>
                       <p className="text-[10px] text-gray-500 text-right max-w-[9.5rem] leading-snug">
                         {montoInscripcionTotal > 0 && !torneo.es_gratis
-                          ? "Un solo pago en Mercado Pago por todas las plazas. Puede incluir cargo por servicio."
+                          ? "Un solo pago en Mercado Pago (precio por jugador × plazas). Puede incluir cargo por servicio."
                           : "Sin costo o validación manual por el organizador."}
                       </p>
                     </div>

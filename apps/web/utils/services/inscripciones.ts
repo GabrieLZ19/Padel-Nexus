@@ -56,9 +56,22 @@ export type PreferenciaInscripcionMp = {
   modo_fee?: "absorber" | "sumar";
   plazas?: number;
   precio_por_plaza?: number;
+  plazas_cobradas?: number[];
+  alcance?: "mi_plaza" | "todas_pendientes";
   moneda: string;
   inscripcionId: string;
   torneoId: string;
+};
+
+export type EstadoPlazasPagoInscripcion = {
+  inscripcion_id: string;
+  mi_plaza: number;
+  precio_por_jugador: number;
+  plazas: Array<{ numero: number; estado: string; usuario_id: string | null }>;
+  plazas_pendientes: number[];
+  puede_pagar_mi_plaza: boolean;
+  puede_pagar_todas: boolean;
+  puede_pagar_resto: boolean;
 };
 
 export const InscripcionesService = {
@@ -190,13 +203,23 @@ export const InscripcionesService = {
   async eliminar(id: string | number): Promise<void> {
     await api.delete(`/inscripciones/${id}`);
   },
+  async obtenerPlazasPago(
+    inscripcionId: string,
+  ): Promise<EstadoPlazasPagoInscripcion> {
+    const response = await api.get<{
+      exito: boolean;
+      data: EstadoPlazasPagoInscripcion;
+    }>(`/inscripciones/${inscripcionId}/plazas-pago`);
+    return response.data.data;
+  },
   async crearPreferenciaMp(
     inscripcionId: string,
+    alcance: "mi_plaza" | "todas_pendientes" = "todas_pendientes",
   ): Promise<PreferenciaInscripcionMp> {
     const response = await api.post<{
       exito: boolean;
       data: PreferenciaInscripcionMp;
-    }>(`/inscripciones/${inscripcionId}/preferencia-mp`);
+    }>(`/inscripciones/${inscripcionId}/preferencia-mp`, { alcance });
     return response.data.data;
   },
   async confirmarRetornoMp(

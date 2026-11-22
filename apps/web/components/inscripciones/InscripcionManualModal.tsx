@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Save, User, Users, CreditCard } from "lucide-react";
 import { Torneo } from "../../utils/types";
@@ -10,6 +10,12 @@ import CustomDropdown from "../ui/CustomDropdown";
 import { useProfileStore } from "../../store/useProfileStore";
 import { esTorneoContextoFederacion } from "../../utils/constants/fapApaRules";
 import { esModalidadParejas } from "../../utils/formatFecha";
+import {
+  ETIQUETA_PRECIO_POR_JUGADOR,
+  montoInscripcionPublico,
+  plazasInscripcionPublico,
+  textoDesglosePorJugador,
+} from "../../utils/inscripcionMonto";
 import type { RolUsuario } from "../../utils/types/user.types";
 import { identificadorPareceDni } from "../../utils/identificadorJugadorManual";
 import { categoriaRequeridaDelTorneo } from "../../utils/categoriaTorneo";
@@ -51,8 +57,17 @@ export default function InscripcionManualModal({
   const [j2Nacimiento, setJ2Nacimiento] = useState("");
   const [j2Telefono, setJ2Telefono] = useState("");
   const [letraPrioridad, setLetraPrioridad] = useState("");
-  const [monto, setMonto] = useState<number>(
-    Number(torneo.precio_inscripcion || 0),
+  const plazas = useMemo(
+    () =>
+      plazasInscripcionPublico({
+        modalidad: torneo.modalidad,
+        tieneCompanero:
+          esModalidadParejas(torneo.modalidad) && Boolean(j2.trim()),
+      }),
+  );
+
+  const [monto, setMonto] = useState<number>(() =>
+    montoInscripcionPublico(Number(torneo.precio_inscripcion || 0), 1),
   );
   /** "" = No pagó / pendiente; "Confirmado" = Pagó */
   const [estadoPago, setEstadoPago] = useState("");
@@ -77,6 +92,13 @@ export default function InscripcionManualModal({
     typeof torneo.es_gratis === "boolean"
       ? torneo.es_gratis
       : Number(torneo.precio_inscripcion || 0) === 0;
+
+  useEffect(() => {
+    if (gratuito) return;
+    setMonto(
+      montoInscripcionPublico(Number(torneo.precio_inscripcion || 0), plazas),
+    );
+  }, [torneo.precio_inscripcion, plazas, gratuito]);
 
   const mostrarDatosJ1 = identificadorPareceDni(j1);
   const mostrarDatosJ2 = identificadorPareceDni(j2);
@@ -425,7 +447,7 @@ export default function InscripcionManualModal({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">
-                      Monto de Inscripción ($)
+                      Total inscripción ($)
                     </label>
                     <div className="relative">
                       <CreditCard className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 size-4" />
@@ -437,6 +459,23 @@ export default function InscripcionManualModal({
                         readOnly={true}
                       />
                     </div>
+                    {!gratuito ? (
+                      <p className="text-[10px] text-gray-500 mt-1.5">
+                        {ETIQUETA_PRECIO_POR_JUGADOR}: $
+                        {Number(torneo.precio_inscripcion || 0).toLocaleString(
+                          "es-AR",
+                        )}
+                        {textoDesglosePorJugador(
+                          Number(torneo.precio_inscripcion || 0),
+                          plazas,
+                        )
+                          ? ` · ${textoDesglosePorJugador(
+                              Number(torneo.precio_inscripcion || 0),
+                              plazas,
+                            )}`
+                          : ""}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div>

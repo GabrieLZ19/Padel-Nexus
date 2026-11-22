@@ -40,8 +40,6 @@ const MENU_POR_ROL: Record<string, string[]> = {
     "/dashboard/comunicaciones",
     "/dashboard/chat",
     "/dashboard/cargos-servicio",
-    "/dashboard/finanzas",
-    "/dashboard/liquidaciones",
   ],
 
   // Asociación provincial: gestiona su circuito, no el padrón de otras asociaciones.
@@ -82,7 +80,6 @@ const MENU_POR_ROL: Record<string, string[]> = {
     "/dashboard/rankings",
     "/dashboard/comunicaciones",
     "/dashboard/chat",
-    "/dashboard/cargos-servicio",
   ],
 
   fiscal: ["/dashboard", "/dashboard/fiscal/torneos"],
