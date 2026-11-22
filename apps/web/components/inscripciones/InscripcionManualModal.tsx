@@ -64,6 +64,7 @@ export default function InscripcionManualModal({
         tieneCompanero:
           esModalidadParejas(torneo.modalidad) && Boolean(j2.trim()),
       }),
+    [torneo.modalidad, j2],
   );
 
   const [monto, setMonto] = useState<number>(() =>

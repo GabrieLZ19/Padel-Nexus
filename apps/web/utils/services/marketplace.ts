@@ -111,6 +111,8 @@ export interface Producto {
   created_at: string;
   promedio_valoraciones?: number;
   total_valoraciones?: number;
+  /** Ventas con pago cobrado (alineado a MKT-2). */
+  ventas_cobradas?: number;
   vendedor: {
     id: string;
     usuario_id?: string;
