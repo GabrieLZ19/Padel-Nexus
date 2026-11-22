@@ -12,8 +12,11 @@ Seguimiento de commits y detalle: [qa-re-test-18-11-progreso.md](qa-re-test-18-1
 
 - **TOR-47**, **PUB-27**, **FEE-2**, **FEE-3** (ver progreso anterior).
 - **FEE-1 + RES-21**, **FEE-5**, **FEE-6**, **FEE-7**, **FEE-8**, **FEE-9** — lote fees MP/inscripciones (commits back + front de nov/2026).
+- **FEE-10**, **FEE-4** — desglose checkout y menú Finanzas superadmin (`95ca06f` front; incl. back en `fcbb060`).
+- **FEE-12** — sync verificado; **7 commits** pendientes de push a `origin` (detalle: [fee-12-sync-github.md](fee-12-sync-github.md)).
+- **TOR-22 + TOR-28** — alta en pase directo FAP (`fcbb060` + `95ca06f`; QA torneo real pendiente).
 
-**Siguiente ítem sugerido**: **FEE-10** (desglose cargo por servicio en checkout/comprobante); alternativa **FEE-4** (menú Finanzas superadmin).
+**Siguiente ítem sugerido**: **TOR-50** (rollback/validación previa si falla alta en llave); alternativa **TOR-24 + TOR-48**.
 
 ---
 
@@ -109,29 +112,30 @@ Seguimiento de commits y detalle: [qa-re-test-18-11-progreso.md](qa-re-test-18-1
   - Modal/checkout de pago de inscripción en `apps/web/` y [apps/web/utils/services/inscripciones.ts](apps/web/utils/services/inscripciones.ts) (o servicio equivalente).
 - **Acción**: Permitir elegir `"Pagar mi plaza"` (1 plaza = precio por jugador) o `"Pagar las dos"` (2 plazas = x2). Registrar el pago por plaza individualmente en BD y confirmar la pareja cuando ambas plazas estén pagadas (evitando doble cobro si una plaza ya está paga).
 
-### 11. FEE-10 — Mostrar desglose de cargo por servicio (Opción B) en checkout y comprobante (MEDIA)
+### 11. FEE-10 — Mostrar desglose de cargo por servicio (Opción B) en checkout y comprobante (MEDIA) — **HECHO en código**
 - **Problema**: Con Opción B (`sumar_al_precio`), el cargo no se ve en el resumen de reservas ni marketplace, en inscripciones solo aparece en un toast breve, y la preferencia de licencias no devuelve `cargo_servicio` ni `modo_fee`.
 - **Archivos**:
   - [apps/api/src/services/licencia.service.ts](apps/api/src/services/licencia.service.ts) (y servicios de reservas, marketplace, inscripciones)
   - Checkouts y pantallas de confirmación/comprobante de los 4 canales en `apps/web/`.
 - **Acción**: Devolver `cargo_servicio` y `modo_fee` en los 4 endpoints de preferencia/preview (incluyendo licencias) y mostrar `"Precio $X · Cargo por servicio $Y · Total $Z"` en el resumen previo a MP y en el comprobante cuando `modo_fee === 'sumar_al_precio'` y `cargo_servicio > 0`.
 
-### 12. FEE-4 — Menú lateral de `superadmin` sin Fees, Finanzas ni Liquidaciones (MEDIA)
+### 12. FEE-4 — Menú lateral de `superadmin` sin Fees, Finanzas ni Liquidaciones (MEDIA) — **HECHO en código**
 - **Problema**: Las rutas `/dashboard/platform-fees`, `/dashboard/finanzas` y `/dashboard/liquidaciones` existen pero no aparecen en ningún grupo del sidebar de `superadmin`.
 - **Archivos**:
   - [apps/web/app/dashboard/layout.tsx](apps/web/app/dashboard/layout.tsx)
   - [apps/web/utils/constants/menuPermissions.ts](apps/web/utils/constants/menuPermissions.ts)
 - **Acción**: Agregar un grupo `"Finanzas"` en el sidebar con `Fees plataforma`, `Finanzas` y `Liquidaciones` visible para `superadmin` (y verificar que `Cargos servicio` no aparezca para `superadmin`).
 
-### 13. FEE-12 — Sincronizar commits con GitHub (MEDIA · GIT)
-- **Problema**: El repositorio remoto en GitHub quedó en el commit del 14/11 (`5e0ddf9`) mientras los cambios del 17/11 (`fb99457`..`bea3c00`) están locales.
-- **Acción**: Verificar rama y estado remoto y pushear los commits pendientes junto con los nuevos fixes (respetando commits separados de back y front).
+### 13. FEE-12 — Sincronizar commits con GitHub (MEDIA · GIT) — **VERIFICADO · push al cierre del plan**
+- **Problema (informe)**: Remoto desactualizado vs local (`5e0ddf9` vs lote 17/11).
+- **Estado 22/11**: `origin/main` = `bea3c00`; local = `17d82ca` (+7 commits listos). `whapy/main` = `5e0ddf9` (pendiente push equipo).
+- **Acción restante**: Al terminar el plan → `git push origin main` y si aplica `git push whapy main`. Detalle: [fee-12-sync-github.md](fee-12-sync-github.md).
 
 ---
 
 ## Bloque 3 — Torneos, Llaves, Zonas y Planillas
 
-### 14. TOR-22 + TOR-28 — Agregar pareja nueva en pase directo de llave (SIGUE / PARCIAL)
+### 14. TOR-22 + TOR-28 — Agregar pareja nueva en pase directo de llave — **HECHO en código (pendiente QA en torneo real)**
 - **Problema**: Al agregar una pareja nueva en un pase directo (ej. `1º A`), la pareja nueva pisa/reemplaza al clasificado `1º A` en el cuarto #19 en lugar de crear el octavo `"1º A vs pareja nueva"` cuyo ganador pase al cuarto.
 - **Archivos**:
   - [apps/api/src/utils/edicionLlaveFap.ts](apps/api/src/utils/edicionLlaveFap.ts)
