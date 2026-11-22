@@ -188,6 +188,7 @@ export const InscripcionesService = {
       inscripcionesOk: number;
       jugadoresCreados: number;
       errores: string[];
+      advertenciasResidencia?: string[];
       totalFilas: number;
     }>("/inscripciones/importar-planilla", data, {
       onUploadProgress: (event) => {

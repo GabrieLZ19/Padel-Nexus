@@ -10,6 +10,7 @@ interface VentaItem {
   created_at?: string;
   producto?: { nombre?: string; thumbnail_url?: string | null };
   orden?: {
+    id?: string;
     estado?: string;
     created_at?: string;
     comprador?: { nombre?: string; apellido?: string; email?: string };
@@ -28,8 +29,16 @@ const estadoStyles: Record<string, string> = {
   cancelada: "bg-red-500/15 text-red-400 border-red-500/30",
 };
 
+function ordenEstadoCobrado(estado?: string | null): boolean {
+  const e = (estado || "").toLowerCase();
+  return e === "pagada" || e === "entregada";
+}
+
 export default function MarketplaceVentasTab({ ventas, stats }: Props) {
-  const ingresosTotal = ventas.reduce(
+  const ventasCobradasLineas = ventas.filter((v) =>
+    ordenEstadoCobrado(v.orden?.estado),
+  );
+  const ingresosTotal = ventasCobradasLineas.reduce(
     (sum, v) => sum + v.precio_unitario * v.cantidad,
     0,
   );
@@ -55,7 +64,14 @@ export default function MarketplaceVentasTab({ ventas, stats }: Props) {
         {[
           {
             label: "Ventas totales",
-            value: stats?.total_ventas ?? ventas.length,
+            value:
+              typeof stats?.total_ventas === "number"
+                ? stats.total_ventas
+                : new Set(
+                    ventasCobradasLineas
+                      .map((v) => v.orden?.id)
+                      .filter(Boolean),
+                  ).size,
             icon: ShoppingBag,
             accent: "text-brand-chartreuse",
           },

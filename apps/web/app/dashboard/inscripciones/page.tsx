@@ -164,6 +164,14 @@ export default function GestionInscripcionesPage() {
 
       await new Promise((r) => setTimeout(r, 450));
 
+      const advertenciasResidencia = resultado.advertenciasResidencia ?? [];
+      if (advertenciasResidencia.length > 0) {
+        sileo.warning({
+          title: "Residencia en planilla",
+          description: advertenciasResidencia.slice(0, 2).join(" "),
+        });
+      }
+
       if (resultado.errores.length === 0) {
         setFeedbackModal({
           isOpen: true,

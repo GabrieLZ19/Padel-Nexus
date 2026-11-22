@@ -470,7 +470,9 @@ export default function ProductoDetallePage() {
                   Ventas
                 </span>
                 <span className="font-black text-sm block mt-1">
-                  {producto.vendedor.total_ventas}
+                  {typeof producto.ventas_cobradas === "number"
+                    ? producto.ventas_cobradas
+                    : producto.vendedor.total_ventas}
                 </span>
               </div>
               <div className="text-center">

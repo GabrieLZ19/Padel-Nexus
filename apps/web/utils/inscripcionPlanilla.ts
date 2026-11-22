@@ -1,5 +1,9 @@
 import * as XLSX from "xlsx";
 import { usarPlanillaInscripcionFap } from "@/utils/constants/fapApaRules";
+import {
+  inferirProvinciaDesdeLocalidadWeb,
+  provinciaCanonicaArgentinaWeb,
+} from "@/utils/localidadProvinciaArgentina";
 
 export type TipoPlanillaInscripcion = "fap" | "general";
 
@@ -127,7 +131,12 @@ export function parseLocalidadProvinciaCelda(valor: unknown): {
     };
   }
   if (parts.length === 1) {
-    return { provincia: parts[0] };
+    const token = parts[0];
+    const provinciaCanon = provinciaCanonicaArgentinaWeb(token);
+    if (provinciaCanon) return { provincia: provinciaCanon };
+    const inferida = inferirProvinciaDesdeLocalidadWeb(token);
+    if (inferida) return { localidad: token, provincia: inferida };
+    return { localidad: token };
   }
   return {};
 }
