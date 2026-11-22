@@ -1,5 +1,4 @@
 import { supabaseAdmin } from "../config/supabase";
-import { env } from "../config/env.config";
 import {
   COMUNICACIONES_BATCH_SIZE,
   COMUNICACIONES_LISTA_TIPOS,
@@ -40,6 +39,7 @@ import {
   sumarOmitidoConMotivo,
   type ComunicacionesCanal,
 } from "./comunicaciones-metricas.service";
+import { normalizarActionUrl } from "../utils/comunicacionesActionUrl";
 
 export interface CrearListaPayload {
   nombre: string;
@@ -90,57 +90,6 @@ function assertListaTipo(tipo: string): asserts tipo is ComunicacionesListaTipo 
   if (!(COMUNICACIONES_LISTA_TIPOS as readonly string[]).includes(tipo)) {
     throw new Error("Tipo de lista inválido. Usá 'manual' o 'dinamica'.");
   }
-}
-
-function hostnameSinWww(hostname: string): string {
-  return hostname.replace(/^www\./i, "").toLowerCase();
-}
-
-/**
- * Acepta rutas relativas (/ranking) o URLs absolutas http(s).
- * Si el host es el frontend de la app, se normaliza a ruta relativa.
- */
-function normalizarActionUrl(url?: string | null): string | null {
-  if (!url) return null;
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-
-  if (trimmed.startsWith("//")) {
-    throw new Error(
-      "Link inválido. Usá una ruta (/ranking) o una URL completa (https://…).",
-    );
-  }
-
-  if (/^https?:\/\//i.test(trimmed)) {
-    let parsed: URL;
-    try {
-      parsed = new URL(trimmed);
-    } catch {
-      throw new Error("Link inválido. Revisá el formato de la URL.");
-    }
-
-    const knownHosts = new Set<string>([
-      "padelnexus.netlify.app",
-      "localhost",
-      "127.0.0.1",
-    ]);
-
-    try {
-      knownHosts.add(hostnameSinWww(new URL(env.FRONTEND_URL).hostname));
-    } catch {
-      // ignore
-    }
-
-    const host = hostnameSinWww(parsed.hostname);
-    if (knownHosts.has(host)) {
-      const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
-      return path || "/";
-    }
-
-    return trimmed;
-  }
-
-  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }
 
 export class ComunicacionesService {
