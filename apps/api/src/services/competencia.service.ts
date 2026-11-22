@@ -1149,7 +1149,7 @@ export class CompetenciaService {
         );
         const { duracionParaFase } = await import("../utils/programacionPartidos");
         const { esModoDescanso, minutosDeModoDescanso } = await import(
-          "../utils/programadorReglas",
+          "../utils/programadorReglas"
         );
         const duracionBase = Number(
           torneoProg.duracion_partido_minutos || 90,

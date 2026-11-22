@@ -547,7 +547,7 @@ export class ProgramacionService {
       supabaseAdmin
         .from("torneos")
         .select(
-          "id, nombre, programacion_estado, programacion_publicada_en, duracion_partido_minutos, descanso_modo, estado, alcance",
+          "id, nombre, programacion_estado, programacion_publicada_en, duracion_partido_minutos, descanso_modo, estado, alcance, formato",
         )
         .eq("id", torneoId)
         .maybeSingle(),

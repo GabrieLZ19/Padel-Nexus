@@ -967,11 +967,13 @@ export class MarketplaceService {
       .eq("orden_id", ordenId);
 
     for (const row of items || []) {
-      const prod = row.producto as {
-        id: string;
-        tipo: string;
-        stock: number;
-      } | null;
+      const productoRaw = row.producto as
+        | { id: string; tipo: string; stock: number }
+        | { id: string; tipo: string; stock: number }[]
+        | null;
+      const prod = Array.isArray(productoRaw)
+        ? productoRaw[0] ?? null
+        : productoRaw;
       if (!prod || prod.tipo !== "producto") continue;
       await supabaseAdmin
         .from("marketplace_productos")
