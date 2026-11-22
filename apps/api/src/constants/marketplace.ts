@@ -10,6 +10,17 @@ export const MARKETPLACE_ESTADOS_ORDEN = {
   CANCELADA: "cancelada",
 } as const;
 
+/** Plazo para pagar una orden pendiente (alineado a reservas MP). */
+export const MARKETPLACE_ORDEN_PENDIENTE_MINUTOS = 15;
+
+export function marketplaceOrdenEstadoCobrado(estado?: string | null): boolean {
+  const e = (estado || "").toLowerCase();
+  return (
+    e === MARKETPLACE_ESTADOS_ORDEN.PAGADA ||
+    e === MARKETPLACE_ESTADOS_ORDEN.ENTREGADA
+  );
+}
+
 export const MARKETPLACE_TIPOS_PRODUCTO = {
   PRODUCTO: "producto",
   SERVICIO: "servicio",

@@ -12,9 +12,38 @@ export type PartidoProgZonaLlave = {
   id?: string;
   ronda?: string;
   orden?: number;
+  estado_partido?: string | null;
+  equipo_a_id?: string | null;
+  equipo_b_id?: string | null;
   cancha_asignada?: string | null;
   fecha_partido?: string | null;
 };
+
+/** Partido con resultado oficial cargado (no revalidar horario publicado). */
+export function partidoYaFinalizado(p: {
+  estado_partido?: string | null;
+}): boolean {
+  const e = String(p.estado_partido || "").toLowerCase();
+  return e.includes("finalizado") || e.includes("finalizada");
+}
+
+/** Zona con todos sus cruces definidos ya finalizados (clasificación cerrada). */
+export function zonaClasificacionCerrada(
+  partidos: PartidoProgZonaLlave[],
+  zoneLetter: string,
+): boolean {
+  let hayJugables = false;
+  for (const p of partidos) {
+    if (!esRondaDeZona(p.ronda)) continue;
+    if (zoneLetterFromNombreGrupo(String(p.ronda)) !== zoneLetter) continue;
+    const estado = String(p.estado_partido || "").toLowerCase();
+    if (estado.includes("pendiente")) continue;
+    if (!p.equipo_a_id || !p.equipo_b_id) continue;
+    hayJugables = true;
+    if (!partidoYaFinalizado(p)) return false;
+  }
+  return hayJugables;
+}
 
 function parseFechaPartidoIso(
   iso: string,
@@ -165,6 +194,7 @@ export function detectarLlaveAntesFinZonaAlimentadora(
   for (const p of playoff) {
     const id = String((p as { id?: string }).id || "");
     if (!id) continue;
+    if (partidoYaFinalizado(p)) continue;
     const orden = Number(p.orden);
     if (!Number.isFinite(orden) || orden <= 0) continue;
     const parsed = parseFechaPartidoIso(String(p.fecha_partido));
@@ -176,6 +206,7 @@ export function detectarLlaveAntesFinZonaAlimentadora(
       feedersByMatchNo,
     );
     for (const letter of letters) {
+      if (zonaClasificacionCerrada(partidos, letter)) continue;
       const ultimo = ultimoFinProgramadoEnZona(
         partidos,
         letter,

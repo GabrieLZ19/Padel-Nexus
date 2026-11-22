@@ -11,6 +11,7 @@ import {
   MARKETPLACE_AUDIENCIAS_PROMOCION,
   MARKETPLACE_ESTADOS_ORDEN,
   MARKETPLACE_ESTADOS_VENDEDOR,
+  marketplaceOrdenEstadoCobrado,
   puedeAudienciaPromocionPlataforma,
   type AudienciaPromocion,
   type EntidadMarketplaceTipo,
@@ -23,6 +24,15 @@ import {
 } from "./marketplace-entity-auth.service";
 import { fechaHoyArgentina } from "../utils/fechaArgentina";
 import { estadoPersistibleCampanaSponsor } from "../utils/sponsorCampanaVigencia";
+import {
+  ordenPendienteExpirada,
+  retencionInicialOrdenDesde,
+} from "../utils/marketplaceOrdenRetencion";
+import {
+  contarOrdenesCobradasPorVendedor,
+  contarUnidadesCobradasPorProducto,
+  sincronizarTotalVentasVendedor,
+} from "../utils/marketplaceVentasCobradas";
 
 interface FiltrosProducto {
   categoria_id?: string;
@@ -334,8 +344,23 @@ export class MarketplaceService {
           totalValoraciones
         : 0;
 
+    const vendedorRaw = producto.vendedor as {
+      id: string;
+      total_ventas?: number;
+      [key: string]: unknown;
+    };
+    const [ventasCobradasVendedor, ventas_cobradas] = await Promise.all([
+      contarOrdenesCobradasPorVendedor(vendedorRaw.id),
+      contarUnidadesCobradasPorProducto(productoId),
+    ]);
+
     return {
       ...producto,
+      ventas_cobradas,
+      vendedor: {
+        ...vendedorRaw,
+        total_ventas: ventasCobradasVendedor,
+      },
       total_valoraciones: totalValoraciones,
       promedio_valoraciones: Math.round(promedioValoraciones * 10) / 10,
     };
@@ -433,7 +458,9 @@ export class MarketplaceService {
       .maybeSingle();
 
     if (error) throw new Error(`Error al obtener tienda: ${error.message}`);
-    return data;
+    if (!data) return null;
+    const total_ventas = await contarOrdenesCobradasPorVendedor(data.id);
+    return { ...data, total_ventas };
   }
 
   static async assertGestionTiendaEntidad(
@@ -679,6 +706,7 @@ export class MarketplaceService {
   }
 
   static async listarMisVentas(vendedorId: string, pagina: number = 1) {
+    await MarketplaceService.expirarOrdenesPendientesVencidas();
     const desde = (pagina - 1) * ITEMS_POR_PAGINA;
     const hasta = desde + ITEMS_POR_PAGINA - 1;
 
@@ -703,6 +731,7 @@ export class MarketplaceService {
   }
 
   static async obtenerEstadisticas(vendedorId: string) {
+    await MarketplaceService.expirarOrdenesPendientesVencidas();
     const { data: vendedor } = await supabaseAdmin
       .from("marketplace_vendedores")
       .select("balance, total_ventas, valoracion_promedio")
@@ -731,15 +760,19 @@ export class MarketplaceService {
 
     const ingresosMes =
       ventasMes
-        ?.filter((v: any) => v.orden?.estado === MARKETPLACE_ESTADOS_ORDEN.PAGADA)
+        ?.filter((v: any) =>
+          marketplaceOrdenEstadoCobrado(v.orden?.estado),
+        )
         .reduce(
           (sum: number, v: any) => sum + v.precio_unitario * v.cantidad,
           0,
         ) || 0;
 
+    const total_ventas = await contarOrdenesCobradasPorVendedor(vendedorId);
+
     return {
       balance: vendedor?.balance || 0,
-      total_ventas: vendedor?.total_ventas || 0,
+      total_ventas,
       valoracion_promedio: vendedor?.valoracion_promedio || 0,
       productos_activos: productosActivos || 0,
       ingresos_mes: ingresosMes,
@@ -780,12 +813,15 @@ export class MarketplaceService {
       total += producto.precio * item.cantidad;
     }
 
+    const ahoraOrden = new Date();
     const { data: orden, error: errOrden } = await supabaseAdmin
       .from("marketplace_ordenes")
       .insert({
         comprador_id: compradorId,
         total,
         datos_envio: datosEnvio || null,
+        estado: MARKETPLACE_ESTADOS_ORDEN.PENDIENTE,
+        retiene_hasta: retencionInicialOrdenDesde(ahoraOrden),
       })
       .select()
       .single();
@@ -922,15 +958,99 @@ export class MarketplaceService {
     };
   }
 
+  private static async restaurarStockItemsOrden(ordenId: string): Promise<void> {
+    const { data: items } = await supabaseAdmin
+      .from("marketplace_items_orden")
+      .select(
+        "cantidad, producto:marketplace_productos(id, tipo, stock)",
+      )
+      .eq("orden_id", ordenId);
+
+    for (const row of items || []) {
+      const prod = row.producto as {
+        id: string;
+        tipo: string;
+        stock: number;
+      } | null;
+      if (!prod || prod.tipo !== "producto") continue;
+      await supabaseAdmin
+        .from("marketplace_productos")
+        .update({ stock: Number(prod.stock) + Number(row.cantidad) })
+        .eq("id", prod.id);
+    }
+  }
+
+  static async marcarOrdenVencidaSinPago(
+    ordenId: string,
+    compradorId?: string | null,
+  ): Promise<boolean> {
+    const { data: orden, error } = await supabaseAdmin
+      .from("marketplace_ordenes")
+      .update({
+        estado: MARKETPLACE_ESTADOS_ORDEN.CANCELADA,
+        retiene_hasta: null,
+      })
+      .eq("id", ordenId)
+      .eq("estado", MARKETPLACE_ESTADOS_ORDEN.PENDIENTE)
+      .select("id, comprador_id")
+      .maybeSingle();
+
+    if (error || !orden) return false;
+
+    await MarketplaceService.restaurarStockItemsOrden(ordenId);
+
+    const uid = compradorId || orden.comprador_id;
+    if (uid) {
+      try {
+        await NotificacionService.crearNotificacion({
+          usuario_id: String(uid),
+          titulo: "Orden sin pago vencida",
+          mensaje:
+            "Tu compra en el marketplace no se completó a tiempo y los productos volvieron a estar disponibles.",
+          tipo: "warning",
+          metadata: { orden_id: ordenId, motivo: "pago_vencido" },
+        });
+      } catch (e) {
+        console.warn("Error al notificar vencimiento orden marketplace:", e);
+      }
+    }
+    return true;
+  }
+
+  /** MKT-1: cancela pendientes fuera de plazo y devuelve stock. */
+  static async expirarOrdenesPendientesVencidas(): Promise<number> {
+    const ahora = new Date();
+    const { data: candidatas, error } = await supabaseAdmin
+      .from("marketplace_ordenes")
+      .select("id, estado, created_at, retiene_hasta, comprador_id")
+      .eq("estado", MARKETPLACE_ESTADOS_ORDEN.PENDIENTE);
+
+    if (error || !candidatas?.length) return 0;
+
+    const expiradas = candidatas.filter((o) =>
+      ordenPendienteExpirada(o, ahora),
+    );
+    let cerradas = 0;
+    for (const o of expiradas) {
+      const ok = await MarketplaceService.marcarOrdenVencidaSinPago(
+        o.id,
+        o.comprador_id,
+      );
+      if (ok) cerradas += 1;
+    }
+    return cerradas;
+  }
+
   static async crearPreferenciaMercadoPago(
     ordenId: string,
     options?: { mobile?: boolean },
   ) {
+    await MarketplaceService.expirarOrdenesPendientesVencidas();
     const { data: orden, error: errOrden } = await supabaseAdmin
       .from("marketplace_ordenes")
       .select(
         `
-        id, total, estado,
+        id, total, estado, comprador_id, created_at, retiene_hasta,
         items:marketplace_items_orden(
           cantidad, precio_unitario,
           producto:marketplace_productos(id, nombre)
@@ -947,6 +1067,22 @@ export class MarketplaceService {
     if (orden.estado !== MARKETPLACE_ESTADOS_ORDEN.PENDIENTE) {
       throw new Error("Esta orden ya fue procesada.");
     }
+
+    if (ordenPendienteExpirada(orden, new Date())) {
+      await MarketplaceService.marcarOrdenVencidaSinPago(
+        ordenId,
+        (orden as { comprador_id?: string }).comprador_id,
+      );
+      throw new Error("El plazo de pago de esta orden venció.");
+    }
+
+    const ahoraMp = new Date();
+    const retieneHastaMp = retencionInicialOrdenDesde(ahoraMp);
+    await supabaseAdmin
+      .from("marketplace_ordenes")
+      .update({ retiene_hasta: retieneHastaMp })
+      .eq("id", ordenId)
+      .eq("estado", MARKETPLACE_ESTADOS_ORDEN.PENDIENTE);
 
     const subtotal = (
       orden as { items: Array<{ cantidad: number; precio_unitario: number }> }
@@ -1031,6 +1167,8 @@ export class MarketplaceService {
         notification_url: mercadoPagoNotificationUrl(
           "/api/marketplace/webhook/mercadopago",
         ),
+        expiration_date_from: ahoraMp.toISOString(),
+        expiration_date_to: retieneHastaMp,
       },
     });
 
@@ -1061,6 +1199,7 @@ export class MarketplaceService {
       .update({
         estado: MARKETPLACE_ESTADOS_ORDEN.PAGADA,
         mp_payment_id: mpPaymentId,
+        retiene_hasta: null,
       })
       .eq("id", ordenId)
       .eq("estado", MARKETPLACE_ESTADOS_ORDEN.PENDIENTE)
@@ -1088,7 +1227,7 @@ export class MarketplaceService {
       for (const [vendedorId, monto] of Object.entries(montosPorVendedor)) {
         const { data: vendedor } = await supabaseAdmin
           .from("marketplace_vendedores")
-          .select("balance, total_ventas")
+          .select("balance")
           .eq("id", vendedorId)
           .single();
 
@@ -1097,9 +1236,9 @@ export class MarketplaceService {
             .from("marketplace_vendedores")
             .update({
               balance: Number(vendedor.balance) + monto,
-              total_ventas: vendedor.total_ventas + 1,
             })
             .eq("id", vendedorId);
+          await sincronizarTotalVentasVendedor(vendedorId);
         }
       }
     }
@@ -1184,6 +1323,7 @@ export class MarketplaceService {
   }
 
   static async listarMisOrdenes(compradorId: string, pagina: number = 1) {
+    await MarketplaceService.expirarOrdenesPendientesVencidas();
     const desde = (pagina - 1) * ITEMS_POR_PAGINA;
     const hasta = desde + ITEMS_POR_PAGINA - 1;
 
@@ -1208,6 +1348,7 @@ export class MarketplaceService {
   }
 
   static async obtenerOrden(ordenId: string, compradorId: string) {
+    await MarketplaceService.expirarOrdenesPendientesVencidas();
     const { data, error } = await supabaseAdmin
       .from("marketplace_ordenes")
       .select(
@@ -1657,8 +1798,11 @@ export class MarketplaceService {
       });
     }
 
+    const total_ventas = await contarOrdenesCobradasPorVendedor(vendedorId);
+
     return {
       ...tienda,
+      total_ventas,
       entidad_nombre,
       productos_activos: productosActivos || 0,
       categorias: Array.from(categoriasMap.values()).sort((a, b) =>

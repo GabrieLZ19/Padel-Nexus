@@ -9,6 +9,7 @@ import {
   normalizarDni,
   esEmailPlaceholderPlanilla,
   sanitizarFilaPlanillaInscripcion,
+  resolverLugarResidenciaDesdePlanilla,
   resolverProvinciaDesdePlanilla,
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
@@ -621,9 +622,12 @@ export class PerfilService {
       .eq("dni", dni)
       .maybeSingle();
 
+    const lugarResidenciaPlanilla = resolverLugarResidenciaDesdePlanilla(fila);
     const provinciaRaw = resolverProvinciaDesdePlanilla(fila);
-    const provinciaPlanilla =
-      provinciaCanonicaArgentina(provinciaRaw) ?? provinciaRaw;
+    const provinciaCanonica =
+      provinciaCanonicaArgentina(provinciaRaw) ?? provinciaRaw ?? null;
+    const lugarPersistir =
+      lugarResidenciaPlanilla || provinciaCanonica || null;
 
     if (existente) {
       const patch: Record<string, unknown> = {};
@@ -631,10 +635,8 @@ export class PerfilService {
       if (!existente.apellido && apellido)
         patch.apellido = PerfilService.capitalizarTexto(apellido);
       if (fila.telefono) patch.telefono = fila.telefono;
-      // Fuente de verdad: ASOCIACIÓN de la planilla. Si no viene, no tocar
-      // (queda el lugar_residencia ya cargado en el perfil).
-      if (provinciaPlanilla) {
-        patch.lugar_residencia = provinciaPlanilla;
+      if (lugarPersistir) {
+        patch.lugar_residencia = lugarPersistir;
       }
       if (fila.categoria) patch.categoria_padel = fila.categoria;
       if (fila.fechaNacimiento) patch.fecha_nacimiento = fila.fechaNacimiento;
@@ -686,8 +688,7 @@ export class PerfilService {
           nombre: PerfilService.capitalizarTexto(nombre),
           apellido: PerfilService.capitalizarTexto(apellido),
           telefono: fila.telefono || null,
-          // Solo ASOCIACIÓN; si falta, placeholder (denominación usará residencia al completar).
-          lugar_residencia: provinciaPlanilla || "A completar",
+          lugar_residencia: lugarPersistir || "A completar",
           categoria_padel: categoriaPadel,
           lado_preferido: "indistinto",
           fecha_nacimiento: fila.fechaNacimiento || null,

@@ -109,6 +109,36 @@ Commits: `fcbb060` (back), `95ca06f` (front). Pendiente QA manual en torneo real
 - `BracketEditor`: `matchNoFapDePartidoId` + `matrizFapDePartido`; eliminatoria usa `origenesAlimentadoresEliminatoria`.
 - Tests: `tor36EtiquetasLlave.test.ts`, `numeracionLlaveP4.test.ts`.
 
-**Siguiente ítem sugerido:** **TOR-49** o **CLI-1**.
+### TOR-49 — Falsos positivos "Revisar horarios publicados" — HECHO (código)
+
+- `partidoYaFinalizado` + `zonaClasificacionCerrada` en `programacionZonaLlave.ts`
+- Avisos al cargar resultado: no revalidan partidos finalizados ni feeders ya jugados (`partidoViolaFeederODescansoPublicado`, `seleccionarPartidosLlaveParaAutoprogramar`)
+- `detectarLlaveAntesFinZonaAlimentadora` / `evaluateProgramacionIssues` ignoran zonas cerradas y partidos finalizados
+- Tests: `tor49ProgramacionPublicada.test.ts`
+
+### CLI-1 — Planilla: localidad vs provincia — HECHO (código)
+
+- `parseLocalidadProvinciaCelda`: token único = provincia canónica, localidad inferida o solo localidad (no confundir)
+- `resolverLugarResidenciaDesdePlanilla` + `PerfilService` persisten localidad en `lugar_residencia`
+- `inferirProvinciaDesdeLocalidad` (`localidadProvinciaArgentina.ts`); `advertenciasResidencia` en import API
+- Front: parse alineado + toast `sileo.warning` en Paso 4 e inscripciones dashboard
+- Tests ampliados: `cli1PlanillaOficial.test.ts`
+
+### MKT-1 — Órdenes sin pago e ingresos del listado — HECHO (código)
+
+- Migración `retiene_hasta` en `marketplace_ordenes` (aplicada Supabase)
+- `expirarOrdenesPendientesVencidas`: cancela pendientes, restaura stock, notifica comprador
+- Plazo 15 min (`MARKETPLACE_ORDEN_PENDIENTE_MINUTOS`); MP `expiration_date_to`
+- `MarketplaceVentasTab`: ingresos del listado solo órdenes `pagada`/`entregada`
+- Tests: `mkt1OrdenPendienteExpirada.test.ts`
+
+### MKT-2 — Conteo ventas cobradas unificado — HECHO (código)
+
+- `marketplaceVentasCobradas.ts`: órdenes `pagada`/`entregada`; sync `total_ventas` al confirmar pago
+- Tienda pública, CRM (`obtenerTiendaEntidad`, stats), producto (`ventas_cobradas` + vendedor alineado)
+- CRM `MarketplaceVentasTab`: ventas totales sin fallback a líneas pendientes
+- Tests: `mkt2VentasCobradas.test.ts`
+
+**Siguiente ítem sugerido:** **MKT-3** o limpieza QA bloque 6.
 
 Plan detallado ítem por ítem: [re-test_18-11_correction_plan.md](re-test_18-11_correction_plan.md).

@@ -22,7 +22,7 @@ Seguimiento de commits y detalle: [qa-re-test-18-11-progreso.md](qa-re-test-18-1
 
 **Hecho TOR-36**: CRM llave con `Gan. #N` en huecos pendientes (`MatchCard`, `BracketEditor`).
 
-**Siguiente ítem sugerido**: **TOR-49** o **CLI-1**.
+**Siguiente ítem sugerido**: **MKT-3** u operativos bloque 6. **MKT-1**, **MKT-2**, **TOR-49**, **CLI-1** — HECHO en código.
 
 ---
 
@@ -179,14 +179,14 @@ Seguimiento de commits y detalle: [qa-re-test-18-11-progreso.md](qa-re-test-18-1
   - Componente de visualización de llave en `apps/web/components/torneos/` (CRM club).
 - **Acción**: Reutilizar la misma lógica de etiqueta de rival pendiente (`Gan. #X`) de la vista pública en la vista de llave del CRM.
 
-### 19. TOR-49 — Falso positivo "Revisar horarios publicados" al cargar resultados (BAJA)
+### 19. TOR-49 — Falso positivo "Revisar horarios publicados" al cargar resultados (BAJA) — HECHO
 - **Problema**: Al cargar o corregir cualquier resultado de llave con programación publicada, salta `"Revisar horarios publicados"` por partidos sin conflicto real (incluso ya jugados).
 - **Archivos**:
   - [apps/api/src/services/programacion.service.ts](apps/api/src/services/programacion.service.ts) / [apps/api/src/utils/programacionPartidos.ts](apps/api/src/utils/programacionPartidos.ts)
   - [apps/web/components/torneos/wizard/Paso9Arbitraje.tsx](apps/web/components/torneos/wizard/Paso9Arbitraje.tsx)
 - **Acción**: Evaluar conflictos reales excluyendo partidos ya finalizados y verificando correctamente los tiempos de fin de zona vs inicio de llave para alertar únicamente cuando exista un conflicto genuino.
 
-### 20. CLI-1 — Importación de planillas: localidad vs provincia (PARCIAL)
+### 20. CLI-1 — Importación de planillas: localidad vs provincia (PARCIAL) — HECHO
 - **Problema**: Cuando la planilla trae solo localidad, se guarda la localidad en el campo provincia y no se guarda la localidad en `lugar_residencia`.
 - **Archivos**:
   - [apps/api/src/utils/inscripcionPlanilla.ts](apps/api/src/utils/inscripcionPlanilla.ts)
@@ -197,14 +197,14 @@ Seguimiento de commits y detalle: [qa-re-test-18-11-progreso.md](qa-re-test-18-1
 
 ## Bloque 4 — Marketplace
 
-### 21. MKT-1 — Vencimiento de órdenes sin pago e ingresos del listado (MEDIA)
+### 21. MKT-1 — Vencimiento de órdenes sin pago e ingresos del listado (MEDIA) — HECHO
 - **Problema**: Órdenes sin pagar quedan `"pendiente"` indefinidamente y se suman en `"INGRESOS DEL LISTADO"`.
 - **Archivos**:
   - [apps/api/src/services/marketplace.service.ts](apps/api/src/services/marketplace.service.ts)
   - Vista de Ventas del marketplace en `apps/web/`.
 - **Acción**: Expirar automáticamente órdenes pendientes sin pago tras un plazo configurable (similar a reservas, marcándolas vencidas/sin pago) y sumar en ingresos únicamente órdenes pagadas/cobradas.
 
-### 22. MKT-2 — Unificar conteo de ventas cobradas en tienda, producto y CRM (BAJA)
+### 22. MKT-2 — Unificar conteo de ventas cobradas en tienda, producto y CRM (BAJA) — HECHO
 - **Problema**: La tienda pública muestra `"VENTAS 1"` mientras producto y CRM muestran `0` cuando no hay ventas cobradas.
 - **Archivos**:
   - [apps/api/src/services/marketplace.service.ts](apps/api/src/services/marketplace.service.ts)

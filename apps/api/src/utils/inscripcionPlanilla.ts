@@ -1,3 +1,6 @@
+import { inferirProvinciaDesdeLocalidad } from "./localidadProvinciaArgentina";
+import { provinciaCanonicaArgentina } from "./provinciaRanking";
+
 export type TipoPlanillaInscripcion = "fap" | "general";
 
 export interface FilaPlanillaInscripcion {
@@ -142,7 +145,12 @@ export function parseLocalidadProvinciaCelda(valor: unknown): {
     };
   }
   if (parts.length === 1) {
-    return { provincia: parts[0] };
+    const token = parts[0];
+    const provinciaCanon = provinciaCanonicaArgentina(token);
+    if (provinciaCanon) return { provincia: provinciaCanon };
+    const inferida = inferirProvinciaDesdeLocalidad(token);
+    if (inferida) return { localidad: token, provincia: inferida };
+    return { localidad: token };
   }
   return {};
 }
@@ -338,6 +346,7 @@ export {
   parseNombreCompleto,
   normalizarDni,
   resolverProvinciaDesdePlanilla,
+  resolverLugarResidenciaDesdePlanilla,
   esResidenciaPlaceholder,
 };
 
@@ -349,8 +358,8 @@ function esResidenciaPlaceholder(valor?: string | null): boolean {
 }
 
 /**
- * Provincia/residencia: ASOCIACIÓN (nacional) o `LOCALIDAD | PROVINCIA` (clubes)
- * cuando no hay asociación ni DIRECCIÓN usable.
+ * Provincia para ranking/denominación: ASOCIACIÓN (nacional), provincia explícita
+ * o inferida desde localidad. No usa el nombre de localidad como provincia.
  */
 function resolverProvinciaDesdePlanilla(
   fila: FilaPlanillaInscripcion,
@@ -358,14 +367,67 @@ function resolverProvinciaDesdePlanilla(
   const asociacion = String(fila.asociacion || "")
     .trim()
     .replace(/\s+/g, " ");
-  if (asociacion && !esResidenciaPlaceholder(asociacion)) return asociacion;
+  if (asociacion && !esResidenciaPlaceholder(asociacion)) {
+    const canon = provinciaCanonicaArgentina(asociacion);
+    return canon ?? asociacion;
+  }
 
   const provinciaLoc = String(fila.provinciaResidencia || "")
     .trim()
     .replace(/\s+/g, " ");
   if (provinciaLoc && !esResidenciaPlaceholder(provinciaLoc)) {
-    return provinciaLoc;
+    const canon = provinciaCanonicaArgentina(provinciaLoc);
+    if (canon) return canon;
+    const inferida = inferirProvinciaDesdeLocalidad(provinciaLoc);
+    if (inferida) return inferida;
+  }
+
+  const localidad = String(fila.localidadResidencia || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (localidad && !esResidenciaPlaceholder(localidad)) {
+    const inferida = inferirProvinciaDesdeLocalidad(localidad);
+    if (inferida) return inferida;
   }
 
   return null;
+}
+
+/** Valor a guardar en `perfiles.lugar_residencia`: prioriza localidad de planilla. */
+function resolverLugarResidenciaDesdePlanilla(
+  fila: FilaPlanillaInscripcion,
+): string | null {
+  const localidad = String(fila.localidadResidencia || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (localidad && !esResidenciaPlaceholder(localidad)) return localidad;
+
+  const provinciaLoc = String(fila.provinciaResidencia || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (provinciaLoc && !esResidenciaPlaceholder(provinciaLoc)) {
+    const canon = provinciaCanonicaArgentina(provinciaLoc);
+    return canon ?? provinciaLoc;
+  }
+
+  const asociacion = String(fila.asociacion || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (asociacion && !esResidenciaPlaceholder(asociacion)) {
+    const canon = provinciaCanonicaArgentina(asociacion);
+    return canon ?? asociacion;
+  }
+
+  return null;
+}
+
+export function advertenciasResidenciaPlanilla(
+  fila: FilaPlanillaInscripcion,
+): string[] {
+  const loc = String(fila.localidadResidencia || "").trim();
+  if (!loc || esResidenciaPlaceholder(loc)) return [];
+  if (resolverProvinciaDesdePlanilla(fila)) return [];
+  return [
+    `Fila ${fila.fila}: solo consta localidad "${loc}"; no se pudo inferir provincia. Completar en el perfil del jugador.`,
+  ];
 }

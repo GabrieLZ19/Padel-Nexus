@@ -18,7 +18,12 @@ import {
   type DistribucionProgramacion,
   type ModoDescanso,
 } from "./programadorReglas";
-import { detectarLlaveAntesFinZonaAlimentadora } from "./programacionZonaLlave";
+import { zoneLetterFromNombreGrupo } from "./fapZoneSeeds";
+import {
+  detectarLlaveAntesFinZonaAlimentadora,
+  partidoYaFinalizado,
+  zonaClasificacionCerrada,
+} from "./programacionZonaLlave";
 
 export interface PartidoProgramable {
   id?: string;
@@ -942,6 +947,7 @@ function notBeforeDesdeFeeders(
       (p) => Number(p.orden) === fOrden && p.fecha_partido,
     );
     if (!feeder?.fecha_partido) continue;
+    if (partidoYaFinalizado(feeder)) continue;
     const parsed = parseFechaPartidoIso(String(feeder.fecha_partido));
     if (!parsed) continue;
 
@@ -1821,6 +1827,7 @@ export function seleccionarPartidosLlaveParaAutoprogramar(
     const sinHorario = !p.cancha_asignada || !p.fecha_partido;
     if (sinHorario) return true;
     if (opts.programacionPublicada) {
+      if (partidoYaFinalizado(p)) return false;
       if (opts.violaHorarioPublicado(p)) {
         const etiqueta = textoPartidoNumerado(p, mapaVisible);
         avisos_programacion_publicada.push(
@@ -1832,6 +1839,76 @@ export function seleccionarPartidosLlaveParaAutoprogramar(
     return opts.violaHorarioPublicado(p);
   });
   return { pendientes, avisos_programacion_publicada };
+}
+
+/**
+ * TOR-49: detecta conflicto real de horario publicado en llave (feeders + descanso).
+ * Omite partidos y feeders ya finalizados.
+ */
+export function partidoViolaFeederODescansoPublicado(
+  p: PartidoProgramable,
+  todosProg: PartidoProgramable[],
+  feedersByMatchNo: Map<number, number[]>,
+  duracionMinutos: number,
+): boolean {
+  if (!p.fecha_partido) return false;
+  if (partidoYaFinalizado(p)) return false;
+  const parsed = parseFechaPartidoIso(String(p.fecha_partido));
+  if (!parsed) return true;
+
+  const notBefore = notBeforeDesdeFeeders(
+    p,
+    todosProg,
+    feedersByMatchNo,
+    duracionMinutos,
+  );
+  for (const nb of notBefore) {
+    if (parsed.fecha < nb.fecha) return true;
+    if (parsed.fecha === nb.fecha && parsed.startMin < nb.startMin) {
+      return true;
+    }
+  }
+
+  const ordenP = Number(p.orden);
+  const feederOrdens =
+    Number.isFinite(ordenP) && ordenP > 0
+      ? feedersByMatchNo.get(ordenP) || []
+      : [];
+
+  const ids = equiposDePartido(p);
+  for (const id of ids) {
+    const historial: PartidoParejaHistorial[] = [];
+    for (const other of todosProg) {
+      if (other === p || !other.fecha_partido) continue;
+      const oOrden = Number(other.orden);
+      if (
+        partidoYaFinalizado(other) &&
+        feederOrdens.includes(oOrden)
+      ) {
+        continue;
+      }
+      const oIds = equiposDePartido(other);
+      if (!oIds.includes(id)) continue;
+      const op = parseFechaPartidoIso(String(other.fecha_partido));
+      if (!op) continue;
+      historial.push({
+        fecha: op.fecha,
+        startMin: op.startMin,
+        endMin: op.startMin + duracionMinutos,
+      });
+    }
+    if (
+      !parejaPuedeJugarEnSlot(
+        historial,
+        parsed.fecha,
+        parsed.startMin,
+        duracionMinutos,
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -1902,58 +1979,16 @@ export async function programarPartidosLlavePendientes(
 
   const todosProg = (todos || []) as PartidoProgramable[];
 
-  const violaFeederODescanso = (p: PartidoProgramable): boolean => {
-    if (!p.fecha_partido) return false;
-    const parsed = parseFechaPartidoIso(String(p.fecha_partido));
-    if (!parsed) return true;
-
-    const notBefore = notBeforeDesdeFeeders(
-      p,
-      todosProg,
-      feedersByMatchNo,
-      duracionMinutos,
-    );
-    for (const nb of notBefore) {
-      if (parsed.fecha < nb.fecha) return true;
-      if (parsed.fecha === nb.fecha && parsed.startMin < nb.startMin) {
-        return true;
-      }
-    }
-
-    const ids = equiposDePartido(p);
-    for (const id of ids) {
-      const historial: PartidoParejaHistorial[] = [];
-      for (const other of todosProg) {
-        if (other === p || !other.fecha_partido) continue;
-        const oIds = equiposDePartido(other);
-        if (!oIds.includes(id)) continue;
-        const op = parseFechaPartidoIso(String(other.fecha_partido));
-        if (!op) continue;
-        historial.push({
-          fecha: op.fecha,
-          startMin: op.startMin,
-          endMin: op.startMin + duracionMinutos,
-        });
-      }
-      if (
-        !parejaPuedeJugarEnSlot(
-          historial,
-          parsed.fecha,
-          parsed.startMin,
-          duracionMinutos,
-        )
-      ) {
-        return true;
-      }
-    }
-    return false;
-  };
-
   const { pendientes, avisos_programacion_publicada } =
     seleccionarPartidosLlaveParaAutoprogramar(partidos, {
       programacionPublicada,
       violaHorarioPublicado: (p) =>
-        violaFeederODescanso(p as PartidoProgramable),
+        partidoViolaFeederODescansoPublicado(
+          p as PartidoProgramable,
+          todosProg,
+          feedersByMatchNo,
+          duracionMinutos,
+        ),
       partidosNumeracion: todosProg.map((p) => ({
         id: String((p as { id?: string }).id || ""),
         ronda: p.ronda,
@@ -2140,6 +2175,7 @@ export function evaluateProgramacionIssues(
   for (const p of assigned) {
     const id = String((p as { id?: string }).id || "");
     if (!id) continue;
+    if (partidoYaFinalizado(p)) continue;
     const parsed = parseFechaPartidoIso(String(p.fecha_partido));
     if (!parsed) {
       issues.push({
@@ -2158,6 +2194,7 @@ export function evaluateProgramacionIssues(
       for (const depOrden of deps) {
         const feeder = partidos.find((x) => Number(x.orden) === depOrden);
         if (!feeder) continue;
+        if (partidoYaFinalizado(feeder)) continue;
         if (!feeder.fecha_partido) {
           issues.push({
             partido_id: id,
@@ -2280,6 +2317,7 @@ export function evaluateProgramacionIssues(
       for (const eq of equipos) {
         let ultimo: { fecha: string; startMin: number } | null = null;
         let ultimoFin = -1;
+        let ultimoRonda: string | null = null;
         for (const prev of partidos) {
           if (!esRondaZona(prev.ronda)) continue;
           if (!equiposDePartido(prev).includes(eq)) continue;
@@ -2292,9 +2330,14 @@ export function evaluateProgramacionIssues(
           if (!ultimo || finRank > ultimoFin) {
             ultimo = fp;
             ultimoFin = finRank;
+            ultimoRonda = String(prev.ronda || "");
           }
         }
         if (!ultimo) continue;
+        const zoneLetter = zoneLetterFromNombreGrupo(ultimoRonda || "");
+        if (zoneLetter && zonaClasificacionCerrada(partidos, zoneLetter)) {
+          continue;
+        }
         const minInicio = minInicioDespuesDePartido(
           ultimo.fecha,
           ultimo.startMin,

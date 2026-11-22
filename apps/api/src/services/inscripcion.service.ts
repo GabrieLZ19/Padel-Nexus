@@ -41,6 +41,7 @@ import {
   type DatosAltaJugadorManual,
 } from "./perfil.service";
 import {
+  advertenciasResidenciaPlanilla,
   agruparFilasEnParejas,
   sanitizarFilaPlanillaInscripcion,
   type FilaPlanillaInscripcion,
@@ -1154,6 +1155,12 @@ export class InscripcionService {
     let inscripcionesOk = 0;
     let jugadoresCreados = 0;
     const errores: string[] = [];
+    const advertenciasResidencia = new Set<string>();
+    for (const fila of filasLimpias) {
+      for (const aviso of advertenciasResidenciaPlanilla(fila)) {
+        advertenciasResidencia.add(aviso);
+      }
+    }
 
     for (const grupo of grupos) {
       try {
@@ -1201,6 +1208,7 @@ export class InscripcionService {
       inscripcionesOk,
       jugadoresCreados,
       errores,
+      advertenciasResidencia: [...advertenciasResidencia],
       totalFilas: filas.length,
       torneoId: torneo.id,
     };

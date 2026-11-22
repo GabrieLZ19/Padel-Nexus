@@ -7,8 +7,10 @@ import XLSX from "xlsx";
 import {
   ARCHIVO_PLANTILLA_CLUB_ASOC_PROVINCIAL,
   ARCHIVO_PLANTILLA_FEDERACION_NACIONAL,
+  advertenciasResidenciaPlanilla,
   parseLocalidadProvinciaCelda,
   parsearFilasPlanilla,
+  resolverLugarResidenciaDesdePlanilla,
   resolverProvinciaDesdePlanilla,
 } from "../src/utils/inscripcionPlanilla.ts";
 
@@ -94,6 +96,41 @@ describe("CLI-1 planillas oficiales FAP / clubes", () => {
       localidad: "Plottier",
       provincia: "Neuquén",
     });
+  });
+
+  it("solo localidad: no la trata como provincia y infiere si es posible", () => {
+    assert.deepEqual(parseLocalidadProvinciaCelda("Plottier"), {
+      localidad: "Plottier",
+      provincia: "Neuquén",
+    });
+    const fila: import("../src/utils/inscripcionPlanilla.ts").FilaPlanillaInscripcion =
+      {
+        fila: 3,
+        apellidoNombre: "Test",
+        dni: "12345678",
+        localidadResidencia: "Plottier",
+        provinciaResidencia: "Neuquén",
+      };
+    assert.equal(resolverLugarResidenciaDesdePlanilla(fila), "Plottier");
+    assert.equal(resolverProvinciaDesdePlanilla(fila), "Neuquén");
+  });
+
+  it("localidad desconocida: queda localidad sin provincia ni advertencia evitable", () => {
+    assert.deepEqual(parseLocalidadProvinciaCelda("Pueblo Ficticio"), {
+      localidad: "Pueblo Ficticio",
+    });
+    const fila: import("../src/utils/inscripcionPlanilla.ts").FilaPlanillaInscripcion =
+      {
+        fila: 4,
+        apellidoNombre: "Test",
+        dni: "87654321",
+        localidadResidencia: "Pueblo Ficticio",
+      };
+    assert.equal(resolverLugarResidenciaDesdePlanilla(fila), "Pueblo Ficticio");
+    assert.equal(resolverProvinciaDesdePlanilla(fila), null);
+    const avisos = advertenciasResidenciaPlanilla(fila);
+    assert.equal(avisos.length, 1);
+    assert.match(avisos[0]!, /Pueblo Ficticio/);
   });
 
   it("planilla nacional conserva LETRA y ASOCIACIÓN", () => {
