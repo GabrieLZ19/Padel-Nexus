@@ -37,4 +37,4 @@ Crear un **segundo proyecto** en Vercel apuntando al **mismo repositorio** que `
 
 ## No afecta el deploy de la plataforma
 
-Vercel despliega **un root directory por proyecto**. Mientras `padel-nexus` siga con Root `apps/web`, los commits que toquen solo `apps/padelnexus-web` pueden disparar el proyecto www si esta conectado al repo; el proyecto play solo rebuilda si cambia su root o dependencias compartidas en el monorepo (segun Ignored Build Step). Opcional: en el proyecto play, **Ignored Build Step** = solo construir si hay cambios bajo `apps/web` (script en docs).
+Vercel despliega **un root directory por proyecto**. Ignored Build Step: ver [`docs/deploy-play-y-www.md`](../../docs/deploy-play-y-www.md) y `deploy/vercel/ignored-build-www.sh` (el `git diff` debe ejecutarse desde la raiz del repo, no desde `apps/padelnexus-web`).
