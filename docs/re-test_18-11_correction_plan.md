@@ -16,7 +16,13 @@ Seguimiento de commits y detalle: [qa-re-test-18-11-progreso.md](qa-re-test-18-1
 - **FEE-12** — sync verificado; **7 commits** pendientes de push a `origin` (detalle: [fee-12-sync-github.md](fee-12-sync-github.md)).
 - **TOR-22 + TOR-28** — alta en pase directo FAP (`fcbb060` + `95ca06f`; QA torneo real pendiente).
 
-**Siguiente ítem sugerido**: **TOR-50** (rollback/validación previa si falla alta en llave); alternativa **TOR-24 + TOR-48**.
+**Hecho en sesión**: TOR-50 (prevalidación + rollback llave); TOR-24/48 back (conflictos horario llave vs zona + desprogramación al guardar zonas).
+
+**Hecho TOR-46**: número visible en errores de lado W* (`edicionLlaveFap`, test `tor46NumerosVisiblesAvisos`).
+
+**Hecho TOR-36**: CRM llave con `Gan. #N` en huecos pendientes (`MatchCard`, `BracketEditor`).
+
+**Siguiente ítem sugerido**: **TOR-49** o **CLI-1**.
 
 ---
 

@@ -84,6 +84,31 @@ Commit: `95ca06f`.
 
 Commits: `fcbb060` (back), `95ca06f` (front). Pendiente QA manual en torneo real.
 
-**Siguiente ítem sugerido:** **TOR-50** (rollback/validación previa si falla alta en llave) o **TOR-24 + TOR-48**.
+### TOR-50 — Rollback / prevalidación alta en llave — HECHO (código)
+
+- Prevalidación FAP (`prevalidarAltaEnSlotLlaveFap`) **antes** de `ejecutarAltaDesdePayload` en `actualizarEquiposPartido`
+- Rollback: `InscripcionService.revertirInscripcionAltaLlave` (sin `assertPasoJugadoresEditable`) + fichas provisionales
+- Tests: `tor50RollbackAltaLlave.test.ts` (incl. bye OK vs lado W* inválido, rollback sin `cancelarInscripcion`)
+
+### TOR-24 + TOR-48 — Zonas y horarios vs llave — HECHO (código back)
+
+- TOR-24 (ya en repo): `fapZoneSeeds`, `sincronizarLlaveTrasCambioZonas`, regeneración selectiva en `guardarZonas`
+- TOR-48: `programacionZonaLlave.ts` — conflicto llave antes de fin de zona alimentadora; `evaluateProgramacionIssues` + `matrixFap`; al guardar zonas, `aplicarDesprogramacionZonaTrasCambioTorneo` quita horario de partidos de zona regenerada en conflicto
+- Tests: `tor48LlaveZonaHorarios.test.ts`, `tor24GuardarZonas.test.ts` (hook desprogramación)
+
+### TOR-46 — Número visible en error lado W* — HECHO
+
+- `crearResolverNumeroVisibleLlave` (`numerosVisiblesPartido.ts`)
+- Mensajes en `edicionLlaveFap.ts` (`partido #N`, sin "matriz #matchNo")
+- `actualizarEquiposPartido` resuelve numeración del torneo antes de validar
+- Test ampliado: `tor46NumerosVisiblesAvisos.test.ts`
+
+### TOR-36 — Gan. #X en llave CRM — HECHO
+
+- `MatchCard`: hueco vacío muestra `Gan. #N` / `1º A` como en vista pública (sin forzar "Por definir" cuando hay origen).
+- `BracketEditor`: `matchNoFapDePartidoId` + `matrizFapDePartido`; eliminatoria usa `origenesAlimentadoresEliminatoria`.
+- Tests: `tor36EtiquetasLlave.test.ts`, `numeracionLlaveP4.test.ts`.
+
+**Siguiente ítem sugerido:** **TOR-49** o **CLI-1**.
 
 Plan detallado ítem por ítem: [re-test_18-11_correction_plan.md](re-test_18-11_correction_plan.md).
