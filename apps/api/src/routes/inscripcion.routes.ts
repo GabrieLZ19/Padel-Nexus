@@ -10,6 +10,7 @@ import {
   webhookMercadoPagoInscripcion,
   crearPreferenciaPagoInscripcion,
   confirmarRetornoPagoInscripcion,
+  obtenerPlazasPagoInscripcion,
 } from "../controllers/inscripcion.controller";
 import { authenticate, authorize } from "../middleware/auth";
 import { ROLES_ADMINISTRATIVOS } from "../constants/roles";
@@ -33,6 +34,7 @@ router.get(
 
 router.post("/", createInscripcion);
 
+router.get("/:id/plazas-pago", obtenerPlazasPagoInscripcion);
 router.post("/:id/preferencia-mp", crearPreferenciaPagoInscripcion);
 router.post("/:id/confirmar-retorno", confirmarRetornoPagoInscripcion);
 

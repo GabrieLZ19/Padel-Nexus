@@ -16,6 +16,7 @@ import {
   type PlatformFeeOrigen,
   type PlatformFeeTipo,
 } from "../constants/platformFee";
+import { precioUnitarioDesdeMonto } from "../utils/inscripcionMonto";
 
 interface CanalConfigRow {
   canal: string;
@@ -177,11 +178,14 @@ export class PlatformFeeService {
     montoBruto: number,
     unidades = 1,
   ): number {
-    if (!config || !config.activo || config.valor <= 0 || montoBruto <= 0) {
+    if (!config || !config.activo || config.valor <= 0) {
       return 0;
     }
     if (config.tipo === "fijo") {
       return Math.round(config.valor * Math.max(1, unidades));
+    }
+    if (montoBruto <= 0) {
+      return 0;
     }
     return Math.round((montoBruto * Number(config.valor)) / 100);
   }
@@ -368,6 +372,7 @@ export class PlatformFeeService {
     org: PlatformFeeOrgRef;
     montoTotal: number;
     plazas: number;
+    soloNumerosPlaza?: number[];
     modo: PlatformFeeModo;
     origen: PlatformFeeOrigen;
     mpPaymentId?: string;
@@ -375,8 +380,13 @@ export class PlatformFeeService {
   }) {
     const plazas = Math.max(1, input.plazas);
     const brutoPorPlaza = Math.round(input.montoTotal / plazas);
+    const indices =
+      input.soloNumerosPlaza?.length &&
+      input.soloNumerosPlaza.every((n) => n >= 1 && n <= plazas)
+        ? input.soloNumerosPlaza
+        : Array.from({ length: plazas }, (_, k) => k + 1);
     const registros = [];
-    for (let i = 1; i <= plazas; i++) {
+    for (const i of indices) {
       const bruto =
         i === plazas
           ? input.montoTotal - brutoPorPlaza * (plazas - 1)
@@ -426,14 +436,85 @@ export class PlatformFeeService {
     });
   }
 
+  /**
+   * Al cancelar o rechazar una inscripción: anula fees pendientes y acredita si ya estaban cobrados/liquidados.
+   */
+  static async anularFeesPorInscripcion(inscripcionId: string) {
+    const prefijo = `${inscripcionId}:plaza-`;
+    const { data: movs, error } = await supabaseAdmin
+      .from("plataforma_fee_movimientos")
+      .select("*")
+      .eq("canal", "inscripciones")
+      .eq("entidad_tipo", "inscripcion_plaza")
+      .like("entidad_id", `${inscripcionId}:plaza-%`);
+    if (error) {
+      throw new Error("No se pudieron cargar movimientos de fee de la inscripción.");
+    }
+
+    const ESTADOS_PAGADOS = new Set(["cobrado_mp", "liquidado"]);
+
+    for (const mov of movs || []) {
+      if (!String(mov.entidad_id || "").startsWith(prefijo)) continue;
+      if (mov.estado === "anulado") continue;
+
+      const { error: updError } = await supabaseAdmin
+        .from("plataforma_fee_movimientos")
+        .update({ estado: "anulado" })
+        .eq("id", mov.id);
+      if (updError) {
+        throw new Error("No se pudo anular el movimiento de fee.");
+      }
+
+      if (ESTADOS_PAGADOS.has(mov.estado as string)) {
+        await PlatformFeeService.registrarCreditoOrganizadorFeeAnulado(mov);
+      }
+    }
+  }
+
+  private static async registrarCreditoOrganizadorFeeAnulado(mov: {
+    id: string;
+    canal: string;
+    org_tipo: string;
+    org_id: string;
+    torneo_id: string | null;
+    monto_fee: number;
+    modo_fee: string;
+  }) {
+    const fee = Number(mov.monto_fee || 0);
+    if (fee <= 0) return;
+
+    const { error } = await supabaseAdmin.from("plataforma_fee_movimientos").upsert(
+      {
+        canal: mov.canal,
+        org_tipo: mov.org_tipo,
+        org_id: mov.org_id,
+        entidad_tipo: "inscripcion_credito_anulacion",
+        entidad_id: String(mov.id),
+        torneo_id: mov.torneo_id,
+        plazas_inscripcion: null,
+        monto_bruto: 0,
+        monto_fee: -fee,
+        modo_fee: mov.modo_fee,
+        estado: "descontar_liquidacion",
+        origen_pago: "manual",
+        mp_payment_id: null,
+      },
+      { onConflict: "entidad_tipo,entidad_id,origen_pago", ignoreDuplicates: true },
+    );
+    if (error) {
+      console.error("Error al registrar crédito por anulación de fee:", error.message);
+    }
+  }
+
   static async registrarFeeInscripcionOnline(
     inscripcionId: string,
     mpPaymentId: string,
-    montoPagado?: number,
+    _montoPagado?: number,
+    soloNumerosPlaza?: number[],
   ) {
     const { data, error } = await supabaseAdmin
       .from("inscripciones")
-      .select("id, torneo_id, monto, usuario2_id")
+      .select("id, torneo_id, monto, usuario2_id, torneos(precio_inscripcion)")
       .eq("id", inscripcionId)
       .single();
     if (error || !data) return null;
@@ -441,19 +522,40 @@ export class PlatformFeeService {
     const org = await PlatformFeeService.resolverOrgDesdeTorneo(data.torneo_id);
     const modo = await PlatformFeeService.resolverModoOrg(org, "inscripciones");
     const plazas = PlatformFeeService.countPlazasInscripcion(data.usuario2_id);
-    const bruto = Number(data.monto || montoPagado || 0);
+    const torneoRaw = data.torneos as
+      | { precio_inscripcion?: number }
+      | { precio_inscripcion?: number }[]
+      | null;
+    const torneo = Array.isArray(torneoRaw) ? torneoRaw[0] : torneoRaw;
+    const precioPlaza = Number(
+      torneo?.precio_inscripcion ??
+        precioUnitarioDesdeMonto(Number(data.monto || 0), plazas),
+    );
 
-    return PlatformFeeService.registrarFeesInscripcionPorPlaza({
-      inscripcionId,
-      torneoId: data.torneo_id,
-      org,
-      montoTotal: bruto,
-      plazas,
-      modo,
-      origen: "mp_online",
-      mpPaymentId,
-      online: true,
-    });
+    const indices =
+      soloNumerosPlaza?.length &&
+      soloNumerosPlaza.every((n) => n >= 1 && n <= plazas)
+        ? soloNumerosPlaza
+        : Array.from({ length: plazas }, (_, i) => i + 1);
+
+    const registros = [];
+    for (const i of indices) {
+      const row = await PlatformFeeService.registrarMovimientoFee({
+        canal: "inscripciones",
+        org,
+        entidadTipo: "inscripcion_plaza",
+        entidadId: `${inscripcionId}:plaza-${i}`,
+        torneoId: data.torneo_id,
+        plazasInscripcion: 1,
+        montoBruto: precioPlaza,
+        modo,
+        origen: "mp_online",
+        mpPaymentId,
+        online: true,
+      });
+      if (row) registros.push(row);
+    }
+    return registros;
   }
 
   static async obtenerSaldoTorneo(torneoId: string) {
@@ -563,6 +665,7 @@ export class PlatformFeeService {
       .select("*")
       .gte("creado_en", desde.toISOString())
       .lt("creado_en", hasta.toISOString())
+      .neq("estado", "anulado")
       .order("creado_en", { ascending: true });
     if (error) throw new Error("No se pudo generar el reporte mensual.");
 

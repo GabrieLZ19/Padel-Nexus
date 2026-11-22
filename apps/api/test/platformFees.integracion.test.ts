@@ -232,6 +232,63 @@ describe("Platform fees integración (Supabase mock)", () => {
     assert.equal(totalFee, 1000);
   });
 
+  it("registrarFeeInscripcionOffPlatform con monto 0 (torneo gratuito) genera fee fijo", async () => {
+    activo = clienteMock([
+      {
+        data: {
+          id: INSCRIPCION_ID,
+          torneo_id: TORNEO_ID,
+          monto: 0,
+          usuario2_id: "user-2",
+        },
+        error: null,
+      },
+      {
+        data: {
+          club_id: CLUB_ID,
+          asociacion_id: null,
+          federacion_id: null,
+        },
+        error: null,
+      },
+      { data: { modo: "absorber" }, error: null },
+      {
+        data: {
+          canal: "inscripciones",
+          tipo: "fijo",
+          valor: 500,
+          activo: true,
+        },
+        error: null,
+      },
+      { data: { id: "fee-mov-1", monto_fee: 500 }, error: null },
+      {
+        data: {
+          canal: "inscripciones",
+          tipo: "fijo",
+          valor: 500,
+          activo: true,
+        },
+        error: null,
+      },
+      { data: { id: "fee-mov-2", monto_fee: 500 }, error: null },
+    ]);
+
+    const rows = await PlatformFeeService.registrarFeeInscripcionOffPlatform(
+      INSCRIPCION_ID,
+      "planilla",
+    );
+    assert.ok(rows);
+    assert.equal(rows!.length, 2);
+    const upserts = activo.llamadas.filter(
+      (l) => l.tabla === "plataforma_fee_movimientos" && l.op === "upsert",
+    );
+    assert.equal(
+      upserts.reduce((a, u) => a + Number((u.payload as { monto_fee: number }).monto_fee), 0),
+      1000,
+    );
+  });
+
   it("registrarFeeInscripcionOnline con modo sumar marca cobrado_mp", async () => {
     activo = clienteMock([
       {

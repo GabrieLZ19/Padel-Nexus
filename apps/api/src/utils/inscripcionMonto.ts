@@ -1,8 +1,8 @@
 import { esModalidadIndividual } from "./modalidad";
 
 /**
- * precio_inscripcion del torneo = valor por plaza (jugador).
- * Una pareja paga precio × 2 en un solo checkout.
+ * precio_inscripcion del torneo = valor por jugador (plaza).
+ * Pareja: monto total = precio × 2 en un solo cobro / inscripción.
  */
 export function plazasInscripcionDesdeContexto(input: {
   modalidad?: string | null;

@@ -56,7 +56,7 @@ export class PagoService {
       );
     }
 
-    if (datos.entidadTipo === "inscripcion" && datos.monto > 0) {
+    if (datos.entidadTipo === "inscripcion") {
       await PlatformFeeService.registrarFeeInscripcionOffPlatform(
         datos.entidadId,
         "manual",

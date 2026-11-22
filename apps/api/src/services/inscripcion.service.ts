@@ -1,5 +1,6 @@
 import { MercadoPagoConfig, Preference } from "mercadopago";
 import {
+  buildInscripcionExternalReference,
   buildMercadoPagoBackUrls,
   getMercadoPagoAccessToken,
   isMercadoPagoConfigured,
@@ -13,6 +14,7 @@ import {
 } from "../constants/fap";
 import { NotificacionService } from "./notificacion.service";
 import { PlatformFeeService } from "./platformFee.service";
+import { InscripcionPlazaPagoService } from "./inscripcionPlazaPago.service";
 import {
   montoInscripcionDesdePrecioTorneo,
   plazasInscripcionDesdeContexto,
@@ -669,6 +671,10 @@ export class InscripcionService {
       );
     }
 
+    await InscripcionPlazaPagoService.asegurarPlazasDesdeInscripcion(
+      inscripcionInsertada,
+    );
+
     // 11. CUPOS
     await supabaseAdmin
       .from("torneos")
@@ -744,6 +750,14 @@ export class InscripcionService {
     if (error || !data)
       throw new Error("Error al actualizar el estado de pago.");
 
+    if (estadoPago === FAP_ESTADOS_PAGO.RECHAZADO) {
+      await PlatformFeeService.anularFeesPorInscripcion(id);
+    }
+
+    if (estadoPago === FAP_ESTADOS_PAGO.CONFIRMADO) {
+      await InscripcionPlazaPagoService.asegurarPlazasDesdeInscripcion(data);
+    }
+
     if (estadoPago === FAP_ESTADOS_PAGO.CONFIRMADO && data.usuario_id) {
       const torneoNombre =
         (data as { torneos?: { nombre?: string } | null }).torneos?.nombre ||
@@ -775,6 +789,8 @@ export class InscripcionService {
 
     if (fetchError || !inscripcion)
       throw new Error("Inscripción no encontrada.");
+
+    await PlatformFeeService.anularFeesPorInscripcion(id);
 
     const { data: torneoInscripcion } = await supabaseAdmin
       .from("torneos")
@@ -977,12 +993,16 @@ export class InscripcionService {
         );
       }
 
+      await InscripcionPlazaPagoService.asegurarPlazasDesdeInscripcion(
+        inscripcionInsertada,
+      );
+
       await supabaseAdmin
         .from("torneos")
         .update({ cupos_actuales: (torneo.cupos_actuales || 0) + 1 })
         .eq("id", torneoId);
 
-      if (estadoPago === FAP_ESTADOS_PAGO.CONFIRMADO && montoInscripcion > 0) {
+      if (estadoPago === FAP_ESTADOS_PAGO.CONFIRMADO) {
         const origenFee =
           (metodoPago || "").toLowerCase() === "planilla" ? "planilla" : "manual";
         await PlatformFeeService.registrarFeeInscripcionOffPlatform(
@@ -1149,6 +1169,21 @@ export class InscripcionService {
       throw new Error("Esta inscripción ya está paga.");
     }
 
+    await InscripcionPlazaPagoService.asegurarPlazasDesdeInscripcion(data);
+    const filasPlaza =
+      await InscripcionPlazaPagoService.listarPorInscripcion(inscripcionId);
+    const miPlaza = InscripcionPlazaPagoService.numeroPlazaDelUsuario(
+      data,
+      usuarioId,
+    );
+    if (!miPlaza) {
+      throw new Error("No tenés permiso para pagar esta inscripción.");
+    }
+    const pendientes = InscripcionPlazaPagoService.plazasPendientes(filasPlaza);
+    if (!pendientes.length) {
+      throw new Error("No hay plazas pendientes de pago.");
+    }
+
     const torneoRaw = data.torneos as
       | { nombre?: string; precio_inscripcion?: number; es_gratis?: boolean }
       | { nombre?: string; precio_inscripcion?: number; es_gratis?: boolean }[]
@@ -1168,24 +1203,88 @@ export class InscripcionService {
       throw new Error("Monto de inscripción inválido.");
     }
 
+    const precioPorJugador =
+      Number(torneo?.precio_inscripcion || 0) > 0
+        ? Number(torneo?.precio_inscripcion)
+        : precioUnitarioDesdeMonto(
+            monto,
+            PlatformFeeService.countPlazasInscripcion(data.usuario2_id),
+          );
+
     return {
       inscripcion: data,
       torneoNombre: torneo?.nombre || "Torneo",
       monto,
+      precioPorJugador,
       torneoId: data.torneo_id as string,
+      plazasPago: filasPlaza,
+      miPlaza,
+      plazasPendientes: pendientes,
+    };
+  }
+
+  static async obtenerEstadoPlazasPago(inscripcionId: string, usuarioId: string) {
+    const ctx = await InscripcionService.assertUsuarioPuedePagarInscripcion(
+      inscripcionId,
+      usuarioId,
+    );
+    return {
+      inscripcion_id: inscripcionId,
+      mi_plaza: ctx.miPlaza,
+      precio_por_jugador: ctx.precioPorJugador,
+      plazas: ctx.plazasPago.map((p) => ({
+        numero: p.numero_plaza,
+        estado: p.estado,
+        usuario_id: p.usuario_id,
+      })),
+      plazas_pendientes: ctx.plazasPendientes,
+      puede_pagar_mi_plaza:
+        ctx.plazasPendientes.includes(ctx.miPlaza) &&
+        ctx.plazasPago.find((p) => p.numero_plaza === ctx.miPlaza)?.estado ===
+          FAP_ESTADOS_PAGO.PENDIENTE,
+      puede_pagar_todas: ctx.plazasPendientes.length > 1,
+      puede_pagar_resto:
+        ctx.plazasPendientes.length > 0 &&
+        ctx.plazasPendientes.length <
+          PlatformFeeService.countPlazasInscripcion(ctx.inscripcion.usuario2_id),
     };
   }
 
   static async crearPreferenciaPago(
     inscripcionId: string,
     usuarioId: string,
-    options?: { mobile?: boolean },
+    options?: { mobile?: boolean; alcance?: "mi_plaza" | "todas_pendientes" },
   ) {
-    const { inscripcion, torneoNombre, monto, torneoId } =
-      await InscripcionService.assertUsuarioPuedePagarInscripcion(
-        inscripcionId,
-        usuarioId,
-      );
+    const {
+      inscripcion,
+      torneoNombre,
+      precioPorJugador,
+      torneoId,
+      miPlaza,
+      plazasPendientes,
+    } = await InscripcionService.assertUsuarioPuedePagarInscripcion(
+      inscripcionId,
+      usuarioId,
+    );
+
+    const alcance = options?.alcance ?? "todas_pendientes";
+    let plazasACobrar: number[];
+    if (alcance === "mi_plaza") {
+      if (!plazasPendientes.includes(miPlaza)) {
+        throw new Error("Tu plaza no tiene pago pendiente.");
+      }
+      plazasACobrar = [miPlaza];
+    } else {
+      if (!plazasPendientes.length) {
+        throw new Error("No hay plazas pendientes de pago.");
+      }
+      plazasACobrar = plazasPendientes;
+    }
+
+    const montoBruto = InscripcionPlazaPagoService.montoBrutoPlazas(
+      precioPorJugador,
+      plazasACobrar,
+    );
 
     const token = getMercadoPagoAccessToken();
     if (!isMercadoPagoConfigured()) {
@@ -1203,20 +1302,17 @@ export class InscripcionService {
     });
 
     const org = await PlatformFeeService.resolverOrgDesdeTorneo(torneoId);
-    const unidades = PlatformFeeService.countPlazasInscripcion(
-      inscripcion.usuario2_id,
-    );
+    const unidades = plazasACobrar.length;
     const breakdown = await PlatformFeeService.calcularCheckout(
       "inscripciones",
       org,
-      monto,
+      montoBruto,
       unidades,
     );
-    const precioPorPlaza = precioUnitarioDesdeMonto(monto, unidades);
     const mpItems = PlatformFeeService.buildMpItemsInscripcion({
       inscripcionId,
       torneoNombre,
-      precioPorPlaza,
+      precioPorPlaza: precioPorJugador,
       plazas: unidades,
       breakdown,
     });
@@ -1228,7 +1324,10 @@ export class InscripcionService {
         auto_return: backUrls.success.startsWith("https://")
           ? "approved"
           : undefined,
-        external_reference: `inscripcion:${inscripcionId}`,
+        external_reference: buildInscripcionExternalReference(
+          inscripcionId,
+          plazasACobrar,
+        ),
         notification_url: mercadoPagoNotificationUrl(
           "/api/inscripciones/webhook/mercadopago",
         ),
@@ -1248,7 +1347,9 @@ export class InscripcionService {
       cargo_servicio: breakdown.montoFee,
       modo_fee: breakdown.modo,
       plazas: unidades,
-      precio_por_plaza: precioPorPlaza,
+      precio_por_plaza: precioPorJugador,
+      plazas_cobradas: plazasACobrar,
+      alcance,
       moneda: "ARS",
       inscripcionId,
       torneoId,
@@ -1259,10 +1360,11 @@ export class InscripcionService {
     inscripcionId: string,
     paymentId: string,
     monto?: number,
+    plazasRef?: number[],
   ) {
     const { data, error } = await supabaseAdmin
       .from("inscripciones")
-      .select("id, estado_pago")
+      .select("id, estado_pago, usuario_id, usuario2_id, monto")
       .eq("id", inscripcionId)
       .maybeSingle();
 
@@ -1273,38 +1375,93 @@ export class InscripcionService {
       return null;
     }
 
-    if (data.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO) {
-      return data;
+    await InscripcionPlazaPagoService.asegurarPlazasDesdeInscripcion(data);
+    let filasPlaza =
+      await InscripcionPlazaPagoService.listarPorInscripcion(inscripcionId);
+    const pendientes = InscripcionPlazaPagoService.plazasPendientes(filasPlaza);
+
+    let plazasACobrar: (1 | 2)[] =
+      plazasRef?.filter((n): n is 1 | 2 => n === 1 || n === 2) ?? [];
+    if (!plazasACobrar.length) {
+      plazasACobrar =
+        pendientes.length > 0
+          ? (pendientes.filter((n): n is 1 | 2 => n === 1 || n === 2) as (
+              | 1
+              | 2
+            )[])
+          : Array.from(
+              {
+                length: PlatformFeeService.countPlazasInscripcion(
+                  data.usuario2_id,
+                ),
+              },
+              (_, i) => (i + 1) as 1 | 2,
+            );
     }
 
-    const updatePayload: Record<string, unknown> = {
-      estado_pago: FAP_ESTADOS_PAGO.CONFIRMADO,
-    };
-    if (monto != null && monto > 0) {
-      updatePayload.monto = monto;
+    plazasACobrar = plazasACobrar.filter((n) =>
+      filasPlaza.some(
+        (r) =>
+          r.numero_plaza === n && r.estado === FAP_ESTADOS_PAGO.PENDIENTE,
+      ),
+    );
+
+    if (!plazasACobrar.length) {
+      if (data.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO) {
+        return data;
+      }
+      await InscripcionPlazaPagoService.sincronizarEstadoInscripcion(
+        inscripcionId,
+      );
+      const { data: refreshed } = await supabaseAdmin
+        .from("inscripciones")
+        .select("*, torneos(nombre)")
+        .eq("id", inscripcionId)
+        .maybeSingle();
+      return refreshed;
     }
+
+    const precioUnit = precioUnitarioDesdeMonto(
+      Number(data.monto || 0),
+      PlatformFeeService.countPlazasInscripcion(data.usuario2_id),
+    );
+    const montos = new Map<number, number>();
+    for (const n of plazasACobrar) {
+      montos.set(n, precioUnit);
+    }
+
+    filasPlaza = await InscripcionPlazaPagoService.marcarPlazasPagadas({
+      inscripcionId,
+      numerosPlaza: plazasACobrar,
+      paymentId,
+      montosPorPlaza: montos,
+    });
+
+    await PlatformFeeService.registrarFeeInscripcionOnline(
+      inscripcionId,
+      paymentId,
+      monto,
+      plazasACobrar,
+    );
+
+    await InscripcionPlazaPagoService.sincronizarEstadoInscripcion(inscripcionId);
 
     const { data: actualizada, error: updError } = await supabaseAdmin
       .from("inscripciones")
-      .update(updatePayload)
-      .eq("id", inscripcionId)
       .select("*, torneos(nombre)")
+      .eq("id", inscripcionId)
       .single();
 
     if (updError || !actualizada) {
       throw new Error("No se pudo confirmar el pago de la inscripción.");
     }
 
-    await InscripcionService.notificarInscripcionConfirmada(
-      actualizada,
-      paymentId,
-    );
-
-    await PlatformFeeService.registrarFeeInscripcionOnline(
-      inscripcionId,
-      paymentId,
-      monto,
-    );
+    if (actualizada.estado_pago === FAP_ESTADOS_PAGO.CONFIRMADO) {
+      await InscripcionService.notificarInscripcionConfirmada(
+        actualizada,
+        paymentId,
+      );
+    }
 
     return actualizada;
   }
@@ -1346,6 +1503,7 @@ export class InscripcionService {
     usuarioId: string,
     paymentId: string,
     monto?: number,
+    plazasPagadas?: number[],
   ) {
     const { data, error } = await supabaseAdmin
       .from("inscripciones")
@@ -1362,6 +1520,7 @@ export class InscripcionService {
       inscripcionId,
       paymentId,
       monto,
+      plazasPagadas,
     );
   }
 }

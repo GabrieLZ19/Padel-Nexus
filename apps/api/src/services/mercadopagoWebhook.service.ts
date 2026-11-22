@@ -19,6 +19,7 @@ export async function acreditarPagoMercadoPago(
         entidad.id,
         paymentId,
         monto,
+        entidad.plazas,
       );
       return;
     case "licencia":

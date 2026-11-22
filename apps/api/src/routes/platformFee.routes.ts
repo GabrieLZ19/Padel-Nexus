@@ -32,7 +32,7 @@ router.patch(
 
 router.get(
   "/preferencias-org",
-  authorize([...ADMINS_ORG]),
+  authorize([...ADMINS_ORG, "admin_club"]),
   PlatformFeeController.obtenerPreferenciasOrg,
 );
 
@@ -56,31 +56,31 @@ router.post(
 
 router.get(
   "/reporte-mensual",
-  authorize(["superadmin", "admin_federacion"]),
+  authorize(["superadmin"]),
   PlatformFeeController.reporteMensual,
 );
 
 router.get(
   "/liquidaciones/resumen",
-  authorize(["superadmin", "admin_federacion"]),
+  authorize(["superadmin"]),
   PlatformFeeController.resumenLiquidaciones,
 );
 
 router.get(
   "/liquidaciones/historial",
-  authorize(["superadmin", "admin_federacion"]),
+  authorize(["superadmin"]),
   PlatformFeeController.historialLiquidaciones,
 );
 
 router.get(
   "/liquidaciones/pendientes",
-  authorize(["superadmin", "admin_federacion"]),
+  authorize(["superadmin"]),
   PlatformFeeController.liquidacionesPendientes,
 );
 
 router.post(
   "/liquidaciones",
-  authorize(["superadmin", "admin_federacion"]),
+  authorize(["superadmin"]),
   PlatformFeeController.marcarLiquidacion,
 );
 

@@ -2,38 +2,24 @@ import { Request, Response } from "express";
 import { PlatformFeeService } from "../services/platformFee.service";
 import { acreditarSaldoTorneoMercadoPago } from "../services/platformFeeWebhook.service";
 import { verifyMercadoPagoWebhookSignature } from "../config/mercadopago";
-import { supabaseAdmin } from "../config/supabase";
 import type {
   PlatformFeeCanal,
   PlatformFeeOrgRef,
   PlatformFeeModo,
   PlatformFeeTipo,
 } from "../constants/platformFee";
+import {
+  resolverOrgFeeDesdeUsuario,
+  usuarioPuedeSaldoTorneo,
+} from "../utils/platformFeeOrgUsuario";
 
 async function orgDesdeUsuario(req: Request): Promise<PlatformFeeOrgRef | null> {
   const userId = req.user?.id;
   if (!userId) return null;
-  const { data } = await supabaseAdmin
-    .from("perfiles")
-    .select("club_id, asociacion_id")
-    .eq("id", userId)
-    .maybeSingle();
-  if (!data) return null;
-  if (data.club_id) {
-    return { org_tipo: "club", org_id: data.club_id };
-  }
-  if (data.asociacion_id) {
-    return { org_tipo: "asociacion", org_id: data.asociacion_id };
-  }
-  if (req.user?.rol === "admin_federacion") {
-    const { data: fed } = await supabaseAdmin
-      .from("federaciones")
-      .select("id")
-      .limit(1)
-      .maybeSingle();
-    if (fed?.id) return { org_tipo: "federacion", org_id: fed.id };
-  }
-  return null;
+  return resolverOrgFeeDesdeUsuario({
+    id: userId,
+    rol: req.user?.rol,
+  });
 }
 
 export const PlatformFeeController = {
@@ -124,6 +110,17 @@ export const PlatformFeeController = {
   async saldoTorneo(req: Request, res: Response) {
     try {
       const { torneoId } = req.params;
+      const user = req.user;
+      if (!user?.id) {
+        return res.status(401).json({ exito: false, error: "No autenticado." });
+      }
+      const permitido = await usuarioPuedeSaldoTorneo(user, torneoId);
+      if (!permitido) {
+        return res.status(403).json({
+          exito: false,
+          error: "No autorizado para el saldo de este torneo.",
+        });
+      }
       const data = await PlatformFeeService.obtenerSaldoTorneo(torneoId);
       return res.json({ exito: true, data });
     } catch (error: unknown) {
@@ -135,10 +132,18 @@ export const PlatformFeeController = {
   async preferenciaSaldoTorneo(req: Request, res: Response) {
     try {
       const { torneoId } = req.params;
-      const usuarioId = req.user?.id;
-      if (!usuarioId) {
+      const user = req.user;
+      if (!user?.id) {
         return res.status(401).json({ exito: false, error: "No autenticado." });
       }
+      const permitido = await usuarioPuedeSaldoTorneo(user, torneoId);
+      if (!permitido) {
+        return res.status(403).json({
+          exito: false,
+          error: "No autorizado para pagar el saldo de este torneo.",
+        });
+      }
+      const usuarioId = user.id;
       const data = await PlatformFeeService.crearPreferenciaSaldoTorneo(
         torneoId,
         usuarioId,

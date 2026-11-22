@@ -102,17 +102,55 @@ export function mercadoPagoNotificationUrl(apiPath: string): string {
 }
 
 export type MercadoPagoEntidadRef =
-  | { canal: "inscripcion"; id: string }
+  | { canal: "inscripcion"; id: string; plazas?: number[] }
   | { canal: "licencia"; id: string }
   | { canal: "reserva"; id: string }
   | { canal: "desconocido"; id: string };
+
+export function buildInscripcionExternalReference(
+  inscripcionId: string,
+  plazas: number[],
+): string {
+  const nums = [...new Set(plazas.filter((n) => n === 1 || n === 2))].sort();
+  if (!nums.length) {
+    return `inscripcion:${inscripcionId}`;
+  }
+  if (nums.length === 1) {
+    return `inscripcion:${inscripcionId}:plaza-${nums[0]}`;
+  }
+  return `inscripcion:${inscripcionId}:plazas-${nums.join("-")}`;
+}
+
+function parsePlazasInscripcionRef(spec: string | undefined): number[] | undefined {
+  if (!spec) return undefined;
+  if (spec.startsWith("plaza-")) {
+    const n = Number(spec.slice(6));
+    return n === 1 || n === 2 ? [n] : undefined;
+  }
+  if (spec.startsWith("plazas-")) {
+    const nums = spec
+      .slice(7)
+      .split("-")
+      .map((x) => Number(x))
+      .filter((n) => n === 1 || n === 2);
+    return nums.length ? nums : undefined;
+  }
+  return undefined;
+}
 
 export function parseMercadoPagoExternalReference(
   externalReference: string,
 ): MercadoPagoEntidadRef {
   const ref = externalReference.trim();
   if (ref.startsWith("inscripcion:")) {
-    return { canal: "inscripcion", id: ref.slice("inscripcion:".length) };
+    const tail = ref.slice("inscripcion:".length);
+    const sep = tail.indexOf(":");
+    if (sep === -1) {
+      return { canal: "inscripcion", id: tail };
+    }
+    const id = tail.slice(0, sep);
+    const plazas = parsePlazasInscripcionRef(tail.slice(sep + 1));
+    return { canal: "inscripcion", id, plazas };
   }
   if (ref.startsWith("licencia:")) {
     return { canal: "licencia", id: ref.slice("licencia:".length) };

@@ -16,7 +16,8 @@ export type PlatformFeeEstado =
   | "pendiente_organizador"
   | "cobrado_mp"
   | "descontar_liquidacion"
-  | "liquidado";
+  | "liquidado"
+  | "anulado";
 
 export type PlatformFeeOrigen =
   | "mp_online"

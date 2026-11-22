@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import {
   getMercadoPagoAccessToken,
+  parseMercadoPagoExternalReference,
   verifyMercadoPagoWebhookSignature,
 } from "../config/mercadopago";
 import { InscripcionService } from "../services/inscripcion.service";
@@ -332,6 +333,27 @@ export const webhookMercadoPagoInscripcion = async (
   }
 };
 
+export const obtenerPlazasPagoInscripcion = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    const usuarioId = req.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ message: "No autorizado." });
+    }
+    const data = await InscripcionService.obtenerEstadoPlazasPago(
+      req.params.id,
+      usuarioId,
+    );
+    return res.status(200).json({ exito: true, data });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    return res.status(400).json({ message, error: message });
+  }
+};
+
 export const crearPreferenciaPagoInscripcion = async (
   req: Request,
   res: Response,
@@ -342,10 +364,13 @@ export const crearPreferenciaPagoInscripcion = async (
       return res.status(401).json({ message: "No autorizado." });
     }
     const mobile = (req.get("x-padel-client") || "").toLowerCase() === "mobile";
+    const alcanceRaw = req.body?.alcance as string | undefined;
+    const alcance =
+      alcanceRaw === "mi_plaza" ? "mi_plaza" : "todas_pendientes";
     const data = await InscripcionService.crearPreferenciaPago(
       req.params.id,
       usuarioId,
-      { mobile },
+      { mobile, alcance },
     );
     return res.status(200).json({ exito: true, data });
   } catch (error: unknown) {
@@ -376,6 +401,7 @@ export const confirmarRetornoPagoInscripcion = async (
 
     const token = getMercadoPagoAccessToken();
     let monto: number | undefined;
+    let plazasPagadas: number[] | undefined;
     if (token) {
       const mpClient = new MercadoPagoConfig({ accessToken: token });
       const paymentClient = new Payment(mpClient);
@@ -386,6 +412,14 @@ export const confirmarRetornoPagoInscripcion = async (
         });
       }
       monto = paymentDetails.transaction_amount ?? undefined;
+      const ref = paymentDetails.external_reference
+        ? parseMercadoPagoExternalReference(
+            String(paymentDetails.external_reference),
+          )
+        : null;
+      if (ref?.canal === "inscripcion" && ref.id === req.params.id) {
+        plazasPagadas = ref.plazas;
+      }
     }
 
     const data = await InscripcionService.confirmarPagoInscripcionRetorno(
@@ -393,6 +427,7 @@ export const confirmarRetornoPagoInscripcion = async (
       usuarioId,
       paymentId,
       monto,
+      plazasPagadas,
     );
     return res.status(200).json({ exito: true, data });
   } catch (error: unknown) {

@@ -104,7 +104,12 @@ describe("Platform fees · cálculo de fee", () => {
       0,
     );
     assert.equal(PlatformFeeService.calcularMontoFee(null, 60_000, 2), 0);
-    assert.equal(PlatformFeeService.calcularMontoFee(cfgFijo, 0, 2), 0);
+  });
+
+  it("fee fijo con inscripción $0 (torneo gratuito) cobra por plaza", () => {
+    assert.equal(PlatformFeeService.calcularMontoFee(cfgFijo, 0, 2), 1000);
+    assert.equal(PlatformFeeService.calcularMontoFee(cfgFijo, 0, 1), 500);
+    assert.equal(PlatformFeeService.calcularMontoFee(cfgPct, 0, 2), 0);
   });
 
   it("fee fijo × unidades (2 plazas = 2× fee)", () => {
