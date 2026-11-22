@@ -30,6 +30,7 @@ export interface Vendedor {
   banco?: string | null;
   mp_collector_id?: string | null;
   mp_notas?: string | null;
+  tienda_destacada?: boolean;
 }
 
 export type EspacioSponsorCampana = "home" | "tienda" | "checkout" | "banner";
@@ -71,6 +72,19 @@ export interface MarketplaceSponsorCampana {
   updated_at?: string;
   sponsor?: Pick<MarketplaceSponsor, "id" | "nombre" | "logo_url" | "activo">;
 }
+
+export type MarketplaceSponsorCampanaPublica = Pick<
+  MarketplaceSponsorCampana,
+  | "id"
+  | "titulo"
+  | "descripcion"
+  | "espacio"
+  | "imagen_url"
+  | "link_url"
+  | "vendedor_id"
+> & {
+  sponsor?: Pick<MarketplaceSponsor, "id" | "nombre" | "logo_url"> | null;
+};
 
 export type DatosCobroTienda = {
   cbu?: string | null;
@@ -142,6 +156,16 @@ export interface EntidadesMarketplace {
 export interface EntidadRef {
   entidad_tipo: EntidadMarketplaceTipo;
   entidad_id: string;
+}
+
+export interface TiendaMarketplaceListItem {
+  id: string;
+  nombre_tienda: string;
+  logo_url?: string | null;
+  provincia?: string | null;
+  valoracion_promedio?: number;
+  tienda_destacada?: boolean;
+  productos_activos: number;
 }
 
 export interface TiendaPublica {
@@ -220,6 +244,29 @@ export const MarketplaceService = {
   async getTiendaPublica(id: string): Promise<TiendaPublica> {
     const response = await api.get<TiendaPublica>(`/marketplace/tiendas/${id}`);
     return response.data;
+  },
+
+  async getTiendasPublicas(): Promise<TiendaMarketplaceListItem[]> {
+    const response = await api.get<{ data?: TiendaMarketplaceListItem[] }>(
+      "/marketplace/tiendas",
+    );
+    return Array.isArray(response.data?.data) ? response.data.data : [];
+  },
+
+  async getCampanasSponsorPublicas(
+    espacio: EspacioSponsorCampana,
+    vendedorId?: string,
+  ): Promise<MarketplaceSponsorCampanaPublica[]> {
+    const response = await api.get<{ data?: MarketplaceSponsorCampanaPublica[] }>(
+      "/marketplace/sponsor-campanas/publicas",
+      {
+        params: {
+          espacio,
+          vendedor_id: vendedorId || undefined,
+        },
+      },
+    );
+    return Array.isArray(response.data?.data) ? response.data.data : [];
   },
 
   async getMarcas(categoriaId?: string): Promise<string[]> {
@@ -617,6 +664,17 @@ export const MarketplaceService = {
 
   async adminReactivarVendedor(id: string): Promise<any> {
     const response = await api.patch(`/marketplace/admin/vendedores/${id}/reactivar`);
+    return response.data;
+  },
+
+  async adminSetTiendaDestacada(
+    id: string,
+    destacada: boolean,
+  ): Promise<Vendedor> {
+    const response = await api.patch<Vendedor>(
+      `/marketplace/admin/vendedores/${id}/destacada`,
+      { destacada },
+    );
     return response.data;
   },
 };

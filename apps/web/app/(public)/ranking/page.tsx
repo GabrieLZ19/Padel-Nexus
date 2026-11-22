@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { formatNombreJugador } from "@/utils/formatoNombreJugador";
 import {
   User,
@@ -14,11 +14,14 @@ import {
   Info,
 } from "lucide-react";
 
-import { RankingsService } from "@/utils/services/ranking";
+import {
+  RankingsService,
+  type RankingContextoJugador,
+} from "@/utils/services/rankings";
+import { useProfileStore } from "@/store/useProfileStore";
 import { RankingJugador } from "@/utils/types";
 import { PROVINCIAS_ARG, NIVELES_PADEL } from "@/utils/constants/padelConfig";
 import {
-  CATEGORIA_RANKING_PUBLICO,
   REGLA_DESEMPATE_RANKING,
   compararRankingPublico,
 } from "@/utils/rankings/orden";
@@ -28,21 +31,79 @@ import Image from "next/image";
 import Link from "next/link";
 import { hrefFichaJugadorPublica } from "@/utils/navigation/jugadorPublico";
 
+function provinciaFiltroValor(raw: string | null | undefined): string {
+  const texto = String(raw || "").trim();
+  if (!texto) return "";
+  const hit = PROVINCIAS_ARG.find(
+    (p) => p.value === texto || p.label === texto,
+  );
+  return hit?.value ?? texto;
+}
+
 export default function RankingPublicPage() {
+  const { profile } = useProfileStore();
   const [rankings, setRankings] = useState<RankingJugador[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [contextos, setContextos] = useState<RankingContextoJugador[]>([]);
+  const [contextoActivoId, setContextoActivoId] = useState<string>("");
+  const [contextosListos, setContextosListos] = useState(false);
 
   // --- ESTADOS DE FILTRADO Y BÚSQUEDA ---
   const [search, setSearch] = useState<string>("");
-  const [activeScope, setActiveScope] = useState<string>("Provincial");
-  const [activeProvincia, setActiveProvincia] = useState<string>(
-    PROVINCIAS_ARG[0].value,
-  );
-  const [activeCategory, setActiveCategory] = useState<string>(
-    CATEGORIA_RANKING_PUBLICO,
-  );
+  const [activeScope, setActiveScope] = useState<string>("");
+  const [activeProvincia, setActiveProvincia] = useState<string>("");
+  const [activeCategory, setActiveCategory] = useState<string>("");
+
+  const filtrosCompletos = useMemo(() => {
+    if (!activeScope || !activeCategory) return false;
+    if (activeScope === "Provincial" && !activeProvincia) return false;
+    return true;
+  }, [activeScope, activeCategory, activeProvincia]);
+
+  const aplicarContexto = useCallback((ctx: RankingContextoJugador) => {
+    setContextoActivoId(ctx.id);
+    setActiveScope(ctx.scope);
+    setActiveCategory(ctx.categoria);
+    if (ctx.scope === "Provincial") {
+      setActiveProvincia(provinciaFiltroValor(ctx.provincia));
+    } else {
+      setActiveProvincia("");
+    }
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    const cargarContextos = async () => {
+      if (!profile?.id) {
+        if (!ignore) {
+          setContextos([]);
+          setContextosListos(true);
+          setLoading(false);
+        }
+        return;
+      }
+      try {
+        const lista = await RankingsService.getMisContextos();
+        if (ignore) return;
+        setContextos(lista);
+        if (lista.length > 0) {
+          aplicarContexto(lista[0]);
+        } else {
+          setLoading(false);
+        }
+      } catch {
+        if (!ignore) setLoading(false);
+      } finally {
+        if (!ignore) setContextosListos(true);
+      }
+    };
+    cargarContextos();
+    return () => {
+      ignore = true;
+    };
+  }, [profile?.id, aplicarContexto]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -54,9 +115,19 @@ export default function RankingPublicPage() {
 
   // --- EFECTO PRINCIPAL DE CARGA ---
   useEffect(() => {
+    if (!contextosListos) return;
     let ignore = false;
 
     const fetchRankings = async () => {
+      if (!filtrosCompletos) {
+        if (!ignore) {
+          setRankings([]);
+          setLoading(false);
+          setIsUpdating(false);
+        }
+        return;
+      }
+
       if (isFirstLoad.current) {
         setLoading(true);
       } else {
@@ -95,7 +166,13 @@ export default function RankingPublicPage() {
     return () => {
       ignore = true;
     };
-  }, [activeScope, activeProvincia, activeCategory]);
+  }, [
+    activeScope,
+    activeProvincia,
+    activeCategory,
+    filtrosCompletos,
+    contextosListos,
+  ]);
 
   // Filtrado puramente de búsqueda en memoria
   const filteredRankings = rankings.filter((player) => {
@@ -145,9 +222,11 @@ export default function RankingPublicPage() {
           <h1 className="text-3xl md:text-[48px] font-black leading-tight tracking-tight text-transparent bg-clip-text bg-linear-to-r from-brand-white to-gray-500">
             Ranking Oficial
           </h1>
-          <p className="text-sm md:text-base text-gray-400 mt-2 font-medium">
-            Temporada {new Date().getFullYear()} · {etiquetaCategoria}
-          </p>
+          {filtrosCompletos && (
+            <p className="text-sm md:text-base text-gray-400 mt-2 font-medium">
+              Temporada {new Date().getFullYear()} · {etiquetaCategoria}
+            </p>
+          )}
           <p className="mt-3 flex items-start gap-2 text-sm text-gray-400 max-w-3xl">
             <Info className="size-4 text-brand-chartreuse shrink-0 mt-0.5" />
             <span>{REGLA_DESEMPATE_RANKING}</span>
@@ -179,6 +258,22 @@ export default function RankingPublicPage() {
           <div className="hidden xl:block w-px h-10 bg-brand-white/10" />
 
           <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
+            {contextos.length > 1 && (
+              <div className="w-full lg:w-72 h-13 min-w-0">
+                <CustomDropdown
+                  value={contextoActivoId}
+                  onChange={(id) => {
+                    const ctx = contextos.find((c) => c.id === id);
+                    if (ctx) aplicarContexto(ctx);
+                  }}
+                  options={contextos.map((c) => ({
+                    value: c.id,
+                    label: c.etiqueta,
+                  }))}
+                  placeholder="Torneo o circuito"
+                />
+              </div>
+            )}
             {/* Pestañas de Alcance */}
             <div className="flex bg-brand-black p-1.5 rounded-2xl border border-brand-white/5 h-13 items-center w-full lg:w-auto overflow-x-auto hide-scrollbar">
               {["Provincial", "Nacional", "Global"].map((scope) => (
@@ -229,6 +324,18 @@ export default function RankingPublicPage() {
               <div className="w-1/3 max-w-75 h-45 bg-brand-white/5 rounded-t-3xl" />
             </div>
             <div className="bg-brand-white/5 rounded-3xl h-100" />
+          </div>
+        ) : !filtrosCompletos ? (
+          <div className="w-full py-32 px-6 text-center border border-dashed border-brand-white/10 rounded-3xl bg-brand-card text-gray-500 animate-in fade-in duration-300">
+            <Trophy className="size-16 mx-auto mb-6 opacity-30 text-brand-chartreuse" />
+            <p className="text-lg font-medium text-gray-400">
+              Elegí qué ranking querés ver
+            </p>
+            <p className="text-sm text-gray-500 mt-3 max-w-md mx-auto">
+              Usá el alcance, la provincia y la categoría para cargar la
+              clasificación. Si participás en torneos, te sugerimos el más
+              reciente al iniciar sesión.
+            </p>
           </div>
         ) : sortedRankings.length === 0 ? (
           <div className="w-full py-32 px-6 text-center border border-dashed border-brand-white/10 rounded-3xl bg-brand-card text-gray-500 animate-in fade-in duration-300">

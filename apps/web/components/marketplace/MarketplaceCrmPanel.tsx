@@ -454,6 +454,7 @@ export default function MarketplaceCrmPanel({
       {vistaModeracion ? (
         <ModeracionTabla
           vendedores={vendedoresMod}
+          puedeDestacar={profile?.rol === "superadmin"}
           onRefresh={() => MarketplaceService.adminGetVendedores().then(setVendedoresMod)}
         />
       ) : (
@@ -697,9 +698,11 @@ export default function MarketplaceCrmPanel({
 function ModeracionTabla({
   vendedores,
   onRefresh,
+  puedeDestacar,
 }: {
-  vendedores: any[];
+  vendedores: { id: string; nombre_tienda: string; entidad_nombre?: string; entidad_tipo?: string; estado: string; tienda_destacada?: boolean }[];
   onRefresh: () => void;
+  puedeDestacar: boolean;
 }) {
   const [motivo, setMotivo] = useState("");
   const [suspendId, setSuspendId] = useState<string | null>(null);
@@ -725,6 +728,9 @@ function ModeracionTabla({
             <th className="py-3 px-4 text-left">Tienda</th>
             <th className="py-3 px-4 text-left">Entidad</th>
             <th className="py-3 px-4 text-left">Estado</th>
+            {puedeDestacar && (
+              <th className="py-3 px-4 text-center">Destacada</th>
+            )}
             <th className="py-3 px-4 text-right">Acciones</th>
           </tr>
         </thead>
@@ -736,6 +742,43 @@ function ModeracionTabla({
                 {v.entidad_nombre || v.entidad_tipo || "—"}
               </td>
               <td className="py-3 px-4 capitalize">{v.estado}</td>
+              {puedeDestacar && (
+                <td className="py-3 px-4 text-center">
+                  <button
+                    type="button"
+                    disabled={v.estado !== "activo"}
+                    onClick={() =>
+                      MarketplaceService.adminSetTiendaDestacada(
+                        v.id,
+                        !v.tienda_destacada,
+                      )
+                        .then(() => {
+                          sileo.success({
+                            title: v.tienda_destacada
+                              ? "Destacado quitado"
+                              : "Tienda destacada",
+                          });
+                          onRefresh();
+                        })
+                        .catch((err: { response?: { data?: { message?: string } } }) => {
+                          sileo.error({
+                            title: "Error",
+                            description:
+                              err.response?.data?.message ||
+                              "No se pudo actualizar.",
+                          });
+                        })
+                    }
+                    className={`text-xs font-bold px-3 py-1.5 rounded-lg border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                      v.tienda_destacada
+                        ? "border-brand-chartreuse text-brand-chartreuse bg-brand-chartreuse/10"
+                        : "border-brand-white/10 text-gray-400 hover:text-brand-white"
+                    }`}
+                  >
+                    {v.tienda_destacada ? "Si" : "No"}
+                  </button>
+                </td>
+              )}
               <td className="py-3 px-4 text-right">
                 {v.estado === "activo" ? (
                   <button type="button" onClick={() => setSuspendId(v.id)} className="text-red-400 text-xs font-bold cursor-pointer">

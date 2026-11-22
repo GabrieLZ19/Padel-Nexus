@@ -14,6 +14,19 @@ export type RamaRankingFront = "masculino" | "femenino";
 /** Alcance del ranking (jurisdiccion). */
 export type AlcanceRanking = "Provincial" | "Nacional" | "Global";
 
+export type AlcanceRankingPublico = "Provincial" | "Nacional" | "Global";
+
+export interface RankingContextoJugador {
+  id: string;
+  torneoId: string;
+  torneoNombre: string;
+  scope: AlcanceRankingPublico;
+  categoria: string;
+  provincia: string | null;
+  etiqueta: string;
+  fechaReferencia: string;
+}
+
 export interface RankingsQueryParams {
   categoria?: string;
   provincia?: string;
@@ -152,6 +165,21 @@ export const RankingsService = {
     });
     const data = response.data?.data;
     return Array.isArray(data) ? (data as RankingJugador[]) : [];
+  },
+
+  /** Contextos de torneo/circuito para preseleccionar filtros con sesión activa. */
+  async getMisContextos(): Promise<RankingContextoJugador[]> {
+    try {
+      const res = await api.get<RankingApiResponse>("/rankings/mis-contextos");
+      const data = res.data?.data;
+      return Array.isArray(data) ? (data as RankingContextoJugador[]) : [];
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        return [];
+      }
+      console.warn("Error al cargar contextos de ranking:", error);
+      return [];
+    }
   },
 
   /**

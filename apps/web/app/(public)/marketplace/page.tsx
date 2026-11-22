@@ -6,7 +6,9 @@ import {
   MarketplaceService,
   Producto,
   Categoria,
+  type TiendaMarketplaceListItem,
 } from "@/utils/services/marketplace";
+import MarketplaceSponsorSlot from "@/components/marketplace/MarketplaceSponsorSlot";
 import { useCartStore } from "@/store/useCartStore";
 import {
   ShoppingBag,
@@ -19,6 +21,7 @@ import {
   Sparkles,
   Star,
   Check,
+  Store,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -36,6 +39,8 @@ function MarketplaceContent() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [favoritos, setFavoritos] = useState<string[]>([]);
+  const [tiendas, setTiendas] = useState<TiendaMarketplaceListItem[]>([]);
+  const [tiendasLoading, setTiendasLoading] = useState(true);
 
   // Filtros
   const [categoriaSeleccionada, setCategoriaSeleccionada] =
@@ -58,6 +63,10 @@ function MarketplaceContent() {
     // Cargar categorías y marcas iniciales
     MarketplaceService.getCategorias().then(setCategorias).catch(console.error);
     MarketplaceService.getMarcas().then(setMarcas).catch(console.error);
+    MarketplaceService.getTiendasPublicas()
+      .then(setTiendas)
+      .catch(() => setTiendas([]))
+      .finally(() => setTiendasLoading(false));
 
     // Cargar favoritos si el usuario está autenticado
     MarketplaceService.getFavoritos()
@@ -340,6 +349,68 @@ function MarketplaceContent() {
 
           {/* GRID DE PRODUCTOS */}
           <main className="flex-1 space-y-8">
+            <MarketplaceSponsorSlot espacio="banner" />
+            <MarketplaceSponsorSlot espacio="home" />
+
+            <section className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-black flex items-center gap-2">
+                  <Store className="size-5 text-brand-chartreuse" />
+                  Tiendas
+                </h2>
+              </div>
+              {tiendasLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {[...Array(4)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-28 rounded-2xl bg-brand-card/40 border border-brand-white/5 animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : tiendas.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  Todavía no hay tiendas publicadas con productos activos.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {tiendas.map((tienda) => (
+                    <Link
+                      key={tienda.id}
+                      href={`/marketplace/tienda/${tienda.id}`}
+                      className="group flex flex-col items-center text-center gap-3 p-4 rounded-2xl border border-brand-white/10 bg-brand-card hover:border-brand-chartreuse/30 transition-colors"
+                    >
+                      <div className="relative size-16 rounded-2xl bg-brand-black border border-brand-white/10 overflow-hidden">
+                        {tienda.logo_url ? (
+                          <Image
+                            src={tienda.logo_url}
+                            alt={tienda.nombre_tienda}
+                            fill
+                            className="object-cover"
+                            sizes="64px"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Store className="size-7 text-gray-500" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 w-full">
+                        <p className="text-sm font-bold text-brand-white group-hover:text-brand-chartreuse line-clamp-2">
+                          {tienda.nombre_tienda}
+                        </p>
+                        {tienda.tienda_destacada && (
+                          <span className="text-[10px] font-black uppercase tracking-wide text-brand-chartreuse mt-1 inline-block">
+                            Destacada
+                          </span>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </section>
+
             {/* Header de listado */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-white/5 pb-5">
               <div className="flex items-baseline gap-2">
@@ -396,9 +467,8 @@ function MarketplaceContent() {
                       ? prod.imagenes[0]
                       : null);
                   return (
-                    <Link
+                    <div
                       key={prod.id}
-                      href={`/marketplace/producto/${prod.id}`}
                       className="group bg-brand-card hover:bg-brand-card/85 border border-brand-white/5 hover:border-brand-chartreuse/25 rounded-3xl overflow-hidden flex flex-col justify-between transition-all duration-300 relative shadow-lg"
                     >
                       {/* Badge destacado */}
@@ -433,8 +503,10 @@ function MarketplaceContent() {
                         />
                       </button>
 
-                      {/* Imagen del producto */}
-                      <div className="relative aspect-square w-full bg-brand-black/35 overflow-hidden border-b border-brand-white/5">
+                      <Link
+                        href={`/marketplace/producto/${prod.id}`}
+                        className="relative aspect-square w-full bg-brand-black/35 overflow-hidden border-b border-brand-white/5 block"
+                      >
                         {imageUrl ? (
                           <Image
                             src={imageUrl}
@@ -448,10 +520,33 @@ function MarketplaceContent() {
                             <ShoppingBag className="size-12 text-gray-600" />
                           </div>
                         )}
-                      </div>
+                      </Link>
 
                       {/* Contenido / Info */}
                       <div className="p-5 flex-1 flex flex-col justify-between">
+                        <Link
+                          href={`/marketplace/tienda/${prod.vendedor.id}`}
+                          className="flex items-center gap-2 mb-3 relative z-10"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="relative size-7 rounded-lg overflow-hidden bg-brand-black border border-brand-white/10 shrink-0">
+                            {prod.vendedor.logo_url ? (
+                              <Image
+                                src={prod.vendedor.logo_url}
+                                alt={prod.vendedor.nombre_tienda}
+                                fill
+                                className="object-cover"
+                                sizes="28px"
+                              />
+                            ) : (
+                              <Store className="size-4 m-1.5 text-gray-500" />
+                            )}
+                          </div>
+                          <span className="text-xs font-bold text-gray-400 hover:text-brand-chartreuse truncate">
+                            {prod.vendedor.nombre_tienda}
+                          </span>
+                        </Link>
+                        <Link href={`/marketplace/producto/${prod.id}`}>
                         <div>
                           <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
                             <span>{prod.marca || "Padel Nexus"}</span>
@@ -478,6 +573,7 @@ function MarketplaceContent() {
                             </div>
                           )}
                         </div>
+                        </Link>
 
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-brand-white/5">
                           <div className="flex flex-col">
@@ -503,7 +599,7 @@ function MarketplaceContent() {
                           </button>
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   );
                 })}
               </div>

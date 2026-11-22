@@ -20,6 +20,7 @@ import Link from "next/link";
 import { sileo } from "sileo";
 import { carritoRequiereEnvio } from "@/utils/marketplace/checkoutEnvio";
 import { CheckoutFeeDesglose } from "@/components/checkout/CheckoutFeeDesglose";
+import MarketplaceSponsorSlot from "@/components/marketplace/MarketplaceSponsorSlot";
 import type { CheckoutFeeResumen } from "@/utils/checkoutFee";
 
 function CheckoutContent() {
@@ -271,6 +272,8 @@ function CheckoutContent() {
       <h1 className="text-3xl font-black tracking-tight mb-8">
         Completar Compra
       </h1>
+
+      <MarketplaceSponsorSlot espacio="checkout" className="mb-8" />
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-20 bg-brand-card rounded-3xl border border-brand-white/5">

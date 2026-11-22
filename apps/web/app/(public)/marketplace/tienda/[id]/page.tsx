@@ -22,6 +22,7 @@ import {
 } from "@/utils/services/marketplace";
 import { useCartStore } from "@/store/useCartStore";
 import DescuentoBadge from "@/components/marketplace/DescuentoBadge";
+import MarketplaceSponsorSlot from "@/components/marketplace/MarketplaceSponsorSlot";
 import { tieneDescuento } from "@/utils/marketplaceDescuento";
 
 function TiendaContent() {
@@ -134,6 +135,8 @@ function TiendaContent() {
           <ArrowLeft className="size-4" />
           Volver al marketplace
         </Link>
+
+        <MarketplaceSponsorSlot espacio="tienda" vendedorId={tiendaId} />
 
         {/* Cabecera tienda */}
         <section className="rounded-3xl border border-brand-white/10 bg-gradient-to-br from-brand-card to-brand-black p-6 md:p-8">
