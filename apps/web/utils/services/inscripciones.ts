@@ -212,6 +212,19 @@ export const InscripcionesService = {
     }>(`/inscripciones/${inscripcionId}/plazas-pago`);
     return response.data.data;
   },
+  async previewCheckoutMp(
+    inscripcionId: string,
+    alcance: "mi_plaza" | "todas_pendientes" = "todas_pendientes",
+  ): Promise<PreferenciaInscripcionMp> {
+    const { data } = await api.get<{
+      exito: boolean;
+      data: PreferenciaInscripcionMp;
+    }>(`/inscripciones/${inscripcionId}/preview-checkout-mp`, {
+      params: { alcance },
+    });
+    return data.data;
+  },
+
   async crearPreferenciaMp(
     inscripcionId: string,
     alcance: "mi_plaza" | "todas_pendientes" = "todas_pendientes",

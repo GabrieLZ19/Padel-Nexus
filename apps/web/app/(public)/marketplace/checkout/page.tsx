@@ -19,6 +19,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { sileo } from "sileo";
 import { carritoRequiereEnvio } from "@/utils/marketplace/checkoutEnvio";
+import { CheckoutFeeDesglose } from "@/components/checkout/CheckoutFeeDesglose";
+import type { CheckoutFeeResumen } from "@/utils/checkoutFee";
 
 function CheckoutContent() {
   const router = useRouter();
@@ -36,6 +38,9 @@ function CheckoutContent() {
   const [direccion, setDireccion] = useState("");
   const [telefono, setTelefono] = useState("");
   const [notas, setNotas] = useState("");
+  const [desgloseMp, setDesgloseMp] = useState<CheckoutFeeResumen | null>(null);
+  const [desgloseComprobante, setDesgloseComprobante] =
+    useState<CheckoutFeeResumen | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -44,6 +49,41 @@ function CheckoutContent() {
       vaciarCarrito();
     }
   }, [paymentStatus, vaciarCarrito]);
+
+  useEffect(() => {
+    if (!mounted || items.length === 0) {
+      setDesgloseMp(null);
+      return;
+    }
+    const ordenItems = items.map((i) => ({
+      productoId: i.productoId,
+      cantidad: i.cantidad,
+    }));
+    void MarketplaceService.previewCheckoutCarrito(ordenItems)
+      .then((data) => {
+        setDesgloseMp({
+          monto_bruto: Number(data.monto_bruto ?? data.monto),
+          cargo_servicio: data.cargo_servicio,
+          modo_fee: data.modo_fee,
+          monto: Number(data.monto),
+        });
+      })
+      .catch(() => setDesgloseMp(null));
+  }, [mounted, items]);
+
+  useEffect(() => {
+    if (paymentStatus !== "success" || !ordenIdParams) return;
+    void MarketplaceService.previewCheckoutOrden(ordenIdParams)
+      .then((data) => {
+        setDesgloseComprobante({
+          monto_bruto: Number(data.monto_bruto ?? data.monto),
+          cargo_servicio: data.cargo_servicio,
+          modo_fee: data.modo_fee,
+          monto: Number(data.monto),
+        });
+      })
+      .catch(() => setDesgloseComprobante(null));
+  }, [paymentStatus, ordenIdParams]);
 
   const handleProcederAlPago = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +127,17 @@ function CheckoutContent() {
 
       // 2. Generar preferencia de MercadoPago
       const pref = await MarketplaceService.pagarOrden(orden.id);
+      if (pref.monto_bruto != null && pref.monto != null) {
+        sessionStorage.setItem(
+          `marketplace_fee_${orden.id}`,
+          JSON.stringify({
+            monto_bruto: pref.monto_bruto,
+            cargo_servicio: pref.cargo_servicio,
+            modo_fee: pref.modo_fee,
+            monto: pref.monto,
+          }),
+        );
+      }
 
       // 3. Redirigir a MercadoPago
       if (pref.initPoint) {
@@ -130,6 +181,17 @@ function CheckoutContent() {
             Orden ID: {ordenIdParams}
           </div>
         )}
+        {desgloseComprobante ? (
+          <div className="bg-brand-card border border-brand-white/10 rounded-2xl p-5 text-left">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+              Monto abonado
+            </p>
+            <CheckoutFeeDesglose
+              resumen={desgloseComprobante}
+              totalLabel="Total pagado"
+            />
+          </div>
+        ) : null}
         <div className="pt-6 flex flex-col gap-3">
           <Link
             href="/mi-perfil/reservas" // O compras cuando tengamos la pestaña
@@ -396,12 +458,19 @@ function CheckoutContent() {
                   </div>
                 )}
                 <div className="h-px bg-brand-white/5 my-2" />
-                <div className="flex justify-between text-base font-black">
-                  <span>Total</span>
-                  <span className="text-brand-chartreuse text-lg">
-                    ${totalPrecio().toLocaleString("es-AR")}
-                  </span>
-                </div>
+                {desgloseMp ? (
+                  <CheckoutFeeDesglose
+                    resumen={desgloseMp}
+                    totalLabel="Total a pagar"
+                  />
+                ) : (
+                  <div className="flex justify-between text-base font-black">
+                    <span>Total</span>
+                    <span className="text-brand-chartreuse text-lg">
+                      ${totalPrecio().toLocaleString("es-AR")}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

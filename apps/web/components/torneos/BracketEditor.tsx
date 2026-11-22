@@ -44,6 +44,11 @@ import {
 import { MatchCard } from "./MatchCard";
 import { FapBracketDiagram, type FapMatrixMatch } from "./FapBracketDiagram";
 import { ladoSlotBloqueadoPorMatriz } from "@/utils/edicionLlaveFap";
+import {
+  inferirSemillaPaseDirectoEnSpec,
+  ladoRivalPaseDirecto,
+  ladoSemillaPaseDirecto,
+} from "@/utils/fapPaseDirectoLlave";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { sileo } from "sileo";
 import {
@@ -2142,8 +2147,22 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                       equipo_a_id: pToEdit.equipo_a_id ?? null,
                       equipo_b_id: pToEdit.equipo_b_id ?? null,
                     });
-                    setMatchEditSlotFocus(opciones?.slotFocus ?? "a");
-                    setMatchEditSemillaFap(opciones?.semillaFap ?? null);
+                    const orden = Number(pToEdit.orden);
+                    const specFap =
+                      Number.isFinite(orden) ?
+                        fapMatrixByOrden.get(orden)
+                      : null;
+                    const semillaInferida =
+                      opciones?.semillaFap ??
+                      (specFap
+                        ? inferirSemillaPaseDirectoEnSpec(specFap)
+                        : null);
+                    const slotRival =
+                      specFap && semillaInferida
+                        ? (ladoRivalPaseDirecto(specFap) ?? opciones?.slotFocus)
+                        : (opciones?.slotFocus ?? "a");
+                    setMatchEditSlotFocus(slotRival ?? "a");
+                    setMatchEditSemillaFap(semillaInferida);
                     setMatchEditMotivo("");
                     setShowMatchEditModal(true);
                   }}
@@ -2448,28 +2467,27 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               </div>
 
               <div className="flex gap-2 text-[10px] font-black uppercase tracking-wider">
-                <button
-                  type="button"
-                  onClick={() => setMatchEditSlotFocus("a")}
-                  className={`flex-1 py-2 rounded-lg border ${
-                    matchEditSlotFocus === "a"
-                      ? "border-sky-400/60 text-sky-300 bg-sky-500/10"
-                      : "border-white/10 text-gray-500"
-                  }`}
-                >
-                  Alta para lado A
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMatchEditSlotFocus("b")}
-                  className={`flex-1 py-2 rounded-lg border ${
-                    matchEditSlotFocus === "b"
-                      ? "border-sky-400/60 text-sky-300 bg-sky-500/10"
-                      : "border-white/10 text-gray-500"
-                  }`}
-                >
-                  Alta para lado B
-                </button>
+                {(["a", "b"] as const).map((lado) => {
+                  const bloqueadoPorSemilla =
+                    matchEditSemillaFap &&
+                    matrizPartidoEnEdicion &&
+                    ladoSemillaPaseDirecto(matrizPartidoEnEdicion) === lado;
+                  return (
+                    <button
+                      key={lado}
+                      type="button"
+                      disabled={Boolean(bloqueadoPorSemilla)}
+                      onClick={() => setMatchEditSlotFocus(lado)}
+                      className={`flex-1 py-2 rounded-lg border disabled:opacity-40 disabled:cursor-not-allowed ${
+                        matchEditSlotFocus === lado
+                          ? "border-sky-400/60 text-sky-300 bg-sky-500/10"
+                          : "border-white/10 text-gray-500"
+                      }`}
+                    >
+                      Alta para lado {lado.toUpperCase()}
+                    </button>
+                  );
+                })}
               </div>
 
               {matchEditSemillaFap ? (

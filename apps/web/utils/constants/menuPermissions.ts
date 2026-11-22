@@ -129,6 +129,15 @@ export const GRUPOS_MENU_SUPERADMIN: MenuGroup[] = [
       "/dashboard/comunicaciones",
     ],
   },
+  {
+    id: "finanzas",
+    label: "Finanzas",
+    hrefs: [
+      "/dashboard/platform-fees",
+      "/dashboard/finanzas",
+      "/dashboard/liquidaciones",
+    ],
+  },
 ];
 
 export const MENU_SUPERADMIN_FIJOS_SUPERIOR = ["/dashboard"];

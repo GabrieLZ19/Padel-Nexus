@@ -10,6 +10,9 @@ import {
   licenciaFrecuenciaPago,
   licenciaMontoPendiente,
 } from "@/utils/licenciaPago";
+import { CheckoutFeeDesglose } from "@/components/checkout/CheckoutFeeDesglose";
+import type { CheckoutFeeResumen } from "@/utils/checkoutFee";
+import { debeMostrarDesgloseFee } from "@/utils/checkoutFee";
 
 interface LicenciaPagoPanelProps {
   licencia: Licencia;
@@ -32,6 +35,7 @@ export default function LicenciaPagoPanel({
   const [transferenciaDisponible, setTransferenciaDisponible] = useState<
     boolean | null
   >(null);
+  const [desgloseMp, setDesgloseMp] = useState<CheckoutFeeResumen | null>(null);
 
   const monto =
     licenciaMontoPendiente(licencia) > 0
@@ -50,6 +54,26 @@ export default function LicenciaPagoPanel({
       })
       .catch(() => {
         if (mounted) setTransferenciaDisponible(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [licencia.id]);
+
+  useEffect(() => {
+    let mounted = true;
+    void LicenciasService.previewCheckoutMercadoPago(licencia.id)
+      .then((data) => {
+        if (!mounted || data.monto == null) return;
+        setDesgloseMp({
+          monto_bruto: Number(data.monto_bruto ?? data.monto),
+          cargo_servicio: data.cargo_servicio,
+          modo_fee: data.modo_fee,
+          monto: Number(data.monto),
+        });
+      })
+      .catch(() => {
+        if (mounted) setDesgloseMp(null);
       });
     return () => {
       mounted = false;
@@ -152,7 +176,12 @@ export default function LicenciaPagoPanel({
     }
   };
 
-  const montoLabel = monto != null ? formatMontoLicenciaArs(monto) : "—";
+  const montoLabel =
+    desgloseMp && debeMostrarDesgloseFee(desgloseMp)
+      ? formatMontoLicenciaArs(desgloseMp.monto)
+      : monto != null
+        ? formatMontoLicenciaArs(monto)
+        : "—";
   const licenciaAprobada =
     (licencia.estado || "").toLowerCase() === "activa";
 
@@ -165,6 +194,11 @@ export default function LicenciaPagoPanel({
         <p className="text-lg font-black text-brand-white mt-1 tabular-nums">
           {montoLabel}
         </p>
+        {desgloseMp && debeMostrarDesgloseFee(desgloseMp) ? (
+          <div className="mt-3">
+            <CheckoutFeeDesglose resumen={desgloseMp} totalLabel="Total MP" />
+          </div>
+        ) : null}
         <p className="text-[11px] text-gray-400 mt-1 leading-snug">
           {licenciaAprobada
             ? "Tu licencia ya está aprobada; completá este pago para regularizar el alta."

@@ -242,7 +242,36 @@ export const MarketplaceService = {
     return response.data;
   },
 
-  async pagarOrden(ordenId: string): Promise<{ preferenceId: string; initPoint: string }> {
+  async previewCheckoutCarrito(items: { productoId: string; cantidad: number }[]) {
+    const response = await api.post("/marketplace/preview-checkout", { items });
+    return response.data as {
+      monto_bruto: number;
+      cargo_servicio?: number;
+      modo_fee?: "absorber" | "sumar";
+      monto: number;
+    };
+  },
+
+  async previewCheckoutOrden(ordenId: string) {
+    const response = await api.get(
+      `/marketplace/ordenes/${ordenId}/preview-checkout`,
+    );
+    return response.data as {
+      monto_bruto: number;
+      cargo_servicio?: number;
+      modo_fee?: "absorber" | "sumar";
+      monto: number;
+    };
+  },
+
+  async pagarOrden(ordenId: string): Promise<{
+    preferenceId: string;
+    initPoint: string;
+    monto?: number;
+    monto_bruto?: number;
+    cargo_servicio?: number;
+    modo_fee?: "absorber" | "sumar";
+  }> {
     const response = await api.post(`/marketplace/ordenes/${ordenId}/pagar`);
     return response.data;
   },

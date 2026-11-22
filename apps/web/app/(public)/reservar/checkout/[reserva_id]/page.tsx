@@ -30,6 +30,8 @@ import {
   urlGoogleMapsClub,
 } from "@/utils/ubicacionClub";
 import { ReservaPlazoPagoBanner } from "@/components/reservas/ReservaPlazoPagoBanner";
+import { CheckoutFeeDesglose } from "@/components/checkout/CheckoutFeeDesglose";
+import type { CheckoutFeeResumen } from "@/utils/checkoutFee";
 import { isAxiosError } from "axios";
 
 interface ReservaDetalle {
@@ -84,6 +86,11 @@ export default function CheckoutPage() {
   const [copiadoCbu, setCopiadoCbu] = useState(false);
   const [copiadoAlias, setCopiadoAlias] = useState(false);
   const [plazoVencido, setPlazoVencido] = useState(false);
+  const [desgloseMp, setDesgloseMp] = useState<CheckoutFeeResumen | null>(
+    null,
+  );
+  const [desgloseComprobante, setDesgloseComprobante] =
+    useState<CheckoutFeeResumen | null>(null);
 
   const handleCopiarCbu = () => {
     if (reserva?.turnos?.canchas?.clubes?.cbu) {
@@ -161,6 +168,30 @@ export default function CheckoutPage() {
     };
     fetchReserva();
 
+    const cargarDesglose = async () => {
+      try {
+        const params =
+          reservaId === "new"
+            ? (() => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const tId = urlParams.get("turno_id");
+                return tId ? { turnoId: tId } : null;
+              })()
+            : { reservaId };
+        if (!params) return;
+        const data = await ReservasService.previewCheckoutMercadoPago(params);
+        setDesgloseMp({
+          monto_bruto: Number(data.monto_bruto ?? data.monto),
+          cargo_servicio: data.cargo_servicio,
+          modo_fee: data.modo_fee,
+          monto: Number(data.monto),
+        });
+      } catch {
+        setDesgloseMp(null);
+      }
+    };
+    void cargarDesglose();
+
     // Capturar el retorno de Mercado Pago desde la URL
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
@@ -171,8 +202,22 @@ export default function CheckoutPage() {
         setMetodoPago("mercadopago");
         if (paymentId && reservaId !== "new") {
           ReservasService.confirmarRetornoMercadoPago(reservaId, paymentId)
-            .then(() => {
+            .then(async () => {
               setCompletado(true);
+              try {
+                const data =
+                  await ReservasService.previewCheckoutMercadoPago({
+                    reservaId,
+                  });
+                setDesgloseComprobante({
+                  monto_bruto: Number(data.monto_bruto ?? data.monto),
+                  cargo_servicio: data.cargo_servicio,
+                  modo_fee: data.modo_fee,
+                  monto: Number(data.monto),
+                });
+              } catch {
+                setDesgloseComprobante(null);
+              }
             })
             .catch((err) => {
               console.error("Error al confirmar retorno de pago:", err);
@@ -266,7 +311,25 @@ export default function CheckoutPage() {
       // 2. Procesar el pago de la reserva
       if (metodoPago === "mercadopago") {
         // Generar la preferencia en el backend
-        const dataMP = await ReservasService.iniciarPagoMercadoPago(activeReservaId);
+        const dataMP =
+          await ReservasService.iniciarPagoMercadoPago(activeReservaId);
+        if (
+          dataMP.monto_bruto != null &&
+          dataMP.modo_fee != null &&
+          dataMP.monto != null
+        ) {
+          const snap: CheckoutFeeResumen = {
+            monto_bruto: Number(dataMP.monto_bruto),
+            cargo_servicio: dataMP.cargo_servicio,
+            modo_fee: dataMP.modo_fee,
+            monto: Number(dataMP.monto),
+          };
+          setDesgloseMp(snap);
+          sessionStorage.setItem(
+            `reserva_fee_${activeReservaId}`,
+            JSON.stringify(snap),
+          );
+        }
         const initPoint = dataMP.initPoint || dataMP.sandboxInitPoint;
         if (initPoint) {
           // Redirigir al usuario al checkout oficial de Mercado Pago
@@ -422,6 +485,18 @@ export default function CheckoutPage() {
               </span>
             </div>
           </div>
+
+          {desgloseComprobante && metodoPago === "mercadopago" ? (
+            <div className="bg-brand-card border border-white/10 rounded-2xl p-5 mb-8">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+                Monto abonado
+              </p>
+              <CheckoutFeeDesglose
+                resumen={desgloseComprobante}
+                totalLabel="Total pagado"
+              />
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-3">
             <Link
@@ -766,14 +841,21 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="pt-5 border-t border-dashed border-white/10 mt-6">
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
-                      Total a Pagar
-                    </span>
-                    <span className="text-3xl font-extrabold text-brand-chartreuse tracking-tight">
-                      {formatMontoArs(reserva.turnos.precio)}
-                    </span>
-                  </div>
+                  {metodoPago === "mercadopago" && desgloseMp ? (
+                    <CheckoutFeeDesglose
+                      resumen={desgloseMp}
+                      totalLabel="Total a pagar"
+                    />
+                  ) : (
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-xs text-gray-400 uppercase tracking-wider font-semibold">
+                        Total a Pagar
+                      </span>
+                      <span className="text-3xl font-extrabold text-brand-chartreuse tracking-tight">
+                        {formatMontoArs(reserva.turnos.precio)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

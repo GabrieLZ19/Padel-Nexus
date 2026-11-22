@@ -9,6 +9,9 @@ import {
 } from "@/utils/services/inscripciones";
 import { inscripcionRequierePagoOnline } from "@/utils/inscripcionPago";
 import { montoInscripcionPublico } from "@/utils/inscripcionMonto";
+import { CheckoutFeeDesglose } from "@/components/checkout/CheckoutFeeDesglose";
+import type { CheckoutFeeResumen } from "@/utils/checkoutFee";
+import { debeMostrarDesgloseFee } from "@/utils/checkoutFee";
 
 interface InscripcionPagoActionsProps {
   inscripcionId: string;
@@ -33,6 +36,11 @@ export function InscripcionPagoActions({
   const [plazasInfo, setPlazasInfo] =
     useState<EstadoPlazasPagoInscripcion | null>(null);
   const [cargandoPlazas, setCargandoPlazas] = useState(true);
+  const [desgloseTodas, setDesgloseTodas] = useState<CheckoutFeeResumen | null>(
+    null,
+  );
+  const [desgloseMiPlaza, setDesgloseMiPlaza] =
+    useState<CheckoutFeeResumen | null>(null);
 
   const pendiente = inscripcionRequierePagoOnline({
     esGratis,
@@ -50,8 +58,42 @@ export function InscripcionPagoActions({
     try {
       const data = await InscripcionesService.obtenerPlazasPago(inscripcionId);
       setPlazasInfo(data);
+      const previews = await Promise.allSettled([
+        InscripcionesService.previewCheckoutMp(inscripcionId, "todas_pendientes"),
+        data.puede_pagar_mi_plaza
+          ? InscripcionesService.previewCheckoutMp(inscripcionId, "mi_plaza")
+          : Promise.resolve(null),
+      ]);
+      if (previews[0].status === "fulfilled" && previews[0].value) {
+        const p = previews[0].value;
+        setDesgloseTodas({
+          monto_bruto: Number(p.monto_bruto ?? p.monto),
+          cargo_servicio: p.cargo_servicio,
+          modo_fee: p.modo_fee,
+          monto: Number(p.monto),
+        });
+      } else {
+        setDesgloseTodas(null);
+      }
+      if (
+        previews[1].status === "fulfilled" &&
+        previews[1].value &&
+        typeof previews[1].value === "object"
+      ) {
+        const p = previews[1].value;
+        setDesgloseMiPlaza({
+          monto_bruto: Number(p.monto_bruto ?? p.monto),
+          cargo_servicio: p.cargo_servicio,
+          modo_fee: p.modo_fee,
+          monto: Number(p.monto),
+        });
+      } else {
+        setDesgloseMiPlaza(null);
+      }
     } catch {
       setPlazasInfo(null);
+      setDesgloseTodas(null);
+      setDesgloseMiPlaza(null);
     } finally {
       setCargandoPlazas(false);
     }
@@ -89,16 +131,6 @@ export function InscripcionPagoActions({
         alcance,
       );
       onPagoIniciado?.();
-      if (Number(pref.cargo_servicio) > 0 && pref.modo_fee === "sumar") {
-        const plazas =
-          pref.plazas && pref.plazas > 1
-            ? ` (${pref.plazas} jugadores)`
-            : " (1 jugador)";
-        sileo.info({
-          title: "Checkout Mercado Pago",
-          description: `Total $${Number(pref.monto).toLocaleString("es-AR")}${plazas}, precio por jugador + cargo por servicio $${Number(pref.cargo_servicio).toLocaleString("es-AR")}.`,
-        });
-      }
       const checkout = pref.initPoint || pref.sandboxInitPoint;
       if (!checkout) {
         sileo.error({
@@ -127,14 +159,23 @@ export function InscripcionPagoActions({
       <p className={`text-gray-400 ${compact ? "text-xs" : "text-sm"}`}>
         Tu inscripción tiene pago pendiente. Elegí pagar solo tu plaza o todas
         las plazas que falten.
-        <span className="block mt-1 text-white font-semibold tabular-nums">
-          Pendiente: ${totalPendiente.toLocaleString("es-AR")}
-          {precioJugador > 0 ? (
-            <span className="block text-xs font-normal text-gray-500 mt-0.5">
-              ${precioJugador.toLocaleString("es-AR")} por jugador
-            </span>
-          ) : null}
-        </span>
+        {desgloseTodas && debeMostrarDesgloseFee(desgloseTodas) ? (
+          <span className="block mt-2 rounded-xl border border-white/10 bg-brand-black/40 p-3">
+            <CheckoutFeeDesglose
+              resumen={desgloseTodas}
+              totalLabel="Total pendiente (MP)"
+            />
+          </span>
+        ) : (
+          <span className="block mt-1 text-white font-semibold tabular-nums">
+            Pendiente: ${totalPendiente.toLocaleString("es-AR")}
+          </span>
+        )}
+        {precioJugador > 0 ? (
+          <span className="block text-xs font-normal text-gray-500 mt-0.5">
+            ${precioJugador.toLocaleString("es-AR")} por jugador
+          </span>
+        ) : null}
       </p>
       {cargandoPlazas ? (
         <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -143,6 +184,15 @@ export function InscripcionPagoActions({
         </div>
       ) : (
         <div className="flex flex-col gap-2">
+          {desgloseMiPlaza && debeMostrarDesgloseFee(desgloseMiPlaza) ? (
+            <p className="text-[11px] text-gray-500 leading-snug">
+              Pagar mi plaza en MP:{" "}
+              <span className="text-white font-semibold tabular-nums">
+                ${desgloseMiPlaza.monto.toLocaleString("es-AR")}
+              </span>{" "}
+              (precio + cargo por servicio)
+            </p>
+          ) : null}
           {plazasInfo?.puede_pagar_mi_plaza ? (
             <button
               type="button"

@@ -90,6 +90,9 @@ export interface LicenciaPreferenciaPago {
   licencia?: Licencia;
   pagoAlternativo?: boolean;
   monto?: number;
+  monto_bruto?: number;
+  cargo_servicio?: number;
+  modo_fee?: "absorber" | "sumar";
   moneda?: string;
   referencia?: string;
   instrucciones?: string;
@@ -193,6 +196,13 @@ export const LicenciasService = {
   }): Promise<LicenciaCotizacion> {
     const response = await api.get("/licencias/cotizacion", { params });
     return unwrapData<LicenciaCotizacion>(response.data);
+  },
+
+  async previewCheckoutMercadoPago(licenciaId: string) {
+    const response = await api.get(
+      `/licencias/${licenciaId}/preview-checkout-mp`,
+    );
+    return unwrapData<LicenciaPreferenciaPago>(response.data);
   },
 
   async crearPreferenciaMp(

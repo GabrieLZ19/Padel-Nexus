@@ -59,6 +59,16 @@ export const ReservasService = {
     return response.data?.data || response.data;
   },
 
+  async previewCheckoutMercadoPago(
+    params: { reservaId?: string; turnoId?: string },
+  ) {
+    const path = params.turnoId
+      ? `/reservas/turno/${params.turnoId}/preview-checkout-mp`
+      : `/reservas/${params.reservaId}/preview-checkout-mp`;
+    const response = await api.get(path);
+    return response.data?.data || response.data;
+  },
+
   async iniciarPagoMercadoPago(reservaId: string): Promise<any> {
     const response = await api.post(`/reservas/${reservaId}/preferencia-mp`);
     return response.data?.data || response.data;
