@@ -5,6 +5,7 @@ export const metadata: Metadata = pageMetadata({
   title: "Reservar canchas",
   description:
     "Encontrá clubes, horarios disponibles y reservá turnos de pádel en línea.",
+  path: "/reservar",
 });
 
 export default function ReservarPublicLayout({

@@ -80,3 +80,13 @@ input,select,textarea{font:inherit}.institution-row{font-variant-numeric:tabular
  .hero-slide{object-position:right center}
  .hero-side{z-index:5}
 }
+
+.header nav a.nav-contact{border:1px solid #515449;border-radius:30px;padding:12px 22px}
+.header nav a.nav-ingress{background:var(--lime);color:#000;border:0!important;border-radius:5px;padding:12px 22px;font-weight:600}
+.header nav a.nav-ingress:hover{background:#e0ff65;color:#000}
+.button.outline{background:transparent;border:1px solid #515449;color:#fff;gap:12px;font-weight:600;justify-content:center}
+.button.outline:hover{background:#181a15;border-color:var(--lime);color:#fff;transform:translateY(-3px)}
+@media(max-width:700px){
+ .header nav a.nav-contact{border:0;border-radius:0;padding:16px 0}
+ .header nav a.nav-ingress{margin-top:12px;display:block;text-align:center}
+}

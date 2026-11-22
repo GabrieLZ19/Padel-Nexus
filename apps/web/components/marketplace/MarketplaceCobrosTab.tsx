@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Landmark, Wallet, Info } from "lucide-react";
+import { Landmark, Info } from "lucide-react";
 import { sileo } from "sileo";
 import type { DatosCobroTienda, EntidadRef, Vendedor } from "@/utils/services/marketplace";
 import { MarketplaceService } from "@/utils/services/marketplace";
@@ -12,18 +12,21 @@ interface Props {
   onSaved: (tienda: Vendedor) => void;
 }
 
+type FormCobroBancario = Pick<
+  DatosCobroTienda,
+  "cbu" | "alias" | "titular_cuenta" | "banco"
+>;
+
 export default function MarketplaceCobrosTab({
   tienda,
   entidadRef,
   onSaved,
 }: Props) {
-  const [form, setForm] = useState<DatosCobroTienda>({
+  const [form, setForm] = useState<FormCobroBancario>({
     cbu: tienda.cbu || "",
     alias: tienda.alias || "",
     titular_cuenta: tienda.titular_cuenta || "",
     banco: tienda.banco || "",
-    mp_collector_id: tienda.mp_collector_id || "",
-    mp_notas: tienda.mp_notas || "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -33,12 +36,10 @@ export default function MarketplaceCobrosTab({
       alias: tienda.alias || "",
       titular_cuenta: tienda.titular_cuenta || "",
       banco: tienda.banco || "",
-      mp_collector_id: tienda.mp_collector_id || "",
-      mp_notas: tienda.mp_notas || "",
     });
   }, [tienda]);
 
-  const setField = (key: keyof DatosCobroTienda, value: string) => {
+  const setField = (key: keyof FormCobroBancario, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -52,20 +53,27 @@ export default function MarketplaceCobrosTab({
       return;
     }
 
+    const alias = form.alias?.trim() || "";
+    if (!cbuDigits && !alias) {
+      sileo.error({
+        title: "Datos incompletos",
+        description: "Ingresá al menos CBU o alias para poder liquidar tus ventas.",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const actualizada = await MarketplaceService.crmActualizarTienda(entidadRef, {
         cbu: cbuDigits || null,
-        alias: form.alias?.trim() || null,
+        alias: alias || null,
         titular_cuenta: form.titular_cuenta?.trim() || null,
         banco: form.banco?.trim() || null,
-        mp_collector_id: form.mp_collector_id?.trim() || null,
-        mp_notas: form.mp_notas?.trim() || null,
       });
       onSaved(actualizada);
       sileo.success({
         title: "Datos de cobro guardados",
-        description: "Ahí se acreditarán las ventas de la tienda.",
+        description: "Usaremos esta cuenta para liquidarte el neto de tus ventas cobradas.",
       });
     } catch (err: unknown) {
       const message =
@@ -90,10 +98,12 @@ export default function MarketplaceCobrosTab({
             <Landmark className="size-5 text-brand-chartreuse" />
           </div>
           <div>
-            <h2 className="text-xl font-black">Destino de acreditación</h2>
+            <h2 className="text-xl font-black">Cuenta para liquidaciones</h2>
             <p className="text-sm text-gray-400 mt-1">
-              Configurá dónde se acreditan los cobros de las ventas de{" "}
-              <span className="text-white font-semibold">{tienda.nombre_tienda}</span>.
+              Los pagos online de{" "}
+              <span className="text-white font-semibold">{tienda.nombre_tienda}</span> se
+              procesan por Padel Nexus. Acá cargás la cuenta bancaria donde querés recibir el
+              neto de tus ventas.
             </p>
           </div>
         </div>
@@ -144,37 +154,6 @@ export default function MarketplaceCobrosTab({
           </div>
         </div>
 
-        <div className="border-t border-brand-white/5 pt-6 space-y-4">
-          <div className="flex items-center gap-2 text-brand-chartreuse">
-            <Wallet className="size-4" />
-            <h3 className="text-sm font-black uppercase tracking-wider">Mercado Pago</h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase">
-                Collector / cuenta MP
-              </label>
-              <input
-                type="text"
-                value={form.mp_collector_id || ""}
-                onChange={(e) => setField("mp_collector_id", e.target.value)}
-                placeholder="ID o email de cobro"
-                className="w-full bg-brand-input border border-brand-white/10 rounded-xl px-4 py-3.5 text-sm focus:border-brand-chartreuse focus:outline-none"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase">Notas</label>
-              <input
-                type="text"
-                value={form.mp_notas || ""}
-                onChange={(e) => setField("mp_notas", e.target.value)}
-                placeholder="Observaciones internas"
-                className="w-full bg-brand-input border border-brand-white/10 rounded-xl px-4 py-3.5 text-sm focus:border-brand-chartreuse focus:outline-none"
-              />
-            </div>
-          </div>
-        </div>
-
         <button
           type="button"
           onClick={() => void handleGuardar()}
@@ -192,13 +171,17 @@ export default function MarketplaceCobrosTab({
             <p className="text-xs font-black uppercase tracking-wider">Cómo se acredita</p>
           </div>
           <p className="text-sm text-gray-400 leading-relaxed">
-            Las ventas del marketplace se liquidan a la cuenta bancaria o collector de Mercado Pago
-            configurado acá. Completá al menos CBU o alias para transferencias, y el collector si
-            operás con Mercado Pago.
+            Los compradores pagan en línea a través de Padel Nexus (Mercado Pago centralizado).
+            Cuando tus ventas quedan cobradas, liquidamos el importe neto a la cuenta que
+            configures acá, por transferencia a CBU o alias.
           </p>
           <ul className="text-xs text-gray-500 space-y-1.5 list-disc pl-4">
-            <li>El split nativo de MP queda para una fase posterior.</li>
-            <li>Estos datos son visibles solo para admins de la entidad.</li>
+            <li>
+              El neto es el monto cobrado menos el cargo por servicio de la plataforma y la
+              comisión de Mercado Pago, según tu configuración de fees.
+            </li>
+            <li>Necesitás al menos CBU o alias para poder recibir liquidaciones.</li>
+            <li>Estos datos son visibles solo para administradores de la entidad.</li>
           </ul>
         </div>
       </div>

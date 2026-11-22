@@ -5,6 +5,7 @@ export const metadata: Metadata = pageMetadata({
   title: "Marketplace",
   description:
     "Productos y servicios de pádel publicados por clubes, asociaciones y la federación.",
+  path: "/marketplace",
 });
 
 export default function MarketplacePublicLayout({

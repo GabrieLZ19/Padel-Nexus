@@ -5,6 +5,7 @@ export const metadata: Metadata = pageMetadata({
   title: "Torneos",
   description:
     "Calendario de torneos oficiales, inscripciones y detalle de competencias por categoría.",
+  path: "/torneos",
 });
 
 export default function TorneosPublicLayout({

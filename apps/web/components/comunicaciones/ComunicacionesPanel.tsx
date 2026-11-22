@@ -1616,7 +1616,7 @@ export default function ComunicacionesPanel() {
               <input
                 value={actionUrl}
                 onChange={(e) => setActionUrl(e.target.value)}
-                placeholder="/ranking o https://padelnexus.netlify.app/ranking"
+                placeholder="/ranking o https://play.padelnexus.app/ranking"
                 className="w-full px-4 py-3 rounded-xl bg-brand-black border border-brand-white/10 text-sm text-brand-white placeholder:text-gray-600 focus:outline-none focus:border-brand-chartreuse/50"
               />
               <p className="text-[11px] text-gray-500">

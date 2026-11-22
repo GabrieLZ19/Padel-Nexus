@@ -368,7 +368,7 @@ function MarketplaceContent() {
 
             {/* Listado */}
             {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {[...Array(6)].map((_, i) => (
                   <div
                     key={i}
@@ -388,7 +388,7 @@ function MarketplaceContent() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {productos.map((prod) => {
                   const imageUrl =
                     prod.thumbnail_url ||
@@ -441,7 +441,7 @@ function MarketplaceContent() {
                             alt={prod.nombre}
                             fill
                             className="object-contain group-hover:scale-105 transition-transform duration-500"
-                            sizes="(max-width: 768px) 100vw, 33vw"
+                            sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 25vw"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -461,7 +461,7 @@ function MarketplaceContent() {
                                 : prod.categoria.nombre}
                             </span>
                           </div>
-                          <h3 className="font-bold text-base text-brand-white group-hover:text-brand-chartreuse transition-colors line-clamp-1 mb-2">
+                          <h3 className="font-bold text-base text-brand-white group-hover:text-brand-chartreuse transition-colors line-clamp-2 min-h-[2.75rem] leading-snug mb-2">
                             {prod.nombre}
                           </h3>
 

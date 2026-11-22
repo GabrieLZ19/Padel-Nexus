@@ -16,6 +16,7 @@ const RUTAS_PUBLICAS: Array<{
   { path: "/signup", changeFrequency: "monthly", priority: 0.5 },
   { path: "/terminos", changeFrequency: "monthly", priority: 0.35 },
   { path: "/privacidad", changeFrequency: "monthly", priority: 0.35 },
+  { path: "/privacidad-menores", changeFrequency: "monthly", priority: 0.35 },
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

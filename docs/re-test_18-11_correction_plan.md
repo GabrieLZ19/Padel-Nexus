@@ -22,7 +22,7 @@ Seguimiento de commits y detalle: [qa-re-test-18-11-progreso.md](qa-re-test-18-1
 
 **Hecho TOR-36**: CRM llave con `Gan. #N` en huecos pendientes (`MatchCard`, `BracketEditor`).
 
-**Siguiente ítem sugerido**: **MKT-3** u operativos bloque 6. **MKT-1**, **MKT-2**, **TOR-49**, **CLI-1** — HECHO en código.
+**Siguiente ítem sugerido**: ops **FEE-3** (credenciales MP prod), **FEE-12** (push git), deploys y QA manual. Bloque 6 limpieza Supabase ejecutado — ver [qa-re-test-18-11-limpieza-supabase.md](qa-re-test-18-11-limpieza-supabase.md).
 
 ---
 

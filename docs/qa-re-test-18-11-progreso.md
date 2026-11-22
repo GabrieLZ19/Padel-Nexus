@@ -139,6 +139,52 @@ Commits: `fcbb060` (back), `95ca06f` (front). Pendiente QA manual en torneo real
 - CRM `MarketplaceVentasTab`: ventas totales sin fallback a líneas pendientes
 - Tests: `mkt2VentasCobradas.test.ts`
 
-**Siguiente ítem sugerido:** **MKT-3** o limpieza QA bloque 6.
+### MKT-3 — Pantalla Cobros de tienda (sin MP collector) — HECHO (código)
+
+- `MarketplaceCobrosTab`: solo datos bancarios (titular, banco, CBU, alias); sin collector ni notas internas
+- Copy alineado a cobro centralizado Padel Nexus + liquidación neta por transferencia
+- Validación: al menos CBU o alias al guardar
+
+### MKT-4 — Tarjetas catálogo `/marketplace` — HECHO (código)
+
+- Grilla alineada a tienda: `sm:2` / `lg:3` / `xl:4` (sin 5 columnas desde `md`)
+- Título del producto: `line-clamp-2` + altura mínima para alinear filas
+- Skeleton de carga y `sizes` de imagen ajustados
+
+### DOM-5 — Botón Ingresar en www — HECHO (código)
+
+- `apps/padelnexus-web/index.html`: **Ingresar** en nav (`https://play.padelnexus.app`) y hero primario
+- Hero secundario **Ver torneos** → `https://play.padelnexus.app/torneos`; **Explorá** conservado como outline
+- Estilos `nav-ingress`, `nav-contact`, `button.outline` en `styles.css`
+
+### DOM-6 — Security headers en play — HECHO (código)
+
+- `apps/web/next.config.ts`: `headers()` global con `X-Frame-Options: DENY`, CSP `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`
+
+**Pendiente:** verificar cabeceras en deploy (`curl -I https://play.padelnexus.app`).
+
+### PUB-26 + PUB-21 — Canonicals, OG PNG, privacidad menores — HECHO (código)
+
+- `siteMetadata`: `og-image.png` 1200x630; sin `canonical` fijo en `rootMetadata`
+- `path` canónico en home, torneos, ranking, reservar, marketplace, partidos, login, signup
+- `privacidad-menores/layout.tsx`: título «Privacidad de menores»
+- `torneos/[id]/layout.tsx`: `generateMetadata` + canonical dinámico
+- Asset `public/brand/og-image.png`; tests `pub26CanonicalOg.test.ts`, `pub21` actualizado
+
+### ENT-33 — Comunicaciones dominios y placeholder — HECHO (código)
+
+- Placeholder acción: `/ranking o https://play.padelnexus.app/ranking`
+- `comunicacionesActionUrl.ts`: hosts `*.padelnexus.app`, apex, netlify legacy, env FRONTEND_URL
+- URLs propias normalizan a ruta relativa (`play`, `www`, `app`)
+- Test: `ent33ComunicacionesDominios.test.ts`
+
+### Bloque 6 — Limpieza QA Supabase + PUB-20 — HECHO (22/11)
+
+- Supabase `tsmgxvygmdskhyhnjqvv`: fees Club Elim 5ª (6), torneos 18-11 (3), sede QA + canchas, órdenes marketplace QA (2)
+- FEE-2 licencia `PAD-BMZ7RD`: ya pendiente; movimiento/liquidación inexistentes
+- `deploy/padelnexus-netlify-legacy/_redirects` → `play.padelnexus.app` (solo sitio Netlify legacy)
+- Registro: [qa-re-test-18-11-limpieza-supabase.md](qa-re-test-18-11-limpieza-supabase.md)
+
+**Pendiente ops:** FEE-3 (MP prod), FEE-12 (push git), deploy `padelnexus-web` (DOM-5), QA manual FEE-9.
 
 Plan detallado ítem por ítem: [re-test_18-11_correction_plan.md](re-test_18-11_correction_plan.md).

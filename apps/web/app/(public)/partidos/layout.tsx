@@ -5,6 +5,7 @@ export const metadata: Metadata = pageMetadata({
   title: "Nos falta uno",
   description:
     "Armá partidos abiertos, sumate a convocatorias y coordiná con otros jugadores.",
+  path: "/partidos",
 });
 
 export default function PartidosPublicLayout({

@@ -4,6 +4,7 @@ import { pageMetadata } from "@/utils/siteMetadata";
 export const metadata: Metadata = pageMetadata({
   title: "Iniciar sesión",
   description: "Accedé a tu cuenta de jugador, club o panel federativo.",
+  path: "/login",
 });
 
 export default function LoginLayout({

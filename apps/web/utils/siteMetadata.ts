@@ -8,7 +8,9 @@ export const SITE_DEFAULT_DESCRIPTION =
 /** Dominio público de la app (sin barra final). Configurar `NEXT_PUBLIC_SITE_URL` en cada entorno. */
 export const SITE_URL_PRODUCTION_DEFAULT = "https://play.padelnexus.app";
 
-const OG_IMAGE_PATH = "/brand/LogoHorizontal.svg";
+const OG_IMAGE_PATH = "/brand/og-image.png";
+const OG_IMAGE_WIDTH = 1200;
+const OG_IMAGE_HEIGHT = 630;
 
 export function getSiteUrl(): string {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim();
@@ -46,7 +48,10 @@ function buildOpenGraph(input?: {
     images: [
       {
         url: absoluteUrl(OG_IMAGE_PATH),
+        width: OG_IMAGE_WIDTH,
+        height: OG_IMAGE_HEIGHT,
         alt: SITE_NAME,
+        type: "image/png",
       },
     ],
   };
@@ -79,9 +84,6 @@ export function rootMetadata(): Metadata {
     icons: {
       icon: [{ url: "/brand/LogoAccessory.svg", type: "image/svg+xml" }],
       apple: "/brand/LogoAccessory.svg",
-    },
-    alternates: {
-      canonical: "/",
     },
   };
 }

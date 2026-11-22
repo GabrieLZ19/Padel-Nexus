@@ -6,6 +6,7 @@ export const metadata: Metadata = pageMetadata({
   title: "Inicio",
   description:
     "Descubrí torneos abiertos, el ranking oficial y reservá canchas en clubes de pádel.",
+  path: "/",
 });
 
 export default function HomePage() {

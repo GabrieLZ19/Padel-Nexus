@@ -84,6 +84,7 @@ describe("PUB-21 SEO Open Graph y sitemap", () => {
       "utf8",
     );
     assert.match(meta, /LogoAccessory/);
+    assert.match(meta, /og-image\.png/);
     const favicon = path.join(RAIZ, "public/favicon.ico");
     assert.ok(
       readFileSync(favicon).byteLength > 0,

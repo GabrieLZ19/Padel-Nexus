@@ -5,6 +5,7 @@ export const metadata: Metadata = pageMetadata({
   title: "Ranking oficial",
   description:
     "Clasificación por categoría, alcance provincial o nacional y evolución de puntos.",
+  path: "/ranking",
 });
 
 export default function RankingPublicLayout({
