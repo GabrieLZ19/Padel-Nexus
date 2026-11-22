@@ -830,6 +830,98 @@ export class MarketplaceService {
     return orden;
   }
 
+  private static async calcularSubtotalCarrito(items: ItemCarrito[]) {
+    const productosIds = items.map((i) => i.productoId);
+    const { data: productos, error: errProd } = await supabaseAdmin
+      .from("marketplace_productos")
+      .select("id, nombre, precio, vendedor_id, activo")
+      .in("id", productosIds);
+
+    if (errProd || !productos) {
+      throw new Error("Error al obtener productos del carrito.");
+    }
+
+    const productosMap = new Map(productos.map((p) => [p.id, p]));
+    let subtotal = 0;
+    let vendedorId: string | null = null;
+
+    for (const item of items) {
+      const producto = productosMap.get(item.productoId);
+      if (!producto) {
+        throw new Error(`Producto ${item.productoId} no encontrado.`);
+      }
+      if (!producto.activo) {
+        throw new Error(`El producto "${producto.nombre}" ya no está disponible.`);
+      }
+      subtotal += Number(producto.precio) * item.cantidad;
+      if (!vendedorId) {
+        vendedorId = producto.vendedor_id;
+      }
+    }
+
+    return { subtotal, vendedorId };
+  }
+
+  static async previewCheckoutCarrito(items: ItemCarrito[]) {
+    const { subtotal, vendedorId } =
+      await MarketplaceService.calcularSubtotalCarrito(items);
+    const { PlatformFeeService } = await import("./platformFee.service");
+    const org = vendedorId
+      ? ({ org_tipo: "club" as const, org_id: vendedorId })
+      : ({
+          org_tipo: "federacion" as const,
+          org_id: items[0]?.productoId || "preview",
+        });
+    const breakdown = await PlatformFeeService.calcularCheckout(
+      "marketplace",
+      org,
+      subtotal,
+      1,
+    );
+    return {
+      ...PlatformFeeService.camposCheckoutApi(breakdown),
+      moneda: "ARS",
+    };
+  }
+
+  static async previewCheckoutOrden(ordenId: string) {
+    const { data: orden, error } = await supabaseAdmin
+      .from("marketplace_ordenes")
+      .select(
+        `
+        id, total,
+        items:marketplace_items_orden(vendedor_id)
+      `,
+      )
+      .eq("id", ordenId)
+      .single();
+
+    if (error || !orden) {
+      throw new Error("Orden no encontrada.");
+    }
+
+    const subtotal = Number(orden.total);
+    const vendedorSample = (orden as { items?: Array<{ vendedor_id: string }> })
+      .items?.[0];
+    const { PlatformFeeService } = await import("./platformFee.service");
+    const org = vendedorSample?.vendedor_id
+      ? ({
+          org_tipo: "club" as const,
+          org_id: vendedorSample.vendedor_id,
+        })
+      : ({ org_tipo: "federacion" as const, org_id: ordenId });
+    const breakdown = await PlatformFeeService.calcularCheckout(
+      "marketplace",
+      org,
+      subtotal,
+      1,
+    );
+    return {
+      ...PlatformFeeService.camposCheckoutApi(breakdown),
+      moneda: "ARS",
+    };
+  }
+
   static async crearPreferenciaMercadoPago(
     ordenId: string,
     options?: { mobile?: boolean },
@@ -856,32 +948,6 @@ export class MarketplaceService {
       throw new Error("Esta orden ya fue procesada.");
     }
 
-    const token = getMercadoPagoAccessToken();
-
-    if (!isMercadoPagoConfigured()) {
-      console.warn(
-        "⚠️ MP Access Token no configurado. Simulando checkout (confirmación inmediata).",
-      );
-      const mockPaymentId = `mock-mp-${Date.now()}`;
-      await MarketplaceService.confirmarPagoOrden(ordenId, mockPaymentId);
-      return {
-        preferenceId: "mock-marketplace-pref",
-        initPoint: null,
-        sandboxInitPoint: null,
-        mockConfirmed: true,
-        paymentId: mockPaymentId,
-      };
-    }
-
-    const mpClient = new MercadoPagoConfig({ accessToken: token! });
-    const preference = new Preference(mpClient);
-
-    const backUrls = buildMercadoPagoBackUrls({
-      mobile: options?.mobile,
-      webPath: "/marketplace/checkout",
-      mobileParams: { orden_id: ordenId },
-    });
-
     const subtotal = (
       orden as { items: Array<{ cantidad: number; precio_unitario: number }> }
     ).items.reduce(
@@ -907,6 +973,35 @@ export class MarketplaceService {
       subtotal,
       1,
     );
+    const camposFee = PlatformFeeService.camposCheckoutApi(breakdown);
+
+    const token = getMercadoPagoAccessToken();
+
+    if (!isMercadoPagoConfigured()) {
+      console.warn(
+        "⚠️ MP Access Token no configurado. Simulando checkout (confirmación inmediata).",
+      );
+      const mockPaymentId = `mock-mp-${Date.now()}`;
+      await MarketplaceService.confirmarPagoOrden(ordenId, mockPaymentId);
+      return {
+        preferenceId: "mock-marketplace-pref",
+        initPoint: null,
+        sandboxInitPoint: null,
+        mockConfirmed: true,
+        paymentId: mockPaymentId,
+        ...camposFee,
+        moneda: "ARS",
+      };
+    }
+
+    const mpClient = new MercadoPagoConfig({ accessToken: token! });
+    const preference = new Preference(mpClient);
+
+    const backUrls = buildMercadoPagoBackUrls({
+      mobile: options?.mobile,
+      webPath: "/marketplace/checkout",
+      mobileParams: { orden_id: ordenId },
+    });
 
     const mpItems = (orden as any).items.map((item: any) => ({
       id: item.producto?.id || "producto",
@@ -952,6 +1047,8 @@ export class MarketplaceService {
         response.sandbox_init_point,
       ),
       sandboxInitPoint: response.sandbox_init_point,
+      ...camposFee,
+      moneda: "ARS",
     };
   }
 

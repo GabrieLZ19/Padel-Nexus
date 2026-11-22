@@ -1330,6 +1330,22 @@ export class LicenciaService {
     };
   }
 
+  static async previewCheckoutMercadoPago(licenciaId: string, usuarioId: string) {
+    const { precio } = await LicenciaService.resolverPagoLicenciaJugador(
+      licenciaId,
+      usuarioId,
+    );
+    const { PlatformFeeService } = await import("./platformFee.service");
+    const org = await PlatformFeeService.resolverOrgDesdeLicencia(licenciaId);
+    const breakdown = await PlatformFeeService.calcularCheckout(
+      "licencias",
+      org,
+      precio,
+      1,
+    );
+    return PlatformFeeService.camposCheckoutApi(breakdown);
+  }
+
   static async crearPreferenciaPago(
     licenciaId: string,
     usuarioId: string,
@@ -1345,6 +1361,16 @@ export class LicenciaService {
       licenciaId,
       usuarioId,
     );
+
+    const { PlatformFeeService } = await import("./platformFee.service");
+    const org = await PlatformFeeService.resolverOrgDesdeLicencia(licenciaId);
+    const breakdown = await PlatformFeeService.calcularCheckout(
+      "licencias",
+      org,
+      precio,
+      1,
+    );
+    const camposFee = PlatformFeeService.camposCheckoutApi(breakdown);
 
     const token = getMercadoPagoAccessToken();
     if (!isMercadoPagoConfigured()) {
@@ -1366,7 +1392,7 @@ export class LicenciaService {
           mockConfirmed: true,
           paymentId: mockPaymentId,
           licencia: actualizada,
-          monto: precio,
+          ...camposFee,
           moneda: "ARS",
           referencia: licencia.nro_licencia,
           instrucciones,
@@ -1382,7 +1408,7 @@ export class LicenciaService {
         sandboxInitPoint: null,
         mockConfirmed: false,
         pagoAlternativo: true,
-        monto: precio,
+        ...camposFee,
         moneda: "ARS",
         referencia: licencia.nro_licencia,
         instrucciones,
@@ -1399,14 +1425,6 @@ export class LicenciaService {
       mobileParams: { licencia_id: licenciaId },
     });
 
-    const { PlatformFeeService } = await import("./platformFee.service");
-    const org = await PlatformFeeService.resolverOrgDesdeLicencia(licenciaId);
-    const breakdown = await PlatformFeeService.calcularCheckout(
-      "licencias",
-      org,
-      precio,
-      1,
-    );
     const mpItems = PlatformFeeService.buildMpItems(
       {
         id: licenciaId,
@@ -1440,7 +1458,7 @@ export class LicenciaService {
       sandboxInitPoint: response.sandbox_init_point,
       mockConfirmed: false,
       pagoAlternativo: false,
-      monto: precio,
+      ...camposFee,
       moneda: "ARS",
       referencia: licencia.nro_licencia,
       instrucciones,

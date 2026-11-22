@@ -354,6 +354,31 @@ export const obtenerPlazasPagoInscripcion = async (
   }
 };
 
+export const previewCheckoutMercadoPagoInscripcion = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    const usuarioId = req.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ message: "No autorizado." });
+    }
+    const alcanceRaw = req.query.alcance as string | undefined;
+    const alcance =
+      alcanceRaw === "mi_plaza" ? "mi_plaza" : "todas_pendientes";
+    const data = await InscripcionService.previewCheckoutMercadoPago(
+      req.params.id,
+      usuarioId,
+      alcance,
+    );
+    return res.status(200).json({ exito: true, data });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    return res.status(400).json({ message, error: message });
+  }
+};
+
 export const crearPreferenciaPagoInscripcion = async (
   req: Request,
   res: Response,

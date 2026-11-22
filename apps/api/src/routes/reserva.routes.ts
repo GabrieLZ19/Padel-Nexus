@@ -16,6 +16,18 @@ router.get(
 // Obtener reservas del usuario autenticado
 router.get("/mis-reservas", authenticate, ReservasController.getMisReservas);
 
+// Preview desglose checkout MP (antes de las rutas /:id genéricas)
+router.get(
+  "/turno/:id/preview-checkout-mp",
+  authenticate,
+  ReservasController.previewCheckoutMercadoPagoTurno,
+);
+router.get(
+  "/:id/preview-checkout-mp",
+  authenticate,
+  ReservasController.previewCheckoutMercadoPago,
+);
+
 // Obtener detalle de una reserva
 router.get("/:id", authenticate, ReservasController.getReservaPorId);
 

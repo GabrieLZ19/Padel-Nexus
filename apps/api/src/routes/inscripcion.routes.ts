@@ -11,6 +11,7 @@ import {
   crearPreferenciaPagoInscripcion,
   confirmarRetornoPagoInscripcion,
   obtenerPlazasPagoInscripcion,
+  previewCheckoutMercadoPagoInscripcion,
 } from "../controllers/inscripcion.controller";
 import { authenticate, authorize } from "../middleware/auth";
 import { ROLES_ADMINISTRATIVOS } from "../constants/roles";
@@ -35,6 +36,7 @@ router.get(
 router.post("/", createInscripcion);
 
 router.get("/:id/plazas-pago", obtenerPlazasPagoInscripcion);
+router.get("/:id/preview-checkout-mp", previewCheckoutMercadoPagoInscripcion);
 router.post("/:id/preferencia-mp", crearPreferenciaPagoInscripcion);
 router.post("/:id/confirmar-retorno", confirmarRetornoPagoInscripcion);
 

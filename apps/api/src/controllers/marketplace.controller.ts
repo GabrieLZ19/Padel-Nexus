@@ -124,6 +124,32 @@ export class MarketplaceController {
     }
   }
 
+  static async previewCheckoutCarrito(req: Request, res: Response) {
+    try {
+      const items = req.body?.items as
+        | Array<{ productoId: string; cantidad: number }>
+        | undefined;
+      if (!items?.length) {
+        return res.status(400).json({ message: "El carrito está vacío." });
+      }
+      const data = await MarketplaceService.previewCheckoutCarrito(items);
+      res.json(data);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error desconocido";
+      res.status(400).json({ message });
+    }
+  }
+
+  static async previewCheckoutOrden(req: Request, res: Response) {
+    try {
+      const data = await MarketplaceService.previewCheckoutOrden(req.params.id);
+      res.json(data);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error desconocido";
+      res.status(400).json({ message });
+    }
+  }
+
   static async pagarOrden(req: Request, res: Response) {
     try {
       const mobile = (req.get("x-padel-client") || "").toLowerCase() === "mobile";

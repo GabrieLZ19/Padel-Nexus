@@ -1250,13 +1250,12 @@ export class InscripcionService {
     };
   }
 
-  static async crearPreferenciaPago(
+  private static async resolverPlazasCheckoutInscripcion(
     inscripcionId: string,
     usuarioId: string,
-    options?: { mobile?: boolean; alcance?: "mi_plaza" | "todas_pendientes" },
+    alcance: "mi_plaza" | "todas_pendientes",
   ) {
     const {
-      inscripcion,
       torneoNombre,
       precioPorJugador,
       torneoId,
@@ -1267,7 +1266,6 @@ export class InscripcionService {
       usuarioId,
     );
 
-    const alcance = options?.alcance ?? "todas_pendientes";
     let plazasACobrar: number[];
     if (alcance === "mi_plaza") {
       if (!plazasPendientes.includes(miPlaza)) {
@@ -1286,6 +1284,63 @@ export class InscripcionService {
       plazasACobrar,
     );
 
+    return {
+      torneoNombre,
+      precioPorJugador,
+      torneoId,
+      plazasACobrar,
+      montoBruto,
+      unidades: plazasACobrar.length,
+    };
+  }
+
+  static async previewCheckoutMercadoPago(
+    inscripcionId: string,
+    usuarioId: string,
+    alcance: "mi_plaza" | "todas_pendientes" = "todas_pendientes",
+  ) {
+    const ctx = await InscripcionService.resolverPlazasCheckoutInscripcion(
+      inscripcionId,
+      usuarioId,
+      alcance,
+    );
+    const org = await PlatformFeeService.resolverOrgDesdeTorneo(ctx.torneoId);
+    const breakdown = await PlatformFeeService.calcularCheckout(
+      "inscripciones",
+      org,
+      ctx.montoBruto,
+      ctx.unidades,
+    );
+    return {
+      ...PlatformFeeService.camposCheckoutApi(breakdown),
+      plazas: ctx.unidades,
+      precio_por_plaza: ctx.precioPorJugador,
+      plazas_cobradas: ctx.plazasACobrar,
+      alcance,
+      moneda: "ARS",
+    };
+  }
+
+  static async crearPreferenciaPago(
+    inscripcionId: string,
+    usuarioId: string,
+    options?: { mobile?: boolean; alcance?: "mi_plaza" | "todas_pendientes" },
+  ) {
+    const alcance = options?.alcance ?? "todas_pendientes";
+    const ctx = await InscripcionService.resolverPlazasCheckoutInscripcion(
+      inscripcionId,
+      usuarioId,
+      alcance,
+    );
+    const {
+      torneoNombre,
+      precioPorJugador,
+      torneoId,
+      plazasACobrar,
+      montoBruto,
+      unidades,
+    } = ctx;
+
     const token = getMercadoPagoAccessToken();
     if (!isMercadoPagoConfigured()) {
       throw new Error(
@@ -1302,7 +1357,6 @@ export class InscripcionService {
     });
 
     const org = await PlatformFeeService.resolverOrgDesdeTorneo(torneoId);
-    const unidades = plazasACobrar.length;
     const breakdown = await PlatformFeeService.calcularCheckout(
       "inscripciones",
       org,

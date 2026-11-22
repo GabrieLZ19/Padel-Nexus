@@ -214,6 +214,39 @@ export const ReservasController = {
   },
 
   /**
+   * GET /api/reservas/:id/preview-checkout-mp
+   * Desglose de precio y cargo por servicio antes del pago.
+   */
+  async previewCheckoutMercadoPago(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const data = await ReservaService.previewCheckoutMercadoPago({
+        reservaId: id,
+      });
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
+  /**
+   * GET /api/reservas/turno/:id/preview-checkout-mp
+   */
+  async previewCheckoutMercadoPagoTurno(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const data = await ReservaService.previewCheckoutMercadoPago({
+        turnoId: id,
+      });
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
+  /**
    * POST /api/reservas/:id/preferencia-mp
    * Crea una preferencia de pago en Mercado Pago para la reserva dada.
    */

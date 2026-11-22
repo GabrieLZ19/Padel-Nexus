@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getFapBracketForPairCount } from "../src/utils/fapBracketMatrices";
 import {
+  corregirAltaEnPaseDirecto,
   entryMatchForLeafSeed,
   planificarMaterializacionByeConSemilla,
   planificarMaterializacionByeFap,
@@ -34,6 +35,14 @@ describe("TOR-22 / TOR-28 materializar rival en pase directo", () => {
     assert.equal(plan?.mismoPartidoEntrada, true);
     assert.equal(plan?.inscripcionRival, "ins-nueva");
     assert.equal(plan?.partidoEntradaOrden, 57);
+  });
+
+  it("corregirAlta mueve alta del clasificado al hueco W*", () => {
+    const spec = { matchNo: 57, a: "1A", b: "W50", winnerTo: 61 };
+    const corr = corregirAltaEnPaseDirecto(spec, true, false);
+    assert.equal(corr.tieneAltaA, false);
+    assert.equal(corr.tieneAltaB, true);
+    assert.equal(corr.semillaInferida, "1A");
   });
 
   it("con semilla explícita limpia avance indebido en partido posterior", () => {

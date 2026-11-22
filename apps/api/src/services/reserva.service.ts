@@ -778,6 +778,48 @@ export class ReservaService {
   }
 
   /**
+   * Preview del desglose de checkout MP (sin crear preferencia).
+   */
+  static async previewCheckoutMercadoPago(input: {
+    reservaId?: string;
+    turnoId?: string;
+  }) {
+    let clubId: string;
+    let precioTurno: number;
+
+    if (input.reservaId) {
+      const reserva = await this.obtenerReservaPorId(input.reservaId);
+      const turnos = reserva.turnos as {
+        precio: number;
+        canchas?: { clubes?: { id: string } };
+      };
+      if (!turnos) throw new Error("Turno asociado no encontrado.");
+      const cancha = turnos.canchas;
+      if (!cancha?.clubes?.id) throw new Error("Club asociado no encontrado.");
+      clubId = cancha.clubes.id;
+      precioTurno = Number(turnos.precio);
+    } else if (input.turnoId) {
+      const turno = await this.obtenerTurnoConDetalles(input.turnoId);
+      const cancha = turno.canchas as { clubes?: { id: string } };
+      if (!cancha?.clubes?.id) throw new Error("Club asociado no encontrado.");
+      clubId = cancha.clubes.id;
+      precioTurno = Number(turno.precio);
+    } else {
+      throw new Error("Se requiere reservaId o turnoId.");
+    }
+
+    const { PlatformFeeService } = await import("./platformFee.service");
+    const org = await PlatformFeeService.resolverOrgDesdeClub(clubId);
+    const breakdown = await PlatformFeeService.calcularCheckout(
+      "reservas",
+      org,
+      precioTurno,
+      1,
+    );
+    return PlatformFeeService.camposCheckoutApi(breakdown);
+  }
+
+  /**
    * Crea una preferencia de pago en Mercado Pago para una reserva específica.
    */
   static async crearPreferenciaPago(
@@ -804,6 +846,17 @@ export class ReservaService {
     const club = cancha.clubes;
     if (!club) throw new Error("Club asociado no encontrado.");
 
+    const { PlatformFeeService } = await import("./platformFee.service");
+    const org = await PlatformFeeService.resolverOrgDesdeClub(club.id);
+    const precioTurno = Number(turnos.precio);
+    const breakdown = await PlatformFeeService.calcularCheckout(
+      "reservas",
+      org,
+      precioTurno,
+      1,
+    );
+    const camposFee = PlatformFeeService.camposCheckoutApi(breakdown);
+
     const token = getMercadoPagoAccessToken();
     if (!isMercadoPagoConfigured()) {
       console.warn(
@@ -815,6 +868,8 @@ export class ReservaService {
         sandboxInitPoint: null,
         mockConfirmed: true,
         paymentId: `mock-reserva-${Date.now()}`,
+        ...camposFee,
+        moneda: "ARS",
       };
     }
 
@@ -830,15 +885,6 @@ export class ReservaService {
       mobileParams: { reserva_id: id },
     });
 
-    const { PlatformFeeService } = await import("./platformFee.service");
-    const org = await PlatformFeeService.resolverOrgDesdeClub(club.id);
-    const precioTurno = Number(turnos.precio);
-    const breakdown = await PlatformFeeService.calcularCheckout(
-      "reservas",
-      org,
-      precioTurno,
-      1,
-    );
     const mpItems = PlatformFeeService.buildMpItems(
       {
         id: turnos.id,
@@ -872,6 +918,8 @@ export class ReservaService {
         response.sandbox_init_point,
       ),
       sandboxInitPoint: response.sandbox_init_point,
+      ...camposFee,
+      moneda: "ARS",
     };
   }
 

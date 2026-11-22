@@ -216,6 +216,21 @@ export class PlatformFeeService {
     };
   }
 
+  /** Campos estándar de desglose para preferencia / preview de checkout MP. */
+  static camposCheckoutApi(breakdown: PlatformFeeCheckoutBreakdown): {
+    monto_bruto: number;
+    cargo_servicio: number;
+    modo_fee: PlatformFeeModo;
+    monto: number;
+  } {
+    return {
+      monto_bruto: breakdown.montoBruto,
+      cargo_servicio: breakdown.montoFee,
+      modo_fee: breakdown.modo,
+      monto: breakdown.montoTotal,
+    };
+  }
+
   /**
    * Checkout de inscripción: una línea por plaza + cargo(s) por servicio discriminado(s).
    */

@@ -13,7 +13,7 @@ export function entryMatchForLeafSeed(
   return null;
 }
 
-function ladoConSemillaDirecta(
+export function ladoConSemillaDirecta(
   spec: FapBracketMatch,
 ): { side: "a" | "b"; seed: string } | null {
   if (!spec.a.startsWith("W") && parseZonePos(spec.a)) {
@@ -25,10 +25,55 @@ function ladoConSemillaDirecta(
   return null;
 }
 
-function ladoReservadoGanador(spec: FapBracketMatch): "a" | "b" | null {
+export function ladoReservadoGanador(spec: FapBracketMatch): "a" | "b" | null {
   if (spec.a.startsWith("W")) return "a";
   if (spec.b.startsWith("W")) return "b";
   return null;
+}
+
+/** Cruce hoja + hueco W* (p. ej. 1A vs W50): permite materializar rival en partido de entrada. */
+export function inferirSemillaPaseDirectoEnSpec(
+  spec: FapBracketMatch,
+): string | null {
+  const seedSide = ladoConSemillaDirecta(spec);
+  const ladoW = ladoReservadoGanador(spec);
+  if (!seedSide || !ladoW) return null;
+  return seedSide.seed;
+}
+
+/**
+ * Si el admin preparó alta en el lado del clasificado, mueve el payload al lado W*
+ * para que la pareja nueva no reemplace al pase directo.
+ */
+export function corregirAltaEnPaseDirecto(
+  spec: FapBracketMatch,
+  tieneAltaA: boolean,
+  tieneAltaB: boolean,
+): {
+  tieneAltaA: boolean;
+  tieneAltaB: boolean;
+  semillaInferida: string | null;
+} {
+  const seedSide = ladoConSemillaDirecta(spec);
+  const ladoW = ladoReservadoGanador(spec);
+  if (!seedSide || !ladoW) {
+    return {
+      tieneAltaA: tieneAltaA,
+      tieneAltaB: tieneAltaB,
+      semillaInferida: null,
+    };
+  }
+  if (tieneAltaA && seedSide.side === "a") {
+    return { tieneAltaA: false, tieneAltaB: true, semillaInferida: seedSide.seed };
+  }
+  if (tieneAltaB && seedSide.side === "b") {
+    return { tieneAltaA: true, tieneAltaB: false, semillaInferida: seedSide.seed };
+  }
+  return {
+    tieneAltaA,
+    tieneAltaB,
+    semillaInferida: inferirSemillaPaseDirectoEnSpec(spec),
+  };
 }
 
 export type PlanMaterializarByeFap = {

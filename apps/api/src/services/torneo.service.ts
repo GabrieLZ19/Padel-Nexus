@@ -2535,44 +2535,107 @@ export class TorneoService {
     const inscripcionesCreadas: string[] = [];
 
     try {
-    if (opciones?.altaLadoA) {
-      const { LlaveAltaParejaService } = await import(
-        "./llaveAltaPareja.service"
-      );
-      const creada = await LlaveAltaParejaService.ejecutarAltaDesdePayload({
-        torneoDestinoId: partido.torneo_id,
-        adminId,
-        motivo,
-        payload: opciones.altaLadoA,
-      });
-      nextA = creada.id;
-      inscripcionesCreadas.push(creada.id);
-    }
-    if (opciones?.altaLadoB) {
-      const { LlaveAltaParejaService } = await import(
-        "./llaveAltaPareja.service"
-      );
-      const creada = await LlaveAltaParejaService.ejecutarAltaDesdePayload({
-        torneoDestinoId: partido.torneo_id,
-        adminId,
-        motivo,
-        payload: opciones.altaLadoB,
-      });
-      nextB = creada.id;
-      inscripcionesCreadas.push(creada.id);
-    }
-
     const { PromocionMenoresService } = await import(
       "./promocionMenores.service"
     );
     const { ORDEN_RONDAS_LLAVE, normalizarRonda } = await import(
       "../utils/edicionLlaveMenores"
     );
-    const { liberarParejasDuplicadasEnLlave } = await import(
-      "../utils/edicionLlaveDuplicados"
-    );
     const esLlave = (ORDEN_RONDAS_LLAVE as readonly string[]).includes(
       normalizarRonda(partido.ronda || ""),
+    );
+
+    let altaLadoAInput = opciones?.altaLadoA;
+    let altaLadoBInput = opciones?.altaLadoB;
+    let semillaFapEfectiva = opciones?.semillaFap;
+    let fapMatchNoOrden = partido.orden;
+    let fapMatrixLoaded: readonly import("../utils/fapBracketTypes").FapBracketMatch[] | null =
+      null;
+
+    if (esLlave) {
+      const { esEliminatoriaDirecta } = await import("../utils/formatoTorneo");
+      const { resolveFapPlantillaPairCount } = await import(
+        "../utils/fapPlantillaTorneo"
+      );
+      const { getFapBracketForPairCount } = await import(
+        "../utils/fapBracketMatrices"
+      );
+      const { corregirAltaEnPaseDirecto } = await import(
+        "../utils/fapByeMaterializacion"
+      );
+      const { resolverMatchNoFap } = await import(
+        "../utils/fapVinculoPartidos"
+      );
+      const { data: torneoFmtPre } = await supabaseAdmin
+        .from("torneos")
+        .select("formato")
+        .eq("id", partido.torneo_id)
+        .maybeSingle();
+      if (torneoFmtPre && !esEliminatoriaDirecta(torneoFmtPre.formato)) {
+        const pairCount = await resolveFapPlantillaPairCount(partido.torneo_id);
+        const matrix = getFapBracketForPairCount(pairCount);
+        if (matrix?.length) {
+          fapMatrixLoaded = matrix;
+          const { data: playoffRows } = await supabaseAdmin
+            .from("partidos")
+            .select("id, ronda, orden")
+            .eq("torneo_id", partido.torneo_id)
+            .in("ronda", [...ORDEN_RONDAS_LLAVE]);
+          fapMatchNoOrden = resolverMatchNoFap(
+            partido.id,
+            partido.orden,
+            matrix,
+            playoffRows ?? [],
+          );
+          const specPre = matrix.find((m) => m.matchNo === fapMatchNoOrden);
+          if (specPre) {
+            const corr = corregirAltaEnPaseDirecto(
+              specPre,
+              Boolean(altaLadoAInput),
+              Boolean(altaLadoBInput),
+            );
+            if (corr.tieneAltaB && !altaLadoBInput && altaLadoAInput) {
+              altaLadoBInput = altaLadoAInput;
+              altaLadoAInput = undefined;
+            } else if (corr.tieneAltaA && !altaLadoAInput && altaLadoBInput) {
+              altaLadoAInput = altaLadoBInput;
+              altaLadoBInput = undefined;
+            }
+            semillaFapEfectiva =
+              semillaFapEfectiva ?? corr.semillaInferida ?? undefined;
+          }
+        }
+      }
+    }
+
+    if (altaLadoAInput) {
+      const { LlaveAltaParejaService } = await import(
+        "./llaveAltaPareja.service"
+      );
+      const creada = await LlaveAltaParejaService.ejecutarAltaDesdePayload({
+        torneoDestinoId: partido.torneo_id,
+        adminId,
+        motivo,
+        payload: altaLadoAInput,
+      });
+      nextA = creada.id;
+      inscripcionesCreadas.push(creada.id);
+    }
+    if (altaLadoBInput) {
+      const { LlaveAltaParejaService } = await import(
+        "./llaveAltaPareja.service"
+      );
+      const creada = await LlaveAltaParejaService.ejecutarAltaDesdePayload({
+        torneoDestinoId: partido.torneo_id,
+        adminId,
+        motivo,
+        payload: altaLadoBInput,
+      });
+      nextB = creada.id;
+      inscripcionesCreadas.push(creada.id);
+    }
+    const { liberarParejasDuplicadasEnLlave } = await import(
+      "../utils/edicionLlaveDuplicados"
     );
     if (esLlave) {
       const { esEliminatoriaDirecta } = await import("../utils/formatoTorneo");
@@ -2598,11 +2661,12 @@ export class TorneoService {
         const pairCount = await resolveFapPlantillaPairCount(
           partido.torneo_id,
         );
-        const matrix = getFapBracketForPairCount(pairCount);
-        const spec = matrix?.find((m) => m.matchNo === partido.orden);
-        const altaLado = opciones?.altaLadoA
+        const matrix =
+          fapMatrixLoaded ?? getFapBracketForPairCount(pairCount) ?? null;
+        const spec = matrix?.find((m) => m.matchNo === fapMatchNoOrden);
+        const altaLado = altaLadoAInput
           ? ("a" as const)
-          : opciones?.altaLadoB
+          : altaLadoBInput
             ? ("b" as const)
             : undefined;
         let omitirValidacionMatriz = false;
@@ -2610,7 +2674,7 @@ export class TorneoService {
           const planBye =
             planificarMaterializacionByeFap(
               spec,
-              partido.orden,
+              fapMatchNoOrden,
               matrix,
               prevA,
               prevB,
@@ -2618,10 +2682,10 @@ export class TorneoService {
               nextB,
               altaLado,
             ) ??
-            (opciones?.semillaFap
+            (semillaFapEfectiva
               ? planificarMaterializacionByeConSemilla(
-                  opciones.semillaFap,
-                  partido.orden,
+                  semillaFapEfectiva,
+                  fapMatchNoOrden,
                   matrix,
                   prevA,
                   prevB,

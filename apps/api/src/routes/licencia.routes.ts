@@ -81,6 +81,10 @@ router.get(
   "/:id/datos-transferencia",
   LicenciasController.obtenerDatosTransferenciaLicencia,
 );
+router.get(
+  "/:id/preview-checkout-mp",
+  LicenciasController.previewCheckoutMercadoPago,
+);
 router.post("/:id/preferencia-mp", LicenciasController.crearPreferenciaPago);
 router.post("/:id/confirmar-retorno", LicenciasController.confirmarRetornoPago);
 router.get("/verificacion/:usuario_id", LicenciasController.verificar);

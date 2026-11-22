@@ -30,6 +30,14 @@ router.post(
 router.use(authenticate);
 
 router.post("/ordenes", MarketplaceController.crearOrden);
+router.post(
+  "/preview-checkout",
+  MarketplaceController.previewCheckoutCarrito,
+);
+router.get(
+  "/ordenes/:id/preview-checkout",
+  MarketplaceController.previewCheckoutOrden,
+);
 router.post("/ordenes/:id/pagar", MarketplaceController.pagarOrden);
 router.post(
   "/ordenes/:id/confirmar-retorno",
