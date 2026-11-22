@@ -70,6 +70,39 @@ export class MarketplaceController {
     }
   }
 
+  static async listarTiendasPublicas(_req: Request, res: Response) {
+    try {
+      const tiendas = await MarketplaceService.listarTiendasPublicas();
+      res.json({ exito: true, data: tiendas });
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Error al listar tiendas.";
+      res.status(500).json({ message });
+    }
+  }
+
+  static async listarCampanasSponsorPublicas(req: Request, res: Response) {
+    try {
+      const espacio = req.query.espacio as string;
+      const espaciosValidos = ["banner", "home", "tienda", "checkout"];
+      if (!espacio || !espaciosValidos.includes(espacio)) {
+        return res
+          .status(400)
+          .json({ message: "Parámetro espacio inválido." });
+      }
+      const vendedorId = req.query.vendedor_id as string | undefined;
+      const data = await MarketplaceService.listarCampanasSponsorPublicas({
+        espacio: espacio as "banner" | "home" | "tienda" | "checkout",
+        vendedor_id: vendedorId,
+      });
+      res.json({ exito: true, data });
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Error al listar campañas.";
+      res.status(500).json({ message });
+    }
+  }
+
   static async obtenerTiendaPublica(req: Request, res: Response) {
     try {
       const tienda = await MarketplaceService.obtenerTiendaPublica(req.params.id);
@@ -642,6 +675,22 @@ export class MarketplaceController {
       res.json(vendedor);
     } catch (err: any) {
       res.status(400).json({ message: err.message });
+    }
+  }
+
+  static async actualizarTiendaDestacada(req: Request, res: Response) {
+    try {
+      const destacada = Boolean(req.body?.destacada);
+      const vendedor = await MarketplaceService.actualizarTiendaDestacada(
+        req.params.id,
+        destacada,
+        req.user!.id,
+      );
+      res.json(vendedor);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "No se pudo actualizar.";
+      res.status(400).json({ message });
     }
   }
 

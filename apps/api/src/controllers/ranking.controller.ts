@@ -23,6 +23,25 @@ export const RankingsController = {
     }
   },
 
+  async listarContextosJugador(req: Request, res: Response): Promise<Response> {
+    try {
+      const usuarioId = req.user?.id;
+      if (!usuarioId) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "Sesión requerida." });
+      }
+      const data = await RankingService.listarContextosRankingJugador(usuarioId);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al obtener contextos de ranking.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
   async obtenerRankingGlobal(req: Request, res: Response): Promise<Response> {
     try {
       const {

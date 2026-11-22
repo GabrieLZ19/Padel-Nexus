@@ -20,6 +20,11 @@ router.get(
   MarketplaceController.listarValoracionesProducto,
 );
 router.get("/marcas", MarketplaceController.listarMarcas);
+router.get("/tiendas", MarketplaceController.listarTiendasPublicas);
+router.get(
+  "/sponsor-campanas/publicas",
+  MarketplaceController.listarCampanasSponsorPublicas,
+);
 router.get("/tiendas/:id", MarketplaceController.obtenerTiendaPublica);
 
 router.post(
@@ -194,6 +199,11 @@ router.patch(
   "/admin/vendedores/:id/reactivar",
   authorize(["superadmin", "admin_federacion", "admin"]),
   MarketplaceController.reactivarVendedor,
+);
+router.patch(
+  "/admin/vendedores/:id/destacada",
+  authorize(["superadmin"]),
+  MarketplaceController.actualizarTiendaDestacada,
 );
 
 export default router;

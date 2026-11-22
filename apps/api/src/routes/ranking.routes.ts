@@ -14,6 +14,11 @@ router.get(
   "/provincial/:torneo_id",
   RankingsController.rankingProvincialTorneo,
 );
+router.get(
+  "/mis-contextos",
+  authenticate,
+  RankingsController.listarContextosJugador,
+);
 router.get("/:usuario_id", RankingsController.obtenerPerfilRanking);
 
 // --- Rutas Administrativas Protegidas ---

@@ -23,7 +23,10 @@ import {
   type EntidadMarketplaceRef,
 } from "./marketplace-entity-auth.service";
 import { fechaHoyArgentina } from "../utils/fechaArgentina";
-import { estadoPersistibleCampanaSponsor } from "../utils/sponsorCampanaVigencia";
+import {
+  campanaSponsorVisiblePublico,
+  estadoPersistibleCampanaSponsor,
+} from "../utils/sponsorCampanaVigencia";
 import {
   ordenPendienteExpirada,
   retencionInicialOrdenDesde,
@@ -1811,6 +1814,159 @@ export class MarketplaceService {
         a.nombre.localeCompare(b.nombre, "es"),
       ),
     };
+  }
+
+  /** Listado público de tiendas activas (destacadas primero). */
+  static async listarTiendasPublicas() {
+    const { data, error } = await supabaseAdmin
+      .from("marketplace_vendedores")
+      .select(
+        "id, nombre_tienda, logo_url, provincia, valoracion_promedio, tienda_destacada",
+      )
+      .eq("estado", MARKETPLACE_ESTADOS_VENDEDOR.ACTIVO)
+      .not("entidad_id", "is", null)
+      .order("tienda_destacada", { ascending: false })
+      .order("nombre_tienda", { ascending: true });
+
+    if (error) {
+      throw new Error(`Error al listar tiendas: ${error.message}`);
+    }
+
+    const tiendas = data || [];
+    const conConteo = await Promise.all(
+      tiendas.map(async (tienda) => {
+        const { count } = await supabaseAdmin
+          .from("marketplace_productos")
+          .select("id", { count: "exact", head: true })
+          .eq("vendedor_id", tienda.id)
+          .eq("activo", true);
+        return {
+          ...tienda,
+          productos_activos: count || 0,
+        };
+      }),
+    );
+
+    return conConteo.filter((t) => t.productos_activos > 0);
+  }
+
+  /** Campañas sponsor visibles en espacios públicos (home, banner, tienda, checkout). */
+  static async listarCampanasSponsorPublicas(filtros: {
+    espacio: EspacioSponsorCampana;
+    vendedor_id?: string;
+  }) {
+    const hoy = fechaHoyArgentina();
+
+    let query = supabaseAdmin
+      .from("marketplace_sponsor_campanas")
+      .select(
+        `
+        id,
+        sponsor_id,
+        vendedor_id,
+        titulo,
+        descripcion,
+        espacio,
+        fecha_inicio,
+        fecha_fin,
+        imagen_url,
+        link_url,
+        estado,
+        sponsor:marketplace_sponsors!inner(id, nombre, logo_url, activo),
+        vendedor:marketplace_vendedores!inner(id, estado, entidad_id)
+      `,
+      )
+      .eq("espacio", filtros.espacio);
+
+    if (filtros.vendedor_id) {
+      query = query.eq("vendedor_id", filtros.vendedor_id);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Error al listar campañas públicas: ${error.message}`);
+    }
+
+    const visibles = (data || []).filter((row) => {
+      const sponsorRaw = row.sponsor as
+        | { activo?: boolean }
+        | { activo?: boolean }[]
+        | null;
+      const sponsor = Array.isArray(sponsorRaw) ? sponsorRaw[0] : sponsorRaw;
+      if (!sponsor?.activo) return false;
+
+      const vendedorRaw = row.vendedor as
+        | { estado?: string; entidad_id?: string | null }
+        | { estado?: string; entidad_id?: string | null }[]
+        | null;
+      const vendedor = Array.isArray(vendedorRaw) ? vendedorRaw[0] : vendedorRaw;
+      if (vendedor?.estado !== MARKETPLACE_ESTADOS_VENDEDOR.ACTIVO) return false;
+      if (!vendedor?.entidad_id) return false;
+
+      return campanaSponsorVisiblePublico(
+        String(row.estado),
+        row.fecha_inicio as string,
+        row.fecha_fin as string,
+        hoy,
+      );
+    });
+
+    return visibles.map((row) => {
+      const sponsorRaw = row.sponsor as
+        | { id: string; nombre: string; logo_url?: string | null; activo: boolean }
+        | { id: string; nombre: string; logo_url?: string | null; activo: boolean }[]
+        | null;
+      const sponsor = Array.isArray(sponsorRaw) ? sponsorRaw[0] : sponsorRaw;
+      return {
+        id: row.id as string,
+        sponsor_id: row.sponsor_id as string,
+        vendedor_id: row.vendedor_id as string,
+        titulo: row.titulo as string,
+        descripcion: (row.descripcion as string | null) ?? null,
+        espacio: row.espacio as EspacioSponsorCampana,
+        fecha_inicio: row.fecha_inicio as string,
+        fecha_fin: row.fecha_fin as string,
+        imagen_url: (row.imagen_url as string | null) ?? null,
+        link_url: (row.link_url as string | null) ?? null,
+        estado: row.estado as EstadoSponsorCampana,
+        sponsor: sponsor
+          ? {
+              id: sponsor.id,
+              nombre: sponsor.nombre,
+              logo_url: sponsor.logo_url ?? null,
+            }
+          : null,
+      };
+    });
+  }
+
+  static async actualizarTiendaDestacada(
+    vendedorId: string,
+    destacada: boolean,
+    adminId: string,
+  ) {
+    const { data, error } = await supabaseAdmin
+      .from("marketplace_vendedores")
+      .update({ tienda_destacada: destacada })
+      .eq("id", vendedorId)
+      .not("entidad_id", "is", null)
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new Error("No se pudo actualizar la tienda destacada.");
+    }
+
+    await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: adminId,
+      accion: destacada
+        ? "DESTACAR_TIENDA_MARKETPLACE"
+        : "QUITAR_DESTACADO_TIENDA_MARKETPLACE",
+      entidad_afectada: `marketplace_vendedores_id: ${vendedorId}`,
+      detalles: { destacada, fecha: new Date().toISOString() },
+    });
+
+    return data;
   }
 
   private static async resolverDestinatariosPromocion(

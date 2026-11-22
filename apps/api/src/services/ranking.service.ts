@@ -25,6 +25,13 @@ import {
   provinciaParaRanking,
 } from "../utils/provinciaRanking";
 import { enriquecerHistorialConRonda } from "../utils/historialRankingRonda";
+import {
+  contextoDesdeTorneo,
+  fusionarContextosRanking,
+  type RankingContextoJugador,
+  type TorneoContextoMin,
+} from "../utils/rankingContextoJugador";
+import { FAP_ESTADOS_PAGO } from "../constants/fap";
 
 export interface ActualizarPuntosDTO {
   usuarioId: string;
@@ -673,6 +680,124 @@ export class RankingService {
       .sort((a, b) => b.puntos - a.puntos);
 
     return { torneos: ids.length, provincias };
+  }
+
+  /**
+   * Torneos / circuitos recientes donde el jugador está inscripto (pago confirmado)
+   * o tiene puntos en historial, con filtros listos para el ranking público.
+   */
+  static async listarContextosRankingJugador(
+    usuarioId: string,
+  ): Promise<RankingContextoJugador[]> {
+    const torneosSelect = `
+      id,
+      nombre,
+      fecha,
+      fecha_fin,
+      alcance,
+      categoria,
+      nivel,
+      es_prueba,
+      asociaciones:asociacion_id ( provincia ),
+      clubes:club_id ( provincia )
+    `;
+
+    const [inscripcionesResult, historialResult] = await Promise.all([
+      supabaseAdmin
+        .from("inscripciones")
+        .select(`created_at, torneo_id, torneos!inner (${torneosSelect})`)
+        .or(`usuario_id.eq.${usuarioId},usuario2_id.eq.${usuarioId}`)
+        .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO),
+      supabaseAdmin
+        .from("historial_ranking")
+        .select(`created_at, torneo_id, torneos!inner (${torneosSelect})`)
+        .eq("usuario_id", usuarioId),
+    ]);
+
+    if (inscripcionesResult.error) {
+      throw new Error(inscripcionesResult.error.message);
+    }
+    if (historialResult.error) {
+      throw new Error(historialResult.error.message);
+    }
+
+    const parciales: RankingContextoJugador[] = [];
+
+    const pushTorneo = (
+      torneoRaw: unknown,
+      fechaExtra?: string | null,
+    ) => {
+      if (!torneoRaw || typeof torneoRaw !== "object") return;
+      const torneo = torneoRaw as TorneoContextoMin;
+      if (esTorneoDePrueba(torneo)) return;
+      const ctx = contextoDesdeTorneo(torneo, fechaExtra);
+      if (ctx) parciales.push(ctx);
+    };
+
+    for (const row of inscripcionesResult.data || []) {
+      pushTorneo(row.torneos, row.created_at as string | undefined);
+    }
+
+    for (const row of historialResult.data || []) {
+      pushTorneo(row.torneos, row.created_at as string | undefined);
+    }
+
+    const fusionados = fusionarContextosRanking(parciales);
+
+    if (fusionados.length > 0) {
+      return fusionados;
+    }
+
+    const { data: perfil } = await supabaseAdmin
+      .from("perfiles")
+      .select("categoria_padel")
+      .eq("id", usuarioId)
+      .maybeSingle();
+
+    const { data: filasRanking } = await supabaseAdmin
+      .from("rankings")
+      .select(
+        "categoria, alcance, provincia_jurisdiccion, puntos, actualizado_hace",
+      )
+      .eq("usuario_id", usuarioId)
+      .gt("puntos", 0)
+      .order("actualizado_hace", { ascending: false })
+      .limit(5);
+
+    const fallback: RankingContextoJugador[] = [];
+    for (const fila of filasRanking || []) {
+      const categoria = fila.categoria || perfil?.categoria_padel;
+      if (!categoria) continue;
+      const scope = String(fila.alcance || "Provincial").trim();
+      const alcance: RankingContextoJugador["scope"] =
+        scope === "Global"
+          ? "Global"
+          : scope === "Nacional"
+            ? "Nacional"
+            : "Provincial";
+      const provincia =
+        alcance === "Provincial"
+          ? String(fila.provincia_jurisdiccion || "").trim() || null
+          : null;
+      const fechaReferencia =
+        (fila.actualizado_hace as string) || new Date().toISOString();
+      const sinteticoId = `ranking-${categoria}-${alcance}-${provincia || "na"}`;
+      fallback.push({
+        id: sinteticoId,
+        torneoId: sinteticoId,
+        torneoNombre: "Mi ranking",
+        scope: alcance,
+        categoria: String(categoria),
+        provincia,
+        etiqueta:
+          alcance === "Provincial" && provincia
+            ? `Ranking ${alcance} · ${provincia} · ${categoria}`
+            : `Ranking ${alcance} · ${categoria}`,
+        fechaReferencia,
+      });
+    }
+
+    return fallback;
   }
 }
 
