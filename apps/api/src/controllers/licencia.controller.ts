@@ -474,12 +474,20 @@ export const LicenciasController = {
       if (!usuarioId) {
         return res.status(401).json({ exito: false, error: "No autenticado." });
       }
-      const paymentId =
-        (req.body?.payment_id as string) || `mobile-licencia-${Date.now()}`;
-      const data = await LicenciaService.confirmarPagoLicencia(
-        req.params.id,
+
+      const licenciaId = String(req.params.id || "").trim();
+      const paymentIdRaw = req.body?.payment_id as string | undefined;
+      if (!paymentIdRaw?.trim()) {
+        return res.status(400).json({
+          exito: false,
+          error: "Se requiere el payment_id de Mercado Pago.",
+        });
+      }
+
+      const data = await LicenciaService.confirmarPagoLicenciaRetorno(
+        licenciaId,
         usuarioId,
-        String(paymentId),
+        paymentIdRaw.trim(),
       );
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {

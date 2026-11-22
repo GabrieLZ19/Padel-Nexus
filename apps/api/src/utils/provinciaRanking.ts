@@ -1,6 +1,44 @@
 import { supabaseAdmin } from "../config/supabase";
 import { normalizarProvincia } from "../constants/rankings";
 
+type PerfilProvinciaMin = {
+  lugar_residencia?: string | null;
+  clubes?: { provincia?: string | null } | null;
+};
+
+/** Filtra filas de ranking con la misma regla provincial del listado público. */
+export function filtrarFilasRankingPorProvincia<
+  T extends { perfiles?: PerfilProvinciaMin | null },
+>(filas: T[], provincia: string, siglas: Map<string, string>): T[] {
+  const prov = String(provincia || "").trim();
+  if (!prov) return filas;
+  return filas.filter((j) =>
+    jugadorPerteneceProvinciaRanking(
+      j.perfiles?.lugar_residencia,
+      j.perfiles?.clubes?.provincia,
+      siglas,
+      prov,
+    ),
+  );
+}
+
+/** ¿El jugador pertenece al filtro provincial del ranking público? (PUB-27) */
+export function jugadorPerteneceProvinciaRanking(
+  lugarResidencia: string | null | undefined,
+  clubProvincia: string | null | undefined,
+  siglas: Map<string, string>,
+  provinciaFiltro: string,
+): boolean {
+  const provNorm = normalizarProvincia(provinciaFiltro);
+  if (!provNorm) return false;
+  const resuelta = provinciaParaRanking(
+    lugarResidencia,
+    siglas,
+    clubProvincia,
+  );
+  return normalizarProvincia(resuelta) === provNorm;
+}
+
 const PROVINCIAS_ARG = [
   "Buenos Aires",
   "CABA",

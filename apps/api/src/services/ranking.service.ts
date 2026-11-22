@@ -20,6 +20,7 @@ import {
 import { esTorneoDePrueba, esVisibleEnSitioPublico } from "../utils/datoPrueba";
 import { esEmailPlaceholderPlanilla } from "../utils/inscripcionPlanilla";
 import {
+  filtrarFilasRankingPorProvincia,
   mapaSiglaAsociacionProvincia,
   provinciaParaRanking,
 } from "../utils/provinciaRanking";
@@ -165,6 +166,7 @@ export class RankingService {
           String(row.alcance || "Provincial"),
           String(row.categoria),
           rama,
+          String(row.provincia_jurisdiccion || "").trim() || null,
         );
         return {
           ...row,
@@ -182,12 +184,38 @@ export class RankingService {
     alcance: string,
     categoria: string,
     rama?: RamaRanking | null,
+    provinciaJurisdiccion?: string | null,
   ): Promise<number | null> {
+    let provinciaFiltro: string | undefined;
+    if (String(alcance).trim() === "Provincial") {
+      const canonJurisdiccion = String(provinciaJurisdiccion || "").trim();
+      if (canonJurisdiccion) {
+        provinciaFiltro = canonJurisdiccion;
+      } else {
+        const { data: perfil } = await supabaseAdmin
+          .from("perfiles")
+          .select(
+            "lugar_residencia, clubes:clubes!perfiles_club_id_fkey ( provincia )",
+          )
+          .eq("id", usuarioId)
+          .maybeSingle();
+        const clubEmbed = perfil?.clubes as { provincia?: string | null } | null;
+        const siglas = await mapaSiglaAsociacionProvincia();
+        const resuelta = provinciaParaRanking(
+          perfil?.lugar_residencia,
+          siglas,
+          clubEmbed?.provincia,
+        );
+        if (resuelta) provinciaFiltro = resuelta;
+      }
+    }
+
     const global = await RankingService.obtenerRankingGlobal({
       alcance,
       categoria,
       rama: rama ?? undefined,
       limit: 500,
+      provincia: provinciaFiltro,
     });
     const hit = global.find((j) => j.usuario_id === usuarioId);
     if (!hit) return null;
@@ -284,6 +312,9 @@ export class RankingService {
     // Se aplica SIEMPRE que venga `provincia`, sin importar el alcance:
     // provincia es un filtro transversal (el usuario lo eligio explicitamente).
     const debeFiltrarProvincia = Boolean(provincia);
+    const siglasProvincia = debeFiltrarProvincia
+      ? await mapaSiglaAsociacionProvincia()
+      : null;
 
     const { data, error } = await query;
     if (error) {
@@ -316,16 +347,13 @@ export class RankingService {
         apellidoValidoParaRanking(jugador.perfiles?.apellido),
     );
 
-    // Filtro provincial insensible a acentos y mayusculas, aplicado en memoria.
-    // Se resuelve UNICAMENTE contra `perfiles.lugar_residencia` (la provincia
-    // que declara el jugador). Antes teniamos fallback al club, pero eso
-    // introducia jugadores fuera de la provincia elegida (ej. residente en
-    // Cordoba con club en Buenos Aires apareciendo bajo "Buenos Aires").
-    if (debeFiltrarProvincia) {
-      const provNorm = normalizarProvincia(provincia);
-      filas = filas.filter(
-        (jugador) =>
-          normalizarProvincia(jugador.perfiles?.lugar_residencia) === provNorm,
+    // Filtro provincial (PUB-27): misma regla que `provincia_ranking` en la respuesta
+    // (sigla de asociación → provincia, nombre canónico, fallback al club del perfil).
+    if (debeFiltrarProvincia && siglasProvincia) {
+      filas = filtrarFilasRankingPorProvincia(
+        filas,
+        String(provincia),
+        siglasProvincia,
       );
     }
 
@@ -361,7 +389,8 @@ export class RankingService {
     const userIds = uniqueData.map((jugador) => jugador.usuario_id);
     const afiliacionesMap: Record<string, { nombre: string; provincia: string }> = {};
 
-    const siglasProvincia = await mapaSiglaAsociacionProvincia();
+    const siglasParaDisplay =
+      siglasProvincia ?? (await mapaSiglaAsociacionProvincia());
 
     if (userIds.length > 0) {
       const { data: afs } = await supabaseAdmin
@@ -400,8 +429,10 @@ export class RankingService {
       const clubInfo = afiliacionesMap[jugador.usuario_id] || null;
       const provinciaRanking = provinciaParaRanking(
         String(perfilObj.lugar_residencia || ""),
-        siglasProvincia,
-        clubInfo?.provincia,
+        siglasParaDisplay,
+        clubInfo?.provincia ||
+          (perfilObj.clubes as { provincia?: string | null } | undefined)
+            ?.provincia,
       );
 
       const emailPerfil = String(

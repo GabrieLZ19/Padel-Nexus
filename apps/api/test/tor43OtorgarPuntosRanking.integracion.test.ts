@@ -120,22 +120,38 @@ function torneoInfoClubLocal() {
 describe("TOR-43 integración: otorgar puntos sin duplicar ranking", () => {
   it("actualiza fila existente 7ª Provincial al sumar puntos de torneo Local", async () => {
     activo = clienteScript([
-      // rondas previas sin partidos (PRELIMINARES, 16AVOS, 32AVOS…)
-      { data: [], error: null },
-      { data: [], error: null },
-      { data: [], error: null },
-      // perdedor: inscripción
+      // perdedor: inscripción y 2 jugadores con puntos de instancia OCTAVOS
       {
         data: { usuario_id: "user-p1", usuario2_id: "user-p2" },
         error: null,
       },
+      {
+        data: {
+          id: "rank-perdedor-1",
+          puntos: 120,
+          pj: 5,
+          pg: 2,
+          alcance: "Provincial",
+          provincia_jurisdiccion: "Neuquén",
+        },
+        error: null,
+      },
       { data: null, error: null },
       { data: null, error: null },
+      {
+        data: {
+          id: "rank-perdedor-2",
+          puntos: 80,
+          pj: 4,
+          pg: 1,
+          alcance: "Provincial",
+          provincia_jurisdiccion: "Neuquén",
+        },
+        error: null,
+      },
       { data: null, error: null },
       { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
-      // ganador: inscripción
+      // ganador: inscripción (solo estadísticas pj/pg, TOR-47)
       {
         data: { usuario_id: USER1, usuario2_id: USER2 },
         error: null,
@@ -152,10 +168,17 @@ describe("TOR-43 integración: otorgar puntos sin duplicar ranking", () => {
         error: null,
       },
       { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
+      {
+        data: {
+          id: "rank-ganador-2",
+          puntos: 400,
+          pj: 9,
+          pg: 6,
+          alcance: "Provincial",
+          provincia_jurisdiccion: "Neuquén",
+        },
+        error: null,
+      },
       { data: null, error: null },
     ]);
 
@@ -190,11 +213,20 @@ describe("TOR-43 integración: otorgar puntos sin duplicar ranking", () => {
       "Debe reutilizar la fila existente del jugador 1 sin duplicar categoría",
     );
 
-    const fila = upsertGanador!.payload as Record<string, unknown>;
-    assert.equal(fila.categoria, "7ª");
-    assert.equal(fila.alcance, "Provincial");
-    assert.equal(fila.puntos, 500 + 90);
-    assert.equal(fila.pj, 11);
-    assert.equal(fila.pg, 8);
+    const filaGanador = upsertGanador!.payload as Record<string, unknown>;
+    assert.equal(filaGanador.categoria, "7ª");
+    assert.equal(filaGanador.alcance, "Provincial");
+    assert.equal(filaGanador.puntos, 500);
+    assert.equal(filaGanador.pj, 11);
+    assert.equal(filaGanador.pg, 8);
+
+    const upsertPerdedor = upsertRanking.find(
+      (u) => (u.payload as Record<string, unknown>).usuario_id === "user-p1",
+    );
+    assert.ok(upsertPerdedor, "Debe actualizar ranking del perdedor");
+    const filaPerdedor = upsertPerdedor!.payload as Record<string, unknown>;
+    assert.equal(filaPerdedor.puntos, 120 + 90);
+    assert.equal(filaPerdedor.pj, 6);
+    assert.equal(filaPerdedor.pg, 2);
   });
 });

@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../config/supabase";
 import {
   alcanceRankingDesdeTorneo,
+  puntosInstanciaEliminatoria,
   tablaPuntosDesdeConfig,
   type ConfigPuntosTorneo,
 } from "./rankingTorneo";
@@ -82,8 +83,12 @@ export async function otorgarPuntosPorPartidoRanking(
     inscripcionId: string | null,
     puntos: number,
     esGanador: boolean,
+    opciones?: { registrarEstadisticasSinPuntos?: boolean },
   ) => {
-    if (!inscripcionId || puntos <= 0) return;
+    if (!inscripcionId) return;
+    const registrarStats =
+      puntos > 0 || Boolean(opciones?.registrarEstadisticasSinPuntos);
+    if (!registrarStats) return;
     const { data: ins } = await supabaseAdmin
       .from("inscripciones")
       .select("usuario_id, usuario2_id")
@@ -116,7 +121,7 @@ export async function otorgarPuntosPorPartidoRanking(
           alcance: rank?.alcance ?? alcanceRanking,
           provincia_jurisdiccion:
             provinciaJurisdiccion ?? rank?.provincia_jurisdiccion ?? null,
-          puntos: pAnt + puntos,
+          puntos: pAnt + Math.max(0, puntos),
           pj: pjAnt + 1,
           pg: esGanador ? pgAnt + 1 : pgAnt,
         },
@@ -127,21 +132,23 @@ export async function otorgarPuntosPorPartidoRanking(
         throw new Error(`Error al actualizar ranking: ${rankError.message}`);
       }
 
-      const { error: histError } = await supabaseAdmin
-        .from("historial_ranking")
-        .insert([
-          {
-            usuario_id: uid,
-            torneo_id: partido.torneo_id,
-            puntos_anteriores: pAnt,
-            puntos_nuevos: pAnt + puntos,
-            ronda: partido.ronda ?? null,
-          },
-        ]);
-      if (histError) {
-        throw new Error(
-          `Error al insertar historial de ranking: ${histError.message}`,
-        );
+      if (puntos > 0) {
+        const { error: histError } = await supabaseAdmin
+          .from("historial_ranking")
+          .insert([
+            {
+              usuario_id: uid,
+              torneo_id: partido.torneo_id,
+              puntos_anteriores: pAnt,
+              puntos_nuevos: pAnt + puntos,
+              ronda: partido.ronda ?? null,
+            },
+          ]);
+        if (histError) {
+          throw new Error(
+            `Error al insertar historial de ranking: ${histError.message}`,
+          );
+        }
       }
     }
   };
@@ -157,48 +164,32 @@ export async function otorgarPuntosPorPartidoRanking(
     return;
   }
 
-  const puntosRonda = TABLA_PUNTOS[rondaNormalizada];
-  let puntosGanadorNetos = puntosRonda?.ganador || 0;
-  let puntosPerdedorNetos = puntosRonda?.perdedor || 0;
+  const configPuntos = (configP || {}) as ConfigPuntosTorneo;
+  const puntosGanador = puntosInstanciaEliminatoria(
+    rondaNormalizada,
+    true,
+    configPuntos,
+  );
+  const puntosPerdedor = puntosInstanciaEliminatoria(
+    rondaNormalizada,
+    false,
+    configPuntos,
+  );
 
-  if (puntosRonda) {
-    const idxRonda = SECUENCIA_RONDAS.indexOf(
-      rondaNormalizada as (typeof SECUENCIA_RONDAS)[number],
-    );
-    let rondaAnterior: string | null = null;
-
-    if (idxRonda > 0) {
-      for (let i = idxRonda - 1; i >= 0; i--) {
-        const rondaCandidata = SECUENCIA_RONDAS[i];
-        const { data: prevMatches } = await supabaseAdmin
-          .from("partidos")
-          .select("id")
-          .eq("torneo_id", partido.torneo_id)
-          .eq("ronda", rondaCandidata)
-          .limit(1);
-
-        if (prevMatches && prevMatches.length > 0) {
-          rondaAnterior = rondaCandidata;
-          break;
-        }
-      }
-    }
-
-    if (rondaAnterior) {
-      const puntosRondaAnterior = TABLA_PUNTOS[rondaAnterior];
-      if (puntosRondaAnterior) {
-        puntosGanadorNetos = Math.max(
-          0,
-          puntosRonda.ganador - puntosRondaAnterior.ganador,
-        );
-        puntosPerdedorNetos = Math.max(
-          0,
-          puntosRonda.perdedor - puntosRondaAnterior.ganador,
-        );
-      }
-    }
-  }
-
-  await otorgarPuntosAInscripcion(perdedorId, puntosPerdedorNetos, false);
-  await otorgarPuntosAInscripcion(ganadorId, puntosGanadorNetos, true);
+  await otorgarPuntosAInscripcion(
+    perdedorId,
+    puntosPerdedor,
+    false,
+    puntosPerdedor > 0
+      ? undefined
+      : { registrarEstadisticasSinPuntos: true },
+  );
+  await otorgarPuntosAInscripcion(
+    ganadorId,
+    puntosGanador,
+    true,
+    puntosGanador > 0
+      ? undefined
+      : { registrarEstadisticasSinPuntos: true },
+  );
 }

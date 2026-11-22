@@ -14,6 +14,10 @@ import {
   descripcionVigenciaLicencia,
   periodoDesdeFecha,
 } from "../utils/licenciaConfig";
+import {
+  paymentIdMercadoPagoValido,
+  validarPagoMercadoPagoAprobado,
+} from "../utils/validarPagoMercadoPago";
 import { esRolAccesoCrm } from "../constants/roles";
 import { resumirLicenciasPorJugador } from "../utils/resumenLicencias";
 import { fechaLatina } from "../utils/fechaArgentina";
@@ -1449,6 +1453,47 @@ export class LicenciaService {
    * Acredita el pago al recibir notificación de Mercado Pago (webhook).
    * Idempotente si el pago ya estaba registrado.
    */
+  static async confirmarPagoLicenciaRetorno(
+    licenciaId: string,
+    usuarioId: string,
+    paymentId: string,
+  ) {
+    const paymentIdTrim = String(paymentId || "").trim();
+    if (!paymentIdTrim) {
+      throw new Error("Se requiere el payment_id de Mercado Pago.");
+    }
+
+    const { precio } = await LicenciaService.resolverPagoLicenciaJugador(
+      licenciaId,
+      usuarioId,
+    );
+
+    if (isMercadoPagoConfigured()) {
+      const validado = await validarPagoMercadoPagoAprobado({
+        paymentId: paymentIdTrim,
+        externalReferenceEsperada: `licencia:${licenciaId}`,
+        montoEsperado: precio,
+      });
+      return LicenciaService.confirmarPagoLicencia(
+        licenciaId,
+        usuarioId,
+        validado.paymentId,
+        validado.monto,
+      );
+    }
+
+    if (!permitirMockMercadoPagoLicencia()) {
+      throw new Error("Mercado Pago no está configurado.");
+    }
+
+    return LicenciaService.confirmarPagoLicencia(
+      licenciaId,
+      usuarioId,
+      paymentIdTrim,
+      precio,
+    );
+  }
+
   static async confirmarPagoLicenciaDesdeWebhook(
     licenciaId: string,
     paymentId: string,
@@ -1486,6 +1531,15 @@ export class LicenciaService {
     paymentId: string,
     monto?: number,
   ) {
+    if (
+      isMercadoPagoConfigured() &&
+      !paymentIdMercadoPagoValido(String(paymentId))
+    ) {
+      throw new Error(
+        "No se puede confirmar el pago sin un payment_id válido de Mercado Pago.",
+      );
+    }
+
     const { data: licencia, error } = await supabaseAdmin
       .from("licencias")
       .select("*")

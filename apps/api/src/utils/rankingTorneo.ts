@@ -54,6 +54,34 @@ export function inferirPuntosActivados(
   return torneoVinculaRanking(alcance);
 }
 
+/**
+ * Puntos absolutos de la instancia alcanzada en llave (TOR-47).
+ * El ganador del torneo recibe puntos_campeon; el perdedor de cada ronda, el valor de esa ronda.
+ * Los ganadores que avanzan no suman hasta ganar la final (solo estadísticas pj/pg).
+ */
+export function puntosInstanciaEliminatoria(
+  ronda: string,
+  esGanador: boolean,
+  config: ConfigPuntosTorneo,
+): number {
+  const r = String(ronda || "").toUpperCase().trim();
+  if (r === "FINAL") {
+    return esGanador
+      ? Number(config.puntos_campeon) || 0
+      : Number(config.puntos_final) || 0;
+  }
+  if (esGanador) return 0;
+  if (r === "SEMIS") return Number(config.puntos_semis) || 0;
+  if (r === "CUARTOS") return Number(config.puntos_cuartos) || 0;
+  if (r === "OCTAVOS") return Number(config.puntos_octavos) || 0;
+  if (r === "16AVOS") return Number(config.puntos_16avos) || 0;
+  if (r === "32AVOS") return Number(config.puntos_32avos) || 0;
+  if (r === "PRELIMINARES") {
+    return Number(config.puntos_16avos) || 0;
+  }
+  return 0;
+}
+
 export function tablaPuntosDesdeConfig(
   config: ConfigPuntosTorneo | null | undefined,
 ): Record<string, { ganador: number; perdedor: number }> | null {
