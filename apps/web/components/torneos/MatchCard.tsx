@@ -97,13 +97,17 @@ export const MatchCard = ({
         ? partido.equipo_a_letra_prioridad
         : partido.equipo_b_letra_prioridad;
     const empty = !j1 && !j2;
+    const origenStr = String(origen || "").trim();
+    const emptyLabel =
+      origenStr ||
+      etiquetaSlotVacioLlave({ esByeInferido: esBye });
 
     return (
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-1 min-h-[1rem]">
-          {origen ? (
+          {origenStr && !empty ? (
             <span className="text-xs font-bold tracking-wide text-brand-chartreuse bg-brand-chartreuse/10 px-1.5 py-0.5 rounded">
-              {origen}
+              {origenStr}
             </span>
           ) : null}
           {esCabezaSerie ? (
@@ -116,8 +120,14 @@ export const MatchCard = ({
         {empty ? (
           <div className="flex items-center gap-2 min-h-[2.25rem]">
             <PlayerAvatar src={null} size="md" />
-            <p className="text-xs font-medium text-brand-ayuda italic">
-              {etiquetaSlotVacioLlave({ origen, esByeInferido: esBye })}
+            <p
+              className={`text-xs font-medium truncate leading-tight ${
+                origenStr
+                  ? "text-brand-chartreuse/90 font-bold not-italic"
+                  : "text-brand-ayuda italic"
+              }`}
+            >
+              {emptyLabel}
             </p>
           </div>
         ) : (

@@ -290,3 +290,23 @@ export function mapaNumeroVisiblePorMatchNo(
 
   return map;
 }
+
+/** MatchNo FAP del cruce vinculado a un partido de llave (no asumir que `orden` == matchNo). */
+export function matchNoFapDePartidoId(
+  partidoId: string,
+  matchNos: number[],
+  partidos: Array<{
+    id: string;
+    ronda?: string | null;
+    orden?: number | null;
+  }>,
+): number | null {
+  const vinculo = vincularPartidosAMatriz(matchNos, partidos);
+  for (const [matchNo, id] of vinculo.entries()) {
+    if (id === partidoId) return matchNo;
+  }
+  const row = partidos.find((p) => p.id === partidoId);
+  const orden = Number(row?.orden);
+  if (Number.isFinite(orden) && matchNos.includes(orden)) return orden;
+  return null;
+}

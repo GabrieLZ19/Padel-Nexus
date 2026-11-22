@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   mapaNumeroVisiblePorMatchNo,
+  matchNoFapDePartidoId,
   numerosVisiblesDePartidos,
 } from "../utils/rondasLlave.ts";
 
@@ -68,6 +69,16 @@ describe("P4 / CUA-01: numeración única zonas + llave", () => {
     assert.equal(porMatchNo.get(50), 17);
     assert.equal(porMatchNo.get(57), 20);
     assert.equal(porMatchNo.get(64), 26);
+  });
+
+  it("matchNoFapDePartidoId vincula partido DB aunque el orden visible difiera", () => {
+    const matchNos = [50, 54, 55, 57, 58, 59, 60, 61, 62, 64];
+    const semi = partidosTorneo.find((p) => p.id === "sem-61");
+    assert.ok(semi);
+    assert.equal(
+      matchNoFapDePartidoId(String(semi!.id), matchNos, partidosTorneo),
+      61,
+    );
   });
 
   it("FapBracketDiagram usa inicioNumeracion al mapear números visibles", () => {

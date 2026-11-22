@@ -16,16 +16,27 @@ describe("TOR-36 etiquetas y UX en llave", () => {
     assert.match(util, /if \(origen\) return POR_DEFINIR/);
   });
 
-  it("MatchCard usa etiquetaSlotVacioLlave", () => {
+  it("MatchCard muestra Gan. #N en hueco vacío (como vista pública)", () => {
     const card = readFileSync(
       path.join(RAIZ, "components/torneos/MatchCard.tsx"),
       "utf8",
     );
-    assert.match(card, /etiquetaSlotVacioLlave/);
+    assert.match(card, /const emptyLabel =/);
+    assert.match(card, /origenStr \|\|/);
     assert.doesNotMatch(
       card.slice(card.indexOf("renderEquipo")),
-      /esBye && !origen \? LIBRE/,
+      /etiquetaSlotVacioLlave\(\{ origen,/,
     );
+  });
+
+  it("BracketEditor resuelve matriz FAP por vínculo matchNo, no solo orden", () => {
+    const editor = readFileSync(
+      path.join(RAIZ, "components/torneos/BracketEditor.tsx"),
+      "utf8",
+    );
+    assert.match(editor, /matchNoFapDePartidoId/);
+    assert.match(editor, /matrizFapDePartido/);
+    assert.match(editor, /origenesAlimentadoresEliminatoria/);
   });
 
   it("BracketEditor persiste validación de cabezas en sesión", () => {

@@ -66,9 +66,11 @@ import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import {
   etiquetaRondaLlave,
   mapaNumeroVisiblePorMatchNo,
+  matchNoFapDePartidoId,
   numerosVisiblesDePartidos,
   numerosVisiblesLlave,
 } from "@/utils/rondasLlave";
+import { origenesAlimentadoresEliminatoria } from "@/utils/etiquetaPareja";
 import { formatearFechaHoraArgentina } from "@/utils/fechaArgentina";
 import { esEliminatoriaDirecta } from "@/utils/formatoTorneo";
 import {
@@ -1239,6 +1241,40 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     return `${m[1]}º ${m[2].toUpperCase()}`;
   };
 
+  const matrizFapDePartido = React.useCallback(
+    (partido: Partido) => {
+      if (!usaPlantillaFap || fapMatrixMatches.length === 0) return null;
+      const matchNos = fapMatrixMatches.map((m) => m.matchNo);
+      const matchNo =
+        matchNoFapDePartidoId(partido.id, matchNos, partidos) ??
+        (Number.isFinite(Number(partido.orden))
+          ? Number(partido.orden)
+          : null);
+      if (matchNo == null) return null;
+      return fapMatrixByOrden.get(matchNo) ?? null;
+    },
+    [usaPlantillaFap, fapMatrixMatches, partidos, fapMatrixByOrden],
+  );
+
+  const origenLadoLlavePartido = React.useCallback(
+    (
+      partido: Partido,
+      side: "a" | "b",
+      matrix: { a: string; b: string } | null,
+    ): string | null => {
+      const equipoId =
+        side === "a" ? partido.equipo_a_id : partido.equipo_b_id;
+      if (equipoId) {
+        return origenPorInscripcion.get(String(equipoId)) || null;
+      }
+      if (matrix) {
+        return formatFapSide(side === "a" ? matrix.a : matrix.b);
+      }
+      return null;
+    },
+    [origenPorInscripcion, numerosLlave],
+  );
+
   const matrizPartidoEnEdicion = React.useMemo(() => {
     if (!selectedMatchToEdit || !usaPlantillaFap) return null;
     const orden = Number(selectedMatchToEdit.orden);
@@ -2183,6 +2219,37 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                         {getRoundMatches(ronda.id, ronda.required).map(
                           (partido, i) => {
                             const partidoVista = partidoLlaveParaVista(partido);
+                            const matrixFap = matrizFapDePartido(partido);
+                            const prevRound =
+                              rondaIndex > 0
+                                ? rondasToShow[rondaIndex - 1]
+                                : null;
+                            const prevMatches = prevRound
+                              ? getRoundMatches(
+                                  prevRound.id,
+                                  prevRound.required,
+                                )
+                              : undefined;
+                            const alimentadoresDirecta =
+                              usaPlantillaFap || !prevMatches
+                                ? { origenA: null, origenB: null }
+                                : origenesAlimentadoresEliminatoria(
+                                    i,
+                                    prevMatches,
+                                    numerosPartido,
+                                  );
+                            const origenA =
+                              origenLadoLlavePartido(
+                                partidoVista,
+                                "a",
+                                matrixFap,
+                              ) ?? alimentadoresDirecta.origenA;
+                            const origenB =
+                              origenLadoLlavePartido(
+                                partidoVista,
+                                "b",
+                                matrixFap,
+                              ) ?? alimentadoresDirecta.origenB;
                             return (
                             <div
                               key={partido.id}
@@ -2197,28 +2264,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                                 isInteractive={puedeEditarLlave}
                                 numeroVisible={numerosPartido.get(partido.id)}
                                 alcance={torneo?.alcance}
-                                origenEquipoA={
-                                  partidoVista.equipo_a_id
-                                    ? origenPorInscripcion.get(
-                                        String(partidoVista.equipo_a_id),
-                                      ) || null
-                                    : formatFapSide(
-                                        fapMatrixByOrden.get(
-                                          Number(partido.orden),
-                                        )?.a,
-                                      )
-                                }
-                                origenEquipoB={
-                                  partidoVista.equipo_b_id
-                                    ? origenPorInscripcion.get(
-                                        String(partidoVista.equipo_b_id),
-                                      ) || null
-                                    : formatFapSide(
-                                        fapMatrixByOrden.get(
-                                          Number(partido.orden),
-                                        )?.b,
-                                      )
-                                }
+                                origenEquipoA={origenA}
+                                origenEquipoB={origenB}
                                 esCabezaSerieA={
                                   !!partidoVista.equipo_a_id &&
                                   cabezasSerieIds.has(
