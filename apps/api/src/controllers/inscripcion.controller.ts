@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 import {
   getMercadoPagoAccessToken,
-  parseMercadoPagoExternalReference,
   verifyMercadoPagoWebhookSignature,
 } from "../config/mercadopago";
 import { InscripcionService } from "../services/inscripcion.service";
@@ -424,44 +423,18 @@ export const confirmarRetornoPagoInscripcion = async (
       });
     }
 
-    const token = getMercadoPagoAccessToken();
-    let monto: number | undefined;
-    let plazasPagadas: number[] | undefined;
-    if (token) {
-      const mpClient = new MercadoPagoConfig({ accessToken: token });
-      const paymentClient = new Payment(mpClient);
-      const paymentDetails = await paymentClient.get({ id: Number(paymentId) });
-      if (paymentDetails.status !== "approved") {
-        return res.status(400).json({
-          message: `El pago no está aprobado. Estado: ${paymentDetails.status}`,
-        });
-      }
-      monto = paymentDetails.transaction_amount ?? undefined;
-      const ref = paymentDetails.external_reference
-        ? parseMercadoPagoExternalReference(
-            String(paymentDetails.external_reference),
-          )
-        : null;
-      if (ref?.canal === "inscripcion" && ref.id === req.params.id) {
-        plazasPagadas = ref.plazas;
-      }
-    }
-
     const data = await InscripcionService.confirmarPagoInscripcionRetorno(
       req.params.id,
       usuarioId,
       paymentId,
-      monto,
-      plazasPagadas,
     );
     return res.status(200).json({ exito: true, data });
   } catch (error: unknown) {
     const message =
-      error instanceof Error ? error.message : "Error desconocido";
-    return res.status(400).json({
-      message: "No se pudo confirmar el pago de la inscripción.",
-      error: message,
-    });
+      error instanceof Error
+        ? error.message
+        : "No se pudo confirmar el pago de la inscripción.";
+    return res.status(400).json({ exito: false, error: message });
   }
 };
 

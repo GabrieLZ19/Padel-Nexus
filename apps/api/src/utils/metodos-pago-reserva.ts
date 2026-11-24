@@ -50,3 +50,22 @@ export function assertMetodoPagoReservaPermitido(
     );
   }
 }
+
+/** Mensaje cuando se intenta confirmar MP por POST /reservas/:id/pagar (FEE-13). */
+export const METODO_MP_RESERVA_SOLO_CHECKOUT =
+  "El pago con Mercado Pago se confirma únicamente desde el checkout o al retornar del pago. Usá transferencia o efectivo si el club los tiene habilitados.";
+
+/**
+ * Validación para confirmación manual de pago (transferencia / efectivo).
+ * Mercado Pago no se acepta en esta ruta: solo webhook o confirmar-retorno con consulta a MP.
+ */
+export function assertMetodoPagoManualReservaPermitido(
+  club: ClubMetodosPagoConfig | null | undefined,
+  metodo: string,
+): void {
+  const normalizado = normalizarMetodoPagoReserva(metodo);
+  if (normalizado === "mercadopago") {
+    throw new Error(METODO_MP_RESERVA_SOLO_CHECKOUT);
+  }
+  assertMetodoPagoReservaPermitido(club, metodo);
+}

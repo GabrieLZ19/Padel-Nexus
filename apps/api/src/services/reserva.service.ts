@@ -9,7 +9,7 @@ import {
 } from "../config/mercadopago";
 import { esHorarioReservaPasado } from "../utils/fechaArgentina";
 import {
-  assertMetodoPagoReservaPermitido,
+  assertMetodoPagoManualReservaPermitido,
   type ClubMetodosPagoConfig,
 } from "../utils/metodos-pago-reserva";
 import { ClubService } from "./club.service";
@@ -23,6 +23,7 @@ import {
 } from "../utils/reservaRetencion";
 import { evaluarCancelacionReservaJugador } from "../utils/cancelacionReservaJugador";
 import { mensajeNotificacionReservaCanceladaPorJugador } from "../utils/reservaCancelacion";
+import { validarPagoMercadoPagoAprobado } from "../utils/validarPagoMercadoPago";
 import { RESERVA_MOTIVO_PAGO_VENCIDO } from "../constants/reserva";
 
 // ── Tipos ──────────────────────────────────────────────────────────────
@@ -540,7 +541,7 @@ export class ReservaService {
         } | null;
       }
     ).turnos?.canchas?.clubes;
-    assertMetodoPagoReservaPermitido(clubEmbed, metodoPago);
+    assertMetodoPagoManualReservaPermitido(clubEmbed, metodoPago);
 
     const esTransferencia = metodoPago === "transferencia";
 
@@ -921,6 +922,57 @@ export class ReservaService {
       ...camposFee,
       moneda: "ARS",
     };
+  }
+
+  /**
+   * Confirma el pago al retornar de Mercado Pago (usuario autenticado, consulta a MP).
+   */
+  static async confirmarPagoReservaRetorno(
+    reservaId: string,
+    usuarioId: string,
+    paymentId: string,
+  ) {
+    const paymentIdTrim = String(paymentId || "").trim();
+    if (!paymentIdTrim) {
+      throw new Error("Se requiere el payment_id de Mercado Pago.");
+    }
+
+    const { data: reserva, error: rError } = await supabaseAdmin
+      .from("reservas")
+      .select("id, usuario_id, estado_pago")
+      .eq("id", reservaId)
+      .single();
+
+    if (rError || !reserva) throw new Error("Reserva no encontrada.");
+    if (reserva.usuario_id !== usuarioId) {
+      throw new Error("No tiene permiso sobre esta reserva.");
+    }
+
+    if (reserva.estado_pago === "completado") {
+      return null;
+    }
+
+    const checkout = await ReservaService.previewCheckoutMercadoPago({
+      reservaId,
+    });
+    const montoEsperado = Number(checkout.monto);
+
+    if (!isMercadoPagoConfigured()) {
+      throw new Error("Mercado Pago no está configurado.");
+    }
+
+    const validado = await validarPagoMercadoPagoAprobado({
+      paymentId: paymentIdTrim,
+      externalReferenceEsperada: reservaId,
+      montoEsperado,
+    });
+
+    return ReservaService.confirmarPagoPorId(
+      reservaId,
+      validado.monto,
+      "MercadoPago",
+      validado.paymentId,
+    );
   }
 
   /**

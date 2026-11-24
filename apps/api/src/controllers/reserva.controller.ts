@@ -328,7 +328,14 @@ export const ReservasController = {
   async confirmarRetornoPago(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const usuario_id = req.user?.id;
       const { payment_id } = req.body;
+
+      if (!usuario_id) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "No autenticado." });
+      }
 
       if (!payment_id) {
         return res.status(400).json({
@@ -337,41 +344,20 @@ export const ReservasController = {
         });
       }
 
-      // Consultar el estado del pago directamente en la API de Mercado Pago
-      const mpClient = new MercadoPagoConfig({
-        accessToken: process.env.MP_ACCESS_TOKEN || "TEST-TOKEN-MOCK",
-      });
-      const paymentClient = new Payment(mpClient);
-      
-      let paymentDetails;
-      try {
-        paymentDetails = await paymentClient.get({ id: Number(payment_id) });
-      } catch (mpErr) {
-        // Fallback para simular pago exitoso si no hay token real o es de test/mock
-        if (
-          !process.env.MP_ACCESS_TOKEN || 
-          process.env.MP_ACCESS_TOKEN === "TEST-TOKEN-MOCK" || 
-          !/APP_USR-|TEST-/.test(process.env.MP_ACCESS_TOKEN)
-        ) {
-          const mockPago = await ReservaService.confirmarPagoPorId(id, 14000, "MercadoPago", String(payment_id));
-          return res.status(200).json({ exito: true, data: mockPago });
-        }
-        throw mpErr;
-      }
+      const pago = await ReservaService.confirmarPagoReservaRetorno(
+        id,
+        usuario_id,
+        String(payment_id),
+      );
 
-      if (paymentDetails.status === "approved") {
-        const monto = paymentDetails.transaction_amount || 0;
-        const pago = await ReservaService.confirmarPagoPorId(id, monto, "MercadoPago", String(payment_id));
-        return res.status(200).json({ exito: true, data: pago });
-      } else {
-        return res.status(400).json({
-          exito: false,
-          error: `El pago no está aprobado. Estado actual: ${paymentDetails.status}`,
-        });
-      }
+      return res.status(200).json({ exito: true, data: pago });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Error desconocido";
-      return res.status(500).json({ exito: false, error: message });
+      const message =
+        error instanceof Error ? error.message : "Error desconocido";
+      if (message.includes("permiso sobre esta reserva")) {
+        return res.status(403).json({ exito: false, error: message });
+      }
+      return res.status(400).json({ exito: false, error: message });
     }
   },
 

@@ -199,26 +199,25 @@ export class MarketplaceController {
   static async confirmarRetornoPago(req: Request, res: Response) {
     try {
       const { payment_id } = req.body;
-      const paymentId =
-        payment_id || `mobile-return-${Date.now()}`;
-
-      const orden = await MarketplaceService.confirmarPagoOrden(
-        req.params.id,
-        String(paymentId),
-      );
-
-      if (!orden) {
-        // Puede estar ya pagada: devolver estado actual
-        const actual = await MarketplaceService.obtenerOrden(
-          req.params.id,
-          req.user!.id,
-        );
-        return res.json(actual);
+      if (!payment_id) {
+        return res.status(400).json({
+          message: "Se requiere el payment_id de Mercado Pago.",
+        });
       }
 
+      const orden = await MarketplaceService.confirmarPagoOrdenRetorno(
+        req.params.id,
+        req.user!.id,
+        String(payment_id),
+      );
+
       res.json(orden);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error desconocido";
+      if (message.includes("permiso para confirmar")) {
+        return res.status(403).json({ message });
+      }
+      res.status(400).json({ message });
     }
   }
 

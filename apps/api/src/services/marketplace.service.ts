@@ -7,6 +7,7 @@ import {
   mercadoPagoNotificationUrl,
   resolveMercadoPagoInitPoint,
 } from "../config/mercadopago";
+import { validarPagoMercadoPagoAprobado } from "../utils/validarPagoMercadoPago";
 import {
   MARKETPLACE_AUDIENCIAS_PROMOCION,
   MARKETPLACE_ESTADOS_ORDEN,
@@ -1119,20 +1120,7 @@ export class MarketplaceService {
     const token = getMercadoPagoAccessToken();
 
     if (!isMercadoPagoConfigured()) {
-      console.warn(
-        "⚠️ MP Access Token no configurado. Simulando checkout (confirmación inmediata).",
-      );
-      const mockPaymentId = `mock-mp-${Date.now()}`;
-      await MarketplaceService.confirmarPagoOrden(ordenId, mockPaymentId);
-      return {
-        preferenceId: "mock-marketplace-pref",
-        initPoint: null,
-        sandboxInitPoint: null,
-        mockConfirmed: true,
-        paymentId: mockPaymentId,
-        ...camposFee,
-        moneda: "ARS",
-      };
+      throw new Error("Mercado Pago no está configurado.");
     }
 
     const mpClient = new MercadoPagoConfig({ accessToken: token! });
@@ -1193,6 +1181,87 @@ export class MarketplaceService {
       ...camposFee,
       moneda: "ARS",
     };
+  }
+
+  /**
+   * Confirma el pago al retornar de Mercado Pago (comprador autenticado, consulta a MP).
+   */
+  static async confirmarPagoOrdenRetorno(
+    ordenId: string,
+    compradorId: string,
+    paymentId: string,
+  ) {
+    const paymentIdTrim = String(paymentId || "").trim();
+    if (!paymentIdTrim) {
+      throw new Error("Se requiere el payment_id de Mercado Pago.");
+    }
+
+    const { data: orden, error: errOrden } = await supabaseAdmin
+      .from("marketplace_ordenes")
+      .select(
+        `
+        id, estado, total, comprador_id,
+        items:marketplace_items_orden(cantidad, precio_unitario, vendedor_id)
+      `,
+      )
+      .eq("id", ordenId)
+      .single();
+
+    if (errOrden || !orden) {
+      throw new Error("Orden no encontrada.");
+    }
+    if (orden.comprador_id !== compradorId) {
+      throw new Error("No tenés permiso para confirmar el pago de esta orden.");
+    }
+
+    if (orden.estado === MARKETPLACE_ESTADOS_ORDEN.PAGADA) {
+      return MarketplaceService.obtenerOrden(ordenId, compradorId);
+    }
+
+    if (orden.estado !== MARKETPLACE_ESTADOS_ORDEN.PENDIENTE) {
+      throw new Error("Esta orden ya fue procesada.");
+    }
+
+    const items = (
+      orden as {
+        items: Array<{ cantidad: number; precio_unitario: number; vendedor_id: string }>;
+      }
+    ).items;
+    const subtotal = items.reduce(
+      (acc, item) => acc + Number(item.precio_unitario) * item.cantidad,
+      0,
+    );
+    const vendedorId = items[0]?.vendedor_id;
+    const { PlatformFeeService } = await import("./platformFee.service");
+    const org = vendedorId
+      ? { org_tipo: "club" as const, org_id: vendedorId }
+      : { org_tipo: "federacion" as const, org_id: ordenId };
+    const breakdown = await PlatformFeeService.calcularCheckout(
+      "marketplace",
+      org,
+      subtotal,
+      1,
+    );
+    const montoEsperado = PlatformFeeService.camposCheckoutApi(breakdown).monto;
+
+    if (!isMercadoPagoConfigured()) {
+      throw new Error("Mercado Pago no está configurado.");
+    }
+
+    const validado = await validarPagoMercadoPagoAprobado({
+      paymentId: paymentIdTrim,
+      externalReferenceEsperada: ordenId,
+      montoEsperado,
+    });
+
+    const confirmada = await MarketplaceService.confirmarPagoOrden(
+      ordenId,
+      validado.paymentId,
+    );
+    if (!confirmada) {
+      return MarketplaceService.obtenerOrden(ordenId, compradorId);
+    }
+    return confirmada;
   }
 
   static async confirmarPagoOrden(

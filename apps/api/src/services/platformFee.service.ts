@@ -1,5 +1,6 @@
 import { MercadoPagoConfig, Preference } from "mercadopago";
 import { supabaseAdmin } from "../config/supabase";
+import { enriquecerMovimientosFinanzas } from "../utils/platformFeeReporteMensual";
 import {
   buildMercadoPagoBackUrls,
   getMercadoPagoAccessToken,
@@ -694,14 +695,18 @@ export class PlatformFeeService {
       0,
     );
 
+    const comisionPct = PlatformFeeService.porcentajeComisionMp();
+    const movimientos = await enriquecerMovimientosFinanzas(filas, comisionPct);
+
     return {
       periodo: { anio, mes },
       resumen: {
         operaciones: filas.length,
         ingresos_brutos: ingresosBrutos,
         fees_plataforma: totalFees,
+        comision_mp_porcentaje: comisionPct,
       },
-      movimientos: filas,
+      movimientos,
     };
   }
 

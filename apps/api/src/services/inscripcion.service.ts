@@ -5,8 +5,13 @@ import {
   getMercadoPagoAccessToken,
   isMercadoPagoConfigured,
   mercadoPagoNotificationUrl,
+  parseMercadoPagoExternalReference,
   resolveMercadoPagoInitPoint,
 } from "../config/mercadopago";
+import {
+  paymentIdMercadoPagoValido,
+  validarPagoMercadoPagoAprobado,
+} from "../utils/validarPagoMercadoPago";
 import { supabaseAdmin } from "../config/supabase";
 import {
   FAP_ESTADOS_LICENCIA,
@@ -1625,9 +1630,15 @@ export class InscripcionService {
     inscripcionId: string,
     usuarioId: string,
     paymentId: string,
-    monto?: number,
-    plazasPagadas?: number[],
   ) {
+    const paymentIdTrim = String(paymentId || "").trim();
+    if (!paymentIdTrim) {
+      throw new Error("Se requiere el payment_id de Mercado Pago.");
+    }
+    if (!paymentIdMercadoPagoValido(paymentIdTrim)) {
+      throw new Error("Se requiere un payment_id numérico de Mercado Pago.");
+    }
+
     const { data, error } = await supabaseAdmin
       .from("inscripciones")
       .select("id, usuario_id, usuario2_id")
@@ -1639,10 +1650,27 @@ export class InscripcionService {
     if (!esTitular) {
       throw new Error("No tenés permiso para confirmar este pago.");
     }
+
+    if (!isMercadoPagoConfigured()) {
+      throw new Error("Mercado Pago no está configurado.");
+    }
+
+    const validado = await validarPagoMercadoPagoAprobado({
+      paymentId: paymentIdTrim,
+      coincideReferencia: (refPago) => {
+        const ref = parseMercadoPagoExternalReference(refPago);
+        return ref.canal === "inscripcion" && ref.id === inscripcionId;
+      },
+    });
+
+    const ref = parseMercadoPagoExternalReference(validado.externalReference);
+    const plazasPagadas =
+      ref.canal === "inscripcion" ? ref.plazas : undefined;
+
     return InscripcionService.confirmarPagoInscripcionDesdeWebhook(
       inscripcionId,
-      paymentId,
-      monto,
+      validado.paymentId,
+      validado.monto,
       plazasPagadas,
     );
   }

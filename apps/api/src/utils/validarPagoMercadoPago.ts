@@ -8,7 +8,10 @@ export function paymentIdMercadoPagoValido(paymentId: string): boolean {
 
 export type ValidacionPagoMpEntidad = {
   paymentId: string;
-  externalReferenceEsperada: string;
+  /** Coincidencia exacta de external_reference (licencia, reserva, orden). */
+  externalReferenceEsperada?: string;
+  /** Validación flexible (p. ej. inscripción con variantes plaza/plazas). */
+  coincideReferencia?: (refPago: string) => boolean;
   montoEsperado?: number;
   toleranciaMonto?: number;
 };
@@ -18,7 +21,7 @@ export type ValidacionPagoMpEntidad = {
  */
 export async function validarPagoMercadoPagoAprobado(
   params: ValidacionPagoMpEntidad,
-): Promise<{ monto: number; paymentId: string }> {
+): Promise<{ monto: number; paymentId: string; externalReference: string }> {
   const paymentId = String(params.paymentId || "").trim();
   if (!paymentIdMercadoPagoValido(paymentId)) {
     throw new Error("Se requiere un payment_id numérico de Mercado Pago.");
@@ -45,10 +48,16 @@ export async function validarPagoMercadoPagoAprobado(
     );
   }
 
-  const refEsperada = String(params.externalReferenceEsperada || "").trim();
   const refPago = String(paymentDetails.external_reference || "").trim();
-  if (!refEsperada || refPago !== refEsperada) {
-    throw new Error("El pago no corresponde a esta licencia.");
+  if (params.coincideReferencia) {
+    if (!refPago || !params.coincideReferencia(refPago)) {
+      throw new Error("El pago no corresponde a esta operación.");
+    }
+  } else {
+    const refEsperada = String(params.externalReferenceEsperada || "").trim();
+    if (!refEsperada || refPago !== refEsperada) {
+      throw new Error("El pago no corresponde a esta operación.");
+    }
   }
 
   const monto = Number(paymentDetails.transaction_amount ?? 0);
@@ -56,9 +65,9 @@ export async function validarPagoMercadoPagoAprobado(
   if (montoEsperado != null && montoEsperado > 0) {
     const tolerancia = params.toleranciaMonto ?? 0.5;
     if (Math.abs(monto - montoEsperado) > tolerancia) {
-      throw new Error("El monto del pago no coincide con el de la licencia.");
+      throw new Error("El monto del pago no coincide con el esperado.");
     }
   }
 
-  return { monto, paymentId };
+  return { monto, paymentId, externalReference: refPago };
 }
