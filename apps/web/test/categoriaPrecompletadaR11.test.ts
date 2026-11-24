@@ -5,13 +5,14 @@ import path from "node:path";
 
 describe("R11 - Categoría y datos precompletados en Paso 3", () => {
   const paso3Path = path.resolve(
-    "apps/web/components/torneos/wizard/Paso3Categorias.tsx",
+    import.meta.dirname,
+    "../components/torneos/wizard/Paso3Categorias.tsx",
   );
 
   it("Paso3Categorias inicializa selectedDias con todos los días de competencia cuando dias_juego no viene en DB", () => {
     const code = fs.readFileSync(paso3Path, "utf-8");
     assert.ok(
-      code.includes("getPlayDaysRange().map((d) => d.value)"),
+      code.includes("generarDiasJuegoDefault("),
       "selectedDias debe preseleccionar todos los días disponibles si dias_juego está vacío",
     );
   });

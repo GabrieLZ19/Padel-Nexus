@@ -18,7 +18,11 @@ import {
   PairDisplay,
   esAlcanceNacional,
 } from "@/components/torneos/PairDisplay";
-import { clasificadosPorZona } from "@/utils/clasificacionZonas";
+import {
+  clasificadosPorZona,
+  ordenInscripcionesZonaCuatroFinales,
+  puedeClasificarZonaCuatroPorFinales,
+} from "@/utils/clasificacionZonas";
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import { formatNombrePareja } from "@/utils/nombrePareja";
 import { ModalSorteoZona } from "./ModalSorteoZona";
@@ -433,6 +437,32 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
       dg: st.gf - st.gc,
     }));
 
+    const cap = capacidadZona ?? parejasInscritas.length;
+    if (puedeClasificarZonaCuatroPorFinales(partidosZona, cap)) {
+      const ordenIds = ordenInscripcionesZonaCuatroFinales(partidosZona);
+      const porId = new Map(lista.map((st) => [st.inscripcionId, st]));
+      const criterios = [
+        "1º por final de ganadores",
+        "2º por final de ganadores",
+        "3º por final de perdedores",
+        "4º por final de perdedores",
+      ];
+      const habilitadasOrdenadas = ordenIds
+        .map((id, idx) => {
+          const row = porId.get(id);
+          if (!row || row.descalificada) return null;
+          return {
+            ...row,
+            requiereSorteo: false,
+            empateConIds: undefined,
+            criterioDesempate: criterios[idx] || "Final de zona",
+          };
+        })
+        .filter(Boolean) as ParejaStats[];
+      const descalificadas = lista.filter((t) => t.descalificada);
+      return [...habilitadasOrdenadas, ...descalificadas];
+    }
+
     // Separar habilitadas de descalificadas
     const habilitadas = lista.filter((t) => !t.descalificada);
     const descalificadas = lista.filter((t) => t.descalificada);
@@ -468,7 +498,7 @@ export const TablaPosicionesZona: React.FC<TablaPosicionesZonaProps> = ({
     }
 
     return [...resultado, ...descalificadas];
-  }, [parejasInscritas, partidosZona]);
+  }, [parejasInscritas, partidosZona, capacidadZona]);
 
   // Identificar parejas en empate absoluto para sorteo pendiente
   const parejasPendientesSorteo = useMemo(() => {

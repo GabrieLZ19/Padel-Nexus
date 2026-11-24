@@ -9,7 +9,13 @@ import {
   ShieldCheck,
   PlusCircle,
   CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  diasCompetenciaDesdeFechas,
+  generarDiasJuegoDefault,
+} from "@/utils/diasJuegoTorneo";
+import { evaluarCapacidadDiasCompetencia } from "@/utils/capacidadDiasCompetencia";
 import { sileo } from "sileo";
 import {
   labelModalidad,
@@ -94,8 +100,10 @@ export const Paso3Categorias = ({
   const [selectedDias, setSelectedDias] = useState<string[]>(() => {
     const raw = (torneo as any).dias_juego;
     if (Array.isArray(raw) && raw.length > 0) return raw;
-    // Si no estaban definidos, preseleccionar todos los días de competencia del torneo
-    return getPlayDaysRange().map((d) => d.value);
+    return generarDiasJuegoDefault(
+      torneo.fecha,
+      (torneo as { fecha_fin?: string | null }).fecha_fin,
+    );
   });
   const [guardandoCategorias, setGuardandoCategorias] = useState(false);
 
@@ -210,47 +218,36 @@ export const Paso3Categorias = ({
     }
   }, [reglamento, categoriasOficiales]);
 
-  // Genera el rango de días reales del torneo si existen las fechas
-  const getPlayDaysRange = () => {
-    if (!torneo.fecha) {
-      return [
-        { label: "Viernes", value: "Viernes" },
-        { label: "Sábado", value: "Sábado" },
-        { label: "Domingo", value: "Domingo" },
-      ];
-    }
-    const startStr = torneo.fecha.split("T")[0];
-    const endStr = (torneo as any).fecha_fin
-      ? (torneo as any).fecha_fin.split("T")[0]
-      : startStr;
+  const playDays = useMemo(
+    () =>
+      diasCompetenciaDesdeFechas(
+        torneo.fecha,
+        (torneo as { fecha_fin?: string | null }).fecha_fin,
+      ),
+    [torneo.fecha, (torneo as { fecha_fin?: string | null }).fecha_fin],
+  );
 
-    const start = new Date(startStr + "T12:00:00");
-    const end = new Date(endStr + "T12:00:00");
-
-    const days = [];
-    const current = new Date(start);
-    let limit = 0;
-
-    while (current <= end && limit < 15) {
-      const dayName = current.toLocaleDateString("es-AR", { weekday: "short" });
-      const capitalized =
-        dayName.charAt(0).toUpperCase() + dayName.slice(1).replace(".", "");
-      const dayNum = current.getDate();
-      const monthName = current.toLocaleDateString("es-AR", { month: "short" });
-      const capitalizedMonth =
-        monthName.charAt(0).toUpperCase() + monthName.slice(1).replace(".", "");
-
-      const label = `${capitalized} ${dayNum} ${capitalizedMonth}`;
-      const value = `${capitalized} ${dayNum}`; // Identificador interno estable
-
-      days.push({ label, value });
-      current.setDate(current.getDate() + 1);
-      limit++;
-    }
-    return days;
-  };
-
-  const playDays = getPlayDaysRange();
+  const avisoCapacidadDias = useMemo(
+    () =>
+      evaluarCapacidadDiasCompetencia({
+        parejas: Number(torneo.cupos_maximos) || 0,
+        duracionMinutos:
+          Number(
+            (torneo as { duracion_partido_minutos?: number })
+              .duracion_partido_minutos,
+          ) || 90,
+        diasSeleccionados: selectedDias.length,
+        canchasDisponibles:
+          Number(
+            (torneo as { canchas_disponibles?: number }).canchas_disponibles,
+          ) || 1,
+      }),
+    [
+      torneo.cupos_maximos,
+      torneo,
+      selectedDias.length,
+    ],
+  );
 
   // R11: Mantener sincronizados categoría, nivel, rama y días cuando se carga el torneo
   useEffect(() => {
@@ -288,9 +285,22 @@ export const Paso3Categorias = ({
     if (Array.isArray(raw) && raw.length > 0) {
       setSelectedDias(raw);
     } else {
-      setSelectedDias(getPlayDaysRange().map((d) => d.value));
+      setSelectedDias(
+        generarDiasJuegoDefault(
+          torneo.fecha,
+          (torneo as { fecha_fin?: string | null }).fecha_fin,
+        ),
+      );
     }
-  }, [torneo.id, torneo.categoria, torneo.nivel, (torneo as any).rama, torneo.fecha, (torneo as any).fecha_fin]);
+  }, [
+    torneo.id,
+    torneo.categoria,
+    torneo.nivel,
+    (torneo as any).rama,
+    torneo.fecha,
+    (torneo as { fecha_fin?: string | null }).fecha_fin,
+    (torneo as any).dias_juego,
+  ]);
 
 
   const handleToggleDia = (value: string) => {
@@ -730,8 +740,23 @@ export const Paso3Categorias = ({
           Competencia (Partidos) *
         </h4>
         <p className="text-[11px] text-gray-400 -mt-2">
-          Obligatorio: seleccioná al menos un día.
+          Obligatorio: seleccioná al menos un día. Al cambiar inicio o fin en el
+          Paso 1 se preseleccionan automáticamente todos los días del rango.
         </p>
+        {!avisoCapacidadDias.ok && avisoCapacidadDias.mensaje ? (
+          <div
+            role="alert"
+            className="flex gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-left"
+          >
+            <AlertTriangle
+              className="size-5 shrink-0 text-amber-400 mt-0.5"
+              aria-hidden
+            />
+            <p className="text-xs text-amber-100/90 leading-relaxed">
+              {avisoCapacidadDias.mensaje}
+            </p>
+          </div>
+        ) : null}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {playDays.map((dia) => {
             const isSelected = selectedDias.includes(dia.value);

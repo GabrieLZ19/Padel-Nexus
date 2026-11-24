@@ -25,6 +25,74 @@ export function partidoZonaPendiente(partido: {
   return !partido.ganador;
 }
 
+export type PartidoClasificacionZona = {
+  orden?: number | null;
+  equipo_a_id?: string | null;
+  equipo_b_id?: string | null;
+  ganador?: string | null;
+  estado_partido?: string | null;
+};
+
+function perdedorDePartido(p: PartidoClasificacionZona): string | null {
+  if (!p.ganador || !p.equipo_a_id || !p.equipo_b_id) return null;
+  return p.ganador === p.equipo_a_id ? p.equipo_b_id : p.equipo_a_id;
+}
+
+function partidosZonaCuatroOrdenados(
+  partidos: PartidoClasificacionZona[],
+): PartidoClasificacionZona[] {
+  return [...partidos].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+}
+
+export function esFixtureZonaCuatroGanadoresPerdedores(
+  partidos: PartidoClasificacionZona[],
+  capacidadParejas: number,
+): boolean {
+  if (capacidadParejas !== 4) return false;
+  if (partidos.length !== 4) return false;
+  const [p1, p2, p3, p4] = partidosZonaCuatroOrdenados(partidos);
+  if (!p1?.equipo_a_id || !p2?.equipo_a_id) return false;
+  const finalesMarcadas =
+    /ganadores/i.test(String(p3?.estado_partido || "")) ||
+    /perdedores/i.test(String(p4?.estado_partido || ""));
+  const cuatroCruces = partidos.every(
+    (p) => p.equipo_a_id && p.equipo_b_id,
+  );
+  return finalesMarcadas || (!finalesMarcadas && cuatroCruces);
+}
+
+export function puedeClasificarZonaCuatroPorFinales(
+  partidos: PartidoClasificacionZona[],
+  capacidadParejas: number,
+): boolean {
+  if (!esFixtureZonaCuatroGanadoresPerdedores(partidos, capacidadParejas)) {
+    return false;
+  }
+  const sorted = partidosZonaCuatroOrdenados(partidos);
+  const pGanadores = sorted[2];
+  const pPerdedores = sorted[3];
+  return Boolean(
+    pGanadores?.ganador &&
+      pPerdedores?.ganador &&
+      pGanadores.equipo_a_id &&
+      pGanadores.equipo_b_id &&
+      pPerdedores.equipo_a_id &&
+      pPerdedores.equipo_b_id,
+  );
+}
+
+export function ordenInscripcionesZonaCuatroFinales(
+  partidos: PartidoClasificacionZona[],
+): string[] {
+  const [, , pGanadores, pPerdedores] = partidosZonaCuatroOrdenados(partidos);
+  const segundo = perdedorDePartido(pGanadores!);
+  const cuarto = perdedorDePartido(pPerdedores!);
+  if (!pGanadores?.ganador || !segundo || !pPerdedores?.ganador || !cuarto) {
+    return [];
+  }
+  return [pGanadores.ganador, segundo, pPerdedores.ganador, cuarto];
+}
+
 export function textoClasificacionZonas(
   zonas: Array<{ parejas?: unknown[]; capacidad?: number }>,
 ): string {

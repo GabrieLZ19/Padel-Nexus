@@ -6,6 +6,7 @@ import { BracketEditor } from "@/components/torneos/BracketEditor";
 import { CUPOS_ESTANDAR_FAP } from "@/utils/constants/fapApaRules";
 import { esEliminatoriaDirecta } from "@/utils/formatoTorneo";
 import { AlertCircle } from "lucide-react";
+import { evaluarCapacidadDiasCompetencia } from "@/utils/capacidadDiasCompetencia";
 
 interface Paso6CuadrosProps {
   torneo: Torneo;
@@ -130,6 +131,25 @@ export const Paso6Cuadros = ({
 
     const isPrimeraVez = partidos.length === 0;
 
+    const capacidadDias = evaluarCapacidadDiasCompetencia({
+      parejas: Number(torneo.cupos_maximos) || cantidadInscriptos,
+      duracionMinutos:
+        Number(
+          (torneo as { duracion_partido_minutos?: number })
+            .duracion_partido_minutos,
+        ) || 90,
+      diasSeleccionados: diasJuego.length,
+      canchasDisponibles:
+        Number(
+          (torneo as { canchas_disponibles?: number }).canchas_disponibles,
+        ) || 1,
+    });
+
+    const avisoCapacidad =
+      !capacidadDias.ok && capacidadDias.mensaje
+        ? ` ${capacidadDias.mensaje}`
+        : "";
+
     const executeGeneration = async () => {
       try {
         setFeedbackModal((prev: any) => ({ ...prev, isLoading: true }));
@@ -173,8 +193,7 @@ export const Paso6Cuadros = ({
         isOpen: true,
         type: "info",
         title: "Generar Fixture",
-        description:
-          "Se crearán los cruces aleatorios basados en las inscripciones confirmadas. El torneo pasará a estado 'Programado' (fixture listo; aún no en juego).",
+        description: `Se crearán los cruces aleatorios basados en las inscripciones confirmadas. El torneo pasará a estado 'Programado' (fixture listo; aún no en juego).${avisoCapacidad}`,
         confirmText: "Generar Cuadro",
         cancelText: "Cancelar",
         onConfirm: executeGeneration,
@@ -185,8 +204,7 @@ export const Paso6Cuadros = ({
         isOpen: true,
         type: "danger",
         title: "¡Atención! Acción destructiva",
-        description:
-          "¿Estás completamente seguro de regenerar el cuadro? Esto borrará el fixture actual y los resultados cargados.",
+        description: `¿Estás completamente seguro de regenerar el cuadro? Esto borrará el fixture actual y los resultados cargados.${avisoCapacidad}`,
         confirmText: "Sí, Borrar y Regenerar",
         cancelText: "Cancelar",
         onConfirm: executeGeneration,
