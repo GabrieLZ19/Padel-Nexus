@@ -1,10 +1,8 @@
 import { supabaseAdmin } from "../config/supabase";
-import {
-  claveCategoria,
-  compararPosicionRanking,
-  variantesCategoria,
-} from "../constants/rankings";
+import { claveCategoria, normalizarRama } from "../constants/rankings";
+import { esJugadorDePrueba } from "../utils/datoPrueba";
 import { elegirProximoPartido } from "../utils/proximoPartido";
+import { RankingService } from "./ranking.service";
 
 type InscripcionFila = {
   id: string;
@@ -258,20 +256,33 @@ async function cargarPartidos(ids: string[]): Promise<PartidoFila[]> {
   return (data || []) as PartidoFila[];
 }
 
+/** Alcance de consulta alineado con la pestaña pública de `/ranking`. */
+function alcanceConsultaRankingPublico(alcance?: string | null): string {
+  const valor = String(alcance || "Provincial").trim();
+  if (valor === "Nacional") return "Nacional";
+  if (valor === "Local") return "Provincial";
+  return "Provincial";
+}
+
 async function puestoEnCategoria(usuarioId: string) {
   const { data: perfil } = await supabaseAdmin
     .from("perfiles")
-    .select("categoria_padel, apellido, nombre")
+    .select(
+      "categoria_padel, sexo, nombre, apellido, email, dni, es_prueba, rol",
+    )
     .eq("id", usuarioId)
     .maybeSingle();
 
-  const categoriaPerfil = perfil?.categoria_padel?.trim();
+  if (!perfil) return null;
+  if (esJugadorDePrueba(perfil)) return null;
+
+  const categoriaPerfil = perfil.categoria_padel?.trim();
   if (!categoriaPerfil) return null;
   const clave = claveCategoria(categoriaPerfil);
 
   const { data: propios } = await supabaseAdmin
     .from("rankings")
-    .select("puntos, categoria, alcance")
+    .select("puntos, categoria, alcance, provincia_jurisdiccion")
     .eq("usuario_id", usuarioId);
 
   const deSuCategoria = (propios || []).filter(
@@ -282,48 +293,29 @@ async function puestoEnCategoria(usuarioId: string) {
   const fila =
     deSuCategoria.find((item) => item.alcance === "Nacional") ||
     deSuCategoria.find((item) => item.alcance === "Provincial") ||
+    deSuCategoria.find((item) => item.alcance === "Local") ||
     deSuCategoria[0] ||
     cualquiera.find((item) => item.alcance === "Nacional") ||
     cualquiera.find((item) => item.alcance === "Provincial") ||
+    cualquiera.find((item) => item.alcance === "Local") ||
     cualquiera[0];
   if (!fila) return null;
+
   const categoria = String(fila.categoria || categoriaPerfil);
+  const alcanceConsulta = alcanceConsultaRankingPublico(fila.alcance);
+  const rama = normalizarRama(perfil?.sexo);
 
-  const { data: tabla } = await supabaseAdmin
-    .from("rankings")
-    .select("usuario_id, puntos, perfiles(apellido, nombre)")
-    .in("categoria", variantesCategoria(String(fila.categoria)))
-    .eq("alcance", fila.alcance);
-
-  const ordenada = (tabla || [])
-    .map((item) => {
-      const persona = uno(
-        item.perfiles as
-          | { apellido: string | null; nombre: string | null }
-          | { apellido: string | null; nombre: string | null }[]
-          | null,
-      );
-      return {
-        usuarioId: item.usuario_id as string,
-        puntos: Number(item.puntos || 0),
-        apellido: persona?.apellido || "",
-        nombre: persona?.nombre || "",
-      };
-    })
-    .sort(compararPosicionRanking);
-
-  const vistos = new Set<string>();
-  const unicos = ordenada.filter((item) => {
-    if (vistos.has(item.usuarioId)) return false;
-    vistos.add(item.usuarioId);
-    return true;
-  });
-
-  const indice = unicos.findIndex((item) => item.usuarioId === usuarioId);
-  if (indice < 0) return null;
+  const puesto = await RankingService.resolverPosicionEnRanking(
+    usuarioId,
+    alcanceConsulta,
+    categoria,
+    rama,
+    fila.provincia_jurisdiccion,
+  );
+  if (puesto == null) return null;
 
   return {
-    puesto: indice + 1,
+    puesto,
     categoria,
     puntos: Number(fila.puntos || 0),
     alcance: String(fila.alcance || ""),

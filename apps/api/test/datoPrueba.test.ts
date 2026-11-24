@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  esDniPrueba,
   esJugadorDePrueba,
   esNombreDePrueba,
   esTorneoDePrueba,
@@ -90,6 +91,16 @@ describe("datos de prueba del sitio público", () => {
         rol: "admin_club",
       }),
       false,
+    );
+    assert.equal(esDniPrueba("99000302"), true);
+    assert.equal(
+      esJugadorDePrueba({
+        nombre: "QA",
+        apellido: "PRUEBA, Provisorio",
+        email: "jugador@email.com",
+        rol: "usuario",
+      }),
+      true,
     );
   });
 });

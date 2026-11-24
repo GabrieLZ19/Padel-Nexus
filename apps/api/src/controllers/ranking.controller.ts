@@ -23,6 +23,25 @@ export const RankingsController = {
     }
   },
 
+  async listarClubesJugador(req: Request, res: Response): Promise<Response> {
+    try {
+      const usuarioId = req.user?.id;
+      if (!usuarioId) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "Sesión requerida." });
+      }
+      const data = await RankingService.listarClubesRankingJugador(usuarioId);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Error al obtener clubes del jugador.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
   async listarContextosJugador(req: Request, res: Response): Promise<Response> {
     try {
       const usuarioId = req.user?.id;
@@ -51,6 +70,7 @@ export const RankingsController = {
         provincia,
         pais,
         rama,
+        club_id,
         tipo_ranking,
         limit,
       } = req.query;
@@ -69,6 +89,7 @@ export const RankingsController = {
       const data = await RankingService.obtenerRankingGlobal({
         categoria: categoria as string | undefined,
         alcance: alcanceFinal,
+        clubId: club_id as string | undefined,
         provincia: provincia as string | undefined,
         pais: (pais as string | undefined) || "Argentina",
         rama: rama as string | undefined,

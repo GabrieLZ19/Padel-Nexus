@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase";
+import { alcancePersistidoRankingTorneo } from "./rankingPorClub";
 import {
   alcanceRankingDesdeTorneo,
   puntosInstanciaEliminatoria,
@@ -118,7 +119,10 @@ export async function otorgarPuntosPorPartidoRanking(
           usuario_id: uid,
           categoria: categoriaNivel,
           rama: torneoInfo.categoria,
-          alcance: rank?.alcance ?? alcanceRanking,
+          alcance: alcancePersistidoRankingTorneo(
+            alcanceRanking,
+            rank?.alcance,
+          ),
           provincia_jurisdiccion:
             provinciaJurisdiccion ?? rank?.provincia_jurisdiccion ?? null,
           puntos: pAnt + Math.max(0, puntos),

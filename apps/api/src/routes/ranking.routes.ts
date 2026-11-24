@@ -19,6 +19,11 @@ router.get(
   authenticate,
   RankingsController.listarContextosJugador,
 );
+router.get(
+  "/mis-clubes",
+  authenticate,
+  RankingsController.listarClubesJugador,
+);
 router.get("/:usuario_id", RankingsController.obtenerPerfilRanking);
 
 // --- Rutas Administrativas Protegidas ---

@@ -19,15 +19,22 @@ flowchart TD
   Ola5 --> Ola6[Ola 6: Operativos e Infra DOM-7, PUB-1, FEE-6/7/10]
 ```
 
-## Ola 3 - Ranking y Sitio Publico (RNK / TOR-53 / PUB) — SIGUIENTE
+## Ola 3 - Ranking y Sitio Publico (RNK / TOR-53 / PUB) — COMPLETADA
 
-- **13. RNK-1** — `GET /rankings/mis-contextos`, FK historial_ranking, aterrizaje torneo reciente.
-- **14. RNK-3** — Filtro Damas / Caballeros en `/ranking`.
-- **15. RNK-2 y TOR-53** — Pestanas Club | Provincial | Nacional; puntos de torneos Local en Provincial + Club.
-- **16. PUB-27** — Puesto unificado panel jugador vs `/ranking`.
-- **17. PUB-28** — Excluir datos QA en rankings; limpieza Supabase con confirmacion.
+- **13. RNK-1** — Hecho: FK `historial_ranking_torneo_id_fkey`, contextos jugador.
+- **14. RNK-3** — Hecho: selector Damas/Caballeros y `rama` en query.
+- **15. RNK-2 / TOR-53** — Hecho: pestanas Club | Provincial | Nacional, ranking por `club_id`, Local visible en Provincial.
+- **16. PUB-27** — Hecho: panel usa `resolverPosicionEnRanking`.
+- **17. PUB-28** — Hecho en codigo (exclusion QA); limpieza Supabase pendiente confirmacion.
 
-Detalle completo de archivos y criterios de aceptacion: ver secciones 13-17 del plan maestro en Cursor o el export L1-L184.
+Regresion: `apps/api/test/ola3RankingSitioPublico.test.ts`, `apps/web/test/ola3RankingPublicoValidacion.test.ts`.
+
+## Ola 4 - Marketplace y Reservas (MKT) — SIGUIENTE
+
+- **18. MKT-2** — Unificar contador VENTAS en tienda publica.
+- **19–22.** MKT-5, MKT-6, MKT-7, MKT-8 (ver progreso y plan maestro).
+
+Detalle completo de archivos y criterios de aceptacion: ver secciones 18-22 del plan maestro en Cursor o el export L1-L184.
 
 ## Referencia Olas 1-2 y 4-6
 

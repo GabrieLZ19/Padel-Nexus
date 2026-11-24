@@ -38,16 +38,18 @@ Commits:
 
 Los torneos reales con solo "Sáb 28" marcado deben corregirse guardando el Paso 1 con `fecha_fin` alineada al rango real (o forzar actualización de fechas) para que el backend regenere todos los días del rango; confirmar con Héctor antes de tocar datos productivos.
 
-## Ola 3 — Ranking y sitio público — PENDIENTE (siguiente)
+## Ola 3 — Ranking y sitio público — COMPLETADA (código + tests)
 
-Orden sugerido del plan: **RNK-1**, **RNK-3**, **RNK-2 / TOR-53**, **PUB-27**, **PUB-28**.
+Regresión: `apps/api/test/ola3RankingSitioPublico.test.ts` y `apps/web/test/ola3RankingPublicoValidacion.test.ts`.
 
 | Código | Estado | Tests |
 |--------|--------|-------|
-| RNK-1 | Pendiente | `rankingContextoJugador.test.ts` |
-| RNK-3 | Pendiente | — |
-| RNK-2 / TOR-53 | Pendiente | — |
-| PUB-27 | Pendiente | — |
-| PUB-28 | Pendiente | + limpieza QA Supabase (con confirmación) |
+| RNK-1 | Hecho | `rankingContextoJugador.test.ts`, `rnk1MisContextosFk.test.ts` |
+| RNK-3 | Hecho | `rnk3RankingRama.test.ts`, `rnk3RankingPublicoRama.test.ts` |
+| RNK-2 / TOR-53 | Hecho | `rnk2Tor53RankingScopes.test.ts`, `rnk2RankingPublicoScopes.test.ts` |
+| PUB-27 | Hecho | `pub27PanelPuestoRanking.test.ts`, `pub27RankingProvincialFiltro.test.ts` |
+| PUB-28 | Hecho (código) | `pub28RankingExclusionQa.test.ts`, `datoPrueba.test.ts` — DNI QA, nombres QA Ensayo/Prueba |
 
-**Siguiente en re-test 24/11:** Ola 3, ítem **RNK-1**.
+**Limpieza Supabase QA (pendiente confirmación de Héctor):** jugadores/torneos `QA Prueba` 18-11 y 24-11, sede `QA Prueba - Sede 18-11`, DNIs 990001xx / 990003xx / 99002401-432. **No ejecutar** sin OK explícito (no tocar torneos Alta Barda).
+
+**Siguiente en re-test 24/11:** Ola 4 — Marketplace y reservas (**MKT-2**).

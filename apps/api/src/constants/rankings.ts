@@ -178,11 +178,16 @@ export function normalizarRama(input?: string | null): RamaRanking | null {
   if (!input) return null;
   const v = input.trim().toLowerCase();
   if (
-    ["masculino", "caballeros", "hombres", "veteranos", "m", "male"].includes(v)
+    v.startsWith("masculin") ||
+    ["caballeros", "hombres", "veteranos", "m", "male"].includes(v)
   ) {
     return "masculino";
   }
-  if (["femenino", "damas", "mujeres", "ladies", "f", "female"].includes(v)) {
+  if (
+    v.startsWith("femenin") ||
+    v.startsWith("dama") ||
+    ["mujeres", "ladies", "f", "female"].includes(v)
+  ) {
     return "femenino";
   }
   return null;

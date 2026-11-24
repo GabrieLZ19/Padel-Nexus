@@ -26,6 +26,7 @@ import {
   provinciaParaRanking,
 } from "../utils/provinciaRanking";
 import { enriquecerHistorialConRonda } from "../utils/historialRankingRonda";
+import { acumularPuntosHistorialPorUsuario } from "../utils/rankingPorClub";
 import {
   contextoDesdeTorneo,
   fusionarContextosRanking,
@@ -50,6 +51,7 @@ export interface ActualizarPuntosDTO {
 export interface RankingGlobalFiltros {
   categoria?: string;
   alcance?: string;
+  clubId?: string;
   provincia?: string;
   pais?: string;
   /**
@@ -250,12 +252,26 @@ export class RankingService {
     const {
       categoria,
       alcance = "Provincial",
+      clubId,
       provincia,
       pais,
       tipoRanking,
       rama,
       limit = 100,
     } = filtros;
+
+    const alcanceNorm = String(alcance || "Provincial").trim();
+    if (alcanceNorm === "Club") {
+      const club = String(clubId || "").trim();
+      if (!club) {
+        throw new Error("Debe indicar el club para el ranking Club.");
+      }
+      return RankingService.obtenerRankingPorClub({
+        ...filtros,
+        clubId: club,
+        alcance: alcanceNorm,
+      });
+    }
 
     let query = supabaseAdmin.from("rankings").select(
       `
@@ -284,10 +300,15 @@ export class RankingService {
       `,
     );
 
-    const alcanceBusqueda = alcance === "Nacional" ? "Provincial" : alcance;
+    const alcanceBusqueda =
+      alcanceNorm === "Nacional" ? "Provincial" : alcanceNorm;
 
     if (alcanceBusqueda && alcanceBusqueda !== "Global") {
-      query = query.eq("alcance", alcanceBusqueda);
+      if (alcanceNorm === "Provincial") {
+        query = query.in("alcance", ["Provincial", "Local"]);
+      } else {
+        query = query.eq("alcance", alcanceBusqueda);
+      }
     }
 
     // El límite trae los puntajes altos. El desempate se resuelve después.
@@ -309,7 +330,7 @@ export class RankingService {
       query = query.eq("perfiles.sexo", ramaNormalizada);
     }
 
-    if (alcance === "Nacional" && pais) {
+    if (alcanceNorm === "Nacional" && pais) {
       query = query.eq("perfiles.pais", pais);
     }
 
@@ -684,6 +705,193 @@ export class RankingService {
   }
 
   /**
+   * Puntos acumulados en torneos del club (historial), por categoría y rama.
+   */
+  static async obtenerRankingPorClub(
+    filtros: RankingGlobalFiltros & { clubId: string },
+  ) {
+    const { clubId, categoria, rama, limit = 100 } = filtros;
+    if (!categoria) {
+      throw new Error("Categoría requerida para el ranking del club.");
+    }
+
+    const { data: torneosClub, error: torneosError } = await supabaseAdmin
+      .from("torneos")
+      .select("id, nivel, es_prueba")
+      .eq("club_id", clubId);
+    if (torneosError) {
+      throw new Error(torneosError.message);
+    }
+
+    const categoriasPermitidas = new Set(variantesCategoria(categoria));
+    const torneoIds = (torneosClub || [])
+      .filter((t) => !esTorneoDePrueba(t))
+      .filter((t) =>
+        categoriasPermitidas.has(String(t.nivel || "").trim()),
+      )
+      .map((t) => String(t.id));
+
+    if (torneoIds.length === 0) {
+      return [];
+    }
+
+    const { data: historial, error: histError } = await supabaseAdmin
+      .from("historial_ranking")
+      .select("usuario_id, puntos_anteriores, puntos_nuevos")
+      .in("torneo_id", torneoIds);
+    if (histError) {
+      throw new Error(histError.message);
+    }
+
+    const acumulado = acumularPuntosHistorialPorUsuario(historial || []);
+    const usuarioIds = [...acumulado.keys()];
+    if (usuarioIds.length === 0) {
+      return [];
+    }
+
+    let queryPerfiles = supabaseAdmin
+      .from("perfiles")
+      .select(
+        `
+          id,
+          nombre,
+          apellido,
+          dni,
+          avatar_url,
+          lugar_residencia,
+          categoria_padel,
+          sexo,
+          email,
+          es_prueba,
+          rol,
+          club_id,
+          clubes (
+            id,
+            nombre,
+            provincia
+          )
+        `,
+      )
+      .in("id", usuarioIds);
+
+    const ramaNormalizada = normalizarRama(rama);
+    if (ramaNormalizada) {
+      queryPerfiles = queryPerfiles.eq("sexo", ramaNormalizada);
+    }
+
+    const { data: perfiles, error: perfError } = await queryPerfiles;
+    if (perfError) {
+      throw new Error(perfError.message);
+    }
+
+    type PerfilRow = Record<string, unknown> & {
+      id: string;
+      apellido?: string | null;
+      nombre?: string | null;
+    };
+
+    const visibles = (perfiles || []).filter((p) =>
+      esVisibleEnSitioPublico(p as PerfilRow),
+    ) as PerfilRow[];
+
+    const filas = visibles
+      .map((perfil) => {
+        const puntos = acumulado.get(perfil.id) ?? 0;
+        return {
+          usuario_id: perfil.id,
+          puntos,
+          categoria,
+          alcance: "Club",
+          perfiles: perfil,
+        };
+      })
+      .filter((row) => row.puntos > 0);
+
+    filas.sort((a, b) =>
+      compararPosicionRanking(
+        {
+          puntos: a.puntos,
+          apellido: a.perfiles.apellido,
+          nombre: a.perfiles.nombre,
+        },
+        {
+          puntos: b.puntos,
+          apellido: b.perfiles.apellido,
+          nombre: b.perfiles.nombre,
+        },
+      ),
+    );
+
+    return filas.slice(0, limit).map((row, index) => ({
+      ...row,
+      posicion_actual: index + 1,
+    }));
+  }
+
+  /** Clubes donde el jugador acumuló puntos o se inscribió (torneos confirmados). */
+  static async listarClubesRankingJugador(
+    usuarioId: string,
+  ): Promise<Array<{ id: string; nombre: string }>> {
+    const torneosSelect = `
+      club_id,
+      clubes:club_id!inner ( id, nombre )
+    `;
+
+    const [inscripcionesResult, historialResult] = await Promise.all([
+      supabaseAdmin
+        .from("inscripciones")
+        .select(`created_at, torneos!fk_inscripciones_torneo!inner (${torneosSelect})`)
+        .or(`usuario_id.eq.${usuarioId},usuario2_id.eq.${usuarioId}`)
+        .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO),
+      supabaseAdmin
+        .from("historial_ranking")
+        .select(
+          `created_at, torneos!historial_ranking_torneo_id_fkey!inner (${torneosSelect})`,
+        )
+        .eq("usuario_id", usuarioId),
+    ]);
+
+    type ClubParcial = { id: string; nombre: string; fecha: string };
+
+    const parciales: ClubParcial[] = [];
+    const pushClub = (torneoRaw: unknown, fecha?: string | null) => {
+      if (!torneoRaw || typeof torneoRaw !== "object") return;
+      const t = torneoRaw as TorneoContextoMin;
+      const club = t.clubes as { id?: string; nombre?: string } | null;
+      const id = String(t.club_id || club?.id || "").trim();
+      const nombre = String(club?.nombre || "").trim();
+      if (!id || !nombre) return;
+      parciales.push({
+        id,
+        nombre,
+        fecha: fecha || new Date(0).toISOString(),
+      });
+    };
+
+    for (const row of inscripcionesResult.data || []) {
+      pushClub(row.torneos, row.created_at as string | undefined);
+    }
+    for (const row of historialResult.data || []) {
+      pushClub(row.torneos, row.created_at as string | undefined);
+    }
+
+    const porClub = new Map<string, ClubParcial>();
+    for (const item of parciales) {
+      const prev = porClub.get(item.id);
+      if (!prev || new Date(item.fecha) > new Date(prev.fecha)) {
+        porClub.set(item.id, item);
+      }
+    }
+
+    return [...porClub.values()]
+      .sort(
+        (a, b) =>
+          new Date(b.fecha).getTime() - new Date(a.fecha).getTime(),
+      )
+      .map((c) => ({ id: c.id, nombre: c.nombre }));
+  }
+
+  /**
    * Torneos / circuitos recientes donde el jugador está inscripto (pago confirmado)
    * o tiene puntos en historial, con filtros listos para el ranking público.
    */
@@ -697,21 +905,27 @@ export class RankingService {
       fecha_fin,
       alcance,
       categoria,
+      club_id,
       nivel,
+      rama,
       es_prueba,
       asociaciones:asociacion_id ( provincia ),
-      clubes:club_id ( provincia )
+      clubes:club_id ( id, nombre, provincia )
     `;
 
     const [inscripcionesResult, historialResult] = await Promise.all([
       supabaseAdmin
         .from("inscripciones")
-        .select(`created_at, torneo_id, torneos!inner (${torneosSelect})`)
+        .select(
+          `created_at, torneo_id, torneos!fk_inscripciones_torneo!inner (${torneosSelect})`,
+        )
         .or(`usuario_id.eq.${usuarioId},usuario2_id.eq.${usuarioId}`)
         .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO),
       supabaseAdmin
         .from("historial_ranking")
-        .select(`created_at, torneo_id, torneos!inner (${torneosSelect})`)
+        .select(
+          `created_at, torneo_id, torneos!historial_ranking_torneo_id_fkey!inner (${torneosSelect})`,
+        )
         .eq("usuario_id", usuarioId),
     ]);
 
@@ -771,8 +985,8 @@ export class RankingService {
       if (!categoria) continue;
       const scope = String(fila.alcance || "Provincial").trim();
       const alcance: RankingContextoJugador["scope"] =
-        scope === "Global"
-          ? "Global"
+        scope === "Local"
+          ? "Club"
           : scope === "Nacional"
             ? "Nacional"
             : "Provincial";
@@ -790,6 +1004,9 @@ export class RankingService {
         scope: alcance,
         categoria: String(categoria),
         provincia,
+        clubId: null,
+        clubNombre: null,
+        rama: null,
         etiqueta:
           alcance === "Provincial" && provincia
             ? `Ranking ${alcance} · ${provincia} · ${categoria}`
