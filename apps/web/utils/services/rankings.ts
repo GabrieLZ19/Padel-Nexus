@@ -1,6 +1,7 @@
 import axios from "axios";
 import { api } from "../api";
 import { RankingJugador, RankingPerfilJugador } from "../types";
+import type { RamaRankingFront } from "../rankings/rama";
 
 /**
  * Tipos de ranking según el reglamento de la entidad rectora.
@@ -8,13 +9,12 @@ import { RankingJugador, RankingPerfilJugador } from "../types";
  */
 export type TipoRankingFront = "menores" | "veteranos" | "libres";
 
-/** Rama del ranking (Damas / Caballeros). */
-export type RamaRankingFront = "masculino" | "femenino";
+export type { RamaRankingFront } from "../rankings/rama";
 
 /** Alcance del ranking (jurisdiccion). */
 export type AlcanceRanking = "Provincial" | "Nacional" | "Global";
 
-export type AlcanceRankingPublico = "Provincial" | "Nacional" | "Global";
+export type AlcanceRankingPublico = "Club" | "Provincial" | "Nacional";
 
 export interface RankingContextoJugador {
   id: string;
@@ -23,6 +23,9 @@ export interface RankingContextoJugador {
   scope: AlcanceRankingPublico;
   categoria: string;
   provincia: string | null;
+  clubId?: string | null;
+  clubNombre?: string | null;
+  rama?: RamaRankingFront | null;
   etiqueta: string;
   fechaReferencia: string;
 }
@@ -35,8 +38,14 @@ export interface RankingsQueryParams {
   /** Alias de `scope`, aceptado por compatibilidad. */
   alcance?: AlcanceRanking | string;
   rama?: RamaRankingFront | string;
+  club_id?: string;
   tipo_ranking?: TipoRankingFront;
   limit?: number;
+}
+
+export interface RankingClubOpcion {
+  id: string;
+  nombre: string;
 }
 
 /**
@@ -168,6 +177,20 @@ export const RankingsService = {
   },
 
   /** Contextos de torneo/circuito para preseleccionar filtros con sesión activa. */
+  async getMisClubes(): Promise<RankingClubOpcion[]> {
+    try {
+      const res = await api.get<RankingApiResponse>("/rankings/mis-clubes");
+      const data = res.data?.data;
+      return Array.isArray(data) ? (data as RankingClubOpcion[]) : [];
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        return [];
+      }
+      console.warn("Error al cargar clubes de ranking:", error);
+      return [];
+    }
+  },
+
   async getMisContextos(): Promise<RankingContextoJugador[]> {
     try {
       const res = await api.get<RankingApiResponse>("/rankings/mis-contextos");

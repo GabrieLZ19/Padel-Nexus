@@ -16,8 +16,10 @@ import {
 
 import {
   RankingsService,
+  type RankingClubOpcion,
   type RankingContextoJugador,
 } from "@/utils/services/rankings";
+import { ClubesService } from "@/utils/services/clubes";
 import { useProfileStore } from "@/store/useProfileStore";
 import { RankingJugador } from "@/utils/types";
 import { PROVINCIAS_ARG, NIVELES_PADEL } from "@/utils/constants/padelConfig";
@@ -25,6 +27,12 @@ import {
   REGLA_DESEMPATE_RANKING,
   compararRankingPublico,
 } from "@/utils/rankings/orden";
+import {
+  OPCIONES_RAMA_RANKING_PUBLICO,
+  etiquetaRamaRankingPublico,
+  ramaInicialRankingPublico,
+  type RamaRankingFront,
+} from "@/utils/rankings/rama";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import Pagination from "@/components/ui/Pagination";
 import Image from "next/image";
@@ -55,23 +63,76 @@ export default function RankingPublicPage() {
   const [activeScope, setActiveScope] = useState<string>("");
   const [activeProvincia, setActiveProvincia] = useState<string>("");
   const [activeCategory, setActiveCategory] = useState<string>("");
+  const [activeRama, setActiveRama] = useState<RamaRankingFront>(() =>
+    ramaInicialRankingPublico(),
+  );
+  const [activeClubId, setActiveClubId] = useState<string>("");
+  const [clubesRanking, setClubesRanking] = useState<RankingClubOpcion[]>([]);
 
   const filtrosCompletos = useMemo(() => {
-    if (!activeScope || !activeCategory) return false;
+    if (!activeScope || !activeCategory || !activeRama) return false;
     if (activeScope === "Provincial" && !activeProvincia) return false;
+    if (activeScope === "Club" && !activeClubId) return false;
     return true;
-  }, [activeScope, activeCategory, activeProvincia]);
+  }, [activeScope, activeCategory, activeProvincia, activeRama, activeClubId]);
 
-  const aplicarContexto = useCallback((ctx: RankingContextoJugador) => {
-    setContextoActivoId(ctx.id);
-    setActiveScope(ctx.scope);
-    setActiveCategory(ctx.categoria);
-    if (ctx.scope === "Provincial") {
-      setActiveProvincia(provinciaFiltroValor(ctx.provincia));
-    } else {
-      setActiveProvincia("");
-    }
-  }, []);
+  const aplicarContexto = useCallback(
+    (ctx: RankingContextoJugador) => {
+      setContextoActivoId(ctx.id);
+      setActiveScope(ctx.scope);
+      setActiveCategory(ctx.categoria);
+      setActiveRama(
+        ctx.rama === "masculino" || ctx.rama === "femenino"
+          ? ctx.rama
+          : ramaInicialRankingPublico(profile?.sexo),
+      );
+      if (ctx.scope === "Club") {
+        if (ctx.clubId) setActiveClubId(ctx.clubId);
+        setActiveProvincia(provinciaFiltroValor(ctx.provincia));
+      } else if (ctx.scope === "Provincial") {
+        setActiveProvincia(provinciaFiltroValor(ctx.provincia));
+      } else {
+        setActiveProvincia("");
+      }
+    },
+    [profile?.sexo],
+  );
+
+  useEffect(() => {
+    if (!contextosListos) return;
+    let ignore = false;
+    const cargarClubes = async () => {
+      try {
+        if (profile?.id) {
+          const prioritarios = await RankingsService.getMisClubes();
+          if (ignore) return;
+          setClubesRanking(prioritarios);
+          if (prioritarios.length > 0) {
+            setActiveClubId((prev) => prev || prioritarios[0].id);
+          }
+          return;
+        }
+        const res = await ClubesService.getAll({ limit: 80 });
+        const raw = res.data;
+        const lista = (Array.isArray(raw) ? raw : []).map((c) => ({
+          id: String((c as { id?: string }).id || ""),
+          nombre: String((c as { nombre?: string }).nombre || "Club"),
+        })).filter((c) => c.id);
+        if (!ignore) {
+          setClubesRanking(lista);
+          if (lista.length > 0) {
+            setActiveClubId((prev) => prev || lista[0].id);
+          }
+        }
+      } catch {
+        if (!ignore) setClubesRanking([]);
+      }
+    };
+    cargarClubes();
+    return () => {
+      ignore = true;
+    };
+  }, [contextosListos, profile?.id]);
 
   useEffect(() => {
     let ignore = false;
@@ -79,6 +140,7 @@ export default function RankingPublicPage() {
       if (!profile?.id) {
         if (!ignore) {
           setContextos([]);
+          setActiveRama(ramaInicialRankingPublico());
           setContextosListos(true);
           setLoading(false);
         }
@@ -91,6 +153,7 @@ export default function RankingPublicPage() {
         if (lista.length > 0) {
           aplicarContexto(lista[0]);
         } else {
+          setActiveRama(ramaInicialRankingPublico(profile.sexo));
           setLoading(false);
         }
       } catch {
@@ -108,7 +171,7 @@ export default function RankingPublicPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, activeScope, activeProvincia, activeCategory]);
+  }, [search, activeScope, activeProvincia, activeCategory, activeRama, activeClubId]);
 
   // REFERENCIA DE CONTROL DE CONTROL VISUAL
   const isFirstLoad = useRef(true);
@@ -138,7 +201,9 @@ export default function RankingPublicPage() {
         const params = {
           scope: activeScope,
           provincia: activeScope === "Provincial" ? activeProvincia : undefined,
+          club_id: activeScope === "Club" ? activeClubId : undefined,
           categoria: activeCategory,
+          rama: activeRama,
         };
 
         const data = await RankingsService.getGlobal(params);
@@ -170,6 +235,8 @@ export default function RankingPublicPage() {
     activeScope,
     activeProvincia,
     activeCategory,
+    activeRama,
+    activeClubId,
     filtrosCompletos,
     contextosListos,
   ]);
@@ -224,7 +291,7 @@ export default function RankingPublicPage() {
           </h1>
           {filtrosCompletos && (
             <p className="text-sm md:text-base text-gray-400 mt-2 font-medium">
-              Temporada {new Date().getFullYear()} · {etiquetaCategoria}
+              Temporada {new Date().getFullYear()} · {etiquetaRamaRankingPublico(activeRama)} · {etiquetaCategoria}
             </p>
           )}
           <p className="mt-3 flex items-start gap-2 text-sm text-gray-400 max-w-3xl">
@@ -274,9 +341,26 @@ export default function RankingPublicPage() {
                 />
               </div>
             )}
+            <div className="flex bg-brand-black p-1.5 rounded-2xl border border-brand-white/5 h-13 items-center w-full lg:w-auto overflow-x-auto hide-scrollbar">
+              {OPCIONES_RAMA_RANKING_PUBLICO.map((opcion) => (
+                <button
+                  key={opcion.value}
+                  type="button"
+                  onClick={() => setActiveRama(opcion.value)}
+                  className={`flex-1 lg:flex-none px-4 md:px-6 py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all h-full whitespace-nowrap cursor-pointer ${
+                    activeRama === opcion.value
+                      ? "bg-brand-chartreuse text-brand-black shadow-[0_0_15px_rgba(203,254,1,0.2)]"
+                      : "text-gray-400 hover:text-brand-white hover:bg-brand-white/5"
+                  }`}
+                >
+                  {opcion.label}
+                </button>
+              ))}
+            </div>
+
             {/* Pestañas de Alcance */}
             <div className="flex bg-brand-black p-1.5 rounded-2xl border border-brand-white/5 h-13 items-center w-full lg:w-auto overflow-x-auto hide-scrollbar">
-              {["Provincial", "Nacional", "Global"].map((scope) => (
+              {(["Club", "Provincial", "Nacional"] as const).map((scope) => (
                 <button
                   key={scope}
                   onClick={() => setActiveScope(scope)}
@@ -293,6 +377,19 @@ export default function RankingPublicPage() {
 
             {/* Dropdowns */}
             <div className="flex gap-3 w-full lg:w-auto z-30">
+              {activeScope === "Club" && (
+                <div className="flex-1 lg:w-56 h-13">
+                  <CustomDropdown
+                    value={activeClubId}
+                    onChange={(val) => setActiveClubId(val)}
+                    options={clubesRanking.map((c) => ({
+                      value: c.id,
+                      label: c.nombre,
+                    }))}
+                    placeholder="Club"
+                  />
+                </div>
+              )}
               {activeScope === "Provincial" && (
                 <div className="flex-1 lg:w-48 h-13">
                   <CustomDropdown
