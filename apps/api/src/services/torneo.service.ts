@@ -39,6 +39,10 @@ import { mismaProvincia } from "../utils/alcanceCuenta";
 import { formatoTorneoSoportaGeneracionCuadro } from "../constants/torneoFormato";
 import { esEliminatoriaDirecta } from "../utils/formatoTorneo";
 import {
+  generarDiasJuegoDefault,
+  resolverDiasJuegoTrasCambioFechas,
+} from "../utils/diasJuegoTorneo";
+import {
   configuracionPuntosInicial,
   inferirPuntosActivados,
   tablaPuntosDesdeConfig,
@@ -939,34 +943,7 @@ export class TorneoService {
   }
 
 
-  static generarDiasJuegoDefault(
-    fechaInicio?: string | null,
-    fechaFin?: string | null,
-  ): string[] {
-    if (!fechaInicio) {
-      return ["Viernes", "Sábado", "Domingo"];
-    }
-    const startStr = fechaInicio.split("T")[0];
-    const endStr = fechaFin ? fechaFin.split("T")[0] : startStr;
-    const start = new Date(startStr + "T12:00:00Z");
-    const end = new Date(endStr + "T12:00:00Z");
-
-    const dias: string[] = [];
-    const current = new Date(start);
-    let limit = 0;
-
-    const nombresDias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-
-    while (current <= end && limit < 15) {
-      const dayName = nombresDias[current.getUTCDay()];
-      const dayNum = current.getUTCDate();
-      dias.push(`${dayName} ${dayNum}`);
-      current.setUTCDate(current.getUTCDate() + 1);
-      limit++;
-    }
-
-    return dias.length > 0 ? dias : ["Viernes", "Sábado", "Domingo"];
-  }
+  static generarDiasJuegoDefault = generarDiasJuegoDefault;
 
   static async crearTorneo(
     datos: TorneoPayload,
@@ -1374,7 +1351,7 @@ export class TorneoService {
     const { data: torneoActual } = await supabaseAdmin
       .from("torneos")
       .select(
-        "estado, fecha, fecha_cierre_inscripcion, club_id, nombre, es_prueba",
+        "estado, fecha, fecha_fin, fecha_cierre_inscripcion, club_id, nombre, es_prueba",
       )
       .eq("id", id)
       .single();
@@ -1479,6 +1456,23 @@ export class TorneoService {
         throw new Error(
           `No es posible reducir el cupo máximo a ${datos.cupos_maximos} porque actualmente hay ${inscritos} inscritos en el torneo.`,
         );
+      }
+    }
+
+    if (torneoActual) {
+      const diasSincronizados = resolverDiasJuegoTrasCambioFechas(
+        {
+          fecha: torneoActual.fecha,
+          fecha_fin: (torneoActual as { fecha_fin?: string | null }).fecha_fin,
+        },
+        {
+          fecha: updateData.fecha,
+          fecha_fin: updateData.fecha_fin,
+        },
+        updateData.dias_juego,
+      );
+      if (diasSincronizados) {
+        updateData.dias_juego = diasSincronizados;
       }
     }
 

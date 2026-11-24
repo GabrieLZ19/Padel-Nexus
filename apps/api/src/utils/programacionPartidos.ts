@@ -1850,17 +1850,26 @@ export function partidoViolaFeederODescansoPublicado(
   todosProg: PartidoProgramable[],
   feedersByMatchNo: Map<number, number[]>,
   duracionMinutos: number,
+  opciones?: {
+    descansoMinutos?: number;
+    descansoModo?: ModoDescanso;
+  },
 ): boolean {
   if (!p.fecha_partido) return false;
   if (partidoYaFinalizado(p)) return false;
   const parsed = parseFechaPartidoIso(String(p.fecha_partido));
   if (!parsed) return true;
 
+  const descansoModo = opciones?.descansoModo;
+  const descansoMinutos = opciones?.descansoMinutos;
+
   const notBefore = notBeforeDesdeFeeders(
     p,
     todosProg,
     feedersByMatchNo,
     duracionMinutos,
+    descansoMinutos,
+    descansoModo,
   );
   for (const nb of notBefore) {
     if (parsed.fecha < nb.fecha) return true;
@@ -1874,6 +1883,11 @@ export function partidoViolaFeederODescansoPublicado(
     Number.isFinite(ordenP) && ordenP > 0
       ? feedersByMatchNo.get(ordenP) || []
       : [];
+  const dependentsByMatchNo = buildDependentsByMatchNo(feedersByMatchNo);
+  const destinos =
+    Number.isFinite(ordenP) && ordenP > 0
+      ? dependentsByMatchNo.get(ordenP) || []
+      : [];
 
   const ids = equiposDePartido(p);
   for (const id of ids) {
@@ -1881,11 +1895,20 @@ export function partidoViolaFeederODescansoPublicado(
     for (const other of todosProg) {
       if (other === p || !other.fecha_partido) continue;
       const oOrden = Number(other.orden);
+      if (Number.isFinite(oOrden) && destinos.includes(oOrden)) {
+        continue;
+      }
       if (
         partidoYaFinalizado(other) &&
         feederOrdens.includes(oOrden)
       ) {
         continue;
+      }
+      if (esRondaDeZona(other.ronda)) {
+        const letter = zoneLetterFromNombreGrupo(String(other.ronda));
+        if (letter && zonaClasificacionCerrada(todosProg, letter)) {
+          continue;
+        }
       }
       const oIds = equiposDePartido(other);
       if (!oIds.includes(id)) continue;
@@ -1903,6 +1926,8 @@ export function partidoViolaFeederODescansoPublicado(
         parsed.fecha,
         parsed.startMin,
         duracionMinutos,
+        descansoMinutos,
+        descansoModo,
       )
     ) {
       return true;
@@ -1945,10 +1970,13 @@ export async function programarPartidosLlavePendientes(
 
   const { data: torneo } = await supabaseAdmin
     .from("torneos")
-    .select("formato, programacion_estado")
+    .select("formato, programacion_estado, descanso_modo")
     .eq("id", torneoId)
     .maybeSingle();
   const programacionPublicada = torneo?.programacion_estado === "publicado";
+  const descansoModo = esModoDescanso(torneo?.descanso_modo)
+    ? torneo!.descanso_modo
+    : undefined;
 
   const { esEliminatoriaDirecta } = await import("./formatoTorneo");
   let feedersByMatchNo: Map<number, number[]>;
@@ -1988,6 +2016,7 @@ export async function programarPartidosLlavePendientes(
           todosProg,
           feedersByMatchNo,
           duracionMinutos,
+          { descansoModo: descansoModo as ModoDescanso | undefined },
         ),
       partidosNumeracion: todosProg.map((p) => ({
         id: String((p as { id?: string }).id || ""),

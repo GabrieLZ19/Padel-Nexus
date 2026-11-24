@@ -1,5 +1,9 @@
 import { supabaseAdmin } from "../config/supabase";
 import { NotificacionService } from "./notificacion.service";
+import {
+  ordenInscripcionesZonaCuatroFinales,
+  puedeClasificarZonaCuatroPorFinales,
+} from "../utils/clasificacionZonas";
 
 export interface EstadisticasPareja {
   inscripcionId: string;
@@ -441,6 +445,35 @@ export class ClasificacionService {
       ds: st.setsAFavor - st.setsEnContra,
       dg: st.gamesAFavor - st.gamesEnContra,
     }));
+
+  const capacidad =
+    _capacidadZona ?? Object.keys(infoParejasMap).length;
+
+    // TOR-52: zona de 4 con finales jugadas — 1º/2º y 3º/4º solo por esos partidos
+    if (puedeClasificarZonaCuatroPorFinales(partidos, capacidad)) {
+      const ordenIds = ordenInscripcionesZonaCuatroFinales(partidos);
+      const porId = new Map(tabla.map((t) => [t.inscripcionId, t]));
+      const criterios = [
+        "1º por final de ganadores",
+        "2º por final de ganadores",
+        "3º por final de perdedores",
+        "4º por final de perdedores",
+      ];
+      const habilitadasOrdenadas = ordenIds
+        .map((id, idx) => {
+          const row = porId.get(id);
+          if (!row || row.descalificada) return null;
+          return {
+            ...row,
+            requiereSorteo: false,
+            empateConIds: undefined,
+            criterioDesempate: criterios[idx] || "Final de zona",
+          };
+        })
+        .filter(Boolean) as EstadisticasPareja[];
+      const descalificadas = tabla.filter((t) => t.descalificada);
+      return [...habilitadasOrdenadas, ...descalificadas];
+    }
 
     // Separar habilitadas de descalificadas
     const habilitadas = tabla.filter((t) => !t.descalificada);

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { getFapBracketForPairCount } from "../src/utils/fapBracketMatrices.ts";
+import { numerosVisiblesDePartidos } from "../src/utils/numerosVisiblesPartido.ts";
 import {
   buildFeedersByMatchNo,
   partidoViolaFeederODescansoPublicado,
@@ -150,6 +151,87 @@ describe("TOR-49 falsos positivos horarios publicados", () => {
             feeders,
             90,
           ),
+      });
+    assert.equal(avisos_programacion_publicada.length, 0);
+  });
+
+  it("re-test 24/11: cuarto #21 (sáb 08:00/09:30) y semi #24 (dom 14:00) sin aviso falso", () => {
+    const matrix = getFapBracketForPairCount(16) || [];
+    const feeders = buildFeedersByMatchNo(matrix);
+    const zonas = ["A", "B", "C", "D"].flatMap((z) =>
+      [1, 2, 3, 4].map((o) => ({
+        id: `z${z}${o}`,
+        ronda: `Zona ${z}`,
+        orden: o,
+        estado_partido: "Finalizado",
+        equipo_a_id: `z${z}${o}a`,
+        equipo_b_id: `z${z}${o}b`,
+        ganador: `z${z}${o}a`,
+        fecha_partido: "2026-11-28T18:00:00-03:00",
+        cancha_asignada: "C1",
+      })),
+    );
+    const llave = matrix.map((m) => ({
+      id: `m${m.matchNo}`,
+      ronda: m.round,
+      orden: m.matchNo,
+      estado_partido: "Programado",
+      equipo_a_id: `cu${m.matchNo}a`,
+      equipo_b_id: `cu${m.matchNo}b`,
+    }));
+
+    const cuarto58 = llave.find((p) => p.orden === 58);
+    const cuarto59 = llave.find((p) => p.orden === 59);
+    const oct57 = llave.find((p) => p.orden === 57);
+    const semi61 = llave.find((p) => p.orden === 61);
+    assert.ok(cuarto58 && cuarto59 && oct57 && semi61);
+
+    cuarto58.fecha_partido = "2026-11-29T08:00:00-03:00";
+    cuarto58.cancha_asignada = "C1";
+    cuarto59.fecha_partido = "2026-11-29T09:30:00-03:00";
+    cuarto59.cancha_asignada = "C2";
+    cuarto59.estado_partido = "Finalizado";
+    cuarto59.ganador = cuarto59.equipo_a_id;
+    oct57.fecha_partido = "2026-11-29T07:00:00-03:00";
+    oct57.estado_partido = "Finalizado";
+    oct57.ganador = oct57.equipo_a_id;
+    semi61.fecha_partido = "2026-11-30T14:00:00-03:00";
+    semi61.cancha_asignada = "C1";
+    semi61.equipo_a_id = cuarto58.equipo_a_id;
+
+    const todos = [...zonas, ...llave];
+    const visibles = numerosVisiblesDePartidos(todos);
+    assert.equal(visibles.get(String(cuarto58.id)), 21);
+    assert.equal(visibles.get(String(semi61.id)), 24);
+
+    const opts = { descansoModo: "tras_fin_120" as const };
+    assert.equal(
+      partidoViolaFeederODescansoPublicado(
+        cuarto58,
+        todos,
+        feeders,
+        90,
+        opts,
+      ),
+      false,
+    );
+    assert.equal(
+      partidoViolaFeederODescansoPublicado(semi61, todos, feeders, 90, opts),
+      false,
+    );
+
+    const { avisos_programacion_publicada } =
+      seleccionarPartidosLlaveParaAutoprogramar(llave, {
+        programacionPublicada: true,
+        violaHorarioPublicado: (p) =>
+          partidoViolaFeederODescansoPublicado(
+            p,
+            todos,
+            feeders,
+            90,
+            opts,
+          ),
+        partidosNumeracion: todos,
       });
     assert.equal(avisos_programacion_publicada.length, 0);
   });
