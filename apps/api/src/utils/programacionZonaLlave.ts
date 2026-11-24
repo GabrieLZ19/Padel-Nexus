@@ -170,6 +170,176 @@ export type ConflictoLlaveZona = {
   message: string;
 };
 
+export type ConflictoZonaLlave = {
+  partido_zona_id: string;
+  zone_letter: string;
+  message: string;
+};
+
+/** Primer inicio programado de llave que depende de cada letra de zona. */
+export function mapInicioTempranoLlavePorZona(
+  partidos: PartidoProgZonaLlave[],
+  matrix: readonly FapBracketMatch[],
+  feedersByMatchNo: Map<number, number[]>,
+): Map<string, { fecha: string; startMin: number }> {
+  const map = new Map<string, { fecha: string; startMin: number }>();
+  for (const p of partidos) {
+    if (esRondaDeZona(p.ronda)) continue;
+    if (!p.cancha_asignada || !p.fecha_partido) continue;
+    if (partidoYaFinalizado(p)) continue;
+    const orden = Number(p.orden);
+    if (!Number.isFinite(orden) || orden <= 0) continue;
+    const parsed = parseFechaPartidoIso(String(p.fecha_partido));
+    if (!parsed) continue;
+    const rank =
+      new Date(`${parsed.fecha}T00:00:00`).getTime() + parsed.startMin * 60_000;
+    const letters = zoneLettersQueAlimentanMatchNo(
+      orden,
+      matrix,
+      feedersByMatchNo,
+    );
+    for (const letter of letters) {
+      const prev = map.get(letter);
+      const prevRank = prev
+        ? new Date(`${prev.fecha}T00:00:00`).getTime() + prev.startMin * 60_000
+        : Number.POSITIVE_INFINITY;
+      if (rank < prevRank) {
+        map.set(letter, { fecha: parsed.fecha, startMin: parsed.startMin });
+      }
+    }
+  }
+  return map;
+}
+
+function partidoEnODespuesDeInstante(
+  parsed: { fecha: string; startMin: number },
+  limite: { fecha: string; startMin: number },
+): boolean {
+  return (
+    parsed.fecha > limite.fecha ||
+    (parsed.fecha === limite.fecha && parsed.startMin >= limite.startMin)
+  );
+}
+
+/**
+ * Partidos de zona con horario en o después del inicio de un cruce de llave
+ * que todavía depende de esa zona.
+ */
+export function detectarZonaDespuesInicioLlaveDependiente(
+  partidos: PartidoProgZonaLlave[],
+  matrix: readonly FapBracketMatch[],
+  feedersByMatchNo: Map<number, number[]>,
+): ConflictoZonaLlave[] {
+  const techoPorZona = mapInicioTempranoLlavePorZona(
+    partidos,
+    matrix,
+    feedersByMatchNo,
+  );
+  if (!techoPorZona.size) return [];
+
+  const out: ConflictoZonaLlave[] = [];
+  for (const p of partidos) {
+    if (!esRondaDeZona(p.ronda)) continue;
+    if (!p.cancha_asignada || !p.fecha_partido) continue;
+    if (partidoYaFinalizado(p)) continue;
+    const id = String((p as { id?: string }).id || "");
+    if (!id) continue;
+    const letter = zoneLetterFromNombreGrupo(String(p.ronda || ""));
+    if (!letter) continue;
+    if (zonaClasificacionCerrada(partidos, letter)) continue;
+    const techo = techoPorZona.get(letter);
+    if (!techo) continue;
+    const parsed = parseFechaPartidoIso(String(p.fecha_partido));
+    if (!parsed) continue;
+    if (partidoEnODespuesDeInstante(parsed, techo)) {
+      out.push({
+        partido_zona_id: id,
+        zone_letter: letter,
+        message: `Partido de zona ${letter} programado en o después de un cruce de llave que depende de esa zona`,
+      });
+    }
+  }
+  return out;
+}
+
+export type ConflictoOrdenInternoZona = {
+  partido_zona_id: string;
+  message: string;
+};
+
+/** Zona de 4 G/P: finales de ganadores/perdedores deben ir después de la ola 1. */
+export function detectarOrdenInternoZonaCuatro(
+  partidos: PartidoProgZonaLlave[],
+  opciones: {
+    duracionZonaMinutos: number;
+    descansoMinutos?: number;
+    descansoModo?: ModoDescanso;
+  },
+): ConflictoOrdenInternoZona[] {
+  const duracionZona = Math.max(30, opciones.duracionZonaMinutos);
+  const byRonda = new Map<string, PartidoProgZonaLlave[]>();
+  for (const p of partidos) {
+    if (!esRondaDeZona(p.ronda)) continue;
+    const nombre = String(p.ronda || "").trim();
+    const list = byRonda.get(nombre) || [];
+    list.push(p);
+    byRonda.set(nombre, list);
+  }
+
+  const out: ConflictoOrdenInternoZona[] = [];
+  for (const [, list] of byRonda) {
+    if (list.length !== 4) continue;
+    const sorted = [...list].sort(
+      (a, b) => (Number(a.orden) || 0) - (Number(b.orden) || 0),
+    );
+    const ola2 = sorted.slice(2);
+    const esGp = ola2.some((p) =>
+      /ganadores|perdedores/i.test(String(p.estado_partido || "")),
+    );
+    if (!esGp) continue;
+
+    let ultimoInicioOla1: { fecha: string; startMin: number } | null = null;
+    let ultimoRank = -1;
+    for (const p of sorted.slice(0, 2)) {
+      if (!p.fecha_partido) continue;
+      const parsed = parseFechaPartidoIso(String(p.fecha_partido));
+      if (!parsed) continue;
+      const finMin = parsed.startMin + duracionZona;
+      const rank =
+        new Date(`${parsed.fecha}T00:00:00`).getTime() + finMin * 60_000;
+      if (rank > ultimoRank) {
+        ultimoRank = rank;
+        ultimoInicioOla1 = parsed;
+      }
+    }
+    if (!ultimoInicioOla1) continue;
+
+    const minOla2 = minInicioDespuesDePartido(
+      ultimoInicioOla1.fecha,
+      ultimoInicioOla1.startMin,
+      duracionZona,
+      opciones.descansoMinutos,
+      opciones.descansoModo,
+    );
+
+    for (const p of ola2) {
+      if (!p.fecha_partido) continue;
+      const id = String((p as { id?: string }).id || "");
+      if (!id) continue;
+      const parsed = parseFechaPartidoIso(String(p.fecha_partido));
+      if (!parsed) continue;
+      if (partidoAntesDeInstanteProgramacion(parsed, minOla2)) {
+        out.push({
+          partido_zona_id: id,
+          message:
+            "Partido de ganadores/perdedores programado antes de los cruces iniciales de la zona",
+        });
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * TOR-48: cruces de llave con horario que arrancan antes de que termine
  * la fase clasificatoria programada de una zona que los alimenta.

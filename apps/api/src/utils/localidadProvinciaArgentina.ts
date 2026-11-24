@@ -4,6 +4,7 @@ import { provinciaCanonicaArgentina } from "./provinciaRanking";
 /** Clave normalizada de localidad -> provincia canónica. */
 const LOCALIDAD_A_PROVINCIA: Record<string, string> = {
   plottier: "Neuquén",
+  "cutral co": "Neuquén",
   neuquen: "Neuquén",
   "san martin de los andes": "Neuquén",
   zapala: "Neuquén",

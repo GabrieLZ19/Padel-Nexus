@@ -63,4 +63,29 @@ describe("TOR-22 / TOR-28 materializar rival en pase directo", () => {
     assert.equal(plan?.ladoDestinoALimpiar, "a");
     assert.equal(plan?.inscripcionRival, "ins-nueva");
   });
+
+  it("cuarto #19 (1A vs W16): materializa octavo y deja Gan. #16 en el cuarto", () => {
+    const matrix: import("../src/utils/fapBracketTypes").FapBracketMatch[] = [
+      { matchNo: 16, a: "1A", b: "2B", winnerTo: 19 },
+      { matchNo: 19, a: "1A", b: "W16", winnerTo: 22 },
+    ];
+    const specCuarto = matrix[1];
+    const plan = planificarMaterializacionByeFap(
+      specCuarto,
+      19,
+      matrix,
+      "ins-1a",
+      null,
+      "ins-1a",
+      "ins-nueva",
+      "b",
+    );
+    assert.ok(plan);
+    assert.equal(plan?.partidoEntradaOrden, 16);
+    assert.equal(plan?.mismoPartidoEntrada, false);
+    assert.equal(plan?.ladoDestinoALimpiar, "a");
+    assert.equal(plan?.ladoClasificado, "a");
+    assert.equal(plan?.inscripcionClasificada, "ins-1a");
+    assert.equal(plan?.inscripcionRival, "ins-nueva");
+  });
 });

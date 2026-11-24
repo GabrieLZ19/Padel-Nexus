@@ -133,6 +133,36 @@ describe("CLI-1 planillas oficiales FAP / clubes", () => {
     assert.match(avisos[0]!, /Pueblo Ficticio/);
   });
 
+  it("asigna fila Excel 1-index con encabezado en fila 1", () => {
+    const matrix = [
+      [
+        "PAREJAS",
+        "APELLIDO y NOMBRE",
+        "DNI",
+        "FECHA NACIM",
+        "CATEGORIA",
+        "EMAIL",
+        "TELEFONO",
+        "LCOALIDAD | PROVINCIA",
+      ],
+      [1, "García, Juan", "30111222", "", "", "", "", "Plottier"],
+    ];
+    const { filas } = parsearFilasPlanilla(matrix);
+    assert.equal(filas.length, 1);
+    assert.equal(filas[0]?.fila, 2);
+    assert.equal(filas[0]?.localidadResidencia, "Plottier");
+    const avisos = advertenciasResidenciaPlanilla(filas[0]!);
+    assert.equal(avisos.length, 0);
+  });
+
+  it("infiere Neuquen desde Cutral Co y Zapala", () => {
+    for (const loc of ["Cutral Co", "Zapala"]) {
+      const parsed = parseLocalidadProvinciaCelda(loc);
+      assert.equal(parsed.localidad, loc);
+      assert.equal(parsed.provincia, "Neuquén");
+    }
+  });
+
   it("planilla nacional conserva LETRA y ASOCIACIÓN", () => {
     const matrix = [
       [

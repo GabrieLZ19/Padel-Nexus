@@ -6,6 +6,11 @@ import {
   listLeafSeeds,
 } from "./fapBracketMatrices";
 import { roundNameForMatchNo, zonePosKey } from "./fapBracketTypes";
+import {
+  equipoEnSlotDesdeClasificado,
+  isSeedRefValidForZoneComposition,
+  listSemillasPendientesFap,
+} from "./fapZoneSeeds";
 
 export interface FapPlayoffPartidoDraft {
   matchNo: number;
@@ -90,4 +95,105 @@ export function nextPowerOfTwo(n: number): number {
   let p = 1;
   while (p < n) p *= 2;
   return p;
+}
+
+export type PartidoLlavePorOrden = {
+  orden: number;
+  equipo_a_id: string | null;
+  equipo_b_id: string | null;
+};
+
+export type ResumenProyeccionLlaveFap = {
+  actualizaciones: Array<{
+    matchNo: number;
+    equipo_a_id: string | null;
+    equipo_b_id: string | null;
+  }>;
+  semillas_invalidadas: string[];
+  semillas_actualizadas: string[];
+  semillas_pendientes: string[];
+};
+
+/**
+ * TOR-24: recalcula hojas de llave según composición actual de zonas y clasificados.
+ * No destructivo: invalida plazas que ya no aplican (ej. 2B si la zona B queda en 2 parejas).
+ */
+export function proyectarSincronizacionHojasFap(
+  matrix: readonly FapBracketMatch[],
+  countsByZone: Map<string, number>,
+  qualifiedMap: Map<string, string>,
+  partidos: PartidoLlavePorOrden[],
+): ResumenProyeccionLlaveFap {
+  const byOrden = new Map(partidos.map((p) => [p.orden, p]));
+  const fills = fillLeafSidesFromQualified(matrix, qualifiedMap);
+  const requiredSeeds = listLeafSeeds(matrix);
+  const semillas_pendientes = listSemillasPendientesFap(
+    requiredSeeds,
+    qualifiedMap,
+    countsByZone,
+  );
+  const semillas_invalidadas: string[] = [];
+  const semillas_actualizadas: string[] = [];
+  const actualizaciones: ResumenProyeccionLlaveFap["actualizaciones"] = [];
+
+  for (const fill of fills) {
+    const partido = byOrden.get(fill.matchNo);
+    if (!partido) continue;
+    const matrixMatch = matrix.find((m) => m.matchNo === fill.matchNo);
+    if (!matrixMatch) continue;
+
+    const prevA = partido.equipo_a_id;
+    const prevB = partido.equipo_b_id;
+
+    const equipo_a_id = equipoEnSlotDesdeClasificado(
+      matrixMatch.a,
+      fill.equipo_a_id,
+      countsByZone,
+      partido.equipo_a_id,
+    );
+    const equipo_b_id = equipoEnSlotDesdeClasificado(
+      matrixMatch.b,
+      fill.equipo_b_id,
+      countsByZone,
+      partido.equipo_b_id,
+    );
+
+    if (!matrixMatch.a.startsWith("W")) {
+      if (prevA && equipo_a_id === null) {
+        semillas_invalidadas.push(matrixMatch.a);
+      } else if (
+        prevA !== equipo_a_id &&
+        equipo_a_id &&
+        isSeedRefValidForZoneComposition(matrixMatch.a, countsByZone)
+      ) {
+        semillas_actualizadas.push(matrixMatch.a);
+      }
+    }
+    if (!matrixMatch.b.startsWith("W")) {
+      if (prevB && equipo_b_id === null) {
+        semillas_invalidadas.push(matrixMatch.b);
+      } else if (
+        prevB !== equipo_b_id &&
+        equipo_b_id &&
+        isSeedRefValidForZoneComposition(matrixMatch.b, countsByZone)
+      ) {
+        semillas_actualizadas.push(matrixMatch.b);
+      }
+    }
+
+    if (equipo_a_id === prevA && equipo_b_id === prevB) continue;
+
+    actualizaciones.push({
+      matchNo: fill.matchNo,
+      equipo_a_id,
+      equipo_b_id,
+    });
+  }
+
+  return {
+    actualizaciones,
+    semillas_invalidadas: [...new Set(semillas_invalidadas)],
+    semillas_actualizadas: [...new Set(semillas_actualizadas)],
+    semillas_pendientes,
+  };
 }

@@ -21,6 +21,8 @@ import {
 import { zoneLetterFromNombreGrupo } from "./fapZoneSeeds";
 import {
   detectarLlaveAntesFinZonaAlimentadora,
+  detectarOrdenInternoZonaCuatro,
+  detectarZonaDespuesInicioLlaveDependiente,
   partidoYaFinalizado,
   zonaClasificacionCerrada,
 } from "./programacionZonaLlave";
@@ -668,6 +670,17 @@ function asignarSlotAPartido(
   registrarBusyParejas(historial, ids, wall.fecha, wall.startMin, duracionMinutos);
 }
 
+function slotDemasiadoTardeParaLlave(
+  wall: { fecha: string; startMin: number },
+  notAfter?: { fecha: string; startMin: number } | null,
+): boolean {
+  if (!notAfter) return false;
+  return (
+    wall.fecha > notAfter.fecha ||
+    (wall.fecha === notAfter.fecha && wall.startMin >= notAfter.startMin)
+  );
+}
+
 /**
  * Busca N canchas libres en el mismo momento que cumplan descanso de parejas.
  */
@@ -681,10 +694,12 @@ function buscarOlaSimultanea(
   descansoMinutos?: number,
   descansoModo?: ModoDescanso,
   notBefore: { fecha: string; startMin: number }[] = [],
+  notAfter?: { fecha: string; startMin: number } | null,
 ): SlotProgramacion[] | null {
   const momentos = agruparSlotsPorMomento(slots);
 
   for (const momento of momentos) {
+    if (slotDemasiadoTardeParaLlave(momento, notAfter)) continue;
     let tooEarly = false;
     for (const nb of notBefore) {
       if (momento.fecha < nb.fecha) {
@@ -763,6 +778,7 @@ function buscarSlotIndividual(
     fechaInicio?: string | null;
     respetarLimiteClasificacion?: boolean;
   },
+  notAfter?: { fecha: string; startMin: number } | null,
 ): SlotProgramacion | null {
   for (const slot of slots) {
     const wall =
@@ -776,6 +792,7 @@ function buscarSlotIndividual(
       minutosAHoraStr(wall.startMin),
     );
     if (ocupados.has(key)) continue;
+    if (slotDemasiadoTardeParaLlave(wall, notAfter)) continue;
     const startMin = wall.startMin;
     let tooEarly = false;
     for (const nb of notBefore) {
@@ -1221,6 +1238,8 @@ export function asignarHorariosAPartidos(
     alcanceTorneo?: string | null;
     /** Solo agenda estos IDs (el resto del array alimenta feeders/ocupación). */
     limitarAIds?: Set<string>;
+    /** Tope de inicio (exclusive) por letra de zona ante cruces de llave ya programados. */
+    notAfterLlavePorZona?: Map<string, { fecha: string; startMin: number }>;
   },
 ): void {
   if (!slots.length || !partidos.length) return;
@@ -1251,8 +1270,15 @@ export function asignarHorariosAPartidos(
         }
       : undefined;
   const limitarAIds = opciones?.limitarAIds;
+  const notAfterLlavePorZona = opciones?.notAfterLlavePorZona;
   const ocupados = new Set(ocupadosIniciales || []);
   const historial = new Map<string, PartidoParejaHistorial[]>();
+
+  const techoLlaveParaRonda = (ronda?: string | null) => {
+    const letter = zoneLetterFromNombreGrupo(String(ronda || ""));
+    if (!letter || !notAfterLlavePorZona) return null;
+    return notAfterLlavePorZona.get(letter) ?? null;
+  };
 
   const opcionesDependenciaPara = (
     partido: PartidoProgramable,
@@ -1332,6 +1358,7 @@ export function asignarHorariosAPartidos(
         descansoModo,
         opcionesDependenciaPara(item.partido),
         validacionZonaPara(item.partido.ronda),
+        techoLlaveParaRonda(item.partido.ronda),
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -1365,6 +1392,11 @@ export function asignarHorariosAPartidos(
   );
 
   for (const [ronda, items] of zonasOrdenadas) {
+    const techoLlave = techoLlaveParaRonda(ronda);
+    const partidosEnZona = partidos
+      .map((partido, index) => ({ partido, index }))
+      .filter(({ partido }) => String(partido.ronda || "") === ronda)
+      .sort((a, b) => (a.partido.orden || 0) - (b.partido.orden || 0));
     const ordenados = [...items].sort(
       (a, b) => (a.partido.orden || 0) - (b.partido.orden || 0),
     );
@@ -1373,40 +1405,59 @@ export function asignarHorariosAPartidos(
       ronda,
     );
 
+    const tbdEnZona = partidosEnZona.filter((i) => esPendienteZona(i.partido));
+    const definidosEnZona = partidosEnZona.filter(
+      (i) => !esPendienteZona(i.partido),
+    );
     const tbd = ordenados.filter((i) => esPendienteZona(i.partido));
     const definidos = ordenados.filter((i) => !esPendienteZona(i.partido));
 
+    const pendienteIds = new Set(
+      pendientes.map(({ partido }) => String(partido.id || "")),
+    );
+    const soloPendienteEnZona = (item: { partido: PartidoProgramable }) =>
+      !pendienteIds.size || pendienteIds.has(String(item.partido.id || ""));
+
     // Zona de 4 FAP: ola 1 = partidos base; ola 2 = ganadores/perdedores (TBD).
     // Si ya no quedan pendientes, se usa el orden correlativo (#1/#2 luego #3/#4).
-    const esZonaCuatro = ordenados.length === 4;
+    const esZonaCuatro = partidosEnZona.length === 4;
     const ola1 = esZonaCuatro
-      ? tbd.length >= 2 && definidos.length >= 2
-        ? definidos.slice(0, 2)
-        : ordenados.slice(0, 2)
+      ? tbdEnZona.length >= 2 && definidosEnZona.length >= 2
+        ? definidosEnZona.slice(0, 2)
+        : partidosEnZona.slice(0, 2)
       : [];
     const ola2 = esZonaCuatro
-      ? tbd.length >= 2 && definidos.length >= 2
-        ? tbd.slice(0, 2)
-        : ordenados.slice(2, 4)
+      ? tbdEnZona.length >= 2 && definidosEnZona.length >= 2
+        ? tbdEnZona.slice(0, 2)
+        : partidosEnZona.slice(2, 4)
       : [];
 
     if (esZonaCuatro) {
       const idsOla1 = [
         ...new Set(ola1.flatMap((i) => equiposDePartido(i.partido))),
       ];
-      const slotsOla1 = buscarOlaSimultanea(
-        2,
-        slots,
-        ocupados,
-        historial,
-        idsOla1.length ? idsOla1 : parejasZona,
-        duracionMinutos,
-        descansoMinutos,
-        descansoModo,
+      const ola1Agendar = ola1.filter(
+        (item) =>
+          soloPendienteEnZona(item) && !partidos[item.index].fecha_partido,
       );
+      const slotsOla1 =
+        ola1Agendar.length === 2
+          ? buscarOlaSimultanea(
+              2,
+              slots,
+              ocupados,
+              historial,
+              idsOla1.length ? idsOla1 : parejasZona,
+              duracionMinutos,
+              descansoMinutos,
+              descansoModo,
+              [],
+              techoLlave,
+            )
+          : null;
       const notBeforeOla2: { fecha: string; startMin: number }[] = [];
       if (slotsOla1) {
-        ola1.forEach((item, idx) => {
+        ola1Agendar.forEach((item, idx) => {
           asignarSlotAPartido(
             partidos[item.index],
             slotsOla1[idx],
@@ -1429,21 +1480,39 @@ export function asignarHorariosAPartidos(
         }
       }
 
+      for (const item of definidosEnZona.slice(0, 2)) {
+        if (!item.partido.fecha_partido) continue;
+        const wall = parseFechaPartidoIso(String(item.partido.fecha_partido));
+        if (!wall) continue;
+        notBeforeOla2.push({
+          fecha: wall.fecha,
+          startMin: wall.startMin + duracionMinutos,
+        });
+      }
+
       // Ola 2: todas las parejas de la zona juegan (G vs G y P vs P), después de la ola 1.
       const idsOla2 = parejasZona.length ? parejasZona : idsOla1;
-      const slotsOla2 = buscarOlaSimultanea(
-        2,
-        slots,
-        ocupados,
-        historial,
-        idsOla2,
-        duracionMinutos,
-        descansoMinutos,
-        descansoModo,
-        notBeforeOla2,
+      const ola2Agendar = ola2.filter(
+        (item) =>
+          soloPendienteEnZona(item) && !partidos[item.index].fecha_partido,
       );
+      const slotsOla2 =
+        ola2Agendar.length === 2
+          ? buscarOlaSimultanea(
+              2,
+              slots,
+              ocupados,
+              historial,
+              idsOla2,
+              duracionMinutos,
+              descansoMinutos,
+              descansoModo,
+              notBeforeOla2,
+              techoLlave,
+            )
+          : null;
       if (slotsOla2) {
-        ola2.forEach((item, idx) => {
+        ola2Agendar.forEach((item, idx) => {
           asignarSlotAPartido(
             partidos[item.index],
             slotsOla2[idx],
@@ -1472,6 +1541,7 @@ export function asignarHorariosAPartidos(
         descansoModo,
         undefined,
         validacionZonaPara(item.partido.ronda),
+        techoLlave,
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -1497,6 +1567,7 @@ export function asignarHorariosAPartidos(
         descansoModo,
         undefined,
         validacionZonaPara(item.partido.ronda),
+        techoLlave,
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -1642,8 +1713,13 @@ export async function programarPartidosConDisponibilidad(
     ocupados?: Set<string>;
     fase?: FaseProgramacion;
     duracionMinutos?: number;
+    duracionZonaMinutos?: number;
+    descansoMinutos?: number;
+    descansoModo?: ModoDescanso;
     feedersByMatchNo?: Map<number, number[]>;
     permitirSinEquipos?: boolean;
+    notAfterLlavePorZona?: Map<string, { fecha: string; startMin: number }>;
+    limitarAIds?: Set<string>;
   },
 ): Promise<void> {
   const { duracionMinutos: configurada, disponibilidad, fecha, fecha_fin, dias_juego } =
@@ -1653,6 +1729,8 @@ export async function programarPartidosConDisponibilidad(
   const fase = opciones?.fase || "zonas";
   const duracionMinutos =
     opciones?.duracionMinutos ?? duracionParaFase(configurada, fase);
+  const duracionZonaMinutos =
+    opciones?.duracionZonaMinutos ?? duracionParaFase(configurada, "zonas");
 
   const dias = resolverDiasProgramacion({
     fecha,
@@ -1667,8 +1745,13 @@ export async function programarPartidosConDisponibilidad(
   });
   asignarHorariosAPartidos(partidos, slots, opciones?.ocupados, {
     duracionMinutos,
+    duracionZonaMinutos,
+    descansoMinutos: opciones?.descansoMinutos,
+    descansoModo: opciones?.descansoModo,
     feedersByMatchNo: opciones?.feedersByMatchNo,
     permitirSinEquipos: opciones?.permitirSinEquipos,
+    notAfterLlavePorZona: opciones?.notAfterLlavePorZona,
+    limitarAIds: opciones?.limitarAIds,
   });
 }
 
@@ -2124,13 +2207,59 @@ export async function programarPartidosZonaPendientes(
   const ocupados = buildOcupadosDesdePartidos(todos || []);
   const drafts: PartidoProgramable[] = (todos || []).map((p) => ({ ...p }));
 
+  const { data: torneo } = await supabaseAdmin
+    .from("torneos")
+    .select("duracion_partido_minutos, descanso_minutos, descanso_modo, formato")
+    .eq("id", torneoId)
+    .maybeSingle();
+
+  const duracionBase = Number(torneo?.duracion_partido_minutos || 90);
+  const modo = esModoDescanso(torneo?.descanso_modo)
+    ? torneo.descanso_modo
+    : undefined;
+  const descanso = modo
+    ? minutosDeModoDescanso(modo)
+    : Number(torneo?.descanso_minutos || 60);
+
+  let notAfterLlavePorZona:
+    | Map<string, { fecha: string; startMin: number }>
+    | undefined;
+  try {
+    const { resolveFapPlantillaPairCount } = await import(
+      "./fapPlantillaTorneo"
+    );
+    const { getFapBracketForPairCount } = await import("./fapBracketMatrices");
+    const { mapInicioTempranoLlavePorZona } = await import(
+      "./programacionZonaLlave"
+    );
+    const pairCount = await resolveFapPlantillaPairCount(torneoId);
+    const matrix = getFapBracketForPairCount(pairCount);
+    if (matrix?.length) {
+      const feeders = buildFeedersByMatchNo(matrix);
+      notAfterLlavePorZona = mapInicioTempranoLlavePorZona(
+        drafts,
+        matrix,
+        feeders,
+      );
+    }
+  } catch {
+    notAfterLlavePorZona = undefined;
+  }
+
+  const pendIds = new Set(pendientes.map((p) => p.id));
+
   await programarPartidosConDisponibilidad(torneoId, drafts, {
     ocupados,
     fase: "zonas",
+    duracionMinutos: duracionParaFase(duracionBase, "zonas"),
+    duracionZonaMinutos: duracionParaFase(duracionBase, "zonas"),
+    descansoMinutos: descanso,
+    descansoModo: modo,
+    notAfterLlavePorZona,
+    limitarAIds: pendIds,
   });
 
   let updated = 0;
-  const pendIds = new Set(pendientes.map((p) => p.id));
   for (const draft of drafts) {
     const id = (draft as { id?: string }).id;
     if (!id || !pendIds.has(id)) continue;
@@ -2412,6 +2541,32 @@ export function evaluateProgramacionIssues(
         message: c.message,
       });
     }
+
+    const conflictosZonaTarde = detectarZonaDespuesInicioLlaveDependiente(
+      partidos,
+      opciones.matrixFap,
+      opciones.feedersByMatchNo,
+    );
+    for (const c of conflictosZonaTarde) {
+      issues.push({
+        partido_id: c.partido_zona_id,
+        severity: "bad",
+        message: c.message,
+      });
+    }
+  }
+
+  const ordenInterno = detectarOrdenInternoZonaCuatro(partidos, {
+    duracionZonaMinutos: duracionZona,
+    descansoMinutos: descanso,
+    descansoModo: opciones.descansoModo,
+  });
+  for (const c of ordenInterno) {
+    issues.push({
+      partido_id: c.partido_zona_id,
+      severity: "bad",
+      message: c.message,
+    });
   }
 
   const byId = new Map<string, ProgramacionIssue>();

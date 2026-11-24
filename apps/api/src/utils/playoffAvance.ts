@@ -7,13 +7,11 @@ import {
 } from "./fapBracketMatrices";
 import {
   buildQualifiedMap,
-  fillLeafSidesFromQualified,
+  proyectarSincronizacionHojasFap,
 } from "./fapBracketPlacement";
 import type { QualifiedPair } from "./fapBracketTypes";
 import {
   buildZonePairCountsByLetter,
-  equipoEnSlotDesdeClasificado,
-  isSeedRefValidForZoneComposition,
   listSemillasPendientesFap,
 } from "./fapZoneSeeds";
 
@@ -277,71 +275,34 @@ export async function avanzarJugadoresALlaves(
 
   if (!playoffMatches || playoffMatches.length === 0) return resumenVacio();
 
+  const proyeccion = proyectarSincronizacionHojasFap(
+    matrix,
+    countsByZone,
+    qualifiedMap,
+  playoffMatches.map((p) => ({
+      orden: Number(p.orden),
+      equipo_a_id: p.equipo_a_id,
+      equipo_b_id: p.equipo_b_id,
+    })),
+  );
   const byOrden = new Map(playoffMatches.map((p) => [p.orden, p]));
-  const fills = fillLeafSidesFromQualified(matrix, qualifiedMap);
-  const semillasInvalidadas: string[] = [];
-  const semillasActualizadas: string[] = [];
+  const semillasInvalidadas = proyeccion.semillas_invalidadas;
+  const semillasActualizadas = proyeccion.semillas_actualizadas;
 
-  for (const fill of fills) {
-    const partido = byOrden.get(fill.matchNo);
+  for (const upd of proyeccion.actualizaciones) {
+    const partido = byOrden.get(upd.matchNo);
     if (!partido) continue;
 
-    const matrixMatch = matrix.find((m) => m.matchNo === fill.matchNo);
-    if (!matrixMatch) continue;
-
-    const prevA = partido.equipo_a_id;
-    const prevB = partido.equipo_b_id;
-
-    const equipo_a_id = equipoEnSlotDesdeClasificado(
-      matrixMatch.a,
-      fill.equipo_a_id,
-      countsByZone,
-      partido.equipo_a_id,
-    );
-    const equipo_b_id = equipoEnSlotDesdeClasificado(
-      matrixMatch.b,
-      fill.equipo_b_id,
-      countsByZone,
-      partido.equipo_b_id,
-    );
-
-    if (!matrixMatch.a.startsWith("W")) {
-      if (prevA && equipo_a_id === null) {
-        semillasInvalidadas.push(matrixMatch.a);
-      } else if (
-        prevA !== equipo_a_id &&
-        equipo_a_id &&
-        isSeedRefValidForZoneComposition(matrixMatch.a, countsByZone)
-      ) {
-        semillasActualizadas.push(matrixMatch.a);
-      }
-    }
-    if (!matrixMatch.b.startsWith("W")) {
-      if (prevB && equipo_b_id === null) {
-        semillasInvalidadas.push(matrixMatch.b);
-      } else if (
-        prevB !== equipo_b_id &&
-        equipo_b_id &&
-        isSeedRefValidForZoneComposition(matrixMatch.b, countsByZone)
-      ) {
-        semillasActualizadas.push(matrixMatch.b);
-      }
-    }
-
-    if (equipo_a_id === prevA && equipo_b_id === prevB) {
-      continue;
-    }
-
     const patch: Record<string, unknown> = {
-      equipo_a_id,
-      equipo_b_id,
+      equipo_a_id: upd.equipo_a_id,
+      equipo_b_id: upd.equipo_b_id,
     };
     if (
       marcarProgramados &&
       !partido.ganador &&
       partido.estado_partido !== "Finalizado" &&
-      equipo_a_id &&
-      equipo_b_id
+      upd.equipo_a_id &&
+      upd.equipo_b_id
     ) {
       patch.estado_partido = "Programado";
     }

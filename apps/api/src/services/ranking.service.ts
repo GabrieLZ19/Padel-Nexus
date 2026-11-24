@@ -19,6 +19,7 @@ import {
 } from "../utils/puntosProvincia";
 import { esTorneoDePrueba, esVisibleEnSitioPublico } from "../utils/datoPrueba";
 import { esEmailPlaceholderPlanilla } from "../utils/inscripcionPlanilla";
+import { provinciaEfectivaDesdePerfil } from "../utils/provinciaPerfil";
 import {
   filtrarFilasRankingPorProvincia,
   mapaSiglaAsociacionProvincia,
@@ -603,11 +604,11 @@ export class RankingService {
         lugar_residencia?: string;
         clubes?: { provincia?: string } | null;
       } | null;
-      return (
-        p?.clubes?.provincia ||
-        p?.lugar_residencia ||
-        "Sin provincia"
+      const resuelta = provinciaEfectivaDesdePerfil(
+        p?.lugar_residencia,
+        p?.clubes?.provincia,
       );
+      return resuelta || "Sin provincia";
     };
 
     const provinciasPorInscripcion = new Map(

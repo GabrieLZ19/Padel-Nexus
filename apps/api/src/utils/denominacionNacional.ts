@@ -1,10 +1,11 @@
 /**
  * Etiqueta de representación en torneos nacionales: "NEUQUÉN A", "BUENOS AIRES C".
- * Provincia = ASOCIACIÓN de la planilla (persistida en lugar_residencia al importar);
- *   si la planilla no trae ASOCIACIÓN, se usa el lugar_residencia ya cargado en el perfil.
+ * Provincia = ASOCIACIÓN de la planilla, provincia canónica en residencia o inferida desde localidad.
  * Letra = LETRA de la planilla (letra_prioridad de la inscripción).
  * Provincia completa en mayúsculas + letra (sin abreviaturas).
  */
+
+import { provinciaEfectivaDesdePerfil } from "./provinciaPerfil";
 
 /** Abreviaturas legacy → nombre completo (por si llega una denominación vieja). */
 const EXPANDIR_ABREVIATURAS: Record<string, string> = {
@@ -91,15 +92,26 @@ export function enrichInscripcionDenominacion(
     letra_prioridad?: string | null;
     usuario_id?: string | null;
     usuario2_id?: string | null;
-    perfiles?: { lugar_residencia?: string | null } | null;
-    perfiles_jugador2?: { lugar_residencia?: string | null } | null;
+    perfiles?: {
+      lugar_residencia?: string | null;
+      clubes?: { provincia?: string | null; nombre?: string | null } | null;
+    } | null;
+    perfiles_jugador2?: {
+      lugar_residencia?: string | null;
+      clubes?: { provincia?: string | null; nombre?: string | null } | null;
+    } | null;
   },
   alcanceTorneo?: string | null,
 ) {
-  const provincia =
-    ins.perfiles?.lugar_residencia?.trim() ||
-    ins.perfiles_jugador2?.lugar_residencia?.trim() ||
-    null;
+  const provinciaJ1 = provinciaEfectivaDesdePerfil(
+    ins.perfiles?.lugar_residencia,
+    ins.perfiles?.clubes?.provincia,
+  );
+  const provinciaJ2 = provinciaEfectivaDesdePerfil(
+    ins.perfiles_jugador2?.lugar_residencia,
+    ins.perfiles_jugador2?.clubes?.provincia,
+  );
+  const provincia = provinciaJ1 || provinciaJ2 || null;
   const letra = ins.letra_prioridad ?? null;
   const usarDenominacion = aplicaDenominacionNacional(alcanceTorneo);
   return {

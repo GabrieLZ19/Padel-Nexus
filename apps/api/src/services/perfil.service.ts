@@ -10,10 +10,8 @@ import {
   esEmailPlaceholderPlanilla,
   sanitizarFilaPlanillaInscripcion,
   resolverLugarResidenciaDesdePlanilla,
-  resolverProvinciaDesdePlanilla,
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
-import { provinciaCanonicaArgentina } from "../utils/provinciaRanking";
 import {
   coincideEmailPreinscripcion,
   coincideUltimos4Telefono,
@@ -622,12 +620,7 @@ export class PerfilService {
       .eq("dni", dni)
       .maybeSingle();
 
-    const lugarResidenciaPlanilla = resolverLugarResidenciaDesdePlanilla(fila);
-    const provinciaRaw = resolverProvinciaDesdePlanilla(fila);
-    const provinciaCanonica =
-      provinciaCanonicaArgentina(provinciaRaw) ?? provinciaRaw ?? null;
-    const lugarPersistir =
-      lugarResidenciaPlanilla || provinciaCanonica || null;
+    const lugarPersistir = resolverLugarResidenciaDesdePlanilla(fila);
 
     if (existente) {
       const patch: Record<string, unknown> = {};

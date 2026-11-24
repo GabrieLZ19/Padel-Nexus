@@ -514,12 +514,12 @@ export class CompetenciaService {
             perfiles:perfiles!fk_inscripciones_usuario (
               club_id,
               lugar_residencia,
-              clubes:clubes!perfiles_club_id_fkey (nombre)
+              clubes:clubes!perfiles_club_id_fkey (nombre, provincia)
             ),
             perfiles_jugador2:perfiles!fk_inscripciones_usuario2 (
               club_id,
               lugar_residencia,
-              clubes:clubes!perfiles_club_id_fkey (nombre)
+              clubes:clubes!perfiles_club_id_fkey (nombre, provincia)
             )
           )
         )
@@ -1169,6 +1169,13 @@ export class CompetenciaService {
               descansoModo: modo,
             },
           );
+
+        const { programarPartidosZonaPendientes } = await import(
+          "../utils/programacionPartidos"
+        );
+        for (const nombreZona of zonasRegeneradas) {
+          await programarPartidosZonaPendientes(torneoId, nombreZona);
+        }
       }
     }
 

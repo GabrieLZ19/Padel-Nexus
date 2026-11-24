@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../config/supabase";
 import { normalizarProvincia } from "../constants/rankings";
+import { provinciaEfectivaDesdePerfil } from "./provinciaPerfil";
 
 type PerfilProvinciaMin = {
   lugar_residencia?: string | null;
@@ -106,14 +107,6 @@ export function provinciaParaRanking(
   if (lr) {
     const porSigla = siglas.get(lr.toUpperCase());
     if (porSigla) return porSigla;
-    const canon = provinciaCanonicaArgentina(lr);
-    if (canon) return canon;
-    if (lr.length > 5 || /\s/.test(lr)) return lr;
   }
-  const club = (clubProvincia || "").trim();
-  if (club) {
-    const canon = provinciaCanonicaArgentina(club);
-    return canon || club;
-  }
-  return "";
+  return provinciaEfectivaDesdePerfil(lugarResidencia, clubProvincia);
 }
