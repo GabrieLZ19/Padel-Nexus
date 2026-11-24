@@ -4,7 +4,7 @@ Plan activo: Re-test 24/11 (PDF Dylan, 24/11/2026).
 
 ## Ola 1 — Seguridad y pagos (FEE) — COMPLETADA
 
-Commits: pendientes de push (back + front en este lote).
+Commits: `fdf72f1` (back), `c300712` (front).
 
 | Código | Estado | Tests |
 |--------|--------|-------|
