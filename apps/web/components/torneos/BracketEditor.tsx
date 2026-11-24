@@ -46,8 +46,10 @@ import { FapBracketDiagram, type FapMatrixMatch } from "./FapBracketDiagram";
 import { ladoSlotBloqueadoPorMatriz } from "@/utils/edicionLlaveFap";
 import {
   inferirSemillaPaseDirectoEnSpec,
+  ladoClasificadoPaseDirectoProtegido,
   ladoRivalPaseDirecto,
   ladoSemillaPaseDirecto,
+  puedeUsarAltaParejaEnSlot,
 } from "@/utils/fapPaseDirectoLlave";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { sileo } from "sileo";
@@ -1289,6 +1291,13 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     return ladoSlotBloqueadoPorMatriz(ref);
   };
 
+  const ladoClasificadoProtegido = (slot: "a" | "b"): boolean =>
+    ladoClasificadoPaseDirectoProtegido(
+      matrizPartidoEnEdicion,
+      matchEditSemillaFap,
+      slot,
+    );
+
   const etiquetaLadoReservado = (slot: "a" | "b"): string | null => {
     if (!matrizPartidoEnEdicion) return null;
     const ref =
@@ -1467,6 +1476,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     slot: "a" | "b",
     newId: string,
   ) => {
+    if (ladoClasificadoProtegido(slot) && newId) {
+      sileo.warning({
+        title: "Clasificado protegido",
+        description:
+          "Ese lado es el pase directo del clasificado. Prepará el rival en el otro lado con «Alta para lado A/B»; el cruce se arma en el octavo correspondiente.",
+      });
+      return;
+    }
     if (newId && slotLadoReservadoGanador(slot) && !matchEditSemillaFap) {
       sileo.warning({
         title: "Lado reservado",
@@ -1513,6 +1530,30 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     const baseB = matchEditBaseline?.equipo_b_id ?? null;
     const nextA = selectedMatchToEdit.equipo_a_id ?? null;
     const nextB = selectedMatchToEdit.equipo_b_id ?? null;
+    if (matrizPartidoEnEdicion && matchEditSemillaFap) {
+      if (ladoClasificadoProtegido("a") && nextA !== baseA) {
+        setFeedbackModal({
+          isOpen: true,
+          type: "warning",
+          title: "No reemplazar el clasificado",
+          description: `El lado A es el pase directo de ${formatFapSide(matchEditSemillaFap)}. Asigná la pareja nueva solo en el lado del rival (hueco W*).`,
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+        return;
+      }
+      if (ladoClasificadoProtegido("b") && nextB !== baseB) {
+        setFeedbackModal({
+          isOpen: true,
+          type: "warning",
+          title: "No reemplazar el clasificado",
+          description: `El lado B es el pase directo de ${formatFapSide(matchEditSemillaFap)}. Asigná la pareja nueva solo en el lado del rival (hueco W*).`,
+          onClose: () =>
+            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+        });
+        return;
+      }
+    }
     if (matrizPartidoEnEdicion && !matchEditSemillaFap) {
       if (slotLadoReservadoGanador("a") && nextA !== baseA) {
         setFeedbackModal({
@@ -2515,15 +2556,17 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
 
               <div className="flex gap-2 text-[10px] font-black uppercase tracking-wider">
                 {(["a", "b"] as const).map((lado) => {
-                  const bloqueadoPorSemilla =
-                    matchEditSemillaFap &&
-                    matrizPartidoEnEdicion &&
-                    ladoSemillaPaseDirecto(matrizPartidoEnEdicion) === lado;
+                  const bloqueadoPorSemilla = !puedeUsarAltaParejaEnSlot(
+                    matrizPartidoEnEdicion,
+                    matchEditSemillaFap,
+                    lado,
+                    ladoSlotBloqueadoPorMatriz,
+                  );
                   return (
                     <button
                       key={lado}
                       type="button"
-                      disabled={Boolean(bloqueadoPorSemilla)}
+                      disabled={bloqueadoPorSemilla}
                       onClick={() => setMatchEditSlotFocus(lado)}
                       className={`flex-1 py-2 rounded-lg border disabled:opacity-40 disabled:cursor-not-allowed ${
                         matchEditSlotFocus === lado
@@ -2587,7 +2630,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     Lado A
                   </label>
                   {selectedMatchToEdit.equipo_a_id &&
-                    !slotLadoReservadoGanador("a") && (
+                    !slotLadoReservadoGanador("a") &&
+                    !ladoClasificadoProtegido("a") && (
                     <button
                       type="button"
                       onClick={() => applyInscripcionToSlot("a", "")}
@@ -2597,7 +2641,14 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     </button>
                   )}
                 </div>
-                {slotLadoReservadoGanador("a") ? (
+                {ladoClasificadoProtegido("a") ? (
+                  <p className="text-sm text-gray-400">
+                    {matchEditSemillaFap
+                      ? `${formatFapSide(matchEditSemillaFap)} (pase directo)`
+                      : "Clasificado"}{" "}
+                    — no se reemplaza; el rival se da de alta en el otro lado.
+                  </p>
+                ) : slotLadoReservadoGanador("a") ? (
                   <p className="text-sm text-gray-400">
                     {etiquetaLadoReservado("a")} — se completa al cargar el
                     resultado del partido previo.
@@ -2632,7 +2683,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     Lado B
                   </label>
                   {selectedMatchToEdit.equipo_b_id &&
-                    !slotLadoReservadoGanador("b") && (
+                    !slotLadoReservadoGanador("b") &&
+                    !ladoClasificadoProtegido("b") && (
                     <button
                       type="button"
                       onClick={() => applyInscripcionToSlot("b", "")}
@@ -2642,10 +2694,22 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     </button>
                   )}
                 </div>
-                {slotLadoReservadoGanador("b") ? (
+                {ladoClasificadoProtegido("b") ? (
+                  <p className="text-sm text-gray-400">
+                    {matchEditSemillaFap
+                      ? `${formatFapSide(matchEditSemillaFap)} (pase directo)`
+                      : "Clasificado"}{" "}
+                    — no se reemplaza; el rival se da de alta en el otro lado.
+                  </p>
+                ) : slotLadoReservadoGanador("b") && !matchEditSemillaFap ? (
                   <p className="text-sm text-gray-400">
                     {etiquetaLadoReservado("b")} — se completa al cargar el
                     resultado del partido previo.
+                  </p>
+                ) : slotLadoReservadoGanador("b") && matchEditSemillaFap ? (
+                  <p className="text-sm text-gray-400">
+                    {etiquetaLadoReservado("b")} — asigná la pareja nueva con
+                    «Alta para lado B» arriba.
                   </p>
                 ) : (
                 <CustomDropdown

@@ -312,6 +312,7 @@ export const TorneosService = {
         semillas_actualizadas: string[];
         semillas_pendientes: string[];
       };
+      zonas_desprogramadas_conflicto_llave?: string[];
     };
   },
 

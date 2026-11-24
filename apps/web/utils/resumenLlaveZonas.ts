@@ -5,6 +5,7 @@ import {
 
 export type ResumenLlaveZonasPayload = {
   zonas_regeneradas?: string[];
+  zonas_desprogramadas_conflicto_llave?: string[];
   llave?: {
     semillas_invalidadas?: string[];
     semillas_actualizadas?: string[];
@@ -23,6 +24,11 @@ export function formatearResumenLlaveZonas(
   if (data.zonas_regeneradas?.length) {
     partes.push(
       `Fixture recalculado en: ${data.zonas_regeneradas.join(", ")}.`,
+    );
+  }
+  if (data.zonas_desprogramadas_conflicto_llave?.length) {
+    partes.push(
+      `Se quitaron horarios en conflicto con la llave (${data.zonas_desprogramadas_conflicto_llave.length} partido(s)). Revisá el programador antes de publicar.`,
     );
   }
   const f = data.fixture_reparado?.filter((z) => z.insertados > 0) ?? [];

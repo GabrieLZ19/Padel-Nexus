@@ -38,3 +38,30 @@ export function ladoRivalPaseDirecto(spec: {
   if (!semilla) return null;
   return semilla === "a" ? "b" : "a";
 }
+
+/** Lado del clasificado (semilla) que no debe reemplazarse al materializar el rival. */
+export function ladoClasificadoPaseDirectoProtegido(
+  spec: { a: string; b: string } | null | undefined,
+  semillaFap: string | null | undefined,
+  slot: "a" | "b",
+): boolean {
+  if (!spec || !semillaFap?.trim()) return false;
+  if (ladoSemillaPaseDirecto(spec) !== slot) return false;
+  const ref = (slot === "a" ? spec.a : spec.b).trim().toUpperCase();
+  return ref === semillaFap.trim().toUpperCase();
+}
+
+export function puedeUsarAltaParejaEnSlot(
+  spec: { a: string; b: string } | null | undefined,
+  semillaFap: string | null | undefined,
+  slot: "a" | "b",
+  refLadoBloqueadoPorMatriz: (ref: string) => boolean,
+): boolean {
+  if (ladoClasificadoPaseDirectoProtegido(spec, semillaFap, slot)) return false;
+  if (!spec) return true;
+  const ref = slot === "a" ? spec.a : spec.b;
+  if (refLadoBloqueadoPorMatriz(ref) && !semillaFap?.trim()) return false;
+  if (semillaFap?.trim() && ladoRivalPaseDirecto(spec) === slot) return true;
+  if (!refLadoBloqueadoPorMatriz(ref)) return true;
+  return Boolean(semillaFap?.trim());
+}
