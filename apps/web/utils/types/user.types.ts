@@ -93,6 +93,7 @@ export interface Perfil {
   /** Segmentos CRM (superadmin): marketing | institucional */
   etiquetas_contacto?: ("marketing" | "institucional")[];
   preferencias_notificacion?: PreferenciasNotificacion | null;
+  pendiente_activacion?: boolean | null;
 }
 
 export interface LogAuditoria {

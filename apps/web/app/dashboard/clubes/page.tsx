@@ -165,20 +165,25 @@ export default function GestionClubesPage() {
       type: "danger",
       title: "Eliminar Club",
       description:
-        "Vas a eliminar permanentemente este complejo deportivo. ¿Estás absolutamente seguro? Toda la información asociada se perderá.",
-      confirmText: "Sí, eliminar",
+        "Si el club no tiene torneos, reservas ni jugadores vinculados, se eliminará del sistema. Si tiene historial, quedará inactivo y podrás reactivarlo después.",
+      confirmText: "Confirmar",
       cancelText: "Mejor no",
       onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
       onConfirm: () => {
         setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
 
         ClubesService.delete(idToDelete)
-          .then(() => {
+          .then((resultado) => {
             setFeedbackModal({
               isOpen: true,
               type: "success",
-              title: "¡Eliminado!",
-              description: "El club fue borrado exitosamente del sistema.",
+              title:
+                resultado.modo === "eliminado" ? "Club eliminado" : "Club dado de baja",
+              description:
+                resultado.message ||
+                (resultado.modo === "eliminado"
+                  ? "El club fue eliminado del sistema."
+                  : "El club quedó inactivo por tener historial operativo."),
               onClose: () =>
                 setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
             });

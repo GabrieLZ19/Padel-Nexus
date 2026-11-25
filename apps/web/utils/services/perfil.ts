@@ -150,6 +150,21 @@ export const PerfilService = {
     return response.data.data;
   },
 
+  async actualizarFichaProvisoria(
+    jugadorId: string,
+    datos: {
+      nombre?: string;
+      apellido?: string;
+      fecha_nacimiento?: string | null;
+    },
+  ): Promise<Perfil> {
+    const response = await api.patch<ApiResponse<Perfil>>(
+      `/perfil/${jugadorId}/ficha-provisoria`,
+      datos,
+    );
+    return response.data.data;
+  },
+
   /**
    * Ficha pública (sin datos sensibles). No requiere autenticación.
    */

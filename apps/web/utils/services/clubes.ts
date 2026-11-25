@@ -32,8 +32,21 @@ export const ClubesService = {
     return (response.data?.data || response.data) as Club;
   },
 
-  async delete(id: string | number): Promise<void> {
-    await api.delete(`/clubes/${id}`);
+  async delete(id: string | number): Promise<{
+    modo?: "eliminado" | "dado_de_baja";
+    message?: string;
+  }> {
+    const response = await api.delete<{
+      exito?: boolean;
+      modo?: "eliminado" | "dado_de_baja";
+      message?: string;
+    }>(`/clubes/${id}`);
+    return response.data;
+  },
+
+  async reactivar(id: string | number): Promise<Club> {
+    const response = await api.patch<{ data?: Club }>(`/clubes/${id}/reactivar`);
+    return (response.data?.data || response.data) as Club;
   },
 
   async promoverAdherido(id: string | number): Promise<Club> {

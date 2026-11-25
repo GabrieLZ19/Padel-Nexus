@@ -33,12 +33,20 @@ import {
   detalleTextoHistorialLicencia,
   etiquetaAccionHistorialLicencia,
 } from "@/utils/historialLicenciaUi";
-import { emailContactoVisible } from "@/utils/inscripcionPlanilla";
+import {
+  emailContactoVisible,
+  esEmailPlaceholderPlanilla,
+} from "@/utils/inscripcionPlanilla";
 
 export default function PerfilJugadorAdminPage() {
   const { id } = useParams();
   const router = useRouter();
-  const esSuperadmin = useProfileStore((s) => s.profile?.rol === "superadmin");
+  const rolSesion = useProfileStore((s) => s.profile?.rol);
+  const esSuperadmin = rolSesion === "superadmin";
+  const puedeEditarFichaProvisoria =
+    rolSesion === "superadmin" ||
+    rolSesion === "admin_federacion" ||
+    rolSesion === "admin_provincial";
 
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +61,13 @@ export default function PerfilJugadorAdminPage() {
     [],
   );
   const [guardandoEtiquetas, setGuardandoEtiquetas] = useState(false);
+  const [editandoFichaProvisoria, setEditandoFichaProvisoria] = useState(false);
+  const [guardandoFichaProvisoria, setGuardandoFichaProvisoria] = useState(false);
+  const [fichaProvisoriaForm, setFichaProvisoriaForm] = useState({
+    nombre: "",
+    apellido: "",
+    fecha_nacimiento: "",
+  });
 
   const licenciasList = licenciasComoArray(perfil?.licencias);
   const currentLicencia =
@@ -150,6 +165,11 @@ export default function PerfilJugadorAdminPage() {
         if (isMounted) {
           setPerfil(data);
           setEtiquetasCrm(data?.etiquetas_contacto ?? []);
+          setFichaProvisoriaForm({
+            nombre: data.nombre || "",
+            apellido: data.apellido || "",
+            fecha_nacimiento: data.fecha_nacimiento?.split("T")[0] || "",
+          });
         }
       } catch (error) {
         console.error("Error al cargar perfil:", error);
@@ -258,6 +278,40 @@ export default function PerfilJugadorAdminPage() {
 
   const licencia = licenciasList[0];
 
+  const esFichaProvisoria =
+    Boolean(perfil.pendiente_activacion) ||
+    esEmailPlaceholderPlanilla(perfil.email);
+
+  const guardarFichaProvisoria = async () => {
+    if (!perfil) return;
+    setGuardandoFichaProvisoria(true);
+    try {
+      const actualizado = await PerfilService.actualizarFichaProvisoria(
+        perfil.id,
+        {
+          nombre: fichaProvisoriaForm.nombre.trim(),
+          apellido: fichaProvisoriaForm.apellido.trim(),
+          fecha_nacimiento: fichaProvisoriaForm.fecha_nacimiento || null,
+        },
+      );
+      setPerfil(actualizado);
+      setEditandoFichaProvisoria(false);
+      sileo.success({
+        title: "Ficha actualizada",
+        description:
+          "Los datos provisorios quedaron guardados con registro de auditoría.",
+      });
+    } catch (err) {
+      sileo.error({
+        title: "No se pudo guardar",
+        description:
+          err instanceof Error ? err.message : "Revisá los datos e intentá de nuevo.",
+      });
+    } finally {
+      setGuardandoFichaProvisoria(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto p-6 md:p-10 space-y-8">
       {/* Botón Volver */}
@@ -308,6 +362,93 @@ export default function PerfilJugadorAdminPage() {
         </div>
 
         <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+          {puedeEditarFichaProvisoria && esFichaProvisoria && (
+            <div className="md:col-span-2 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400">
+                    Ficha provisoria
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    Podés corregir nombre, apellido y fecha de nacimiento. Cada
+                    cambio queda auditado.
+                  </p>
+                </div>
+                {!editandoFichaProvisoria ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditandoFichaProvisoria(true)}
+                    className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-semibold"
+                  >
+                    Editar datos
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditandoFichaProvisoria(false)}
+                      className="px-4 py-2 rounded-xl border border-white/10 text-gray-300 text-sm"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={guardandoFichaProvisoria}
+                      onClick={() => void guardarFichaProvisoria()}
+                      className="px-4 py-2 rounded-xl bg-brand-chartreuse text-brand-black text-sm font-bold disabled:opacity-50"
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                )}
+              </div>
+              {editandoFichaProvisoria && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <label className="block text-xs text-gray-400">
+                    Nombre
+                    <input
+                      value={fichaProvisoriaForm.nombre}
+                      onChange={(e) =>
+                        setFichaProvisoriaForm((p) => ({
+                          ...p,
+                          nombre: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white text-sm"
+                    />
+                  </label>
+                  <label className="block text-xs text-gray-400">
+                    Apellido
+                    <input
+                      value={fichaProvisoriaForm.apellido}
+                      onChange={(e) =>
+                        setFichaProvisoriaForm((p) => ({
+                          ...p,
+                          apellido: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white text-sm"
+                    />
+                  </label>
+                  <label className="block text-xs text-gray-400">
+                    Fecha de nacimiento
+                    <input
+                      type="date"
+                      value={fichaProvisoriaForm.fecha_nacimiento}
+                      onChange={(e) =>
+                        setFichaProvisoriaForm((p) => ({
+                          ...p,
+                          fecha_nacimiento: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white text-sm"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Datos Deportivos */}
           <div className="space-y-5">
             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">
