@@ -3,6 +3,22 @@ import { Torneo, FormTorneoState, Partido, GrupoTorneoListado } from "../types";
 import { hydrateTorneoRestrictions } from "../inscripcionElegibilidad";
 import type { VistaTorneoId, VistaTorneoParam } from "../constants/padelConfig";
 
+export interface CategoriaEventoItem {
+  id: string;
+  etiqueta: string;
+  nivel?: string | null;
+  rama?: string | null;
+  estado?: string | null;
+  actual?: boolean;
+}
+
+export interface CategoriasEventoResponse {
+  evento_id: string | null;
+  evento_nombre: string | null;
+  torneo_actual_id: string;
+  categorias: CategoriaEventoItem[];
+}
+
 export interface PaginatedTorneos {
   data: Torneo[];
   total: number;
@@ -13,6 +29,41 @@ export interface PaginatedTorneos {
   total_torneos?: number;
   grupos?: GrupoTorneoListado[];
   aviso?: string | null;
+}
+
+export interface ProgramacionBoardQueryParams {
+  duracion?: number;
+  descanso?: number;
+  descansoModo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+  jornadas?: number;
+  horaInicio?: string;
+  horaFin?: string;
+  franjasPorDia?: string | Record<string, { inicio?: string; fin?: string }>;
+}
+
+export interface ProgramacionAsignarPayload {
+  partido_id: string;
+  fecha_iso: string;
+  cancha_label: string;
+  motivo?: string;
+}
+
+export interface ProgramacionDesasignarPayload {
+  partido_id: string;
+  motivo?: string;
+}
+
+export interface ProgramacionAutoPayload {
+  estrategia?: "smart" | "continuous";
+  distribucion?: "zonas_primero" | "continua";
+  duracionMinutos?: number;
+  descansoMinutos?: number;
+  descansoModo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+  jornadas?: number;
+  horaInicio?: string;
+  horaFin?: string;
+  franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+  motivo?: string;
 }
 
 export const TorneosService = {
@@ -89,6 +140,13 @@ export const TorneosService = {
   async getById(id: string): Promise<Torneo> {
     const response = await api.get<Torneo>(`/torneos/${id}`);
     return hydrateTorneoRestrictions(response.data);
+  },
+
+  async getCategoriasEvento(id: string): Promise<CategoriasEventoResponse> {
+    const response = await api.get<CategoriasEventoResponse>(
+      `/torneos/${id}/categorias-evento`,
+    );
+    return response.data;
   },
 
   async create(torneoData: FormTorneoState): Promise<Torneo> {
@@ -555,15 +613,7 @@ export const TorneosService = {
 
   async getProgramacionBoard(
     torneoId: string,
-    params?: {
-      duracion?: number;
-      descanso?: number;
-      descansoModo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
-      jornadas?: number;
-      horaInicio?: string;
-      horaFin?: string;
-      franjasPorDia?: string | Record<string, { inicio?: string; fin?: string }>;
-    },
+    params?: ProgramacionBoardQueryParams,
   ): Promise<ProgramacionBoard> {
     const response = await api.get<ProgramacionBoard>(
       `/torneos/${torneoId}/programacion/board`,
@@ -574,12 +624,7 @@ export const TorneosService = {
 
   async asignarProgramacion(
     torneoId: string,
-    payload: {
-      partido_id: string;
-      fecha_iso: string;
-      cancha_label: string;
-      motivo?: string;
-    },
+    payload: ProgramacionAsignarPayload,
   ): Promise<ProgramacionBoard> {
     const response = await api.put<ProgramacionBoard>(
       `/torneos/${torneoId}/programacion/asignar`,
@@ -610,7 +655,7 @@ export const TorneosService = {
 
   async desasignarProgramacion(
     torneoId: string,
-    payload: { partido_id: string; motivo?: string },
+    payload: ProgramacionDesasignarPayload,
   ): Promise<ProgramacionBoard> {
     const response = await api.put<ProgramacionBoard>(
       `/torneos/${torneoId}/programacion/desasignar`,
@@ -632,18 +677,7 @@ export const TorneosService = {
 
   async autoAsignarProgramacion(
     torneoId: string,
-    payload: {
-      estrategia?: "smart" | "continuous";
-      distribucion?: "zonas_primero" | "continua";
-      duracionMinutos?: number;
-      descansoMinutos?: number;
-      descansoModo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
-      jornadas?: number;
-      horaInicio?: string;
-      horaFin?: string;
-      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
-      motivo?: string;
-    } = {},
+    payload: ProgramacionAutoPayload = {},
   ): Promise<ProgramacionBoard> {
     const response = await api.post<ProgramacionBoard>(
       `/torneos/${torneoId}/programacion/auto`,
@@ -697,6 +731,81 @@ export const TorneosService = {
     );
     return response.data;
   },
+
+  async getGrupoIdPorTorneo(
+    torneoId: string,
+  ): Promise<{ grupo_id: string | null }> {
+    const response = await api.get<{ grupo_id: string | null }>(
+      `/torneos/${torneoId}/programacion/grupo`,
+    );
+    return response.data;
+  },
+
+  async getEventoProgramacionBoard(
+    grupoId: string,
+    params?: ProgramacionBoardQueryParams,
+  ): Promise<ProgramacionBoardEvento> {
+    const response = await api.get<ProgramacionBoardEvento>(
+      `/torneos/grupos/${grupoId}/programacion/board`,
+      { params },
+    );
+    return response.data;
+  },
+
+  async asignarEventoProgramacion(
+    grupoId: string,
+    payload: ProgramacionAsignarPayload,
+  ): Promise<ProgramacionBoardEvento> {
+    const response = await api.put<ProgramacionBoardEvento>(
+      `/torneos/grupos/${grupoId}/programacion/asignar`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async desasignarEventoProgramacion(
+    grupoId: string,
+    payload: ProgramacionDesasignarPayload,
+  ): Promise<ProgramacionBoardEvento> {
+    const response = await api.put<ProgramacionBoardEvento>(
+      `/torneos/grupos/${grupoId}/programacion/desasignar`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async limpiarEventoProgramacion(
+    grupoId: string,
+    payload: { motivo?: string; torneo_id?: string } = {},
+  ): Promise<ProgramacionBoardEvento> {
+    const response = await api.post<ProgramacionBoardEvento>(
+      `/torneos/grupos/${grupoId}/programacion/limpiar`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async autoAsignarEventoProgramacion(
+    grupoId: string,
+    payload: ProgramacionAutoPayload & { orden_torneo_ids?: string[] } = {},
+  ): Promise<ProgramacionBoardEvento> {
+    const response = await api.post<ProgramacionBoardEvento>(
+      `/torneos/grupos/${grupoId}/programacion/auto`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async publicarEventoProgramacion(
+    grupoId: string,
+    payload: { torneo_ids?: string[] } = {},
+  ): Promise<ProgramacionBoardEvento> {
+    const response = await api.post<ProgramacionBoardEvento>(
+      `/torneos/grupos/${grupoId}/programacion/publicar`,
+      payload,
+    );
+    return response.data;
+  },
 };
 
 /**
@@ -734,6 +843,10 @@ export interface ProgramacionIssue {
 
 export interface BoardPartido {
   id: string;
+  torneo_id?: string;
+  torneo_nombre?: string;
+  categoria_etiqueta?: string;
+  categoria_color?: string;
   ronda: string | null;
   ronda_etiqueta?: string;
   ronda_orden?: number;
@@ -750,6 +863,20 @@ export interface BoardPartido {
   horario_bloqueado: boolean;
   assigned: boolean;
   slot_key: string | null;
+}
+
+export interface ProgramacionBoardEvento extends ProgramacionBoard {
+  modo: "evento";
+  grupo_id: string;
+  evento_nombre: string | null;
+  torneo_referencia_id: string;
+  torneos: Array<{
+    id: string;
+    nombre: string;
+    nivel?: string | null;
+    rama?: string | null;
+    programacion_estado?: string | null;
+  }>;
 }
 
 export interface ProgramacionBoard {

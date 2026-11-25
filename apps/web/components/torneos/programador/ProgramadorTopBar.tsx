@@ -29,6 +29,7 @@ interface Props {
   onNuevaEdicion: () => void;
   onBack: () => void;
   onFocusConflictos?: () => void;
+  titulo?: string;
 }
 
 function etiquetaHorarios(estado: string): string {
@@ -61,6 +62,7 @@ export function ProgramadorTopBar({
   onNuevaEdicion,
   onBack,
   onFocusConflictos,
+  titulo = "Programador visual",
 }: Props) {
   const estado = board.programacion_estado;
   const estadoLabel = etiquetaHorarios(estado);
@@ -86,7 +88,7 @@ export function ProgramadorTopBar({
           <div className="flex flex-wrap items-center gap-2">
             <CalendarClock className="size-5 text-brand-chartreuse shrink-0" />
             <h1 className="truncate text-lg font-bold text-brand-white">
-              Programador visual
+              {titulo}
             </h1>
             {estadoTorneo ? (
               <span className="prog-ghost inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">

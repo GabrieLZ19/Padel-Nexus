@@ -518,7 +518,7 @@ export default function ComunicacionesPanel() {
 
       setRawTorneos(tors);
       setTorneos(
-        tors.map((t) => ({
+        tors.map((t: Torneo) => ({
           value: t.id,
           label: t.nombre || t.id,
         })),

@@ -44,13 +44,17 @@ export function PromoverParejaMenores({
     return null;
   }
 
-  const destino = opciones.destinos.find((item) => item.id === destinoId);
+  const destino = opciones.destinos.find(
+    (item: Opciones["destinos"][number]) => item.id === destinoId,
+  );
   const huecos = [
     { value: "nuevo", label: "Crear partido en la primera ronda" },
-    ...(destino?.byes || []).map((bye) => ({
-      value: `${bye.partidoId}|${bye.lado}`,
-      label: `Bye contra ${bye.rival}`,
-    })),
+    ...(destino?.byes || []).map(
+      (bye: NonNullable<Opciones["destinos"][number]["byes"]>[number]) => ({
+        value: `${bye.partidoId}|${bye.lado}`,
+        label: `Bye contra ${bye.rival}`,
+      }),
+    ),
   ];
 
   const confirmar = async () => {
@@ -108,7 +112,7 @@ export function PromoverParejaMenores({
             value={parejaId}
             onChange={setParejaId}
             placeholder="Pareja a pasar"
-            options={opciones.parejas.map((pareja) => ({
+            options={opciones.parejas.map((pareja: Opciones["parejas"][number]) => ({
               value: pareja.inscripcionId,
               label: `${pareja.nombre} · ${pareja.ronda}`,
             }))}
@@ -120,7 +124,7 @@ export function PromoverParejaMenores({
               setHueco("nuevo");
             }}
             placeholder="Categoría superior"
-            options={opciones.destinos.map((item) => ({
+            options={opciones.destinos.map((item: Opciones["destinos"][number]) => ({
               value: item.id,
               label: `${item.categoria || item.nombre}`,
             }))}

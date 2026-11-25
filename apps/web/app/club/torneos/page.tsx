@@ -153,7 +153,7 @@ export default function ClubTorneosPage() {
 
       // Defensa extra: nunca mostrar torneos de otro club
       const propios = (res.data || []).filter(
-        (t) => String(t.club_id) === String(club.id),
+        (t: Torneo) => String(t.club_id) === String(club.id),
       );
       setTournaments(propios);
       setGrupos(
@@ -536,6 +536,9 @@ export default function ClubTorneosPage() {
               grupos={gruposVista}
               colSpan={6}
               presentacion="tarjetas"
+              eventoProgramacionHref={(grupo) =>
+                grupo.id ? `/club/eventos/${grupo.id}/programacion` : null
+              }
               onSumar={(grupo) =>
                 setAgrupacion({
                   nombre: grupo.nombre || "",
@@ -561,6 +564,9 @@ export default function ClubTorneosPage() {
                 <TorneoFilasAgrupadas
                   grupos={gruposVista}
                   colSpan={6}
+                  eventoProgramacionHref={(grupo) =>
+                    grupo.id ? `/club/eventos/${grupo.id}/programacion` : null
+                  }
                   onSumar={(grupo) =>
                     setAgrupacion({
                       nombre: grupo.nombre || "",

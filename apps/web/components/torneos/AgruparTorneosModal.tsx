@@ -47,7 +47,7 @@ export default function AgruparTorneosModal({
       vista: "todos",
       clubId,
     })
-      .then((respuesta) => {
+      .then((respuesta: { data?: Torneo[] }) => {
         if (activo) setCandidatos(respuesta.data || []);
       })
       .catch(() => {

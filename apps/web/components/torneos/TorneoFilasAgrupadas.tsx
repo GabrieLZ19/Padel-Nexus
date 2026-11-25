@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, useState, type ReactNode } from "react";
-import { ChevronRight, Plus } from "lucide-react";
+import Link from "next/link";
+import { CalendarClock, ChevronRight, Plus } from "lucide-react";
 import type { EstadoTorneo, GrupoTorneoListado, Torneo } from "@/utils/types";
 
 interface TorneoFilasAgrupadasProps {
@@ -9,6 +10,7 @@ interface TorneoFilasAgrupadasProps {
   colSpan: number;
   renderFila: (torneo: Torneo, enGrupo: boolean) => ReactNode;
   onSumar?: (grupo: GrupoTorneoListado) => void;
+  eventoProgramacionHref?: (grupo: GrupoTorneoListado) => string | null;
   /** En pantallas chicas cada torneo es una tarjeta, no una fila de tabla. */
   presentacion?: "tabla" | "tarjetas";
 }
@@ -73,6 +75,7 @@ export default function TorneoFilasAgrupadas({
   colSpan,
   renderFila,
   onSumar,
+  eventoProgramacionHref,
   presentacion = "tabla",
 }: TorneoFilasAgrupadasProps) {
   const [competenciasAbiertas, setCompetenciasAbiertas] = useState<
@@ -135,6 +138,15 @@ export default function TorneoFilasAgrupadas({
                     {estado.etiqueta}
                   </span>
                 </button>
+                {eventoProgramacionHref && grupo.id && categorias >= 2 ? (
+                  <Link
+                    href={eventoProgramacionHref(grupo) || "#"}
+                    className="inline-flex shrink-0 items-center gap-1.5 border-r border-white/10 px-3 text-xs font-bold text-white hover:text-brand-chartreuse"
+                  >
+                    <CalendarClock className="size-3.5" />
+                    <span className="hidden sm:inline">Programador maestro</span>
+                  </Link>
+                ) : null}
                 {onSumar && (
                   <button
                     type="button"
@@ -253,6 +265,15 @@ export default function TorneoFilasAgrupadas({
                       {estado.etiqueta}
                     </span>
                   </button>
+                  {eventoProgramacionHref && grupo.id && categorias >= 2 ? (
+                    <Link
+                      href={eventoProgramacionHref(grupo) || "#"}
+                      className="inline-flex shrink-0 items-center gap-1.5 border-r border-white/10 px-4 text-xs font-bold text-white hover:text-brand-chartreuse"
+                    >
+                      <CalendarClock className="size-3.5" />
+                      Programador maestro
+                    </Link>
+                  ) : null}
                   {onSumar && (
                     <button
                       type="button"

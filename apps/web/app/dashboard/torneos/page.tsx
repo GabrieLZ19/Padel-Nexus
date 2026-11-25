@@ -642,6 +642,11 @@ export default function TorneosPage() {
                 grupos={gruposVista}
                 colSpan={5}
                 presentacion="tarjetas"
+                eventoProgramacionHref={(grupo) =>
+                  grupo.id
+                    ? `/dashboard/eventos/${grupo.id}/programacion`
+                    : null
+                }
                 onSumar={(grupo) =>
                   setAgrupacion({
                     nombre: grupo.nombre || "",
@@ -682,6 +687,11 @@ export default function TorneosPage() {
                   <TorneoFilasAgrupadas
                     grupos={gruposVista}
                     colSpan={5}
+                    eventoProgramacionHref={(grupo) =>
+                      grupo.id
+                        ? `/dashboard/eventos/${grupo.id}/programacion`
+                        : null
+                    }
                     onSumar={(grupo) =>
                       setAgrupacion({
                         nombre: grupo.nombre || "",

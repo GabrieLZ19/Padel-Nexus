@@ -42,6 +42,7 @@ import {
 } from "@/utils/inscripcionElegibilidad";
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import { esRondaDeZona } from "@/utils/rondasLlave";
+import { SelectorCategoriaEvento } from "@/components/torneos/SelectorCategoriaEvento";
 
 export default function TorneoDetallePage() {
   const params = useParams();
@@ -153,13 +154,13 @@ export default function TorneoDetallePage() {
 
     setLoadingFixture(true);
     TorneosService.getById(torneoId)
-      .then((torneoData) => {
+      .then((torneoData: Torneo) => {
         if (isMounted) {
           setTorneo(torneoData);
           setLoadingTorneo(false);
         }
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error("Error al cargar el torneo:", error);
         if (isMounted) setLoadingTorneo(false);
       });
@@ -167,7 +168,7 @@ export default function TorneoDetallePage() {
     Promise.all([
       TorneosService.getPartidos(torneoId, { sincronizar: false }),
       TorneosService.getZonas(torneoId)
-        .then((r) => r.zonas)
+        .then((r: { zonas: unknown[] }) => r.zonas)
         .catch(() => []),
       TorneosService.getLlaveMatriz(torneoId).catch(() => null),
     ])
@@ -184,7 +185,7 @@ export default function TorneoDetallePage() {
           }
         }
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error("Error al cargar fixture del torneo:", error);
       })
       .finally(() => {
@@ -197,34 +198,40 @@ export default function TorneoDetallePage() {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         TorneosService.getPartidos(torneoId, { sincronizar: false }).then(
-          (p) => isMounted && setPartidos(p || []),
+          (p: Partido[] | null) => isMounted && setPartidos(p || []),
         );
         TorneosService.getZonas(torneoId)
-          .then((r) => isMounted && setZonas(r.zonas || []))
+          .then((r: { zonas: unknown[] }) =>
+            isMounted && setZonas(r.zonas || []),
+          )
           .catch(() => undefined);
       }, 1200);
     };
 
-    const handleWebsocketTorneo = (e: any) => {
-      const data = e.detail;
+    const handleWebsocketTorneo = (e: Event) => {
+      const data = (e as CustomEvent<{ torneo_id?: string }>).detail;
       if (data?.torneo_id === torneoId) {
-        TorneosService.getById(torneoId).then((t) => isMounted && setTorneo(t));
+        TorneosService.getById(torneoId).then(
+          (t: Torneo) => isMounted && setTorneo(t),
+        );
         debouncedRefreshPartidos();
       }
     };
 
-    const handleWebsocketPartido = (e: any) => {
-      const data = e.detail;
+    const handleWebsocketPartido = (e: Event) => {
+      const data = (e as CustomEvent<{ torneo_id?: string }>).detail;
       if (data?.torneo_id === torneoId) debouncedRefreshPartidos();
     };
 
-    const handleWebsocketBracket = (e: any) => {
-      const data = e.detail;
+    const handleWebsocketBracket = (e: Event) => {
+      const data = (e as CustomEvent<{ torneo_id?: string }>).detail;
       if (data?.torneo_id === torneoId) {
         // Refrescar datos sin forzar el tab Cuadro: el jugador puede quedarse en Grupos.
         debouncedRefreshPartidos();
         TorneosService.getLlaveMatriz(torneoId)
-          .then((matrizData) => {
+          .then((matrizData: Awaited<
+            ReturnType<typeof TorneosService.getLlaveMatriz>
+          >) => {
             if (!isMounted) return;
             if (matrizData?.supported && matrizData.matches?.length) {
               setFapMatrixMatches(matrizData.matches);
@@ -429,6 +436,11 @@ export default function TorneoDetallePage() {
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white leading-tight">
                 {torneo.nombre}
               </h1>
+              <SelectorCategoriaEvento
+                torneoId={torneoId}
+                modoPublico
+                className="max-w-md"
+              />
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-400">
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="size-3.5 text-brand-chartreuse/80" />

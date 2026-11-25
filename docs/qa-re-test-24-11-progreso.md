@@ -100,5 +100,7 @@ Regresión: `apps/api/test/ola3RankingSitioPublico.test.ts` y `apps/web/test/ola
 | Código | Estado | Tests |
 |--------|--------|-------|
 | CLI-4 | HECHO | `cli4ReplicarTorneo.test.ts`, `cli4ReplicarTorneoModal.test.ts` |
+| CLI-5 | HECHO | `cli5CategoriasEvento.test.ts`, `cli5SelectorCategoriaEvento.test.ts` |
+| CLI-3 | HECHO (código Fase 1+2; QA punto 15 manual post 28/11) | `cli3ProgramadorMaestro.test.ts`, `cli3EventoCategoriaColores.test.ts`, [cli3-programador-maestro.md](./cli3-programador-maestro.md) |
 
-**Siguiente en re-test 24/11:** Ola 5 — **CLI-5** (selector de categoría dentro del evento).
+**Siguiente en re-test 24/11:** QA manual **CLI-3** checklist punto 15 con evento real (3+ categorías, 5 canchas) cuando Héctor confirme post bloqueantes 28/11.

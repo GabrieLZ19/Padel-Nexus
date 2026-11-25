@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   TorneosService,
   type ProgramacionBoard,
+  type ProgramacionBoardEvento,
   type BoardPartido,
 } from "@/utils/services/torneos";
 import { sileo } from "sileo";
@@ -58,7 +59,15 @@ function apiErrorMessage(e: unknown, fallback: string): string {
   return fallback;
 }
 
-export function useProgramadorBoard(torneoId: string) {
+export function useProgramadorBoard(
+  torneoId: string,
+  options?: { grupoId?: string; ordenAutoTorneoIds?: string[] },
+) {
+  const grupoId = options?.grupoId;
+  const ordenAutoRef = useRef(options?.ordenAutoTorneoIds ?? []);
+  useEffect(() => {
+    ordenAutoRef.current = options?.ordenAutoTorneoIds ?? [];
+  }, [options?.ordenAutoTorneoIds]);
   const [board, setBoard] = useState<ProgramacionBoard | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -86,6 +95,24 @@ export function useProgramadorBoard(torneoId: string) {
   useEffect(() => {
     boardRef.current = board;
   }, [board]);
+
+  const torneoConfigId = (): string => {
+    const current = boardRef.current;
+    if (grupoId && current && "torneo_referencia_id" in current) {
+      return (current as ProgramacionBoardEvento).torneo_referencia_id;
+    }
+    return torneoId;
+  };
+
+  const fetchBoard = useCallback(
+    (query: ReturnType<typeof boardQuery>) => {
+      if (grupoId) {
+        return TorneosService.getEventoProgramacionBoard(grupoId, query);
+      }
+      return TorneosService.getProgramacionBoard(torneoId, query);
+    },
+    [torneoId, grupoId],
+  );
 
   const applyBoard = useCallback((data: ProgramacionBoard) => {
     configHidratadaRef.current = true;
@@ -119,19 +146,17 @@ export function useProgramadorBoard(torneoId: string) {
 
   const load = useCallback(
     async (options?: { silent?: boolean }) => {
-      if (!torneoId) return;
+      if (!torneoId && !grupoId) return;
       if (!options?.silent && !boardRef.current) {
         setLoading(true);
       } else {
         setSyncing(true);
       }
       try {
-        const data = await TorneosService.getProgramacionBoard(
-          torneoId,
-          boardQuery(configRef.current, {
-            incluirDescansoPreview: configHidratadaRef.current,
-          }),
-        );
+        const query = boardQuery(configRef.current, {
+          incluirDescansoPreview: configHidratadaRef.current,
+        });
+        const data = await fetchBoard(query);
         applyBoard(data);
       } catch (e: unknown) {
         sileo.error({ title: apiErrorMessage(e, "Error al cargar el programador") });
@@ -140,7 +165,7 @@ export function useProgramadorBoard(torneoId: string) {
         setSyncing(false);
       }
     },
-    [torneoId, applyBoard],
+    [fetchBoard, applyBoard],
   );
 
   useEffect(() => {
@@ -151,7 +176,7 @@ export function useProgramadorBoard(torneoId: string) {
       if (configTimerRef.current) clearTimeout(configTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [torneoId]);
+  }, [torneoId, grupoId]);
 
   const scheduleBoardSync = useCallback(() => {
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
@@ -159,8 +184,7 @@ export function useProgramadorBoard(torneoId: string) {
     syncTimerRef.current = setTimeout(async () => {
       setSyncing(true);
       try {
-        const data = await TorneosService.getProgramacionBoard(
-          torneoId,
+        const data = await fetchBoard(
           boardQuery(configRef.current, {
             incluirDescansoPreview: configHidratadaRef.current,
           }),
@@ -173,7 +197,7 @@ export function useProgramadorBoard(torneoId: string) {
         if (gen === syncGenRef.current) setSyncing(false);
       }
     }, SYNC_DEBOUNCE_MS);
-  }, [torneoId, applyBoard]);
+  }, [fetchBoard, applyBoard]);
 
   const reloadWithConfig = useCallback(
     (next?: Partial<ProgramadorConfig>) => {
@@ -199,8 +223,8 @@ export function useProgramadorBoard(torneoId: string) {
       configTimerRef.current = setTimeout(async () => {
         setBusy(true);
         try {
-          if (debePersistir) {
-            await TorneosService.persistirConfigProgramacion(torneoId, {
+          if (debePersistir && !grupoId) {
+            await TorneosService.persistirConfigProgramacion(torneoConfigId(), {
               duracionMinutos: merged.duracion,
               descansoModo: merged.descansoModo,
               ...(merged.franjasPorDia && Object.keys(merged.franjasPorDia).length > 0
@@ -208,8 +232,7 @@ export function useProgramadorBoard(torneoId: string) {
                 : {}),
             });
           }
-          const data = await TorneosService.getProgramacionBoard(
-            torneoId,
+          const data = await fetchBoard(
             boardQuery(merged, { incluirDescansoPreview: true }),
           );
           applyBoard(data);
@@ -220,7 +243,7 @@ export function useProgramadorBoard(torneoId: string) {
         }
       }, CONFIG_DEBOUNCE_MS);
     },
-    [torneoId, applyBoard],
+    [fetchBoard, grupoId, applyBoard],
   );
 
   const bloqueadoPorAlcance = board?.solo_lectura === true;
@@ -299,13 +322,23 @@ export function useProgramadorBoard(torneoId: string) {
       }
 
       try {
-        await TorneosService.asignarProgramacion(torneoId, {
-          partido_id: partidoId,
-          fecha_iso: fechaIso,
-          cancha_label: canchaLabel,
-          motivo,
-        });
-        scheduleBoardSync();
+        if (grupoId) {
+          const data = await TorneosService.asignarEventoProgramacion(grupoId, {
+            partido_id: partidoId,
+            fecha_iso: fechaIso,
+            cancha_label: canchaLabel,
+            motivo,
+          });
+          applyBoard(data);
+        } else {
+          await TorneosService.asignarProgramacion(torneoId, {
+            partido_id: partidoId,
+            fecha_iso: fechaIso,
+            cancha_label: canchaLabel,
+            motivo,
+          });
+          scheduleBoardSync();
+        }
       } catch (e: unknown) {
         if (prev) setBoard(prev);
         const msg = apiErrorMessage(e, "No se pudo asignar");
@@ -315,7 +348,7 @@ export function useProgramadorBoard(torneoId: string) {
         });
       }
     },
-    [isReadOnly, torneoId, scheduleBoardSync],
+    [isReadOnly, torneoId, grupoId, scheduleBoardSync, applyBoard],
   );
 
   const asignarLote = useCallback(
@@ -341,6 +374,14 @@ export function useProgramadorBoard(torneoId: string) {
         return;
       }
       if (!partidoIds.length) return;
+      if (grupoId) {
+        sileo.warning({
+          title: "Asignación en lote",
+          description:
+            "En el programador del evento usá auto-asignar o arrastrá partido por partido.",
+        });
+        return;
+      }
 
       setBusy(true);
       const prev = boardRef.current;
@@ -435,26 +476,38 @@ export function useProgramadorBoard(torneoId: string) {
       }
 
       try {
-        await TorneosService.desasignarProgramacion(torneoId, {
-          partido_id: partidoId,
-          motivo,
-        });
-        scheduleBoardSync();
+        if (grupoId) {
+          const data = await TorneosService.desasignarEventoProgramacion(
+            grupoId,
+            { partido_id: partidoId, motivo },
+          );
+          applyBoard(data);
+        } else {
+          await TorneosService.desasignarProgramacion(torneoId, {
+            partido_id: partidoId,
+            motivo,
+          });
+          scheduleBoardSync();
+        }
       } catch (e: unknown) {
         if (prev && !opts?.silent) setBoard(prev);
         sileo.error({ title: apiErrorMessage(e, "No se pudo desasignar") });
       }
     },
-    [isReadOnly, torneoId, scheduleBoardSync],
+    [isReadOnly, torneoId, grupoId, scheduleBoardSync, applyBoard],
   );
 
   const limpiar = useCallback(async () => {
     if (isReadOnly) return;
     setBusy(true);
     try {
-      const data = await TorneosService.limpiarProgramacion(torneoId, {
-        motivo: "Limpiar programación desde el programador visual",
-      });
+      const data = grupoId
+        ? await TorneosService.limpiarEventoProgramacion(grupoId, {
+            motivo: "Limpiar programación desde el programador del evento",
+          })
+        : await TorneosService.limpiarProgramacion(torneoId, {
+            motivo: "Limpiar programación desde el programador visual",
+          });
       applyBoard(data);
       sileo.success({ title: "Programación limpia", description: "Podés empezar de cero." });
     } catch (e: unknown) {
@@ -462,13 +515,13 @@ export function useProgramadorBoard(torneoId: string) {
     } finally {
       setBusy(false);
     }
-  }, [isReadOnly, torneoId, applyBoard]);
+  }, [isReadOnly, torneoId, grupoId, applyBoard]);
 
   const autoAsignar = useCallback(async () => {
     if (isReadOnly) return;
     setBusy(true);
     try {
-      const data = await TorneosService.autoAsignarProgramacion(torneoId, {
+      const autoPayload = {
         distribucion: configRef.current.distribucion,
         duracionMinutos: configRef.current.duracion,
         descansoModo: configRef.current.descansoModo,
@@ -484,7 +537,17 @@ export function useProgramadorBoard(torneoId: string) {
         ...(configRef.current.franjasPorDia
           ? { franjasPorDia: configRef.current.franjasPorDia }
           : {}),
-      });
+      };
+      const orden =
+        grupoId && ordenAutoRef.current.length > 0
+          ? { orden_torneo_ids: ordenAutoRef.current }
+          : {};
+      const data = grupoId
+        ? await TorneosService.autoAsignarEventoProgramacion(grupoId, {
+            ...autoPayload,
+            ...orden,
+          })
+        : await TorneosService.autoAsignarProgramacion(torneoId, autoPayload);
       applyBoard(data);
       const pendientes = data.summary?.pendientes ?? 0;
       if (pendientes > 0) {
@@ -500,10 +563,18 @@ export function useProgramadorBoard(torneoId: string) {
     } finally {
       setBusy(false);
     }
-  }, [isReadOnly, torneoId, applyBoard]);
+  }, [isReadOnly, torneoId, grupoId, applyBoard]);
 
   const guardarBorrador = useCallback(async () => {
     if (isReadOnly) return;
+    if (grupoId) {
+      sileo.warning({
+        title: "Borrador del evento",
+        description:
+          "Cada categoría guarda su estado al asignar. Publicá cuando todas estén listas.",
+      });
+      return;
+    }
     setBusy(true);
     try {
       const actual = configRef.current;
@@ -528,7 +599,7 @@ export function useProgramadorBoard(torneoId: string) {
     }
   }, [isReadOnly, torneoId, applyBoard]);
 
-  const publicar = useCallback(async () => {
+  const publicar = useCallback(async (torneoIds?: string[]) => {
     if (!boardRef.current) return;
     const motivo = motivoPublicacionBloqueada(boardRef.current);
     if (motivo) {
@@ -541,7 +612,14 @@ export function useProgramadorBoard(torneoId: string) {
     setBusy(true);
     try {
       const yaEnCurso = boardRef.current?.estado === "En curso";
-      await TorneosService.publicarProgramacion(torneoId);
+      if (grupoId) {
+        await TorneosService.publicarEventoProgramacion(
+          grupoId,
+          torneoIds?.length ? { torneo_ids: torneoIds } : {},
+        );
+      } else {
+        await TorneosService.publicarProgramacion(torneoId);
+      }
       await load();
       sileo.success({
         title: "Programación publicada",
@@ -554,10 +632,17 @@ export function useProgramadorBoard(torneoId: string) {
     } finally {
       setBusy(false);
     }
-  }, [load, torneoId]);
+  }, [load, torneoId, grupoId]);
 
   const nuevaEdicion = useCallback(
     async (motivo?: string) => {
+      if (grupoId) {
+        sileo.warning({
+          title: "Nueva edición",
+          description: "Abrí una nueva edición desde el programador de cada categoría.",
+        });
+        return;
+      }
       setBusy(true);
       try {
         const data = await TorneosService.nuevaEdicionProgramacion(torneoId, {

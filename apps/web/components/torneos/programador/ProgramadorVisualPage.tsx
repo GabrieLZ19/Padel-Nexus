@@ -10,10 +10,13 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { SedesFiscalesTab } from "@/components/torneos/SedesFiscalesTab";
-import type { BoardPartido } from "@/utils/services/torneos";
+import type {
+  BoardPartido,
+  ProgramacionBoardEvento,
+} from "@/utils/services/torneos";
 import { ConflictosPanel } from "./ConflictosPanel";
 import { ProgramadorConfigBar } from "./ProgramadorConfigBar";
 import { ProgramadorTopBar } from "./ProgramadorTopBar";
@@ -23,14 +26,25 @@ import { ScheduleGrid } from "./ScheduleGrid";
 import { useProgramadorBoard } from "./useProgramadorBoard";
 import { motivoPublicacionBloqueada } from "@/utils/programadorPublicar";
 import { sileo } from "sileo";
+import { EventoCategoriaFilter } from "./EventoCategoriaFilter";
+import { EventoPublicarModal } from "./EventoPublicarModal";
 
 interface Props {
   torneoId: string;
   backHref: string;
+  grupoId?: string;
+  tituloEvento?: string | null;
 }
 
-export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
+export function ProgramadorVisualPage({
+  torneoId,
+  backHref,
+  grupoId,
+  tituloEvento,
+}: Props) {
   const router = useRouter();
+  const [filtroTorneoId, setFiltroTorneoId] = useState<string | null>(null);
+  const [ordenAutoIds, setOrdenAutoIds] = useState<string[]>([]);
   const {
     board,
     loading,
@@ -53,10 +67,40 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
     nuevaEdicion,
     issueByPartido,
     partidoEnSlot,
-  } = useProgramadorBoard(torneoId);
+  } = useProgramadorBoard(torneoId, { grupoId, ordenAutoTorneoIds: ordenAutoIds });
+
+  const boardEvento = useMemo((): ProgramacionBoardEvento | null => {
+    if (!board || !grupoId) return null;
+    if ("modo" in board && board.modo === "evento") {
+      return board as ProgramacionBoardEvento;
+    }
+    return null;
+  }, [board, grupoId]);
+
+  useEffect(() => {
+    if (boardEvento && ordenAutoIds.length === 0) {
+      setOrdenAutoIds(boardEvento.torneos.map((t) => t.id));
+    }
+  }, [boardEvento, ordenAutoIds.length]);
+
+  const partidosFiltrados = useMemo(() => {
+    if (!board) return [];
+    if (!filtroTorneoId) return board.partidos;
+    return board.partidos.filter((p) => p.torneo_id === filtroTorneoId);
+  }, [board, filtroTorneoId]);
+
+  const partidoEnSlotVisible = useCallback(
+    (slotKey: string): BoardPartido | undefined => {
+      const p = partidoEnSlot(slotKey);
+      if (!p || !filtroTorneoId) return p;
+      return p.torneo_id === filtroTorneoId ? p : undefined;
+    },
+    [partidoEnSlot, filtroTorneoId],
+  );
 
   const [activeDrag, setActiveDrag] = useState<BoardPartido | null>(null);
   const [confirmPublicar, setConfirmPublicar] = useState(false);
+  const [confirmPublicarEvento, setConfirmPublicarEvento] = useState(false);
   const [confirmEdicion, setConfirmEdicion] = useState(false);
   const [confirmLimpiar, setConfirmLimpiar] = useState(false);
   const [quitarPartido, setQuitarPartido] = useState<BoardPartido | null>(null);
@@ -152,6 +196,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
         busy={busy}
         syncing={syncing}
         isReadOnly={isReadOnly}
+        titulo={grupoId ? "Programador maestro" : "Programador visual"}
         soloLectura={bloqueadoPorAlcance}
         onAgregarSede={() => setSedesAbiertas(true)}
         onGuardarBorrador={() => void guardarBorrador()}
@@ -168,7 +213,8 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
             });
             return;
           }
-          setConfirmPublicar(true);
+          if (boardEvento) setConfirmPublicarEvento(true);
+          else setConfirmPublicar(true);
         }}
         onNuevaEdicion={() => setConfirmEdicion(true)}
         onBack={() => router.push(backHref)}
@@ -186,6 +232,16 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
         onChange={(next) => reloadWithConfig(next)}
       />
 
+      {boardEvento ? (
+        <EventoCategoriaFilter
+          board={boardEvento}
+          filtroTorneoId={filtroTorneoId}
+          onFiltroChange={setFiltroTorneoId}
+          ordenAutoIds={ordenAutoIds}
+          onOrdenAutoChange={setOrdenAutoIds}
+        />
+      ) : null}
+
       <ConflictosPanel
         issues={board.issues}
         partidos={board.partidos}
@@ -200,20 +256,23 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
       >
         <div className="grid min-h-[70vh] w-full flex-1 grid-cols-1 grid-rows-[minmax(240px,0.85fr)_minmax(320px,1.15fr)] gap-2 lg:min-h-0 lg:grid-cols-[minmax(240px,320px)_minmax(0,1fr)] lg:grid-rows-1 lg:overflow-hidden">
           <div className="order-2 flex h-full min-h-0 flex-col gap-2 overflow-hidden lg:order-1">
-            <ZonaParejasPanel
-              torneoId={torneoId}
-              readOnly={isReadOnly}
-              onMoved={() => void load()}
-            />
+            {!grupoId ? (
+              <ZonaParejasPanel
+                torneoId={torneoId}
+                readOnly={isReadOnly}
+                onMoved={() => void load()}
+              />
+            ) : null}
             <div className="min-h-0 flex-1">
               <PendingMatchesSidebar
-                partidos={board.partidos}
+                partidos={partidosFiltrados}
                 issues={board.issues}
                 readOnly={isReadOnly}
                 activeDay={activeDay}
                 diasDisponibles={board.dias}
                 onAsignarLote={asignarLote}
                 busy={busy}
+                ocultarLote={Boolean(grupoId)}
               />
             </div>
           </div>
@@ -227,7 +286,7 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
                 const partido = board.partidos.find((p) => p.id === id);
                 if (partido) setQuitarPartido(partido);
               }}
-              partidoEnSlot={partidoEnSlot}
+              partidoEnSlot={partidoEnSlotVisible}
               issueByPartido={issueByPartido}
             />
           </div>
@@ -246,6 +305,20 @@ export function ProgramadorVisualPage({ torneoId, backHref }: Props) {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {boardEvento ? (
+        <EventoPublicarModal
+          open={confirmPublicarEvento}
+          onClose={() => setConfirmPublicarEvento(false)}
+          board={boardEvento}
+          advertencias={board.summary.advertencias}
+          busy={busy}
+          onConfirm={(ids) => {
+            setConfirmPublicarEvento(false);
+            void publicar(ids);
+          }}
+        />
+      ) : null}
 
       <FeedbackModal
         isOpen={confirmPublicar}

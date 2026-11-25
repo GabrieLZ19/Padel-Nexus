@@ -125,13 +125,13 @@ function TorneosContent() {
     let isMounted = true;
 
     TorneosService.getAll()
-      .then((data) => {
+      .then((data: Torneo[]) => {
         if (isMounted) {
           setTournaments(data || []);
           setLoading(false);
         }
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error("Error al cargar torneos:", error);
         if (isMounted) setLoading(false);
       });

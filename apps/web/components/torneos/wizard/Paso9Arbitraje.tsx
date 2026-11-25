@@ -18,6 +18,7 @@ import {
 } from "@/utils/etiquetaPareja";
 import { sileo } from "sileo";
 import CustomDropdown from "@/components/ui/CustomDropdown";
+import { SelectorCategoriaEvento } from "@/components/torneos/SelectorCategoriaEvento";
 
 type VistaRapida = "pendientes" | "finalizados" | "todo";
 
@@ -140,6 +141,7 @@ export const PasoResultados = ({
   triggerRefresh,
   isReadOnly = false,
 }: PasoResultadosProps) => {
+  const idTorneo = torneoId || torneo?.id || "";
   const numeroPaso = useNumeroPaso("matches");
   const [guardandoPartidoId, setGuardandoPartidoId] = useState<string | null>(
     null,
@@ -843,7 +845,14 @@ export const PasoResultados = ({
   return (
     <div className="space-y-3">
       <div className="sticky top-0 z-20 -mx-1 bg-gradient-to-b from-brand-black via-brand-black to-transparent px-1 pb-2 pt-1">
-        <header className="rounded-xl border border-white/10 bg-brand-card px-2.5 py-2">
+        <header className="rounded-xl border border-white/10 bg-brand-card px-2.5 py-2 space-y-2">
+          {idTorneo ? (
+            <SelectorCategoriaEvento
+              torneoId={idTorneo}
+              pasoWizard="matches"
+              className="border-none bg-transparent px-0 py-0"
+            />
+          ) : null}
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="shrink-0 text-sm font-extrabold tracking-tight text-white">
               Paso {numeroPaso}: Resultados

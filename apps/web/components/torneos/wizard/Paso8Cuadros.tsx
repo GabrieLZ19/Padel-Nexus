@@ -7,6 +7,7 @@ import { CUPOS_ESTANDAR_FAP } from "@/utils/constants/fapApaRules";
 import { esEliminatoriaDirecta } from "@/utils/formatoTorneo";
 import { AlertCircle } from "lucide-react";
 import { evaluarCapacidadDiasCompetencia } from "@/utils/capacidadDiasCompetencia";
+import { SelectorCategoriaEvento } from "@/components/torneos/SelectorCategoriaEvento";
 
 interface Paso6CuadrosProps {
   torneo: Torneo;
@@ -214,9 +215,16 @@ export const Paso6Cuadros = ({
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-bold text-white uppercase tracking-wider">
-        Paso {numeroPaso}: Cuadros
-      </h3>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <h3 className="text-lg font-bold text-white uppercase tracking-wider">
+          Paso {numeroPaso}: Cuadros
+        </h3>
+        <SelectorCategoriaEvento
+          torneoId={torneoId}
+          pasoWizard="draws"
+          className="w-full sm:max-w-md"
+        />
+      </div>
       {partidos.length === 0 && formatoEsEliminatoriaDirecta && (
           <div className="bg-black/20 p-6 rounded-3xl border border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
             <div>

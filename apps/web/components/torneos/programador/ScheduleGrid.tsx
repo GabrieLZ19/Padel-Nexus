@@ -10,6 +10,7 @@ import type {
   ProgramacionIssue,
   IssueSeverity,
 } from "@/utils/services/torneos";
+import { CategoriaPartidoBadge } from "./CategoriaPartidoBadge";
 
 interface Props {
   board: ProgramacionBoard;
@@ -68,11 +69,15 @@ function BookingCard({
 
   const hasIssue = issue && issue.severity !== "ok";
 
+  const accent = partido.categoria_color
+    ? { borderLeftWidth: 3, borderLeftColor: partido.categoria_color }
+    : undefined;
+
   return (
     <div
       ref={setRefs}
       id={`booking-card-${partido.id}`}
-      style={style}
+      style={{ ...style, ...accent }}
       className={`prog-booking relative flex h-full min-h-[52px] flex-col rounded-lg border p-1.5 text-left ${severityClass(
         issue?.severity,
       )} ${highlighted ? "outline outline-2 outline-offset-1 outline-brand-chartreuse" : ""}`}
@@ -98,9 +103,12 @@ function BookingCard({
             aria-hidden
           />
         ) : null}
-        <p className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase opacity-80">
-          {partido.ronda_etiqueta || partido.ronda}
-        </p>
+        <div className="min-w-0 flex-1">
+          <CategoriaPartidoBadge partido={partido} compact />
+          <p className="truncate text-[10px] font-bold uppercase opacity-80">
+            {partido.ronda_etiqueta || partido.ronda}
+          </p>
+        </div>
         {!readOnly ? (
           <button
             type="button"

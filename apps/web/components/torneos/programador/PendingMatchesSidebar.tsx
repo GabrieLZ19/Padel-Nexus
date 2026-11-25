@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 import type { BoardPartido, ProgramacionIssue } from "@/utils/services/torneos";
+import { CategoriaPartidoBadge } from "./CategoriaPartidoBadge";
 
 interface Props {
   partidos: BoardPartido[];
@@ -20,6 +21,7 @@ interface Props {
   diasDisponibles?: string[];
   onAsignarLote?: (partidoIds: string[], dia?: string) => Promise<void> | void;
   busy?: boolean;
+  ocultarLote?: boolean;
 }
 
 function PendingCard({
@@ -96,6 +98,7 @@ function PendingCard({
           <GripVertical className="size-3.5 shrink-0 text-gray-500" aria-hidden />
         )}
         <div className="min-w-0 flex-1">
+          <CategoriaPartidoBadge partido={partido} compact />
           <p className="truncate text-xs font-semibold leading-none text-brand-white">
             {partido.label_a}{" "}
             <span className="font-normal text-gray-500">vs</span>{" "}
@@ -127,6 +130,7 @@ export function PendingMatchesSidebar({
   diasDisponibles = [],
   onAsignarLote,
   busy = false,
+  ocultarLote = false,
 }: Props) {
   const [tab, setTab] = useState<"zones" | "bracket">("zones");
   const [mostrarAsignados, setMostrarAsignados] = useState(false);
@@ -252,7 +256,7 @@ export function PendingMatchesSidebar({
             <p className="text-xs text-gray-400">
               {pendientes} sin horario
             </p>
-            {!readOnly && pendientes > 0 && (
+            {!readOnly && !ocultarLote && pendientes > 0 && (
               <button
                 type="button"
                 onClick={toggleSelectAllPhase}
@@ -304,7 +308,7 @@ export function PendingMatchesSidebar({
       </div>
 
       {/* BARRA DE ACCIÓN LOTE */}
-      {selectedIds.size > 0 && (
+      {!ocultarLote && selectedIds.size > 0 && (
         <div className="shrink-0 border-b border-white/10 bg-brand-chartreuse/10 p-2 text-xs">
           <div className="flex items-center justify-between gap-1 font-bold text-white mb-1.5">
             <span className="flex items-center gap-1.5 text-brand-chartreuse">
@@ -383,7 +387,7 @@ export function PendingMatchesSidebar({
                     <span className="font-medium text-gray-400">{list.length}</span>
                   </button>
 
-                  {!readOnly && unassignedInGroup.length > 0 && (
+                  {!readOnly && !ocultarLote && unassignedInGroup.length > 0 && (
                     <button
                       type="button"
                       onClick={(e) => toggleGroupSelect(list, e)}
@@ -407,7 +411,7 @@ export function PendingMatchesSidebar({
                         key={p.id}
                         partido={p}
                         issue={issueMap.get(p.id)}
-                        readOnly={readOnly}
+                        readOnly={readOnly || ocultarLote}
                         selected={selectedIds.has(p.id)}
                         onToggleSelect={() => toggleSelect(p.id)}
                       />
