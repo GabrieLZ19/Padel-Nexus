@@ -197,6 +197,22 @@ function pickDatosProductoUpdate(
 const ITEMS_POR_PAGINA = 12;
 
 export class MarketplaceService {
+  /** Tiendas visibles en catálogo público (activas y vinculadas a entidad). */
+  private static async idsVendedoresCatalogoPublico(): Promise<string[]> {
+    const { data, error } = await supabaseAdmin
+      .from("marketplace_vendedores")
+      .select("id")
+      .eq("estado", MARKETPLACE_ESTADOS_VENDEDOR.ACTIVO)
+      .not("entidad_id", "is", null);
+
+    if (error) {
+      throw new Error(
+        `Error al resolver tiendas del catálogo: ${error.message}`,
+      );
+    }
+    return data?.map((v) => v.id) ?? [];
+  }
+
   static async listarCategorias() {
     const { data, error } = await supabaseAdmin
       .from("marketplace_categorias")
@@ -205,16 +221,27 @@ export class MarketplaceService {
 
     if (error) throw new Error(`Error al listar categorías: ${error.message}`);
 
-    const { data: conteos } = await supabaseAdmin
-      .from("marketplace_productos")
-      .select("categoria_id")
-      .eq("activo", true);
-
+    const vendedorIds = await this.idsVendedoresCatalogoPublico();
     const conteoPorCategoria: Record<string, number> = {};
-    conteos?.forEach((p) => {
-      conteoPorCategoria[p.categoria_id] =
-        (conteoPorCategoria[p.categoria_id] || 0) + 1;
-    });
+
+    if (vendedorIds.length > 0) {
+      const { data: conteos, error: conteosError } = await supabaseAdmin
+        .from("marketplace_productos")
+        .select("categoria_id")
+        .eq("activo", true)
+        .in("vendedor_id", vendedorIds);
+
+      if (conteosError) {
+        throw new Error(
+          `Error al contar productos por categoría: ${conteosError.message}`,
+        );
+      }
+
+      conteos?.forEach((p) => {
+        conteoPorCategoria[p.categoria_id] =
+          (conteoPorCategoria[p.categoria_id] || 0) + 1;
+      });
+    }
 
     return data.map((cat) => ({
       ...cat,
@@ -228,13 +255,7 @@ export class MarketplaceService {
     const desde = (pagina - 1) * porPagina;
     const hasta = desde + porPagina - 1;
 
-    const { data: vendedoresActivos } = await supabaseAdmin
-      .from("marketplace_vendedores")
-      .select("id")
-      .eq("estado", MARKETPLACE_ESTADOS_VENDEDOR.ACTIVO)
-      .not("entidad_id", "is", null);
-
-    const vendedorIds = vendedoresActivos?.map((v) => v.id) || [];
+    const vendedorIds = await this.idsVendedoresCatalogoPublico();
     if (vendedorIds.length === 0) {
       return {
         productos: [],
@@ -371,10 +392,16 @@ export class MarketplaceService {
   }
 
   static async listarMarcas(categoriaId?: string) {
+    const vendedorIds = await this.idsVendedoresCatalogoPublico();
+    if (vendedorIds.length === 0) {
+      return [];
+    }
+
     let query = supabaseAdmin
       .from("marketplace_productos")
       .select("marca")
       .eq("activo", true)
+      .in("vendedor_id", vendedorIds)
       .not("marca", "is", null);
 
     if (categoriaId) {
@@ -384,7 +411,13 @@ export class MarketplaceService {
     const { data, error } = await query;
     if (error) throw new Error(`Error al listar marcas: ${error.message}`);
 
-    const marcasUnicas = [...new Set(data?.map((p) => p.marca).filter(Boolean))];
+    const marcasUnicas = [
+      ...new Set(
+        data
+          ?.map((p) => p.marca?.trim())
+          .filter((m): m is string => Boolean(m)),
+      ),
+    ];
     return marcasUnicas.sort();
   }
 

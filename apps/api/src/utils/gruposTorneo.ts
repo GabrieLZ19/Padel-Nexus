@@ -53,6 +53,19 @@ function ordenNivel(nivel?: string | null): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Nomenclatura CLI-4: `<evento> — <nivel> <rama corta>` sin duplicar sufijos del origen. */
+export function nombreTorneoReplicado(
+  nombreOrigen: string,
+  nivelOrigen: string | null | undefined,
+  ramaOrigen: string | null | undefined,
+  nivelNuevo: string,
+  ramaNueva: string,
+): string {
+  const base = nombreBaseTorneo(nombreOrigen, nivelOrigen, ramaOrigen);
+  const etiquetaRama = ramaCorta(ramaNueva) || String(ramaNueva || "").trim();
+  return `${base} — ${nivelNuevo} ${etiquetaRama}`.trim();
+}
+
 export function nombreBaseTorneo(
   nombre?: string | null,
   nivel?: string | null,

@@ -25,7 +25,11 @@ import {
   avanzarPartidosInternosZonaCuatro,
   sincronizarClasificadosALlave,
 } from "../utils/playoffAvance";
-import { armarGruposTorneo, nombreBaseTorneo } from "../utils/gruposTorneo";
+import {
+  armarGruposTorneo,
+  nombreBaseTorneo,
+  nombreTorneoReplicado,
+} from "../utils/gruposTorneo";
 import { resolverReglamentoPersistido } from "../utils/reglamentoTorneo";
 import { debeDescalificarPorWoDeZona } from "../utils/walkoverZona";
 import { normalizarAlcanceTorneo } from "../utils/pasesRepresentacion";
@@ -1027,6 +1031,9 @@ export class TorneoService {
           subtitulo: payload.subtitulo,
           club_id: payload.club_id || null,
           fecha: payload.fecha,
+          fecha_fin:
+            (datos as { fecha_fin?: string | null }).fecha_fin ??
+            payload.fecha,
           estado: payload.estado,
           cupos_maximos: datos.cupos_maximos,
           cupos_actuales: 0,
@@ -1047,7 +1054,11 @@ export class TorneoService {
           hora_inicio_jornada: datos.hora_inicio_jornada || "08:00",
           reglas_arbitraje: (datos as any).reglas_arbitraje || null,
           dias_juego: diasJuego,
-          configuracion_puntos: configuracionPuntosInicial(),
+          configuracion_puntos:
+            (datos as { configuracion_puntos?: ConfigPuntosTorneo | null })
+              .configuracion_puntos ?? configuracionPuntosInicial(),
+          descanso_modo: (datos as { descanso_modo?: string | null }).descanso_modo ?? null,
+          es_gratis: (datos as { es_gratis?: boolean | null }).es_gratis ?? false,
         },
       ])
       .select()
@@ -1095,22 +1106,69 @@ export class TorneoService {
     return torneo;
   }
 
-  private static ramaCorta(rama?: string | null): string {
-    const r = String(rama || "").toLowerCase();
-    if (r.startsWith("fem")) return "Fem.";
-    if (r.startsWith("mix")) return "Mix.";
-    return "Masc.";
-  }
+  private static async clonarSedesYDisponibilidadDesdeTorneo(
+    origenId: string,
+    destinoId: string,
+    clubIdOrganizador?: string | null,
+  ): Promise<void> {
+    const { data: sedesOrigen } = await supabaseAdmin
+      .from("torneo_sedes")
+      .select("club_id")
+      .eq("torneo_id", origenId);
 
-  private static nombreReplicado(
-    nombreOrigen: string,
-    nivelOrigen: string | null | undefined,
-    ramaOrigen: string | null | undefined,
-    nivelNuevo: string,
-    ramaNueva: string,
-  ): string {
-    const base = nombreBaseTorneo(nombreOrigen, nivelOrigen, ramaOrigen);
-    return `${base} — ${nivelNuevo} ${TorneoService.ramaCorta(ramaNueva)}`;
+    const clubIds = [
+      ...new Set(
+        (sedesOrigen || [])
+          .map((fila) => String(fila.club_id || "").trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (clubIds.length === 0 && clubIdOrganizador) {
+      clubIds.push(String(clubIdOrganizador));
+    }
+    if (clubIds.length > 0) {
+      await TorneoService.guardarSedes(destinoId, clubIds);
+    }
+
+    const { data: franjasOrigen, error: franjasError } = await supabaseAdmin
+      .from("torneo_canchas_disponibilidad")
+      .select(
+        "club_id, cancha_id, fecha, hora_inicio, hora_fin, categoria",
+      )
+      .eq("torneo_id", origenId);
+
+    if (franjasError) {
+      throw new Error(
+        `No se pudieron leer franjas del torneo origen: ${franjasError.message}`,
+      );
+    }
+
+    if (!franjasOrigen?.length) return;
+
+    await supabaseAdmin
+      .from("torneo_canchas_disponibilidad")
+      .delete()
+      .eq("torneo_id", destinoId);
+
+    const { error: insertError } = await supabaseAdmin
+      .from("torneo_canchas_disponibilidad")
+      .insert(
+        franjasOrigen.map((fila) => ({
+          torneo_id: destinoId,
+          club_id: fila.club_id,
+          cancha_id: fila.cancha_id,
+          fecha: fila.fecha,
+          hora_inicio: fila.hora_inicio,
+          hora_fin: fila.hora_fin,
+          categoria: fila.categoria,
+        })),
+      );
+
+    if (insertError) {
+      throw new Error(
+        `No se pudieron copiar franjas de sedes: ${insertError.message}`,
+      );
+    }
   }
 
   /**
@@ -1122,7 +1180,6 @@ export class TorneoService {
     opciones: {
       niveles: string[];
       ramas?: string[];
-      soloMismaRama?: boolean;
     },
     adminId?: string,
   ) {
@@ -1146,7 +1203,7 @@ export class TorneoService {
       .map((r) => String(r || "").trim())
       .filter(Boolean);
 
-    if (opciones.soloMismaRama || ramasDestino.length === 0) {
+    if (ramasDestino.length === 0) {
       ramasDestino = [ramaOrigen];
     }
 
@@ -1169,7 +1226,7 @@ export class TorneoService {
 
     for (const par of pares) {
       try {
-        const nombre = TorneoService.nombreReplicado(
+        const nombre = nombreTorneoReplicado(
           origen.nombre,
           origen.nivel,
           ramaOrigen,
@@ -1177,11 +1234,17 @@ export class TorneoService {
           par.rama,
         );
 
+        const diasOrigen = Array.isArray(origen.dias_juego)
+          ? (origen.dias_juego as string[])
+          : undefined;
+
         const payload: TorneoPayload & Record<string, unknown> = {
           nombre,
           subtitulo: origen.subtitulo || undefined,
           club_id: origen.club_id,
           fecha: origen.fecha,
+          fecha_fin: origen.fecha_fin ?? origen.fecha,
+          dias_juego: diasOrigen,
           estado: FAP_ESTADOS_TORNEO.BORRADOR,
           cupos_maximos: origen.cupos_maximos || 16,
           nivel: par.nivel,
@@ -1198,6 +1261,9 @@ export class TorneoService {
           canchas_disponibles: origen.canchas_disponibles || 1,
           duracion_partido_minutos: origen.duracion_partido_minutos || 90,
           hora_inicio_jornada: origen.hora_inicio_jornada || "08:00",
+          descanso_modo: origen.descanso_modo ?? null,
+          es_gratis: origen.es_gratis ?? false,
+          configuracion_puntos: origen.configuracion_puntos ?? null,
           rama: par.rama,
           reglamento: origen.reglamento,
           asociacion_id: origen.asociacion_id,
@@ -1206,6 +1272,13 @@ export class TorneoService {
         };
 
         const creado = await TorneoService.crearTorneo(payload as TorneoPayload);
+
+        const nuevoId = (creado as { id: string }).id;
+        await TorneoService.clonarSedesYDisponibilidadDesdeTorneo(
+          id,
+          nuevoId,
+          origen.club_id,
+        );
 
         const extras: Record<string, unknown> = {};
         if (origen.banners) extras.banners = origen.banners;

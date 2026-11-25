@@ -290,15 +290,11 @@ export const replicarTorneo = async (
     const negado = await negarAlcance(req, req.params.id, "editar");
     if (negado) return res.status(403).json({ message: negado });
 
-    const rol = req.user?.rol;
-    const soloMismaRama = rol === "admin_club";
-
     const resultado = await TorneoService.replicarTorneo(
       req.params.id,
       {
         niveles: Array.isArray(niveles) ? niveles : [],
         ramas: Array.isArray(ramas) ? ramas : undefined,
-        soloMismaRama,
       },
       req.user?.id,
     );
