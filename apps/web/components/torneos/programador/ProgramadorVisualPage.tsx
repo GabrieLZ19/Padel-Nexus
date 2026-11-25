@@ -28,6 +28,7 @@ import { motivoPublicacionBloqueada } from "@/utils/programadorPublicar";
 import { sileo } from "sileo";
 import { EventoCategoriaFilter } from "./EventoCategoriaFilter";
 import { EventoPublicarModal } from "./EventoPublicarModal";
+import { resolverDropEnSlot } from "@/utils/programadorDrop";
 
 interface Props {
   torneoId: string;
@@ -57,6 +58,7 @@ export function ProgramadorVisualPage({
     bloqueadoPorAlcance,
     reloadWithConfig,
     asignar,
+    intercambiarHorarios,
     asignarLote,
     desasignar,
     limpiar,
@@ -89,15 +91,6 @@ export function ProgramadorVisualPage({
     return board.partidos.filter((p) => p.torneo_id === filtroTorneoId);
   }, [board, filtroTorneoId]);
 
-  const partidoEnSlotVisible = useCallback(
-    (slotKey: string): BoardPartido | undefined => {
-      const p = partidoEnSlot(slotKey);
-      if (!p || !filtroTorneoId) return p;
-      return p.torneo_id === filtroTorneoId ? p : undefined;
-    },
-    [partidoEnSlot, filtroTorneoId],
-  );
-
   const [activeDrag, setActiveDrag] = useState<BoardPartido | null>(null);
   const [confirmPublicar, setConfirmPublicar] = useState(false);
   const [confirmPublicarEvento, setConfirmPublicarEvento] = useState(false);
@@ -108,6 +101,18 @@ export function ProgramadorVisualPage({
   const [highlightedPartidoId, setHighlightedPartidoId] = useState<
     string | null
   >(null);
+  const [confirmIntercambioCategoria, setConfirmIntercambioCategoria] =
+    useState<{
+      partido: BoardPartido;
+      occupant: BoardPartido;
+      slot: { fecha_iso: string; cancha_label: string };
+      origen: { fecha_iso: string; cancha_label: string };
+    } | null>(null);
+  const [confirmReemplazoSlot, setConfirmReemplazoSlot] = useState<{
+    partido: BoardPartido;
+    occupant: BoardPartido;
+    slot: { fecha_iso: string; cancha_label: string };
+  } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -173,11 +178,49 @@ export function ProgramadorVisualPage({
       const slot = board.slots.find((s) => s.key === slotKey);
       if (!slot) return;
       const occupant = partidoEnSlot(slotKey);
-      // Asignar hace el swap optimista; desasignar del ocupante va en silencio a la API.
-      if (occupant && occupant.id !== partido.id) {
-        void desasignar(occupant.id, undefined, { silent: true });
+      const destino = {
+        fecha_iso: slot.fecha_iso,
+        cancha_label: slot.cancha_label,
+      };
+      const decision = resolverDropEnSlot(partido, occupant, {
+        esEvento: Boolean(grupoId),
+      });
+
+      switch (decision.action) {
+        case "bloquear":
+          sileo.error({
+            title: "Cancha ocupada",
+            description: decision.mensaje,
+          });
+          return;
+        case "asignar_libre":
+          void asignar(partido.id, destino.fecha_iso, destino.cancha_label);
+          return;
+        case "intercambiar":
+          if (!occupant) return;
+          void intercambiarHorarios(
+            partido.id,
+            destino,
+            occupant.id,
+            decision.origen,
+          );
+          return;
+        case "confirmar_intercambio_categoria":
+          if (!occupant) return;
+          setConfirmIntercambioCategoria({
+            partido,
+            occupant,
+            slot: destino,
+            origen: decision.origen,
+          });
+          return;
+        case "confirmar_reemplazo":
+          if (!occupant) return;
+          setConfirmReemplazoSlot({ partido, occupant, slot: destino });
+          return;
+        default:
+          return;
       }
-      void asignar(partido.id, slot.fecha_iso, slot.cancha_label);
     }
   };
 
@@ -282,11 +325,12 @@ export function ProgramadorVisualPage({
               day={activeDay}
               readOnly={isReadOnly}
               highlightedPartidoId={highlightedPartidoId}
+              filtroTorneoId={filtroTorneoId}
               onRemove={(id) => {
                 const partido = board.partidos.find((p) => p.id === id);
                 if (partido) setQuitarPartido(partido);
               }}
-              partidoEnSlot={partidoEnSlotVisible}
+              partidoEnSlot={partidoEnSlot}
               issueByPartido={issueByPartido}
             />
           </div>
@@ -334,6 +378,56 @@ export function ProgramadorVisualPage({
         onConfirm={() => {
           setConfirmPublicar(false);
           void publicar();
+        }}
+      />
+
+      <FeedbackModal
+        isOpen={Boolean(confirmIntercambioCategoria)}
+        onClose={() => setConfirmIntercambioCategoria(null)}
+        type="warning"
+        title="Intercambiar con otra categoría"
+        description={
+          confirmIntercambioCategoria
+            ? `«${confirmIntercambioCategoria.partido.label}» ocupará el horario de «${confirmIntercambioCategoria.occupant.label}», y ese partido pasará al horario que dejás libre. No se envía nada a Pendientes sin avisar.`
+            : ""
+        }
+        confirmText="Intercambiar"
+        cancelText="Cancelar"
+        onConfirm={() => {
+          const payload = confirmIntercambioCategoria;
+          setConfirmIntercambioCategoria(null);
+          if (!payload) return;
+          void intercambiarHorarios(
+            payload.partido.id,
+            payload.slot,
+            payload.occupant.id,
+            payload.origen,
+          );
+        }}
+      />
+
+      <FeedbackModal
+        isOpen={Boolean(confirmReemplazoSlot)}
+        onClose={() => setConfirmReemplazoSlot(null)}
+        type="warning"
+        title="Reemplazar horario"
+        description={
+          confirmReemplazoSlot
+            ? `«${confirmReemplazoSlot.occupant.label}» vuelve a Pendientes y «${confirmReemplazoSlot.partido.label}» toma su lugar.`
+            : ""
+        }
+        confirmText="Reemplazar"
+        cancelText="Cancelar"
+        onConfirm={async () => {
+          const payload = confirmReemplazoSlot;
+          setConfirmReemplazoSlot(null);
+          if (!payload) return;
+          await desasignar(payload.occupant.id, undefined, { silent: true });
+          await asignar(
+            payload.partido.id,
+            payload.slot.fecha_iso,
+            payload.slot.cancha_label,
+          );
         }}
       />
 

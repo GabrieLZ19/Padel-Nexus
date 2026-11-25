@@ -17,6 +17,7 @@ interface Props {
   day: string;
   readOnly?: boolean;
   highlightedPartidoId?: string | null;
+  filtroTorneoId?: string | null;
   onRemove: (partidoId: string) => void;
   partidoEnSlot: (slotKey: string) => BoardPartido | undefined;
   issueByPartido: (partidoId: string) => ProgramacionIssue | null;
@@ -147,9 +148,32 @@ function BookingCard({
   );
 }
 
+function OcupacionAjenaCard({ partido }: { partido: BoardPartido }) {
+  const accent = partido.categoria_color
+    ? { borderLeftWidth: 3, borderLeftColor: partido.categoria_color }
+    : undefined;
+
+  return (
+    <div
+      style={accent}
+      className="prog-booking flex h-full min-h-[52px] flex-col rounded-lg border border-white/15 bg-white/5 p-1.5 opacity-55"
+      title="Ocupado por otra categoría del evento"
+    >
+      <p className="text-[9px] font-bold uppercase tracking-wide text-brand-ayuda">
+        Otra categoría
+      </p>
+      <CategoriaPartidoBadge partido={partido} compact />
+      <p className="mt-1 line-clamp-2 text-[10px] font-semibold leading-tight text-brand-white/80">
+        {partido.label_a} vs {partido.label_b}
+      </p>
+    </div>
+  );
+}
+
 function SlotCell({
   slotKey,
   partido,
+  ocupacionAjena,
   issue,
   readOnly,
   highlighted,
@@ -157,11 +181,13 @@ function SlotCell({
 }: {
   slotKey: string;
   partido?: BoardPartido;
+  ocupacionAjena?: BoardPartido;
   issue: ProgramacionIssue | null;
   readOnly?: boolean;
   highlighted?: boolean;
   onRemove: (id: string) => void;
 }) {
+  const ocupadaPorOtro = Boolean(ocupacionAjena);
   const { setNodeRef, isOver } = useDroppable({
     id: `slot-${slotKey}`,
     data: { type: "slot", slotKey },
@@ -172,7 +198,11 @@ function SlotCell({
     <td
       ref={setNodeRef}
       className={`min-w-[160px] border border-white/5 p-1 align-top sm:min-w-[180px] ${
-        isOver ? "bg-brand-chartreuse/15" : ""
+        isOver
+          ? ocupadaPorOtro
+            ? "bg-amber-500/20"
+            : "bg-brand-chartreuse/15"
+          : ""
       }`}
     >
       {partido ? (
@@ -183,6 +213,8 @@ function SlotCell({
           highlighted={highlighted}
           onRemove={() => onRemove(partido.id)}
         />
+      ) : ocupacionAjena ? (
+        <OcupacionAjenaCard partido={ocupacionAjena} />
       ) : (
         <div className="prog-slot flex h-full min-h-[52px] items-center justify-center rounded-lg text-[10px] font-semibold">
           Libre
@@ -197,6 +229,7 @@ export function ScheduleGrid({
   day,
   readOnly,
   highlightedPartidoId,
+  filtroTorneoId,
   onRemove,
   partidoEnSlot,
   issueByPartido,
@@ -296,12 +329,25 @@ export function ScheduleGrid({
                     </td>
                   );
                 }
-                const partido = partidoEnSlot(slot.key);
+                const partidoReal = partidoEnSlot(slot.key);
+                const partido =
+                  filtroTorneoId &&
+                  partidoReal &&
+                  partidoReal.torneo_id !== filtroTorneoId
+                    ? undefined
+                    : partidoReal;
+                const ocupacionAjena =
+                  filtroTorneoId &&
+                  partidoReal &&
+                  partidoReal.torneo_id !== filtroTorneoId
+                    ? partidoReal
+                    : undefined;
                 return (
                   <SlotCell
                     key={slot.key}
                     slotKey={slot.key}
                     partido={partido}
+                    ocupacionAjena={ocupacionAjena}
                     issue={partido ? issueByPartido(partido.id) : null}
                     readOnly={readOnly}
                     highlighted={

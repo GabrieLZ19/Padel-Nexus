@@ -292,21 +292,6 @@ export function useProgramadorBoard(
             };
           }
           // Liberar slot ocupado por otro (swap optimista)
-          if (
-            p.assigned &&
-            p.cancha_asignada === canchaLabel &&
-            p.fecha_partido === fechaIso &&
-            p.id !== partidoId
-          ) {
-            return {
-              ...p,
-              assigned: false,
-              cancha_asignada: null,
-              fecha_partido: null,
-              slot_key: null,
-              horario_bloqueado: false,
-            };
-          }
           return p;
         });
         const asignados = partidos.filter((p) => p.assigned).length;
@@ -349,6 +334,82 @@ export function useProgramadorBoard(
       }
     },
     [isReadOnly, torneoId, grupoId, scheduleBoardSync, applyBoard],
+  );
+
+  const intercambiarHorarios = useCallback(
+    async (
+      partidoId: string,
+      destino: { fecha_iso: string; cancha_label: string },
+      occupantId: string,
+      origen: { fecha_iso: string; cancha_label: string } | null,
+    ) => {
+      if (boardRef.current?.solo_lectura) {
+        sileo.error({
+          title: "Solo lectura",
+          description:
+            boardRef.current.aviso_alcance ||
+            "No podés cambiar los horarios de este torneo.",
+        });
+        return;
+      }
+      if (isReadOnly) {
+        sileo.error({
+          title: "Programación publicada",
+          description: "Creá una nueva edición para editar.",
+        });
+        return;
+      }
+      const prev = boardRef.current;
+      try {
+        if (grupoId) {
+          await TorneosService.desasignarEventoProgramacion(grupoId, {
+            partido_id: occupantId,
+          });
+          let data = await TorneosService.asignarEventoProgramacion(grupoId, {
+            partido_id: partidoId,
+            fecha_iso: destino.fecha_iso,
+            cancha_label: destino.cancha_label,
+          });
+          if (origen) {
+            data = await TorneosService.asignarEventoProgramacion(grupoId, {
+              partido_id: occupantId,
+              fecha_iso: origen.fecha_iso,
+              cancha_label: origen.cancha_label,
+            });
+          }
+          applyBoard(data);
+        } else {
+          await TorneosService.desasignarProgramacion(torneoId, {
+            partido_id: occupantId,
+          });
+          await TorneosService.asignarProgramacion(torneoId, {
+            partido_id: partidoId,
+            fecha_iso: destino.fecha_iso,
+            cancha_label: destino.cancha_label,
+          });
+          if (origen) {
+            await TorneosService.asignarProgramacion(torneoId, {
+              partido_id: occupantId,
+              fecha_iso: origen.fecha_iso,
+              cancha_label: origen.cancha_label,
+            });
+          }
+          const data = await fetchBoard(
+            boardQuery(configRef.current, {
+              incluirDescansoPreview: configHidratadaRef.current,
+            }),
+          );
+          applyBoard(data);
+        }
+      } catch (e: unknown) {
+        if (prev) setBoard(prev);
+        sileo.error({
+          title: "No se pudo intercambiar",
+          description: apiErrorMessage(e, "Revisá conflictos de cancha u horario."),
+        });
+      }
+    },
+    [isReadOnly, torneoId, grupoId, applyBoard, fetchBoard],
   );
 
   const asignarLote = useCallback(
@@ -696,6 +757,7 @@ export function useProgramadorBoard(
     reloadWithConfig,
     load,
     asignar,
+    intercambiarHorarios,
     asignarLote,
     desasignar,
     limpiar,
