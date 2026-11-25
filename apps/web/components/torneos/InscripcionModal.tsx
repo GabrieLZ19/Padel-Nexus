@@ -207,7 +207,6 @@ export default function InscripcionModal({
     try {
       const creada = (await InscripcionesService.inscribir({
         torneo_id: torneo.id,
-        usuario_id: profile.id,
         usuario2_email: isIndividual ? null : email2,
         jugador1_nombre: jugador1Nombre,
         jugador2_nombre: isIndividual ? "-" : jugador2Nombre || "",

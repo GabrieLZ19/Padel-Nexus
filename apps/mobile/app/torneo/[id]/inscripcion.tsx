@@ -121,7 +121,6 @@ export default function InscripcionScreen() {
     try {
       const creada = await InscripcionesService.inscribir({
         torneo_id: id,
-        usuario_id: usuario.id,
         usuario2_email: emailCompanero.trim() || elegibilidad?.jugador2?.email,
         jugador1_nombre: nombreYo,
         jugador2_nombre:
