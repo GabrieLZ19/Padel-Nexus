@@ -378,9 +378,15 @@ export class CompetenciaService {
       }
     }
 
+    const { ocupadosSemillaEventoParaTorneo } = await import(
+      "../utils/programacionEvento"
+    );
+    const ocupadosEvento = await ocupadosSemillaEventoParaTorneo(torneoId);
+
     if (partidosZonaFase.length > 0) {
       await programarPartidosConDisponibilidad(torneoId, partidosZonaFase, {
         fase: "zonas",
+        ocupados: ocupadosEvento,
       });
       await supabaseAdmin.from("partidos").insert(partidosZonaFase);
     }
@@ -411,6 +417,7 @@ export class CompetenciaService {
           partidosZonaFase,
           playoffPartidos,
           feedersByMatchNo,
+          { ocupadosSemilla: ocupadosEvento },
         );
         await supabaseAdmin.from("partidos").insert(playoffPartidos);
       }
@@ -871,7 +878,12 @@ export class CompetenciaService {
         .select("cancha_asignada, fecha_partido")
         .eq("torneo_id", torneoId);
 
-      const ocupados = buildOcupadosDesdePartidos(partidosProgramados || []);
+      const { mergeOcupadosSemilla, ocupadosSemillaEventoParaTorneo } =
+        await import("../utils/programacionEvento");
+      const ocupados = mergeOcupadosSemilla(
+        buildOcupadosDesdePartidos(partidosProgramados || []),
+        await ocupadosSemillaEventoParaTorneo(torneoId),
+      );
       await programarPartidosConDisponibilidad(torneoId, conHorario, {
         ocupados,
       });

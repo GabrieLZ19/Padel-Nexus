@@ -12,6 +12,18 @@ export function terminoIlikePostgrest(queryRaw: string): string {
   return `"${term.replace(/"/g, '\\"')}"`;
 }
 
+const MAX_TOKENS_BUSQUEDA_JUGADOR = 6;
+
+/** ENT-37: cada palabra debe coincidir en nombre, apellido, DNI o nro de licencia. */
+export function tokenizarBusquedaJugadores(search: string): string[] {
+  return search
+    .trim()
+    .split(/\s+/u)
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, MAX_TOKENS_BUSQUEDA_JUGADOR);
+}
+
 /** Búsqueda del listado de jugadores/licencias (federación, superadmin, provincial). */
 export function orBusquedaContactosAdmin(quoted: string): string {
   return [
@@ -27,6 +39,24 @@ export function orBusquedaContactosAdmin(quoted: string): string {
  * La búsqueda por N° de licencia va aparte (tabla `licencias`) y se une vía `usuarioIdsNroLicencia`.
  * Mezclar `licencias.*` en este or rompe el parser de PostgREST con embed inner.
  */
+/** Un token sobre perfiles (sin email; nro de licencia vía ids separados). */
+export function orBusquedaTokenJugadoresLicencias(
+  quoted: string,
+  usuarioIdsNroLicencia?: string[],
+): string {
+  const parts = [
+    `nombre.ilike.${quoted}`,
+    `apellido.ilike.${quoted}`,
+    `dni.ilike.${quoted}`,
+  ];
+  const ids = (usuarioIdsNroLicencia || []).filter(Boolean);
+  if (ids.length > 0) {
+    parts.push(`id.in.(${ids.map((id) => `"${id}"`).join(",")})`);
+  }
+  return parts.join(",");
+}
+
+/** @deprecated Preferir orBusquedaTokenJugadoresLicencias por token (ENT-37). */
 export function orBusquedaJugadoresLicencias(
   quoted: string,
   usuarioIdsNroLicencia?: string[],

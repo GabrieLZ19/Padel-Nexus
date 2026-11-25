@@ -547,7 +547,7 @@ export class ProgramacionService {
       supabaseAdmin
         .from("torneos")
         .select(
-          "id, nombre, programacion_estado, programacion_publicada_en, duracion_partido_minutos, descanso_modo, estado, alcance, formato",
+          "id, nombre, programacion_estado, programacion_publicada_en, duracion_partido_minutos, descanso_modo, estado, alcance, formato, grupo_id",
         )
         .eq("id", torneoId)
         .maybeSingle(),
@@ -725,6 +725,36 @@ export class ProgramacionService {
       feedersByMatchNo: feeders,
       matrixFap: matrixFap ?? undefined,
     });
+
+    const grupoId = torneo.grupo_id ? String(torneo.grupo_id) : "";
+    if (grupoId) {
+      const {
+        cargarMetaEvento,
+        cargarPartidosProgramablesEvento,
+        issuesCruzadosEvento,
+      } = await import("../utils/programacionEvento");
+      const meta = await cargarMetaEvento(grupoId);
+      const partidosEvento = await cargarPartidosProgramablesEvento(grupoId);
+      const duracionMap = new Map(
+        meta.torneos.map((t) => [
+          t.id,
+          Number(t.duracion_partido_minutos || duracion),
+        ]),
+      );
+      const cruzados = await issuesCruzadosEvento(partidosEvento, duracionMap);
+      const idsLocales = new Set(partidos.map((p) => p.id));
+      const seenIssues = new Set(
+        issues.map((i) => `${i.partido_id}|${i.message}`),
+      );
+      for (const i of cruzados) {
+        if (!idsLocales.has(i.partido_id)) continue;
+        const k = `${i.partido_id}|${i.message}`;
+        if (!seenIssues.has(k)) {
+          seenIssues.add(k);
+          issues.push(i);
+        }
+      }
+    }
 
     const asignados = partidos.filter((p) => p.assigned).length;
     const pendientes = partidos.length - asignados;

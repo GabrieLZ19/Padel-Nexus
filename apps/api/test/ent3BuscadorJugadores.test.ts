@@ -17,7 +17,7 @@ function fuente(relativo: string): string {
 function cuerpoObtenerLicencias(src: string): string {
   const inicio = src.indexOf("static async obtenerLicencias");
   assert.ok(inicio >= 0);
-  const fin = src.indexOf("static async resumenDesdeTablaLicencias", inicio);
+  const fin = src.indexOf("private static parseResumenLicenciasRpc", inicio);
   assert.ok(fin > inicio);
   return src.slice(inicio, fin);
 }
@@ -52,7 +52,8 @@ describe("ENT-3 buscador jugadores federación/superadmin", () => {
     const licencias = fuente("apps/api/src/services/licencia.service.ts");
     const bloque = cuerpoObtenerLicencias(licencias);
     assert.match(bloque, /terminoIlikePostgrest/);
-    assert.match(bloque, /orBusquedaJugadoresLicencias/);
+    assert.match(bloque, /orBusquedaTokenJugadoresLicencias/);
+    assert.match(bloque, /tokenizarBusquedaJugadores/);
     assert.match(bloque, /usuarioIdsPorBusquedaNroLicencia/);
     assert.doesNotMatch(bloque, /const term = `%/);
   });

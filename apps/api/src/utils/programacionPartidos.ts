@@ -1764,6 +1764,7 @@ export async function programarLlaveInicialTrasZonasFap(
   partidosZona: PartidoProgramable[],
   playoffPartidos: PartidoProgramable[],
   feedersByMatchNo: Map<number, number[]>,
+  opciones?: { ocupadosSemilla?: Set<string> },
 ): Promise<void> {
   if (!playoffPartidos.length) return;
 
@@ -1809,6 +1810,9 @@ export async function programarLlaveInicialTrasZonasFap(
     duracionMinutos: durLlave,
   });
   const ocupados = buildOcupadosDesdePartidos(partidosZona);
+  if (opciones?.ocupadosSemilla) {
+    for (const k of opciones.ocupadosSemilla) ocupados.add(k);
+  }
   const fechaInicio =
     contexto.fecha ?? (torneo?.fecha ? String(torneo.fecha) : null);
   const alcanceTorneo = torneo?.alcance ?? null;
@@ -2204,7 +2208,12 @@ export async function programarPartidosZonaPendientes(
     )
     .eq("torneo_id", torneoId);
 
-  const ocupados = buildOcupadosDesdePartidos(todos || []);
+  const { mergeOcupadosSemilla, ocupadosSemillaEventoParaTorneo } =
+    await import("./programacionEvento");
+  const ocupados = mergeOcupadosSemilla(
+    buildOcupadosDesdePartidos(todos || []),
+    await ocupadosSemillaEventoParaTorneo(torneoId),
+  );
   const drafts: PartidoProgramable[] = (todos || []).map((p) => ({ ...p }));
 
   const { data: torneo } = await supabaseAdmin

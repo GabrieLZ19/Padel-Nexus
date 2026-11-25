@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "../config/supabase";
 import {
   buildCanchaLabel,
+  buildOcupadosDesdePartidos,
   equiposDePartido,
   parseFechaPartidoIso,
   type DisponibilidadTorneo,
@@ -96,6 +97,39 @@ export async function cargarMetaEvento(
     evento_nombre: grupo?.nombre ? String(grupo.nombre) : null,
     torneos: torneos as TorneoEnEvento[],
   };
+}
+
+/** Slots ya ocupados por otras categorías del mismo evento (para auto-asignar / generar cuadros). */
+export async function ocupadosSemillaEventoParaTorneo(
+  torneoId: string,
+): Promise<Set<string>> {
+  const { data: torneo } = await supabaseAdmin
+    .from("torneos")
+    .select("grupo_id")
+    .eq("id", torneoId)
+    .maybeSingle();
+  const grupoId = torneo?.grupo_id ? String(torneo.grupo_id) : "";
+  if (!grupoId) return new Set();
+
+  const partidos = await cargarPartidosProgramablesEvento(grupoId);
+  const otros = partidos.filter(
+    (p) =>
+      String(p.torneo_id) !== String(torneoId) &&
+      p.cancha_asignada &&
+      p.fecha_partido,
+  );
+  return buildOcupadosDesdePartidos(otros);
+}
+
+export function mergeOcupadosSemilla(
+  ...sets: Array<Set<string> | undefined | null>
+): Set<string> {
+  const out = new Set<string>();
+  for (const s of sets) {
+    if (!s) continue;
+    for (const k of s) out.add(k);
+  }
+  return out;
 }
 
 export async function cargarPartidosProgramablesEvento(

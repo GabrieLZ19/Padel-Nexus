@@ -19,13 +19,12 @@ import {
   validarPagoMercadoPagoAprobado,
 } from "../utils/validarPagoMercadoPago";
 import { esRolAccesoCrm } from "../constants/roles";
-import { resumirLicenciasPorJugador } from "../utils/resumenLicencias";
+import type { ResumenLicencias } from "../utils/resumenLicencias";
 import { fechaLatina } from "../utils/fechaArgentina";
 import { enmascararDni } from "../utils/enmascararDni";
 import {
   aplicarEstadoEfectivoLicencia,
   estadoEfectivoLicencia,
-  jugadorCoincideEstadoLicencia,
   normalizarEstadoAlmacenadoLicencia,
   reconciliarEstadoAlmacenadoConVencimiento,
   normalizarPerfilLicencias,
@@ -38,9 +37,10 @@ import {
 } from "../utils/verificacionLicenciaPublica";
 import { fechaHoyArgentina } from "../utils/fechaArgentina";
 import {
-  orBusquedaJugadoresLicencias,
+  orBusquedaTokenJugadoresLicencias,
   patronIlikeSql,
   terminoIlikePostgrest,
+  tokenizarBusquedaJugadores,
 } from "../utils/postgrestBusqueda";
 import {
   montoLicenciaDesdeSolicitud,
@@ -190,93 +190,78 @@ export class LicenciaService {
       query = query.eq("licencias.estado", estado);
     }
 
-    if (search?.trim()) {
-      const quoted = terminoIlikePostgrest(search);
-      const idsNro = await usuarioIdsPorBusquedaNroLicencia(search);
-      query = query.or(orBusquedaJugadoresLicencias(quoted, idsNro));
+    const tokensBusqueda = search?.trim()
+      ? tokenizarBusquedaJugadores(search)
+      : [];
+    if (tokensBusqueda.length > 0) {
+      for (const token of tokensBusqueda) {
+        const quoted = terminoIlikePostgrest(token);
+        const idsNro = await usuarioIdsPorBusquedaNroLicencia(token);
+        query = query.or(
+          orBusquedaTokenJugadoresLicencias(quoted, idsNro),
+        );
+      }
     }
 
-    // Filtro DB seguro: solo por lugar_residencia del perfil.
-    // El match por asociacion_id se refuerza en memoria (PostgREST no
-    // permite bien or() mezclando columna de padre + hija embebida).
     if (alcanceProvincial) {
-      // Traemos un lote amplio y paginamos en memoria tras el refuerzo
-      // (acentos + asociacion_id). Volúmenes provinciales son chicos.
-      query = query.ilike(
-        "lugar_residencia",
-        `%${alcanceProvincial.provincia}%`,
+      const { data: paginaRaw, error: errPagina } = await supabaseAdmin.rpc(
+        "licencias_perfiles_ids_paginados",
+        {
+          p_offset: from,
+          p_limit: limit,
+          p_hoy: hoyArgentina,
+          p_tokens: tokensBusqueda.length ? tokensBusqueda : null,
+          p_estado: estado || null,
+          p_provincia: alcanceProvincial.provincia,
+          p_asociacion_id: alcanceProvincial.asociacionId,
+        },
       );
+      if (errPagina) {
+        console.error("Error paginando licencias (provincial):", errPagina);
+        throw new Error(errPagina.message || "Error al listar licencias");
+      }
+
+      const pagina = (paginaRaw || {}) as { ids?: string[]; total?: number };
+      const ids = Array.isArray(pagina.ids) ? pagina.ids.map(String) : [];
+      const total = Number(pagina.total || 0);
+
+      type FilaPerfilLicencias = {
+        id: string;
+        created_at?: string;
+        [key: string]: unknown;
+      };
+      let rows: FilaPerfilLicencias[] = [];
+      if (ids.length > 0) {
+        const { data: filas, error: errFilas } = await supabaseAdmin
+          .from("perfiles")
+          .select(
+            "*, licencias:licencias!fk_licencias_usuario!inner(*), afiliaciones:afiliaciones!fk_afiliaciones_usuario(id, entidad, estado, fecha_vencimiento)",
+          )
+          .in("id", ids);
+        if (errFilas) {
+          throw new Error(errFilas.message || "Error al listar licencias");
+        }
+        const orden = new Map(ids.map((id, idx) => [id, idx]));
+        rows = (filas || []).sort(
+          (a, b) => (orden.get(a.id) ?? 0) - (orden.get(b.id) ?? 0),
+        );
+      }
+
+      const data = rows.map((perfil) => normalizarPerfilLicencias(perfil));
+      const resumen = await LicenciaService.resumenEstados(
+        search,
+        alcanceProvincial,
+      );
+      return { data, total, resumen };
     }
 
-    const rangeTo = alcanceProvincial ? 499 : to;
-    const rangeFrom = alcanceProvincial ? 0 : from;
-
-    const { data, error, count } = await query.range(rangeFrom, rangeTo);
+    const { data, error, count } = await query.range(from, to);
     if (error) {
       console.error("🔴 Error al obtener licencias por perfil:", error);
       throw new Error(error.message || "Error al listar licencias");
     }
 
-    let rows = data || [];
-
-    if (alcanceProvincial) {
-      const target = normalizarTexto(alcanceProvincial.provincia);
-      const asocId = alcanceProvincial.asociacionId;
-
-      if (asocId) {
-        const { data: extra } = await supabaseAdmin
-          .from("perfiles")
-          .select(
-            "*, licencias:licencias!fk_licencias_usuario!inner(*), afiliaciones:afiliaciones!fk_afiliaciones_usuario(id, entidad, estado, fecha_vencimiento)",
-          )
-          .eq("licencias.asociacion_id", asocId)
-          .order("created_at", { ascending: false })
-          .range(0, 499);
-
-        const byId = new Map<string, (typeof rows)[number]>();
-        for (const r of rows) byId.set(r.id, r);
-        for (const r of extra || []) byId.set(r.id, r);
-        rows = [...byId.values()];
-      }
-
-      rows = rows.filter((perfil) => {
-        const licencias = Array.isArray(perfil.licencias)
-          ? perfil.licencias
-          : perfil.licencias
-            ? [perfil.licencias]
-            : [];
-        if (
-          asocId &&
-          licencias.some(
-            (l: { asociacion_id?: string | null }) =>
-              l.asociacion_id === asocId,
-          )
-        ) {
-          return true;
-        }
-        return normalizarTexto(perfil.lugar_residencia) === target;
-      });
-
-      if (estado) {
-        rows = rows.filter((perfil) =>
-          jugadorCoincideEstadoLicencia(
-            normalizarPerfilLicencias(perfil),
-            estado,
-          ),
-        );
-      }
-
-      rows = rows.map((perfil) => normalizarPerfilLicencias(perfil));
-
-      const total = rows.length;
-      const resumen = await LicenciaService.resumenEstados(
-        search,
-        alcanceProvincial,
-      );
-      return { data: rows.slice(from, to + 1), total, resumen };
-    }
-
-    rows = rows.map((perfil) => normalizarPerfilLicencias(perfil));
+    const rows = (data || []).map((perfil) => normalizarPerfilLicencias(perfil));
 
     const resumen = await LicenciaService.resumenEstados(search, null);
     return {
@@ -286,46 +271,20 @@ export class LicenciaService {
     };
   }
 
-  /**
-   * Cuenta jugadores por estado leyendo solo la tabla de licencias.
-   * Evita recorrer todo el padrón de perfiles en cada apertura del tablero.
-   */
-  private static async resumenDesdeTablaLicencias() {
-    const porJugador = new Map<
-      string,
-      { estado?: string | null; fecha_vencimiento?: string | null }[]
-    >();
-    const pageSize = 1000;
-    for (let from = 0; ; from += pageSize) {
-      const { data, error } = await supabaseAdmin
-        .from("licencias")
-        .select("usuario_id, estado, fecha_vencimiento")
-        .range(from, from + pageSize - 1);
-      if (error) throw new Error(error.message || "Error al resumir licencias");
-      for (const row of data || []) {
-        const id = String(row.usuario_id || "");
-        if (!id) continue;
-        const lista = porJugador.get(id) || [];
-        const efectivo = aplicarEstadoEfectivoLicencia({
-          estado: row.estado as string | null,
-          fecha_vencimiento: row.fecha_vencimiento as string | null,
-        });
-        lista.push({
-          estado: efectivo.estado,
-          fecha_vencimiento: row.fecha_vencimiento as string | null,
-        });
-        porJugador.set(id, lista);
-      }
-      if (!data || data.length < pageSize) break;
-    }
-    return resumirLicenciasPorJugador(
-      [...porJugador.values()].map((licencias) => ({ licencias })),
-    );
+  private static parseResumenLicenciasRpc(raw: unknown): ResumenLicencias {
+    const row = (raw || {}) as Record<string, unknown>;
+    return {
+      total: Number(row.total || 0),
+      pendientes: Number(row.pendientes || 0),
+      vigentes: Number(row.vigentes || 0),
+      vencidas: Number(row.vencidas || 0),
+      suspendidas: Number(row.suspendidas || 0),
+      otros: Number(row.otros || 0),
+    };
   }
 
   /**
-   * Cuenta jugadores por estado de licencia en todo el alcance, sin paginar
-   * y sin el filtro de una pestaña. Es la misma cifra que muestra el listado.
+   * Cuenta jugadores por estado de licencia en el alcance (agregación en DB).
    */
   private static async resumenEstados(
     search: string | undefined,
@@ -334,76 +293,18 @@ export class LicenciaService {
       provincia: string;
     } | null,
   ) {
-    if (!search?.trim() && !alcanceProvincial) {
-      return LicenciaService.resumenDesdeTablaLicencias();
+    const tokens =
+      search?.trim() ? tokenizarBusquedaJugadores(search) : [];
+    const { data, error } = await supabaseAdmin.rpc("licencias_resumen_jugadores", {
+      p_hoy: fechaHoyArgentina(),
+      p_tokens: tokens.length ? tokens : null,
+      p_provincia: alcanceProvincial?.provincia || null,
+      p_asociacion_id: alcanceProvincial?.asociacionId || null,
+    });
+    if (error) {
+      throw new Error(error.message || "Error al resumir licencias");
     }
-
-    const select =
-      "id, lugar_residencia, licencias:licencias!fk_licencias_usuario!inner(estado, asociacion_id, fecha_vencimiento)";
-
-    const filas: Array<{
-      id: string;
-      lugar_residencia?: string | null;
-      licencias?:
-        | { estado?: string | null; asociacion_id?: string | null }
-        | { estado?: string | null; asociacion_id?: string | null }[];
-    }> = [];
-    const idsNro =
-      search?.trim() ?
-        await usuarioIdsPorBusquedaNroLicencia(search)
-      : [];
-
-    const pageSize = 1000;
-    for (let from = 0; ; from += pageSize) {
-      let query = supabaseAdmin.from("perfiles").select(select);
-      if (search?.trim()) {
-        const quoted = terminoIlikePostgrest(search);
-        query = query.or(orBusquedaJugadoresLicencias(quoted, idsNro));
-      }
-      if (alcanceProvincial) {
-        query = query.ilike(
-          "lugar_residencia",
-          `%${alcanceProvincial.provincia}%`,
-        );
-      }
-      const { data, error } = await query.range(from, from + pageSize - 1);
-      if (error) throw new Error(error.message || "Error al resumir licencias");
-      filas.push(...(data || []));
-      if (!data || data.length < pageSize) break;
-    }
-
-    let rows = filas;
-    if (alcanceProvincial) {
-      const target = normalizarTexto(alcanceProvincial.provincia);
-      const asocId = alcanceProvincial.asociacionId;
-      if (asocId) {
-        const { data: extra, error } = await supabaseAdmin
-          .from("perfiles")
-          .select(select)
-          .eq("licencias.asociacion_id", asocId);
-        if (error) throw new Error(error.message || "Error al resumir licencias");
-        const byId = new Map(rows.map((row) => [row.id, row]));
-        for (const row of extra || []) byId.set(row.id, row);
-        rows = [...byId.values()];
-      }
-
-      rows = rows.filter((perfil) => {
-        const licencias = Array.isArray(perfil.licencias)
-          ? perfil.licencias
-          : perfil.licencias
-            ? [perfil.licencias]
-            : [];
-        if (
-          asocId &&
-          licencias.some((licencia) => licencia.asociacion_id === asocId)
-        ) {
-          return true;
-        }
-        return normalizarTexto(perfil.lugar_residencia) === target;
-      });
-    }
-
-    return resumirLicenciasPorJugador(rows);
+    return LicenciaService.parseResumenLicenciasRpc(data);
   }
 
   /**

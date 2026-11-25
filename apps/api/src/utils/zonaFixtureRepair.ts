@@ -257,7 +257,12 @@ export async function completarPartidosFaltantesDeGrupo(
     .select("cancha_asignada, fecha_partido")
     .eq("torneo_id", torneoId);
 
-  const ocupados = buildOcupadosDesdePartidos(partidosProgramados || []);
+  const { mergeOcupadosSemilla, ocupadosSemillaEventoParaTorneo } =
+    await import("./programacionEvento");
+  const ocupados = mergeOcupadosSemilla(
+    buildOcupadosDesdePartidos(partidosProgramados || []),
+    await ocupadosSemillaEventoParaTorneo(torneoId),
+  );
   await programarPartidosConDisponibilidad(torneoId, conHorario, { ocupados });
   const { error } = await supabaseAdmin.from("partidos").insert(conHorario);
   if (error) throw new Error(error.message);
