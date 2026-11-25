@@ -155,3 +155,47 @@ export function armarGruposTorneo<T extends TorneoAgrupable>(
     return { id: info.id, nombre: info.nombre, ramas };
   });
 }
+
+export interface TorneoCategoriaEvento {
+  id: string;
+  nombre?: string | null;
+  nivel?: string | null;
+  categoria?: string | null;
+  rama?: string | null;
+  estado?: string | null;
+  es_prueba?: boolean | null;
+}
+
+/** Etiqueta corta para selector CLI-5 (nivel + rama). */
+export function etiquetaCategoriaEventoTorneo(torneo: {
+  nombre?: string | null;
+  nivel?: string | null;
+  categoria?: string | null;
+  rama?: string | null;
+}): string {
+  const nivel = String(torneo.nivel || "").trim();
+  const rama = ramaCorta(torneo.rama);
+  if (nivel && rama) return `${nivel} ${rama}`;
+  if (nivel) return nivel;
+  const desdeNombre = nombreBaseTorneo(
+    torneo.nombre,
+    torneo.nivel,
+    torneo.rama,
+  );
+  if (desdeNombre && desdeNombre !== (torneo.nombre || "").trim()) {
+    return desdeNombre;
+  }
+  return String(torneo.nombre || torneo.categoria || "Categoría").trim();
+}
+
+export function ordenarTorneosCategoriaEvento<T extends TorneoCategoriaEvento>(
+  torneos: T[],
+): T[] {
+  return [...torneos].sort((a, b) => {
+    const porRama = ordenRama(a.rama) - ordenRama(b.rama);
+    if (porRama !== 0) return porRama;
+    const porNivel = ordenNivel(b.nivel) - ordenNivel(a.nivel);
+    if (porNivel !== 0) return porNivel;
+    return String(a.nombre || "").localeCompare(String(b.nombre || ""), "es");
+  });
+}

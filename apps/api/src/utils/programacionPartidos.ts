@@ -182,7 +182,7 @@ function wallClockParts(
   };
 }
 
-function parseFechaPartidoIso(
+export function parseFechaPartidoIso(
   iso: string,
 ): { fecha: string; startMin: number } | null {
   try {
@@ -559,7 +559,7 @@ export function parejaPuedeJugarEnSlot(
   return true;
 }
 
-function equiposDePartido(p: PartidoProgramable): string[] {
+export function equiposDePartido(p: PartidoProgramable): string[] {
   const ids: string[] = [];
   if (p.equipo_a_id) ids.push(String(p.equipo_a_id));
   if (p.equipo_b_id) ids.push(String(p.equipo_b_id));

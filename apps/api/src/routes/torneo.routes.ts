@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   getAllTorneos,
   getTorneoById,
+  getCategoriasEventoTorneo,
   createTorneo,
   agruparTorneos,
   replicarTorneo,
@@ -63,13 +64,75 @@ import {
   persistirConfigProgramacion,
   nuevaEdicionProgramacion,
 } from "../controllers/programacion.controller";
+import {
+  asignarEventoProgramacion,
+  autoAsignarEventoProgramacion,
+  desasignarEventoProgramacion,
+  getEventoProgramacionBoard,
+  limpiarEventoProgramacion,
+  publicarEventoProgramacion,
+  resolverGrupoProgramacionPorTorneo,
+} from "../controllers/programacionEvento.controller";
 import { authenticate, authorize, optionalAuthenticate } from "../middleware/auth";
 
+const PROGRAMACION_ROLES = [
+  "superadmin",
+  "admin_federacion",
+  "admin_provincial",
+  "admin_club",
+  "admin",
+] as const;
+
 const router = Router();
+
+// Programador maestro por evento (grupo de torneos) — antes de /:id
+router.get(
+  "/grupos/:grupoId/programacion/board",
+  authenticate,
+  authorize([...PROGRAMACION_ROLES]),
+  getEventoProgramacionBoard,
+);
+router.put(
+  "/grupos/:grupoId/programacion/asignar",
+  authenticate,
+  authorize([...PROGRAMACION_ROLES]),
+  asignarEventoProgramacion,
+);
+router.put(
+  "/grupos/:grupoId/programacion/desasignar",
+  authenticate,
+  authorize([...PROGRAMACION_ROLES]),
+  desasignarEventoProgramacion,
+);
+router.post(
+  "/grupos/:grupoId/programacion/limpiar",
+  authenticate,
+  authorize([...PROGRAMACION_ROLES]),
+  limpiarEventoProgramacion,
+);
+router.post(
+  "/grupos/:grupoId/programacion/auto",
+  authenticate,
+  authorize([...PROGRAMACION_ROLES]),
+  autoAsignarEventoProgramacion,
+);
+router.post(
+  "/grupos/:grupoId/programacion/publicar",
+  authenticate,
+  authorize([...PROGRAMACION_ROLES]),
+  publicarEventoProgramacion,
+);
+router.get(
+  "/:torneoId/programacion/grupo",
+  authenticate,
+  authorize([...PROGRAMACION_ROLES]),
+  resolverGrupoProgramacionPorTorneo,
+);
 
 // Lectura pública; si hay sesión de club, el listado se acota a su club_id
 router.get("/", optionalAuthenticate, getAllTorneos);
 router.get("/:id", optionalAuthenticate, getTorneoById);
+router.get("/:id/categorias-evento", optionalAuthenticate, getCategoriasEventoTorneo);
 router.get("/:id/partidos", optionalAuthenticate, getPartidosByTorneo);
 router.get("/:id/posiciones", obtenerPosicionesZona);
 router.get("/:id/zonas", getZonasByTorneo);

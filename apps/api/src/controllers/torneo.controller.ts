@@ -169,6 +169,31 @@ export const getAllTorneos = async (
   }
 };
 
+export const getCategoriasEventoTorneo = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const torneoId = req.params.id;
+    const data = await TorneoService.obtenerPorId(torneoId);
+    const torneoEsPrueba = esTorneoDePrueba(data);
+    const esCrm = esRolAccesoCrm(req.user?.rol);
+    let inscripto = false;
+    if (!esCrm && torneoEsPrueba && req.user?.id) {
+      inscripto = await jugadorInscriptoEnTorneo(torneoId, req.user.id);
+    }
+    if (!puedeVerTorneoFueraDelSitioPublico(esCrm, torneoEsPrueba, inscripto)) {
+      return res.status(404).json({ message: "Torneo no encontrado." });
+    }
+    const listado = await TorneoService.listarCategoriasEvento(torneoId, {
+      ocultarPrueba: !esCrm,
+    });
+    return res.status(200).json(listado);
+  } catch {
+    return res.status(404).json({ message: "Torneo no encontrado" });
+  }
+};
+
 export const getTorneoById = async (
   req: Request,
   res: Response,

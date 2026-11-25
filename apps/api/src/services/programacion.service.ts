@@ -791,7 +791,7 @@ export class ProgramacionService {
     const { data: torneo } = await supabaseAdmin
       .from("torneos")
       .select(
-        "id, programacion_estado, duracion_partido_minutos, descanso_modo, fecha",
+        "id, programacion_estado, duracion_partido_minutos, descanso_modo, fecha, grupo_id",
       )
       .eq("id", torneoId)
       .maybeSingle();
@@ -817,6 +817,18 @@ export class ProgramacionService {
     const fechaIso = String(payload.fecha_iso || "").trim();
     if (!cancha || !fechaIso) {
       throw new Error("cancha_label y fecha_iso son obligatorios");
+    }
+
+    if (torneo.grupo_id) {
+      const { validarAsignacionEnEvento } = await import("../utils/programacionEvento");
+      const eventoError = await validarAsignacionEnEvento(
+        String(torneo.grupo_id),
+        payload.partido_id,
+        cancha,
+        fechaIso,
+        torneoId,
+      );
+      if (eventoError) throw new Error(eventoError);
     }
 
     const { data: todosPartidosDb } = await supabaseAdmin
@@ -1204,6 +1216,7 @@ export class ProgramacionService {
       franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
       motivo?: string;
       adminId?: string;
+      ocupadosSemilla?: Set<string>;
     } = {},
   ): Promise<ProgramacionBoard> {
     const { data: torneo } = await supabaseAdmin
@@ -1259,6 +1272,9 @@ export class ProgramacionService {
     const ocupados = buildOcupadosDesdePartidos(
       drafts.filter((d) => d.cancha_asignada && d.fecha_partido),
     );
+    if (opciones.ocupadosSemilla) {
+      for (const key of opciones.ocupadosSemilla) ocupados.add(key);
+    }
 
     const zonasDrafts = drafts.filter((d) =>
       /^ZONA\s+/i.test(String(d.ronda || "")),

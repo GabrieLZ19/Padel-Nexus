@@ -27,8 +27,10 @@ import {
 } from "../utils/playoffAvance";
 import {
   armarGruposTorneo,
+  etiquetaCategoriaEventoTorneo,
   nombreBaseTorneo,
   nombreTorneoReplicado,
+  ordenarTorneosCategoriaEvento,
 } from "../utils/gruposTorneo";
 import { resolverReglamentoPersistido } from "../utils/reglamentoTorneo";
 import { debeDescalificarPorWoDeZona } from "../utils/walkoverZona";
@@ -944,6 +946,82 @@ export class TorneoService {
 
     if (error || !data) throw new Error("Torneo no encontrado.");
     return TorneoService.evaluateDynamicState(data);
+  }
+
+  static async listarCategoriasEvento(
+    id: string,
+    opciones?: { ocultarPrueba?: boolean },
+  ) {
+    const { data: actual, error } = await supabaseAdmin
+      .from("torneos")
+      .select(
+        "id, grupo_id, nombre, nivel, categoria, rama, estado, es_prueba",
+      )
+      .eq("id", id)
+      .single();
+
+    if (error || !actual) throw new Error("Torneo no encontrado.");
+
+    const mapFila = (
+      fila: {
+        id: string;
+        nombre?: string | null;
+        nivel?: string | null;
+        categoria?: string | null;
+        rama?: string | null;
+        estado?: string | null;
+        es_prueba?: boolean | null;
+      },
+      actualId: string,
+    ) => ({
+      id: fila.id,
+      etiqueta: etiquetaCategoriaEventoTorneo(fila),
+      nivel: fila.nivel ?? null,
+      rama: fila.rama ?? null,
+      estado: fila.estado ?? null,
+      actual: fila.id === actualId,
+    });
+
+    if (!actual.grupo_id) {
+      return {
+        evento_id: null as string | null,
+        evento_nombre: null as string | null,
+        torneo_actual_id: actual.id,
+        categorias: [mapFila(actual, actual.id)],
+      };
+    }
+
+    const { data: hermanos, error: hermanosError } = await supabaseAdmin
+      .from("torneos")
+      .select("id, nombre, nivel, categoria, rama, estado, es_prueba")
+      .eq("grupo_id", actual.grupo_id);
+
+    if (hermanosError) {
+      throw new Error(hermanosError.message);
+    }
+
+    let lista = hermanos || [];
+    if (opciones?.ocultarPrueba) {
+      lista = lista.filter((fila) => !fila.es_prueba);
+    }
+    if (!lista.some((fila) => fila.id === actual.id)) {
+      lista = [...lista, actual];
+    }
+
+    const { data: grupo } = await supabaseAdmin
+      .from("grupos_torneo")
+      .select("id, nombre")
+      .eq("id", actual.grupo_id)
+      .maybeSingle();
+
+    return {
+      evento_id: String(actual.grupo_id),
+      evento_nombre: grupo?.nombre ? String(grupo.nombre) : null,
+      torneo_actual_id: actual.id,
+      categorias: ordenarTorneosCategoriaEvento(lista).map((fila) =>
+        mapFila(fila, actual.id),
+      ),
+    };
   }
 
 
