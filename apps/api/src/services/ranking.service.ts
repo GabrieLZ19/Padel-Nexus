@@ -34,6 +34,7 @@ import {
   type TorneoContextoMin,
 } from "../utils/rankingContextoJugador";
 import { FAP_ESTADOS_PAGO } from "../constants/fap";
+import { sanitizarPerfilRankingPublico } from "../utils/rankingRespuestaPublica";
 
 export interface ActualizarPuntosDTO {
   usuarioId: string;
@@ -451,10 +452,9 @@ export class RankingService {
     }
 
     return uniqueData.map((jugador, index) => {
-      const perfilObj = { ...(jugador.perfiles || {}) };
-      delete perfilObj.email;
-      delete perfilObj.es_prueba;
-      delete perfilObj.rol;
+      const perfilObj = sanitizarPerfilRankingPublico({
+        ...((jugador.perfiles || {}) as Record<string, unknown>),
+      });
       const clubInfo = afiliacionesMap[jugador.usuario_id] || null;
       const provinciaRanking = provinciaParaRanking(
         String(perfilObj.lugar_residencia || ""),
@@ -825,6 +825,9 @@ export class RankingService {
     return filas.slice(0, limit).map((row, index) => ({
       ...row,
       posicion_actual: index + 1,
+      perfiles: sanitizarPerfilRankingPublico(
+        (row.perfiles || {}) as Record<string, unknown>,
+      ),
     }));
   }
 

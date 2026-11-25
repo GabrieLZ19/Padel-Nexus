@@ -5,6 +5,7 @@ import {
   verifyMercadoPagoWebhookSignature,
 } from "../config/mercadopago";
 import { InscripcionService } from "../services/inscripcion.service";
+import { assertJugador1EsUsuarioSesion } from "../utils/inscripcionAutorizacion";
 import { acreditarPagoMercadoPago } from "../services/mercadopagoWebhook.service";
 import type { FilaPlanillaInscripcion } from "../utils/inscripcionPlanilla";
 import { AlcanceCuentaService } from "../services/alcanceCuenta.service";
@@ -85,7 +86,7 @@ export const createInscripcion = async (
   try {
     const {
       torneo_id,
-      usuario_id, // Temporal hasta tener JWT
+      usuario_id: usuarioIdBody,
       jugador1_nombre,
       jugador2_nombre,
       usuario2_email,
@@ -93,17 +94,30 @@ export const createInscripcion = async (
       letraPrioridad,
     } = req.body;
 
-    // Idealmente sacar el ID del usuario del token de autenticación: req.user.id
-    const usuarioSolicitanteId = usuario_id;
+    const usuarioSesionId = req.user?.id;
+    if (!usuarioSesionId) {
+      return res.status(401).json({ message: "No autorizado." });
+    }
 
-    if (!torneo_id || !usuarioSolicitanteId) {
+    if (!torneo_id) {
       return res.status(400).json({ message: "Faltan datos obligatorios." });
+    }
+
+    try {
+      assertJugador1EsUsuarioSesion(usuarioSesionId, usuarioIdBody);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Error desconocido";
+      return res.status(403).json({
+        message: "No se pudo procesar la inscripción.",
+        error: message,
+      });
     }
 
     const nuevaInscripcion = await InscripcionService.registrarInscripcion({
       torneoId: torneo_id,
-      usuarioSolicitanteId,
-      jugador1Id: usuarioSolicitanteId, // Asumimos que el que se anota es el J1
+      usuarioSolicitanteId: usuarioSesionId,
+      jugador1Id: usuarioSesionId,
       jugador2Email: usuario2_email,
       jugador1Nombre: jugador1_nombre,
       jugador2Nombre: jugador2_nombre,
@@ -116,7 +130,6 @@ export const createInscripcion = async (
     const message =
       error instanceof Error ? error.message : "Error desconocido";
 
-    // Devolvemos 400 (Bad Request) o 403 (Forbidden) en lugar de 500 para errores de validación de negocio.
     return res.status(400).json({
       message: "No se pudo procesar la inscripción.",
       error: message,
@@ -131,21 +144,35 @@ export const updateEstadoPago = async (
   try {
     const { id } = req.params;
     const { estado_pago } = req.body;
+    const usuarioId = req.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ message: "No autorizado." });
+    }
 
     if (!estado_pago)
       return res
         .status(400)
         .json({ message: "Debe enviar un estado de pago válido." });
 
-    const data = await InscripcionService.actualizarEstadoPago(id, estado_pago);
+    const data = await InscripcionService.actualizarEstadoPago(
+      id,
+      estado_pago,
+      { id: usuarioId, rol: req.user?.rol },
+    );
 
     return res.status(200).json(data);
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";
-    return res
-      .status(500)
-      .json({ message: "Error al actualizar estado", error: message });
+    const status = message.includes("no encontrada")
+      ? 404
+      : message.includes("No tenés permiso")
+        ? 403
+        : 500;
+    return res.status(status).json({
+      message: "Error al actualizar estado",
+      error: message,
+    });
   }
 };
 
@@ -155,8 +182,15 @@ export const deleteInscripcion = async (
 ): Promise<Response | void> => {
   try {
     const { id } = req.params;
+    const usuarioId = req.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ message: "No autorizado." });
+    }
 
-    await InscripcionService.cancelarInscripcion(id);
+    await InscripcionService.cancelarInscripcion(id, {
+      id: usuarioId,
+      rol: req.user?.rol,
+    });
 
     return res
       .status(200)
@@ -164,7 +198,11 @@ export const deleteInscripcion = async (
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";
-    const status = message.includes("no encontrada") ? 404 : 500;
+    const status = message.includes("no encontrada")
+      ? 404
+      : message.includes("No tenés permiso")
+        ? 403
+        : 500;
     return res.status(status).json({
       message: "Error al cancelar inscripción",
       error: message,

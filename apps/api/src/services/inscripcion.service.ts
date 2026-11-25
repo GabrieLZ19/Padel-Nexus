@@ -26,6 +26,10 @@ import {
   precioUnitarioDesdeMonto,
 } from "../utils/inscripcionMonto";
 import {
+  usuarioPuedeActualizarEstadoPagoInscripcion,
+  usuarioPuedeCancelarInscripcion,
+} from "../utils/inscripcionAutorizacion";
+import {
   assertCategoria,
   assertEdad,
   assertInscripcionAbierta,
@@ -745,7 +749,31 @@ export class InscripcionService {
     return inscripcionInsertada;
   }
 
-  static async actualizarEstadoPago(id: string, estadoPago: string) {
+  static async actualizarEstadoPago(
+    id: string,
+    estadoPago: string,
+    actor: { id: string; rol?: string | null },
+  ) {
+    const { data: existente, error: fetchError } = await supabaseAdmin
+      .from("inscripciones")
+      .select("torneo_id")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !existente) {
+      throw new Error("Inscripción no encontrada.");
+    }
+
+    const permitido = await usuarioPuedeActualizarEstadoPagoInscripcion(
+      actor,
+      existente.torneo_id as string,
+    );
+    if (!permitido) {
+      throw new Error(
+        "No tenés permiso para actualizar el pago de esta inscripción.",
+      );
+    }
+
     const { data, error } = await supabaseAdmin
       .from("inscripciones")
       .update({ estado_pago: estadoPago })
@@ -847,15 +875,27 @@ export class InscripcionService {
     }
   }
 
-  static async cancelarInscripcion(id: string) {
+  static async cancelarInscripcion(
+    id: string,
+    actor: { id: string; rol?: string | null },
+  ) {
     const { data: inscripcion, error: fetchError } = await supabaseAdmin
       .from("inscripciones")
-      .select("torneo_id")
+      .select("torneo_id, usuario_id, usuario2_id")
       .eq("id", id)
       .single();
 
     if (fetchError || !inscripcion)
       throw new Error("Inscripción no encontrada.");
+
+    const permitido = await usuarioPuedeCancelarInscripcion(actor, {
+      usuario_id: inscripcion.usuario_id as string | null,
+      usuario2_id: inscripcion.usuario2_id as string | null,
+      torneo_id: inscripcion.torneo_id as string,
+    });
+    if (!permitido) {
+      throw new Error("No tenés permiso para cancelar esta inscripción.");
+    }
 
     await PlatformFeeService.anularFeesPorInscripcion(id);
 

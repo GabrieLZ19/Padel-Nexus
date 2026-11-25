@@ -18,7 +18,7 @@ export class ProgramacionEventoService {
     const boards = await Promise.all(
       meta.torneos.map((t) => ProgramacionService.getBoard(t.id, opciones)),
     );
-    return mergeBoardsEvento(grupoId, meta, boards);
+    return await mergeBoardsEvento(grupoId, meta, boards);
   }
 
   static async asignar(

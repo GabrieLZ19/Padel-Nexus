@@ -137,6 +137,64 @@ export async function cargarPartidosProgramablesEvento(
   }));
 }
 
+/** Resuelve jugadores (usuario_id) de cada partido vía inscripciones del evento. */
+export async function mapaJugadoresUsuarioPorPartidoEvento(
+  partidosEvento: PartidoProgramable[],
+): Promise<Map<string, string[]>> {
+  const inscIds = new Set<string>();
+  for (const p of partidosEvento) {
+    for (const id of equiposDePartido(p)) inscIds.add(id);
+  }
+
+  const jugadoresPorInscripcion = new Map<string, string[]>();
+  if (inscIds.size > 0) {
+    const { data, error } = await supabaseAdmin
+      .from("inscripciones")
+      .select("id, usuario_id, usuario2_id")
+      .in("id", [...inscIds]);
+    if (error) throw new Error(error.message);
+    for (const row of data || []) {
+      const usuarios = [row.usuario_id, row.usuario2_id]
+        .filter((id): id is string => Boolean(id))
+        .map(String);
+      jugadoresPorInscripcion.set(String(row.id), usuarios);
+    }
+  }
+
+  const porPartido = new Map<string, string[]>();
+  for (const p of partidosEvento) {
+    const jugadores = new Set<string>();
+    for (const inscId of equiposDePartido(p)) {
+      const usuarios = jugadoresPorInscripcion.get(inscId);
+      if (usuarios?.length) {
+        for (const uid of usuarios) jugadores.add(uid);
+      }
+    }
+    porPartido.set(String(p.id), [...jugadores]);
+  }
+  return porPartido;
+}
+
+function jugadoresParaSolapeEvento(
+  partidoId: string,
+  partido: PartidoProgramable,
+  jugadoresPorPartido?: Map<string, string[]>,
+): string[] {
+  const desdeMapa = jugadoresPorPartido?.get(String(partidoId));
+  if (desdeMapa?.length) return desdeMapa;
+  return equiposDePartido(partido);
+}
+
+function duracionPartidoEvento(
+  partido: PartidoProgramable & { torneo_id?: string },
+  duracionFallback: number,
+  duracionPorTorneo?: Map<string, number>,
+): number {
+  const tid = String(partido.torneo_id || "");
+  const custom = tid ? duracionPorTorneo?.get(tid) : undefined;
+  return Math.max(30, custom ?? duracionFallback);
+}
+
 export function unionDisponibilidad(
   listas: DisponibilidadTorneo[][],
 ): DisponibilidadTorneo[] {
@@ -175,6 +233,8 @@ export function validarSolapesAgendaCompartida(
     duracionMinutos: number;
     descansoMinutos?: number;
     descansoModo?: ModoDescanso;
+    jugadoresPorPartido?: Map<string, string[]>;
+    duracionMinutosPorTorneo?: Map<string, number>;
   },
 ): string | null {
   const targetId = String(partidoId);
@@ -214,15 +274,39 @@ export function validarSolapesAgendaCompartida(
     }
 
     if (op.fecha !== tp.fecha) continue;
-    const equiposA = equiposDePartido(target);
-    const equiposB = equiposDePartido(p);
-    const common = equiposA.some((e) => equiposB.includes(e));
+    const jugadoresA = jugadoresParaSolapeEvento(
+      targetId,
+      target,
+      opciones.jugadoresPorPartido,
+    );
+    const jugadoresB = jugadoresParaSolapeEvento(
+      id,
+      p,
+      opciones.jugadoresPorPartido,
+    );
+    const common = jugadoresA.some((uid) => jugadoresB.includes(uid));
     if (!common) continue;
 
-    if (op.startMin === tp.startMin) {
+    const duracionOtro = duracionPartidoEvento(
+      p as PartidoProgramable & { torneo_id?: string },
+      duracion,
+      opciones.duracionMinutosPorTorneo,
+    );
+    const inicioA = tp.startMin;
+    const finA = tp.startMin + duracion;
+    const inicioB = op.startMin;
+    const finB = op.startMin + duracionOtro;
+
+    if (inicioA < finB && inicioB < finA) {
       return "Jugador con partidos simultáneos en otra categoría del evento";
     }
-    const gap = Math.abs(op.startMin - tp.startMin) - duracion;
+
+    const gap =
+      inicioB >= finA
+        ? inicioB - finA
+        : inicioA >= finB
+          ? inicioA - finB
+          : 0;
     if (gap < descanso) {
       return "Descanso insuficiente para un jugador inscripto en otra categoría";
     }
@@ -322,17 +406,19 @@ export function resolverCanchaIdDesdeLabel(
   return { cancha_id: row.cancha_id, club_id: row.club_id };
 }
 
-export function issuesCruzadosEvento(
-  partidosEvento: PartidoProgramable[],
+export async function issuesCruzadosEvento(
+  partidosEvento: Array<PartidoProgramable & { torneo_id?: string }>,
   duracionPorTorneo: Map<string, number>,
-): ProgramacionIssue[] {
+): Promise<ProgramacionIssue[]> {
   const issues: ProgramacionIssue[] = [];
+  const jugadoresPorPartido =
+    await mapaJugadoresUsuarioPorPartidoEvento(partidosEvento);
   const assigned = partidosEvento.filter(
     (p) => p.cancha_asignada && p.fecha_partido,
   );
   for (const p of assigned) {
     const id = String(p.id || "");
-    const torneoId = String((p as { torneo_id?: string }).torneo_id || "");
+    const torneoId = String(p.torneo_id || "");
     const duracion = duracionPorTorneo.get(torneoId) || 90;
     const parsed = parseFechaPartidoIso(String(p.fecha_partido));
     if (!parsed || !id) continue;
@@ -341,7 +427,12 @@ export function issuesCruzadosEvento(
       id,
       String(p.cancha_asignada),
       String(p.fecha_partido),
-      { duracionMinutos: duracion, descansoMinutos: 60 },
+      {
+        duracionMinutos: duracion,
+        descansoMinutos: 60,
+        jugadoresPorPartido,
+        duracionMinutosPorTorneo: duracionPorTorneo,
+      },
     );
     if (msg) {
       issues.push({ partido_id: id, severity: "bad", message: msg });
@@ -351,11 +442,11 @@ export function issuesCruzadosEvento(
   return issues;
 }
 
-export function mergeBoardsEvento(
+export async function mergeBoardsEvento(
   grupoId: string,
   meta: EventoProgramacionMeta,
   boards: ProgramacionBoard[],
-): ProgramacionBoardEvento {
+): Promise<ProgramacionBoardEvento> {
   const ref = boards[0];
   const diasSet = new Set<string>();
   const slotsMap = new Map<string, ProgramacionBoard["slots"][number]>();
@@ -403,7 +494,7 @@ export function mergeBoardsEvento(
     cancha_asignada: p.cancha_asignada,
     fecha_partido: p.fecha_partido,
   }));
-  const cruzados = issuesCruzadosEvento(progEvento, duracionMap);
+  const cruzados = await issuesCruzadosEvento(progEvento, duracionMap);
   const seen = new Set(issues.map((i) => `${i.partido_id}|${i.message}`));
   for (const i of cruzados) {
     const k = `${i.partido_id}|${i.message}`;
@@ -459,6 +550,14 @@ export async function validarAsignacionEnEvento(
   const descansoModo = esModoDescanso(torneo.descanso_modo)
     ? torneo.descanso_modo
     : "tras_fin_60";
+  const jugadoresPorPartido =
+    await mapaJugadoresUsuarioPorPartidoEvento(partidosEvento);
+  const duracionMinutosPorTorneo = new Map(
+    meta.torneos.map((t) => [
+      t.id,
+      Number(t.duracion_partido_minutos || 90),
+    ]),
+  );
 
   const solape = validarSolapesAgendaCompartida(
     partidosEvento,
@@ -469,6 +568,8 @@ export async function validarAsignacionEnEvento(
       duracionMinutos: duracion,
       descansoMinutos: minutosDeModoDescanso(descansoModo),
       descansoModo,
+      jugadoresPorPartido,
+      duracionMinutosPorTorneo,
     },
   );
   if (solape) return solape;
