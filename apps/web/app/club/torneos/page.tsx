@@ -690,7 +690,6 @@ export default function ClubTorneosPage() {
       <ReplicarTorneoModal
         isOpen={Boolean(replicarTorneo)}
         torneo={replicarTorneo}
-        modoClub
         onClose={() => setReplicarTorneo(null)}
         onSuccess={(n) => {
           loadData();

@@ -52,4 +52,53 @@ Regresión: `apps/api/test/ola3RankingSitioPublico.test.ts` y `apps/web/test/ola
 
 **Limpieza Supabase QA (pendiente confirmación de Héctor):** jugadores/torneos `QA Prueba` 18-11 y 24-11, sede `QA Prueba - Sede 18-11`, DNIs 990001xx / 990003xx / 99002401-432. **No ejecutar** sin OK explícito (no tocar torneos Alta Barda).
 
-**Siguiente en re-test 24/11:** Ola 4 — Marketplace y reservas (**MKT-2**).
+## Ola 4 — Marketplace y reservas (en curso)
+
+| Código | Estado | Tests |
+|--------|--------|-------|
+| MKT-2 | HECHO (código heredado 18/11 + regresión 24/11) | `mkt2VentasCobradas.test.ts` (util + tienda pública / producto / CRM) |
+| MKT-5 | HECHO | `mkt5MarketplaceMobileLayout.test.ts` |
+| MKT-6 | HECHO | `mkt6MarcaProducto.test.ts` |
+| MKT-7 | HECHO | `mkt7FacetasCatalogoPublico.test.ts` |
+| MKT-8 | HECHO (consulta + reactivación acordada) | `mkt8TiendasSuspendidasInventario.test.ts` + inventario abajo |
+
+### MKT-8 — Inventario Supabase (`marketplace_vendedores` + clubes, 24/11)
+
+**Resumen:** las **8** tiendas registradas están `suspendido`; **ninguna** `activo` → el catálogo público queda vacío salvo QA con tienda suspendida (productos activos no visibles por MKT-7).
+
+| Tienda | Estado tienda | Entidad | Club / Federación | Estado club | Prod. activos |
+|--------|---------------|---------|-------------------|-------------|---------------|
+| Federación Argentina de Pádel | suspendido | federacion | FAP | — | 1 |
+| New Center Store | suspendido | club | New Center | Inactivo | 1 |
+| La Plata Padel Market | suspendido | club | LA PLATA PADEL INDOOR | Inactivo | 0 |
+| QA Prueba Tienda | suspendido | club | QA Prueba Club | Inactivo | 1 |
+| Brujo del Padel / Enzo / Indumentaria Z / Whapy Test | suspendido | — (sin entidad) | — | — | 0–1 legacy |
+
+**Alta Barda (torneos Héctor):**
+
+| Club | Estado club | Tienda marketplace |
+|------|-------------|-------------------|
+| CLUB ALTA BARDA PADEL | **Activo** | Sin tienda |
+| Alta Barda Padel | Inactivo | Sin tienda |
+
+**Club La Plata Padel** (nombre del plan): Inactivo, **sin** fila en `marketplace_vendedores` (la tienda “La Plata” apunta a **LA PLATA PADEL INDOOR**, otro club).
+
+**Acción posible tras confirmación:** `POST /marketplace/admin/vendedores/:id/reactivar` (superadmin) y/o `UPDATE clubes.estado` si el club debe quedar Activo para operar fuera del marketplace.
+
+**Reactivación aplicada (24/11, con OK del equipo):**
+
+- Tienda **Federación Argentina de Pádel** (`ab74d086-…`) → `activo`.
+- Entidad FAP ya estaba `activo` en `federaciones`; sin cambio de club.
+- Verificación: 1 producto activo visible en catálogo bajo tienda activa con `entidad_id`.
+
+**Pendiente operativo:** 7 tiendas siguen `suspendido` (incl. New Center, La Plata, QA). Alta Barda no tiene tienda registrada.
+
+## Ola 4 — COMPLETADA
+
+## Ola 5 — Pedidos Héctor (post 28/11)
+
+| Código | Estado | Tests |
+|--------|--------|-------|
+| CLI-4 | HECHO | `cli4ReplicarTorneo.test.ts`, `cli4ReplicarTorneoModal.test.ts` |
+
+**Siguiente en re-test 24/11:** Ola 5 — **CLI-5** (selector de categoría dentro del evento).

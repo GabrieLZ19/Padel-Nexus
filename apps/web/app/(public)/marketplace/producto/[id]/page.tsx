@@ -28,6 +28,7 @@ import Link from "next/link";
 import { sileo } from "sileo";
 import DescuentoBadge from "@/components/marketplace/DescuentoBadge";
 import { tieneDescuento } from "@/utils/marketplaceDescuento";
+import { etiquetaMarcaProducto } from "@/utils/marketplaceMarca";
 
 export default function ProductoDetallePage() {
   const { id } = useParams() as { id: string };
@@ -186,6 +187,7 @@ export default function ProductoDetallePage() {
 
   const promedioValoraciones = producto.promedio_valoraciones ?? 0;
   const totalValoraciones = producto.total_valoraciones ?? 0;
+  const marcaProducto = etiquetaMarcaProducto(producto.marca);
 
   return (
     <div className="min-h-screen bg-brand-black text-brand-white pb-20">
@@ -249,10 +251,12 @@ export default function ProductoDetallePage() {
           <div className="lg:col-span-7 flex flex-col justify-between space-y-8">
             <div className="space-y-6">
               {/* Categoría / Marca */}
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-bold bg-brand-white/5 border border-brand-white/5 text-gray-400 px-3 py-1 rounded-full uppercase tracking-wider">
-                  {producto.marca || "Padel Nexus"}
-                </span>
+              <div className="flex items-center gap-3 flex-wrap">
+                {marcaProducto && (
+                  <span className="text-xs font-bold bg-brand-white/5 border border-brand-white/5 text-gray-400 px-3 py-1 rounded-full uppercase tracking-wider">
+                    {marcaProducto}
+                  </span>
+                )}
                 <span className="text-xs font-bold bg-brand-chartreuse/10 border border-brand-chartreuse/25 text-brand-chartreuse px-3 py-1 rounded-full uppercase tracking-wider">
                   {producto.categoria.nombre}
                 </span>
@@ -581,7 +585,9 @@ export default function ProductoDetallePage() {
           <div className="mt-20 space-y-6">
             <h3 className="text-xl font-black">Productos Relacionados</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-              {relacionados.map((rel) => (
+              {relacionados.map((rel) => {
+                const marcaRel = etiquetaMarcaProducto(rel.marca);
+                return (
                 <Link
                   key={rel.id}
                   href={`/marketplace/producto/${rel.id}`}
@@ -602,9 +608,11 @@ export default function ProductoDetallePage() {
                     )}
                   </div>
                   <div className="p-4 space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                      {rel.marca || "Padel Nexus"}
-                    </span>
+                    {marcaRel && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block">
+                        {marcaRel}
+                      </span>
+                    )}
                     <h4 className="font-bold text-sm text-brand-white group-hover:text-brand-chartreuse transition-colors line-clamp-1">
                       {rel.nombre}
                     </h4>
@@ -613,7 +621,8 @@ export default function ProductoDetallePage() {
                     </span>
                   </div>
                 </Link>
-              ))}
+              );
+              })}
             </div>
           </div>
         )}

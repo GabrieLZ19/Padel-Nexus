@@ -10,43 +10,11 @@ import {
   getNivelesParaCategoria,
 } from "@/utils/constants/fapApaRules";
 import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
-
-function ramaCorta(rama?: string | null): string {
-  const r = String(rama || "").toLowerCase();
-  if (r.startsWith("fem")) return "Fem.";
-  if (r.startsWith("mix")) return "Mix.";
-  return "Masc.";
-}
-
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function previewNombre(
-  origen: Torneo,
-  nivel: string,
-  rama: string,
-): string {
-  let base = (origen.nombre || "Torneo").trim();
-  const sufijos = [
-    `${origen.nivel || ""} ${ramaCorta(origen.rama)}`,
-    origen.nivel || "",
-    ramaCorta(origen.rama),
-    origen.rama || "",
-  ].filter((s) => s.trim());
-
-  for (const s of sufijos) {
-    const re = new RegExp(`[\\s—\\-–]*${escapeRegExp(s)}\\s*$`, "i");
-    base = base.replace(re, "").trim();
-  }
-  return `${base} — ${nivel} ${ramaCorta(rama)}`;
-}
+import { previewNombreTorneoReplicado } from "@/utils/replicarTorneoNombre";
 
 interface ReplicarTorneoModalProps {
   isOpen: boolean;
   torneo: Torneo | null;
-  /** Club: solo niveles, misma rama. CRM: niveles + ramas. */
-  modoClub?: boolean;
   onClose: () => void;
   onSuccess: (creados: number) => void;
   onError: (message: string) => void;
@@ -55,7 +23,6 @@ interface ReplicarTorneoModalProps {
 export default function ReplicarTorneoModal({
   isOpen,
   torneo,
-  modoClub = false,
   onClose,
   onSuccess,
   onError,
@@ -78,16 +45,13 @@ export default function ReplicarTorneoModal({
   useEffect(() => {
     if (!isOpen || !torneo) return;
     setNivelesSel([]);
-    setRamasSel(modoClub ? [] : [torneo.rama || "Masculina"]);
+    setRamasSel([torneo.rama || "Masculina"]);
   }, [isOpen, torneo, nivelesOpts]);
 
   const paresPreview = useMemo(() => {
     if (!torneo) return [];
-    const ramas = modoClub
-      ? [torneo.rama || "Masculina"]
-      : ramasSel.length > 0
-        ? ramasSel
-        : [torneo.rama || "Masculina"];
+    const ramas =
+      ramasSel.length > 0 ? ramasSel : [torneo.rama || "Masculina"];
     const out: Array<{ rama: string; nivel: string; nombre: string }> = [];
     for (const rama of ramas) {
       for (const nivel of nivelesSel) {
@@ -96,12 +60,18 @@ export default function ReplicarTorneoModal({
         out.push({
           rama,
           nivel,
-          nombre: previewNombre(torneo, nivel, rama),
+          nombre: previewNombreTorneoReplicado(
+            torneo.nombre || "Torneo",
+            torneo.nivel,
+            torneo.rama,
+            nivel,
+            rama,
+          ),
         });
       }
     }
     return out;
-  }, [torneo, nivelesSel, ramasSel, modoClub]);
+  }, [torneo, nivelesSel, ramasSel]);
 
   const toggleNivel = (value: string) => {
     setNivelesSel((prev) =>
@@ -123,9 +93,11 @@ export default function ReplicarTorneoModal({
     }
     setLoading(true);
     try {
+      const ramasPayload =
+        ramasSel.length > 0 ? ramasSel : [torneo.rama || "Masculina"];
       const res = await TorneosService.replicar(torneo.id, {
         niveles: nivelesSel,
-        ramas: modoClub ? undefined : ramasSel,
+        ramas: ramasPayload,
       });
       const n = res.creados?.length || 0;
       if (n === 0) {
@@ -225,37 +197,34 @@ export default function ReplicarTorneoModal({
                 </div>
               </div>
 
-              {modoClub ? (
-                <p className="text-xs text-gray-500 leading-relaxed bg-white/[0.03] border border-white/8 rounded-xl px-3 py-2.5">
-                  Se mantienen la rama ({torneo.rama || "Masculina"}) y el resto
-                  de parámetros del torneo base. Solo se crean nuevos niveles.
+              <div>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                  Ramas
                 </p>
-              ) : (
-                <div>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Ramas
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {RAMAS_PADEL.map((r) => {
-                      const active = ramasSel.includes(r.value);
-                      return (
-                        <button
-                          key={r.value}
-                          type="button"
-                          onClick={() => toggleRama(r.value)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                            active
-                              ? "bg-brand-chartreuse/15 border-brand-chartreuse/40 text-brand-chartreuse"
-                              : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
-                          }`}
-                        >
-                          {r.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                <p className="text-xs text-gray-500 mb-2 leading-relaxed">
+                  Podés combinar varios niveles y ramas; se copian fechas, días
+                  de competencia, sedes, cupo y puntos del torneo base.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {RAMAS_PADEL.map((r) => {
+                    const active = ramasSel.includes(r.value);
+                    return (
+                      <button
+                        key={r.value}
+                        type="button"
+                        onClick={() => toggleRama(r.value)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                          active
+                            ? "bg-brand-chartreuse/15 border-brand-chartreuse/40 text-brand-chartreuse"
+                            : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        {r.label}
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
 
               <div>
                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">

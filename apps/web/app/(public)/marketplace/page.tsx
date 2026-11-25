@@ -12,22 +12,18 @@ import MarketplaceSponsorSlot from "@/components/marketplace/MarketplaceSponsorS
 import { useCartStore } from "@/store/useCartStore";
 import {
   ShoppingBag,
-  Search,
-  ChevronDown,
   Heart,
   Plus,
-  Grid,
   SlidersHorizontal,
-  Sparkles,
-  Star,
-  Check,
   Store,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { sileo } from "sileo";
 import DescuentoBadge from "@/components/marketplace/DescuentoBadge";
+import MarketplaceCatalogFiltros from "@/components/marketplace/MarketplaceCatalogFiltros";
 import { tieneDescuento } from "@/utils/marketplaceDescuento";
+import { etiquetaMarcaProducto } from "@/utils/marketplaceMarca";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 
 function MarketplaceContent() {
@@ -56,8 +52,43 @@ function MarketplaceContent() {
   const [orden, setOrden] = useState<string>("destacados");
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
+  const [filtrosMovilAbiertos, setFiltrosMovilAbiertos] = useState(false);
 
   const { agregarItem } = useCartStore();
+
+  const filtrosActivosMovil =
+    Boolean(busqueda) ||
+    Boolean(categoriaSeleccionada) ||
+    Boolean(tipoSeleccionado) ||
+    Boolean(marcaSeleccionada);
+
+  const filtrosPanelProps = {
+    categorias,
+    marcas,
+    busqueda,
+    onBusquedaChange: (value: string) => {
+      setBusqueda(value);
+      setPagina(1);
+    },
+    categoriaSeleccionada,
+    onCategoriaChange: (id: string) => {
+      setCategoriaSeleccionada(id);
+      setPagina(1);
+    },
+    verTodasCategorias,
+    onToggleVerTodasCategorias: () =>
+      setVerTodasCategorias((prev) => !prev),
+    tipoSeleccionado,
+    onTipoChange: (tipo: "producto" | "servicio" | "") => {
+      setTipoSeleccionado(tipo);
+      setPagina(1);
+    },
+    marcaSeleccionada,
+    onMarcaChange: (marca: string) => {
+      setMarcaSeleccionada(marca);
+      setPagina(1);
+    },
+  };
 
   useEffect(() => {
     // Cargar categorías y marcas iniciales
@@ -179,176 +210,29 @@ function MarketplaceContent() {
   return (
     <div className="min-h-screen bg-brand-black text-brand-white">
       <div className="max-w-full mx-auto px-6 md:px-12 py-10">
-        <div className="flex flex-col lg:flex-row gap-10">
-          {/* SIDEBAR FILTROS */}
-          <aside className="w-full lg:w-64 shrink-0 space-y-8">
-            {/* Buscador */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Buscar palas, ropa..."
-                value={busqueda}
-                onChange={(e) => {
-                  setBusqueda(e.target.value);
-                  setPagina(1);
-                }}
-                className="w-full bg-brand-input border border-brand-white/10 rounded-2xl pl-12 pr-4 py-3 text-sm focus:border-brand-chartreuse focus:outline-none transition-all duration-200"
+        {filtrosMovilAbiertos && (
+          <>
+            <button
+              type="button"
+              aria-label="Cerrar panel de filtros"
+              className="fixed inset-0 z-40 bg-black/60 lg:hidden cursor-pointer border-0"
+              onClick={() => setFiltrosMovilAbiertos(false)}
+            />
+            <aside
+              className="fixed inset-y-0 left-0 z-50 w-[min(100%,20rem)] overflow-y-auto bg-brand-black border-r border-brand-white/10 p-6 lg:hidden shadow-2xl"
+              data-testid="marketplace-filtros-movil"
+            >
+              <MarketplaceCatalogFiltros
+                {...filtrosPanelProps}
+                onCloseMobile={() => setFiltrosMovilAbiertos(false)}
               />
-              <Search className="absolute left-4 top-3.5 size-4.5 text-gray-400" />
-            </div>
+            </aside>
+          </>
+        )}
 
-            {/* Categorías */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold tracking-wider text-gray-400 uppercase">
-                Categorías
-              </h3>
-              <div className="space-y-1.5">
-                <button
-                  onClick={() => {
-                    setCategoriaSeleccionada("");
-                    setPagina(1);
-                  }}
-                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 cursor-pointer ${
-                    categoriaSeleccionada === ""
-                      ? "bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20"
-                      : "text-gray-400 hover:text-brand-white hover:bg-brand-white/5 border border-transparent"
-                  }`}
-                >
-                  <span>Todas</span>
-                  <span className="text-xs bg-brand-white/5 px-2 py-0.5 rounded-full text-gray-400 font-bold border border-brand-white/5">
-                    {categorias.reduce(
-                      (sum, c) => sum + (c.total_productos || 0),
-                      0,
-                    )}
-                  </span>
-                </button>
-
-                {(verTodasCategorias ? categorias : categorias.slice(0, 4)).map(
-                  (cat) => (
-                    <button
-                      key={cat.id}
-                      onClick={() => {
-                        setCategoriaSeleccionada(cat.id);
-                        setPagina(1);
-                      }}
-                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 cursor-pointer ${
-                        categoriaSeleccionada === cat.id
-                          ? "bg-brand-chartreuse/10 text-brand-chartreuse border border-brand-chartreuse/20"
-                          : "text-gray-400 hover:text-brand-white hover:bg-brand-white/5 border border-transparent"
-                      }`}
-                    >
-                      <span>{cat.nombre}</span>
-                      <span className="text-xs bg-brand-white/5 px-2 py-0.5 rounded-full text-gray-400 font-bold border border-brand-white/5">
-                        {cat.total_productos || 0}
-                      </span>
-                    </button>
-                  ),
-                )}
-
-                {categorias.length > 4 && (
-                  <button
-                    onClick={() => setVerTodasCategorias(!verTodasCategorias)}
-                    className="w-full text-left text-xs font-bold text-brand-chartreuse hover:underline pt-2 pl-4 cursor-pointer"
-                  >
-                    {verTodasCategorias ? "Ver menos -" : "Ver más +"}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Tipos */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold tracking-wider text-gray-400 uppercase">
-                Tipo
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => {
-                    setTipoSeleccionado("");
-                    setPagina(1);
-                  }}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 border cursor-pointer text-center ${
-                    tipoSeleccionado === ""
-                      ? "bg-brand-chartreuse/10 text-brand-chartreuse border-brand-chartreuse/30"
-                      : "bg-brand-input/40 border-brand-white/5 text-gray-400 hover:text-brand-white"
-                  }`}
-                >
-                  Todos
-                </button>
-                <button
-                  onClick={() => {
-                    setTipoSeleccionado("producto");
-                    setPagina(1);
-                  }}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 border cursor-pointer text-center ${
-                    tipoSeleccionado === "producto"
-                      ? "bg-brand-chartreuse/10 text-brand-chartreuse border-brand-chartreuse/30"
-                      : "bg-brand-input/40 border-brand-white/5 text-gray-400 hover:text-brand-white"
-                  }`}
-                >
-                  Productos
-                </button>
-                <button
-                  onClick={() => {
-                    setTipoSeleccionado("servicio");
-                    setPagina(1);
-                  }}
-                  className={`col-span-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 border cursor-pointer text-center ${
-                    tipoSeleccionado === "servicio"
-                      ? "bg-brand-chartreuse/10 text-brand-chartreuse border-brand-chartreuse/30"
-                      : "bg-brand-input/40 border-brand-white/5 text-gray-400 hover:text-brand-white"
-                  }`}
-                >
-                  Clases y Servicios
-                </button>
-              </div>
-            </div>
-
-            {/* Marcas */}
-            {marcas.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-bold tracking-wider text-gray-400 uppercase">
-                  Marcas
-                </h3>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-3 cursor-pointer text-sm text-gray-400 hover:text-brand-white">
-                    <input
-                      type="radio"
-                      name="marca"
-                      checked={marcaSeleccionada === ""}
-                      onChange={() => {
-                        setMarcaSeleccionada("");
-                        setPagina(1);
-                      }}
-                      className="accent-brand-chartreuse size-4"
-                    />
-                    <span>Todas las marcas</span>
-                  </label>
-                  {marcas.map((m) => (
-                    <label
-                      key={m}
-                      className="flex items-center gap-3 cursor-pointer text-sm text-gray-400 hover:text-brand-white"
-                    >
-                      <input
-                        type="radio"
-                        name="marca"
-                        checked={marcaSeleccionada === m}
-                        onChange={() => {
-                          setMarcaSeleccionada(m);
-                          setPagina(1);
-                        }}
-                        className="accent-brand-chartreuse size-4"
-                      />
-                      <span>{m}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </aside>
-
-          {/* GRID DE PRODUCTOS */}
-          <main className="flex-1 space-y-8">
+        <div className="flex flex-col lg:flex-row gap-10">
+          {/* MKT-5: en móvil el contenido principal (banner + Tiendas) va antes que los filtros */}
+          <main className="flex-1 space-y-8 order-1 lg:order-2 min-w-0">
             <MarketplaceSponsorSlot espacio="banner" />
             <MarketplaceSponsorSlot espacio="home" />
 
@@ -411,6 +295,23 @@ function MarketplaceContent() {
               )}
             </section>
 
+            <div className="lg:hidden">
+              <button
+                type="button"
+                onClick={() => setFiltrosMovilAbiertos(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-brand-white/10 bg-brand-input/60 text-sm font-bold text-brand-white cursor-pointer"
+                data-testid="marketplace-filtrar-movil"
+              >
+                <SlidersHorizontal className="size-4 text-brand-chartreuse" />
+                Filtrar
+                {filtrosActivosMovil && (
+                  <span className="text-[10px] font-black uppercase tracking-wide text-brand-chartreuse">
+                    Activos
+                  </span>
+                )}
+              </button>
+            </div>
+
             {/* Header de listado */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-white/5 pb-5">
               <div className="flex items-baseline gap-2">
@@ -461,6 +362,7 @@ function MarketplaceContent() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {productos.map((prod) => {
+                  const marcaLabel = etiquetaMarcaProducto(prod.marca);
                   const imageUrl =
                     prod.thumbnail_url ||
                     (prod.imagenes && prod.imagenes.length > 0
@@ -548,8 +450,12 @@ function MarketplaceContent() {
                         </Link>
                         <Link href={`/marketplace/producto/${prod.id}`}>
                         <div>
-                          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
-                            <span>{prod.marca || "Padel Nexus"}</span>
+                          <div
+                            className={`flex items-center text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1 ${
+                              marcaLabel ? "justify-between" : "justify-end"
+                            }`}
+                          >
+                            {marcaLabel && <span>{marcaLabel}</span>}
                             <span className="text-[10px] px-2 py-0.5 rounded bg-brand-white/5 text-gray-400">
                               {prod.tipo === "servicio"
                                 ? "Clase / Servicio"
@@ -624,6 +530,10 @@ function MarketplaceContent() {
               </div>
             )}
           </main>
+
+          <aside className="hidden lg:block w-full lg:w-64 shrink-0 lg:order-1">
+            <MarketplaceCatalogFiltros {...filtrosPanelProps} />
+          </aside>
         </div>
       </div>
     </div>
