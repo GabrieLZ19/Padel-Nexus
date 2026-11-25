@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase";
+import { historialFederacion } from "../utils/entidadHistorial";
 
 export interface FederacionPayload {
   nombre: string;
@@ -122,6 +123,27 @@ export class FederacionService {
 
     if (error) throw new Error(`Error al cambiar estado de la federación: ${error.message}`);
     return data;
+  }
+
+  static async gestionarBaja(id: string): Promise<{
+    modo: "eliminado" | "dado_de_baja";
+    asociaciones: number;
+  }> {
+    const historial = await historialFederacion(id);
+
+    if (!historial.tieneHistorial) {
+      const { error } = await supabaseAdmin
+        .from("federaciones")
+        .delete()
+        .eq("id", id);
+      if (error) {
+        throw new Error(`No se pudo eliminar la federación: ${error.message}`);
+      }
+      return { modo: "eliminado", asociaciones: 0 };
+    }
+
+    await FederacionService.cambiarEstado(id, "inactivo");
+    return { modo: "dado_de_baja", asociaciones: historial.asociaciones };
   }
 
   static async resolveFapId(): Promise<string | null> {

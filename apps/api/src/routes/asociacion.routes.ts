@@ -8,6 +8,7 @@ import {
   crearAsociacion,
   actualizarAsociacion,
   cambiarEstadoAsociacion,
+  eliminarAsociacion,
   obtenerConfigLicenciaAsociacion,
   actualizarConfigLicenciaAsociacion,
 } from "../controllers/asociacion.controller";
@@ -40,6 +41,13 @@ router.patch(
   authenticate,
   authorize(["superadmin", "admin_federacion", "admin"]),
   cambiarEstadoAsociacion,
+);
+
+router.delete(
+  "/:id",
+  authenticate,
+  authorize(["superadmin", "admin_federacion", "admin"]),
+  eliminarAsociacion,
 );
 
 router.get(

@@ -436,6 +436,30 @@ export const updateClub = async (
   }
 };
 
+export const reactivarClub = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res
+        .status(400)
+        .json({ exito: false, error: "ID del club requerido." });
+    }
+    const data = await ClubService.reactivarClub(id);
+    return res.status(200).json({
+      exito: true,
+      message: "Club reactivado correctamente.",
+      data,
+    });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    return res.status(500).json({ exito: false, error: message });
+  }
+};
+
 export const deleteClub = async (
   req: Request,
   res: Response,
@@ -448,10 +472,18 @@ export const deleteClub = async (
         .status(400)
         .json({ exito: false, error: "ID del club requerido." });
 
-    await ClubService.desactivarClub(id);
-    return res
-      .status(200)
-      .json({ exito: true, message: "Club desactivado correctamente." });
+    const resultado = await ClubService.gestionarBajaClub(id);
+    const message =
+      resultado.modo === "eliminado"
+        ? "El club no tenía historial y fue eliminado del sistema."
+        : "El club tiene historial operativo y quedó dado de baja (inactivo). Podés reactivarlo cuando corresponda.";
+
+    return res.status(200).json({
+      exito: true,
+      modo: resultado.modo,
+      historial: resultado.historial,
+      message,
+    });
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";

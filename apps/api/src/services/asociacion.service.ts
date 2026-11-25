@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase";
+import { historialAsociacion } from "../utils/entidadHistorial";
 
 export interface AsociacionPayload {
   nombre: string;
@@ -328,6 +329,32 @@ export class AsociacionService {
   /**
    * Cambiar estado de activación de la asociación (Habilitar / Inhabilitar)
    */
+  static async gestionarBaja(id: string): Promise<{
+    modo: "eliminado" | "dado_de_baja";
+    clubes: number;
+    torneos: number;
+  }> {
+    const historial = await historialAsociacion(id);
+
+    if (!historial.tieneHistorial) {
+      const { error } = await supabaseAdmin
+        .from("asociaciones")
+        .delete()
+        .eq("id", id);
+      if (error) {
+        throw new Error(`No se pudo eliminar la asociación: ${error.message}`);
+      }
+      return { modo: "eliminado", clubes: 0, torneos: 0 };
+    }
+
+    await AsociacionService.cambiarEstado(id, "inactivo");
+    return {
+      modo: "dado_de_baja",
+      clubes: historial.clubes,
+      torneos: historial.torneos,
+    };
+  }
+
   static async cambiarEstado(id: string, estado: "activo" | "inactivo" | "pendiente") {
     const { data, error } = await supabaseAdmin
       .from("asociaciones")

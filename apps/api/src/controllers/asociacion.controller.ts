@@ -88,6 +88,23 @@ export const cambiarEstadoAsociacion = async (req: Request, res: Response): Prom
   }
 };
 
+export const eliminarAsociacion = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const resultado = await AsociacionService.gestionarBaja(id);
+    const message =
+      resultado.modo === "eliminado"
+        ? "La asociación no tenía historial y fue eliminada."
+        : "La asociación tiene clubes o torneos vinculados y quedó inactiva.";
+    return res.status(200).json({ exito: true, ...resultado, message });
+  } catch (error: any) {
+    return res.status(400).json({ exito: false, message: error.message });
+  }
+};
+
 export const obtenerConfigLicenciaAsociacion = async (
   req: Request,
   res: Response,

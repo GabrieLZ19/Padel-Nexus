@@ -5,6 +5,7 @@ import {
   crearFederacion,
   actualizarFederacion,
   cambiarEstadoFederacion,
+  eliminarFederacion,
   obtenerConfigLicenciaFederacion,
   actualizarConfigLicenciaFederacion,
 } from "../controllers/federacion.controller";
@@ -34,6 +35,13 @@ router.patch(
   authenticate,
   authorize(["superadmin"]),
   cambiarEstadoFederacion,
+);
+
+router.delete(
+  "/:id",
+  authenticate,
+  authorize(["superadmin"]),
+  eliminarFederacion,
 );
 
 router.get(

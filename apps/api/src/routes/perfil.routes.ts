@@ -78,4 +78,10 @@ router.get(
   PerfilController.getPerfilById,
 );
 
+router.patch(
+  "/:id/ficha-provisoria",
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  PerfilController.actualizarFichaProvisoriaAdmin,
+);
+
 export default router;

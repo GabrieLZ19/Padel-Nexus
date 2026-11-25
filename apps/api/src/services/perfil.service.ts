@@ -939,4 +939,113 @@ export class PerfilService {
 
     return fila.data;
   }
+
+  static esFichaProvisoriaAdmin(perfil: {
+    email?: string | null;
+    pendiente_activacion?: boolean | null;
+  }): boolean {
+    return (
+      Boolean(perfil.pendiente_activacion) ||
+      esEmailPlaceholderPlanilla(perfil.email)
+    );
+  }
+
+  /**
+   * Corrección de datos en fichas provisorias (padrón / preinscripción) por staff.
+   */
+  static async actualizarFichaProvisoriaPorAdmin(
+    adminId: string,
+    jugadorId: string,
+    datos: {
+      nombre?: string;
+      apellido?: string;
+      fecha_nacimiento?: string | null;
+    },
+  ) {
+    const { data: antes, error: readError } = await supabaseAdmin
+      .from("perfiles")
+      .select(
+        "id, nombre, apellido, fecha_nacimiento, email, pendiente_activacion, rol",
+      )
+      .eq("id", jugadorId)
+      .maybeSingle();
+
+    if (readError || !antes) {
+      throw new Error("Jugador no encontrado.");
+    }
+    if (antes.rol !== "usuario") {
+      throw new Error("Solo aplica a fichas de jugador.");
+    }
+    if (!PerfilService.esFichaProvisoriaAdmin(antes)) {
+      throw new Error(
+        "La ficha no es provisoria. Usá el flujo de solicitud de cambio del jugador.",
+      );
+    }
+
+    const patch: Record<string, unknown> = {};
+    const cambios: Record<string, { antes: unknown; despues: unknown }> = {};
+
+    if (datos.nombre !== undefined) {
+      const nombre = normalizarNombrePerfil(datos.nombre);
+      if (nombre.length < 2) {
+        throw new Error("El nombre es obligatorio (mínimo 2 caracteres).");
+      }
+      if (nombre !== (antes.nombre || "")) {
+        patch.nombre = nombre;
+        cambios.nombre = { antes: antes.nombre, despues: nombre };
+      }
+    }
+
+    if (datos.apellido !== undefined) {
+      const apellido = normalizarNombrePerfil(datos.apellido);
+      if (apellido.length < 2 || /\d/.test(apellido)) {
+        throw new Error(
+          "El apellido es obligatorio (mínimo 2 letras, sin números).",
+        );
+      }
+      if (apellido !== (antes.apellido || "")) {
+        patch.apellido = apellido;
+        cambios.apellido = { antes: antes.apellido, despues: apellido };
+      }
+    }
+
+    if (datos.fecha_nacimiento !== undefined) {
+      const fecha = datos.fecha_nacimiento
+        ? normalizeFechaNacimiento(datos.fecha_nacimiento)
+        : null;
+      if (fecha !== (antes.fecha_nacimiento || null)) {
+        patch.fecha_nacimiento = fecha;
+        cambios.fecha_nacimiento = {
+          antes: antes.fecha_nacimiento,
+          despues: fecha,
+        };
+      }
+    }
+
+    if (Object.keys(patch).length === 0) {
+      throw new Error("No hay cambios para guardar.");
+    }
+
+    const { data, error: updateError } = await supabaseAdmin
+      .from("perfiles")
+      .update(patch)
+      .eq("id", jugadorId)
+      .select("*")
+      .single();
+
+    if (updateError || !data) {
+      throw new Error(
+        updateError?.message || "No se pudo actualizar la ficha provisoria.",
+      );
+    }
+
+    await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: adminId,
+      accion: "editar_ficha_provisoria",
+      entidad_afectada: jugadorId,
+      detalles: { cambios },
+    });
+
+    return data;
+  }
 }

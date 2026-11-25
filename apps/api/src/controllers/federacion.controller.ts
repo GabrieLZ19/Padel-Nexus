@@ -67,6 +67,20 @@ export const cambiarEstadoFederacion = async (req: Request, res: Response) => {
   }
 };
 
+export const eliminarFederacion = async (req: Request, res: Response) => {
+  try {
+    const resultado = await FederacionService.gestionarBaja(req.params.id);
+    const message =
+      resultado.modo === "eliminado"
+        ? "La federación no tenía historial y fue eliminada."
+        : "La federación tiene asociaciones vinculadas y quedó inactiva. Podés reactivarla.";
+    return res.status(200).json({ exito: true, ...resultado, message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Error al eliminar";
+    return res.status(400).json({ exito: false, message });
+  }
+};
+
 export const obtenerConfigLicenciaFederacion = async (
   req: Request,
   res: Response,

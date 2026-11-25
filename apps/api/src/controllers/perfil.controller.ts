@@ -100,6 +100,45 @@ export const PerfilController = {
     }
   },
 
+  async actualizarFichaProvisoriaAdmin(
+    req: Request,
+    res: Response,
+  ): Promise<Response> {
+    try {
+      const adminId = req.user?.id;
+      if (!adminId) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "Usuario no autorizado." });
+      }
+
+      const { id } = req.params;
+      const { nombre, apellido, fecha_nacimiento } = req.body ?? {};
+
+      const data = await PerfilService.actualizarFichaProvisoriaPorAdmin(
+        adminId,
+        id,
+        {
+          nombre,
+          apellido,
+          fecha_nacimiento,
+        },
+      );
+
+      return res.status(200).json({
+        exito: true,
+        mensaje: "Ficha provisoria actualizada.",
+        data,
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar la ficha.";
+      return res.status(400).json({ exito: false, error: message });
+    }
+  },
+
   /**
    * POST /api/perfil/me/solicitar-cambio
    * Registra un pedido de cambio de DNI, fecha de nacimiento o categoría. No modifica la ficha.

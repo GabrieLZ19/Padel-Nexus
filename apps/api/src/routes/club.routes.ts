@@ -5,6 +5,7 @@ import {
   createClub,
   updateClub,
   deleteClub,
+  reactivarClub,
   promoverClubAdherido,
   getCanchasPorClub,
   createCancha,
@@ -66,6 +67,13 @@ router.delete(
   authenticate,
   authorize(["superadmin", "admin_federacion", "admin_provincial"]),
   deleteClub,
+);
+
+router.patch(
+  "/:id/reactivar",
+  authenticate,
+  authorize(["superadmin", "admin_federacion", "admin_provincial"]),
+  reactivarClub,
 );
 
 router.get(

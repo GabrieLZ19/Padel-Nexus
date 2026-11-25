@@ -23,6 +23,10 @@ import {
   haversineKm,
 } from "../utils/coordenadasClub";
 import {
+  historialClub,
+  type ResumenHistorialEntidad,
+} from "../utils/entidadHistorial";
+import {
   clubCumpleFiltroCancha,
   slotCoincideHora,
   type CanchaResumenClub,
@@ -890,6 +894,51 @@ export class ClubService {
       .eq("id", id);
 
     if (error) throw new Error("Error interno al intentar desactivar el club.");
+  }
+
+  static async reactivarClub(id: string) {
+    const { data, error } = await supabaseAdmin
+      .from("clubes")
+      .update({ estado: "Activo" })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw new Error("Error al reactivar el club.");
+    return data;
+  }
+
+  static async eliminarClubDefinitivo(id: string): Promise<void> {
+    const { count: torneos } = await supabaseAdmin
+      .from("torneos")
+      .select("id", { count: "exact", head: true })
+      .eq("club_id", id);
+
+    if (torneos && torneos > 0) {
+      throw new Error(
+        "No se puede eliminar: el club tiene torneos registrados. Usá dar de baja.",
+      );
+    }
+
+    const { error } = await supabaseAdmin.from("clubes").delete().eq("id", id);
+    if (error) {
+      throw new Error(`No se pudo eliminar el club: ${error.message}`);
+    }
+  }
+
+  static async gestionarBajaClub(id: string): Promise<{
+    modo: "eliminado" | "dado_de_baja";
+    historial: ResumenHistorialEntidad;
+  }> {
+    const historial = await historialClub(id);
+
+    if (!historial.tieneHistorial) {
+      await ClubService.eliminarClubDefinitivo(id);
+      return { modo: "eliminado", historial };
+    }
+
+    await ClubService.desactivarClub(id);
+    return { modo: "dado_de_baja", historial };
   }
 
   // ── Canchas CRUD ──────────────────────────────────────────────────────
