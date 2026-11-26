@@ -74,6 +74,23 @@ export function esTorneoDePrueba(
   return Boolean(torneo.es_prueba) || esNombreDePrueba(torneo.nombre);
 }
 
+/** TOR-56: motivo explícito para exclusion de ranking / avisos en cierre. */
+export function motivoExclusionRankingTorneo(
+  torneo:
+    | { nombre?: string | null; es_prueba?: boolean | null }
+    | null
+    | undefined,
+): string | null {
+  if (!torneo) return null;
+  if (torneo.es_prueba) {
+    return "marcado como torneo de prueba (es_prueba)";
+  }
+  if (esNombreDePrueba(torneo.nombre)) {
+    return "nombre de ensayo o QA detectado";
+  }
+  return null;
+}
+
 export function esClubDePrueba(
   club:
     | { nombre?: string | null; es_prueba?: boolean | null }

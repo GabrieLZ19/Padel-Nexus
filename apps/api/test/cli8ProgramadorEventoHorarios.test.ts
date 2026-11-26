@@ -30,6 +30,16 @@ describe("CLI-8 generar cuadros y publicar respetando evento", () => {
     );
   });
 
+  it("autoAsignar de una categoría respeta horarios de otras del mismo evento", () => {
+    const svc = readFileSync(
+      path.join(RAIZ, "src/services/programacion.service.ts"),
+      "utf8",
+    );
+    assert.match(svc, /static async autoAsignar/);
+    assert.match(svc, /ocupadosSemillaEventoParaTorneo\(torneoId\)/);
+    assert.match(svc, /mergeOcupadosSemilla/);
+  });
+
   it("getBoard mezcla issues cruzados cuando el torneo pertenece a un evento", () => {
     const svc = readFileSync(
       path.join(RAIZ, "src/services/programacion.service.ts"),

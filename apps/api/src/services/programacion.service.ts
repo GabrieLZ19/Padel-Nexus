@@ -1368,12 +1368,15 @@ export class ProgramacionService {
       horario_bloqueado: p.horario_bloqueado,
     }));
 
-    const ocupados = buildOcupadosDesdePartidos(
-      drafts.filter((d) => d.cancha_asignada && d.fecha_partido),
+    const { mergeOcupadosSemilla, ocupadosSemillaEventoParaTorneo } =
+      await import("../utils/programacionEvento");
+    const ocupados = mergeOcupadosSemilla(
+      buildOcupadosDesdePartidos(
+        drafts.filter((d) => d.cancha_asignada && d.fecha_partido),
+      ),
+      await ocupadosSemillaEventoParaTorneo(torneoId),
+      opciones.ocupadosSemilla,
     );
-    if (opciones.ocupadosSemilla) {
-      for (const key of opciones.ocupadosSemilla) ocupados.add(key);
-    }
 
     const zonasDrafts = drafts.filter((d) =>
       /^ZONA\s+/i.test(String(d.ronda || "")),

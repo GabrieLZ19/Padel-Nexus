@@ -156,6 +156,29 @@ export function armarGruposTorneo<T extends TorneoAgrupable>(
   });
 }
 
+/** CLI-14: si una categoría del evento pasa el filtro de vista, incluir al resto del mismo grupo_id. */
+export function expandirTorneosMismoGrupoParaAgrupado<
+  T extends { id?: string; grupo_id?: string | null },
+>(filtrados: T[], universo: T[]): T[] {
+  const grupoIds = new Set(
+    filtrados
+      .map((t) => (t.grupo_id ? String(t.grupo_id) : ""))
+      .filter(Boolean),
+  );
+  if (!grupoIds.size) return filtrados;
+
+  const idsIn = new Set(filtrados.map((t) => t.id).filter(Boolean));
+  const extra = universo.filter(
+    (t) =>
+      t.grupo_id &&
+      grupoIds.has(String(t.grupo_id)) &&
+      t.id &&
+      !idsIn.has(t.id),
+  );
+  if (!extra.length) return filtrados;
+  return [...filtrados, ...extra];
+}
+
 export interface TorneoCategoriaEvento {
   id: string;
   nombre?: string | null;

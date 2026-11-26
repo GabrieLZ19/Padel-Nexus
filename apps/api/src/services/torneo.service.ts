@@ -31,6 +31,7 @@ import {
 import {
   armarGruposTorneo,
   etiquetaCategoriaEventoTorneo,
+  expandirTorneosMismoGrupoParaAgrupado,
   nombreBaseTorneo,
   nombreTorneoReplicado,
   ordenarTorneosCategoriaEvento,
@@ -661,6 +662,8 @@ export class TorneoService {
 
     let vistaActiva: VistaOperativaTorneo | "todos" | undefined;
     let vistaAutomatica = false;
+    const universoAntesVista = formatted;
+
     if (vistaPedida) {
       if (vistaPedida === "auto") {
         vistaAutomatica = true;
@@ -678,6 +681,12 @@ export class TorneoService {
         formatted = formatted.filter(
           (t) => vistaDeEstado(t.estado) === vistaActiva,
         );
+        if (filtros?.agrupar) {
+          formatted = expandirTorneosMismoGrupoParaAgrupado(
+            formatted,
+            universoAntesVista,
+          );
+        }
       }
     }
 

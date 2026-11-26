@@ -4,6 +4,7 @@ import {
   esDniPrueba,
   esJugadorDePrueba,
   esNombreDePrueba,
+  motivoExclusionRankingTorneo,
   esTorneoDePrueba,
   esVisibleEnSitioPublico,
   resolverEsPruebaTorneo,
@@ -30,6 +31,10 @@ describe("datos de prueba del sitio público", () => {
     );
     assert.equal(resolverEsPruebaTorneo("Torneo Oficial 7ª", true), false);
     assert.equal(resolverEsPruebaTorneo("QA Prueba Club", true), true);
+    assert.equal(
+      motivoExclusionRankingTorneo({ nombre: "Open", es_prueba: true }),
+      "marcado como torneo de prueba (es_prueba)",
+    );
   });
 
   it("reconoce jugadores de ensayo por el correo, el nombre o la marca", () => {

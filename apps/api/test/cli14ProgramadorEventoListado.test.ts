@@ -4,6 +4,8 @@ import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { expandirTorneosMismoGrupoParaAgrupado } from "../src/utils/gruposTorneo.ts";
+
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("CLI-14 evento agrupado y programador maestro", () => {
@@ -14,6 +16,21 @@ describe("CLI-14 evento agrupado y programador maestro", () => {
     );
     assert.match(cmp, /eventoProgramacionHref && grupo\.id/);
     assert.doesNotMatch(cmp, /categorias >= 2/);
+  });
+
+  it("expandirTorneosMismoGrupo incluye categorías hermanas al filtrar vista", () => {
+    const universo = [
+      { id: "a", grupo_id: "g1", estado: "En curso" },
+      { id: "b", grupo_id: "g1", estado: "Programado" },
+      { id: "c", grupo_id: "g2", estado: "Programado" },
+    ];
+    const filtrados = universo.filter((t) => t.id === "a");
+    const expandido = expandirTorneosMismoGrupoParaAgrupado(
+      filtrados,
+      universo,
+    );
+    assert.equal(expandido.length, 2);
+    assert.ok(expandido.some((t) => t.id === "b"));
   });
 
   it("listado API agrupa sin duplicar torneos con grupo_id", () => {
@@ -28,5 +45,6 @@ describe("CLI-14 evento agrupado y programador maestro", () => {
     );
     assert.match(svc, /agrupar\)/);
     assert.match(svc, /armarGruposTorneo/);
+    assert.match(svc, /expandirTorneosMismoGrupoParaAgrupado/);
   });
 });

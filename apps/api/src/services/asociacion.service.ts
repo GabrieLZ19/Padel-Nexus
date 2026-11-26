@@ -241,15 +241,30 @@ export class AsociacionService {
 
     const { data: clubes, error } = await supabaseAdmin
       .from("clubes")
-      .select("*")
-      .ilike("provincia", `%${asoc.provincia}%`);
+      .select(
+        "id, nombre, localidad, provincia, direccion, estado, canchas, canchas_detalle:canchas(id, activa)",
+      )
+      .eq("asociacion_id", asociacionId)
+      .order("nombre", { ascending: true });
 
     if (error) {
       console.error("[AsociacionService] Error clubes:", error.message);
       return [];
     }
 
-    return clubes || [];
+    return (clubes || []).map((c) => {
+      const filas = (c as { canchas_detalle?: Array<{ activa?: boolean | null }> })
+        .canchas_detalle;
+      const activas =
+        filas?.filter((row) => row.activa !== false).length ?? null;
+      const { canchas_detalle: _, ...rest } = c as Record<string, unknown> & {
+        canchas_detalle?: unknown;
+      };
+      return {
+        ...rest,
+        canchas_activas: activas ?? Number(c.canchas || 0),
+      };
+    });
   }
 
   /**
