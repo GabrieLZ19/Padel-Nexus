@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase";
+import { esTorneoDePrueba } from "./datoPrueba";
 import { alcancePersistidoRankingTorneo } from "./rankingPorClub";
 import {
   alcanceRankingDesdeTorneo,
@@ -10,6 +11,8 @@ import {
 export type TorneoInfoPuntos = {
   nivel: string;
   categoria: string;
+  nombre?: string | null;
+  es_prueba?: boolean | null;
   modalidad?: string | null;
   alcance?: string | null;
   configuracion_puntos?: ConfigPuntosTorneo | null;
@@ -67,6 +70,8 @@ export async function otorgarPuntosPorPartidoRanking(
   torneoInfo: TorneoInfoPuntos,
   ganadorId: string,
 ): Promise<void> {
+  if (esTorneoDePrueba(torneoInfo)) return;
+
   const configP = torneoInfo.configuracion_puntos;
   const TABLA_PUNTOS = tablaPuntosDesdeConfig(configP);
   if (!TABLA_PUNTOS) return;

@@ -169,5 +169,35 @@ describe("TOR-24 guardar zonas y llave", () => {
     assert.match(src, /proyectarSincronizacionHojasFap/);
     assert.match(src, /sincronizarLlaveTrasCambioZonas/);
     assert.match(src, /zonasCompletas\.get\(g\.nombre_grupo\)/);
+    assert.match(
+      src,
+      /partido\.ganador[\s\S]*FINALIZADO[\s\S]*continue/,
+    );
+  });
+
+  it("guardarZonas registra resumen de llave en auditoria", () => {
+    const svc = readFileSync(
+      path.join(RAIZ, "api/src/services/competencia.service.ts"),
+      "utf8",
+    );
+    assert.match(svc, /llave_sincronizada:\s*llave/);
+  });
+
+  it("zona E con 4 parejas habilita 3E; zona B con 2 no admite 2B", () => {
+    const counts = buildZonePairCountsByLetter([
+      {
+        nombre_grupo: "Zona B",
+        grupo_parejas: [{}, {}],
+      },
+      {
+        nombre_grupo: "Zona E",
+        grupo_parejas: [{}, {}, {}, {}] as { inscripcion_id: string }[],
+      },
+    ]);
+    assert.equal(isSeedRefValidForZoneComposition("3E", counts), true);
+    assert.equal(isSeedRefValidForZoneComposition("2B", counts), false);
+    const seeds = buildValidLeafSeedRefs(counts);
+    assert.ok(seeds.has("3E"));
+    assert.ok(!seeds.has("2B"));
   });
 });

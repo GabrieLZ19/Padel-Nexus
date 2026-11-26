@@ -1220,6 +1220,7 @@ export class CompetenciaService {
         }),
         resoluciones_cabezas_serie: resolucionesCabezasSerie ?? [],
         zonas_desprogramadas_conflicto_llave,
+        llave_sincronizada: llave,
       },
     });
 

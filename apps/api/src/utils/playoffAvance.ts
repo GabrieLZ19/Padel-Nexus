@@ -292,6 +292,12 @@ export async function avanzarJugadoresALlaves(
   for (const upd of proyeccion.actualizaciones) {
     const partido = byOrden.get(upd.matchNo);
     if (!partido) continue;
+    if (
+      partido.ganador ||
+      String(partido.estado_partido || "").toUpperCase() === "FINALIZADO"
+    ) {
+      continue;
+    }
 
     const patch: Record<string, unknown> = {
       equipo_a_id: upd.equipo_a_id,

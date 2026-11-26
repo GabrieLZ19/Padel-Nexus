@@ -6,9 +6,9 @@ const EMAIL_PRUEBA = /\.test$|@example\.com$|prueba|demo\d|whapy/i;
 const NOMBRE_JUGADOR_PRUEBA = /whapy/i;
 /** Cuentas y fichas del re-test 24/11 y ensayos explícitos en CRM. */
 const NOMBRE_QA_RANKING = /\bqa\s+(prueba|ensayo)\b/i;
-/** DNIs reservados para QA (re-test 18/11 y 24/11). */
+/** DNIs reservados para QA (re-test 18/11, 24/11 y 25/11). */
 const DNI_QA_RANKING =
-  /^(?:990001\d{2}|990003\d{2}|990024(?:0[1-9]|1\d|2\d|3[0-2]))$/;
+  /^(?:990001\d{2}|990003\d{2}|990024(?:0[1-9]|1\d|2\d|3[0-2])|990025\d{2}|990026\d{2})$/;
 
 export function esDniPrueba(dni?: string | null): boolean {
   const texto = String(dni || "").trim();
@@ -35,13 +35,14 @@ export function esJugadorDePrueba(
   if (!perfil) return false;
   if (perfil.es_prueba) return true;
   if (esDniPrueba(perfil.dni)) return true;
+  const nombre = `${perfil.nombre || ""} ${perfil.apellido || ""}`;
+  if (NOMBRE_QA_RANKING.test(nombre)) return true;
+  if (NOMBRE_JUGADOR_PRUEBA.test(nombre)) return true;
   const email = String(perfil.email || "");
   if (EMAIL_PRUEBA.test(email)) return true;
   if (esEmailPlaceholderPlanilla(email)) return false;
   if (/\.local$/i.test(email)) return true;
-  const nombre = `${perfil.nombre || ""} ${perfil.apellido || ""}`;
-  if (NOMBRE_QA_RANKING.test(nombre)) return true;
-  return NOMBRE_JUGADOR_PRUEBA.test(nombre);
+  return false;
 }
 
 /** El sitio público lista jugadores. Las cuentas de panel no entran en el ranking. */

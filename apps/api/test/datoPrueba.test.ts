@@ -93,6 +93,8 @@ describe("datos de prueba del sitio público", () => {
       false,
     );
     assert.equal(esDniPrueba("99000302"), true);
+    assert.equal(esDniPrueba("99002588"), true);
+    assert.equal(esDniPrueba("99002601"), true);
     assert.equal(
       esJugadorDePrueba({
         nombre: "QA",

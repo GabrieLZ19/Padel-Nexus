@@ -1,5 +1,6 @@
 import { FAP_ESTADOS_TORNEO } from "../constants/fap";
 import { supabaseAdmin } from "../config/supabase";
+import { esTorneoDePrueba } from "./datoPrueba";
 import {
   otorgarPuntosPorPartidoRanking,
   ordenarPartidosParaRecalculoPuntos,
@@ -13,13 +14,18 @@ export async function recalcularPuntosTorneoFinalizado(
   const { data: torneo, error } = await supabaseAdmin
     .from("torneos")
     .select(
-      "id, estado, nivel, categoria, modalidad, alcance, configuracion_puntos, clubes!club_id ( provincia )",
+      "id, nombre, es_prueba, estado, nivel, categoria, modalidad, alcance, configuracion_puntos, clubes!club_id ( provincia )",
     )
     .eq("id", torneoId)
     .single();
 
   if (error || !torneo) {
     throw new Error("Torneo no encontrado.");
+  }
+  if (esTorneoDePrueba(torneo)) {
+    throw new Error(
+      "Los torneos de prueba no acumulan puntos en el ranking público.",
+    );
   }
   if (torneo.estado !== FAP_ESTADOS_TORNEO.FINALIZADO) {
     throw new Error(

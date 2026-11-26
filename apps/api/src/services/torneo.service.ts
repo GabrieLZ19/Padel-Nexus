@@ -2352,7 +2352,7 @@ export class TorneoService {
     const { data: torneoInfo } = await supabaseAdmin
       .from("torneos")
       .select(
-        "nivel, categoria, modalidad, formato, configuracion_puntos, alcance, clubes!club_id ( provincia )",
+        "nombre, es_prueba, nivel, categoria, modalidad, formato, configuracion_puntos, alcance, clubes!club_id ( provincia )",
       )
       .eq("id", partido.torneo_id)
       .single();
