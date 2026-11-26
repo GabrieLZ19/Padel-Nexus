@@ -113,7 +113,8 @@ export const PerfilController = {
       }
 
       const { id } = req.params;
-      const { nombre, apellido, fecha_nacimiento } = req.body ?? {};
+      const { nombre, apellido, fecha_nacimiento, email, telefono } =
+        req.body ?? {};
 
       const data = await PerfilService.actualizarFichaProvisoriaPorAdmin(
         adminId,
@@ -122,6 +123,8 @@ export const PerfilController = {
           nombre,
           apellido,
           fecha_nacimiento,
+          email,
+          telefono,
         },
       );
 
@@ -296,6 +299,91 @@ export const PerfilController = {
    * POST /api/perfil/preinscripcion/:dni/verificar
    * Devuelve datos de preinscripción tras validar teléfono o email declarado en la ficha.
    */
+  async solicitarOtpPadronFapPreinscripcion(
+    req: Request,
+    res: Response,
+  ): Promise<Response> {
+    try {
+      const { dni } = req.params;
+      if (!dni) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "El DNI es obligatorio." });
+      }
+
+      const { fecha_nacimiento, nro_licencia, canal, email, telefono } =
+        req.body ?? {};
+
+      if (!fecha_nacimiento || !nro_licencia) {
+        return res.status(400).json({
+          exito: false,
+          error: "Fecha de nacimiento y N° de licencia son obligatorios.",
+        });
+      }
+
+      if (canal !== "email" && canal !== "telefono") {
+        return res.status(400).json({
+          exito: false,
+          error: "Indicá un canal válido (email o telefono).",
+        });
+      }
+
+      const resultado = await PerfilService.solicitarOtpActivacionPadronFap(
+        dni,
+        { fecha_nacimiento, nro_licencia, canal, email, telefono },
+      );
+      return res.status(200).json({ exito: true, ...resultado });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "No pudimos enviar el código.";
+      const coincidencia = message === "Los datos de verificación no coinciden.";
+      return res.status(coincidencia ? 403 : 400).json({
+        exito: false,
+        error: message,
+      });
+    }
+  },
+
+  async confirmarOtpPadronFapPreinscripcion(
+    req: Request,
+    res: Response,
+  ): Promise<Response> {
+    try {
+      const { dni } = req.params;
+      if (!dni) {
+        return res
+          .status(400)
+          .json({ exito: false, error: "El DNI es obligatorio." });
+      }
+
+      const { fecha_nacimiento, nro_licencia, codigo } = req.body ?? {};
+      if (!fecha_nacimiento || !nro_licencia || !codigo) {
+        return res.status(400).json({
+          exito: false,
+          error: "Completá fecha de nacimiento, licencia y código.",
+        });
+      }
+
+      const resultado = await PerfilService.confirmarOtpActivacionPadronFap(
+        dni,
+        { fecha_nacimiento, nro_licencia, codigo },
+      );
+      return res.status(200).json({ exito: true, ...resultado });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No pudimos validar el código.";
+      const codigoInvalido =
+        message === "Código inválido o vencido." ||
+        message === "Los datos de verificación no coinciden.";
+      return res.status(codigoInvalido ? 403 : 400).json({
+        exito: false,
+        error: message,
+      });
+    }
+  },
+
   async verificarPreinscripcionPorDni(
     req: Request,
     res: Response,

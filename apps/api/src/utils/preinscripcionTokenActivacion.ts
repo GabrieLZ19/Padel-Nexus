@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { supabaseAdmin } from "../config/supabase";
-import type { MetodoVerificacionPreinscripcion } from "./preinscripcionVerificacion";
+import type { MetodoTokenActivacionPreinscripcion } from "./preinscripcionVerificacion";
 
 const TOKEN_BYTES = 32;
 const TOKEN_VIGENCIA_MS = 30 * 60 * 1000;
@@ -16,7 +16,7 @@ export function generarTokenActivacionPlano(): string {
 export async function emitirTokenActivacionPreinscripcion(params: {
   dni: string;
   perfilId: string;
-  metodo: MetodoVerificacionPreinscripcion;
+  metodo: MetodoTokenActivacionPreinscripcion;
 }): Promise<{ token: string; expires_at: string }> {
   const dni = String(params.dni || "").replace(/\D/g, "");
   const token = generarTokenActivacionPlano();

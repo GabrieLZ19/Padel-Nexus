@@ -2,6 +2,17 @@ import { esEmailPlaceholderPlanilla } from "./inscripcionPlanilla";
 
 export type MetodoVerificacionPreinscripcion = "telefono" | "email";
 
+export type MetodoTokenActivacionPreinscripcion =
+  | MetodoVerificacionPreinscripcion
+  | "padron_fap";
+
+export function activacionPadronFapDisponible(ficha: {
+  telefono?: string | null;
+  email?: string | null;
+}): boolean {
+  return metodosVerificacionPreinscripcion(ficha).length === 0;
+}
+
 export function soloDigitosTelefono(telefono: string | null | undefined): string {
   if (!telefono) return "";
   return telefono.replace(/\D/g, "");

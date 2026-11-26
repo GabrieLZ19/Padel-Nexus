@@ -41,6 +41,16 @@ router.post(
   rateLimitPreinscripcion,
   PerfilController.verificarPreinscripcionPorDni,
 );
+router.post(
+  "/preinscripcion/:dni/padron-fap/solicitar-otp",
+  rateLimitPreinscripcion,
+  PerfilController.solicitarOtpPadronFapPreinscripcion,
+);
+router.post(
+  "/preinscripcion/:dni/padron-fap/confirmar-otp",
+  rateLimitPreinscripcion,
+  PerfilController.confirmarOtpPadronFapPreinscripcion,
+);
 
 router.get("/google", PerfilController.iniciarGoogleAuth);
 router.get("/google/callback", PerfilController.googleCallback);

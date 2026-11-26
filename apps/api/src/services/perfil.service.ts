@@ -13,11 +13,22 @@ import {
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
 import {
+  activacionPadronFapDisponible,
   coincideEmailPreinscripcion,
   coincideUltimos4Telefono,
   metodosVerificacionPreinscripcion,
   type MetodoVerificacionPreinscripcion,
 } from "../utils/preinscripcionVerificacion";
+import {
+  coincideFechaNacimientoPadron,
+  coincidenLicenciasPadron,
+  emailValidoPadronOtp,
+  normalizarEmailPadronOtp,
+  normalizarTelefonoPadronOtp,
+  telefonoValidoPadronOtp,
+} from "../utils/preinscripcionPadronFap";
+import { enviarOtpActivacionPadronResend } from "../utils/preinscripcionOtpEmail";
+import { crearOtpPadronFap, validarOtpPadronFap } from "../utils/preinscripcionOtpPadronStore";
 import {
   assertDniNoBloqueadoPreinscripcion,
   registrarIntentoFallidoPreinscripcion,
@@ -464,16 +475,20 @@ export class PerfilService {
     }
 
     const metodos_disponibles = metodosVerificacionPreinscripcion(data);
+    const padron_fap_disponible = activacionPadronFapDisponible(data);
 
     return {
       encontrado: true as const,
       pendiente_activacion: true as const,
       verificacion_requerida: true as const,
       metodos_disponibles,
+      padron_fap_disponible,
       mensaje:
         metodos_disponibles.length > 0
           ? "Encontramos tus datos cargados por tu club o asociación. Confirmá tu identidad para continuar."
-          : "Encontramos tus datos cargados por tu club o asociación. Contactá a tu entidad para completar el teléfono o email de verificación.",
+          : padron_fap_disponible
+            ? "Encontramos tus datos del padrón FAP. Validá DNI, fecha de nacimiento y N° de licencia para activar con un código a tu email o teléfono."
+            : "Encontramos tus datos cargados por tu club o asociación. Contactá a tu entidad para completar el teléfono o email de verificación.",
     };
   }
 
@@ -533,6 +548,216 @@ export class PerfilService {
       encontrado: true as const,
       pendiente_activacion: true as const,
       perfil: PerfilService.perfilPublicableDesdeFicha(data),
+      verification_token: token,
+      verification_token_expires_at: expires_at,
+    };
+  }
+
+  private static async assertFichaPendienteActivacionPadron(data: {
+    pendiente_activacion: boolean | null;
+    email: string | null;
+  }): Promise<void> {
+    const cuentaPendiente =
+      data.pendiente_activacion || esEmailPlaceholderPlanilla(data.email);
+    if (!cuentaPendiente) {
+      throw new Error("Este DNI ya tiene una cuenta activa.");
+    }
+  }
+
+  private static async obtenerNroLicenciaPerfil(
+    usuarioId: string,
+  ): Promise<string | null> {
+    const { data, error } = await supabaseAdmin
+      .from("licencias")
+      .select("nro_licencia")
+      .eq("usuario_id", usuarioId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error("Error al consultar la licencia.");
+    }
+    return data?.nro_licencia ? String(data.nro_licencia) : null;
+  }
+
+  private static async validarIdentidadPadronFap(
+    dni: string,
+    payload: { fecha_nacimiento: string; nro_licencia: string },
+  ): Promise<NonNullable<Awaited<ReturnType<typeof PerfilService.obtenerFichaPreinscripcionPorDni>>>> {
+    await assertDniNoBloqueadoPreinscripcion(dni);
+    const data = await PerfilService.obtenerFichaPreinscripcionPorDni(dni);
+    if (!data) {
+      await registrarIntentoFallidoPreinscripcion(dni);
+      throw new Error("Los datos de verificación no coinciden.");
+    }
+
+    await PerfilService.assertFichaPendienteActivacionPadron(data);
+
+    if (!activacionPadronFapDisponible(data)) {
+      throw new Error(
+        "Esta ficha ya tiene teléfono o email para verificar. Usá ese método.",
+      );
+    }
+
+    const fechaOk = coincideFechaNacimientoPadron(
+      data.fecha_nacimiento,
+      payload.fecha_nacimiento,
+    );
+    const nroEnFicha = await PerfilService.obtenerNroLicenciaPerfil(
+      String(data.id),
+    );
+    const licenciaOk = coincidenLicenciasPadron(
+      nroEnFicha,
+      payload.nro_licencia,
+    );
+
+    if (!fechaOk || !licenciaOk) {
+      await registrarIntentoFallidoPreinscripcion(dni);
+      throw new Error("Los datos de verificación no coinciden.");
+    }
+
+    return data;
+  }
+
+  /**
+   * Tras validar identidad FAP, envía OTP al email o teléfono nuevo del jugador.
+   */
+  static async solicitarOtpActivacionPadronFap(
+    dni: string,
+    payload: {
+      fecha_nacimiento: string;
+      nro_licencia: string;
+      canal: "email" | "telefono";
+      email?: string;
+      telefono?: string;
+    },
+  ) {
+    const data = await PerfilService.validarIdentidadPadronFap(dni, {
+      fecha_nacimiento: payload.fecha_nacimiento,
+      nro_licencia: payload.nro_licencia,
+    });
+    await reiniciarIntentosPreinscripcion(normalizarDni(dni));
+
+    let destino = "";
+    if (payload.canal === "email") {
+      const email = normalizarEmailPadronOtp(payload.email || "");
+      if (!emailValidoPadronOtp(email)) {
+        throw new Error("Ingresá un correo válido para recibir el código.");
+      }
+      destino = email;
+    } else {
+      const tel = normalizarTelefonoPadronOtp(payload.telefono || "");
+      if (!telefonoValidoPadronOtp(tel)) {
+        throw new Error("Ingresá un teléfono válido (mínimo 8 dígitos).");
+      }
+      destino = tel;
+    }
+
+    const { codigoPlano, expiresAt } = await crearOtpPadronFap({
+      dni: normalizarDni(dni),
+      perfilId: String(data.id),
+      canal: payload.canal,
+      destino,
+    });
+
+    if (payload.canal === "email") {
+      await enviarOtpActivacionPadronResend(destino, codigoPlano);
+    } else if (process.env.SMS_OTP_HABILITADO === "true") {
+      console.info(
+        `[preinscripcion] OTP SMS pendiente de proveedor · ${destino.slice(-4)}`,
+      );
+    } else if (process.env.NODE_ENV !== "production") {
+      console.info(
+        `[preinscripcion] OTP teléfono (solo dev) · destino …${destino.slice(-4)} · código ${codigoPlano}`,
+      );
+    } else {
+      throw new Error(
+        "El envío de códigos por SMS no está habilitado. Usá un correo electrónico.",
+      );
+    }
+
+    return {
+      otp_enviado: true as const,
+      canal: payload.canal,
+      otp_expires_at: expiresAt,
+      mensaje:
+        payload.canal === "email"
+          ? "Te enviamos un código a tu correo. Ingresalo para continuar."
+          : "Te enviamos un código por SMS. Ingresalo para continuar.",
+    };
+  }
+
+  /**
+   * Valida el OTP y emite token de activación (método padron_fap).
+   */
+  static async confirmarOtpActivacionPadronFap(
+    dni: string,
+    payload: {
+      fecha_nacimiento: string;
+      nro_licencia: string;
+      codigo: string;
+    },
+  ) {
+    const dniLimpio = normalizarDni(dni);
+    await assertDniNoBloqueadoPreinscripcion(dniLimpio);
+
+    const data = await PerfilService.validarIdentidadPadronFap(dniLimpio, {
+      fecha_nacimiento: payload.fecha_nacimiento,
+      nro_licencia: payload.nro_licencia,
+    });
+
+    const codigo = String(payload.codigo || "").trim().replace(/\D/g, "");
+    if (codigo.length !== 6) {
+      await registrarIntentoFallidoPreinscripcion(dniLimpio);
+      throw new Error("Código inválido o vencido.");
+    }
+
+    let otpValidado;
+    try {
+      otpValidado = await validarOtpPadronFap(dniLimpio, codigo);
+    } catch {
+      await registrarIntentoFallidoPreinscripcion(dniLimpio);
+      throw new Error("Código inválido o vencido.");
+    }
+
+    if (otpValidado.perfilId !== String(data.id)) {
+      throw new Error("Código inválido o vencido.");
+    }
+
+    await reiniciarIntentosPreinscripcion(dniLimpio);
+
+    const patch: Record<string, unknown> = {};
+    if (otpValidado.canal === "email") {
+      patch.email = otpValidado.destino;
+    } else {
+      patch.telefono = otpValidado.destino;
+    }
+
+    if (Object.keys(patch).length > 0) {
+      await supabaseAdmin.from("perfiles").update(patch).eq("id", data.id);
+    }
+
+    const { token, expires_at } = await emitirTokenActivacionPreinscripcion({
+      dni: dniLimpio,
+      perfilId: String(data.id),
+      metodo: "padron_fap",
+    });
+
+    return {
+      encontrado: true as const,
+      pendiente_activacion: true as const,
+      perfil: PerfilService.perfilPublicableDesdeFicha({
+        ...data,
+        email:
+          otpValidado.canal === "email"
+            ? otpValidado.destino
+            : data.email,
+        telefono:
+          otpValidado.canal === "telefono"
+            ? otpValidado.destino
+            : data.telefono,
+      }),
       verification_token: token,
       verification_token_expires_at: expires_at,
     };
@@ -960,12 +1185,14 @@ export class PerfilService {
       nombre?: string;
       apellido?: string;
       fecha_nacimiento?: string | null;
+      email?: string | null;
+      telefono?: string | null;
     },
   ) {
     const { data: antes, error: readError } = await supabaseAdmin
       .from("perfiles")
       .select(
-        "id, nombre, apellido, fecha_nacimiento, email, pendiente_activacion, rol",
+        "id, nombre, apellido, fecha_nacimiento, email, telefono, pendiente_activacion, rol",
       )
       .eq("id", jugadorId)
       .maybeSingle();
@@ -1019,6 +1246,39 @@ export class PerfilService {
           antes: antes.fecha_nacimiento,
           despues: fecha,
         };
+      }
+    }
+
+    if (datos.email !== undefined) {
+      const emailNorm = datos.email
+        ? normalizarEmailPadronOtp(String(datos.email))
+        : "";
+      if (emailNorm && !emailValidoPadronOtp(emailNorm)) {
+        throw new Error("El email no es válido.");
+      }
+      if (emailNorm && esEmailPlaceholderPlanilla(emailNorm)) {
+        throw new Error("Usá un email real, no un marcador de planilla.");
+      }
+      const anterior = antes.email || null;
+      const nuevo = emailNorm || null;
+      if (nuevo !== anterior) {
+        patch.email = nuevo;
+        cambios.email = { antes: anterior, despues: nuevo };
+      }
+    }
+
+    if (datos.telefono !== undefined) {
+      const telNorm = datos.telefono
+        ? normalizarTelefonoPadronOtp(String(datos.telefono))
+        : "";
+      if (telNorm && !telefonoValidoPadronOtp(telNorm)) {
+        throw new Error("El teléfono debe tener al menos 8 dígitos.");
+      }
+      const anterior = antes.telefono || null;
+      const nuevo = telNorm || null;
+      if (nuevo !== anterior) {
+        patch.telefono = nuevo;
+        cambios.telefono = { antes: anterior, despues: nuevo };
       }
     }
 

@@ -185,17 +185,12 @@ export class AuthService {
         email: preinscripto.email,
       };
       const metodos = metodosVerificacionPreinscripcion(fichaParaMetodos);
-
-      if (metodos.length === 0) {
-        throw new Error(
-          "No podés activar esta ficha sin verificación. Contactá a tu entidad para que complete el teléfono o email en tu ficha.",
-        );
-      }
-
       const tokenActivacion = String(datos.verification_token || "").trim();
       if (!tokenActivacion) {
         throw new Error(
-          "Debés verificar tu identidad (teléfono o email de la ficha) antes de completar el registro.",
+          metodos.length > 0
+            ? "Debés verificar tu identidad (teléfono o email de la ficha) antes de completar el registro."
+            : "Debés verificar tu identidad con el padrón FAP (código OTP) antes de completar el registro.",
         );
       }
 
