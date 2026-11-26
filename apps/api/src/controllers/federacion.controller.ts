@@ -1,5 +1,17 @@
 import { Request, Response } from "express";
 import { FederacionService } from "../services/federacion.service";
+
+function statusDesdeError(error: unknown, defaultStatus: number): number {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "statusCode" in error &&
+    typeof (error as { statusCode: unknown }).statusCode === "number"
+  ) {
+    return (error as { statusCode: number }).statusCode;
+  }
+  return defaultStatus;
+}
 import { LicenciaOrganizacionService } from "../services/licenciaOrganizacion.service";
 
 export const listarFederaciones = async (_req: Request, res: Response) => {
@@ -70,14 +82,15 @@ export const cambiarEstadoFederacion = async (req: Request, res: Response) => {
 export const eliminarFederacion = async (req: Request, res: Response) => {
   try {
     const resultado = await FederacionService.gestionarBaja(req.params.id);
+    const h = resultado.historial;
     const message =
       resultado.modo === "eliminado"
         ? "La federación no tenía historial y fue eliminada."
-        : "La federación tiene asociaciones vinculadas y quedó inactiva. Podés reactivarla.";
+        : `La federación tiene historial (${h.asociaciones} asociaciones, ${h.licencias} licencias, ${h.afiliaciones} afiliaciones, ${h.usuariosAdmin} admins) y quedó inactiva. Podés reactivarla.`;
     return res.status(200).json({ exito: true, ...resultado, message });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error al eliminar";
-    return res.status(400).json({ exito: false, message });
+    return res.status(statusDesdeError(error, 400)).json({ exito: false, message });
   }
 };
 

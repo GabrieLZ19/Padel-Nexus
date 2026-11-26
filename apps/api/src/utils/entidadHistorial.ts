@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/supabase";
+import { mismaProvincia } from "./alcanceCuenta";
 
 export type ResumenHistorialEntidad = {
   tieneHistorial: boolean;
@@ -92,13 +93,40 @@ export async function historialClub(clubId: string): Promise<ResumenHistorialEnt
   return resumen;
 }
 
+export type ResumenHistorialAsociacion = {
+  tieneHistorial: boolean;
+  clubes: number;
+  torneos: number;
+  licencias: number;
+  afiliaciones: number;
+  usuariosAdmin: number;
+};
+
 export async function historialAsociacion(
   asociacionId: string,
-): Promise<{ tieneHistorial: boolean; clubes: number; torneos: number }> {
+): Promise<ResumenHistorialAsociacion> {
+  const resumen: ResumenHistorialAsociacion = {
+    tieneHistorial: false,
+    clubes: 0,
+    torneos: 0,
+    licencias: 0,
+    afiliaciones: 0,
+    usuariosAdmin: 0,
+  };
+
+  const { data: asoc } = await supabaseAdmin
+    .from("asociaciones")
+    .select("id, provincia")
+    .eq("id", asociacionId)
+    .maybeSingle();
+
+  if (!asoc) return resumen;
+
   const { count: clubes } = await supabaseAdmin
     .from("clubes")
     .select("id", { count: "exact", head: true })
     .eq("asociacion_id", asociacionId);
+  resumen.clubes = clubes ?? 0;
 
   const { data: clubRows } = await supabaseAdmin
     .from("clubes")
@@ -106,27 +134,155 @@ export async function historialAsociacion(
     .eq("asociacion_id", asociacionId);
   const clubIds = (clubRows || []).map((c) => c.id);
 
-  let torneos = 0;
+  const torneoIds = new Set<string>();
+  const { data: torneosPorAsoc } = await supabaseAdmin
+    .from("torneos")
+    .select("id")
+    .eq("asociacion_id", asociacionId);
+  for (const t of torneosPorAsoc || []) {
+    torneoIds.add(String(t.id));
+  }
   if (clubIds.length > 0) {
-    const { count } = await supabaseAdmin
+    const { data: torneosClub } = await supabaseAdmin
       .from("torneos")
-      .select("id", { count: "exact", head: true })
+      .select("id")
       .in("club_id", clubIds);
-    torneos = count ?? 0;
+    for (const t of torneosClub || []) {
+      torneoIds.add(String(t.id));
+    }
+  }
+  resumen.torneos = torneoIds.size;
+
+  const { count: licencias } = await supabaseAdmin
+    .from("licencias")
+    .select("id", { count: "exact", head: true })
+    .eq("asociacion_id", asociacionId);
+  resumen.licencias = licencias ?? 0;
+
+  const { count: afiliaciones } = await supabaseAdmin
+    .from("afiliaciones")
+    .select("id", { count: "exact", head: true })
+    .eq("asociacion_id", asociacionId);
+  resumen.afiliaciones = afiliaciones ?? 0;
+
+  let usuariosAdmin = 0;
+  if (clubIds.length > 0) {
+    const { count: adminsClub } = await supabaseAdmin
+      .from("perfiles")
+      .select("id", { count: "exact", head: true })
+      .in("club_id", clubIds)
+      .eq("rol", "admin_club");
+    usuariosAdmin += adminsClub ?? 0;
   }
 
-  const tieneHistorial = (clubes ?? 0) > 0 || torneos > 0;
-  return { tieneHistorial, clubes: clubes ?? 0, torneos };
+  const { data: adminsProvinciales } = await supabaseAdmin
+    .from("perfiles")
+    .select("id, lugar_residencia")
+    .eq("rol", "admin_provincial");
+  usuariosAdmin += (adminsProvinciales || []).filter((p) =>
+    mismaProvincia(p.lugar_residencia, asoc.provincia),
+  ).length;
+
+  resumen.usuariosAdmin = usuariosAdmin;
+
+  resumen.tieneHistorial =
+    resumen.clubes > 0 ||
+    resumen.torneos > 0 ||
+    resumen.licencias > 0 ||
+    resumen.afiliaciones > 0 ||
+    resumen.usuariosAdmin > 0;
+
+  return resumen;
 }
+
+export type ResumenHistorialFederacion = {
+  tieneHistorial: boolean;
+  asociaciones: number;
+  licencias: number;
+  afiliaciones: number;
+  usuariosAdmin: number;
+};
 
 export async function historialFederacion(
   federacionId: string,
-): Promise<{ tieneHistorial: boolean; asociaciones: number }> {
-  const { count: asociaciones } = await supabaseAdmin
+): Promise<ResumenHistorialFederacion> {
+  const resumen: ResumenHistorialFederacion = {
+    tieneHistorial: false,
+    asociaciones: 0,
+    licencias: 0,
+    afiliaciones: 0,
+    usuariosAdmin: 0,
+  };
+
+  const { data: asocRows } = await supabaseAdmin
     .from("asociaciones")
-    .select("id", { count: "exact", head: true })
+    .select("id, provincia")
     .eq("federacion_id", federacionId);
 
-  const tieneHistorial = (asociaciones ?? 0) > 0;
-  return { tieneHistorial, asociaciones: asociaciones ?? 0 };
+  const asociacionIds = (asocRows || []).map((a) => String(a.id));
+  resumen.asociaciones = asociacionIds.length;
+
+  if (asociacionIds.length > 0) {
+    const { count: licencias } = await supabaseAdmin
+      .from("licencias")
+      .select("id", { count: "exact", head: true })
+      .in("asociacion_id", asociacionIds);
+    resumen.licencias = licencias ?? 0;
+
+    const { count: afiliaciones } = await supabaseAdmin
+      .from("afiliaciones")
+      .select("id", { count: "exact", head: true })
+      .in("asociacion_id", asociacionIds);
+    resumen.afiliaciones = afiliaciones ?? 0;
+
+    const { data: clubes } = await supabaseAdmin
+      .from("clubes")
+      .select("id")
+      .in("asociacion_id", asociacionIds);
+    const clubIds = (clubes || []).map((c) => String(c.id));
+
+    let usuariosAdmin = 0;
+    const { count: adminsFederacion } = await supabaseAdmin
+      .from("perfiles")
+      .select("id", { count: "exact", head: true })
+      .eq("rol", "admin_federacion");
+    usuariosAdmin += adminsFederacion ?? 0;
+
+    if (clubIds.length > 0) {
+      const { count: adminsClub } = await supabaseAdmin
+        .from("perfiles")
+        .select("id", { count: "exact", head: true })
+        .in("club_id", clubIds)
+        .eq("rol", "admin_club");
+      usuariosAdmin += adminsClub ?? 0;
+    }
+
+    const provincias = new Set(
+      (asocRows || [])
+        .map((a) => String(a.provincia || "").trim())
+        .filter(Boolean),
+    );
+    const { data: adminsProvinciales } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, lugar_residencia")
+      .eq("rol", "admin_provincial");
+    for (const p of adminsProvinciales || []) {
+      for (const prov of provincias) {
+        if (mismaProvincia(p.lugar_residencia, prov)) {
+          usuariosAdmin += 1;
+          break;
+        }
+      }
+    }
+
+    resumen.usuariosAdmin = usuariosAdmin;
+  }
+
+  resumen.tieneHistorial =
+    resumen.asociaciones > 0 ||
+    resumen.licencias > 0 ||
+    resumen.afiliaciones > 0 ||
+    resumen.usuariosAdmin > 0;
+
+  return resumen;
 }

@@ -1,5 +1,9 @@
 import { supabaseAdmin } from "../config/supabase";
-import { historialAsociacion } from "../utils/entidadHistorial";
+import {
+  historialAsociacion,
+  type ResumenHistorialAsociacion,
+} from "../utils/entidadHistorial";
+import { EntidadNoEncontradaError } from "../utils/entidadNoEncontrada";
 
 export interface AsociacionPayload {
   nombre: string;
@@ -331,9 +335,13 @@ export class AsociacionService {
    */
   static async gestionarBaja(id: string): Promise<{
     modo: "eliminado" | "dado_de_baja";
-    clubes: number;
-    torneos: number;
+    historial: ResumenHistorialAsociacion;
   }> {
+    const existe = await AsociacionService.obtenerPorId(id);
+    if (!existe) {
+      throw new EntidadNoEncontradaError("Asociación");
+    }
+
     const historial = await historialAsociacion(id);
 
     if (!historial.tieneHistorial) {
@@ -344,15 +352,18 @@ export class AsociacionService {
       if (error) {
         throw new Error(`No se pudo eliminar la asociación: ${error.message}`);
       }
-      return { modo: "eliminado", clubes: 0, torneos: 0 };
+      return { modo: "eliminado", historial };
     }
 
     await AsociacionService.cambiarEstado(id, "inactivo");
-    return {
-      modo: "dado_de_baja",
-      clubes: historial.clubes,
-      torneos: historial.torneos,
-    };
+    return { modo: "dado_de_baja", historial };
+  }
+
+  static async exigirAsociacionExistente(id: string): Promise<void> {
+    const existe = await AsociacionService.obtenerPorId(id);
+    if (!existe) {
+      throw new EntidadNoEncontradaError("Asociación");
+    }
   }
 
   static async cambiarEstado(id: string, estado: "activo" | "inactivo" | "pendiente") {
