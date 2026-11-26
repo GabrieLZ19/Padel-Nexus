@@ -3,11 +3,15 @@ import {
   AVISO_SIN_CLUB,
   AVISO_SIN_PROVINCIA,
   decidirAlcanceTorneo,
-  mismaProvincia,
+  ErrorAlcanceFichaProvisoria,
+  jugadorEnAlcanceFederacion,
+  jugadorEnAlcanceProvincial,
   type AccionSobreTorneo,
   type ContextoCuenta,
+  type DatosAlcanceJugadorFicha,
   type DecisionAlcance,
 } from "../utils/alcanceCuenta";
+import { LicenciaOrganizacionService } from "./licenciaOrganizacion.service";
 
 export interface CuentaResuelta extends ContextoCuenta {
   aviso: string | null;
@@ -127,5 +131,117 @@ export class AlcanceCuentaService {
     if (!decision.permitido) {
       throw new Error(decision.motivo || "No tenés permiso para esta acción.");
     }
+  }
+
+  private static async datosAlcanceJugadorFicha(
+    jugadorId: string,
+  ): Promise<DatosAlcanceJugadorFicha> {
+    const { data: perfil, error } = await supabaseAdmin
+      .from("perfiles")
+      .select("lugar_residencia, club_id")
+      .eq("id", jugadorId)
+      .maybeSingle();
+
+    if (error || !perfil) {
+      throw new Error("Jugador no encontrado.");
+    }
+
+    let clubProvincia: string | null = null;
+    let clubAsociacionId: string | null = null;
+    if (perfil.club_id) {
+      const { data: club } = await supabaseAdmin
+        .from("clubes")
+        .select("provincia, asociacion_id")
+        .eq("id", perfil.club_id)
+        .maybeSingle();
+      clubProvincia = club?.provincia ?? null;
+      clubAsociacionId = club?.asociacion_id ?? null;
+    }
+
+    const { data: licencia } = await supabaseAdmin
+      .from("licencias")
+      .select("asociacion_id, datos_solicitud")
+      .eq("usuario_id", jugadorId)
+      .maybeSingle();
+
+    const datos = (licencia?.datos_solicitud || {}) as Record<string, unknown>;
+    const licenciaProvinciaSolicitud =
+      typeof datos.provincia === "string" ? datos.provincia : null;
+
+    return {
+      lugarResidencia: perfil.lugar_residencia,
+      clubProvincia,
+      clubAsociacionId,
+      licenciaAsociacionId: licencia?.asociacion_id ?? null,
+      licenciaProvinciaSolicitud,
+    };
+  }
+
+  /**
+   * ENT-38: ficha provisoria solo dentro de la jurisdicción del actor.
+   */
+  static async exigirEdicionFichaProvisoria(
+    actor: { id: string; rol?: string | null },
+    jugadorId: string,
+  ): Promise<void> {
+    const rol = actor.rol || "usuario";
+    if (rol === "superadmin" || rol === "admin") return;
+
+    const jugador = await AlcanceCuentaService.datosAlcanceJugadorFicha(jugadorId);
+
+    if (rol === "admin_provincial") {
+      const asoc = await LicenciaOrganizacionService.resolverAsociacionProvincial(
+        actor.id,
+      );
+      if (
+        !jugadorEnAlcanceProvincial(jugador, {
+          provincia: asoc.provincia,
+          asociacionId: asoc.asociacionId,
+        })
+      ) {
+        throw new ErrorAlcanceFichaProvisoria(
+          "No podés editar fichas de jugadores fuera de tu provincia.",
+        );
+      }
+      return;
+    }
+
+    if (rol === "admin_federacion") {
+      const contexto = await LicenciaOrganizacionService.resolverContextoAdmin(
+        actor.id,
+        rol,
+      );
+      if (contexto.tipo !== "federacion" || !contexto.entidad_id) {
+        throw new ErrorAlcanceFichaProvisoria();
+      }
+
+      const { data: asociaciones, error } = await supabaseAdmin
+        .from("asociaciones")
+        .select("id, provincia")
+        .eq("federacion_id", contexto.entidad_id);
+
+      if (error) throw new Error(error.message);
+
+      const asociacionIds = new Set(
+        (asociaciones || []).map((a) => String(a.id)),
+      );
+      const provincias = (asociaciones || [])
+        .map((a) => String(a.provincia || "").trim())
+        .filter(Boolean);
+
+      if (
+        !jugadorEnAlcanceFederacion(jugador, {
+          asociacionIds,
+          provincias,
+        })
+      ) {
+        throw new ErrorAlcanceFichaProvisoria(
+          "No podés editar fichas fuera del circuito de tu federación.",
+        );
+      }
+      return;
+    }
+
+    throw new ErrorAlcanceFichaProvisoria();
   }
 }

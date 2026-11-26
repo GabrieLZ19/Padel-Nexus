@@ -106,3 +106,56 @@ export function decidirAlcanceTorneo(
   if (accion === "ver") return permitido(false, false);
   return denegado("No tenés permiso para esta acción.");
 }
+
+export class ErrorAlcanceFichaProvisoria extends Error {
+  readonly statusCode = 403;
+
+  constructor(
+    message = "No tenés permiso para editar esta ficha fuera de tu jurisdicción.",
+  ) {
+    super(message);
+    this.name = "ErrorAlcanceFichaProvisoria";
+  }
+}
+
+export type DatosAlcanceJugadorFicha = {
+  lugarResidencia?: string | null;
+  clubProvincia?: string | null;
+  clubAsociacionId?: string | null;
+  licenciaAsociacionId?: string | null;
+  licenciaProvinciaSolicitud?: string | null;
+};
+
+/** ENT-38: admin provincial — provincia del jugador, club o licencia. */
+export function jugadorEnAlcanceProvincial(
+  jugador: DatosAlcanceJugadorFicha,
+  alcance: { provincia: string; asociacionId: string | null },
+): boolean {
+  const { provincia, asociacionId } = alcance;
+  if (mismaProvincia(jugador.lugarResidencia, provincia)) return true;
+  if (mismaProvincia(jugador.clubProvincia, provincia)) return true;
+  if (mismaProvincia(jugador.licenciaProvinciaSolicitud, provincia)) return true;
+  if (asociacionId && jugador.licenciaAsociacionId === asociacionId) return true;
+  if (asociacionId && jugador.clubAsociacionId === asociacionId) return true;
+  return false;
+}
+
+/** ENT-38: admin federación — asociaciones y provincias del circuito. */
+export function jugadorEnAlcanceFederacion(
+  jugador: DatosAlcanceJugadorFicha,
+  alcance: {
+    asociacionIds: ReadonlySet<string>;
+    provincias: readonly string[];
+  },
+): boolean {
+  for (const prov of alcance.provincias) {
+    if (mismaProvincia(jugador.lugarResidencia, prov)) return true;
+    if (mismaProvincia(jugador.clubProvincia, prov)) return true;
+    if (mismaProvincia(jugador.licenciaProvinciaSolicitud, prov)) return true;
+  }
+  const licAsoc = jugador.licenciaAsociacionId;
+  if (licAsoc && alcance.asociacionIds.has(licAsoc)) return true;
+  const clubAsoc = jugador.clubAsociacionId;
+  if (clubAsoc && alcance.asociacionIds.has(clubAsoc)) return true;
+  return false;
+}

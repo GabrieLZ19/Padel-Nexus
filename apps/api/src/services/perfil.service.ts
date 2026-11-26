@@ -38,6 +38,8 @@ import { emitirTokenActivacionPreinscripcion } from "../utils/preinscripcionToke
 import { randomBytes } from "crypto";
 import { esVisibleEnSitioPublico } from "../utils/datoPrueba";
 import { capitalizarNombre, normalizarNombrePerfil } from "../utils/formatoTexto";
+import { sincronizarNombresInscripcionesJugador } from "../utils/sincronizarNombresInscripcionesJugador";
+import { ErrorDniFichaDuplicado } from "../utils/errorDniFicha";
 import { NotificacionService } from "./notificacion.service";
 import {
   CATEGORIAS_LIBRES,
@@ -293,6 +295,16 @@ export class PerfilService {
       throw new Error(
         `No se pudieron actualizar los datos del perfil: ${error?.message}`,
       );
+    }
+
+    if (
+      nombreCapitalizado !== undefined ||
+      apellidoCapitalizado !== undefined
+    ) {
+      await sincronizarNombresInscripcionesJugador(userId, {
+        nombre: data.nombre,
+        apellido: data.apellido,
+      });
     }
 
     return data;
@@ -1179,7 +1191,7 @@ export class PerfilService {
    * Corrección de datos en fichas provisorias (padrón / preinscripción) por staff.
    */
   static async actualizarFichaProvisoriaPorAdmin(
-    adminId: string,
+    actor: { id: string; rol?: string | null },
     jugadorId: string,
     datos: {
       nombre?: string;
@@ -1189,6 +1201,9 @@ export class PerfilService {
       telefono?: string | null;
     },
   ) {
+    const { AlcanceCuentaService } = await import("./alcanceCuenta.service");
+    await AlcanceCuentaService.exigirEdicionFichaProvisoria(actor, jugadorId);
+
     const { data: antes, error: readError } = await supabaseAdmin
       .from("perfiles")
       .select(
@@ -1299,13 +1314,158 @@ export class PerfilService {
       );
     }
 
+    let inscripciones_sync: Awaited<
+      ReturnType<typeof sincronizarNombresInscripcionesJugador>
+    > | null = null;
+    if (cambios.nombre || cambios.apellido) {
+      inscripciones_sync = await sincronizarNombresInscripcionesJugador(
+        jugadorId,
+        { nombre: data.nombre, apellido: data.apellido },
+      );
+    }
+
     await supabaseAdmin.from("logs_auditoria").insert({
-      usuario_id_admin: adminId,
+      usuario_id_admin: actor.id,
       accion: "editar_ficha_provisoria",
+      entidad_afectada: jugadorId,
+      detalles: { cambios, inscripciones_sync },
+    });
+
+    return data;
+  }
+
+  /** ENT-41: corrección de DNI exclusiva de superadmin con auditoría. */
+  static async corregirDniFichaPorSuperadmin(
+    actor: { id: string; rol?: string | null },
+    jugadorId: string,
+    dniRaw: string,
+  ) {
+    if (actor.rol !== "superadmin") {
+      const err = new Error("Solo superadmin puede corregir el DNI.");
+      Object.assign(err, { statusCode: 403 });
+      throw err;
+    }
+
+    const dniNuevo = normalizarDni(String(dniRaw || ""));
+    if (!dniNuevo || dniNuevo.length < 7) {
+      throw new Error("Ingresá un DNI válido (mínimo 7 dígitos).");
+    }
+
+    const { data: antes, error: readError } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, dni, email, rol")
+      .eq("id", jugadorId)
+      .maybeSingle();
+
+    if (readError || !antes) {
+      throw new Error("Jugador no encontrado.");
+    }
+    if (antes.rol !== "usuario") {
+      throw new Error("Solo aplica a fichas de jugador.");
+    }
+
+    const dniAnterior = antes.dni ? normalizarDni(antes.dni) : null;
+    if (dniNuevo === dniAnterior) {
+      throw new Error("El DNI ingresado es el mismo que el actual.");
+    }
+
+    const { data: duplicado } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, nombre, apellido")
+      .eq("dni", dniNuevo)
+      .neq("id", jugadorId)
+      .maybeSingle();
+
+    if (duplicado) {
+      throw new ErrorDniFichaDuplicado({
+        id: duplicado.id,
+        nombre: duplicado.nombre ?? null,
+        apellido: duplicado.apellido ?? null,
+      });
+    }
+
+    const patch: Record<string, unknown> = { dni: dniNuevo };
+    const cambios: Record<string, { antes: unknown; despues: unknown }> = {
+      dni: { antes: antes.dni ?? null, despues: dniNuevo },
+    };
+
+    if (esEmailPlaceholderPlanilla(antes.email)) {
+      const emailNuevo = PerfilService.emailPlaceholderDesdeDni(dniNuevo);
+      patch.email = emailNuevo;
+      cambios.email = { antes: antes.email ?? null, despues: emailNuevo };
+    }
+
+    const { data, error: updateError } = await supabaseAdmin
+      .from("perfiles")
+      .update(patch)
+      .eq("id", jugadorId)
+      .select("*")
+      .single();
+
+    if (updateError || !data) {
+      throw new Error(
+        updateError?.message || "No se pudo actualizar el DNI.",
+      );
+    }
+
+    await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: actor.id,
+      accion: "corregir_dni_ficha",
       entidad_afectada: jugadorId,
       detalles: { cambios },
     });
 
     return data;
+  }
+
+  /** ENT-41: historial de correcciones de ficha (DNI y ficha provisoria). */
+  static async listarHistorialCorreccionesFicha(jugadorId: string) {
+    const acciones = ["corregir_dni_ficha", "editar_ficha_provisoria"];
+
+    const { data, error } = await supabaseAdmin
+      .from("logs_auditoria")
+      .select("id, accion, detalles, created_at, usuario_id_admin")
+      .eq("entidad_afectada", jugadorId)
+      .in("accion", acciones)
+      .order("created_at", { ascending: false })
+      .limit(40);
+
+    if (error) {
+      throw new Error("No se pudo cargar el historial de la ficha.");
+    }
+
+    const filas = data ?? [];
+    const adminIds = [
+      ...new Set(
+        filas
+          .map((r) => r.usuario_id_admin)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    ];
+
+    const nombresAdmin = new Map<string, string>();
+    if (adminIds.length > 0) {
+      const { data: perfiles } = await supabaseAdmin
+        .from("perfiles")
+        .select("id, nombre, apellido, email")
+        .in("id", adminIds);
+      for (const p of perfiles ?? []) {
+        const etiqueta = [p.nombre, p.apellido]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+        nombresAdmin.set(
+          p.id,
+          etiqueta || (typeof p.email === "string" ? p.email : "Administrador"),
+        );
+      }
+    }
+
+    return filas.map((fila) => ({
+      ...fila,
+      admin_nombre: fila.usuario_id_admin
+        ? nombresAdmin.get(fila.usuario_id_admin) ?? null
+        : null,
+    }));
   }
 }

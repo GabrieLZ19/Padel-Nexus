@@ -100,6 +100,69 @@ export const PerfilController = {
     }
   },
 
+  async corregirDniFicha(req: Request, res: Response): Promise<Response> {
+    try {
+      const adminId = req.user?.id;
+      if (!adminId) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "Usuario no autorizado." });
+      }
+
+      const { id } = req.params;
+      const dni = req.body?.dni;
+      if (dni === undefined || dni === null || String(dni).trim() === "") {
+        return res
+          .status(400)
+          .json({ exito: false, error: "El DNI es obligatorio." });
+      }
+
+      const data = await PerfilService.corregirDniFichaPorSuperadmin(
+        { id: adminId, rol: req.user?.rol },
+        id,
+        String(dni),
+      );
+
+      return res.status(200).json({
+        exito: true,
+        mensaje: "DNI actualizado.",
+        data,
+      });
+    } catch (error: unknown) {
+      const statusCode =
+        typeof error === "object" &&
+        error !== null &&
+        "statusCode" in error &&
+        typeof (error as { statusCode: unknown }).statusCode === "number"
+          ? (error as { statusCode: number }).statusCode
+          : 400;
+      const message =
+        error instanceof Error ? error.message : "No se pudo corregir el DNI.";
+      const extra =
+        typeof error === "object" &&
+        error !== null &&
+        "otroPerfil" in error &&
+        statusCode === 409
+          ? { otro_perfil: (error as { otroPerfil: unknown }).otroPerfil }
+          : {};
+      return res.status(statusCode).json({ exito: false, error: message, ...extra });
+    }
+  },
+
+  async listarHistorialFicha(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const data = await PerfilService.listarHistorialCorreccionesFicha(id);
+      return res.status(200).json({ exito: true, data });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No se pudo cargar el historial.";
+      return res.status(500).json({ exito: false, error: message });
+    }
+  },
+
   async actualizarFichaProvisoriaAdmin(
     req: Request,
     res: Response,
@@ -117,7 +180,7 @@ export const PerfilController = {
         req.body ?? {};
 
       const data = await PerfilService.actualizarFichaProvisoriaPorAdmin(
-        adminId,
+        { id: adminId, rol: req.user?.rol },
         id,
         {
           nombre,
@@ -134,11 +197,18 @@ export const PerfilController = {
         data,
       });
     } catch (error: unknown) {
+      const statusCode =
+        typeof error === "object" &&
+        error !== null &&
+        "statusCode" in error &&
+        typeof (error as { statusCode: unknown }).statusCode === "number"
+          ? (error as { statusCode: number }).statusCode
+          : 400;
       const message =
         error instanceof Error
           ? error.message
           : "No se pudo actualizar la ficha.";
-      return res.status(400).json({ exito: false, error: message });
+      return res.status(statusCode).json({ exito: false, error: message });
     }
   },
 

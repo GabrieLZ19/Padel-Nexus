@@ -75,6 +75,24 @@ router.post("/push-token", PerfilController.registrarPushToken);
 router.post("/avatar", PerfilController.subirAvatar);
 router.delete("/avatar", PerfilController.eliminarAvatar);
 
+router.get(
+  "/:id/historial-ficha",
+  authorize([
+    "superadmin",
+    "admin_federacion",
+    "admin_provincial",
+    "admin",
+    "admin_club",
+  ]),
+  PerfilController.listarHistorialFicha,
+);
+
+router.patch(
+  "/:id/dni",
+  authorize(["superadmin"]),
+  PerfilController.corregirDniFicha,
+);
+
 // Acceso restringido a jerarquías de administración (incl. admin de club)
 router.get(
   "/:id",

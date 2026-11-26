@@ -6,6 +6,7 @@ import {
 } from "./perfil.service";
 import { categoriaRequeridaDelTorneo } from "../utils/categoriaTorneo";
 import { assertCategoria } from "../utils/inscripcionElegibilidad";
+import { formatNombreInscripcionJugador as formatNombreCompleto } from "../utils/formatNombreInscripcion";
 
 export type ParejaExternaLlave = {
   inscripcion_origen_id: string;
@@ -19,18 +20,6 @@ export type ParejaExternaLlave = {
   bloqueada_en_torneo?: boolean;
   motivo_bloqueo?: string;
 };
-
-function formatNombreCompleto(
-  apellido?: string | null,
-  nombre?: string | null,
-): string {
-  const ap = (apellido || "").trim();
-  const nom = (nombre || "").trim();
-  if (ap && nom) return `${ap.toUpperCase()}, ${nom}`;
-  if (ap) return ap.toUpperCase();
-  if (nom) return nom;
-  return "Desconocido";
-}
 
 function pareceDni(q: string): boolean {
   return /^\d{7,11}$/.test(q.trim());
