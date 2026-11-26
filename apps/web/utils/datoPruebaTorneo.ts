@@ -16,3 +16,16 @@ export function torneoVisibleEnSitioPublico(torneo: {
   if (esNombreTorneoDePrueba(torneo.nombre)) return false;
   return torneo.es_prueba === false;
 }
+
+export function motivoExclusionRankingTorneoUi(torneo: {
+  nombre?: string | null;
+  es_prueba?: boolean | null;
+}): string | null {
+  if (torneo.es_prueba) {
+    return "marcado como torneo de prueba (es_prueba)";
+  }
+  if (esNombreTorneoDePrueba(torneo.nombre)) {
+    return "nombre de ensayo o QA detectado";
+  }
+  return null;
+}

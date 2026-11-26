@@ -313,10 +313,26 @@ export default function DetalleAsociacionPage() {
 
                   <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/5 text-xs text-gray-400">
                     <div>
-                      <span>Canchas:</span> <span className="text-white font-bold">{c.canchas || 4}</span>
+                      <span>Canchas:</span>{" "}
+                      <span className="text-white font-bold">
+                        {typeof c.canchas_activas === "number"
+                          ? c.canchas_activas
+                          : typeof c.canchas === "number"
+                            ? c.canchas
+                            : 0}
+                      </span>
                     </div>
                     <div>
-                      <span>Estado:</span> <span className="text-emerald-400 font-bold">Activo</span>
+                      <span>Estado:</span>{" "}
+                      <span
+                        className={
+                          String(c.estado || "activo").toLowerCase() === "activo"
+                            ? "text-emerald-400 font-bold"
+                            : "text-rose-400 font-bold"
+                        }
+                      >
+                        {String(c.estado || "Activo")}
+                      </span>
                     </div>
                   </div>
                 </div>

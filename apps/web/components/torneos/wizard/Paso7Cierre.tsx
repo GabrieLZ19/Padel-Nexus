@@ -17,6 +17,7 @@ import {
   inferirPuntosActivados,
   torneoVinculaRanking,
 } from "@/utils/puntosTorneo";
+import { motivoExclusionRankingTorneoUi } from "@/utils/datoPruebaTorneo";
 
 interface Paso5CierreProps {
   torneo: Torneo;
@@ -80,6 +81,7 @@ export const Paso5Cierre = ({
   const rawPuntos = torneo.configuracion_puntos || {};
   const rawProvincia = rawPuntos.puntos_provincia || {};
   const rankingVinculado = torneoVinculaRanking(torneo.alcance);
+  const motivoTorneoPrueba = motivoExclusionRankingTorneoUi(torneo);
   const [puntosActivados, setPuntosActivados] = useState(() =>
     inferirPuntosActivados(rawPuntos, torneo.alcance),
   );
@@ -573,6 +575,20 @@ export const Paso5Cierre = ({
           </div>
         </div>
       </div>
+
+      {motivoTorneoPrueba ? (
+        <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 px-5 py-4 text-sm text-violet-100/90">
+          <p className="font-bold text-violet-200 mb-1">
+            Torneo excluido del ranking oficial
+          </p>
+          <p className="text-violet-100/80 leading-relaxed">
+            Motivo: {motivoTorneoPrueba}. Los resultados no suman puntos aunque
+            actives la asignación abajo. Para publicar en el sitio y sumar al
+            ranking, desmarcá la bandera de torneo de prueba en el paso Datos del
+            torneo (y evitá nombres de ensayo).
+          </p>
+        </div>
+      ) : null}
 
       {rankingVinculado && !puntosActivados ? (
         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4 text-sm text-amber-100/90">
