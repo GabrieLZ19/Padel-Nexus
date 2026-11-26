@@ -5,6 +5,8 @@
  *   pnpm --filter api import:padron-fap -- "ruta/al/jugadores.html"
  *   pnpm --filter api import:padron-fap -- "ruta.html" --limit 100
  *   pnpm --filter api import:padron-fap -- "ruta.html" --dry-run
+ *   pnpm --filter api import:padron-fap -- "ruta.html" --sanear-acentos --dry-run
+ *   pnpm --filter api import:padron-fap -- "ruta.html" --solo-sanear --dry-run
  *   pnpm --filter api import:padron-fap -- "ruta.html" --retry-log errores.jsonl
  */
 import fs from "fs";
@@ -14,7 +16,12 @@ import { supabaseAdmin } from "../config/supabase";
 import { FAP_ESTADOS_LICENCIA } from "../constants/fap";
 import { capitalizarNombre } from "../utils/formatoTexto";
 import { esEmailPlaceholderPlanilla } from "../utils/inscripcionPlanilla";
-import { parsePadronFapHtml } from "../utils/padronFapHtml";
+import {
+  construirPatchPerfilPadronFap,
+  decodificarHtmlPadronFap,
+  parsePadronFapHtml,
+  type PerfilExistentePadron,
+} from "../utils/padronFapHtml";
 import {
   emailPlaceholderPadronFap,
   lugarResidenciaDesdePadronFap,
@@ -26,16 +33,7 @@ import {
   calcularFechaVencimientoLicencia,
 } from "../utils/licenciaConfig";
 
-type Existente = {
-  id: string;
-  nombre: string | null;
-  apellido: string | null;
-  email: string | null;
-  categoria_padel: string | null;
-  lugar_residencia: string | null;
-  fecha_nacimiento: string | null;
-  sexo: string | null;
-};
+type Existente = PerfilExistentePadron;
 
 type Resumen = {
   totalFilas: number;
@@ -52,6 +50,8 @@ const PAUSA_MS = 40;
 
 function parseArgs(argv: string[]) {
   const dryRun = argv.includes("--dry-run");
+  const soloSanear = argv.includes("--solo-sanear");
+  const sanearAcentos = soloSanear || argv.includes("--sanear-acentos");
   const limitIdx = argv.indexOf("--limit");
   const limit =
     limitIdx >= 0 && argv[limitIdx + 1]
@@ -68,7 +68,14 @@ function parseArgs(argv: string[]) {
       "Indicá la ruta al HTML exportado (ej. jugadores.xls (5).html).",
     );
   }
-  return { dryRun, limit, retryLog, filePath: path.resolve(fileArg) };
+  return {
+    dryRun,
+    sanearAcentos,
+    soloSanear,
+    limit,
+    retryLog,
+    filePath: path.resolve(fileArg),
+  };
 }
 
 function dniesDesdeLogErrores(logPath: string): Set<string> {
@@ -100,7 +107,7 @@ async function cargarExistentesPorDni(): Promise<Map<string, Existente>> {
     const { data, error } = await supabaseAdmin
       .from("perfiles")
       .select(
-        "id, dni, nombre, apellido, email, categoria_padel, lugar_residencia, fecha_nacimiento, sexo",
+        "id, dni, nombre, apellido, email, telefono, categoria_padel, lugar_residencia, fecha_nacimiento, sexo, pendiente_activacion",
       )
       .not("dni", "is", null)
       .range(from, from + pageSize - 1);
@@ -272,6 +279,7 @@ async function actualizarFicha(
   fechaVencimiento: string,
   licenciasOcupadas: Set<string>,
   dryRun: boolean,
+  sanearAcentos: boolean,
 ): Promise<"actualizado" | "licencia" | "omitido"> {
   const { sexo, categoria_padel } = parseNivelFapFicha(fila.nivel);
   const nombre = capitalizarNombre(fila.nombre);
@@ -279,27 +287,21 @@ async function actualizarFicha(
   const lugar = lugarResidenciaDesdePadronFap(fila.ciudad, fila.provincia);
   const nroLicencia = normalizarNroLicenciaFap(fila.licenciaRaw);
 
-  const patch: Record<string, unknown> = {};
-  if (!existente.nombre && nombre) patch.nombre = nombre;
-  if (!existente.apellido && apellido) patch.apellido = apellido;
-  if (!existente.categoria_padel) patch.categoria_padel = categoria_padel;
-  if (!existente.sexo) patch.sexo = sexo;
-  if (!existente.fecha_nacimiento && fila.fechaNacimiento) {
-    patch.fecha_nacimiento = fila.fechaNacimiento;
-  }
-  if (
-    !existente.lugar_residencia ||
-    existente.lugar_residencia === "A completar"
-  ) {
-    patch.lugar_residencia = lugar;
-  }
-  if (
-    existente.email &&
-    esEmailPlaceholderPlanilla(existente.email) &&
-    Object.keys(patch).length > 0
-  ) {
-    patch.pendiente_activacion = true;
-  }
+  const patch = construirPatchPerfilPadronFap(
+    existente,
+    {
+      nombre,
+      apellido,
+      categoria_padel,
+      sexo,
+      fecha_nacimiento: fila.fechaNacimiento,
+      lugar_residencia: lugar,
+    },
+    {
+      sanearAcentos,
+      esEmailPlaceholder: esEmailPlaceholderPlanilla,
+    },
+  );
 
   let accion: "actualizado" | "omitido" = "omitido";
 
@@ -344,6 +346,8 @@ async function procesarLote(
   fechaVencimiento: string,
   licenciasOcupadas: Set<string>,
   dryRun: boolean,
+  sanearAcentos: boolean,
+  soloSanear: boolean,
   resumen: Resumen,
   logErrores: fs.WriteStream,
 ) {
@@ -361,10 +365,16 @@ async function procesarLote(
               fechaVencimiento,
               licenciasOcupadas,
               dryRun,
+              sanearAcentos,
             );
             if (r === "actualizado") resumen.actualizados++;
             else if (r === "licencia") resumen.licenciasCreadas++;
             else resumen.omitidos++;
+            return;
+          }
+
+          if (soloSanear) {
+            resumen.omitidos++;
             return;
           }
 
@@ -386,7 +396,7 @@ async function procesarLote(
 
     if ((i + CONCURRENCY) % 200 === 0 || i + CONCURRENCY >= filas.length) {
       console.log(
-        `[padron-fap] ${resumen.procesados}/${filas.length} | +${resumen.creados} nuevos | ${resumen.errores} errores`,
+        `[padron-fap] ${resumen.procesados}/${filas.length} | +${resumen.creados} nuevos | ~${resumen.actualizados} actualizados | ${resumen.errores} errores`,
       );
     }
     await sleep(PAUSA_MS);
@@ -394,14 +404,16 @@ async function procesarLote(
 }
 
 async function main() {
-  const { dryRun, limit, retryLog, filePath } = parseArgs(process.argv.slice(2));
+  const { dryRun, sanearAcentos, soloSanear, limit, retryLog, filePath } =
+    parseArgs(process.argv.slice(2));
 
   if (!fs.existsSync(filePath)) {
     throw new Error(`No existe el archivo: ${filePath}`);
   }
 
   console.log(`[padron-fap] Leyendo ${filePath}`);
-  const html = fs.readFileSync(filePath, "utf8");
+  const htmlBuffer = fs.readFileSync(filePath);
+  const html = decodificarHtmlPadronFap(htmlBuffer);
   let filas = parsePadronFapHtml(html);
   if (retryLog) {
     const solo = dniesDesdeLogErrores(retryLog);
@@ -410,8 +422,15 @@ async function main() {
   }
   if (limit && limit > 0) filas = filas.slice(0, limit);
 
+  const modoFlags = [
+    dryRun ? "dry-run" : null,
+    soloSanear ? "solo-sanear" : sanearAcentos ? "sanear-acentos" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   console.log(
-    `[padron-fap] ${filas.length} jugadores únicos por DNI${dryRun ? " (dry-run)" : ""}`,
+    `[padron-fap] ${filas.length} jugadores únicos por DNI${modoFlags ? ` (${modoFlags})` : ""}`,
   );
 
   const fechaVencimiento = calcularFechaVencimientoLicencia(
@@ -446,6 +465,8 @@ async function main() {
     fechaVencimiento,
     licenciasOcupadas,
     dryRun,
+    sanearAcentos,
+    soloSanear,
     resumen,
     logErrores,
   );
