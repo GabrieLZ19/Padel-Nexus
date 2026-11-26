@@ -1,13 +1,19 @@
 import { supabaseAdmin } from "../config/supabase";
 import {
   buildCanchaLabel,
+  buildFeedersByMatchNo,
+  buildFeedersEliminatoriaDirecta,
   buildOcupadosDesdePartidos,
   equiposDePartido,
   parseFechaPartidoIso,
+  parejasProspectivasDesdeFeeders,
   type DisponibilidadTorneo,
+  type PartidoParejaHistorial,
   type PartidoProgramable,
   type ProgramacionIssue,
+  type RestriccionesJugadorEvento,
 } from "./programacionPartidos";
+import { esEliminatoriaDirecta } from "./formatoTorneo";
 import {
   etiquetaCategoriaEventoTorneo,
   type TorneoCategoriaEvento,
@@ -48,6 +54,7 @@ export interface EventoProgramacionMeta {
   grupo_id: string;
   evento_nombre: string | null;
   torneos: TorneoEnEvento[];
+  orden_categorias: string[];
 }
 
 export interface BoardPartidoEvento extends BoardPartido {
@@ -68,6 +75,19 @@ export interface ProgramacionBoardEvento extends Omit<
   torneos: TorneoEnEvento[];
   partidos: BoardPartidoEvento[];
   filtro_categoria?: string;
+  orden_categorias: string[];
+}
+
+export function resolverOrdenCategoriasEvento(
+  torneoIds: string[],
+  stored?: unknown,
+): string[] {
+  const ids = torneoIds.filter(Boolean);
+  if (!Array.isArray(stored) || !stored.length) return ids;
+  const prefs = stored
+    .map((id) => String(id))
+    .filter((id) => ids.includes(id));
+  return [...prefs, ...ids.filter((id) => !prefs.includes(id))];
 }
 
 export async function cargarMetaEvento(
@@ -75,7 +95,7 @@ export async function cargarMetaEvento(
 ): Promise<EventoProgramacionMeta> {
   const { data: grupo } = await supabaseAdmin
     .from("grupos_torneo")
-    .select("id, nombre")
+    .select("id, nombre, programacion_orden_torneo_ids")
     .eq("id", grupoId)
     .maybeSingle();
 
@@ -92,10 +112,15 @@ export async function cargarMetaEvento(
     throw new Error("El evento no tiene competencias asociadas.");
   }
 
+  const torneoIds = (torneos as TorneoEnEvento[]).map((t) => t.id);
   return {
     grupo_id: grupoId,
     evento_nombre: grupo?.nombre ? String(grupo.nombre) : null,
     torneos: torneos as TorneoEnEvento[],
+    orden_categorias: resolverOrdenCategoriasEvento(
+      torneoIds,
+      grupo?.programacion_orden_torneo_ids,
+    ),
   };
 }
 
@@ -171,6 +196,39 @@ export async function cargarPartidosProgramablesEvento(
   }));
 }
 
+async function feedersPorTorneoEvento(
+  torneoId: string,
+  partidosTorneo: PartidoProgramable[],
+): Promise<Map<number, number[]>> {
+  const { data: torneo } = await supabaseAdmin
+    .from("torneos")
+    .select("formato")
+    .eq("id", torneoId)
+    .maybeSingle();
+  if (esEliminatoriaDirecta(torneo?.formato)) {
+    return buildFeedersEliminatoriaDirecta(partidosTorneo);
+  }
+  const { resolveFapPlantillaPairCount } = await import("./fapPlantillaTorneo");
+  const { getFapBracketForPairCount } = await import("./fapBracketMatrices");
+  const pairCount = await resolveFapPlantillaPairCount(torneoId);
+  const matrix = getFapBracketForPairCount(pairCount);
+  if (matrix?.length) return buildFeedersByMatchNo(matrix);
+  return buildFeedersEliminatoriaDirecta(partidosTorneo);
+}
+
+function usuariosDesdeInscripciones(
+  inscripcionIds: string[],
+  jugadoresPorInscripcion: Map<string, string[]>,
+): string[] {
+  const usuarios = new Set<string>();
+  for (const inscId of inscripcionIds) {
+    for (const uid of jugadoresPorInscripcion.get(inscId) || []) {
+      usuarios.add(uid);
+    }
+  }
+  return [...usuarios];
+}
+
 /** Resuelve jugadores (usuario_id) de cada partido vía inscripciones del evento. */
 export async function mapaJugadoresUsuarioPorPartidoEvento(
   partidosEvento: PartidoProgramable[],
@@ -178,6 +236,26 @@ export async function mapaJugadoresUsuarioPorPartidoEvento(
   const inscIds = new Set<string>();
   for (const p of partidosEvento) {
     for (const id of equiposDePartido(p)) inscIds.add(id);
+  }
+
+  const porTorneo = new Map<string, PartidoProgramable[]>();
+  for (const p of partidosEvento) {
+    const tid = String((p as { torneo_id?: string }).torneo_id || "");
+    if (!tid) continue;
+    const list = porTorneo.get(tid) || [];
+    list.push(p);
+    porTorneo.set(tid, list);
+  }
+
+  for (const [torneoId, lista] of porTorneo) {
+    const feeders = await feedersPorTorneoEvento(torneoId, lista);
+    for (const p of lista) {
+      if (equiposDePartido(p).length) continue;
+      if (/^ZONA\s+/i.test(String(p.ronda || ""))) continue;
+      for (const inscId of parejasProspectivasDesdeFeeders(p, lista, feeders)) {
+        inscIds.add(inscId);
+      }
+    }
   }
 
   const jugadoresPorInscripcion = new Map<string, string[]>();
@@ -197,16 +275,126 @@ export async function mapaJugadoresUsuarioPorPartidoEvento(
 
   const porPartido = new Map<string, string[]>();
   for (const p of partidosEvento) {
+    let inscripciones = equiposDePartido(p);
+    if (!inscripciones.length) {
+      const tid = String((p as { torneo_id?: string }).torneo_id || "");
+      const lista = tid ? porTorneo.get(tid) || [] : [];
+      if (lista.length) {
+        const feeders = await feedersPorTorneoEvento(tid, lista);
+        inscripciones = parejasProspectivasDesdeFeeders(p, lista, feeders);
+      }
+    }
     const jugadores = new Set<string>();
-    for (const inscId of equiposDePartido(p)) {
-      const usuarios = jugadoresPorInscripcion.get(inscId);
-      if (usuarios?.length) {
-        for (const uid of usuarios) jugadores.add(uid);
+    for (const inscId of inscripciones) {
+      for (const uid of usuariosDesdeInscripciones(
+        [inscId],
+        jugadoresPorInscripcion,
+      )) {
+        jugadores.add(uid);
       }
     }
     porPartido.set(String(p.id), [...jugadores]);
   }
   return porPartido;
+}
+
+/** Mapa inscripción → usuario(s) para descanso en auto-asignador (CLI-10). */
+export async function mapaJugadoresPorInscripcion(
+  inscripcionIds: Iterable<string>,
+): Promise<Map<string, string[]>> {
+  const ids = [...new Set([...inscripcionIds].map(String))].filter(Boolean);
+  const map = new Map<string, string[]>();
+  if (!ids.length) return map;
+  const { data, error } = await supabaseAdmin
+    .from("inscripciones")
+    .select("id, usuario_id, usuario2_id")
+    .in("id", ids);
+  if (error) throw new Error(error.message);
+  for (const row of data || []) {
+    map.set(
+      String(row.id),
+      [row.usuario_id, row.usuario2_id]
+        .filter((id): id is string => Boolean(id))
+        .map(String),
+    );
+  }
+  return map;
+}
+
+export async function restriccionesJugadorEventoParaAutoAsignar(
+  torneoId: string,
+  grupoId: string,
+  partidosLocales: PartidoProgramable[],
+  feedersByMatchNo: Map<number, number[]>,
+  descansoMinutos: number,
+  descansoModo: ModoDescanso,
+): Promise<Pick<
+  RestriccionesJugadorEvento,
+  "historialJugadores" | "jugadoresPorInscripcion"
+> | null> {
+  if (!grupoId) return null;
+
+  const evento = await cargarPartidosProgramablesEvento(grupoId);
+  const merged = evento.map((p) => {
+    const local = partidosLocales.find((l) => String(l.id) === String(p.id));
+    return local ? { ...p, ...local, torneo_id: String(p.torneo_id) } : p;
+  });
+
+  const meta = await cargarMetaEvento(grupoId);
+  const duracionMap = new Map(
+    meta.torneos.map((t) => [
+      t.id,
+      Number(t.duracion_partido_minutos || 90),
+    ]),
+  );
+
+  const jugadoresPorPartido =
+    await mapaJugadoresUsuarioPorPartidoEvento(merged);
+
+  const historialJugadores = new Map<string, PartidoParejaHistorial[]>();
+  for (const p of merged) {
+    if (String(p.torneo_id) === String(torneoId)) continue;
+    if (!p.cancha_asignada || !p.fecha_partido) continue;
+    const parsed = parseFechaPartidoIso(String(p.fecha_partido));
+    if (!parsed) continue;
+    const duracion = Math.max(
+      30,
+      duracionMap.get(String(p.torneo_id)) || 90,
+    );
+    const entry: PartidoParejaHistorial = {
+      fecha: parsed.fecha,
+      startMin: parsed.startMin,
+      endMin: parsed.startMin + duracion,
+    };
+    for (const uid of jugadoresPorPartido.get(String(p.id)) || []) {
+      const list = historialJugadores.get(uid) || [];
+      list.push(entry);
+      historialJugadores.set(uid, list);
+    }
+  }
+
+  const inscIds = new Set<string>();
+  for (const p of partidosLocales) {
+    for (const id of equiposDePartido(p)) inscIds.add(id);
+    if (!equiposDePartido(p).length) {
+      for (const id of parejasProspectivasDesdeFeeders(
+        p,
+        partidosLocales,
+        feedersByMatchNo,
+      )) {
+        inscIds.add(id);
+      }
+    }
+  }
+
+  const jugadoresPorInscripcion =
+    await mapaJugadoresPorInscripcion(inscIds);
+  if (!historialJugadores.size || !jugadoresPorInscripcion.size) {
+    return historialJugadores.size
+      ? { historialJugadores, jugadoresPorInscripcion }
+      : null;
+  }
+  return { historialJugadores, jugadoresPorInscripcion };
 }
 
 function jugadoresParaSolapeEvento(
@@ -227,6 +415,55 @@ function duracionPartidoEvento(
   const tid = String(partido.torneo_id || "");
   const custom = tid ? duracionPorTorneo?.get(tid) : undefined;
   return Math.max(30, custom ?? duracionFallback);
+}
+
+export type DisponibilidadEventoInput = {
+  club_id: string;
+  cancha_id: string;
+  fecha: string;
+  hora_inicio: string;
+  hora_fin?: string | null;
+  categoria?: string | null;
+};
+
+/** Normaliza filas del cliente antes de persistir en cada categoría del evento. */
+export function normalizarFilasDisponibilidadEvento(
+  filas: Array<Record<string, unknown>>,
+): DisponibilidadEventoInput[] {
+  return filas
+    .map((d) => ({
+      club_id: String(d.club_id ?? "").trim(),
+      cancha_id: String(d.cancha_id ?? "").trim(),
+      fecha: String(d.fecha ?? "").trim(),
+      hora_inicio: String(d.hora_inicio ?? "").trim(),
+      hora_fin:
+        d.hora_fin != null && String(d.hora_fin).trim() !== ""
+          ? String(d.hora_fin)
+          : null,
+      categoria:
+        typeof d.categoria === "string" && d.categoria.trim()
+          ? d.categoria.trim()
+          : null,
+    }))
+    .filter(
+      (r) => r.club_id && r.cancha_id && r.fecha && r.hora_inicio,
+    );
+}
+
+/**
+ * CLI-9: unión de disponibilidad de todas las categorías del evento
+ * (para programador individual y auto-asignador).
+ */
+export async function disponibilidadCompartidaEvento(
+  grupoId: string,
+  fallback: DisponibilidadTorneo[],
+): Promise<DisponibilidadTorneo[]> {
+  const meta = await cargarMetaEvento(grupoId);
+  const contextos = await Promise.all(
+    meta.torneos.map((t) => cargarContextoProgramacion(t.id)),
+  );
+  const union = unionDisponibilidad(contextos.map((c) => c.disponibilidad));
+  return union.length ? union : fallback;
 }
 
 export function unionDisponibilidad(
@@ -564,6 +801,7 @@ export async function mergeBoardsEvento(
     franjas_por_dia: ref.franjas_por_dia,
     partidos,
     issues,
+    orden_categorias: meta.orden_categorias,
     summary: { total, asignados, pendientes, advertencias },
   };
 }

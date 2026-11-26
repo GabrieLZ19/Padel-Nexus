@@ -72,6 +72,9 @@ import {
   limpiarEventoProgramacion,
   publicarEventoProgramacion,
   resolverGrupoProgramacionPorTorneo,
+  guardarSedesEventoProgramacion,
+  guardarCanchasDisponibilidadEventoProgramacion,
+  guardarOrdenCategoriasEventoProgramacion,
 } from "../controllers/programacionEvento.controller";
 import { authenticate, authorize, optionalAuthenticate } from "../middleware/auth";
 
@@ -121,6 +124,24 @@ router.post(
   authenticate,
   authorize([...PROGRAMACION_ROLES]),
   publicarEventoProgramacion,
+);
+router.post(
+  "/grupos/:grupoId/programacion/sedes",
+  authenticate,
+  authorize([...PROGRAMACION_ROLES]),
+  guardarSedesEventoProgramacion,
+);
+router.post(
+  "/grupos/:grupoId/programacion/canchas-disponibilidad",
+  authenticate,
+  authorize([...PROGRAMACION_ROLES]),
+  guardarCanchasDisponibilidadEventoProgramacion,
+);
+router.post(
+  "/grupos/:grupoId/programacion/orden-categorias",
+  authenticate,
+  authorize([...PROGRAMACION_ROLES]),
+  guardarOrdenCategoriasEventoProgramacion,
 );
 router.get(
   "/:torneoId/programacion/grupo",

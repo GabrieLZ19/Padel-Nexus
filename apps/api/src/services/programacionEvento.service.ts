@@ -1,11 +1,14 @@
 import { supabaseAdmin } from "../config/supabase";
 import { ProgramacionService } from "./programacion.service";
+import { TorneoService } from "./torneo.service";
 import type { ModoDescanso } from "../utils/programadorReglas";
 import { buildOcupadosDesdePartidos } from "../utils/programacionPartidos";
 import {
   cargarMetaEvento,
   cargarPartidosProgramablesEvento,
   mergeBoardsEvento,
+  normalizarFilasDisponibilidadEvento,
+  resolverOrdenCategoriasEvento,
   type ProgramacionBoardEvento,
 } from "../utils/programacionEvento";
 
@@ -64,7 +67,25 @@ export class ProgramacionEventoService {
   }
 
   /**
-   * Fase 2: auto por categorías en orden (prioridad opcional), compartiendo ocupación.
+   * CLI-11: persiste el orden de prioridad de categorías del evento.
+   */
+  static async guardarOrdenCategoriasEvento(
+    grupoId: string,
+    ordenTorneoIds: string[],
+  ): Promise<string[]> {
+    const meta = await cargarMetaEvento(grupoId);
+    const torneoIds = meta.torneos.map((t) => t.id);
+    const orden = resolverOrdenCategoriasEvento(torneoIds, ordenTorneoIds);
+    const { error } = await supabaseAdmin
+      .from("grupos_torneo")
+      .update({ programacion_orden_torneo_ids: orden })
+      .eq("id", grupoId);
+    if (error) throw new Error(error.message);
+    return orden;
+  }
+
+  /**
+   * Fase 2 / CLI-11: auto por categorías en orden, dos pasadas (zonas luego llave).
    */
   static async autoAsignar(
     grupoId: string,
@@ -84,25 +105,40 @@ export class ProgramacionEventoService {
     } = {},
   ): Promise<ProgramacionBoardEvento> {
     const meta = await cargarMetaEvento(grupoId);
-    let orden = meta.torneos.map((t) => t.id);
+    const torneoIds = meta.torneos.map((t) => t.id);
+    let orden = resolverOrdenCategoriasEvento(
+      torneoIds,
+      meta.orden_categorias,
+    );
     if (opciones.orden_torneo_ids?.length) {
-      const prefs = opciones.orden_torneo_ids.filter((id) =>
-        orden.includes(id),
+      orden = resolverOrdenCategoriasEvento(
+        torneoIds,
+        opciones.orden_torneo_ids,
       );
-      orden = [...prefs, ...orden.filter((id) => !prefs.includes(id))];
+      await ProgramacionEventoService.guardarOrdenCategoriasEvento(
+        grupoId,
+        orden,
+      );
     }
 
-    for (const torneoId of orden) {
-      const eventPartidos = await cargarPartidosProgramablesEvento(grupoId);
-      const ocupadosSemilla = buildOcupadosDesdePartidos(
-        eventPartidos.filter((p) => p.cancha_asignada && p.fecha_partido),
-      );
-      await ProgramacionService.autoAsignar(torneoId, {
-        ...opciones,
-        motivo: opciones.motivo,
-        adminId: opciones.adminId,
-        ocupadosSemilla,
-      });
+    const baseOpciones = {
+      ...opciones,
+      motivo: opciones.motivo,
+      adminId: opciones.adminId,
+    };
+
+    for (const soloFase of ["zonas", "llave"] as const) {
+      for (const torneoId of orden) {
+        const eventPartidos = await cargarPartidosProgramablesEvento(grupoId);
+        const ocupadosSemilla = buildOcupadosDesdePartidos(
+          eventPartidos.filter((p) => p.cancha_asignada && p.fecha_partido),
+        );
+        await ProgramacionService.autoAsignar(torneoId, {
+          ...baseOpciones,
+          soloFase,
+          ocupadosSemilla,
+        });
+      }
     }
 
     return ProgramacionEventoService.getBoard(grupoId);
@@ -138,5 +174,39 @@ export class ProgramacionEventoService {
       .eq("id", torneoId)
       .maybeSingle();
     return { grupo_id: data?.grupo_id ? String(data.grupo_id) : null };
+  }
+
+  /**
+   * CLI-9: sedes del evento replicadas en cada categoría (misma configuración).
+   */
+  static async guardarSedesEvento(
+    grupoId: string,
+    clubIds: Array<string | number>,
+  ): Promise<void> {
+    const meta = await cargarMetaEvento(grupoId);
+    const ids = clubIds.map((id) => String(id));
+    for (const t of meta.torneos) {
+      await TorneoService.guardarSedes(t.id, ids);
+    }
+  }
+
+  /**
+   * CLI-9: franjas de canchas replicadas en cada categoría del evento.
+   */
+  static async guardarCanchasDisponibilidadEvento(
+    grupoId: string,
+    disponibilidad: Array<Record<string, unknown>>,
+  ): Promise<void> {
+    const meta = await cargarMetaEvento(grupoId);
+    const filas = normalizarFilasDisponibilidadEvento(disponibilidad);
+    for (const t of meta.torneos) {
+      const conCategoria = filas.map((fila) => ({
+        ...fila,
+        categoria:
+          fila.categoria ||
+          (t.categoria ? String(t.categoria) : null),
+      }));
+      await TorneoService.guardarCanchasDisponibilidad(t.id, conCategoria);
+    }
   }
 }

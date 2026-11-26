@@ -201,3 +201,75 @@ export const resolverGrupoProgramacionPorTorneo = async (
     return res.status(400).json({ error: msg });
   }
 };
+
+export const guardarSedesEventoProgramacion = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const grupoId = req.params.grupoId;
+    const bloqueo = await exigirEdicionEvento(req, grupoId, res);
+    if (bloqueo) return bloqueo;
+    const clubIds = Array.isArray(req.body.club_ids) ? req.body.club_ids : [];
+    await ProgramacionEventoService.guardarSedesEvento(grupoId, clubIds);
+    return res.status(200).json({ message: "Sedes del evento guardadas correctamente" });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    return res.status(400).json({ message: "Error al guardar sedes del evento", error: msg });
+  }
+};
+
+export const guardarOrdenCategoriasEventoProgramacion = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const grupoId = req.params.grupoId;
+    const bloqueo = await exigirEdicionEvento(req, grupoId, res);
+    if (bloqueo) return bloqueo;
+    const ordenTorneoIds = Array.isArray(req.body.orden_torneo_ids)
+      ? req.body.orden_torneo_ids.map((id: unknown) => String(id))
+      : [];
+    const orden = await ProgramacionEventoService.guardarOrdenCategoriasEvento(
+      grupoId,
+      ordenTorneoIds,
+    );
+    return res.status(200).json({
+      message: "Orden de categorías guardado",
+      orden_categorias: orden,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    return res.status(400).json({
+      message: "Error al guardar orden de categorías",
+      error: msg,
+    });
+  }
+};
+
+export const guardarCanchasDisponibilidadEventoProgramacion = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const grupoId = req.params.grupoId;
+    const bloqueo = await exigirEdicionEvento(req, grupoId, res);
+    if (bloqueo) return bloqueo;
+    const disponibilidad = Array.isArray(req.body.disponibilidad)
+      ? req.body.disponibilidad
+      : [];
+    await ProgramacionEventoService.guardarCanchasDisponibilidadEvento(
+      grupoId,
+      disponibilidad,
+    );
+    return res.status(200).json({
+      message: "Disponibilidad de canchas del evento guardada correctamente",
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    return res.status(400).json({
+      message: "Error al guardar disponibilidad del evento",
+      error: msg,
+    });
+  }
+};

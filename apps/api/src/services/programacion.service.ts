@@ -565,6 +565,17 @@ export class ProgramacionService {
 
     if (!torneo) throw new Error("Torneo no encontrado");
 
+    const grupoIdEvento = torneo.grupo_id ? String(torneo.grupo_id) : "";
+    if (grupoIdEvento) {
+      const { disponibilidadCompartidaEvento } = await import(
+        "../utils/programacionEvento"
+      );
+      contexto.disponibilidad = await disponibilidadCompartidaEvento(
+        grupoIdEvento,
+        contexto.disponibilidad,
+      );
+    }
+
     // Construimos mapa correlativo continuo para todo el torneo:
     // Zonas primero (por letra y orden), luego llave (por ronda y orden)
     const zonasDb = (partidosDb || [])
@@ -1247,12 +1258,14 @@ export class ProgramacionService {
       motivo?: string;
       adminId?: string;
       ocupadosSemilla?: Set<string>;
+      /** CLI-11 evento: solo zonas o solo llave (reparto equilibrado). */
+      soloFase?: "zonas" | "llave";
     } = {},
   ): Promise<ProgramacionBoard> {
     const { data: torneo } = await supabaseAdmin
       .from("torneos")
       .select(
-        "id, programacion_estado, duracion_partido_minutos, descanso_modo, alcance, fecha",
+        "id, programacion_estado, duracion_partido_minutos, descanso_modo, alcance, fecha, grupo_id",
       )
       .eq("id", torneoId)
       .maybeSingle();
@@ -1278,6 +1291,17 @@ export class ProgramacionService {
     });
 
     const contexto = await cargarContextoProgramacion(torneoId);
+    const grupoIdEvento = torneo.grupo_id ? String(torneo.grupo_id) : "";
+    if (grupoIdEvento) {
+      const { disponibilidadCompartidaEvento } = await import(
+        "../utils/programacionEvento"
+      );
+      contexto.disponibilidad = await disponibilidadCompartidaEvento(
+        grupoIdEvento,
+        contexto.disponibilidad,
+      );
+    }
+
     const { data: partidosDb } = await supabaseAdmin
       .from("partidos")
       .select(
@@ -1353,12 +1377,57 @@ export class ProgramacionService {
       franjasPorDia: opciones.franjasPorDia,
     };
 
+    const feedersTorneo = await this.feedersForTorneo(torneoId);
+    let eventoJugadorRest: {
+      historialJugadoresEvento?: Map<
+        string,
+        import("../utils/programacionPartidos").PartidoParejaHistorial[]
+      >;
+      jugadoresPorInscripcion?: Map<string, string[]>;
+    } = {};
+    if (grupoIdEvento) {
+      const { restriccionesJugadorEventoParaAutoAsignar } = await import(
+        "../utils/programacionEvento"
+      );
+      const rest = await restriccionesJugadorEventoParaAutoAsignar(
+        torneoId,
+        grupoIdEvento,
+        drafts,
+        feedersTorneo,
+        descansoMinutos,
+        descansoModo ?? "tras_fin_60",
+      );
+      if (rest) {
+        eventoJugadorRest = {
+          historialJugadoresEvento: rest.historialJugadores,
+          jugadoresPorInscripcion: rest.jugadoresPorInscripcion,
+        };
+      }
+    }
+
     const dias = diasDelContexto(contexto, ventana.jornadas);
     const tieneMultiplesDias = dias.length >= 2;
     const ultimoDia = tieneMultiplesDias ? dias[dias.length - 1] : null;
+    const soloFase = opciones.soloFase;
+    const boardQuery = {
+      duracionMinutos: duracion,
+      descansoMinutos: opciones.descansoMinutos,
+      descansoModo: opciones.descansoModo,
+      jornadas: opciones.jornadas,
+      horaInicio: opciones.horaInicio,
+      horaFin: opciones.horaFin,
+      franjasPorDia: opciones.franjasPorDia,
+    };
 
-    if (distribucion === "continua") {
-      const feeders = await this.feedersForTorneo(torneoId);
+    if (soloFase === "llave" && !llaveDrafts.length) {
+      return this.getBoard(torneoId, boardQuery);
+    }
+    if (soloFase === "zonas" && !zonasDrafts.length) {
+      return this.getBoard(torneoId, boardQuery);
+    }
+
+    if (distribucion === "continua" && !soloFase) {
+      const feeders = feedersTorneo;
       const allSlots = slotsDesdeContexto(contexto, duracion, ventana);
 
       if (tieneMultiplesDias && ultimoDia) {
@@ -1382,6 +1451,7 @@ export class ProgramacionService {
               descansoModo,
               fechaInicio: metaProgramacion.fechaInicio,
               alcanceTorneo: metaProgramacion.alcanceTorneo,
+              ...eventoJugadorRest,
               feedersByMatchNo: feeders,
               permitirSinEquipos: true,
               distribucion: "continua",
@@ -1411,6 +1481,7 @@ export class ProgramacionService {
             descansoModo,
             fechaInicio: metaProgramacion.fechaInicio,
             alcanceTorneo: metaProgramacion.alcanceTorneo,
+              ...eventoJugadorRest,
             feedersByMatchNo: feeders,
             permitirSinEquipos: true,
             distribucion: "continua",
@@ -1432,6 +1503,7 @@ export class ProgramacionService {
               descansoModo,
               fechaInicio: metaProgramacion.fechaInicio,
               alcanceTorneo: metaProgramacion.alcanceTorneo,
+              ...eventoJugadorRest,
               feedersByMatchNo: feeders,
               permitirSinEquipos: true,
               distribucion: "continua",
@@ -1448,13 +1520,14 @@ export class ProgramacionService {
           descansoModo,
           fechaInicio: metaProgramacion.fechaInicio,
           alcanceTorneo: metaProgramacion.alcanceTorneo,
+              ...eventoJugadorRest,
           feedersByMatchNo: feeders,
           permitirSinEquipos: true,
           distribucion: "continua",
         });
       }
     } else if (zonasDrafts.length || llaveDrafts.length) {
-      if (zonasDrafts.length) {
+      if (soloFase !== "llave" && zonasDrafts.length) {
         const dur = duracionParaFase(duracion, "zonas");
         const allSlotsZonas = filtrarSlotsSmart(
           slotsDesdeContexto(contexto, dur, ventana),
@@ -1477,6 +1550,7 @@ export class ProgramacionService {
             descansoModo,
             fechaInicio: metaProgramacion.fechaInicio,
             alcanceTorneo: metaProgramacion.alcanceTorneo,
+              ...eventoJugadorRest,
             limitarAIds: limitarIdsDePartidos(zonasDrafts),
           },
         );
@@ -1496,6 +1570,7 @@ export class ProgramacionService {
             descansoModo,
             fechaInicio: metaProgramacion.fechaInicio,
             alcanceTorneo: metaProgramacion.alcanceTorneo,
+              ...eventoJugadorRest,
             limitarAIds: limitarIdsDePartidos(sinAsignarZonas),
           });
         }
@@ -1506,8 +1581,8 @@ export class ProgramacionService {
       );
       for (const k of ocupados) ocupadosDespues.add(k);
 
-      if (llaveDrafts.length) {
-        const feeders = await this.feedersForTorneo(torneoId);
+      if (soloFase !== "zonas" && llaveDrafts.length) {
+        const feeders = feedersTorneo;
         const dur = duracionParaFase(duracion, "llave");
         const allSlotsLlave = filtrarSlotsSmart(
           slotsDesdeContexto(contexto, dur, ventana),
@@ -1543,6 +1618,7 @@ export class ProgramacionService {
                 descansoModo,
                 fechaInicio: metaProgramacion.fechaInicio,
                 alcanceTorneo: metaProgramacion.alcanceTorneo,
+              ...eventoJugadorRest,
                 feedersByMatchNo: feeders,
                 permitirSinEquipos: true,
                 notBeforeExtra: notBeforeTrasZonas,
@@ -1579,6 +1655,7 @@ export class ProgramacionService {
                 descansoModo,
                 fechaInicio: metaProgramacion.fechaInicio,
                 alcanceTorneo: metaProgramacion.alcanceTorneo,
+              ...eventoJugadorRest,
                 feedersByMatchNo: feeders,
                 permitirSinEquipos: true,
                 notBeforeExtra: notBeforeTrasZonas,
@@ -1602,6 +1679,7 @@ export class ProgramacionService {
                 descansoModo,
                 fechaInicio: metaProgramacion.fechaInicio,
                 alcanceTorneo: metaProgramacion.alcanceTorneo,
+              ...eventoJugadorRest,
                 feedersByMatchNo: feeders,
                 permitirSinEquipos: true,
                 notBeforeExtra: notBeforeTrasZonas,
@@ -1620,6 +1698,7 @@ export class ProgramacionService {
             descansoModo,
             fechaInicio: metaProgramacion.fechaInicio,
             alcanceTorneo: metaProgramacion.alcanceTorneo,
+              ...eventoJugadorRest,
             feedersByMatchNo: feeders,
             permitirSinEquipos: true,
             notBeforeExtra: finWallClockTrasPartidos(
