@@ -70,7 +70,7 @@ function slotsDesdeContexto(
     jornadas?: number;
     horaInicio?: string;
     horaFin?: string;
-    franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+    franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
   },
 ): SlotProgramacion[] {
   const dias = diasDelContexto(contexto, ventana?.jornadas);
@@ -534,7 +534,7 @@ export class ProgramacionService {
       jornadas?: number;
       horaInicio?: string;
       horaFin?: string;
-      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
     } = {},
   ): Promise<ProgramacionBoard> {
     const [
@@ -726,9 +726,25 @@ export class ProgramacionService {
       pairCount && !esEliminatoriaDirecta(torneo.formato)
         ? getFapBracketForPairCount(pairCount)
         : undefined;
+    const franjasPorDiaMap = construirFranjasPorDiaBoard(
+      dias,
+      contexto.disponibilidad,
+      {
+        franjasPorDia: opciones.franjasPorDia,
+        horaInicio: opciones.horaInicio,
+        horaFin: opciones.horaFin,
+      },
+    );
+    const duracionPorDia: Record<string, number> = {};
+    for (const [f, fr] of Object.entries(franjasPorDiaMap)) {
+      if (fr.duracion != null && Number.isFinite(fr.duracion)) {
+        duracionPorDia[f] = fr.duracion;
+      }
+    }
     const issues = evaluateProgramacionIssues(drafts, {
       duracionMinutos: duracion,
       duracionZonaMinutos: duracionParaFase(duracion, "zonas"),
+      duracionPorDia,
       descansoMinutos: descanso,
       descansoModo,
       fechaInicio: contexto.fecha,
@@ -770,16 +786,6 @@ export class ProgramacionService {
     const asignados = partidos.filter((p) => p.assigned).length;
     const pendientes = partidos.length - asignados;
     const advertencias = issues.filter((i) => i.severity !== "ok").length;
-
-    const franjasPorDiaMap = construirFranjasPorDiaBoard(
-      dias,
-      contexto.disponibilidad,
-      {
-        franjasPorDia: opciones.franjasPorDia,
-        horaInicio: opciones.horaInicio,
-        horaFin: opciones.horaFin,
-      },
-    );
 
     return {
       torneo_id: torneoId,
@@ -879,7 +885,19 @@ export class ProgramacionService {
       )
       .eq("torneo_id", torneoId);
 
-    const duracion = Number(torneo.duracion_partido_minutos || 90);
+    const fechaDiaAsignar = fechaIso.slice(0, 10);
+    const { data: dispDia } = await supabaseAdmin
+      .from("torneo_canchas_disponibilidad")
+      .select("duracion_partido_minutos")
+      .eq("torneo_id", torneoId)
+      .eq("fecha", fechaDiaAsignar)
+      .not("duracion_partido_minutos", "is", null)
+      .limit(1)
+      .maybeSingle();
+
+    const duracion = Number(
+      dispDia?.duracion_partido_minutos || torneo.duracion_partido_minutos || 90,
+    );
     const descansoModo = esModoDescanso(torneo.descanso_modo)
       ? torneo.descanso_modo
       : "tras_fin_60";
@@ -1254,7 +1272,7 @@ export class ProgramacionService {
       jornadas?: number;
       horaInicio?: string;
       horaFin?: string;
-      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
       motivo?: string;
       adminId?: string;
       ocupadosSemilla?: Set<string>;
@@ -1766,7 +1784,7 @@ export class ProgramacionService {
     opciones: {
       duracionMinutos?: number;
       descansoModo?: ModoDescanso;
-      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
       adminId?: string;
     } = {},
   ): Promise<ProgramacionBoard> {
@@ -1827,7 +1845,7 @@ export class ProgramacionService {
       jornadas?: number;
       horaInicio?: string;
       horaFin?: string;
-      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
     } = {},
   ): Promise<ProgramacionBoard> {
     const { data: torneo } = await supabaseAdmin
@@ -1968,7 +1986,7 @@ export interface ProgramacionBoard {
     cancha_label: string;
     fecha_iso: string;
   }>;
-  franjas_por_dia?: Record<string, { inicio: string; fin: string }>;
+  franjas_por_dia?: Record<string, { inicio: string; fin: string; duracion?: number }>;
   partidos: BoardPartido[];
   issues: ProgramacionIssue[];
   summary: {

@@ -348,7 +348,12 @@ export interface TorneoPayload {
   premios?: { uno?: string; dos?: string; tres?: string };
   canchas_disponibles?: number;
   duracion_partido_minutos?: number;
-  descanso_modo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240" | null;
+  descanso_modo?:
+    | "sin_descanso"
+    | "tras_fin_60"
+    | "tras_fin_120"
+    | "entre_inicios_240"
+    | null;
   hora_inicio_jornada?: string;
   reglas_arbitraje?: Record<string, any> | null;
 }

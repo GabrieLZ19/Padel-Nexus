@@ -3,11 +3,16 @@
  * Los códigos de ronda guardados no cambian; acá solo se etiquetan y se ordenan.
  */
 
-export type ModoDescanso = "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+export type ModoDescanso =
+  | "sin_descanso"
+  | "tras_fin_60"
+  | "tras_fin_120"
+  | "entre_inicios_240";
 
 export type DistribucionProgramacion = "zonas_primero" | "continua";
 
 const MODOS_DESCANSO: ModoDescanso[] = [
+  "sin_descanso",
   "tras_fin_60",
   "tras_fin_120",
   "entre_inicios_240",
@@ -97,6 +102,7 @@ export function ordenRondaProgramador(ronda?: string | null): number {
 }
 
 export function minutosDeModoDescanso(modo: ModoDescanso): number {
+  if (modo === "sin_descanso") return 0;
   if (modo === "tras_fin_120") return 120;
   if (modo === "entre_inicios_240") return 240;
   return 60;
@@ -104,6 +110,7 @@ export function minutosDeModoDescanso(modo: ModoDescanso): number {
 
 /**
  * true cuando dos inicios del mismo día no cumplen el descanso elegido.
+ * `sin_descanso` permite partidos seguidos (delta >= duracion, sin solape).
  * `tras_fin_*` mide desde el final estimado. `entre_inicios_240` mide de inicio a inicio.
  */
 export function evaluarDescansoInsuficiente(
@@ -114,6 +121,7 @@ export function evaluarDescansoInsuficiente(
 ): boolean {
   const delta = Math.abs(inicioA - inicioB);
   if (delta === 0) return true;
+  if (modo === "sin_descanso") return delta < duracion;
   if (modo === "entre_inicios_240") return delta < 240;
   return delta - duracion < minutosDeModoDescanso(modo);
 }

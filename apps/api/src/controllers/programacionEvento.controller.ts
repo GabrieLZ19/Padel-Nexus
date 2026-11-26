@@ -168,6 +168,29 @@ export const autoAsignarEventoProgramacion = async (
   }
 };
 
+export const persistirConfigEventoProgramacion = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const grupoId = req.params.grupoId;
+    const bloqueo = await exigirEdicionEvento(req, grupoId, res);
+    if (bloqueo) return bloqueo;
+    const data = await ProgramacionEventoService.persistirConfig(grupoId, {
+      duracionMinutos: req.body.duracionMinutos,
+      descansoModo: req.body.descansoModo,
+      franjasPorDia: req.body.franjasPorDia,
+      adminId: req.user?.id,
+    });
+    return res.status(200).json(data);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    return res
+      .status(400)
+      .json({ message: "No se pudo guardar la configuración", error: msg });
+  }
+};
+
 export const publicarEventoProgramacion = async (
   req: Request,
   res: Response,

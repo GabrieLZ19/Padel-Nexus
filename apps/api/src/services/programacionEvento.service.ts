@@ -99,7 +99,7 @@ export class ProgramacionEventoService {
       jornadas?: number;
       horaInicio?: string;
       horaFin?: string;
-      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
       motivo?: string;
       adminId?: string;
     } = {},
@@ -142,6 +142,23 @@ export class ProgramacionEventoService {
     }
 
     return ProgramacionEventoService.getBoard(grupoId);
+  }
+
+  static async persistirConfig(
+    grupoId: string,
+    opciones: {
+      duracionMinutos?: number;
+      descansoModo?: ModoDescanso;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
+      adminId?: string;
+    } = {},
+  ): Promise<ProgramacionBoardEvento> {
+    const meta = await cargarMetaEvento(grupoId);
+    for (const t of meta.torneos) {
+      if (t.programacion_estado === "publicado") continue;
+      await ProgramacionService.persistirConfigProgramacion(t.id, opciones);
+    }
+    return ProgramacionEventoService.getBoard(grupoId, opciones);
   }
 
   static async publicar(

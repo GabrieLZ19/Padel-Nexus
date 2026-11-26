@@ -800,6 +800,15 @@ export async function mergeBoardsEvento(
     canchasCount: canchasMap.size,
   });
 
+  const todosPublicados =
+    boards.length > 0 &&
+    boards.every((b) => b.programacion_estado === "publicado");
+  const estadoEventoProgramacion = todosPublicados
+    ? "publicado"
+    : boards.some((b) => b.programacion_estado === "programado")
+      ? "programado"
+      : ref.programacion_estado;
+
   return {
     modo: "evento",
     grupo_id: grupoId,
@@ -807,7 +816,7 @@ export async function mergeBoardsEvento(
     torneo_referencia_id: ref.torneo_id,
     torneos: meta.torneos,
     estado: ref.estado,
-    programacion_estado: ref.programacion_estado,
+    programacion_estado: estadoEventoProgramacion,
     programacion_publicada_en: ref.programacion_publicada_en,
     duracion_partido_minutos: ref.duracion_partido_minutos,
     descanso_minutos: ref.descanso_minutos,

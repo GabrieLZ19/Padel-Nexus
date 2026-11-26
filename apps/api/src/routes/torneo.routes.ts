@@ -70,6 +70,7 @@ import {
   desasignarEventoProgramacion,
   getEventoProgramacionBoard,
   limpiarEventoProgramacion,
+  persistirConfigEventoProgramacion,
   publicarEventoProgramacion,
   resolverGrupoProgramacionPorTorneo,
   guardarSedesEventoProgramacion,
@@ -118,6 +119,12 @@ router.post(
   authenticate,
   authorize([...PROGRAMACION_ROLES]),
   autoAsignarEventoProgramacion,
+);
+router.put(
+  "/grupos/:grupoId/programacion/config",
+  authenticate,
+  authorize([...PROGRAMACION_ROLES]),
+  persistirConfigEventoProgramacion,
 );
 router.post(
   "/grupos/:grupoId/programacion/publicar",

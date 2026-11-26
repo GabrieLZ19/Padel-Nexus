@@ -45,6 +45,7 @@ export interface DisponibilidadTorneo {
   fecha: string;
   hora_inicio: string;
   hora_fin?: string | null;
+  duracion_partido_minutos?: number | null;
   clubes?: { nombre?: string } | null;
   canchas?: { nombre?: string } | null;
 }
@@ -360,7 +361,7 @@ export function generarSlotsDesdeSedesYVentana(params: {
   duracionMinutos: number;
   horaInicioMin?: number;
   horaFinMin?: number;
-  franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+  franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
 }): SlotProgramacion[] {
   const duracion = Math.max(30, params.duracionMinutos || 90);
   const horaInicioDefault = params.horaInicioMin ?? PROGRAMADOR_HORA_INICIO_MIN;
@@ -417,14 +418,19 @@ export function generarSlotsDesdeSedesYVentana(params: {
       if (fechaHoraFin <= fechaHoraInicio) fechaHoraFin += 1440;
     }
 
+    const duracionDia = Math.max(
+      30,
+      Number(franja?.duracion ?? dispFecha?.duracion_partido_minutos ?? duracion) || duracion,
+    );
+
     for (const cancha of canchas) {
       const canchaLabel = buildCanchaLabel(cancha);
       if (!canchaLabel) continue;
       // Fin exclusivo: con fin 00:00 y turno 90, el último inicio es 22:30.
       for (
         let minuto = fechaHoraInicio;
-        minuto + duracion <= fechaHoraFin;
-        minuto += duracion
+        minuto + duracionDia <= fechaHoraFin;
+        minuto += duracionDia
       ) {
         try {
           const fechaIso = buildFechaIso(fecha, minuto);
@@ -1885,7 +1891,7 @@ export async function cargarContextoProgramacion(torneoId: string): Promise<{
     supabaseAdmin
       .from("torneo_canchas_disponibilidad")
       .select(
-        "club_id, cancha_id, fecha, hora_inicio, hora_fin, canchas(*), clubes(*)",
+        "club_id, cancha_id, fecha, hora_inicio, hora_fin, duracion_partido_minutos, canchas(*), clubes(*)",
       )
       .eq("torneo_id", torneoId)
       .order("fecha", { ascending: true })
@@ -2089,11 +2095,13 @@ export interface PartidoLlaveAutoprogramable {
   estado_partido?: string | null;
   cancha_asignada?: string | null;
   fecha_partido?: string | null;
+  horario_bloqueado?: boolean | null;
 }
 
 /**
  * TOR-32: con programación publicada no se mueven horarios ya asignados;
- * solo se autoprograman cruces nuevos sin cancha/hora y se avisa conflicto.
+ * tampoco se tocan partidos con horario_bloqueado=true.
+ * Solo se autoprograman cruces nuevos sin cancha/hora y se avisa conflicto.
  */
 export function seleccionarPartidosLlaveParaAutoprogramar(
   partidos: PartidoLlaveAutoprogramable[],
@@ -2128,6 +2136,7 @@ export function seleccionarPartidosLlaveParaAutoprogramar(
     }
     const sinHorario = !p.cancha_asignada || !p.fecha_partido;
     if (sinHorario) return true;
+    if (p.horario_bloqueado) return false;
     if (opts.programacionPublicada) {
       if (partidoYaFinalizado(p)) return false;
       if (opts.violaHorarioPublicado(p)) {
@@ -2270,7 +2279,7 @@ export async function programarPartidosLlavePendientes(
   const { data: partidos } = await supabaseAdmin
     .from("partidos")
     .select(
-      "id, ronda, orden, equipo_a_id, equipo_b_id, estado_partido, cancha_asignada, fecha_partido",
+      "id, ronda, orden, equipo_a_id, equipo_b_id, estado_partido, cancha_asignada, fecha_partido, horario_bloqueado",
     )
     .eq("torneo_id", torneoId)
     .in("ronda", PLAYOFF);
@@ -2536,6 +2545,7 @@ export function evaluateProgramacionIssues(
   opciones: {
     duracionMinutos: number;
     duracionZonaMinutos?: number;
+    duracionPorDia?: Record<string, number>;
     descansoMinutos?: number;
     descansoModo?: ModoDescanso;
     fechaInicio?: string | null;
@@ -2545,10 +2555,14 @@ export function evaluateProgramacionIssues(
     matrixFap?: readonly import("./fapBracketTypes").FapBracketMatch[];
   },
 ): ProgramacionIssue[] {
-  const duracion = Math.max(30, opciones.duracionMinutos || 90);
+  const duracionBase = Math.max(30, opciones.duracionMinutos || 90);
+  const duracionParaFecha = (fecha: string): number => {
+    const d = opciones.duracionPorDia?.[fecha];
+    return d != null && Number.isFinite(d) && d >= 30 ? d : duracionBase;
+  };
   const duracionZona = Math.max(
     30,
-    opciones.duracionZonaMinutos ?? duracion,
+    opciones.duracionZonaMinutos ?? duracionBase,
   );
   const descanso =
     opciones.descansoMinutos ??
@@ -2577,6 +2591,7 @@ export function evaluateProgramacionIssues(
       continue;
     }
 
+    const duracion = duracionParaFecha(parsed.fecha);
     const equipos = equiposDePartido(p);
 
     const orden = Number(p.orden);

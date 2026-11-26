@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { PagoController } from "../controllers/pago.controller";
 import { authenticate, authorize } from "../middleware/auth";
+import { ROLES_ADMINISTRATIVOS } from "../constants/roles";
 
 const router = Router();
 
@@ -10,7 +11,7 @@ router.use(authenticate);
 // Endpoint del Checkbox administrativo (Fase 1)
 router.patch(
   "/confirmar-manual",
-  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin"]),
+  authorize(ROLES_ADMINISTRATIVOS),
   PagoController.confirmarPagoManual,
 );
 

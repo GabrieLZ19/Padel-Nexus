@@ -490,10 +490,11 @@ export class CompetenciaService {
   static async obtenerZonas(torneoId: string) {
     const { data: torneoRow } = await supabaseAdmin
       .from("torneos")
-      .select("alcance")
+      .select("alcance, cabezas_serie_activas")
       .eq("id", torneoId)
       .maybeSingle();
     const alcanceTorneo = torneoRow?.alcance ?? null;
+    const cabezasSerieActivas = torneoRow?.cabezas_serie_activas !== false;
 
     const { data: grupos, error } = await supabaseAdmin
       .from("grupos")
@@ -585,22 +586,23 @@ export class CompetenciaService {
       });
     });
 
-    const cabezasDeSerieIds = idsCabezasGlobalesPorRanking(
-      parejasConPuntos,
-      grupos.length,
-    );
+    const cabezasDeSerieIds = cabezasSerieActivas
+      ? idsCabezasGlobalesPorRanking(parejasConPuntos, grupos.length)
+      : new Set<string>();
 
-    const cabezasPorInscripcion = marcarCabezasUnicasEnZonas(
-      grupos.map((g) => ({
-        id: g.id,
-        parejas: (g.grupo_parejas || []).map((gp: { inscripcion_id: string }) => ({
-          id: gp.inscripcion_id,
-        })),
-      })),
-      cabezasDeSerieIds,
-      puntosPorId,
-      persistidas,
-    );
+    const cabezasPorInscripcion = cabezasSerieActivas
+      ? marcarCabezasUnicasEnZonas(
+          grupos.map((g) => ({
+            id: g.id,
+            parejas: (g.grupo_parejas || []).map((gp: { inscripcion_id: string }) => ({
+              id: gp.inscripcion_id,
+            })),
+          })),
+          cabezasDeSerieIds,
+          puntosPorId,
+          persistidas,
+        )
+      : new Map<string, boolean>();
 
     // Obtener los ids de usuario para consultar afiliaciones activas
     const userIds: string[] = [];
@@ -677,6 +679,7 @@ export class CompetenciaService {
     return {
       zonas: gruposConClub,
       cabezas_ranking_globales: [...cabezasDeSerieIds],
+      cabezas_serie_activas: cabezasSerieActivas,
     };
   }
 
@@ -998,14 +1001,7 @@ export class CompetenciaService {
         }
       }
     } else {
-      for (const z of zonas) {
-        const marcadas = z.parejas.filter((p) => p.es_cabeza_serie);
-        if (marcadas.length > 1) {
-          throw new Error(
-            `La ${z.nombre} no puede tener más de una cabeza de serie designada.`,
-          );
-        }
-      }
+      // Con validación de cabezas de serie desactivada no se asignan ni validan cabezas.
     }
 
     const { data: gruposPrevios } = await supabaseAdmin
@@ -1082,6 +1078,12 @@ export class CompetenciaService {
       .filter((t): t is string => Boolean(t))
       .join(" · ") || "Distribución de zonas actualizada.";
 
+    // Persistir preferencia de cabezas de serie en el torneo
+    await supabaseAdmin
+      .from("torneos")
+      .update({ cabezas_serie_activas: Boolean(validarCabezasSerie) })
+      .eq("id", torneoId);
+
     // 1. Guardar la nueva distribución de parejas para cada zona
     for (const z of zonas) {
       // Eliminar las parejas anteriores del grupo
@@ -1101,7 +1103,7 @@ export class CompetenciaService {
         seed: idx + 1,
         es_cabeza_serie: validarCabezasSerie
           ? Boolean(cabezaFlags.get(p.id))
-          : Boolean(p.es_cabeza_serie),
+          : false,
       }));
 
       if (toInsert.length > 0) {

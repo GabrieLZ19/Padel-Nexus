@@ -7,7 +7,10 @@ import {
 
 export { normalizarFechaProgramacionDia };
 
-export type FranjasPorDiaInput = Record<string, { inicio?: string; fin?: string }>;
+export type FranjasPorDiaInput = Record<
+  string,
+  { inicio?: string; fin?: string; duracion?: number }
+>;
 
 export async function persistirFranjasPorDiaTorneo(
   torneoId: string,
@@ -17,13 +20,25 @@ export async function persistirFranjasPorDiaTorneo(
     const fecha = normalizarFechaProgramacionDia(fechaRaw);
     if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) continue;
 
-    const updates: { hora_inicio?: string; hora_fin?: string } = {};
+    const updates: {
+      hora_inicio?: string;
+      hora_fin?: string;
+      duracion_partido_minutos?: number;
+    } = {};
     if (franja.inicio) {
       updates.hora_inicio = `${franja.inicio.slice(0, 5)}:00`;
     }
     if (franja.fin !== undefined && franja.fin !== "") {
       updates.hora_fin =
         franja.fin === "00:00" ? "23:59:59" : `${franja.fin.slice(0, 5)}:00`;
+    }
+    if (
+      franja.duracion != null &&
+      Number.isFinite(Number(franja.duracion)) &&
+      Number(franja.duracion) >= 30 &&
+      Number(franja.duracion) <= 180
+    ) {
+      updates.duracion_partido_minutos = Math.round(Number(franja.duracion));
     }
     if (Object.keys(updates).length === 0) continue;
 
@@ -77,7 +92,7 @@ export async function persistirDescansoYDuracionTorneo(
 export function franjaHorariaDesdeDisponibilidad(
   disponibilidad: DisponibilidadTorneo[],
   dia: string,
-): { inicio: string; fin: string } | null {
+): { inicio: string; fin: string; duracion?: number } | null {
   const diaNorm = normalizarFechaProgramacionDia(dia);
   const row = disponibilidad.find(
     (c) => normalizarFechaProgramacionDia(c.fecha) === diaNorm,
@@ -93,7 +108,12 @@ export function franjaHorariaDesdeDisponibilidad(
         ? "00:00"
         : rawFin.slice(0, 5);
   }
-  return { inicio, fin };
+  const durRaw = row.duracion_partido_minutos;
+  const duracion =
+    durRaw != null && Number.isFinite(Number(durRaw))
+      ? Number(durRaw)
+      : undefined;
+  return { inicio, fin, ...(duracion != null ? { duracion } : {}) };
 }
 
 /** Arma `franjas_por_dia` del board: query del cliente o horas persistidas en disponibilidad. */
@@ -105,8 +125,11 @@ export function construirFranjasPorDiaBoard(
     horaInicio?: string;
     horaFin?: string;
   },
-): Record<string, { inicio: string; fin: string }> {
-  const franjasPorDiaMap: Record<string, { inicio: string; fin: string }> = {};
+): Record<string, { inicio: string; fin: string; duracion?: number }> {
+  const franjasPorDiaMap: Record<
+    string,
+    { inicio: string; fin: string; duracion?: number }
+  > = {};
   for (const f of dias) {
     const franjaOpt =
       opciones?.franjasPorDia?.[f] ??
@@ -114,6 +137,10 @@ export function construirFranjasPorDiaBoard(
     const desdeDb = franjaHorariaDesdeDisponibilidad(disponibilidad, f);
     const inicioDisp = desdeDb?.inicio || "";
     const finDisp = desdeDb?.fin || "";
+    const duracion =
+      franjaOpt?.duracion != null
+        ? Number(franjaOpt.duracion)
+        : desdeDb?.duracion;
     franjasPorDiaMap[f] = {
       inicio:
         franjaOpt?.inicio ||
@@ -124,6 +151,7 @@ export function construirFranjasPorDiaBoard(
         franjaOpt?.fin !== undefined && franjaOpt?.fin !== ""
           ? franjaOpt.fin
           : finDisp || opciones?.horaFin || "",
+      ...(duracion != null && Number.isFinite(duracion) ? { duracion } : {}),
     };
   }
   return franjasPorDiaMap;
