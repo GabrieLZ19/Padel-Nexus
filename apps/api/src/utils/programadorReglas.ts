@@ -149,11 +149,25 @@ export function jornadasDesdeInicio(
   return out;
 }
 
+/** Paso de inicio/fin en el programador visual (CLI-22). */
+export const INCREMENTO_GRILLA_PROGRAMADOR_MIN = 15;
+
+export function minutosEnGrillaProgramador(min: number): boolean {
+  return Number.isFinite(min) && min >= 0 && min % INCREMENTO_GRILLA_PROGRAMADOR_MIN === 0;
+}
+
+export function horaEnGrillaProgramador(hora?: string | null): boolean {
+  const min = minutosDesdeHora(hora);
+  if (min == null) return false;
+  return minutosEnGrillaProgramador(min);
+}
+
 export function minutosDesdeHora(hora?: string | null): number | null {
   const match = String(hora || "").match(/^(\d{1,2}):(\d{2})/);
   if (!match) return null;
   const h = Number(match[1]);
   const min = Number(match[2]);
+  if (h === 24 && min === 0) return 24 * 60;
   if (h > 23 || min > 59) return null;
   return h * 60 + min;
 }

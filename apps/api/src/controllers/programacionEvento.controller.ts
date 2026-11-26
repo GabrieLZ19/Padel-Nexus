@@ -109,6 +109,32 @@ export const asignarEventoProgramacion = async (
   }
 };
 
+export const intercambiarEventoProgramacion = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const grupoId = req.params.grupoId;
+    const bloqueo = await exigirEdicionEvento(req, grupoId, res);
+    if (bloqueo) return bloqueo;
+    const data = await ProgramacionEventoService.intercambiar(grupoId, {
+      partido_id: req.body.partido_id,
+      occupant_id: req.body.occupant_id,
+      destino: req.body.destino,
+      origen: req.body.origen,
+      motivo: req.body.motivo,
+      adminId: req.user?.id,
+    });
+    return res.status(200).json(data);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    return res.status(400).json({
+      message: "No se pudo intercambiar",
+      error: msg,
+    });
+  }
+};
+
 export const desasignarEventoProgramacion = async (
   req: Request,
   res: Response,

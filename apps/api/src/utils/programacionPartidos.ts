@@ -13,6 +13,7 @@ import {
   esModoDescanso,
   minutosDeModoDescanso,
   minutosDesdeHora,
+  minutosEnGrillaProgramador,
   ordenDeAsignacion,
   ordenRondaProgramador,
   type DistribucionProgramacion,
@@ -386,7 +387,14 @@ export function generarSlotsDesdeSedesYVentana(params: {
     let fechaHoraInicio = horaInicioDefault;
     if (franja?.inicio) {
       const min = minutosDesdeHora(franja.inicio);
-      if (min != null) fechaHoraInicio = min;
+      if (min != null) {
+        if (!minutosEnGrillaProgramador(min)) {
+          throw new Error(
+            `Inicio inválido para ${fecha}: debe estar en incrementos de 15 minutos (${franja.inicio})`,
+          );
+        }
+        fechaHoraInicio = min;
+      }
     } else if (dispFecha?.hora_inicio) {
       const min = minutosDesdeHora(dispFecha.hora_inicio);
       if (min != null) fechaHoraInicio = min;
@@ -761,6 +769,19 @@ function slotDemasiadoTardeParaLlave(
 /**
  * Busca N canchas libres en el mismo momento que cumplan descanso de parejas.
  */
+export function duracionTurnoEnFecha(
+  fecha: string,
+  fallback: number,
+  duracionPorDia?: Record<string, number>,
+): number {
+  const norm = normalizarFechaProgramacionDia(fecha);
+  const custom = duracionPorDia?.[fecha] ?? duracionPorDia?.[norm];
+  if (custom != null && Number.isFinite(custom) && custom >= 30) {
+    return Math.round(custom);
+  }
+  return Math.max(30, fallback);
+}
+
 function buscarOlaSimultanea(
   cantidad: number,
   slots: SlotProgramacion[],
@@ -773,6 +794,7 @@ function buscarOlaSimultanea(
   notBefore: { fecha: string; startMin: number }[] = [],
   notAfter?: { fecha: string; startMin: number } | null,
   restriccionesEvento?: RestriccionesJugadorEvento,
+  duracionPorDia?: Record<string, number>,
 ): SlotProgramacion[] | null {
   const momentos = agruparSlotsPorMomento(slots);
 
@@ -791,13 +813,19 @@ function buscarOlaSimultanea(
     }
     if (tooEarly) continue;
 
+    const duracionMomento = duracionTurnoEnFecha(
+      momento.fecha,
+      duracionMinutos,
+      duracionPorDia,
+    );
+
     if (
       !parejasPueden(
         historial,
         parejaIds,
         momento.fecha,
         momento.startMin,
-        duracionMinutos,
+        duracionMomento,
         descansoMinutos,
         descansoModo,
       )
@@ -811,7 +839,7 @@ function buscarOlaSimultanea(
         parejaIds,
         momento.fecha,
         momento.startMin,
-        duracionMinutos,
+        duracionMomento,
         descansoMinutos,
         descansoModo,
       )
@@ -872,6 +900,7 @@ function buscarSlotIndividual(
   },
   notAfter?: { fecha: string; startMin: number } | null,
   restriccionesEvento?: RestriccionesJugadorEvento,
+  duracionPorDia?: Record<string, number>,
 ): SlotProgramacion | null {
   for (const slot of slots) {
     const wall =
@@ -879,6 +908,11 @@ function buscarSlotIndividual(
         fecha: slot.fecha,
         startMin: parseHoraAMinutos(slot.hora),
       };
+    const duracionSlot = duracionTurnoEnFecha(
+      wall.fecha,
+      duracionMinutos,
+      duracionPorDia,
+    );
     const key = slotKey(
       slot.canchaLabel,
       wall.fecha,
@@ -907,7 +941,7 @@ function buscarSlotIndividual(
         fechaInicio: validacionZona.fechaInicio,
         fechaPartido: wall.fecha,
         startMin,
-        duracionMinutos,
+        duracionMinutos: duracionSlot,
       })
     ) {
       continue;
@@ -918,7 +952,7 @@ function buscarSlotIndividual(
         parejaIds,
         wall.fecha,
         startMin,
-        duracionMinutos,
+        duracionSlot,
         descansoMinutos,
         descansoModo,
       )
@@ -932,7 +966,7 @@ function buscarSlotIndividual(
         parejaIds,
         wall.fecha,
         startMin,
-        duracionMinutos,
+        duracionSlot,
         descansoMinutos,
         descansoModo,
       )
@@ -953,7 +987,7 @@ function buscarSlotIndividual(
           startMin,
           opcionesDependencia.todos,
           opcionesDependencia.dependentsByMatchNo,
-          duracionMinutos,
+          duracionSlot,
           descansoMinutos,
           descansoModo,
         )
@@ -1417,11 +1451,26 @@ export function asignarHorariosAPartidos(
     /** CLI-10: descanso de jugadores (usuario_id) en otras categorías del evento. */
     historialJugadoresEvento?: Map<string, PartidoParejaHistorial[]>;
     jugadoresPorInscripcion?: Map<string, string[]>;
+    /** Duración por fecha (franjas del programador) para zonas y llave. */
+    duracionPorDia?: Record<string, number>;
   },
 ): void {
   if (!slots.length || !partidos.length) return;
 
   const duracionMinutos = Math.max(30, opciones?.duracionMinutos || 75);
+  const duracionPorDia = opciones?.duracionPorDia;
+  const duracionDeSlot = (slot: SlotProgramacion, esZona: boolean): number => {
+    const wall =
+      parseFechaPartidoIso(slot.fechaIso) || {
+        fecha: slot.fecha,
+        startMin: parseHoraAMinutos(slot.hora),
+      };
+    return duracionTurnoEnFecha(
+      wall.fecha,
+      esZona ? duracionZonaMinutos : duracionMinutos,
+      duracionPorDia,
+    );
+  };
   const descansoMinutos = opciones?.descansoMinutos;
   const descansoModo = opciones?.descansoModo;
   const feedersByMatchNo = opciones?.feedersByMatchNo || new Map();
@@ -1563,6 +1612,7 @@ export function asignarHorariosAPartidos(
         validacionZonaPara(item.partido.ronda),
         techoLlaveParaRonda(item.partido.ronda),
         restriccionesEvento,
+        duracionPorDia,
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -1570,7 +1620,7 @@ export function asignarHorariosAPartidos(
         slot,
         ocupados,
         historial,
-        duracionMinutos,
+        duracionDeSlot(slot, esRondaZona(item.partido.ronda)),
         equiposDePartido(item.partido).length ? undefined : ids,
         restriccionesEvento,
       );
@@ -1660,6 +1710,7 @@ export function asignarHorariosAPartidos(
               [],
               techoLlave,
               restriccionesEvento,
+              duracionPorDia,
             )
           : null;
       const notBeforeOla2: { fecha: string; startMin: number }[] = [];
@@ -1670,7 +1721,7 @@ export function asignarHorariosAPartidos(
             slotsOla1[idx],
             ocupados,
             historial,
-            duracionMinutos,
+            duracionDeSlot(slotsOla1[idx], true),
             undefined,
             restriccionesEvento,
           );
@@ -1681,7 +1732,8 @@ export function asignarHorariosAPartidos(
               fecha: s.fecha,
               startMin: parseHoraAMinutos(s.hora),
             };
-          const finOla = wall.startMin + duracionMinutos;
+          const finOla =
+            wall.startMin + duracionDeSlot(s, true);
           notBeforeOla2.push({
             fecha: wall.fecha,
             startMin: finOla,
@@ -1695,7 +1747,9 @@ export function asignarHorariosAPartidos(
         if (!wall) continue;
         notBeforeOla2.push({
           fecha: wall.fecha,
-          startMin: wall.startMin + duracionMinutos,
+          startMin:
+            wall.startMin +
+            duracionTurnoEnFecha(wall.fecha, duracionMinutos, duracionPorDia),
         });
       }
 
@@ -1719,6 +1773,7 @@ export function asignarHorariosAPartidos(
               notBeforeOla2,
               techoLlave,
               restriccionesEvento,
+              duracionPorDia,
             )
           : null;
       if (slotsOla2) {
@@ -1728,7 +1783,7 @@ export function asignarHorariosAPartidos(
             slotsOla2[idx],
             ocupados,
             historial,
-            duracionMinutos,
+            duracionDeSlot(slotsOla2[idx], true),
             esPendienteZona(item.partido) ? idsOla2 : undefined,
             restriccionesEvento,
           );
@@ -1754,6 +1809,7 @@ export function asignarHorariosAPartidos(
         validacionZonaPara(item.partido.ronda),
         techoLlave,
         restriccionesEvento,
+        duracionPorDia,
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -1761,7 +1817,7 @@ export function asignarHorariosAPartidos(
         slot,
         ocupados,
         historial,
-        duracionMinutos,
+        duracionDeSlot(slot, true),
         undefined,
         restriccionesEvento,
       );
@@ -1783,6 +1839,7 @@ export function asignarHorariosAPartidos(
         validacionZonaPara(item.partido.ronda),
         techoLlave,
         restriccionesEvento,
+        duracionPorDia,
       );
       if (!slot) continue;
       asignarSlotAPartido(
@@ -1790,7 +1847,7 @@ export function asignarHorariosAPartidos(
         slot,
         ocupados,
         historial,
-        duracionMinutos,
+        duracionDeSlot(slot, true),
         parejasZona,
         restriccionesEvento,
       );
@@ -1851,6 +1908,7 @@ export function asignarHorariosAPartidos(
       validacionZonaPara(item.partido.ronda),
       undefined,
       restriccionesEvento,
+      duracionPorDia,
     );
     if (!slot) continue;
     asignarSlotAPartido(
@@ -1858,7 +1916,7 @@ export function asignarHorariosAPartidos(
       slot,
       ocupados,
       historial,
-      duracionMinutos,
+      duracionDeSlot(slot, false),
       equiposDePartido(item.partido).length ? undefined : ids,
       restriccionesEvento,
     );
@@ -1914,7 +1972,10 @@ export async function cargarContextoProgramacion(torneoId: string): Promise<{
 
 export type FaseProgramacion = "zonas" | "llave";
 
-/** FAP: zonas default/mín 75′ (permite 60); llave mín 90′. */
+/**
+ * FAP: zonas default/mín 75′ (permite 60).
+ * Llave default 90′, pero respeta 60 u otra duración explícita del torneo o franja.
+ */
 export function duracionParaFase(
   configurada: number,
   fase: FaseProgramacion,
@@ -1924,7 +1985,24 @@ export function duracionParaFase(
     if (base === 60) return 60;
     return Math.max(75, base || 75);
   }
+  if (base === 60) return 60;
+  if (base >= 30 && base < 90) return base;
   return Math.max(90, base || 90);
+}
+
+export function duracionMinutosEnDia(
+  fecha: string,
+  fallback: number,
+  franjasPorDia?: Record<string, { duracion?: number }>,
+): number {
+  const norm = normalizarFechaProgramacionDia(fecha);
+  const franja =
+    franjasPorDia?.[fecha] ?? franjasPorDia?.[norm];
+  const custom = franja?.duracion;
+  if (custom != null && Number.isFinite(Number(custom)) && Number(custom) >= 30) {
+    return Math.round(Number(custom));
+  }
+  return Math.max(30, fallback || 90);
 }
 
 export async function programarPartidosConDisponibilidad(
@@ -2855,6 +2933,7 @@ export function validarAsignacionHorarioPartido(
   opciones: {
     duracionMinutos: number;
     duracionZonaMinutos?: number;
+    duracionPorDia?: Record<string, number>;
     descansoMinutos?: number;
     descansoModo?: ModoDescanso;
     feedersByMatchNo?: Map<number, number[]>;
@@ -2873,8 +2952,15 @@ export function validarAsignacionHorarioPartido(
 
   const parsed = parseFechaPartidoIso(fecha);
   if (!parsed) return "Fecha/hora inválida";
+  if (!minutosEnGrillaProgramador(parsed.startMin)) {
+    return "El horario debe estar en incrementos de 15 minutos";
+  }
 
-  const duracion = Math.max(30, opciones.duracionMinutos || 90);
+  const duracion = duracionTurnoEnFecha(
+    parsed.fecha,
+    Math.max(30, opciones.duracionMinutos || 90),
+    opciones.duracionPorDia,
+  );
   const descanso =
     opciones.descansoMinutos ??
     (opciones.descansoModo

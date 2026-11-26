@@ -836,6 +836,45 @@ export async function mergeBoardsEvento(
   };
 }
 
+export type IntercambioHorariosPayload = {
+  partido_id: string;
+  occupant_id: string;
+  destino: { fecha_iso: string; cancha_label: string };
+  origen?: { fecha_iso: string; cancha_label: string } | null;
+};
+
+export function draftIntercambioHorariosEvento(
+  partidos: PartidoProgramable[],
+  payload: IntercambioHorariosPayload,
+): PartidoProgramable[] {
+  const { partido_id, occupant_id, destino, origen } = payload;
+  return partidos.map((p) => {
+    const id = String(p.id || "");
+    if (id === partido_id) {
+      return {
+        ...p,
+        cancha_asignada: destino.cancha_label,
+        fecha_partido: destino.fecha_iso,
+      };
+    }
+    if (id === occupant_id) {
+      if (origen?.fecha_iso && origen?.cancha_label) {
+        return {
+          ...p,
+          cancha_asignada: origen.cancha_label,
+          fecha_partido: origen.fecha_iso,
+        };
+      }
+      return {
+        ...p,
+        cancha_asignada: null,
+        fecha_partido: null,
+      };
+    }
+    return p;
+  });
+}
+
 export async function validarAsignacionEnEvento(
   grupoId: string,
   partidoId: string,

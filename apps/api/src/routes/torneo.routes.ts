@@ -58,6 +58,7 @@ import {
   asignarProgramacion,
   asignarLoteProgramacion,
   desasignarProgramacion,
+  intercambiarProgramacion,
   limpiarProgramacion,
   autoAsignarProgramacion,
   guardarBorradorProgramacion,
@@ -68,6 +69,7 @@ import {
   asignarEventoProgramacion,
   autoAsignarEventoProgramacion,
   desasignarEventoProgramacion,
+  intercambiarEventoProgramacion,
   getEventoProgramacionBoard,
   limpiarEventoProgramacion,
   persistirConfigEventoProgramacion,
@@ -107,6 +109,12 @@ router.put(
   authenticate,
   authorize([...PROGRAMACION_ROLES]),
   desasignarEventoProgramacion,
+);
+router.put(
+  "/grupos/:grupoId/programacion/intercambiar",
+  authenticate,
+  authorize([...PROGRAMACION_ROLES]),
+  intercambiarEventoProgramacion,
 );
 router.post(
   "/grupos/:grupoId/programacion/limpiar",
@@ -349,6 +357,11 @@ router.put(
   "/:id/programacion/desasignar",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   desasignarProgramacion,
+);
+router.put(
+  "/:id/programacion/intercambiar",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  intercambiarProgramacion,
 );
 router.post(
   "/:id/programacion/limpiar",

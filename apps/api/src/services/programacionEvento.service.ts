@@ -61,7 +61,7 @@ export class ProgramacionEventoService {
       ? meta.torneos.filter((t) => t.id === opciones.torneo_id)
       : meta.torneos;
     for (const t of targets) {
-      await ProgramacionService.limpiar(t.id, opciones);
+      await ProgramacionService.limpiar(t.id, { ...opciones, omitirBoard: true });
     }
     return ProgramacionEventoService.getBoard(grupoId);
   }
@@ -125,22 +125,53 @@ export class ProgramacionEventoService {
       ...opciones,
       motivo: opciones.motivo,
       adminId: opciones.adminId,
+      distribucion: "zonas_primero" as const,
     };
 
     for (const soloFase of ["zonas", "llave"] as const) {
+      const eventPartidos = await cargarPartidosProgramablesEvento(grupoId);
+      const ocupadosSemilla = buildOcupadosDesdePartidos(
+        eventPartidos.filter((p) => p.cancha_asignada && p.fecha_partido),
+      );
       for (const torneoId of orden) {
-        const eventPartidos = await cargarPartidosProgramablesEvento(grupoId);
-        const ocupadosSemilla = buildOcupadosDesdePartidos(
-          eventPartidos.filter((p) => p.cancha_asignada && p.fecha_partido),
-        );
         await ProgramacionService.autoAsignar(torneoId, {
           ...baseOpciones,
           soloFase,
           ocupadosSemilla,
+          omitirBoard: true,
         });
+        const refrescados = await cargarPartidosProgramablesEvento(grupoId);
+        ocupadosSemilla.clear();
+        for (const key of buildOcupadosDesdePartidos(
+          refrescados.filter((p) => p.cancha_asignada && p.fecha_partido),
+        )) {
+          ocupadosSemilla.add(key);
+        }
       }
     }
 
+    return ProgramacionEventoService.getBoard(grupoId);
+  }
+
+  /** CLI-17: intercambio validado y atómico entre categorías del evento. */
+  static async intercambiar(
+    grupoId: string,
+    payload: {
+      partido_id: string;
+      occupant_id: string;
+      destino: { fecha_iso: string; cancha_label: string };
+      origen?: { fecha_iso: string; cancha_label: string } | null;
+      motivo?: string;
+      adminId?: string;
+    },
+  ): Promise<ProgramacionBoardEvento> {
+    const {
+      validarIntercambioHorariosEvento,
+      aplicarIntercambioHorariosPartidos,
+    } = await import("../utils/programacionIntercambio");
+    const err = await validarIntercambioHorariosEvento(grupoId, payload);
+    if (err) throw new Error(err);
+    await aplicarIntercambioHorariosPartidos(payload, payload.motivo);
     return ProgramacionEventoService.getBoard(grupoId);
   }
 

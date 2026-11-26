@@ -249,6 +249,33 @@ export const desasignarProgramacion = async (
   }
 };
 
+/** PUT /api/torneos/:id/programacion/intercambiar */
+export const intercambiarProgramacion = async (
+  req: Request,
+  res: Response,
+): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const bloqueo = await rechazarSiNoEdita(req, id, res);
+    if (bloqueo) return bloqueo;
+    const data = await ProgramacionService.intercambiarHorarios(id, {
+      partido_id: req.body.partido_id,
+      occupant_id: req.body.occupant_id,
+      destino: req.body.destino,
+      origen: req.body.origen,
+      motivo: req.body.motivo,
+      adminId: req.user?.id,
+    });
+    return res.status(200).json(data);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Error desconocido";
+    return res.status(400).json({
+      message: "No se pudo intercambiar los horarios",
+      error: msg,
+    });
+  }
+};
+
 /** POST /api/torneos/:id/programacion/limpiar */
 export const limpiarProgramacion = async (
   req: Request,

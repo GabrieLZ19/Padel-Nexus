@@ -18,6 +18,7 @@ import {
   esRondaCampeonato,
   etiquetaRondaProgramador,
   evaluarDescansoInsuficiente,
+  minutosDeModoDescanso,
   jornadasDesdeInicio,
   ordenDeAsignacion,
   ordenRondaProgramador,
@@ -76,6 +77,16 @@ describe("programador paso 5", () => {
       ordenDeAsignacion(partidos, "continua").map((p) => p.id),
       ["octavos", "zona"],
     );
+  });
+
+  it("sin_descanso permite inicios consecutivos sin hueco obligatorio", () => {
+    const inicio = 10 * 60;
+    const duracion = 60;
+    assert.equal(
+      evaluarDescansoInsuficiente("sin_descanso", inicio, inicio + duracion, duracion),
+      false,
+    );
+    assert.equal(minutosDeModoDescanso("sin_descanso"), 0);
   });
 
   it("aplica los tres descansos: 60 o 120 desde el final, o 4 h entre inicios", () => {

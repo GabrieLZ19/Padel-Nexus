@@ -63,6 +63,30 @@ function diasDelContexto(
   return jornadasDesdeInicio(inicio, jornadas);
 }
 
+function duracionPorDiaDesdeVentana(
+  contexto: Awaited<ReturnType<typeof cargarContextoProgramacion>>,
+  ventana?: {
+    jornadas?: number;
+    horaInicio?: string;
+    horaFin?: string;
+    franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
+  },
+): Record<string, number> {
+  const dias = diasDelContexto(contexto, ventana?.jornadas);
+  const franjas = construirFranjasPorDiaBoard(dias, contexto.disponibilidad, {
+    franjasPorDia: ventana?.franjasPorDia,
+    horaInicio: ventana?.horaInicio,
+    horaFin: ventana?.horaFin,
+  });
+  const map: Record<string, number> = {};
+  for (const [fecha, fr] of Object.entries(franjas)) {
+    if (fr.duracion != null && Number.isFinite(fr.duracion)) {
+      map[fecha] = Number(fr.duracion);
+    }
+  }
+  return map;
+}
+
 function slotsDesdeContexto(
   contexto: Awaited<ReturnType<typeof cargarContextoProgramacion>>,
   duracionMinutos: number,
@@ -474,7 +498,7 @@ export class ProgramacionService {
     return map;
   }
 
-  private static async feedersForTorneo(
+  static async feedersForTorneo(
     torneoId: string,
     pairCount?: number,
   ): Promise<Map<number, number[]>> {
@@ -1215,8 +1239,8 @@ export class ProgramacionService {
    */
   static async limpiar(
     torneoId: string,
-    opciones: { motivo?: string; adminId?: string } = {},
-  ): Promise<ProgramacionBoard> {
+    opciones: { motivo?: string; adminId?: string; omitirBoard?: boolean } = {},
+  ): Promise<ProgramacionBoard | null> {
     const { data: torneo } = await supabaseAdmin
       .from("torneos")
       .select("id, programacion_estado")
@@ -1253,6 +1277,7 @@ export class ProgramacionService {
       });
     }
 
+    if (opciones.omitirBoard) return null;
     return this.getBoard(torneoId);
   }
 
@@ -1278,8 +1303,10 @@ export class ProgramacionService {
       ocupadosSemilla?: Set<string>;
       /** CLI-11 evento: solo zonas o solo llave (reparto equilibrado). */
       soloFase?: "zonas" | "llave";
+      /** CLI-16: el programador de evento arma el board una sola vez al final. */
+      omitirBoard?: boolean;
     } = {},
-  ): Promise<ProgramacionBoard> {
+  ): Promise<ProgramacionBoard | null> {
     const { data: torneo } = await supabaseAdmin
       .from("torneos")
       .select(
@@ -1394,6 +1421,8 @@ export class ProgramacionService {
       horaFin: opciones.horaFin,
       franjasPorDia: opciones.franjasPorDia,
     };
+    const duracionPorDiaMap = duracionPorDiaDesdeVentana(contexto, ventana);
+    const franjaOpts = { duracionPorDia: duracionPorDiaMap };
 
     const feedersTorneo = await this.feedersForTorneo(torneoId);
     let eventoJugadorRest: {
@@ -1438,9 +1467,11 @@ export class ProgramacionService {
     };
 
     if (soloFase === "llave" && !llaveDrafts.length) {
+      if (opciones.omitirBoard) return null;
       return this.getBoard(torneoId, boardQuery);
     }
     if (soloFase === "zonas" && !zonasDrafts.length) {
+      if (opciones.omitirBoard) return null;
       return this.getBoard(torneoId, boardQuery);
     }
 
@@ -1463,6 +1494,7 @@ export class ProgramacionService {
             slotsPrevios.length ? slotsPrevios : allSlots,
             ocupados,
             {
+              ...franjaOpts,
               duracionMinutos: duracion,
               duracionZonaMinutos: duracionParaFase(duracion, "zonas"),
               descansoMinutos,
@@ -1493,6 +1525,7 @@ export class ProgramacionService {
           const slotsCampeonato =
             slotsUltimoDia.length ? slotsUltimoDia : allSlots;
           asignarHorariosAPartidos(drafts, slotsCampeonato, ocupadosDespues, {
+            ...franjaOpts,
             duracionMinutos: duracion,
             duracionZonaMinutos: duracionParaFase(duracion, "zonas"),
             descansoMinutos,
@@ -1515,6 +1548,7 @@ export class ProgramacionService {
             );
             for (const k of ocupados) ocupadosFin.add(k);
             asignarHorariosAPartidos(drafts, allSlots, ocupadosFin, {
+              ...franjaOpts,
               duracionMinutos: duracion,
               duracionZonaMinutos: duracionParaFase(duracion, "zonas"),
               descansoMinutos,
@@ -1532,6 +1566,7 @@ export class ProgramacionService {
       } else {
         const ordenados = ordenDeAsignacion(drafts, "continua");
         asignarHorariosAPartidos(ordenados, allSlots, ocupados, {
+          ...franjaOpts,
           duracionMinutos: duracion,
           duracionZonaMinutos: duracionParaFase(duracion, "zonas"),
           descansoMinutos,
@@ -1563,6 +1598,7 @@ export class ProgramacionService {
           slotsZonas.length ? slotsZonas : allSlotsZonas,
           ocupados,
           {
+            ...franjaOpts,
             duracionMinutos: dur,
             descansoMinutos,
             descansoModo,
@@ -1583,6 +1619,7 @@ export class ProgramacionService {
           );
           for (const k of ocupados) ocupadosHastaAca.add(k);
           asignarHorariosAPartidos(drafts, allSlotsZonas, ocupadosHastaAca, {
+            ...franjaOpts,
             duracionMinutos: dur,
             descansoMinutos,
             descansoModo,
@@ -1630,6 +1667,7 @@ export class ProgramacionService {
               slotsPrevios.length ? slotsPrevios : allSlotsLlave,
               ocupadosDespues,
               {
+                ...franjaOpts,
                 duracionMinutos: dur,
                 duracionZonaMinutos: durZona,
                 descansoMinutos,
@@ -1667,6 +1705,7 @@ export class ProgramacionService {
               slotsCampeonato.length ? slotsCampeonato : allSlotsLlave,
               ocupadosDespues,
               {
+                ...franjaOpts,
                 duracionMinutos: dur,
                 duracionZonaMinutos: durZona,
                 descansoMinutos,
@@ -1691,6 +1730,7 @@ export class ProgramacionService {
               );
               for (const k of ocupados) ocupadosFin.add(k);
               asignarHorariosAPartidos(drafts, allSlotsLlave, ocupadosFin, {
+                ...franjaOpts,
                 duracionMinutos: dur,
                 duracionZonaMinutos: durZona,
                 descansoMinutos,
@@ -1710,6 +1750,7 @@ export class ProgramacionService {
           const durZona = duracionParaFase(duracion, "zonas");
           const finZonaOpts = { descansoMinutos, descansoModo };
           asignarHorariosAPartidos(drafts, allSlotsLlave, ocupadosDespues, {
+            ...franjaOpts,
             duracionMinutos: dur,
             duracionZonaMinutos: durZona,
             descansoMinutos,
@@ -1765,6 +1806,7 @@ export class ProgramacionService {
       });
     }
 
+    if (opciones.omitirBoard) return null;
     return this.getBoard(torneoId, {
       duracionMinutos: duracion,
       descansoMinutos: opciones.descansoMinutos,
@@ -1774,6 +1816,30 @@ export class ProgramacionService {
       horaFin: opciones.horaFin,
       franjasPorDia: opciones.franjasPorDia,
     });
+  }
+
+  /**
+   * CLI-17: intercambio atómico entre dos partidos del mismo torneo (validación previa).
+   */
+  static async intercambiarHorarios(
+    torneoId: string,
+    payload: {
+      partido_id: string;
+      occupant_id: string;
+      destino: { fecha_iso: string; cancha_label: string };
+      origen?: { fecha_iso: string; cancha_label: string } | null;
+      motivo?: string;
+      adminId?: string;
+    },
+  ): Promise<ProgramacionBoard> {
+    const {
+      validarIntercambioHorariosTorneo,
+      aplicarIntercambioHorariosPartidos,
+    } = await import("../utils/programacionIntercambio");
+    const err = await validarIntercambioHorariosTorneo(torneoId, payload);
+    if (err) throw new Error(err);
+    await aplicarIntercambioHorariosPartidos(payload);
+    return this.getBoard(torneoId);
   }
 
   /**

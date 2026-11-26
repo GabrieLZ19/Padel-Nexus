@@ -1,5 +1,9 @@
 import { supabaseAdmin } from "../config/supabase";
-import { esModoDescanso, type ModoDescanso } from "./programadorReglas";
+import {
+  esModoDescanso,
+  horaEnGrillaProgramador,
+  type ModoDescanso,
+} from "./programadorReglas";
 import {
   normalizarFechaProgramacionDia,
   type DisponibilidadTorneo,
@@ -26,9 +30,19 @@ export async function persistirFranjasPorDiaTorneo(
       duracion_partido_minutos?: number;
     } = {};
     if (franja.inicio) {
+      if (!horaEnGrillaProgramador(franja.inicio)) {
+        throw new Error(
+          `Inicio inválido para ${fecha}: debe estar en incrementos de 15 minutos`,
+        );
+      }
       updates.hora_inicio = `${franja.inicio.slice(0, 5)}:00`;
     }
     if (franja.fin !== undefined && franja.fin !== "") {
+      if (franja.fin !== "00:00" && !horaEnGrillaProgramador(franja.fin)) {
+        throw new Error(
+          `Fin inválido para ${fecha}: debe estar en incrementos de 15 minutos`,
+        );
+      }
       updates.hora_fin =
         franja.fin === "00:00" ? "23:59:59" : `${franja.fin.slice(0, 5)}:00`;
     }
