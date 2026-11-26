@@ -12,8 +12,8 @@ export function claveParNivelRama(rama: string, nivel: string): string {
 }
 
 export function opcionesParesReplicar(
-  niveles: Array<{ value: string; label: string }>,
-  ramas: Array<{ value: RamaPadel | string; label: string }>,
+  niveles: ReadonlyArray<{ value: string; label: string }>,
+  ramas: ReadonlyArray<{ value: RamaPadel | string; label: string }>,
   origen: { nivel?: string | null; rama?: string | null },
 ): ParNivelRama[] {
   const nivelOrigen = String(origen.nivel || "").trim();
