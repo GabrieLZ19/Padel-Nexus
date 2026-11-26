@@ -105,4 +105,21 @@ export const AsociacionesService = {
       return [];
     }
   },
+
+  delete: async (
+    id: string,
+  ): Promise<{
+    modo?: "eliminado" | "dado_de_baja";
+    message?: string;
+    historial?: {
+      clubes?: number;
+      torneos?: number;
+      licencias?: number;
+      afiliaciones?: number;
+      usuariosAdmin?: number;
+    };
+  }> => {
+    const res = await api.delete(`/asociaciones/${id}`);
+    return res.data;
+  },
 };

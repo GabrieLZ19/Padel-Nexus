@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -17,8 +17,13 @@ import {
   X,
   LayoutGrid,
   List,
+  Trash2,
 } from "lucide-react";
 import { AsociacionesService, Asociacion } from "@/utils/services/asociaciones";
+import FeedbackModal, {
+  type FeedbackModalProps,
+} from "@/components/ui/FeedbackModal";
+import { mensajeErrorApi } from "@/utils/mensajeErrorApi";
 import CustomDropdown from "@/components/ui/CustomDropdown";
 import { ConfigLicenciasPanel } from "@/components/licencias/ConfigLicenciasPanel";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
@@ -28,6 +33,7 @@ import { useSiglaRectora } from "@/utils/useSiglaRectora";
 export default function DetalleAsociacionPage() {
   const siglaRectora = useSiglaRectora();
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
 
   const [asociacion, setAsociacion] = useState<Asociacion | null>(null);
@@ -44,6 +50,13 @@ export default function DetalleAsociacionPage() {
   // Modal Expediente del Jugador
   const [selectedJugador, setSelectedJugador] = useState<any | null>(null);
   const [showJugadorModal, setShowJugadorModal] = useState(false);
+  const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "warning",
+    onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+  });
 
   useEffect(() => {
     if (id) {
@@ -77,6 +90,54 @@ export default function DetalleAsociacionPage() {
     setShowJugadorModal(true);
   };
 
+  const solicitarBajaAsociacion = () => {
+    if (!asociacion) return;
+    setFeedbackModal({
+      isOpen: true,
+      type: "danger",
+      title: "Dar de baja asociación",
+      description:
+        "Si no hay clubes, torneos, licencias, afiliaciones ni administradores vinculados, se eliminará del sistema. Si hay historial, quedará inactiva y podrás reactivarla después.",
+      confirmText: "Confirmar",
+      cancelText: "Cancelar",
+      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      onConfirm: () => {
+        setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+        AsociacionesService.delete(asociacion.id)
+          .then((resultado) => {
+            setFeedbackModal({
+              isOpen: true,
+              type: "success",
+              title:
+                resultado.modo === "eliminado"
+                  ? "Asociación eliminada"
+                  : "Asociación dada de baja",
+              description:
+                resultado.message ||
+                "La operación se completó correctamente.",
+              onClose: () => {
+                setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
+                router.push("/dashboard/asociaciones");
+              },
+            });
+          })
+          .catch((error) => {
+            setFeedbackModal({
+              isOpen: true,
+              type: "error",
+              title: "No se pudo dar de baja",
+              description: mensajeErrorApi(
+                error,
+                "Revisá permisos e intentá de nuevo.",
+              ),
+              onClose: () =>
+                setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+            });
+          });
+      },
+    });
+  };
+
   const torneosFiltrados = torneos.filter((t) => {
     if (selectedClubFilter === "Todos") return true;
     return (
@@ -90,6 +151,20 @@ export default function DetalleAsociacionPage() {
     return (
       <div className="p-12 text-center text-gray-500 font-semibold max-w-7xl mx-auto">
         Cargando expediente de la asociación...
+      </div>
+    );
+  }
+
+  if (!asociacion) {
+    return (
+      <div className="p-8 max-w-7xl mx-auto space-y-4">
+        <Link
+          href="/dashboard/asociaciones"
+          className="inline-flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-brand-chartreuse transition-colors"
+        >
+          <ArrowLeft className="size-4" /> Volver al Padrón de Asociaciones
+        </Link>
+        <p className="text-white font-bold">Asociación no encontrada.</p>
       </div>
     );
   }
@@ -127,9 +202,19 @@ export default function DetalleAsociacionPage() {
             </div>
           </div>
 
-          <span className="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5 shrink-0">
-            <ShieldCheck className="size-4" /> Entidad Afiliada
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+              <ShieldCheck className="size-4" /> Entidad Afiliada
+            </span>
+            <button
+              type="button"
+              onClick={solicitarBajaAsociacion}
+              className="p-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+              title="Dar de baja o eliminar asociación"
+            >
+              <Trash2 className="size-4" />
+            </button>
+          </div>
         </div>
 
         {/* Métricas Consolidadas Reales */}
@@ -534,6 +619,8 @@ export default function DetalleAsociacionPage() {
           </div>
         </div>
       )}
+
+      <FeedbackModal {...feedbackModal} />
     </div>
   );
 }

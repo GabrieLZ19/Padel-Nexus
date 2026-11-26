@@ -2,24 +2,37 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Landmark,
   MapPin,
   Scale,
+  Trash2,
 } from "lucide-react";
 import {
   FederacionesService,
   type Federacion,
 } from "@/utils/services/federaciones";
 import { ConfigLicenciasPanel } from "@/components/licencias/ConfigLicenciasPanel";
+import FeedbackModal, {
+  type FeedbackModalProps,
+} from "@/components/ui/FeedbackModal";
+import { mensajeErrorApi } from "@/utils/mensajeErrorApi";
 
 export default function DetalleFederacionPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
   const [federacion, setFederacion] = useState<Federacion | null>(null);
   const [loading, setLoading] = useState(true);
+  const [feedbackModal, setFeedbackModal] = useState<FeedbackModalProps>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "warning",
+    onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+  });
 
   useEffect(() => {
     if (!id) return;
@@ -58,6 +71,53 @@ export default function DetalleFederacionPage() {
 
   const asociaciones = federacion.asociaciones || [];
 
+  const solicitarBajaFederacion = () => {
+    setFeedbackModal({
+      isOpen: true,
+      type: "danger",
+      title: "Dar de baja federación",
+      description:
+        "Si no hay asociaciones, licencias, afiliaciones ni administradores vinculados, se eliminará del sistema. Si hay historial, quedará inactiva.",
+      confirmText: "Confirmar",
+      cancelText: "Cancelar",
+      onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      onConfirm: () => {
+        setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+        FederacionesService.delete(federacion.id)
+          .then((resultado) => {
+            setFeedbackModal({
+              isOpen: true,
+              type: "success",
+              title:
+                resultado.modo === "eliminado"
+                  ? "Federación eliminada"
+                  : "Federación dada de baja",
+              description:
+                resultado.message ||
+                "La operación se completó correctamente.",
+              onClose: () => {
+                setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
+                router.push("/dashboard/federaciones");
+              },
+            });
+          })
+          .catch((error) => {
+            setFeedbackModal({
+              isOpen: true,
+              type: "error",
+              title: "No se pudo dar de baja",
+              description: mensajeErrorApi(
+                error,
+                "Revisá permisos e intentá de nuevo.",
+              ),
+              onClose: () =>
+                setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+            });
+          });
+      },
+    });
+  };
+
   return (
     <div className="p-6 md:p-8 max-w-[1400px] mx-auto space-y-8">
       <Link
@@ -68,7 +128,8 @@ export default function DetalleFederacionPage() {
       </Link>
 
       <div className="bg-[#151515] border border-white/5 rounded-3xl p-8">
-        <div className="flex items-start gap-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4 min-w-0">
           <div className="size-14 rounded-2xl bg-brand-chartreuse flex items-center justify-center shrink-0">
             <Scale className="size-7 text-brand-black" />
           </div>
@@ -84,6 +145,15 @@ export default function DetalleFederacionPage() {
               {federacion.pais || "Sin país"} · {asociaciones.length} asociaciones
             </p>
           </div>
+          </div>
+          <button
+            type="button"
+            onClick={solicitarBajaFederacion}
+            className="p-2.5 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors shrink-0"
+            title="Dar de baja o eliminar federación"
+          >
+            <Trash2 className="size-4" />
+          </button>
         </div>
         {federacion.descripcion && (
           <p className="text-sm text-gray-400 mt-6">{federacion.descripcion}</p>
@@ -126,6 +196,8 @@ export default function DetalleFederacionPage() {
           </div>
         )}
       </div>
+
+      <FeedbackModal {...feedbackModal} />
     </div>
   );
 }

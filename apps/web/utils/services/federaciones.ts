@@ -79,4 +79,20 @@ export const FederacionesService = {
       null
     );
   },
+
+  delete: async (
+    id: string,
+  ): Promise<{
+    modo?: "eliminado" | "dado_de_baja";
+    message?: string;
+    historial?: {
+      asociaciones?: number;
+      licencias?: number;
+      afiliaciones?: number;
+      usuariosAdmin?: number;
+    };
+  }> => {
+    const res = await api.delete(`/federaciones/${id}`);
+    return res.data;
+  },
 };
