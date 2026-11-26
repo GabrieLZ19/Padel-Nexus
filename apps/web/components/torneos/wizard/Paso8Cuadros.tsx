@@ -8,6 +8,7 @@ import { esEliminatoriaDirecta } from "@/utils/formatoTorneo";
 import { AlertCircle } from "lucide-react";
 import { evaluarCapacidadDiasCompetencia } from "@/utils/capacidadDiasCompetencia";
 import { SelectorCategoriaEvento } from "@/components/torneos/SelectorCategoriaEvento";
+import { inscripcionPagoPendienteBloqueaCuadro } from "@/utils/torneoInscripcionSinCosto";
 
 interface Paso6CuadrosProps {
   torneo: Torneo;
@@ -50,8 +51,8 @@ export const Paso6Cuadros = ({
   const numeroPaso = useNumeroPaso("draws");
   const [generando, setGenerando] = useState(false);
   const cantidadInscriptos = inscripciones.length;
-  const hayPendientes = inscripciones.some(
-    (ins) => ins.estado_pago !== "Confirmado",
+  const hayPendientes = inscripciones.some((ins) =>
+    inscripcionPagoPendienteBloqueaCuadro(ins, torneo),
   );
   const formatoEsEliminatoriaDirecta = esEliminatoriaDirecta(torneo?.formato);
   const cupoValido =

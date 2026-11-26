@@ -33,6 +33,10 @@ import {
 import { importarPlanillaConProgreso } from "@/utils/planillaImportProgress";
 import { PlanillaImportProgressBar } from "@/components/inscripciones/PlanillaImportProgressBar";
 import type { PlanillaImportProgressState } from "@/components/inscripciones/PlanillaImportProgressBar";
+import {
+  inscripcionCuentaComoConfirmada,
+  torneoInscripcionSinCosto,
+} from "@/utils/torneoInscripcionSinCosto";
 import { esModalidadIndividual } from "@/utils/formatFecha";
 import { TorneoSaldoPadelNexus } from "@/components/torneos/TorneoSaldoPadelNexus";
 
@@ -84,10 +88,7 @@ export const Paso4Jugadores = ({
     userRole,
   );
   const nacional = esAlcanceNacional(torneo.alcance);
-  const gratuito =
-    typeof torneo.es_gratis === "boolean"
-      ? torneo.es_gratis
-      : Number(torneo.precio_inscripcion || 0) === 0;
+  const gratuito = torneoInscripcionSinCosto(torneo);
 
   const [importingCSV, setImportingCSV] = useState(false);
   const [importProgress, setImportProgress] =
@@ -100,9 +101,8 @@ export const Paso4Jugadores = ({
     isLoading: false,
   });
 
-  const confirmadasCount = inscripciones.filter(
-    (i) => i.estado_pago === "Confirmado",
-  ).length;
+  const confirmadasCount = inscripciones.filter(inscripcionCuentaComoConfirmada)
+    .length;
 
   const fixtureActivo =
     torneo.estado === "Programado" || torneo.estado === "En curso";
@@ -278,9 +278,7 @@ export const Paso4Jugadores = ({
         <h3 className="font-bold text-white flex items-center gap-2">
           <CheckCircle2 className="size-5 text-[#00ff88]" />
           Paso {numeroPaso}: Inscripciones (
-          {gratuito
-            ? `${inscripciones.length} inscriptas`
-            : `${confirmadasCount} confirmadas`}{" "}
+          {`${confirmadasCount} confirmadas`}{" "}
           de {torneo.cupos_maximos || 16})
         </h3>
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
@@ -350,7 +348,7 @@ export const Paso4Jugadores = ({
             </thead>
             <tbody className="divide-y divide-white/5">
               {inscripciones.map((ins) => {
-                const isConfirmed = !gratuito && ins.estado_pago === "Confirmado";
+                const isConfirmed = inscripcionCuentaComoConfirmada(ins);
                 return (
                   <tr
                     key={ins.id}
@@ -359,36 +357,32 @@ export const Paso4Jugadores = ({
                     }`}
                   >
                     <td className="px-8 py-5 text-center">
-                      {gratuito ? (
-                        <span className="text-xs font-bold text-gray-500">N/A</span>
-                      ) : (
-                        <input
-                          type="checkbox"
-                          checked={isConfirmed}
-                          disabled={isConfirmed || readOnly}
-                          title={readOnly ? (torneo.solo_lectura ? "Modo lectura" : "Torneo finalizado") : undefined}
-                          onChange={() => {
-                            if (!isConfirmed) {
-                              setPagoModal({
-                                isOpen: true,
-                                inscripcionId: String(ins.id),
-                                montoDefecto: montoInscripcionSugeridoDesdeTorneo(
-                                  {
+                      <input
+                        type="checkbox"
+                        checked={isConfirmed}
+                        disabled={isConfirmed || readOnly}
+                        title={readOnly ? (torneo.solo_lectura ? "Modo lectura" : "Torneo finalizado") : undefined}
+                        onChange={() => {
+                          if (!isConfirmed) {
+                            setPagoModal({
+                              isOpen: true,
+                              inscripcionId: String(ins.id),
+                              montoDefecto: gratuito
+                                ? 0
+                                : montoInscripcionSugeridoDesdeTorneo({
                                     precioPorJugador: Number(
                                       torneo.precio_inscripcion || 0,
                                     ),
                                     modalidad: torneo.modalidad,
                                     tieneJugador2: Boolean(ins.usuario2_id),
                                     montoGuardado: ins.monto,
-                                  },
-                                ),
-                                isLoading: false,
-                              });
-                            }
-                          }}
-                          className="size-4 rounded border-white/10 text-brand-chartreuse cursor-pointer disabled:cursor-not-allowed"
-                        />
-                      )}
+                                  }),
+                              isLoading: false,
+                            });
+                          }
+                        }}
+                        className="size-4 rounded border-white/10 text-brand-chartreuse cursor-pointer disabled:cursor-not-allowed"
+                      />
                     </td>
                     <td className="px-8 py-5 font-mono text-gray-500 text-sm">
                       {String(ins.id).slice(0, 8).toUpperCase()}
@@ -428,19 +422,23 @@ export const Paso4Jugadores = ({
                             : "bg-gray-500/10 text-gray-400 border border-gray-500/20"
                         }`}
                       >
-                        {gratuito
-                          ? "N/A"
-                          : isConfirmed
-                            ? modoFederacion
+                        {isConfirmed
+                          ? gratuito
+                            ? "Confirmado"
+                            : modoFederacion
                               ? "Pagó"
                               : "Confirmado"
+                          : gratuito
+                            ? "Pendiente de confirmar"
                             : modoFederacion
                               ? "No pagó"
                               : "Pendiente de pago"}
                       </span>
                     </td>
                     <td className="px-8 py-5 text-right font-semibold text-sm">
-                      {gratuito ? "N/A" : `$${Number(ins.monto || 0).toLocaleString("es-AR")}`}
+                      {gratuito
+                        ? "$0"
+                        : `$${Number(ins.monto || 0).toLocaleString("es-AR")}`}
                     </td>
                     <td className="px-8 py-5 text-center">
                       <button
