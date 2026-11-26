@@ -67,6 +67,8 @@ export default function PerfilJugadorAdminPage() {
     nombre: "",
     apellido: "",
     fecha_nacimiento: "",
+    email: "",
+    telefono: "",
   });
 
   const licenciasList = licenciasComoArray(perfil?.licencias);
@@ -169,6 +171,8 @@ export default function PerfilJugadorAdminPage() {
             nombre: data.nombre || "",
             apellido: data.apellido || "",
             fecha_nacimiento: data.fecha_nacimiento?.split("T")[0] || "",
+            email: emailContactoVisible(data.email) || "",
+            telefono: data.telefono || "",
           });
         }
       } catch (error) {
@@ -292,6 +296,8 @@ export default function PerfilJugadorAdminPage() {
           nombre: fichaProvisoriaForm.nombre.trim(),
           apellido: fichaProvisoriaForm.apellido.trim(),
           fecha_nacimiento: fichaProvisoriaForm.fecha_nacimiento || null,
+          email: fichaProvisoriaForm.email.trim() || null,
+          telefono: fichaProvisoriaForm.telefono.trim() || null,
         },
       );
       setPerfil(actualizado);
@@ -370,8 +376,8 @@ export default function PerfilJugadorAdminPage() {
                     Ficha provisoria
                   </p>
                   <p className="text-sm text-gray-400">
-                    Podés corregir nombre, apellido y fecha de nacimiento. Cada
-                    cambio queda auditado.
+                    Podés corregir datos de contacto y ficha. Cada cambio queda
+                    auditado.
                   </p>
                 </div>
                 {!editandoFichaProvisoria ? (
@@ -403,7 +409,7 @@ export default function PerfilJugadorAdminPage() {
                 )}
               </div>
               {editandoFichaProvisoria && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <label className="block text-xs text-gray-400">
                     Nombre
                     <input
@@ -442,6 +448,36 @@ export default function PerfilJugadorAdminPage() {
                         }))
                       }
                       className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white text-sm"
+                    />
+                  </label>
+                  <label className="block text-xs text-gray-400">
+                    Email (activación)
+                    <input
+                      type="email"
+                      value={fichaProvisoriaForm.email}
+                      onChange={(e) =>
+                        setFichaProvisoriaForm((p) => ({
+                          ...p,
+                          email: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white text-sm"
+                      placeholder="Correo real del jugador"
+                    />
+                  </label>
+                  <label className="block text-xs text-gray-400 md:col-span-2">
+                    Teléfono (activación)
+                    <input
+                      type="tel"
+                      value={fichaProvisoriaForm.telefono}
+                      onChange={(e) =>
+                        setFichaProvisoriaForm((p) => ({
+                          ...p,
+                          telefono: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-white/10 bg-black/30 p-3 text-white text-sm"
+                      placeholder="Teléfono para verificación"
                     />
                   </label>
                 </div>

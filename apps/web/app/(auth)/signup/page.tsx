@@ -78,6 +78,17 @@ export default function SignUpPage() {
   );
   const [fichaPendienteSinMetodos, setFichaPendienteSinMetodos] =
     useState(false);
+  const [padronFapDisponible, setPadronFapDisponible] = useState(false);
+  const [nroLicenciaPadron, setNroLicenciaPadron] = useState("");
+  const [canalOtpPadron, setCanalOtpPadron] = useState<"email" | "telefono">(
+    "email",
+  );
+  const [contactoOtpPadron, setContactoOtpPadron] = useState("");
+  const [codigoOtpPadron, setCodigoOtpPadron] = useState("");
+  const [enviandoOtpPadron, setEnviandoOtpPadron] = useState(false);
+  const [confirmandoOtpPadron, setConfirmandoOtpPadron] = useState(false);
+  const [mensajeOtpPadron, setMensajeOtpPadron] = useState<string | null>(null);
+  const [errorOtpPadron, setErrorOtpPadron] = useState<string | null>(null);
   const [fichaPendienteActiva, setFichaPendienteActiva] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<{
@@ -231,17 +242,15 @@ export default function SignUpPage() {
       return;
     }
 
-    if (fichaPendienteSinMetodos) {
+    if (
+      fichaPendienteActiva &&
+      (metodosPreinscripcion.length > 0 || padronFapDisponible) &&
+      !verificationToken
+    ) {
       setError(
-        "Esta ficha no tiene teléfono ni email para verificar. Contactá a tu entidad antes de activar la cuenta.",
-      );
-      setLoading(false);
-      return;
-    }
-
-    if (fichaPendienteActiva && metodosPreinscripcion.length > 0 && !verificationToken) {
-      setError(
-        "Debés verificar tu identidad con el teléfono o email de la ficha antes de registrarte.",
+        padronFapDisponible && metodosPreinscripcion.length === 0
+          ? "Debés verificar tu identidad con el padrón FAP (código OTP) antes de registrarte."
+          : "Debés verificar tu identidad con el teléfono o email de la ficha antes de registrarte.",
       );
       setLoading(false);
       return;
@@ -323,6 +332,11 @@ export default function SignUpPage() {
     setMetodosPreinscripcion([]);
     setUltimos4Verificacion("");
     setErrorVerificacionPreinscripcion(null);
+    setPadronFapDisponible(false);
+    setNroLicenciaPadron("");
+    setCodigoOtpPadron("");
+    setMensajeOtpPadron(null);
+    setErrorOtpPadron(null);
     if (errors.dni) setErrors((p) => ({ ...p, dni: undefined }));
   };
 
@@ -360,6 +374,7 @@ export default function SignUpPage() {
     setVerificationToken(null);
     setFichaPendienteSinMetodos(false);
     setFichaPendienteActiva(false);
+    setPadronFapDisponible(false);
     try {
       const resultado = await PerfilService.buscarPreinscripcionPorDni(dniLimpio);
       if (!resultado.encontrado) return;
@@ -373,9 +388,11 @@ export default function SignUpPage() {
       }
 
       const metodos = resultado.metodos_disponibles ?? [];
+      const padron = Boolean(resultado.padron_fap_disponible);
       setMetodosPreinscripcion(metodos);
       setFichaPendienteActiva(true);
-      setFichaPendienteSinMetodos(metodos.length === 0);
+      setFichaPendienteSinMetodos(metodos.length === 0 && padron);
+      setPadronFapDisponible(padron);
       setPreinscripcionRequiereVerificacion(
         Boolean(resultado.verificacion_requerida && metodos.length > 0),
       );
@@ -449,6 +466,87 @@ export default function SignUpPage() {
       );
     } finally {
       setVerificandoPreinscripcion(false);
+    }
+  };
+
+  const solicitarCodigoPadronFap = async () => {
+    const dniLimpio = dni.trim().replace(/\./g, "");
+    if (!validateDni(dniLimpio) || !fechaNacimiento.trim()) return;
+    if (!nroLicenciaPadron.trim()) {
+      setErrorOtpPadron("Ingresá el N° de licencia FAP.");
+      return;
+    }
+    const contacto =
+      canalOtpPadron === "email"
+        ? contactoOtpPadron.trim() || email.trim()
+        : contactoOtpPadron.trim() || telefono.trim();
+    if (canalOtpPadron === "email" && !contacto.includes("@")) {
+      setErrorOtpPadron("Ingresá un email válido para recibir el código.");
+      return;
+    }
+    if (canalOtpPadron === "telefono" && contacto.replace(/\D/g, "").length < 8) {
+      setErrorOtpPadron("Ingresá un teléfono válido (mínimo 8 dígitos).");
+      return;
+    }
+
+    setEnviandoOtpPadron(true);
+    setErrorOtpPadron(null);
+    setMensajeOtpPadron(null);
+    try {
+      const res = await PerfilService.solicitarOtpPadronFap(dniLimpio, {
+        fecha_nacimiento: fechaNacimiento,
+        nro_licencia: nroLicenciaPadron.trim(),
+        canal: canalOtpPadron,
+        email: canalOtpPadron === "email" ? contacto : undefined,
+        telefono: canalOtpPadron === "telefono" ? contacto : undefined,
+      });
+      setMensajeOtpPadron(
+        res.mensaje || "Te enviamos un código. Ingresalo abajo para continuar.",
+      );
+    } catch (err) {
+      const msg = isAxiosError(err)
+        ? (err.response?.data as { error?: string } | undefined)?.error
+        : null;
+      setErrorOtpPadron(
+        msg || "No pudimos enviar el código. Revisá tus datos.",
+      );
+    } finally {
+      setEnviandoOtpPadron(false);
+    }
+  };
+
+  const confirmarCodigoPadronFap = async () => {
+    const dniLimpio = dni.trim().replace(/\./g, "");
+    if (
+      !validateDni(dniLimpio) ||
+      codigoOtpPadron.replace(/\D/g, "").length < 6
+    ) {
+      setErrorOtpPadron("Ingresá el código de 6 dígitos.");
+      return;
+    }
+    setConfirmandoOtpPadron(true);
+    setErrorOtpPadron(null);
+    try {
+      const resultado = await PerfilService.confirmarOtpPadronFap(dniLimpio, {
+        fecha_nacimiento: fechaNacimiento,
+        nro_licencia: nroLicenciaPadron.trim(),
+        codigo: codigoOtpPadron.replace(/\D/g, ""),
+      });
+      if (!resultado.perfil) return;
+      aplicarPerfilPreinscripcion(resultado.perfil);
+      setVerificationToken(resultado.verification_token ?? null);
+      setFichaPendienteSinMetodos(false);
+      setPreinscripcionMsg(
+        "Identidad verificada. Completá email y contraseña para activar tu cuenta.",
+      );
+      setMensajeOtpPadron(null);
+    } catch (err) {
+      const msg = isAxiosError(err)
+        ? (err.response?.data as { error?: string } | undefined)?.error
+        : null;
+      setErrorOtpPadron(msg || "Código inválido. Revisá e intentá de nuevo.");
+    } finally {
+      setConfirmandoOtpPadron(false);
     }
   };
 
@@ -819,6 +917,95 @@ export default function SignUpPage() {
                     <p className="text-brand-chartreuse text-xs mt-1.5 ml-1">
                       {preinscripcionMsg}
                     </p>
+                  )}
+                  {padronFapDisponible && metodosPreinscripcion.length === 0 && (
+                    <div className="mt-3 p-3 rounded-xl border border-brand-white/10 bg-brand-card/40 space-y-3">
+                      <p className="text-gray-400 text-xs">
+                        Activación por padrón FAP: validá tu identidad y recibí
+                        un código en tu email o teléfono.
+                      </p>
+                      <input
+                        type="text"
+                        placeholder="N° de licencia FAP"
+                        value={nroLicenciaPadron}
+                        onChange={(e) => setNroLicenciaPadron(e.target.value)}
+                        className={getInputStyles(false)}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setCanalOtpPadron("email")}
+                          className={`flex-1 text-xs py-2 rounded-lg border transition-colors ${
+                            canalOtpPadron === "email"
+                              ? "border-brand-chartreuse text-brand-chartreuse"
+                              : "border-brand-white/10 text-gray-400"
+                          }`}
+                        >
+                          Código por email
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCanalOtpPadron("telefono")}
+                          className={`flex-1 text-xs py-2 rounded-lg border transition-colors ${
+                            canalOtpPadron === "telefono"
+                              ? "border-brand-chartreuse text-brand-chartreuse"
+                              : "border-brand-white/10 text-gray-400"
+                          }`}
+                        >
+                          Código por SMS
+                        </button>
+                      </div>
+                      <input
+                        type={canalOtpPadron === "email" ? "email" : "tel"}
+                        placeholder={
+                          canalOtpPadron === "email"
+                            ? "Email donde querés recibir el código"
+                            : "Teléfono donde querés recibir el código"
+                        }
+                        value={contactoOtpPadron}
+                        onChange={(e) => setContactoOtpPadron(e.target.value)}
+                        className={getInputStyles(false)}
+                      />
+                      <button
+                        type="button"
+                        disabled={enviandoOtpPadron}
+                        onClick={() => void solicitarCodigoPadronFap()}
+                        className="w-full text-xs font-bold uppercase tracking-wider py-2.5 rounded-lg bg-white/10 text-white disabled:opacity-50"
+                      >
+                        {enviandoOtpPadron ? "Enviando..." : "Enviar código"}
+                      </button>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="Código de 6 dígitos"
+                        value={codigoOtpPadron}
+                        onChange={(e) =>
+                          setCodigoOtpPadron(
+                            e.target.value.replace(/\D/g, "").slice(0, 6),
+                          )
+                        }
+                        className={getInputStyles(false)}
+                      />
+                      <button
+                        type="button"
+                        disabled={confirmandoOtpPadron}
+                        onClick={() => void confirmarCodigoPadronFap()}
+                        className="w-full text-xs font-bold uppercase tracking-wider py-2.5 rounded-lg bg-brand-chartreuse text-brand-black disabled:opacity-50"
+                      >
+                        {confirmandoOtpPadron
+                          ? "Validando..."
+                          : "Validar código y cargar datos"}
+                      </button>
+                      {mensajeOtpPadron && (
+                        <p className="text-brand-chartreuse text-xs">
+                          {mensajeOtpPadron}
+                        </p>
+                      )}
+                      {errorOtpPadron && (
+                        <p className="text-red-400 text-xs">{errorOtpPadron}</p>
+                      )}
+                    </div>
                   )}
                   {preinscripcionRequiereVerificacion && (
                     <div className="mt-3 p-3 rounded-xl border border-brand-white/10 bg-brand-card/40 space-y-3">

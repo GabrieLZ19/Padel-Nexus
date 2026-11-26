@@ -156,6 +156,8 @@ export const PerfilService = {
       nombre?: string;
       apellido?: string;
       fecha_nacimiento?: string | null;
+      email?: string | null;
+      telefono?: string | null;
     },
   ): Promise<Perfil> {
     const response = await api.patch<ApiResponse<Perfil>>(
@@ -279,6 +281,7 @@ export const PerfilService = {
     pendiente_activacion?: boolean;
     verificacion_requerida?: boolean;
     metodos_disponibles?: Array<"telefono" | "email">;
+    padron_fap_disponible?: boolean;
     mensaje?: string;
     perfil?: Partial<RegistroPayload>;
   }> {
@@ -288,6 +291,7 @@ export const PerfilService = {
       pendiente_activacion?: boolean;
       verificacion_requerida?: boolean;
       metodos_disponibles?: Array<"telefono" | "email">;
+      padron_fap_disponible?: boolean;
       mensaje?: string;
       perfil?: Partial<RegistroPayload>;
     }>(`/perfil/preinscripcion/${encodeURIComponent(dni)}`);
@@ -314,6 +318,62 @@ export const PerfilService = {
       verification_token?: string;
       verification_token_expires_at?: string;
     }>(`/perfil/preinscripcion/${encodeURIComponent(dni)}/verificar`, payload);
+    return response.data;
+  },
+
+  async solicitarOtpPadronFap(
+    dni: string,
+    payload: {
+      fecha_nacimiento: string;
+      nro_licencia: string;
+      canal: "email" | "telefono";
+      email?: string;
+      telefono?: string;
+    },
+  ): Promise<{
+    otp_enviado: boolean;
+    canal: "email" | "telefono";
+    otp_expires_at?: string;
+    mensaje?: string;
+  }> {
+    const response = await api.post<{
+      exito: boolean;
+      otp_enviado: boolean;
+      canal: "email" | "telefono";
+      otp_expires_at?: string;
+      mensaje?: string;
+    }>(
+      `/perfil/preinscripcion/${encodeURIComponent(dni)}/padron-fap/solicitar-otp`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async confirmarOtpPadronFap(
+    dni: string,
+    payload: {
+      fecha_nacimiento: string;
+      nro_licencia: string;
+      codigo: string;
+    },
+  ): Promise<{
+    encontrado: boolean;
+    pendiente_activacion?: boolean;
+    perfil?: Partial<RegistroPayload>;
+    verification_token?: string;
+    verification_token_expires_at?: string;
+  }> {
+    const response = await api.post<{
+      exito: boolean;
+      encontrado: boolean;
+      pendiente_activacion?: boolean;
+      perfil?: Partial<RegistroPayload>;
+      verification_token?: string;
+      verification_token_expires_at?: string;
+    }>(
+      `/perfil/preinscripcion/${encodeURIComponent(dni)}/padron-fap/confirmar-otp`,
+      payload,
+    );
     return response.data;
   },
 };
