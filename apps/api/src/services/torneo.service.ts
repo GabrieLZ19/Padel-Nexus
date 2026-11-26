@@ -1386,8 +1386,9 @@ export class TorneoService {
           origen_id: id,
           creados: creados.length,
           omitidos: omitidos.length,
-          niveles,
-          ramas: ramasDestino,
+          niveles: opciones.niveles ?? null,
+          ramas: opciones.ramas ?? null,
+          pares: pares.map((p) => ({ nivel: p.nivel, rama: p.rama })),
         },
       });
     }

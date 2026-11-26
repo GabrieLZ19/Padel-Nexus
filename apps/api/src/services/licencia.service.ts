@@ -228,6 +228,10 @@ export class LicenciaService {
       type FilaPerfilLicencias = {
         id: string;
         created_at?: string;
+        licencias?:
+          | { estado?: string | null; fecha_vencimiento?: string | null }
+          | { estado?: string | null; fecha_vencimiento?: string | null }[]
+          | null;
         [key: string]: unknown;
       };
       let rows: FilaPerfilLicencias[] = [];

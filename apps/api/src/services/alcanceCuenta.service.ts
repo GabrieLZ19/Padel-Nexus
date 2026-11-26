@@ -10,6 +10,7 @@ import {
   type ContextoCuenta,
   type DatosAlcanceJugadorFicha,
   type DecisionAlcance,
+  mismaProvincia,
 } from "../utils/alcanceCuenta";
 import { LicenciaOrganizacionService } from "./licenciaOrganizacion.service";
 
