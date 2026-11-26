@@ -2001,6 +2001,15 @@ export function partidoViolaFeederODescansoPublicado(
       if (!oIds.includes(id)) continue;
       const op = parseFechaPartidoIso(String(other.fecha_partido));
       if (!op) continue;
+      // Partidos posteriores al inicio de este cruce no aplican al descanso publicado
+      // (p. ej. octavos sábado y fondo de zona el mismo día aún sin jugar).
+      if (
+        !partidoYaFinalizado(other) &&
+        (op.fecha > parsed.fecha ||
+          (op.fecha === parsed.fecha && op.startMin > parsed.startMin))
+      ) {
+        continue;
+      }
       historial.push({
         fecha: op.fecha,
         startMin: op.startMin,
@@ -2428,6 +2437,13 @@ export function evaluateProgramacionIssues(
       const otherEquipos = equiposDePartido(other);
       const common = equipos.some((e) => otherEquipos.includes(e));
       if (!common) continue;
+      if (
+        !partidoYaFinalizado(other) &&
+        (op.fecha > parsed.fecha ||
+          (op.fecha === parsed.fecha && op.startMin > parsed.startMin))
+      ) {
+        continue;
+      }
 
       if (op.startMin === parsed.startMin) {
         issues.push({

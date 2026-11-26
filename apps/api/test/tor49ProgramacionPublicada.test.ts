@@ -235,4 +235,105 @@ describe("TOR-49 falsos positivos horarios publicados", () => {
       });
     assert.equal(avisos_programacion_publicada.length, 0);
   });
+
+  it("octavos en paralelo distinta cancha: sin aviso al validar horario publicado", () => {
+    const matrix = getFapBracketForPairCount(16) || [];
+    const feeders = buildFeedersByMatchNo(matrix);
+    const partidos = [
+      {
+        id: "o1",
+        ronda: "OCTAVOS",
+        orden: 57,
+        equipo_a_id: "p1",
+        equipo_b_id: "p2",
+        estado_partido: "Finalizado",
+        cancha_asignada: "C1",
+        fecha_partido: "2026-11-29T10:00:00-03:00",
+      },
+      {
+        id: "o2",
+        ronda: "OCTAVOS",
+        orden: 58,
+        equipo_a_id: "p3",
+        equipo_b_id: "p4",
+        estado_partido: "Programado",
+        cancha_asignada: "C2",
+        fecha_partido: "2026-11-29T10:00:00-03:00",
+      },
+    ];
+    assert.equal(
+      partidoViolaFeederODescansoPublicado(
+        partidos[1],
+        partidos,
+        feeders,
+        90,
+        { descansoModo: "tras_fin_120" },
+      ),
+      false,
+    );
+    const { avisos_programacion_publicada } =
+      seleccionarPartidosLlaveParaAutoprogramar(partidos, {
+        programacionPublicada: true,
+        violaHorarioPublicado: (p) =>
+          partidoViolaFeederODescansoPublicado(
+            p,
+            partidos,
+            feeders,
+            90,
+            { descansoModo: "tras_fin_120" },
+          ),
+      });
+    assert.equal(avisos_programacion_publicada.length, 0);
+  });
+
+  it("no penaliza octavos por cruces de zona posteriores aún sin jugar", () => {
+    const matrix = getFapBracketForPairCount(16) || [];
+    const feeders = buildFeedersByMatchNo(matrix);
+    const cruza = matrix.find((m) => m.a === "1A" || m.b === "1A");
+    assert.ok(cruza);
+
+    const partidos = [
+      {
+        id: "za1",
+        ronda: "Zona A",
+        orden: 1,
+        equipo_a_id: "p1",
+        equipo_b_id: "p2",
+        estado_partido: "Finalizado",
+        cancha_asignada: "C1",
+        fecha_partido: "2026-11-28T18:00:00-03:00",
+      },
+      {
+        id: "za2",
+        ronda: "Zona A",
+        orden: 2,
+        equipo_a_id: "p1",
+        equipo_b_id: "p5",
+        estado_partido: "Programado",
+        cancha_asignada: "C1",
+        fecha_partido: "2026-11-29T20:00:00-03:00",
+      },
+      {
+        id: "oct",
+        ronda: "OCTAVOS",
+        orden: cruza.matchNo,
+        equipo_a_id: "p1",
+        equipo_b_id: "p9",
+        estado_partido: "Programado",
+        cancha_asignada: "C2",
+        fecha_partido: "2026-11-29T10:00:00-03:00",
+      },
+    ];
+
+    assert.equal(
+      partidoViolaFeederODescansoPublicado(
+        partidos[2],
+        partidos,
+        feeders,
+        90,
+        { descansoModo: "tras_fin_120" },
+      ),
+      false,
+    );
+  });
 });
