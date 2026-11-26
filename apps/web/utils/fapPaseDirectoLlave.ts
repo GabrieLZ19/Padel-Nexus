@@ -59,9 +59,13 @@ export function puedeUsarAltaParejaEnSlot(
 ): boolean {
   if (ladoClasificadoPaseDirectoProtegido(spec, semillaFap, slot)) return false;
   if (!spec) return true;
+  const semillaPase = inferirSemillaPaseDirectoEnSpec(spec);
+  if (semillaPase && ladoSemillaPaseDirecto(spec) === slot) return false;
   const ref = slot === "a" ? spec.a : spec.b;
-  if (refLadoBloqueadoPorMatriz(ref) && !semillaFap?.trim()) return false;
-  if (semillaFap?.trim() && ladoRivalPaseDirecto(spec) === slot) return true;
+  const ladoRival = ladoRivalPaseDirecto(spec);
+  if (ladoRival === slot && (semillaFap?.trim() || semillaPase)) return true;
+  if (refLadoBloqueadoPorMatriz(ref) && !semillaFap?.trim() && !semillaPase)
+    return false;
   if (!refLadoBloqueadoPorMatriz(ref)) return true;
-  return Boolean(semillaFap?.trim());
+  return Boolean(semillaFap?.trim() || semillaPase);
 }

@@ -36,7 +36,27 @@ describe("TOR-22 pase directo en modal de llave", () => {
     );
     assert.equal(
       puedeUsarAltaParejaEnSlot(specCuarto, null, "b", bloqueado),
+      true,
+    );
+  });
+
+  it("sin patrón pase directo bloquea alta en huecos Gan.", () => {
+    const spec = { a: "W16", b: "W17" };
+    const bloqueado = (ref: string) => ref.startsWith("W");
+    assert.equal(puedeUsarAltaParejaEnSlot(spec, null, "a", bloqueado), false);
+    assert.equal(puedeUsarAltaParejaEnSlot(spec, null, "b", bloqueado), false);
+  });
+
+  it("bloquea lado del clasificado sin semilla_fap explícita en octavo", () => {
+    const specOctavo = { a: "1A", b: "W50" };
+    const bloqueado = (ref: string) => ref.startsWith("W");
+    assert.equal(
+      puedeUsarAltaParejaEnSlot(specOctavo, null, "a", bloqueado),
       false,
+    );
+    assert.equal(
+      puedeUsarAltaParejaEnSlot(specOctavo, null, "b", bloqueado),
+      true,
     );
   });
 });

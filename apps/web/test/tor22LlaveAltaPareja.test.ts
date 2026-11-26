@@ -49,6 +49,7 @@ describe("TOR-22 editor de llaves: otra categoría o DNI", () => {
     assert.match(editor, /resolverLadoParaGuardarPartido/);
     assert.match(editor, /ladoClasificadoPaseDirectoProtegido/);
     assert.match(editor, /puedeUsarAltaParejaEnSlot/);
+    assert.match(editor, /filter\(\(lado\) =>/);
     assert.match(editor, /No reemplazar el clasificado/);
   });
 });

@@ -2325,8 +2325,17 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                                     equipo_a_id: pToEdit.equipo_a_id ?? null,
                                     equipo_b_id: pToEdit.equipo_b_id ?? null,
                                   });
+                                  const specFap = matrizFapDePartido(pToEdit);
+                                  const semillaInferida = specFap
+                                    ? inferirSemillaPaseDirectoEnSpec(specFap)
+                                    : null;
+                                  const slotRival =
+                                    specFap && semillaInferida
+                                      ? (ladoRivalPaseDirecto(specFap) ?? "a")
+                                      : "a";
+                                  setMatchEditSlotFocus(slotRival);
+                                  setMatchEditSemillaFap(semillaInferida);
                                   setMatchEditMotivo("");
-                                  setMatchEditSlotFocus("a");
                                   setShowMatchEditModal(true);
                                 }}
                               />
@@ -2555,20 +2564,21 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
               </div>
 
               <div className="flex gap-2 text-[10px] font-black uppercase tracking-wider">
-                {(["a", "b"] as const).map((lado) => {
-                  const bloqueadoPorSemilla = !puedeUsarAltaParejaEnSlot(
-                    matrizPartidoEnEdicion,
-                    matchEditSemillaFap,
-                    lado,
-                    ladoSlotBloqueadoPorMatriz,
-                  );
-                  return (
+                {(["a", "b"] as const)
+                  .filter((lado) =>
+                    puedeUsarAltaParejaEnSlot(
+                      matrizPartidoEnEdicion,
+                      matchEditSemillaFap,
+                      lado,
+                      ladoSlotBloqueadoPorMatriz,
+                    ),
+                  )
+                  .map((lado) => (
                     <button
                       key={lado}
                       type="button"
-                      disabled={bloqueadoPorSemilla}
                       onClick={() => setMatchEditSlotFocus(lado)}
-                      className={`flex-1 py-2 rounded-lg border disabled:opacity-40 disabled:cursor-not-allowed ${
+                      className={`flex-1 py-2 rounded-lg border ${
                         matchEditSlotFocus === lado
                           ? "border-sky-400/60 text-sky-300 bg-sky-500/10"
                           : "border-white/10 text-gray-500"
@@ -2576,8 +2586,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     >
                       Alta para lado {lado.toUpperCase()}
                     </button>
-                  );
-                })}
+                  ))}
               </div>
 
               {matchEditSemillaFap ? (
