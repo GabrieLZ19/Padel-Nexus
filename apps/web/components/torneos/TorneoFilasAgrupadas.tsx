@@ -138,7 +138,7 @@ export default function TorneoFilasAgrupadas({
                     {estado.etiqueta}
                   </span>
                 </button>
-                {eventoProgramacionHref && grupo.id && categorias >= 2 ? (
+                {eventoProgramacionHref && grupo.id ? (
                   <Link
                     href={eventoProgramacionHref(grupo) || "#"}
                     className="inline-flex shrink-0 items-center gap-1.5 border-r border-white/10 px-3 text-xs font-bold text-white hover:text-brand-chartreuse"
@@ -265,7 +265,7 @@ export default function TorneoFilasAgrupadas({
                       {estado.etiqueta}
                     </span>
                   </button>
-                  {eventoProgramacionHref && grupo.id && categorias >= 2 ? (
+                  {eventoProgramacionHref && grupo.id ? (
                     <Link
                       href={eventoProgramacionHref(grupo) || "#"}
                       className="inline-flex shrink-0 items-center gap-1.5 border-r border-white/10 px-4 text-xs font-bold text-white hover:text-brand-chartreuse"

@@ -167,7 +167,11 @@ export const TorneosService = {
 
   async replicar(
     id: string,
-    payload: { niveles: string[]; ramas?: string[] },
+    payload: {
+      niveles?: string[];
+      ramas?: string[];
+      pares?: Array<{ nivel: string; rama: string }>;
+    },
   ): Promise<{
     exito?: boolean;
     creados: Torneo[];

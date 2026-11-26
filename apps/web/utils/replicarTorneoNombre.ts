@@ -6,7 +6,7 @@ function ramaCorta(rama?: string | null): string {
   return "";
 }
 
-function nombreBaseTorneo(
+export function nombreBaseTorneo(
   nombre?: string | null,
   nivel?: string | null,
   rama?: string | null,

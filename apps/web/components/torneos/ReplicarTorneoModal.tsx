@@ -10,7 +10,14 @@ import {
   getNivelesParaCategoria,
 } from "@/utils/constants/fapApaRules";
 import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
-import { previewNombreTorneoReplicado } from "@/utils/replicarTorneoNombre";
+import {
+  nombreBaseTorneo,
+  previewNombreTorneoReplicado,
+} from "@/utils/replicarTorneoNombre";
+import {
+  claveParNivelRama,
+  opcionesParesReplicar,
+} from "@/utils/replicarTorneoPares";
 
 interface ReplicarTorneoModalProps {
   isOpen: boolean;
@@ -38,66 +45,73 @@ export default function ReplicarTorneoModal({
     [reglamento, categoria],
   );
 
-  const [nivelesSel, setNivelesSel] = useState<string[]>([]);
-  const [ramasSel, setRamasSel] = useState<string[]>([]);
+  const [paresSel, setParesSel] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !torneo) return;
-    setNivelesSel([]);
-    setRamasSel([torneo.rama || "Masculina"]);
+    setParesSel([]);
   }, [isOpen, torneo, nivelesOpts]);
+
+  const opcionesPares = useMemo(() => {
+    if (!torneo) return [];
+    return opcionesParesReplicar(nivelesOpts, RAMAS_PADEL, {
+      nivel: torneo.nivel,
+      rama: torneo.rama,
+    });
+  }, [torneo, nivelesOpts]);
 
   const paresPreview = useMemo(() => {
     if (!torneo) return [];
-    const ramas =
-      ramasSel.length > 0 ? ramasSel : [torneo.rama || "Masculina"];
-    const out: Array<{ rama: string; nivel: string; nombre: string }> = [];
-    for (const rama of ramas) {
-      for (const nivel of nivelesSel) {
-        if (rama === (torneo.rama || "Masculina") && nivel === torneo.nivel)
-          continue;
-        out.push({
-          rama,
-          nivel,
-          nombre: previewNombreTorneoReplicado(
-            torneo.nombre || "Torneo",
-            torneo.nivel,
-            torneo.rama,
-            nivel,
-            rama,
-          ),
-        });
-      }
-    }
-    return out;
-  }, [torneo, nivelesSel, ramasSel]);
+    const set = new Set(paresSel);
+    return opcionesPares
+      .filter((p) => set.has(claveParNivelRama(String(p.rama), p.nivel)))
+      .map((p) => ({
+        rama: String(p.rama),
+        nivel: p.nivel,
+        etiqueta: `${p.nivelLabel} · ${p.ramaLabel}`,
+        nombre: previewNombreTorneoReplicado(
+          torneo.nombre || "Torneo",
+          torneo.nivel,
+          torneo.rama,
+          p.nivel,
+          String(p.rama),
+        ),
+      }));
+  }, [torneo, opcionesPares, paresSel]);
 
-  const toggleNivel = (value: string) => {
-    setNivelesSel((prev) =>
-      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
-    );
-  };
+  const etiquetaOrigen = useMemo(() => {
+    if (!torneo) return "";
+    const nivelCat =
+      etiquetaNivelYCategoria(torneo.nivel, torneo.categoria) || "Sin nivel";
+    const rama = torneo.rama || "Sin rama";
+    return `${nivelCat} · ${rama}`;
+  }, [torneo]);
 
-  const toggleRama = (value: string) => {
-    setRamasSel((prev) =>
-      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
+  const nombreEventoBase = useMemo(() => {
+    if (!torneo) return "";
+    return nombreBaseTorneo(torneo.nombre, torneo.nivel, torneo.rama);
+  }, [torneo]);
+
+  const togglePar = (rama: string, nivel: string) => {
+    const clave = claveParNivelRama(rama, nivel);
+    setParesSel((prev) =>
+      prev.includes(clave)
+        ? prev.filter((k) => k !== clave)
+        : [...prev, clave],
     );
   };
 
   const handleSubmit = async () => {
     if (!torneo) return;
     if (paresPreview.length === 0) {
-      onError("Seleccioná al menos una combinación distinta al torneo origen.");
+      onError("Seleccioná al menos un par nivel + rama distinto al torneo origen.");
       return;
     }
     setLoading(true);
     try {
-      const ramasPayload =
-        ramasSel.length > 0 ? ramasSel : [torneo.rama || "Masculina"];
       const res = await TorneosService.replicar(torneo.id, {
-        niveles: nivelesSel,
-        ramas: ramasPayload,
+        pares: paresPreview.map((p) => ({ nivel: p.nivel, rama: p.rama })),
       });
       const n = res.creados?.length || 0;
       if (n === 0) {
@@ -142,11 +156,13 @@ export default function ReplicarTorneoModal({
                   Replicar torneo
                 </h3>
                 <p className="text-xs text-gray-500 mt-1 truncate">
-                  Base: {torneo.nombre}
+                  Evento: {nombreEventoBase}
                 </p>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  {etiquetaNivelYCategoria(torneo.nivel, torneo.categoria) || "Libres"} ·{" "}
-                  {torneo.rama || "—"}
+                <p className="text-[11px] text-brand-chartreuse/90 mt-1 font-semibold">
+                  Origen ({etiquetaOrigen})
+                </p>
+                <p className="text-[10px] text-gray-500 mt-0.5 truncate">
+                  Nombre actual: {torneo.nombre}
                 </p>
               </div>
               <button
@@ -161,72 +177,49 @@ export default function ReplicarTorneoModal({
             </div>
 
             <div className="p-6 space-y-5 overflow-y-auto flex-1">
-              <div>
+              <motion.div>
                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                  Niveles a crear
+                  Combinaciones nivel + rama
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {nivelesOpts.map((n) => {
-                    const active = nivelesSel.includes(n.value);
-                    return (
-                      <button
-                        key={n.value}
-                        type="button"
-                        onClick={() => toggleNivel(n.value)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                          active
-                            ? "bg-brand-chartreuse/15 border-brand-chartreuse/40 text-brand-chartreuse"
-                            : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
-                        }`}
-                      >
-                        {active ? (
-                          <span className="inline-flex items-center gap-1">
-                            <Check className="size-3" /> {n.label}
-                          </span>
-                        ) : (
-                          n.label
-                        )}
-                      </button>
-                    );
-                  })}
-                  {nivelesOpts.length === 0 ? (
-                    <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+                  Elegí cada par puntual. No se arma el producto de todos los
+                  niveles con todas las ramas. Se copian fechas, días de
+                  competencia, sedes, cupo y puntos del torneo base.
+                </p>
+                <div className="flex flex-col gap-1.5 max-h-52 overflow-y-auto rounded-xl border border-white/8 bg-[#111] p-2">
+                  {opcionesPares.length === 0 ? (
+                    <p className="text-xs text-gray-500 p-2">
                       No hay niveles para esta categoría/reglamento.
                     </p>
-                  ) : null}
+                  ) : (
+                    opcionesPares.map((p) => {
+                      const clave = claveParNivelRama(String(p.rama), p.nivel);
+                      const active = paresSel.includes(clave);
+                      return (
+                        <button
+                          key={clave}
+                          type="button"
+                          onClick={() => togglePar(String(p.rama), p.nivel)}
+                          className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                            active
+                              ? "border-brand-chartreuse/40 bg-brand-chartreuse/10 text-brand-chartreuse"
+                              : "border-transparent bg-white/5 text-gray-300 hover:bg-white/8"
+                          }`}
+                        >
+                          <span className="font-bold">
+                            {p.nivelLabel} · {p.ramaLabel}
+                          </span>
+                          {active ? (
+                            <Check className="size-3.5 shrink-0" />
+                          ) : null}
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
-              </div>
+              </motion.div>
 
-              <div>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                  Ramas
-                </p>
-                <p className="text-xs text-gray-500 mb-2 leading-relaxed">
-                  Podés combinar varios niveles y ramas; se copian fechas, días
-                  de competencia, sedes, cupo y puntos del torneo base.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {RAMAS_PADEL.map((r) => {
-                    const active = ramasSel.includes(r.value);
-                    return (
-                      <button
-                        key={r.value}
-                        type="button"
-                        onClick={() => toggleRama(r.value)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                          active
-                            ? "bg-brand-chartreuse/15 border-brand-chartreuse/40 text-brand-chartreuse"
-                            : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
-                        }`}
-                      >
-                        {r.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
+              <motion.div>
                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
                   Se crearán {paresPreview.length} torneo
                   {paresPreview.length === 1 ? "" : "s"}
@@ -234,23 +227,27 @@ export default function ReplicarTorneoModal({
                 <ul className="max-h-40 overflow-y-auto space-y-1.5 rounded-xl border border-white/8 bg-[#111] p-3">
                   {paresPreview.length === 0 ? (
                     <li className="text-xs text-gray-500">
-                      Ninguna combinación nueva seleccionada.
+                      Ningún par seleccionado.
                     </li>
                   ) : (
                     paresPreview.map((p) => (
                       <li
                         key={`${p.rama}-${p.nivel}`}
-                        className="text-xs text-gray-300 font-medium truncate"
+                        className="text-xs text-gray-300"
                       >
-                        {p.nombre}
+                        <span className="font-bold text-brand-chartreuse/90">
+                          {p.etiqueta}
+                        </span>
+                        <span className="text-gray-500"> — </span>
+                        <span className="font-medium truncate">{p.nombre}</span>
                       </li>
                     ))
                   )}
                 </ul>
-              </div>
+              </motion.div>
             </div>
 
-            <div className="p-6 pt-0 shrink-0">
+            <motion.div className="p-6 pt-0 shrink-0">
               <button
                 type="button"
                 disabled={loading || paresPreview.length === 0}
@@ -267,7 +264,7 @@ export default function ReplicarTorneoModal({
                   </>
                 )}
               </button>
-            </div>
+            </motion.div>
           </motion.div>
         </div>
       ) : null}

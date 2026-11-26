@@ -125,9 +125,12 @@ export function parseLocalidadProvinciaCelda(valor: unknown): {
   const parts = partesLocalidadProvincia(raw);
 
   if (parts.length >= 2) {
+    const provinciaRaw = parts[parts.length - 1];
+    const provinciaCanon =
+      provinciaCanonicaArgentinaWeb(provinciaRaw) ?? provinciaRaw;
     return {
       localidad: parts[0],
-      provincia: parts[parts.length - 1],
+      provincia: provinciaCanon,
     };
   }
   if (parts.length === 1) {

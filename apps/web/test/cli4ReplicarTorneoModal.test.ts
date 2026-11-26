@@ -19,13 +19,13 @@ describe("CLI-4 modal replicar torneo", () => {
     assert.equal(nombre, "Evento Test — 6a Masc.");
   });
 
-  it("modal expone ramas y envía ramas al replicar (club y CRM)", () => {
+  it("modal expone pares nivel+rama al replicar (club y CRM)", () => {
     const modal = readFileSync(
       path.join(RAIZ, "components/torneos/ReplicarTorneoModal.tsx"),
       "utf8",
     );
     assert.match(modal, /RAMAS_PADEL/);
-    assert.match(modal, /ramas: ramasPayload/);
+    assert.match(modal, /pares: paresPreview\.map/);
     assert.doesNotMatch(modal, /modoClub/);
     const clubPage = readFileSync(
       path.join(RAIZ, "app/club/torneos/page.tsx"),

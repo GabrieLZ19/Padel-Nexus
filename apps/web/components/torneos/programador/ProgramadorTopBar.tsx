@@ -30,6 +30,10 @@ interface Props {
   onBack: () => void;
   onFocusConflictos?: () => void;
   titulo?: string;
+  /** En programador maestro: nombre del evento en el encabezado principal. */
+  nombreEvento?: string | null;
+  /** Subtítulo de capacidad: por defecto usa summary del board. */
+  resumenCapacidad?: string | null;
 }
 
 function etiquetaHorarios(estado: string): string {
@@ -63,6 +67,8 @@ export function ProgramadorTopBar({
   onBack,
   onFocusConflictos,
   titulo = "Programador visual",
+  nombreEvento,
+  resumenCapacidad,
 }: Props) {
   const estado = board.programacion_estado;
   const estadoLabel = etiquetaHorarios(estado);
@@ -73,6 +79,11 @@ export function ProgramadorTopBar({
   const motivoBloqueoPublicar = motivoPublicacionBloqueada(board, {
     isReadOnly,
   });
+
+  const tituloPrincipal = nombreEvento?.trim() || titulo;
+  const lineaCapacidad =
+    resumenCapacidad ??
+    `${board.summary.asignados}/${board.summary.total} partidos asignados`;
 
   return (
     <header className="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -88,8 +99,13 @@ export function ProgramadorTopBar({
           <div className="flex flex-wrap items-center gap-2">
             <CalendarClock className="size-5 text-brand-chartreuse shrink-0" />
             <h1 className="truncate text-lg font-bold text-brand-white">
-              {titulo}
+              {tituloPrincipal}
             </h1>
+            {nombreEvento?.trim() ? (
+              <span className="prog-ghost inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
+                Programador maestro
+              </span>
+            ) : null}
             {estadoTorneo ? (
               <span className="prog-ghost inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
                 {estadoTorneo}
@@ -124,9 +140,14 @@ export function ProgramadorTopBar({
             ) : null}
           </div>
           <p className="text-xs text-gray-400 truncate">
-            {board.nombre}
-            {" · "}
-            {board.summary.asignados}/{board.summary.total} asignados
+            {nombreEvento?.trim()
+              ? lineaCapacidad
+              : [
+                  "nombre" in board && board.nombre ? board.nombre : null,
+                  lineaCapacidad,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
             {board.summary.advertencias > 0 ? (
               <>
                 {" · "}

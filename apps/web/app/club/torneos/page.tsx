@@ -20,6 +20,7 @@ import Pagination from "@/components/ui/Pagination";
 import { Torneo, Club, FormTorneoState, GrupoTorneoListado } from "@/utils/types";
 import TorneoModal from "@/components/torneos/TorneoModal";
 import ReplicarTorneoModal from "@/components/torneos/ReplicarTorneoModal";
+import { etiquetaTorneoEnGrupo } from "@/utils/etiquetaTorneoGrupo";
 import AgruparTorneosModal from "@/components/torneos/AgruparTorneosModal";
 import TorneoFilasAgrupadas from "@/components/torneos/TorneoFilasAgrupadas";
 import FeedbackModal, { FeedbackModalProps } from "@/components/ui/FeedbackModal";
@@ -434,13 +435,20 @@ export default function ClubTorneosPage() {
       }`}
     >
       <div className="flex items-start justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => router.push(hrefDetalleTorneo("/club", t))}
-          className="cursor-pointer text-left text-[15px] font-bold text-white"
-        >
-          {t.nombre}
-        </button>
+        <div className="min-w-0 flex-1">
+          {enGrupo ? (
+            <p className="text-[10px] font-bold uppercase tracking-wide text-brand-chartreuse mb-0.5">
+              {etiquetaTorneoEnGrupo(t)}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => router.push(hrefDetalleTorneo("/club", t))}
+            className="cursor-pointer text-left text-[15px] font-bold text-white"
+          >
+            {t.nombre}
+          </button>
+        </div>
         <span className="shrink-0 text-xs font-bold text-gray-400">
           {t.pendiente || t.estado || "Borrador"}
         </span>
@@ -584,6 +592,11 @@ export default function ClubTorneosPage() {
                     onClick={() => router.push(hrefDetalleTorneo("/club", t))}
                   >
                     <td className={enGrupo ? "py-2.5 pl-16 pr-6" : "py-4 px-6"}>
+                      {enGrupo ? (
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-brand-chartreuse mb-0.5">
+                          {etiquetaTorneoEnGrupo(t)}
+                        </p>
+                      ) : null}
                       <p className="font-bold text-white">{t.nombre}</p>
                       <p className="text-xs text-gray-500 mt-0.5 font-medium">
                         {[(t as { rama?: string }).rama, etiquetaNivelYCategoria(t.nivel, t.categoria) || "Sin nivel"].filter(Boolean).join(" · ")}

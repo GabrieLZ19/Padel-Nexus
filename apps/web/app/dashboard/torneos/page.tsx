@@ -19,6 +19,7 @@ import { Torneo, Club, FormTorneoState, GrupoTorneoListado } from "../../../util
 
 import TorneoModal from "../../../components/torneos/TorneoModal";
 import ReplicarTorneoModal from "../../../components/torneos/ReplicarTorneoModal";
+import { etiquetaTorneoEnGrupo } from "@/utils/etiquetaTorneoGrupo";
 import AgruparTorneosModal from "../../../components/torneos/AgruparTorneosModal";
 import TorneoFilasAgrupadas from "../../../components/torneos/TorneoFilasAgrupadas";
 import FeedbackModal, {
@@ -444,6 +445,11 @@ export default function TorneosPage() {
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap">
+              {enGrupo ? (
+                <span className="text-[10px] font-bold uppercase tracking-wide text-brand-chartreuse">
+                  {etiquetaTorneoEnGrupo(t)}
+                </span>
+              ) : null}
               <button
                 type="button"
                 onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}
@@ -709,6 +715,11 @@ export default function TorneosPage() {
                     >
                       <td className={enGrupo ? "py-2.5 pl-16 pr-8" : "py-4 px-8"}>
                         <div className="flex items-center gap-2 flex-wrap">
+                          {enGrupo ? (
+                            <span className="w-full text-[10px] font-bold uppercase tracking-wide text-brand-chartreuse">
+                              {etiquetaTorneoEnGrupo(t)}
+                            </span>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => router.push(hrefDetalleTorneo("/dashboard", t))}

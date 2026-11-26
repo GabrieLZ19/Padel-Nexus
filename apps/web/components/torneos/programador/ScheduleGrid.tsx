@@ -18,6 +18,7 @@ interface Props {
   readOnly?: boolean;
   highlightedPartidoId?: string | null;
   filtroTorneoId?: string | null;
+  filtroClubId?: string | null;
   onRemove: (partidoId: string) => void;
   partidoEnSlot: (slotKey: string) => BoardPartido | undefined;
   issueByPartido: (partidoId: string) => ProgramacionIssue | null;
@@ -230,6 +231,7 @@ export function ScheduleGrid({
   readOnly,
   highlightedPartidoId,
   filtroTorneoId,
+  filtroClubId,
   onRemove,
   partidoEnSlot,
   issueByPartido,
@@ -251,14 +253,21 @@ export function ScheduleGrid({
 
   const courts = useMemo(() => {
     const labels = new Set(daySlots.map((s) => s.cancha_label));
-    const ordered = board.canchas
-      .map((c) => c.label)
-      .filter((l) => labels.has(l));
+    const canchasDia = board.canchas.filter((c) => {
+      if (!labels.has(c.label)) return false;
+      if (!filtroClubId) return true;
+      return c.club_id === filtroClubId;
+    });
+    const ordered = canchasDia.map((c) => c.label);
     for (const l of labels) {
+      if (filtroClubId) {
+        const meta = board.canchas.find((x) => x.label === l);
+        if (meta?.club_id !== filtroClubId) continue;
+      }
       if (!ordered.includes(l)) ordered.push(l);
     }
     return ordered;
-  }, [board.canchas, daySlots]);
+  }, [board.canchas, daySlots, filtroClubId]);
 
   const slotLookup = useMemo(() => {
     const m = new Map<string, (typeof daySlots)[0]>();
@@ -277,10 +286,14 @@ export function ScheduleGrid({
   }
 
   if (hours.length === 0 || courts.length === 0) {
+    const sedeActiva = filtroClubId
+      ? board.canchas.find((c) => c.club_id === filtroClubId)?.club
+      : null;
     return (
       <div className="prog-surface flex h-full min-h-[240px] items-center justify-center rounded-2xl p-8 text-center text-sm text-brand-ayuda">
-        No hay canchas para este día. Sumalas con Agregar club / cancha:
-        la grilla se arma de 08:00 a 00:00.
+        {filtroClubId && sedeActiva
+          ? `No hay canchas de ${sedeActiva} en este día. Probá otra jornada o quitá el filtro de sede.`
+          : "No hay canchas para este día. Sumalas con Agregar club / cancha: la grilla se arma de 08:00 a 00:00."}
       </div>
     );
   }

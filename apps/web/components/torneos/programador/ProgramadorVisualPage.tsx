@@ -46,6 +46,7 @@ export function ProgramadorVisualPage({
 }: Props) {
   const router = useRouter();
   const [filtroTorneoId, setFiltroTorneoId] = useState<string | null>(null);
+  const [filtroClubId, setFiltroClubId] = useState<string | null>(null);
   const [ordenAutoIds, setOrdenAutoIds] = useState<string[]>([]);
   const {
     board,
@@ -111,6 +112,17 @@ export function ProgramadorVisualPage({
     if (!filtroTorneoId) return board.partidos;
     return board.partidos.filter((p) => p.torneo_id === filtroTorneoId);
   }, [board, filtroTorneoId]);
+
+  const nombreEventoCabecera = useMemo(() => {
+    const fromBoard = boardEvento?.evento_nombre?.trim();
+    if (fromBoard) return fromBoard;
+    return tituloEvento?.trim() || null;
+  }, [boardEvento?.evento_nombre, tituloEvento]);
+
+  const resumenCapacidadEvento = useMemo(() => {
+    if (!board || !boardEvento) return null;
+    return `${board.summary.asignados}/${board.summary.total} partidos del evento asignados`;
+  }, [board, boardEvento]);
 
   const [activeDrag, setActiveDrag] = useState<BoardPartido | null>(null);
   const [confirmPublicar, setConfirmPublicar] = useState(false);
@@ -261,6 +273,8 @@ export function ProgramadorVisualPage({
         syncing={syncing}
         isReadOnly={isReadOnly}
         titulo={grupoId ? "Programador maestro" : "Programador visual"}
+        nombreEvento={grupoId ? nombreEventoCabecera : null}
+        resumenCapacidad={resumenCapacidadEvento}
         soloLectura={bloqueadoPorAlcance}
         onAgregarSede={() => setSedesAbiertas(true)}
         onGuardarBorrador={() => void guardarBorrador()}
@@ -301,6 +315,8 @@ export function ProgramadorVisualPage({
           board={boardEvento}
           filtroTorneoId={filtroTorneoId}
           onFiltroChange={setFiltroTorneoId}
+          filtroClubId={filtroClubId}
+          onFiltroClubChange={setFiltroClubId}
           ordenAutoIds={ordenAutoIds}
           onOrdenAutoChange={handleOrdenAutoChange}
           disabled={isReadOnly || busy}
@@ -348,6 +364,7 @@ export function ProgramadorVisualPage({
               readOnly={isReadOnly}
               highlightedPartidoId={highlightedPartidoId}
               filtroTorneoId={filtroTorneoId}
+              filtroClubId={filtroClubId}
               onRemove={(id) => {
                 const partido = board.partidos.find((p) => p.id === id);
                 if (partido) setQuitarPartido(partido);

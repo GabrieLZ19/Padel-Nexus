@@ -9,6 +9,8 @@ interface Props {
   board: ProgramacionBoardEvento;
   filtroTorneoId: string | null;
   onFiltroChange: (torneoId: string | null) => void;
+  filtroClubId: string | null;
+  onFiltroClubChange: (clubId: string | null) => void;
   ordenAutoIds: string[];
   onOrdenAutoChange: (ids: string[]) => void;
   disabled?: boolean;
@@ -30,6 +32,8 @@ export function EventoCategoriaFilter({
   board,
   filtroTorneoId,
   onFiltroChange,
+  filtroClubId,
+  onFiltroClubChange,
   ordenAutoIds,
   onOrdenAutoChange,
   disabled = false,
@@ -38,6 +42,18 @@ export function EventoCategoriaFilter({
     () => board.torneos.map((t) => t.id),
     [board.torneos],
   );
+
+  const sedes = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of board.canchas) {
+      if (!c.club_id) continue;
+      const nombre = c.club?.trim() || c.club_id;
+      if (!map.has(c.club_id)) map.set(c.club_id, nombre);
+    }
+    return [...map.entries()]
+      .map(([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }, [board.canchas]);
 
   const orden = ordenAutoIds.length
     ? [
@@ -64,26 +80,40 @@ export function EventoCategoriaFilter({
       aria-label="Categorías del evento"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-gray-300">
-          Categorías del evento
-          {board.evento_nombre ? (
-            <span className="font-normal text-gray-500">
-              {" "}
-              · {board.evento_nombre}
-            </span>
+        <p className="text-xs font-semibold text-gray-300">Categorías del evento</p>
+        <div className="flex flex-wrap items-center gap-3">
+          {sedes.length > 1 ? (
+            <label className="flex items-center gap-1.5 text-[11px] text-gray-400">
+              <span className="font-semibold text-gray-500">Sede</span>
+              <select
+                value={filtroClubId ?? ""}
+                onChange={(e) =>
+                  onFiltroClubChange(e.target.value ? e.target.value : null)
+                }
+                className="prog-ghost max-w-[200px] cursor-pointer rounded-lg border border-white/10 bg-transparent px-2 py-1 text-[11px] font-semibold text-brand-white"
+                aria-label="Filtrar grilla por sede"
+              >
+                <option value="">Todas las sedes</option>
+                {sedes.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
           ) : null}
-        </p>
-        <button
-          type="button"
-          onClick={() => onFiltroChange(null)}
-          className={`text-[11px] font-semibold underline-offset-2 hover:underline ${
-            filtroTorneoId == null
-              ? "text-brand-chartreuse"
-              : "text-gray-400 cursor-pointer"
-          }`}
-        >
-          Ver todas
-        </button>
+          <button
+            type="button"
+            onClick={() => onFiltroChange(null)}
+            className={`text-[11px] font-semibold underline-offset-2 hover:underline ${
+              filtroTorneoId == null
+                ? "text-brand-chartreuse"
+                : "text-gray-400 cursor-pointer"
+            }`}
+          >
+            Ver todas
+          </button>
+        </div>
       </div>
       <div className="flex flex-wrap gap-2">
         {orden.map((id, index) => {
@@ -151,8 +181,9 @@ export function EventoCategoriaFilter({
         })}
       </div>
       <p className="text-[10px] text-gray-500">
-        El color coincide con la grilla y pendientes. El número es la prioridad
-        del auto-asignar entre categorías (zonas en bloque, luego llaves).
+        El color coincide con la grilla y pendientes. Al filtrar una categoría,
+        las celdas de otras se muestran atenuadas. El número es la prioridad del
+        auto-asignar entre categorías (zonas en bloque, luego llaves).
       </p>
     </section>
   );
