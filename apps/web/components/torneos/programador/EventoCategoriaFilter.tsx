@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { colorCategoriaEvento } from "@/utils/eventoCategoriaColores";
 import type { ProgramacionBoardEvento } from "@/utils/services/torneos";
 
@@ -10,6 +11,7 @@ interface Props {
   onFiltroChange: (torneoId: string | null) => void;
   ordenAutoIds: string[];
   onOrdenAutoChange: (ids: string[]) => void;
+  disabled?: boolean;
 }
 
 function etiquetaTorneo(
@@ -20,12 +22,17 @@ function etiquetaTorneo(
   return t.nombre;
 }
 
+function etiquetaPrioridad(posicion: number): string {
+  return `${posicion}º`;
+}
+
 export function EventoCategoriaFilter({
   board,
   filtroTorneoId,
   onFiltroChange,
   ordenAutoIds,
   onOrdenAutoChange,
+  disabled = false,
 }: Props) {
   const torneoIds = useMemo(
     () => board.torneos.map((t) => t.id),
@@ -39,9 +46,16 @@ export function EventoCategoriaFilter({
       ]
     : torneoIds;
 
-  const subirPrioridad = (torneoId: string) => {
-    const rest = orden.filter((id) => id !== torneoId);
-    onOrdenAutoChange([torneoId, ...rest]);
+  const mover = (torneoId: string, delta: -1 | 1) => {
+    const idx = orden.indexOf(torneoId);
+    if (idx < 0) return;
+    const next = idx + delta;
+    if (next < 0 || next >= orden.length) return;
+    const copia = [...orden];
+    const tmp = copia[idx];
+    copia[idx] = copia[next];
+    copia[next] = tmp;
+    onOrdenAutoChange(copia);
   };
 
   return (
@@ -72,12 +86,14 @@ export function EventoCategoriaFilter({
         </button>
       </div>
       <div className="flex flex-wrap gap-2">
-        {orden.map((id) => {
+        {orden.map((id, index) => {
           const t = board.torneos.find((x) => x.id === id);
           if (!t) return null;
           const color = colorCategoriaEvento(id, torneoIds);
           const activo = filtroTorneoId === id;
           const etiqueta = etiquetaTorneo(t);
+          const puedeSubir = index > 0 && !disabled;
+          const puedeBajar = index < orden.length - 1 && !disabled;
           return (
             <div
               key={id}
@@ -104,21 +120,39 @@ export function EventoCategoriaFilter({
                   {etiqueta}
                 </span>
               </button>
+              <span
+                className="flex items-center border-l border-white/10 px-2 py-1.5 text-[10px] font-bold tabular-nums text-gray-300"
+                title="Prioridad en auto-asignación del evento"
+              >
+                {etiquetaPrioridad(index + 1)}
+              </span>
               <button
                 type="button"
-                onClick={() => subirPrioridad(id)}
-                className="border-l border-white/10 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400 hover:bg-white/5 hover:text-brand-chartreuse cursor-pointer"
-                title="Priorizar en auto-asignación"
+                disabled={!puedeSubir}
+                onClick={() => mover(id, -1)}
+                className="border-l border-white/10 px-1.5 py-1.5 text-gray-400 hover:bg-white/5 hover:text-brand-chartreuse disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 cursor-pointer disabled:cursor-not-allowed"
+                title="Subir prioridad"
+                aria-label={`Subir prioridad de ${etiqueta}`}
               >
-                1º
+                <ChevronUp className="size-3.5" aria-hidden />
+              </button>
+              <button
+                type="button"
+                disabled={!puedeBajar}
+                onClick={() => mover(id, 1)}
+                className="border-l border-white/10 px-1.5 py-1.5 text-gray-400 hover:bg-white/5 hover:text-brand-chartreuse disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-400 cursor-pointer disabled:cursor-not-allowed"
+                title="Bajar prioridad"
+                aria-label={`Bajar prioridad de ${etiqueta}`}
+              >
+                <ChevronDown className="size-3.5" aria-hidden />
               </button>
             </div>
           );
         })}
       </div>
       <p className="text-[10px] text-gray-500">
-        El color coincide con la grilla y pendientes. «1º» define el orden del
-        auto-asignar entre categorías.
+        El color coincide con la grilla y pendientes. El número es la prioridad
+        del auto-asignar entre categorías (zonas en bloque, luego llaves).
       </p>
     </section>
   );

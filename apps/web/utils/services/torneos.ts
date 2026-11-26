@@ -806,6 +806,39 @@ export const TorneosService = {
     );
     return response.data;
   },
+
+  async guardarSedesEvento(
+    grupoId: string,
+    clubIds: Array<string | number>,
+  ) {
+    const response = await api.post(
+      `/torneos/grupos/${grupoId}/programacion/sedes`,
+      { club_ids: clubIds },
+    );
+    return response.data;
+  },
+
+  async guardarCanchasDisponibilidadEvento(
+    grupoId: string,
+    disponibilidad: unknown[],
+  ) {
+    const response = await api.post(
+      `/torneos/grupos/${grupoId}/programacion/canchas-disponibilidad`,
+      { disponibilidad },
+    );
+    return response.data;
+  },
+
+  async guardarOrdenCategoriasEvento(
+    grupoId: string,
+    ordenTorneoIds: string[],
+  ): Promise<{ orden_categorias: string[] }> {
+    const response = await api.post<{ orden_categorias: string[] }>(
+      `/torneos/grupos/${grupoId}/programacion/orden-categorias`,
+      { orden_torneo_ids: ordenTorneoIds },
+    );
+    return response.data;
+  },
 };
 
 /**
@@ -870,6 +903,7 @@ export interface ProgramacionBoardEvento extends ProgramacionBoard {
   grupo_id: string;
   evento_nombre: string | null;
   torneo_referencia_id: string;
+  orden_categorias: string[];
   torneos: Array<{
     id: string;
     nombre: string;

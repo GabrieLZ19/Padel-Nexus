@@ -45,6 +45,8 @@ function normalizarProvinciaNominatim(raw: string): string {
 
 interface SedesFiscalesTabProps {
   torneoId: string;
+  /** Si viene del programador maestro, persiste sedes/canchas en todas las categorías. */
+  grupoEventoId?: string;
   onRefresh?: () => void;
   readOnly?: boolean;
   torneoInicial?: Torneo | null;
@@ -109,11 +111,34 @@ function categoriaTorneoLabel(torneo: {
 
 export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   torneoId,
+  grupoEventoId,
   onRefresh,
   readOnly = false,
   torneoInicial,
   diasIniciales,
 }) => {
+  const guardarSedesEnTorneo = async (clubIds: Array<string | number>) => {
+    if (grupoEventoId) {
+      await TorneosService.guardarSedesEvento(grupoEventoId, clubIds);
+    } else {
+      await TorneosService.guardarSedes(torneoId, clubIds);
+    }
+  };
+
+  type FilaDisponibilidad = Array<
+    Record<string, unknown> & { club_id?: string; cancha_id?: string }
+  >;
+
+  const guardarDispEnTorneo = async (list: FilaDisponibilidad) => {
+    if (grupoEventoId) {
+      await TorneosService.guardarCanchasDisponibilidadEvento(
+        grupoEventoId,
+        list,
+      );
+    } else {
+      await TorneosService.guardarCanchasDisponibilidad(torneoId, list);
+    }
+  };
   const [clubs, setClubs] = useState<Club[]>([]);
   const [selectedClubs, setSelectedClubs] = useState<Club[]>([]);
   const [canchasDisponibles, setCanchasDisponibles] = useState<
@@ -357,14 +382,16 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
   ) => {
     setSaving(true);
     try {
-      await TorneosService.guardarCanchasDisponibilidad(torneoId, newList);
+      await guardarDispEnTorneo(newList);
       const disp = await TorneosService.getCanchasDisponibilidad(torneoId);
       setDispList((disp as typeof dispList) || []);
       sileo.success({
         title: "Canchas guardadas correctamente",
         description:
           successMessage ||
-          "Las canchas de la sede quedaron asociadas y listas para la programación.",
+          (grupoEventoId
+            ? "Las canchas quedaron aplicadas a todas las categorías del evento."
+            : "Las canchas de la sede quedaron asociadas y listas para la programación."),
       });
       onRefresh?.();
     } catch (e) {
@@ -587,7 +614,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
     const clubIds = [...selectedClubs.map((c) => c.id), newClubId];
     try {
       setSaving(true);
-      await TorneosService.guardarSedes(torneoId, clubIds);
+      await guardarSedesEnTorneo(clubIds);
       const clubAdded = clubs.find((c) => String(c.id) === newClubId);
       if (clubAdded) setSelectedClubs([...selectedClubs, clubAdded]);
       setNewClubId("");
@@ -613,7 +640,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
       .filter((id) => String(id) !== String(clubId));
     try {
       setSaving(true);
-      await TorneosService.guardarSedes(torneoId, clubIds);
+      await guardarSedesEnTorneo(clubIds);
       setSelectedClubs(
         selectedClubs.filter((c) => String(c.id) !== String(clubId)),
       );
@@ -624,7 +651,7 @@ export const SedesFiscalesTab: React.FC<SedesFiscalesTabProps> = ({
         (d) => String(d.club_id) !== String(clubId),
       );
       if (remaining.length !== dispList.length) {
-        await TorneosService.guardarCanchasDisponibilidad(torneoId, remaining);
+        await guardarDispEnTorneo(remaining);
         const disp = await TorneosService.getCanchasDisponibilidad(torneoId);
         setDispList((disp as typeof dispList) || []);
       }

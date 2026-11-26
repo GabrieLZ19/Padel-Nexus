@@ -13,9 +13,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { SedesFiscalesTab } from "@/components/torneos/SedesFiscalesTab";
-import type {
-  BoardPartido,
-  ProgramacionBoardEvento,
+import {
+  TorneosService,
+  type BoardPartido,
+  type ProgramacionBoardEvento,
 } from "@/utils/services/torneos";
 import { ConflictosPanel } from "./ConflictosPanel";
 import { ProgramadorConfigBar } from "./ProgramadorConfigBar";
@@ -80,10 +81,30 @@ export function ProgramadorVisualPage({
   }, [board, grupoId]);
 
   useEffect(() => {
-    if (boardEvento && ordenAutoIds.length === 0) {
-      setOrdenAutoIds(boardEvento.torneos.map((t) => t.id));
-    }
+    if (!boardEvento || ordenAutoIds.length > 0) return;
+    const fromBoard =
+      boardEvento.orden_categorias?.length > 0
+        ? boardEvento.orden_categorias
+        : boardEvento.torneos.map((t) => t.id);
+    setOrdenAutoIds(fromBoard);
   }, [boardEvento, ordenAutoIds.length]);
+
+  const handleOrdenAutoChange = useCallback(
+    async (ids: string[]) => {
+      setOrdenAutoIds(ids);
+      if (!grupoId || isReadOnly) return;
+      try {
+        await TorneosService.guardarOrdenCategoriasEvento(grupoId, ids);
+      } catch (e: unknown) {
+        const msg =
+          e instanceof Error
+            ? e.message
+            : "No se pudo guardar el orden de categorías";
+        sileo.error({ title: msg });
+      }
+    },
+    [grupoId, isReadOnly],
+  );
 
   const partidosFiltrados = useMemo(() => {
     if (!board) return [];
@@ -281,7 +302,8 @@ export function ProgramadorVisualPage({
           filtroTorneoId={filtroTorneoId}
           onFiltroChange={setFiltroTorneoId}
           ordenAutoIds={ordenAutoIds}
-          onOrdenAutoChange={setOrdenAutoIds}
+          onOrdenAutoChange={handleOrdenAutoChange}
+          disabled={isReadOnly || busy}
         />
       ) : null}
 
@@ -504,6 +526,7 @@ export function ProgramadorVisualPage({
             <div className="overflow-y-auto p-3 sm:p-4">
               <SedesFiscalesTab
                 torneoId={torneoId}
+                grupoEventoId={grupoId}
                 diasIniciales={board.dias}
                 onRefresh={() => void load({ silent: true })}
               />
