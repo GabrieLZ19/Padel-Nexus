@@ -59,6 +59,7 @@ const ETIQUETA_RESERVA: Record<string, string> = {
 
 const ETIQUETA_PAGO: Record<string, string> = {
   pendiente: "Pago pendiente",
+  pendiente_en_club: "Cobrar en el club",
   completado: "Pagado",
   rechazado: "Pago rechazado",
   cancelado: "Sin cobro",

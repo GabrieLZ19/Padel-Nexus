@@ -176,6 +176,18 @@ export const RankingsService = {
     return Array.isArray(data) ? (data as RankingJugador[]) : [];
   },
 
+  /** RNK-4: clubes activos con ranking (visitantes sin sesión). */
+  async getClubesRankingPublico(): Promise<RankingClubOpcion[]> {
+    try {
+      const res = await api.get<RankingApiResponse>("/rankings/clubes");
+      const data = res.data?.data;
+      return Array.isArray(data) ? (data as RankingClubOpcion[]) : [];
+    } catch (error: unknown) {
+      console.warn("Error al cargar clubes de ranking publico:", error);
+      return [];
+    }
+  },
+
   /** Contextos de torneo/circuito para preseleccionar filtros con sesión activa. */
   async getMisClubes(): Promise<RankingClubOpcion[]> {
     try {

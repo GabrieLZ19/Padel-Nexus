@@ -134,9 +134,9 @@ export const ReservasService = {
   async pagarManual(
     reservaId: string,
     payload: {
-      monto: number;
       metodo_pago: string;
       referencia_pago?: string;
+      comprobante_url?: string;
     },
   ): Promise<unknown> {
     try {

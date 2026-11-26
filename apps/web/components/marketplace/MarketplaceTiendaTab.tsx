@@ -24,6 +24,8 @@ interface Props {
   onChangeLogo: (base64: string | null) => void;
   onPublicar: () => void;
   onGuardar: () => void;
+  /** MKT-10: datos visibles pero sin edición si la tienda está suspendida */
+  soloLectura?: boolean;
 }
 
 function LogoAvatar({
@@ -66,6 +68,7 @@ export default function MarketplaceTiendaTab({
   onChangeLogo,
   onPublicar,
   onGuardar,
+  soloLectura = false,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const logoMostrar = logoPreview || logoUrl;
@@ -96,7 +99,8 @@ export default function MarketplaceTiendaTab({
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-brand-white/10 text-xs font-bold text-gray-300 hover:border-brand-chartreuse/40 cursor-pointer"
+            disabled={soloLectura}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-brand-white/10 text-xs font-bold text-gray-300 hover:border-brand-chartreuse/40 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Upload className="size-3.5" />
             Subir foto
@@ -105,7 +109,8 @@ export default function MarketplaceTiendaTab({
             <button
               type="button"
               onClick={() => onChangeLogo(null)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-red-400 cursor-pointer"
+              disabled={soloLectura}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-red-400 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Trash2 className="size-3.5" />
               Quitar
@@ -241,7 +246,9 @@ export default function MarketplaceTiendaTab({
               type="text"
               value={nombreTienda}
               onChange={(e) => onChangeNombre(e.target.value)}
-              className="w-full bg-brand-input border border-brand-white/10 rounded-xl px-4 py-3.5 text-sm focus:border-brand-chartreuse focus:outline-none"
+              readOnly={soloLectura}
+              disabled={soloLectura}
+              className="w-full bg-brand-input border border-brand-white/10 rounded-xl px-4 py-3.5 text-sm focus:border-brand-chartreuse focus:outline-none disabled:opacity-70 disabled:cursor-not-allowed"
             />
           </div>
           {mostrarProvincia ? (
@@ -252,6 +259,7 @@ export default function MarketplaceTiendaTab({
                 onChange={onChangeProvincia}
                 placeholder="Provincia"
                 options={PROVINCIAS_ARG}
+                disabled={soloLectura}
               />
             </div>
           ) : null}
@@ -261,16 +269,24 @@ export default function MarketplaceTiendaTab({
               value={descripcion}
               onChange={(e) => onChangeDescripcion(e.target.value)}
               rows={4}
-              className="w-full bg-brand-input border border-brand-white/10 rounded-xl px-4 py-3.5 text-sm resize-none focus:border-brand-chartreuse focus:outline-none"
+              readOnly={soloLectura}
+              disabled={soloLectura}
+              className="w-full bg-brand-input border border-brand-white/10 rounded-xl px-4 py-3.5 text-sm resize-none focus:border-brand-chartreuse focus:outline-none disabled:opacity-70 disabled:cursor-not-allowed"
             />
           </div>
-          <button
-            type="button"
-            onClick={onGuardar}
-            className="bg-brand-chartreuse text-brand-black font-bold px-6 py-3 rounded-xl cursor-pointer hover:opacity-95"
-          >
-            Guardar cambios
-          </button>
+          {!soloLectura ? (
+            <button
+              type="button"
+              onClick={onGuardar}
+              className="bg-brand-chartreuse text-brand-black font-bold px-6 py-3 rounded-xl cursor-pointer hover:opacity-95"
+            >
+              Guardar cambios
+            </button>
+          ) : (
+            <p className="text-xs text-gray-500">
+              La edición del perfil de tienda está pausada mientras la suspensión esté vigente.
+            </p>
+          )}
         </div>
       </div>
 

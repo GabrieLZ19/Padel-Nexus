@@ -206,11 +206,8 @@ export default function ReservaCheckoutScreen() {
     try {
       const reservaActual = await asegurarReservaCompleta();
       const reservaId = reservaActual.id;
-      const monto = reservaActual.turnos?.precio ?? reserva.turnos.precio;
-
       if (metodoPago === "efectivo") {
         await ReservasService.pagarManual(reservaId, {
-          monto,
           metodo_pago: "efectivo",
         });
         await refrescarReserva(reservaId);

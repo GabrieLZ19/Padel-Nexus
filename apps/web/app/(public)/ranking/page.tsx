@@ -19,7 +19,6 @@ import {
   type RankingClubOpcion,
   type RankingContextoJugador,
 } from "@/utils/services/rankings";
-import { ClubesService } from "@/utils/services/clubes";
 import { useProfileStore } from "@/store/useProfileStore";
 import { RankingJugador } from "@/utils/types";
 import { PROVINCIAS_ARG, NIVELES_PADEL } from "@/utils/constants/padelConfig";
@@ -112,17 +111,10 @@ export default function RankingPublicPage() {
           }
           return;
         }
-        const res = await ClubesService.getAll({ limit: 80 });
-        const raw = res.data;
-        const lista = (Array.isArray(raw) ? raw : []).map((c) => ({
-          id: String((c as { id?: string }).id || ""),
-          nombre: String((c as { nombre?: string }).nombre || "Club"),
-        })).filter((c) => c.id);
+        const lista = await RankingsService.getClubesRankingPublico();
         if (!ignore) {
           setClubesRanking(lista);
-          if (lista.length > 0) {
-            setActiveClubId((prev) => prev || lista[0].id);
-          }
+          setActiveClubId((prev) => (prev && lista.some((c) => c.id === prev) ? prev : ""));
         }
       } catch {
         if (!ignore) setClubesRanking([]);

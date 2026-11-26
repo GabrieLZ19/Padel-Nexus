@@ -22,6 +22,8 @@ export interface Vendedor {
   provincia?: string;
   balance: number;
   estado: "activo" | "suspendido";
+  motivo_suspension?: string | null;
+  suspendido_desde?: string | null;
   valoracion_promedio: number;
   total_ventas: number;
   cbu?: string | null;

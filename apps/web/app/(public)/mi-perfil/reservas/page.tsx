@@ -331,6 +331,8 @@ export default function MisReservasPage() {
               reserva.estado_reserva === "cancelada" && !isVencidaPago;
 
             const isPaid = reserva.estado_pago === "completado";
+            const isPagoEnClub =
+              !isCancelled && reserva.estado_pago === "pendiente_en_club";
             const isPayPending =
               !isCancelled && reserva.estado_pago === "pendiente";
 
@@ -509,6 +511,12 @@ export default function MisReservasPage() {
                         <span className="inline-flex items-center gap-1.5 text-[9px] md:text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-yellow-500/10 text-yellow-400 border border-yellow-500/25 rounded-lg animate-pulse">
                           <Loader2 className="w-3 h-3 animate-spin text-yellow-400" />{" "}
                           En revisión
+                        </span>
+                      )}
+
+                      {isPagoEnClub && (
+                        <span className="inline-flex items-center gap-1 text-[9px] md:text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-amber-500/10 text-amber-300 border border-amber-500/25 rounded-lg">
+                          Pago en el club
                         </span>
                       )}
 

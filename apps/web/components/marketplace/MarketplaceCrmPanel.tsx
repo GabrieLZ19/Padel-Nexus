@@ -22,6 +22,7 @@ import MarketplacePublicacionesTab from "./MarketplacePublicacionesTab";
 import MarketplacePromocionesTab from "./MarketplacePromocionesTab";
 import MarketplaceCobrosTab from "./MarketplaceCobrosTab";
 import MarketplaceSponsorsTab from "./MarketplaceSponsorsTab";
+import MarketplaceTiendaSuspendidaBanner from "./MarketplaceTiendaSuspendidaBanner";
 import {
   MarketplaceService,
   type AudienciaPromocion,
@@ -156,6 +157,8 @@ export default function MarketplaceCrmPanel({
 
   const puedePromoPlataforma = entidadTipo === "federacion";
 
+  const tiendaSuspendida = tienda?.estado === "suspendido";
+
   useEffect(() => {
     if (!puedePromoPlataforma && promoAudiencia === "plataforma") {
       setPromoAudiencia("afiliados");
@@ -283,6 +286,7 @@ export default function MarketplaceCrmPanel({
 
   const handleGuardarTienda = async () => {
     if (!entidadRef || !tienda) return;
+    if (tiendaSuspendida) return;
     try {
       await MarketplaceService.crmActualizarTienda(entidadRef, {
         nombre_tienda: nombreTienda,
@@ -301,6 +305,13 @@ export default function MarketplaceCrmPanel({
     typeof MarketplaceService.crmCrearProducto
   >[1] & { imagenes_existentes?: string[]; imagenes_nuevas_base64?: string[] }) => {
     if (!entidadRef) return;
+    if (tiendaSuspendida) {
+      sileo.warning({
+        title: "Tienda suspendida",
+        description: "No podés crear ni editar publicaciones hasta la reactivación.",
+      });
+      return;
+    }
     try {
       if (editProduct) {
         await MarketplaceService.crmEditarProducto(entidadRef, editProduct.id, payload);
@@ -388,6 +399,7 @@ export default function MarketplaceCrmPanel({
   const handleEnviarPromo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!entidadRef || !tienda) return;
+    if (tiendaSuspendida) return;
     if (promoDestino === "categoria" && !promoCategoriaId) {
       sileo.error({ title: "Categoría requerida", description: "Elegí a qué categoría debe llevar la promo." });
       return;
@@ -486,6 +498,10 @@ export default function MarketplaceCrmPanel({
                 ))}
               </div>
 
+              {tiendaSuspendida && tienda ? (
+                <MarketplaceTiendaSuspendidaBanner tienda={tienda} />
+              ) : null}
+
               {/* Stats — full width */}
               {stats && tienda && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -527,6 +543,7 @@ export default function MarketplaceCrmPanel({
                   onChangeLogo={handleChangeLogo}
                   onPublicar={handleRegistrarTienda}
                   onGuardar={handleGuardarTienda}
+                  soloLectura={tiendaSuspendida}
                 />
               )}
 
@@ -545,7 +562,9 @@ export default function MarketplaceCrmPanel({
                   ) : (
                     <MarketplacePublicacionesTab
                       productos={productos}
+                      gestionBloqueada={tiendaSuspendida}
                       onCrear={() => {
+                        if (tiendaSuspendida) return;
                         setEditProduct(null);
                         setShowProductForm(true);
                       }}
@@ -628,6 +647,7 @@ export default function MarketplaceCrmPanel({
                     categorias={categorias}
                     productos={productos}
                     enviando={promoEnviando}
+                    gestionBloqueada={tiendaSuspendida}
                     nombreTienda={tienda.nombre_tienda}
                     logoTienda={logoPreview || tienda.logo_url || undefined}
                     onChangeTitulo={setPromoTitulo}
@@ -645,7 +665,7 @@ export default function MarketplaceCrmPanel({
         </>
       )}
 
-      {showProductForm && entidadRef && (
+      {showProductForm && entidadRef && !tiendaSuspendida && (
         <MarketplaceProductoForm
           categorias={categorias}
           editId={editProduct?.id}

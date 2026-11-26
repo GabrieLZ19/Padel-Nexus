@@ -16,6 +16,7 @@ describe("RNK-2 ranking público — Club | Provincial | Nacional", () => {
     assert.match(page, /club_id:\s*activeScope === "Club"/);
     assert.doesNotMatch(page, /"Global"/);
     assert.match(page, /RankingsService\.getMisClubes/);
+    assert.match(page, /getClubesRankingPublico/);
   });
 
   it("el servicio expone mis-clubes y club_id en query", () => {

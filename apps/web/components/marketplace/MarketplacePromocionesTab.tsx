@@ -19,6 +19,7 @@ interface Props {
   categorias: Categoria[];
   productos: Producto[];
   enviando: boolean;
+  gestionBloqueada?: boolean;
   nombreTienda?: string;
   logoTienda?: string;
   onChangeTitulo: (v: string) => void;
@@ -73,6 +74,7 @@ export default function MarketplacePromocionesTab({
   categorias,
   productos,
   enviando,
+  gestionBloqueada = false,
   nombreTienda,
   logoTienda,
   onChangeTitulo,
@@ -106,8 +108,20 @@ export default function MarketplacePromocionesTab({
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 xl:gap-8">
-      <form onSubmit={onSubmit} className="xl:col-span-8 space-y-6">
-        <div className="rounded-3xl border border-brand-white/5 bg-gradient-to-br from-brand-card to-brand-black p-6 md:p-8 space-y-6">
+      <form
+        onSubmit={gestionBloqueada ? (e) => e.preventDefault() : onSubmit}
+        className="xl:col-span-8 space-y-6"
+      >
+        {gestionBloqueada ? (
+          <p className="text-sm text-amber-200/90 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3">
+            No podés enviar promociones mientras la tienda esté suspendida.
+          </p>
+        ) : null}
+        <div
+          className={`rounded-3xl border border-brand-white/5 bg-gradient-to-br from-brand-card to-brand-black p-6 md:p-8 space-y-6 ${
+            gestionBloqueada ? "opacity-60 pointer-events-none" : ""
+          }`}
+        >
           <div className="flex items-center gap-3">
             <div className="size-12 rounded-2xl bg-brand-chartreuse/15 flex items-center justify-center">
               <Megaphone className="size-6 text-brand-chartreuse" />
@@ -210,6 +224,7 @@ export default function MarketplacePromocionesTab({
           <button
             type="submit"
             disabled={
+              gestionBloqueada ||
               enviando ||
               (destino === "categoria" && !categoriaId) ||
               (destino === "producto" && !productoId)

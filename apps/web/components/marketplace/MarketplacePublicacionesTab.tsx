@@ -19,6 +19,8 @@ type FiltroPub = "todas" | "activas" | "inactivas" | "descuento";
 
 interface Props {
   productos: Producto[];
+  /** MKT-10: sin alta ni edición mientras la tienda esté suspendida */
+  gestionBloqueada?: boolean;
   onCrear: () => void;
   onEditar: (p: Producto) => void;
   onDesactivar: (id: string) => void;
@@ -32,6 +34,7 @@ function calcDescuento(p: Producto): number | null {
 
 export default function MarketplacePublicacionesTab({
   productos,
+  gestionBloqueada = false,
   onCrear,
   onEditar,
   onDesactivar,
@@ -70,7 +73,13 @@ export default function MarketplacePublicacionesTab({
         <button
           type="button"
           onClick={onCrear}
-          className="inline-flex items-center justify-center gap-2 bg-brand-chartreuse text-brand-black font-black px-5 py-3 rounded-xl text-sm cursor-pointer"
+          disabled={gestionBloqueada}
+          title={
+            gestionBloqueada
+              ? "No podés crear publicaciones mientras la tienda esté suspendida."
+              : undefined
+          }
+          className="inline-flex items-center justify-center gap-2 bg-brand-chartreuse text-brand-black font-black px-5 py-3 rounded-xl text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Plus className="size-4" />
           Crear publicación
@@ -181,7 +190,8 @@ export default function MarketplacePublicacionesTab({
                     <button
                       type="button"
                       onClick={() => onEditar(p)}
-                      className="flex-1 min-w-[70px] inline-flex items-center justify-center gap-1 py-2 rounded-lg bg-brand-white/5 text-xs font-bold cursor-pointer hover:bg-brand-white/10"
+                      disabled={gestionBloqueada}
+                      className="flex-1 min-w-[70px] inline-flex items-center justify-center gap-1 py-2 rounded-lg bg-brand-white/5 text-xs font-bold cursor-pointer hover:bg-brand-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Pencil className="size-3" /> Editar
                     </button>
@@ -189,7 +199,8 @@ export default function MarketplacePublicacionesTab({
                       <button
                         type="button"
                         onClick={() => onDesactivar(p.id)}
-                        className="inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-brand-white/5 text-xs font-bold text-amber-400 cursor-pointer hover:bg-amber-500/10"
+                        disabled={gestionBloqueada}
+                        className="inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-brand-white/5 text-xs font-bold text-amber-400 cursor-pointer hover:bg-amber-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
                         title="Desactivar"
                       >
                         <EyeOff className="size-3" />
@@ -198,7 +209,8 @@ export default function MarketplacePublicacionesTab({
                       <button
                         type="button"
                         onClick={() => onActivar(p.id)}
-                        className="inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-brand-chartreuse/10 text-xs font-bold text-brand-chartreuse cursor-pointer hover:bg-brand-chartreuse/20"
+                        disabled={gestionBloqueada}
+                        className="inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-brand-chartreuse/10 text-xs font-bold text-brand-chartreuse cursor-pointer hover:bg-brand-chartreuse/20 disabled:opacity-40 disabled:cursor-not-allowed"
                         title="Activar"
                       >
                         <Eye className="size-3" />
@@ -208,7 +220,8 @@ export default function MarketplacePublicacionesTab({
                       <button
                         type="button"
                         onClick={() => onQuitarDescuento(p)}
-                        className="inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-brand-white/5 text-xs font-bold text-gray-400 cursor-pointer hover:text-brand-white"
+                        disabled={gestionBloqueada}
+                        className="inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-brand-white/5 text-xs font-bold text-gray-400 cursor-pointer hover:text-brand-white disabled:opacity-40 disabled:cursor-not-allowed"
                         title="Quitar descuento"
                       >
                         <Tag className="size-3" />

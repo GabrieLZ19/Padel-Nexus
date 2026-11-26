@@ -342,7 +342,6 @@ export default function CheckoutPage() {
       } else {
         // Métodos de pago offline/manuales
         await ReservasService.pagarReserva(activeReservaId, {
-          monto: reserva.turnos.precio,
           metodo_pago: metodoPago,
           referencia_pago: metodoPago === "transferencia" ? referenciaTransferencia : undefined,
           comprobante_url: comprobanteUrl || undefined,
@@ -445,6 +444,14 @@ export default function CheckoutPage() {
                   {reserva.turnos.canchas.clubes.nombre}
                 </span>
                 . Te notificaremos cuando tu reserva sea confirmada.
+              </>
+            ) : metodoPago === "efectivo" ? (
+              <>
+                Tu turno quedó confirmado. Aboná en{" "}
+                <span className="text-white font-medium">
+                  {reserva.turnos.canchas.clubes.nombre}
+                </span>{" "}
+                antes de jugar; el club registrará el cobro en caja.
               </>
             ) : (
               <>
