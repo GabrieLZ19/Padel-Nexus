@@ -11,6 +11,28 @@ export type ResumenHistorialEntidad = {
   perfilesVinculados: number;
 };
 
+/** ENT-36: licencia auto de alta sin pagos no cuenta como historial operativo. */
+export async function contarLicenciasClubConPagos(
+  clubId: string,
+): Promise<number> {
+  const { data: licencias } = await supabaseAdmin
+    .from("licencias_club")
+    .select("id")
+    .eq("club_id", clubId);
+
+  if (!licencias?.length) return 0;
+
+  let conActividad = 0;
+  for (const lic of licencias) {
+    const { count: pagos } = await supabaseAdmin
+      .from("licencias_club_pagos")
+      .select("id", { count: "exact", head: true })
+      .eq("licencia_club_id", lic.id);
+    if ((pagos ?? 0) > 0) conActividad += 1;
+  }
+  return conActividad;
+}
+
 export async function historialClub(clubId: string): Promise<ResumenHistorialEntidad> {
   const resumen: ResumenHistorialEntidad = {
     tieneHistorial: false,
@@ -64,11 +86,7 @@ export async function historialClub(clubId: string): Promise<ResumenHistorialEnt
     }
   }
 
-  const { count: licenciasClub } = await supabaseAdmin
-    .from("licencias_club")
-    .select("id", { count: "exact", head: true })
-    .eq("club_id", clubId);
-  resumen.licenciasClub = licenciasClub ?? 0;
+  resumen.licenciasClub = await contarLicenciasClubConPagos(clubId);
 
   const { count: afiliaciones } = await supabaseAdmin
     .from("afiliaciones")

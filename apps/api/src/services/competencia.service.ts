@@ -66,7 +66,9 @@ export class CompetenciaService {
     // 1. OBTENER TORNEO Y VALIDAR DÍAS DE COMPETENCIA
     const { data: torneoMeta, error: errTorneo } = await supabaseAdmin
       .from("torneos")
-      .select("reglamento, dias_juego, es_gratis, precio_inscripcion")
+      .select(
+        "reglamento, dias_juego, es_gratis, precio_inscripcion, cabezas_serie_activas",
+      )
       .eq("id", torneoId)
       .maybeSingle();
 
@@ -86,6 +88,9 @@ export class CompetenciaService {
     }
 
     const reglamento = String(torneoMeta.reglamento || "FAP").toUpperCase();
+    const cabezasSerieActivas =
+      (torneoMeta as { cabezas_serie_activas?: boolean }).cabezas_serie_activas !==
+      false;
     // FAP/APA: preferir 3; Amateur: preferir 4
     const preferredSize: 3 | 4 = reglamento === "AMATEUR" ? 4 : 3;
 
@@ -281,7 +286,7 @@ export class CompetenciaService {
         grupo_id: grupoInsertado.id,
         inscripcion_id: pareja.inscripcionId,
         seed: idx + 1,
-        es_cabeza_serie: idx === 0,
+        es_cabeza_serie: cabezasSerieActivas && idx === 0,
       }));
       if (grupoParejasData.length > 0) {
         await supabaseAdmin.from("grupo_parejas").insert(grupoParejasData);

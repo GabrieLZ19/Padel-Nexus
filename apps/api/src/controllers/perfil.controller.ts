@@ -163,6 +163,52 @@ export const PerfilController = {
     }
   },
 
+  async unirFichasJugador(req: Request, res: Response): Promise<Response> {
+    try {
+      const adminId = req.user?.id;
+      if (!adminId) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "Usuario no autorizado." });
+      }
+
+      const { id: origenId } = req.params;
+      const destinoId = req.body?.ficha_destino_id;
+      const motivo = req.body?.motivo;
+      if (!destinoId || typeof destinoId !== "string") {
+        return res.status(400).json({
+          exito: false,
+          error: "Indicá la ficha destino (ficha_destino_id).",
+        });
+      }
+
+      const resultado = await PerfilService.unirFichasPorSuperadmin(
+        { id: adminId, rol: req.user?.rol },
+        origenId,
+        destinoId,
+        String(motivo ?? ""),
+      );
+
+      return res.status(200).json({
+        exito: true,
+        mensaje: "Fichas unidas correctamente.",
+        data: resultado.perfil,
+        resumen: resultado.resumen,
+      });
+    } catch (error: unknown) {
+      const statusCode =
+        typeof error === "object" &&
+        error !== null &&
+        "statusCode" in error &&
+        typeof (error as { statusCode: unknown }).statusCode === "number"
+          ? (error as { statusCode: number }).statusCode
+          : 400;
+      const message =
+        error instanceof Error ? error.message : "No se pudieron unir las fichas.";
+      return res.status(statusCode).json({ exito: false, error: message });
+    }
+  },
+
   async actualizarFichaProvisoriaAdmin(
     req: Request,
     res: Response,

@@ -1461,7 +1461,11 @@ export class PerfilService {
 
   /** ENT-41: historial de correcciones de ficha (DNI y ficha provisoria). */
   static async listarHistorialCorreccionesFicha(jugadorId: string) {
-    const acciones = ["corregir_dni_ficha", "editar_ficha_provisoria"];
+    const acciones = [
+      "corregir_dni_ficha",
+      "editar_ficha_provisoria",
+      "unir_fichas_jugador",
+    ];
 
     const { data, error } = await supabaseAdmin
       .from("logs_auditoria")
@@ -1508,5 +1512,73 @@ export class PerfilService {
         ? nombresAdmin.get(fila.usuario_id_admin) ?? null
         : null,
     }));
+  }
+
+  /** ENT-45: unir ficha origen en destino (tras colisión de DNI 409). */
+  static async unirFichasPorSuperadmin(
+    actor: { id: string; rol?: string | null },
+    origenId: string,
+    destinoId: string,
+    motivo: string,
+  ) {
+    if (actor.rol !== "superadmin") {
+      const err = new Error("Solo superadmin puede unir fichas de jugador.");
+      Object.assign(err, { statusCode: 403 });
+      throw err;
+    }
+
+    const motivoLimpio = motivo?.trim();
+    if (!motivoLimpio) {
+      throw new Error("Debés indicar un motivo para unir las fichas.");
+    }
+
+    const { data: origen } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, rol, dni, nombre, apellido")
+      .eq("id", origenId)
+      .maybeSingle();
+    const { data: destino } = await supabaseAdmin
+      .from("perfiles")
+      .select("id, rol, dni, nombre, apellido")
+      .eq("id", destinoId)
+      .maybeSingle();
+
+    if (!origen || !destino) {
+      throw new Error("No se encontró la ficha origen o destino.");
+    }
+    if (origen.rol !== "usuario" || destino.rol !== "usuario") {
+      throw new Error("Solo aplica a fichas de jugador.");
+    }
+
+    const { fusionarFichasJugador } = await import("../utils/fusionFichasJugador");
+    const resumen = await fusionarFichasJugador(origenId, destinoId);
+
+    await supabaseAdmin.from("logs_auditoria").insert({
+      usuario_id_admin: actor.id,
+      accion: "unir_fichas_jugador",
+      entidad_afectada: destinoId,
+      detalles: {
+        motivo: motivoLimpio,
+        resumen,
+        origen: {
+          id: origen.id,
+          nombre: origen.nombre,
+          apellido: origen.apellido,
+          dni: origen.dni,
+        },
+        destino: {
+          id: destino.id,
+          dni: destino.dni,
+        },
+      },
+    });
+
+    const { data: perfilDestino } = await supabaseAdmin
+      .from("perfiles")
+      .select("*")
+      .eq("id", destinoId)
+      .single();
+
+    return { perfil: perfilDestino, resumen };
   }
 }

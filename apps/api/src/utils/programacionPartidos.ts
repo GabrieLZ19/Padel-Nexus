@@ -9,6 +9,7 @@ import {
   esRondaCampeonato,
   esRondaDeZona,
   evaluarDescansoInsuficiente,
+  mensajeDescansoInsuficienteProgramador,
   limiteClasificacion11EsObligatorio,
   esModoDescanso,
   minutosDeModoDescanso,
@@ -2689,9 +2690,10 @@ export function evaluateProgramacionIssues(
         }
         const fp = parseFechaPartidoIso(String(feeder.fecha_partido));
         if (!fp) continue;
+        const finFeederMin = fp.startMin + duracion;
         if (
           fp.fecha > parsed.fecha ||
-          (fp.fecha === parsed.fecha && fp.startMin >= parsed.startMin)
+          (fp.fecha === parsed.fecha && parsed.startMin < finFeederMin)
         ) {
           const origenVisible = numeroVisiblePorOrdenInterno(
             depOrden,
@@ -2705,6 +2707,7 @@ export function evaluateProgramacionIssues(
           });
         } else if (
           fp.fecha === parsed.fecha &&
+          parsed.startMin >= finFeederMin &&
           (opciones.descansoModo
             ? evaluarDescansoInsuficiente(
                 opciones.descansoModo,
@@ -2717,7 +2720,20 @@ export function evaluateProgramacionIssues(
           issues.push({
             partido_id: id,
             severity: "bad",
-            message: "Descanso insuficiente desde el partido de origen",
+            message: opciones.descansoModo
+              ? mensajeDescansoInsuficienteProgramador(
+                  opciones.descansoModo,
+                  fp.startMin,
+                  parsed.startMin,
+                  duracion,
+                )
+              : mensajeDescansoInsuficienteProgramador(
+                  undefined,
+                  fp.startMin,
+                  parsed.startMin,
+                  duracion,
+                  descanso,
+                ),
           });
         }
       }
@@ -2773,9 +2789,13 @@ export function evaluateProgramacionIssues(
           issues.push({
             partido_id: id,
             severity: "bad",
-            message: opciones.descansoModo === "entre_inicios_240"
-              ? "Descanso insuficiente: hacen falta 4 h entre inicios"
-              : `Descanso insuficiente: ${Math.max(0, gap)} min`,
+            message: mensajeDescansoInsuficienteProgramador(
+              opciones.descansoModo,
+              op.startMin,
+              parsed.startMin,
+              duracion,
+              opciones.descansoModo ? undefined : descanso,
+            ),
           });
         }
       }

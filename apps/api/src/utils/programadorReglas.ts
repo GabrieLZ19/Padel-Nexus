@@ -126,6 +126,39 @@ export function evaluarDescansoInsuficiente(
   return delta - duracion < minutosDeModoDescanso(modo);
 }
 
+/**
+ * CLI-19: mensaje explícito de descanso (hacen falta X min, quedan Y min).
+ * No usar para orden cronológico inválido (inicio antes del fin del origen).
+ */
+export function mensajeDescansoInsuficienteProgramador(
+  modo: ModoDescanso | undefined,
+  inicioOrigen: number,
+  inicioDestino: number,
+  duracion: number,
+  descansoMinutosPlano?: number,
+): string {
+  const m = modo ?? "tras_fin_120";
+  if (m === "entre_inicios_240") {
+    const delta = Math.abs(inicioDestino - inicioOrigen);
+    const faltan = Math.max(0, 240 - delta);
+    return `Descanso insuficiente: hacen falta ${faltan} min, quedan ${delta} min entre inicios`;
+  }
+  if (m === "sin_descanso") {
+    const delta = Math.abs(inicioDestino - inicioOrigen);
+    const faltan = Math.max(0, duracion - delta);
+    return `Descanso insuficiente: hacen falta ${faltan} min, quedan ${delta} min (sin solape)`;
+  }
+  const minDescanso =
+    descansoMinutosPlano ?? minutosDeModoDescanso(m);
+  const [antes, despues] =
+    inicioOrigen <= inicioDestino
+      ? [inicioOrigen, inicioDestino]
+      : [inicioDestino, inicioOrigen];
+  const quedan = Math.max(0, despues - (antes + duracion));
+  const faltan = Math.max(0, minDescanso - quedan);
+  return `Descanso insuficiente: hacen falta ${faltan} min, quedan ${quedan} min`;
+}
+
 /** 1 a 4 fechas corridas desde el inicio del torneo. */
 export function jornadasDesdeInicio(
   fechaIso: string,

@@ -93,6 +93,12 @@ router.patch(
   PerfilController.corregirDniFicha,
 );
 
+router.post(
+  "/:id/unir-ficha",
+  authorize(["superadmin"]),
+  PerfilController.unirFichasJugador,
+);
+
 // Acceso restringido a jerarquías de administración (incl. admin de club)
 router.get(
   "/:id",

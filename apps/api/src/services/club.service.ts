@@ -909,16 +909,61 @@ export class ClubService {
   }
 
   static async eliminarClubDefinitivo(id: string): Promise<void> {
-    const { count: torneos } = await supabaseAdmin
-      .from("torneos")
-      .select("id", { count: "exact", head: true })
-      .eq("club_id", id);
-
-    if (torneos && torneos > 0) {
+    const historial = await historialClub(id);
+    if (historial.torneos > 0) {
       throw new Error(
         "No se puede eliminar: el club tiene torneos registrados. Usá dar de baja.",
       );
     }
+    if (historial.reservas > 0) {
+      throw new Error(
+        "No se puede eliminar: el club tiene reservas. Usá dar de baja.",
+      );
+    }
+    if (historial.inscripciones > 0) {
+      throw new Error(
+        "No se puede eliminar: el club tiene inscripciones en torneos.",
+      );
+    }
+    if (historial.perfilesVinculados > 0) {
+      throw new Error(
+        "No se puede eliminar: hay jugadores vinculados a este club.",
+      );
+    }
+
+    const { data: licencias } = await supabaseAdmin
+      .from("licencias_club")
+      .select("id")
+      .eq("club_id", id);
+    for (const lic of licencias || []) {
+      await supabaseAdmin
+        .from("licencias_club_pagos")
+        .delete()
+        .eq("licencia_club_id", lic.id);
+    }
+    if (licencias?.length) {
+      await supabaseAdmin.from("licencias_club").delete().eq("club_id", id);
+    }
+
+    const { data: canchas } = await supabaseAdmin
+      .from("canchas")
+      .select("id")
+      .eq("club_id", id);
+    const canchaIds = (canchas || []).map((c) => c.id);
+    if (canchaIds.length > 0) {
+      const { data: turnos } = await supabaseAdmin
+        .from("turnos")
+        .select("id")
+        .in("cancha_id", canchaIds);
+      const turnoIds = (turnos || []).map((t) => t.id);
+      if (turnoIds.length > 0) {
+        await supabaseAdmin.from("reservas").delete().in("turno_id", turnoIds);
+        await supabaseAdmin.from("turnos").delete().in("id", turnoIds);
+      }
+      await supabaseAdmin.from("canchas").delete().in("id", canchaIds);
+    }
+
+    await supabaseAdmin.from("afiliaciones").delete().eq("club_id", id);
 
     const { error } = await supabaseAdmin.from("clubes").delete().eq("id", id);
     if (error) {

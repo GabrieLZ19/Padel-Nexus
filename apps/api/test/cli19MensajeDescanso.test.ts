@@ -1,0 +1,91 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import {
+  evaluateProgramacionIssues,
+  type PartidoProgramable,
+} from "../src/utils/programacionPartidos.ts";
+import { mensajeDescansoInsuficienteProgramador } from "../src/utils/programadorReglas.ts";
+
+describe("CLI-19 mensajes de descanso vs orden de llave", () => {
+  it("mensajeDetalle: hacen falta X min, quedan Y min", () => {
+    const msg = mensajeDescansoInsuficienteProgramador(
+      "tras_fin_60",
+      10 * 60,
+      11 * 60 + 45,
+      90,
+    );
+    assert.match(msg, /hacen falta 45 min/);
+    assert.match(msg, /quedan 15 min/);
+  });
+
+  it("orden inválido: antes del fin del feeder, no mensaje de descanso", () => {
+    const partidos: PartidoProgramable[] = [
+      {
+        id: "f",
+        ronda: "CUARTOS",
+        orden: 23,
+        equipo_a_id: "a",
+        equipo_b_id: "b",
+        cancha_asignada: "C1",
+        fecha_partido: "2026-12-01T10:00:00-03:00",
+      },
+      {
+        id: "h",
+        ronda: "SEMIS",
+        orden: 25,
+        equipo_a_id: "a",
+        equipo_b_id: "c",
+        cancha_asignada: "C2",
+        fecha_partido: "2026-12-01T10:30:00-03:00",
+      },
+    ];
+    const feeders = new Map<number, number[]>([[25, [23]]]);
+    const issues = evaluateProgramacionIssues(partidos, {
+      duracionMinutos: 90,
+      descansoModo: "tras_fin_60",
+      feedersByMatchNo: feeders,
+    });
+    const bad = issues.filter((i) => i.partido_id === "h");
+    assert.ok(
+      bad.some((i) => /Orden de llave inválido/.test(i.message)),
+      `issues: ${bad.map((i) => i.message).join("; ")}`,
+    );
+    assert.ok(
+      !bad.some((i) => /Descanso insuficiente/.test(i.message)),
+    );
+  });
+
+  it("descanso insuficiente desde feeder con detalle", () => {
+    const partidos: PartidoProgramable[] = [
+      {
+        id: "f",
+        ronda: "CUARTOS",
+        orden: 23,
+        equipo_a_id: "a",
+        equipo_b_id: "b",
+        cancha_asignada: "C1",
+        fecha_partido: "2026-12-01T10:00:00-03:00",
+      },
+      {
+        id: "h",
+        ronda: "SEMIS",
+        orden: 25,
+        equipo_a_id: "a",
+        equipo_b_id: "c",
+        cancha_asignada: "C1",
+        fecha_partido: "2026-12-01T11:45:00-03:00",
+      },
+    ];
+    const feeders = new Map<number, number[]>([[25, [23]]]);
+    const issues = evaluateProgramacionIssues(partidos, {
+      duracionMinutos: 90,
+      descansoModo: "tras_fin_60",
+      feedersByMatchNo: feeders,
+    });
+    const bad = issues.filter((i) => i.partido_id === "h");
+    assert.ok(
+      bad.some((i) => /Descanso insuficiente: hacen falta/.test(i.message)),
+    );
+    assert.ok(bad.some((i) => /quedan \d+ min/.test(i.message)));
+  });
+});

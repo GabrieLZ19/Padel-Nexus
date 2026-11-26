@@ -162,6 +162,14 @@ function indiceColumna(headerRow: string[], patron: RegExp): number {
   return headerRow.findIndex((cell) => patron.test(cell.toUpperCase()));
 }
 
+/** Encabezado real: columna DNI + APELLIDO/NOMBRE o PAREJAS (TOR-55 / CLI-1). */
+export function esFilaEncabezadoPlanilla(row: string[]): boolean {
+  const hasDni = row.some((c) => /^DNI$/i.test(String(c).trim()));
+  if (!hasDni) return false;
+  const joined = row.join(" ").toUpperCase();
+  return /APELLIDO|NOMBRE/.test(joined) || /PAREJAS/.test(joined);
+}
+
 /** Parsea filas crudas (array de arrays) exportadas desde la planilla XLS. */
 export function parsearFilasPlanilla(
   matrix: unknown[][],
@@ -171,7 +179,7 @@ export function parsearFilasPlanilla(
 
   for (let i = 0; i < matrix.length; i++) {
     const row = matrix[i].map((c) => normalizarTexto(c));
-    if (row.some((c) => /DNI/i.test(c))) {
+    if (esFilaEncabezadoPlanilla(row)) {
       headerIndex = i;
       headerRow = row;
       break;
@@ -179,9 +187,7 @@ export function parsearFilasPlanilla(
   }
 
   if (headerIndex < 0) {
-    throw new Error(
-      "No se encontró la fila de encabezados (DNI) en la planilla.",
-    );
+    throw new Error("No se encontró el encabezado de la planilla.");
   }
 
   const tipo = detectarTipoPlanilla(headerRow);
