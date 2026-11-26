@@ -2,7 +2,7 @@
 
 Plan maestro: `.cursor/plans/re-test_26-11_item_por_item_cd026153.plan.md` (o copia en Cursor).
 
-**Siguiente ítem:** **Item 7** — TOR-49, TOR-22, TOR-24.
+**Siguiente ítem:** **Item 10** — CLI-8/12/14, ENT-43, TOR-56.
 
 ## Completados
 
@@ -14,10 +14,12 @@ Plan maestro: `.cursor/plans/re-test_26-11_item_por_item_cd026153.plan.md` (o co
 | 4 | ENT-42 | HECHO | [qa-re-test-26-11-item4-ent42.md](./qa-re-test-26-11-item4-ent42.md) |
 | 5 | CLI-21/22 | HECHO | [qa-re-test-26-11-item5-cli21-22.md](./qa-re-test-26-11-item5-cli21-22.md) |
 | 6 | CLI-16/17 | HECHO | [qa-re-test-26-11-item6-cli16-17.md](./qa-re-test-26-11-item6-cli16-17.md) |
+| 7 | TOR-49/22/24 | HECHO (verificado tests) | [qa-re-test-26-11-item7-tor49-22-24.md](./qa-re-test-26-11-item7-tor49-22-24.md) |
+| 8 | TOR-55/CLI-18/19/57 | HECHO | [qa-re-test-26-11-item8-tor55-cli18-19-57.md](./qa-re-test-26-11-item8-tor55-cli18-19-57.md) |
+| 9 | ENT-45/ENT-36 | HECHO | [qa-re-test-26-11-item9-ent45-ent36.md](./qa-re-test-26-11-item9-ent45-ent36.md) |
 
 ## Pendientes (prioridad)
 
 | Prioridad | Items |
 |-----------|--------|
-| Sigue | 7 TOR-49/22/24, 8 TOR-55/CLI-18/19/57, 9 ENT-45/36 |
 | Post 28/11 | 10 CLI-8/12/14, ENT-43, TOR-56 |
