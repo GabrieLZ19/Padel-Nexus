@@ -53,6 +53,14 @@ export interface ProgramacionDesasignarPayload {
   motivo?: string;
 }
 
+export interface ProgramacionIntercambiarPayload {
+  partido_id: string;
+  occupant_id: string;
+  destino: { fecha_iso: string; cancha_label: string };
+  origen?: { fecha_iso: string; cancha_label: string } | null;
+  motivo?: string;
+}
+
 export interface ProgramacionAutoPayload {
   estrategia?: "smart" | "continuous";
   distribucion?: "zonas_primero" | "continua";
@@ -678,6 +686,17 @@ export const TorneosService = {
     return response.data;
   },
 
+  async intercambiarProgramacion(
+    torneoId: string,
+    payload: ProgramacionIntercambiarPayload,
+  ): Promise<ProgramacionBoard> {
+    const response = await api.put<ProgramacionBoard>(
+      `/torneos/${torneoId}/programacion/intercambiar`,
+      payload,
+    );
+    return response.data;
+  },
+
   async limpiarProgramacion(
     torneoId: string,
     payload: { motivo?: string } = {},
@@ -798,6 +817,17 @@ export const TorneosService = {
   ): Promise<ProgramacionBoardEvento> {
     const response = await api.put<ProgramacionBoardEvento>(
       `/torneos/grupos/${grupoId}/programacion/desasignar`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async intercambiarEventoProgramacion(
+    grupoId: string,
+    payload: ProgramacionIntercambiarPayload,
+  ): Promise<ProgramacionBoardEvento> {
+    const response = await api.put<ProgramacionBoardEvento>(
+      `/torneos/grupos/${grupoId}/programacion/intercambiar`,
       payload,
     );
     return response.data;

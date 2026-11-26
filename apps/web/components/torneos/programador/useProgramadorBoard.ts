@@ -367,49 +367,38 @@ export function useProgramadorBoard(
         return;
       }
       const prev = boardRef.current;
+      const payload = {
+        partido_id: partidoId,
+        occupant_id: occupantId,
+        destino,
+        origen: origen ?? undefined,
+      };
       try {
         if (grupoId) {
-          await TorneosService.desasignarEventoProgramacion(grupoId, {
-            partido_id: occupantId,
-          });
-          let data = await TorneosService.asignarEventoProgramacion(grupoId, {
-            partido_id: partidoId,
-            fecha_iso: destino.fecha_iso,
-            cancha_label: destino.cancha_label,
-          });
-          if (origen) {
-            data = await TorneosService.asignarEventoProgramacion(grupoId, {
-              partido_id: occupantId,
-              fecha_iso: origen.fecha_iso,
-              cancha_label: origen.cancha_label,
-            });
-          }
+          const data = await TorneosService.intercambiarEventoProgramacion(
+            grupoId,
+            payload,
+          );
           applyBoard(data);
         } else {
-          await TorneosService.desasignarProgramacion(torneoId, {
-            partido_id: occupantId,
-          });
-          await TorneosService.asignarProgramacion(torneoId, {
-            partido_id: partidoId,
-            fecha_iso: destino.fecha_iso,
-            cancha_label: destino.cancha_label,
-          });
-          if (origen) {
-            await TorneosService.asignarProgramacion(torneoId, {
-              partido_id: occupantId,
-              fecha_iso: origen.fecha_iso,
-              cancha_label: origen.cancha_label,
-            });
-          }
-          const data = await fetchBoard(
-            boardQuery(configRef.current, {
-              incluirDescansoPreview: configHidratadaRef.current,
-            }),
+          const data = await TorneosService.intercambiarProgramacion(
+            torneoId,
+            payload,
           );
           applyBoard(data);
         }
       } catch (e: unknown) {
         if (prev) setBoard(prev);
+        try {
+          const remoto = await fetchBoard(
+            boardQuery(configRef.current, {
+              incluirDescansoPreview: configHidratadaRef.current,
+            }),
+          );
+          applyBoard(remoto);
+        } catch {
+          /* mantener prev local si el refresh también falla */
+        }
         sileo.error({
           title: "No se pudo intercambiar",
           description: apiErrorMessage(e, "Revisá conflictos de cancha u horario."),
