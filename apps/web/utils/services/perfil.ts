@@ -167,6 +167,37 @@ export const PerfilService = {
     return response.data.data;
   },
 
+  async corregirDni(jugadorId: string, dni: string): Promise<Perfil> {
+    const response = await api.patch<ApiResponse<Perfil>>(
+      `/perfil/${jugadorId}/dni`,
+      { dni },
+    );
+    return response.data.data;
+  },
+
+  async getHistorialFicha(jugadorId: string): Promise<
+    Array<{
+      id: string;
+      accion: string;
+      detalles: Record<string, unknown> | null;
+      created_at: string;
+      admin_nombre?: string | null;
+    }>
+  > {
+    const response = await api.get<
+      ApiResponse<
+        Array<{
+          id: string;
+          accion: string;
+          detalles: Record<string, unknown> | null;
+          created_at: string;
+          admin_nombre?: string | null;
+        }>
+      >
+    >(`/perfil/${jugadorId}/historial-ficha`);
+    return response.data.data;
+  },
+
   /**
    * Ficha pública (sin datos sensibles). No requiere autenticación.
    */

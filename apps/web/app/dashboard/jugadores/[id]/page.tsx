@@ -18,6 +18,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  Pencil,
 } from "lucide-react";
 import { Perfil } from "@/utils/types";
 import CredencialDigital from "@/components/perfil/CredencialDigital";
@@ -33,6 +34,11 @@ import {
   detalleTextoHistorialLicencia,
   etiquetaAccionHistorialLicencia,
 } from "@/utils/historialLicenciaUi";
+import {
+  detalleTextoHistorialFicha,
+  etiquetaAccionHistorialFicha,
+} from "@/utils/historialFichaUi";
+import { isAxiosError } from "axios";
 import {
   emailContactoVisible,
   esEmailPlaceholderPlanilla,
@@ -84,6 +90,18 @@ export default function PerfilJugadorAdminPage() {
       admin_nombre?: string | null;
     }>
   >([]);
+  const [historialFicha, setHistorialFicha] = useState<
+    Array<{
+      id: string;
+      accion: string;
+      detalles: Record<string, unknown> | null;
+      created_at: string;
+      admin_nombre?: string | null;
+    }>
+  >([]);
+  const [editandoDni, setEditandoDni] = useState(false);
+  const [dniInput, setDniInput] = useState("");
+  const [guardandoDni, setGuardandoDni] = useState(false);
 
   const cargarHistorialLicencia = useCallback(async (licenciaId: string) => {
     try {
@@ -91,6 +109,15 @@ export default function PerfilJugadorAdminPage() {
       setHistorialLicencia(rows);
     } catch {
       setHistorialLicencia([]);
+    }
+  }, []);
+
+  const cargarHistorialFicha = useCallback(async (jugadorId: string) => {
+    try {
+      const rows = await PerfilService.getHistorialFicha(jugadorId);
+      setHistorialFicha(rows);
+    } catch {
+      setHistorialFicha([]);
     }
   }, []);
 
@@ -174,6 +201,8 @@ export default function PerfilJugadorAdminPage() {
             email: emailContactoVisible(data.email) || "",
             telefono: data.telefono || "",
           });
+          setDniInput(data.dni || "");
+          void cargarHistorialFicha(data.id);
         }
       } catch (error) {
         console.error("Error al cargar perfil:", error);
@@ -181,7 +210,7 @@ export default function PerfilJugadorAdminPage() {
         if (isMounted) setLoading(false);
       }
     },
-    [id],
+    [id, cargarHistorialFicha],
   );
 
   useEffect(() => {
@@ -302,6 +331,7 @@ export default function PerfilJugadorAdminPage() {
       );
       setPerfil(actualizado);
       setEditandoFichaProvisoria(false);
+      await cargarHistorialFicha(actualizado.id);
       sileo.success({
         title: "Ficha actualizada",
         description:
@@ -315,6 +345,42 @@ export default function PerfilJugadorAdminPage() {
       });
     } finally {
       setGuardandoFichaProvisoria(false);
+    }
+  };
+
+  const guardarDni = async () => {
+    if (!perfil) return;
+    const limpio = dniInput.replace(/\D/g, "");
+    if (limpio.length < 7) {
+      sileo.error({
+        title: "DNI inválido",
+        description: "Ingresá al menos 7 dígitos.",
+      });
+      return;
+    }
+    setGuardandoDni(true);
+    try {
+      const actualizado = await PerfilService.corregirDni(perfil.id, limpio);
+      setPerfil(actualizado);
+      setDniInput(actualizado.dni || limpio);
+      setEditandoDni(false);
+      await cargarHistorialFicha(actualizado.id);
+      sileo.success({
+        title: "DNI actualizado",
+        description: "El cambio quedó registrado en el historial de la ficha.",
+      });
+    } catch (err) {
+      const descripcion = isAxiosError(err)
+        ? String(err.response?.data?.error || err.message)
+        : err instanceof Error
+          ? err.message
+          : "No se pudo guardar el DNI.";
+      sileo.error({
+        title: "No se pudo corregir el DNI",
+        description: descripcion,
+      });
+    } finally {
+      setGuardandoDni(false);
     }
   };
 
@@ -527,14 +593,100 @@ export default function PerfilJugadorAdminPage() {
                   />
                 </div>
               ) : null}
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400 flex items-center gap-2 text-sm">
-                  <User className="size-4" /> DNI
-                </span>
-                <span className="font-medium text-white">
-                  {perfil.dni || "No registrado"}
-                </span>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-gray-400 flex items-center gap-2 text-sm">
+                    <User className="size-4" /> DNI
+                  </span>
+                  {esSuperadmin && editandoDni ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="w-32 bg-[#1a1a1a] text-brand-white border border-white/10 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-brand-chartreuse font-mono"
+                        value={dniInput}
+                        onChange={(e) => setDniInput(e.target.value)}
+                        disabled={guardandoDni}
+                      />
+                      <button
+                        type="button"
+                        disabled={guardandoDni}
+                        onClick={() => void guardarDni()}
+                        className="p-1 bg-brand-chartreuse text-black rounded hover:bg-[#b3e600] transition-colors disabled:opacity-50 cursor-pointer"
+                      >
+                        <ShieldCheck size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={guardandoDni}
+                        onClick={() => {
+                          setEditandoDni(false);
+                          setDniInput(perfil.dni || "");
+                        }}
+                        className="text-[10px] font-bold text-gray-500 hover:text-white uppercase tracking-wide cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-white font-mono">
+                        {perfil.dni || "No registrado"}
+                      </span>
+                      {esSuperadmin ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDniInput(perfil.dni || "");
+                            setEditandoDni(true);
+                          }}
+                          className="text-gray-500 hover:text-white transition-colors p-1 cursor-pointer"
+                          title="Corregir DNI"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+                {esSuperadmin ? (
+                  <p className="text-[10px] text-gray-500 leading-snug">
+                    Solo superadmin. Si el DNI ya existe en otra ficha, el sistema
+                    lo rechazará y lo verás en el historial tras un cambio válido.
+                  </p>
+                ) : null}
               </div>
+
+              {historialFicha.length > 0 ? (
+                <div className="rounded-xl border border-white/5 bg-black/20 px-3 py-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">
+                    Historial de correcciones de ficha
+                  </p>
+                  <ul className="space-y-2 max-h-40 overflow-y-auto text-[11px] text-gray-400">
+                    {historialFicha.map((ev) => {
+                      const detalle = detalleTextoHistorialFicha(ev);
+                      const autor =
+                        ev.admin_nombre?.trim() || "Sin autor registrado";
+                      return (
+                        <li key={ev.id} className="space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-x-2">
+                            <span className="font-semibold text-gray-200">
+                              {etiquetaAccionHistorialFicha(ev.accion)}
+                            </span>
+                            <span className="text-gray-500">
+                              {fechaHoraLatinaArgentina(ev.created_at)}
+                            </span>
+                          </div>
+                          <p className="text-gray-500 leading-snug">
+                            Por {autor}
+                            {detalle ? ` · ${detalle}` : ""}
+                          </p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
 
               <div className="flex items-center justify-between">
                 <span className="text-gray-400 flex items-center gap-2 text-sm">
