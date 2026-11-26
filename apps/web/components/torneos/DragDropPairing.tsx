@@ -11,7 +11,6 @@ import {
   useSensor,
   useSensors,
   DragStartEvent,
-  DragOverEvent,
   DragEndEvent,
   useDroppable,
 } from "@dnd-kit/core";
@@ -266,7 +265,7 @@ export const DroppableZona = ({
   totalZonas?: number;
   isSiembra?: boolean;
 }) => {
-  const { setNodeRef } = useDroppable({
+  const { setNodeRef, isOver } = useDroppable({
     id: zona.id,
     disabled: !isEditing,
   });
@@ -450,7 +449,11 @@ export const DroppableZona = ({
   return (
     <div
       ref={setNodeRef}
-      className="bg-[#2a2a2a] rounded-3xl p-4 flex flex-col h-full min-h-75 border border-white/5 shadow-xl"
+      className={`bg-[#2a2a2a] rounded-3xl p-4 flex flex-col h-full min-h-75 border shadow-xl transition-colors ${
+        isOver && isEditing
+          ? "border-brand-chartreuse ring-2 ring-brand-chartreuse/40 bg-[#303324]"
+          : "border-white/5"
+      }`}
     >
       <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-3">
         <h4 className="text-white font-black uppercase tracking-widest text-lg">
@@ -634,71 +637,29 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
     setActiveId(event.active.id as string);
   };
 
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeId = active.id as string;
-    const overId = over.id as string;
-
-    if (activeId === overId) return;
-
-    const activeZona = findZonaOfPareja(activeId);
-    const overZona =
-      findZonaOfPareja(overId) || zonas.find((z) => z.id === overId);
-
-    if (!activeZona || !overZona || activeZona.id === overZona.id) return;
-
-    onZonasChange(
-      zonas.map((z) => {
-        if (z.id === activeZona.id) {
-          return {
-            ...z,
-            parejas: z.parejas.filter((p) => p.id !== activeId),
-          };
-        }
-        if (z.id === overZona.id) {
-          const activePareja = getParejaById(activeId);
-          if (!activePareja) return z;
-
-          const overIndex = z.parejas.findIndex((p) => p.id === overId);
-          const newParejas = [...z.parejas];
-          if (overIndex >= 0) {
-            newParejas.splice(overIndex, 0, activePareja);
-          } else {
-            newParejas.push(activePareja);
-          }
-          return { ...z, parejas: newParejas };
-        }
-        return z;
-      }),
-    );
-  };
-
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
 
     if (!over) return;
 
-    const activeId = active.id as string;
-    const overId = over.id as string;
+    const activeIdStr = String(active.id);
+    const overIdStr = String(over.id);
 
-    const activeZona = findZonaOfPareja(activeId);
+    const activeZona = findZonaOfPareja(activeIdStr);
     const overZona =
-      findZonaOfPareja(overId) || zonas.find((z) => z.id === overId);
+      findZonaOfPareja(overIdStr) || zonas.find((z) => z.id === overIdStr);
 
-    if (activeZona && overZona && activeZona.id !== overZona.id) {
-      // It moved across zones, trigger the onMove callback
-      onMovePareja(activeId, activeZona.id, overZona.id);
-    } else if (
-      activeZona &&
-      activeZona.id === overZona?.id &&
-      activeId !== overId
-    ) {
-      // Reordered in the same zone
-      const oldIndex = activeZona.parejas.findIndex((p) => p.id === activeId);
-      const newIndex = activeZona.parejas.findIndex((p) => p.id === overId);
+    if (!activeZona || !overZona) return;
+
+    if (activeZona.id !== overZona.id) {
+      // Movimiento atómico entre zonas al soltar: evita bucles en onDragOver y modales en medio del arrastre.
+      onMovePareja(activeIdStr, activeZona.id, overZona.id);
+    } else if (activeIdStr !== overIdStr) {
+      // Reordenamiento dentro de la misma zona (solo si overIdStr es una pareja válida).
+      const oldIndex = activeZona.parejas.findIndex((p) => p.id === activeIdStr);
+      const newIndex = activeZona.parejas.findIndex((p) => p.id === overIdStr);
+      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
 
       onZonasChange(
         zonas.map((z) => {
@@ -719,7 +680,6 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
       sensors={sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">

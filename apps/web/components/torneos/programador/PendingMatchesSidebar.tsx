@@ -74,7 +74,7 @@ function PendingCard({
           : "hover:border-white/20"
       } ${
         !readOnly && !partido.assigned
-          ? "cursor-grab active:cursor-grabbing"
+          ? "touch-none select-none cursor-grab active:cursor-grabbing"
           : ""
       }`}
       {...listeners}

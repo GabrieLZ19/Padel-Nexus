@@ -11,6 +11,7 @@ import { sileo } from "sileo";
 import { motivoPublicacionBloqueada } from "@/utils/programadorPublicar";
 
 export type ModoDescansoProgramador =
+  | "sin_descanso"
   | "tras_fin_60"
   | "tras_fin_120"
   | "entre_inicios_240";
@@ -24,7 +25,7 @@ export interface ProgramadorConfig {
   jornadas: 0 | 1 | 2 | 3 | 4;
   horaInicio: string;
   horaFin: string;
-  franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+  franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
 }
 
 function boardQuery(
@@ -120,6 +121,7 @@ export function useProgramadorBoard(
     setConfig((c) => {
       const descansoBoard = data.descanso_modo;
       const descansoValido =
+        descansoBoard === "sin_descanso" ||
         descansoBoard === "tras_fin_60" ||
         descansoBoard === "tras_fin_120" ||
         descansoBoard === "entre_inicios_240"
@@ -223,14 +225,19 @@ export function useProgramadorBoard(
       configTimerRef.current = setTimeout(async () => {
         setBusy(true);
         try {
-          if (debePersistir && !grupoId) {
-            await TorneosService.persistirConfigProgramacion(torneoConfigId(), {
+          if (debePersistir) {
+            const payload = {
               duracionMinutos: merged.duracion,
               descansoModo: merged.descansoModo,
               ...(merged.franjasPorDia && Object.keys(merged.franjasPorDia).length > 0
                 ? { franjasPorDia: merged.franjasPorDia }
                 : {}),
-            });
+            };
+            if (grupoId) {
+              await TorneosService.persistirConfigEventoProgramacion(grupoId, payload);
+            } else {
+              await TorneosService.persistirConfigProgramacion(torneoConfigId(), payload);
+            }
           }
           const data = await fetchBoard(
             boardQuery(merged, { incluirDescansoPreview: true }),

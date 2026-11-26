@@ -272,9 +272,12 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   const loadZonas = async () => {
     try {
       setLoading(true);
-      const { zonas: data, cabezas_ranking_globales } =
+      const { zonas: data, cabezas_ranking_globales, cabezas_serie_activas } =
         await TorneosService.getZonas(torneoId);
       setCabezasRankingGlobales(new Set(cabezas_ranking_globales));
+      if (!cabezas_serie_activas) {
+        setValidarCabezasSerie(false);
+      }
       const formattedZonas: ZonaDrag[] = data.map((grupo: any) => ({
         id: grupo.id,
         nombre: grupo.nombre_grupo,
@@ -708,6 +711,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       setZonas((prev) => {
         const resolved = typeof next === "function" ? next(prev) : next;
         if (!isEditing) return resolved;
+        if (!validarCabezasSerie) return resolved;
 
         const cabezasGlobales = cabezasGlobalesParaValidacion(resolved);
         const conflictoRanking =
@@ -860,7 +864,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 nombre: z.nombre,
                 parejas: z.parejas.map((p) => ({
                   id: p.id,
-                  es_cabeza_serie: Boolean(p.cabezaDeSerie),
+                  es_cabeza_serie: validarCabezasSerie
+                    ? Boolean(p.cabezaDeSerie)
+                    : false,
                 })),
               })),
               motivo: motivo,
@@ -1952,7 +1958,22 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 </div>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => setValidarCabezasSerie(!validarCabezasSerie)}
+                    onClick={() => {
+                      const next = !validarCabezasSerie;
+                      setValidarCabezasSerie(next);
+                      if (!next) {
+                        setZonas((prev) =>
+                          prev.map((z) => ({
+                            ...z,
+                            parejas: z.parejas.map((p) => ({
+                              ...p,
+                              cabezaDeSerie: false,
+                            })),
+                          })),
+                        );
+                        setResolucionesCabezasSerie([]);
+                      }
+                    }}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${validarCabezasSerie ? "bg-brand-chartreuse" : "bg-gray-600"}`}
                   >
                     <span

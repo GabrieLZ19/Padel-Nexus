@@ -34,11 +34,11 @@ export interface PaginatedTorneos {
 export interface ProgramacionBoardQueryParams {
   duracion?: number;
   descanso?: number;
-  descansoModo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+  descansoModo?: "sin_descanso" | "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
   jornadas?: number;
   horaInicio?: string;
   horaFin?: string;
-  franjasPorDia?: string | Record<string, { inicio?: string; fin?: string }>;
+  franjasPorDia?: string | Record<string, { inicio?: string; fin?: string; duracion?: number }>;
 }
 
 export interface ProgramacionAsignarPayload {
@@ -58,11 +58,11 @@ export interface ProgramacionAutoPayload {
   distribucion?: "zonas_primero" | "continua";
   duracionMinutos?: number;
   descansoMinutos?: number;
-  descansoModo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+  descansoModo?: "sin_descanso" | "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
   jornadas?: number;
   horaInicio?: string;
   horaFin?: string;
-  franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+  franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
   motivo?: string;
 }
 
@@ -269,18 +269,28 @@ export const TorneosService = {
   async getZonas(torneoId: string): Promise<{
     zonas: Array<Record<string, unknown>>;
     cabezas_ranking_globales: string[];
+    cabezas_serie_activas: boolean;
   }> {
     const response = await api.get<
       | Array<Record<string, unknown>>
-      | { zonas: Array<Record<string, unknown>>; cabezas_ranking_globales?: string[] }
+      | {
+          zonas: Array<Record<string, unknown>>;
+          cabezas_ranking_globales?: string[];
+          cabezas_serie_activas?: boolean;
+        }
     >(`/torneos/${torneoId}/zonas`);
     const raw = response.data;
     if (Array.isArray(raw)) {
-      return { zonas: raw, cabezas_ranking_globales: [] };
+      return {
+        zonas: raw,
+        cabezas_ranking_globales: [],
+        cabezas_serie_activas: true,
+      };
     }
     return {
       zonas: raw.zonas ?? [],
       cabezas_ranking_globales: raw.cabezas_ranking_globales ?? [],
+      cabezas_serie_activas: raw.cabezas_serie_activas !== false,
     };
   },
 
@@ -694,12 +704,27 @@ export const TorneosService = {
     torneoId: string,
     payload: {
       duracionMinutos?: number;
-      descansoModo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
-      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+      descansoModo?: "sin_descanso" | "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
     } = {},
   ): Promise<ProgramacionBoard> {
     const response = await api.post<ProgramacionBoard>(
       `/torneos/${torneoId}/programacion/config`,
+      payload,
+    );
+    return response.data;
+  },
+
+  async persistirConfigEventoProgramacion(
+    grupoId: string,
+    payload: {
+      duracionMinutos?: number;
+      descansoModo?: "sin_descanso" | "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
+    } = {},
+  ): Promise<ProgramacionBoardEvento> {
+    const response = await api.put<ProgramacionBoardEvento>(
+      `/torneos/grupos/${grupoId}/programacion/config`,
       payload,
     );
     return response.data;
@@ -711,11 +736,11 @@ export const TorneosService = {
       motivo?: string;
       duracionMinutos?: number;
       descansoMinutos?: number;
-      descansoModo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+      descansoModo?: "sin_descanso" | "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
       jornadas?: number;
       horaInicio?: string;
       horaFin?: string;
-      franjasPorDia?: Record<string, { inicio?: string; fin?: string }>;
+      franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
     } = {},
   ): Promise<ProgramacionBoard> {
     const response = await api.post<ProgramacionBoard>(
@@ -927,7 +952,7 @@ export interface ProgramacionBoard {
   programacion_publicada_en: string | null;
   duracion_partido_minutos: number;
   descanso_minutos: number;
-  descanso_modo?: "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
+  descanso_modo?: "sin_descanso" | "tras_fin_60" | "tras_fin_120" | "entre_inicios_240";
   sugerencia?: { canchas: number; horas: number; mensaje: string };
   dias: string[];
   canchas: Array<{
@@ -944,7 +969,7 @@ export interface ProgramacionBoard {
     cancha_label: string;
     fecha_iso: string;
   }>;
-  franjas_por_dia?: Record<string, { inicio: string; fin: string }>;
+  franjas_por_dia?: Record<string, { inicio: string; fin: string; duracion?: number }>;
   partidos: BoardPartido[];
   issues: ProgramacionIssue[];
   summary: {

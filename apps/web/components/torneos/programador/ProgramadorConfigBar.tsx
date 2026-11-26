@@ -38,6 +38,7 @@ const TURNO_OPTS = [
 ] as const;
 
 const DESCANSO_OPTS = [
+  { value: "sin_descanso", label: "0 min (partidos seguidos)" },
   { value: "tras_fin_60", label: "60 min desde el final" },
   { value: "tras_fin_120", label: "120 min desde el final" },
   { value: "entre_inicios_240", label: "4 h entre inicios" },
@@ -58,7 +59,7 @@ const JORNADA_OPTS = [
 
 function horasInicioOpciones(): { value: string; label: string }[] {
   const opts: { value: string; label: string }[] = [];
-  for (let min = 7 * 60; min <= 23 * 60; min += 30) {
+  for (let min = 7 * 60; min <= 23 * 60; min += 15) {
     const h = String(Math.floor(min / 60)).padStart(2, "0");
     const m = String(min % 60).padStart(2, "0");
     opts.push({ value: `${h}:${m}`, label: `${h}:${m}` });
@@ -68,10 +69,10 @@ function horasInicioOpciones(): { value: string; label: string }[] {
 
 function horasFinOpciones(desde?: string): { value: string; label: string }[] {
   const piso = desde
-    ? Number(desde.slice(0, 2)) * 60 + Number(desde.slice(3, 5)) + 30
-    : 8 * 60 + 30;
+    ? Number(desde.slice(0, 2)) * 60 + Number(desde.slice(3, 5)) + 15
+    : 8 * 60 + 15;
   const opts: { value: string; label: string }[] = [];
-  for (let min = 8 * 60; min <= 24 * 60; min += 30) {
+  for (let min = 8 * 60; min <= 24 * 60; min += 15) {
     if (min < piso) continue;
     if (min === 24 * 60) {
       opts.push({ value: "00:00", label: "00:00 (medianoche)" });
@@ -113,6 +114,27 @@ export function ProgramadorConfigBar({
     { value: "", label: "Por defecto (hasta 00:00)" },
     ...horasFinOpciones(currentInicio),
   ];
+
+  const currentDuracion =
+    (activeDay && config.franjasPorDia?.[activeDay]?.duracion) ||
+    config.duracion ||
+    90;
+
+  const handleDuracionChange = (v: string) => {
+    const num = Number(v) as 60 | 75 | 90;
+    if (activeDay) {
+      const nextFranjas = {
+        ...(config.franjasPorDia || {}),
+        [activeDay]: {
+          ...(config.franjasPorDia?.[activeDay] || {}),
+          duracion: num,
+        },
+      };
+      onChange({ franjasPorDia: nextFranjas });
+    } else {
+      onChange({ duracion: num });
+    }
+  };
 
   const handleInicioChange = (v: string) => {
     if (activeDay) {
@@ -198,13 +220,11 @@ export function ProgramadorConfigBar({
       <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
         <div>
           <span className="mb-0.5 block text-xs font-bold uppercase tracking-wider text-gray-400">
-            Turno
+            Turno {activeDay ? `(${formatDia(activeDay)})` : ""}
           </span>
           <CustomDropdown
-            value={String(config.duracion)}
-            onChange={(v) =>
-              onChange({ duracion: Number(v) as 60 | 75 | 90 })
-            }
+            value={String(currentDuracion)}
+            onChange={handleDuracionChange}
             options={[...TURNO_OPTS]}
             placeholder="Duración"
             disabled={disabled}
