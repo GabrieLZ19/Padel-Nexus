@@ -208,3 +208,26 @@ export function planificarMaterializacionByeConSemilla(
     altaEnLado,
   );
 }
+
+/** Cómo debe quedar el partido que editó el admin (p. ej. cuarto) tras materializar el octavo. */
+export function equiposDestinoTrasMaterializarBye(
+  plan: PlanMaterializarByeFap,
+  prevA: string | null,
+  prevB: string | null,
+): { nextA: string | null; nextB: string | null } {
+  if (plan.mismoPartidoEntrada) {
+    const entradaA =
+      plan.ladoClasificado === "a"
+        ? plan.inscripcionClasificada
+        : plan.inscripcionRival;
+    const entradaB =
+      plan.ladoClasificado === "b"
+        ? plan.inscripcionClasificada
+        : plan.inscripcionRival;
+    return { nextA: entradaA, nextB: entradaB };
+  }
+  return {
+    nextA: plan.ladoDestinoALimpiar === "a" ? null : prevA,
+    nextB: plan.ladoDestinoALimpiar === "b" ? null : prevB,
+  };
+}

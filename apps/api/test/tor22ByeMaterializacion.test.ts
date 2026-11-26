@@ -4,6 +4,7 @@ import { getFapBracketForPairCount } from "../src/utils/fapBracketMatrices";
 import {
   corregirAltaEnPaseDirecto,
   entryMatchForLeafSeed,
+  equiposDestinoTrasMaterializarBye,
   planificarMaterializacionByeConSemilla,
   planificarMaterializacionByeFap,
 } from "../src/utils/fapByeMaterializacion";
@@ -87,5 +88,29 @@ describe("TOR-22 / TOR-28 materializar rival en pase directo", () => {
     assert.equal(plan?.ladoClasificado, "a");
     assert.equal(plan?.inscripcionClasificada, "ins-1a");
     assert.equal(plan?.inscripcionRival, "ins-nueva");
+    if (plan) {
+      const destino = equiposDestinoTrasMaterializarBye(plan, "ins-1a", null);
+      assert.equal(destino.nextA, null);
+      assert.equal(destino.nextB, null);
+    }
+  });
+
+  it("octavo 1A vs rival nuevo: destino del cuarto sigue en hueco W*", () => {
+    const matrix = getFapBracketForPairCount(16)!;
+    const spec57 = matrix.find((m) => m.matchNo === 57)!;
+    const plan = planificarMaterializacionByeFap(
+      spec57,
+      57,
+      matrix,
+      "ins-1a",
+      null,
+      "ins-1a",
+      "ins-nueva",
+      "b",
+    );
+    assert.ok(plan);
+    const destino = equiposDestinoTrasMaterializarBye(plan, "ins-1a", null);
+    assert.equal(destino.nextA, "ins-1a");
+    assert.equal(destino.nextB, "ins-nueva");
   });
 });
