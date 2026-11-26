@@ -74,6 +74,26 @@ export function esTorneoDePrueba(
   return Boolean(torneo.es_prueba) || esNombreDePrueba(torneo.nombre);
 }
 
+export function esClubDePrueba(
+  club:
+    | { nombre?: string | null; es_prueba?: boolean | null }
+    | null
+    | undefined,
+): boolean {
+  if (!club) return true;
+  if (club.es_prueba) return true;
+  return esNombreDePrueba(club.nombre);
+}
+
+/** RNK-4: solo clubes operativos en listados públicos de ranking. */
+export function esClubActivoPublico(
+  club: { estado?: string | null } | null | undefined,
+): boolean {
+  if (!club) return false;
+  const estado = String(club.estado ?? "Activo").trim().toLowerCase();
+  return estado === "activo";
+}
+
 /**
  * Persiste `es_prueba` en torneos. Los nombres de ensayo nunca se publican.
  * visibleSitioPublico=true => es_prueba false (salvo nombre de prueba).

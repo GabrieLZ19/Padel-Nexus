@@ -14,6 +14,7 @@ router.get(
   "/provincial/:torneo_id",
   RankingsController.rankingProvincialTorneo,
 );
+router.get("/clubes", RankingsController.listarClubesRankingPublico);
 router.get(
   "/mis-contextos",
   authenticate,

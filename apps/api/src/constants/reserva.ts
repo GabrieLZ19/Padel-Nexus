@@ -9,3 +9,13 @@ export const RESERVA_TRANSFERENCIA_RETENCION_MINUTOS = 60 * 24 * 14;
 
 /** Motivo al liberar el turno por TTL de pago (RES-12). */
 export const RESERVA_MOTIVO_PAGO_VENCIDO = "Plazo de pago vencido";
+
+/** Estados de pago de reservas (columna `reservas.estado_pago`). */
+export const RESERVA_ESTADOS_PAGO = {
+  PENDIENTE: "pendiente",
+  /** RES-22: jugador eligió pagar en el club; el cobro lo registra el club. */
+  PENDIENTE_EN_CLUB: "pendiente_en_club",
+  COMPLETADO: "completado",
+  RECHAZADO: "rechazado",
+  CANCELADO: "cancelado",
+} as const;

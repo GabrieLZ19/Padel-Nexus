@@ -472,7 +472,7 @@ export class MarketplaceController {
   static async listarProductosEntidad(req: Request, res: Response) {
     try {
       const ref = parseEntidadRef(req);
-      const tienda = await MarketplaceService.assertGestionTiendaEntidad(
+      const tienda = await MarketplaceService.assertAccesoTiendaEntidad(
         req.user!.id,
         req.user!.rol,
         ref,
@@ -581,7 +581,7 @@ export class MarketplaceController {
   static async listarVentasEntidad(req: Request, res: Response) {
     try {
       const ref = parseEntidadRef(req);
-      const tienda = await MarketplaceService.assertGestionTiendaEntidad(
+      const tienda = await MarketplaceService.assertAccesoTiendaEntidad(
         req.user!.id,
         req.user!.rol,
         ref,
@@ -600,7 +600,7 @@ export class MarketplaceController {
   static async obtenerEstadisticasEntidad(req: Request, res: Response) {
     try {
       const ref = parseEntidadRef(req);
-      const tienda = await MarketplaceService.assertGestionTiendaEntidad(
+      const tienda = await MarketplaceService.assertAccesoTiendaEntidad(
         req.user!.id,
         req.user!.rol,
         ref,

@@ -17,7 +17,12 @@ import {
   puntosInscripcionPorMejorInstancia,
   sumarPuntosPorProvincia,
 } from "../utils/puntosProvincia";
-import { esTorneoDePrueba, esVisibleEnSitioPublico } from "../utils/datoPrueba";
+import {
+  esClubActivoPublico,
+  esClubDePrueba,
+  esTorneoDePrueba,
+  esVisibleEnSitioPublico,
+} from "../utils/datoPrueba";
 import { esEmailPlaceholderPlanilla } from "../utils/inscripcionPlanilla";
 import { provinciaEfectivaDesdePerfil } from "../utils/provinciaPerfil";
 import {
@@ -831,13 +836,87 @@ export class RankingService {
     }));
   }
 
+  /** IDs de clubes activos (no QA) con al menos un torneo con historial de ranking. */
+  private static async idsClubesConRankingPublico(): Promise<Set<string>> {
+    const { data: torneos, error } = await supabaseAdmin
+      .from("torneos")
+      .select(
+        "id, club_id, es_prueba, nombre, clubes:club_id!inner(id, nombre, estado)",
+      )
+      .not("club_id", "is", null);
+
+    if (error) throw new Error(error.message);
+
+    type TorneoClubRow = {
+      id: string;
+      club_id: string;
+      clubes?: { id?: string; nombre?: string; estado?: string } | null;
+    };
+
+    const torneosValidos = (torneos || []).filter((raw) => {
+      const t = raw as TorneoClubRow & { es_prueba?: boolean; nombre?: string };
+      if (esTorneoDePrueba(t)) return false;
+      const club = Array.isArray(t.clubes) ? t.clubes[0] : t.clubes;
+      if (!club?.id) return false;
+      if (!esClubActivoPublico(club) || esClubDePrueba(club)) return false;
+      return true;
+    }) as TorneoClubRow[];
+
+    if (torneosValidos.length === 0) return new Set();
+
+    const torneoIds = torneosValidos.map((t) => String(t.id));
+    const { data: historial, error: histError } = await supabaseAdmin
+      .from("historial_ranking")
+      .select("torneo_id")
+      .in("torneo_id", torneoIds);
+
+    if (histError) throw new Error(histError.message);
+
+    const conHistorial = new Set(
+      (historial || []).map((h) => String(h.torneo_id)),
+    );
+
+    const clubIds = new Set<string>();
+    for (const t of torneosValidos) {
+      if (conHistorial.has(String(t.id))) {
+        clubIds.add(String(t.club_id));
+      }
+    }
+    return clubIds;
+  }
+
+  /** RNK-4: clubes activos con ranking publicado (sin QA). */
+  static async listarClubesConRankingPublico(): Promise<
+    Array<{ id: string; nombre: string }>
+  > {
+    const ids = await RankingService.idsClubesConRankingPublico();
+    if (ids.size === 0) return [];
+
+    const { data: clubes, error } = await supabaseAdmin
+      .from("clubes")
+      .select("id, nombre, estado")
+      .in("id", [...ids])
+      .eq("estado", "Activo")
+      .order("nombre");
+
+    if (error) throw new Error(error.message);
+
+    return (clubes || [])
+      .filter((c) => !esClubDePrueba(c))
+      .map((c) => ({
+        id: String(c.id),
+        nombre: String(c.nombre || "").trim(),
+      }))
+      .filter((c) => c.id && c.nombre);
+  }
+
   /** Clubes donde el jugador acumuló puntos o se inscribió (torneos confirmados). */
   static async listarClubesRankingJugador(
     usuarioId: string,
   ): Promise<Array<{ id: string; nombre: string }>> {
     const torneosSelect = `
       club_id,
-      clubes:club_id!inner ( id, nombre )
+      clubes:club_id!inner ( id, nombre, estado )
     `;
 
     const [inscripcionesResult, historialResult] = await Promise.all([
@@ -860,10 +939,15 @@ export class RankingService {
     const pushClub = (torneoRaw: unknown, fecha?: string | null) => {
       if (!torneoRaw || typeof torneoRaw !== "object") return;
       const t = torneoRaw as TorneoContextoMin;
-      const club = t.clubes as { id?: string; nombre?: string } | null;
+      const club = t.clubes as {
+        id?: string;
+        nombre?: string;
+        estado?: string;
+      } | null;
       const id = String(t.club_id || club?.id || "").trim();
       const nombre = String(club?.nombre || "").trim();
       if (!id || !nombre) return;
+      if (!esClubActivoPublico(club) || esClubDePrueba(club)) return;
       parciales.push({
         id,
         nombre,

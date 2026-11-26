@@ -42,6 +42,9 @@ describe("RNK-2 / TOR-53 ranking Club y visibilidad provincial", () => {
     assert.match(svc, /obtenerRankingPorClub/);
     assert.match(svc, /in\("alcance", \["Provincial", "Local"\]\)/);
     assert.match(svc, /listarClubesRankingJugador/);
+    assert.match(svc, /listarClubesConRankingPublico/);
+    assert.match(svc, /esClubActivoPublico/);
+    assert.match(svc, /esClubDePrueba/);
     const otorgar = readFileSync(
       path.join(RAIZ_API, "src/utils/otorgarPuntosPartidoTorneo.ts"),
       "utf8",

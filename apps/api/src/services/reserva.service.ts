@@ -24,7 +24,11 @@ import {
 import { evaluarCancelacionReservaJugador } from "../utils/cancelacionReservaJugador";
 import { mensajeNotificacionReservaCanceladaPorJugador } from "../utils/reservaCancelacion";
 import { validarPagoMercadoPagoAprobado } from "../utils/validarPagoMercadoPago";
-import { RESERVA_MOTIVO_PAGO_VENCIDO } from "../constants/reserva";
+import {
+  RESERVA_ESTADOS_PAGO,
+  RESERVA_MOTIVO_PAGO_VENCIDO,
+} from "../constants/reserva";
+import { montoTurnoDesdeReserva } from "../utils/reservaMontoTurno";
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 
@@ -500,7 +504,6 @@ export class ReservaService {
   static async confirmarPago(
     reservaId: string,
     usuarioId: string,
-    monto: number,
     metodoPago: string,
     referenciaPago?: string,
     comprobanteUrl?: string,
@@ -512,6 +515,7 @@ export class ReservaService {
         `
         id, usuario_id, estado_pago, estado_reserva, created_at, retiene_hasta, motivo_cancelacion,
         turnos (
+          precio,
           canchas (
             clubes ( id, nombre, provincia, localidad, direccion, latitud, longitud, cbu, alias, suscripcion_sin_comisiones, pago_transferencia_habilitado, pago_efectivo_habilitado )
           )
@@ -531,7 +535,7 @@ export class ReservaService {
       await ReservaService.marcarReservaVencidaPorPago(reservaId);
       throw new Error("RESERVA_PAGO_VENCIDO");
     }
-    if (reserva.estado_pago === "completado")
+    if (reserva.estado_pago === RESERVA_ESTADOS_PAGO.COMPLETADO)
       throw new Error("Esta reserva ya fue pagada.");
 
     const clubEmbed = (
@@ -543,18 +547,33 @@ export class ReservaService {
     ).turnos?.canchas?.clubes;
     assertMetodoPagoManualReservaPermitido(clubEmbed, metodoPago);
 
-    const esTransferencia = metodoPago === "transferencia";
+    const monto = montoTurnoDesdeReserva(reserva);
+    const metodo = metodoPago.toLowerCase();
+    const esTransferencia = metodo === "transferencia";
+    const esEfectivo = metodo === "efectivo";
+
+    if (!esTransferencia && !esEfectivo) {
+      throw new Error("Método de pago no válido para confirmación manual.");
+    }
 
     const retieneHasta = esTransferencia
       ? retencionTransferenciaDesde(new Date())
       : null;
 
+    const estadoReserva = esTransferencia ? "pendiente" : "confirmada";
+    const estadoPagoReserva = esTransferencia
+      ? RESERVA_ESTADOS_PAGO.PENDIENTE
+      : esEfectivo
+        ? RESERVA_ESTADOS_PAGO.PENDIENTE_EN_CLUB
+        : RESERVA_ESTADOS_PAGO.COMPLETADO;
+    const estadoPagoRegistro = esEfectivo || esTransferencia ? "pendiente" : "completado";
+
     // 2. Actualizar la reserva
     const { error: updError } = await supabaseAdmin
       .from("reservas")
       .update({
-        estado_reserva: esTransferencia ? "pendiente" : "confirmada",
-        estado_pago: esTransferencia ? "pendiente" : "completado",
+        estado_reserva: estadoReserva,
+        estado_pago: estadoPagoReserva,
         ...(esTransferencia ? { retiene_hasta: retieneHasta } : { retiene_hasta: null }),
       })
       .eq("id", reservaId);
@@ -570,10 +589,10 @@ export class ReservaService {
           reserva_id: reservaId,
           usuario_id: usuarioId,
           monto,
-          metodo_pago: metodoPago,
+          metodo_pago: metodo,
           referencia_pago: referenciaPago || null,
           comprobante_url: comprobanteUrl || null,
-          estado: esTransferencia ? "pendiente" : "completado",
+          estado: estadoPagoRegistro,
         },
       ])
       .select()
@@ -585,6 +604,8 @@ export class ReservaService {
     // 4. Notificaciones
     if (esTransferencia) {
       this.enviarNotificacionesTransferenciaPendiente(reservaId, monto);
+    } else if (esEfectivo) {
+      this.enviarNotificacionesPagoEnClubPendiente(reservaId, monto);
     } else {
       this.enviarNotificacionesPago(reservaId, monto);
     }
@@ -1137,6 +1158,46 @@ export class ReservaService {
     } catch (notifError) {
       console.warn(
         "Error al emitir notificaciones de transferencia pendiente:",
+        notifError,
+      );
+    }
+  }
+
+  /** RES-22: reserva confirmada; el cobro queda pendiente en caja del club. */
+  static async enviarNotificacionesPagoEnClubPendiente(
+    reservaId: string,
+    monto: number,
+  ) {
+    try {
+      const { NotificacionService } = require("./notificacion.service");
+
+      const details = await this.obtenerReservaPorId(reservaId);
+      // @ts-ignore
+      const canchaNombre = details.turnos?.canchas?.nombre || "Cancha";
+      // @ts-ignore
+      const clubNombre = details.turnos?.canchas?.clubes?.nombre || "Club";
+      // @ts-ignore
+      const horaInicio = details.turnos?.hora_inicio?.slice(0, 5) || "00:00";
+
+      if (details.usuario_id) {
+        await NotificacionService.crearNotificacion({
+          usuario_id: details.usuario_id,
+          titulo: "Reserva confirmada — pago en el club",
+          mensaje: `Tu turno en ${canchaNombre} (${clubNombre}) el ${details.fecha_reserva} a las ${horaInicio} Hs quedó confirmado. Aboná $${monto} en el club antes de jugar.`,
+          tipo: "info",
+          metadata: { reserva_id: reservaId },
+        });
+      }
+
+      await NotificacionService.notificarAdmins({
+        titulo: "Reserva con cobro pendiente en caja",
+        mensaje: `Turno confirmado con pago en el club ($${monto}) en ${canchaNombre} (${clubNombre}) del ${details.fecha_reserva} a las ${horaInicio} Hs. Registralo con Cobrar cuando recibas el efectivo.`,
+        tipo: "info",
+        metadata: { reserva_id: reservaId },
+      });
+    } catch (notifError) {
+      console.warn(
+        "Error al emitir notificaciones de pago en el club:",
         notifError,
       );
     }

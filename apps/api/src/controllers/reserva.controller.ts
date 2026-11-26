@@ -125,7 +125,7 @@ export const ReservasController = {
     try {
       const { id } = req.params;
       const usuario_id = req.user?.id;
-      const { monto, metodo_pago, referencia_pago, comprobante_url } = req.body;
+      const { metodo_pago, referencia_pago, comprobante_url } = req.body;
 
       if (!usuario_id) {
         return res
@@ -133,17 +133,16 @@ export const ReservasController = {
           .json({ exito: false, error: "No autenticado." });
       }
 
-      if (!monto || !metodo_pago) {
+      if (!metodo_pago) {
         return res.status(400).json({
           exito: false,
-          error: "Se requieren monto y metodo_pago.",
+          error: "Se requiere metodo_pago.",
         });
       }
 
       const pago = await ReservaService.confirmarPago(
         id,
         usuario_id,
-        parseFloat(monto),
         metodo_pago,
         referencia_pago,
         comprobante_url,

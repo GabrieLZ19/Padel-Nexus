@@ -497,10 +497,16 @@ export class MarketplaceService {
     if (error) throw new Error(`Error al obtener tienda: ${error.message}`);
     if (!data) return null;
     const total_ventas = await contarOrdenesCobradasPorVendedor(data.id);
-    return { ...data, total_ventas };
+    const base = { ...data, total_ventas };
+    if (data.estado === MARKETPLACE_ESTADOS_VENDEDOR.SUSPENDIDO) {
+      const suspension = await this.obtenerUltimaSuspensionVendedor(data.id);
+      return { ...base, ...suspension };
+    }
+    return base;
   }
 
-  static async assertGestionTiendaEntidad(
+  /** Acceso CRM a una tienda existente (incluye estado suspendido para consulta). */
+  static async assertAccesoTiendaEntidad(
     usuarioId: string,
     rol: string | undefined,
     ref: EntidadMarketplaceRef,
@@ -517,10 +523,50 @@ export class MarketplaceService {
         "La entidad no tiene tienda activa. Registrala desde el módulo Marketplace.",
       );
     }
+    return tienda;
+  }
+
+  static async assertGestionTiendaEntidad(
+    usuarioId: string,
+    rol: string | undefined,
+    ref: EntidadMarketplaceRef,
+  ) {
+    const tienda = await this.assertAccesoTiendaEntidad(usuarioId, rol, ref);
     if (tienda.estado !== MARKETPLACE_ESTADOS_VENDEDOR.ACTIVO) {
       throw new Error("La tienda de esta entidad está suspendida.");
     }
     return tienda;
+  }
+
+  static async obtenerUltimaSuspensionVendedor(vendedorId: string): Promise<{
+    motivo_suspension: string | null;
+    suspendido_desde: string | null;
+  }> {
+    const entidadAfectada = `marketplace_vendedores_id: ${vendedorId}`;
+    const { data, error } = await supabaseAdmin
+      .from("logs_auditoria")
+      .select("detalles, created_at")
+      .eq("accion", "SUSPENDER_VENDEDOR_MARKETPLACE")
+      .eq("entidad_afectada", entidadAfectada)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      return { motivo_suspension: null, suspendido_desde: null };
+    }
+
+    const detalles = data.detalles as { motivo?: string } | null;
+    const motivo =
+      typeof detalles?.motivo === "string" && detalles.motivo.trim().length > 0
+        ? detalles.motivo.trim()
+        : null;
+
+    return {
+      motivo_suspension: motivo,
+      suspendido_desde:
+        typeof data.created_at === "string" ? data.created_at : null,
+    };
   }
 
   /** @deprecated Registro libre de usuarios — usar registrarTiendaEntidad */
@@ -2194,7 +2240,7 @@ export class MarketplaceService {
     rol: string | undefined,
     ref: EntidadMarketplaceRef,
   ) {
-    const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+    const tienda = await this.assertAccesoTiendaEntidad(usuarioId, rol, ref);
     const { data, error } = await supabaseAdmin
       .from("marketplace_sponsors")
       .select("*")
@@ -2324,7 +2370,7 @@ export class MarketplaceService {
     ref: EntidadMarketplaceRef,
     sponsorId?: string,
   ) {
-    const tienda = await this.assertGestionTiendaEntidad(usuarioId, rol, ref);
+    const tienda = await this.assertAccesoTiendaEntidad(usuarioId, rol, ref);
     await MarketplaceService.finalizarCampanasSponsorVencidas(tienda.id);
     let query = supabaseAdmin
       .from("marketplace_sponsor_campanas")
