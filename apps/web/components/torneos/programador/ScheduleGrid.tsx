@@ -82,20 +82,23 @@ function BookingCard({
       style={{ ...style, ...accent }}
       className={`prog-booking relative flex h-full min-h-[52px] flex-col rounded-lg border p-1.5 text-left ${severityClass(
         issue?.severity,
-      )} ${highlighted ? "outline outline-2 outline-offset-1 outline-brand-chartreuse" : ""}`}
+      )} ${highlighted ? "outline outline-2 outline-offset-1 outline-brand-chartreuse" : ""} ${
+        !readOnly
+          ? "touch-none select-none cursor-grab active:cursor-grabbing"
+          : ""
+      }`}
       title={issue?.message || partido.label}
+      {...(!readOnly ? listeners : {})}
+      {...(!readOnly ? attributes : {})}
     >
       <div className="relative z-20 mb-0.5 flex shrink-0 items-center gap-0.5 border-b border-white/10 pb-0.5">
         {!readOnly ? (
-          <button
-            type="button"
-            className="touch-none shrink-0 cursor-grab rounded p-0.5 text-gray-500 hover:bg-black/20 hover:text-white active:cursor-grabbing"
-            aria-label="Arrastrar para mover de horario"
-            {...listeners}
-            {...attributes}
+          <span
+            className="shrink-0 rounded p-0.5 text-gray-500"
+            aria-hidden
           >
-            <GripVertical className="size-3.5" aria-hidden />
-          </button>
+            <GripVertical className="size-3.5" />
+          </span>
         ) : null}
         {hasIssue ? (
           <AlertTriangle

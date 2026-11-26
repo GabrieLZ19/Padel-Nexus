@@ -90,17 +90,21 @@ function ParejaCard({
         transform: CSS.Translate.toString(transform),
         opacity: isDragging ? 0.45 : 1,
       }}
-      className="prog-inset flex items-center gap-1.5 rounded-lg px-2 py-1.5"
+      className={`prog-inset flex items-center gap-1.5 rounded-lg px-2 py-1.5 ${
+        !readOnly
+          ? "touch-none select-none cursor-grab active:cursor-grabbing"
+          : ""
+      }`}
+      {...(!readOnly ? listeners : {})}
+      {...(!readOnly ? attributes : {})}
     >
-      <button
-        type="button"
-        className="cursor-grab text-brand-ayuda disabled:cursor-default"
-        disabled={readOnly}
-        {...listeners}
-        {...attributes}
-      >
-        <GripVertical size={14} />
-      </button>
+      {!readOnly ? (
+        <GripVertical
+          size={14}
+          className="shrink-0 text-brand-ayuda"
+          aria-hidden
+        />
+      ) : null}
       <span className="truncate text-[11px] font-medium text-brand-white">
         {pareja.nombre}
       </span>

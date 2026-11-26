@@ -1953,7 +1953,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     Validación de cabezas de serie
                   </span>
                   <span className="text-[10px] text-brand-ayuda leading-snug block mt-0.5">
-                    Se recuerda en esta sesión del navegador mientras editás zonas.
+                    ON: al guardar zonas, bloquea dos parejas del top del ranking
+                    en la misma zona y persiste la preferencia en el torneo. OFF:
+                    libera la distribución (sin esa validación). La preferencia
+                    se recuerda en esta sesión del navegador.
                   </span>
                 </div>
                 <div className="flex items-center gap-3">

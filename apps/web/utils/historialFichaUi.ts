@@ -10,6 +10,7 @@ const ETIQUETAS_CAMPO: Record<string, string> = {
 export function etiquetaAccionHistorialFicha(accion: string): string {
   if (accion === "corregir_dni_ficha") return "Corrección de DNI";
   if (accion === "editar_ficha_provisoria") return "Edición ficha provisoria";
+  if (accion === "unir_fichas_jugador") return "Unión de fichas duplicadas";
   return accion;
 }
 
@@ -24,6 +25,11 @@ export function detalleTextoHistorialFicha(ev: {
 }): string {
   const detalles = ev.detalles;
   if (!detalles || typeof detalles !== "object") return "";
+
+  const motivo = detalles.motivo;
+  if (typeof motivo === "string" && motivo.trim()) {
+    return `Motivo: ${motivo.trim()}`;
+  }
 
   const cambios = detalles.cambios;
   if (!cambios || typeof cambios !== "object") return "";

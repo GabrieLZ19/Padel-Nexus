@@ -102,6 +102,12 @@ export default function PerfilJugadorAdminPage() {
   const [editandoDni, setEditandoDni] = useState(false);
   const [dniInput, setDniInput] = useState("");
   const [guardandoDni, setGuardandoDni] = useState(false);
+  const [fusionDuplicado, setFusionDuplicado] = useState<{
+    destinoId: string;
+    etiqueta: string;
+  } | null>(null);
+  const [motivoFusion, setMotivoFusion] = useState("");
+  const [fusionando, setFusionando] = useState(false);
 
   const cargarHistorialLicencia = useCallback(async (licenciaId: string) => {
     try {
@@ -370,6 +376,19 @@ export default function PerfilJugadorAdminPage() {
         description: "El cambio quedó registrado en el historial de la ficha.",
       });
     } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 409) {
+        const otro = err.response.data?.otro_perfil as
+          | { id: string; nombre?: string | null; apellido?: string | null }
+          | undefined;
+        if (otro?.id) {
+          const etiqueta =
+            [otro.apellido, otro.nombre].filter(Boolean).join(", ").trim() ||
+            otro.id;
+          setFusionDuplicado({ destinoId: otro.id, etiqueta });
+          setMotivoFusion("");
+          return;
+        }
+      }
       const descripcion = isAxiosError(err)
         ? String(err.response?.data?.error || err.message)
         : err instanceof Error
@@ -381,6 +400,44 @@ export default function PerfilJugadorAdminPage() {
       });
     } finally {
       setGuardandoDni(false);
+    }
+  };
+
+  const confirmarFusionFicha = async (motivoArg?: string) => {
+    if (!perfil || !fusionDuplicado) return;
+    const motivo = (motivoArg ?? motivoFusion).trim();
+    if (motivo.length < 8) {
+      sileo.error({
+        title: "Motivo requerido",
+        description: "Indicá al menos 8 caracteres explicando por qué unís las fichas.",
+      });
+      return;
+    }
+    setFusionando(true);
+    try {
+      await PerfilService.unirFicha(perfil.id, {
+        ficha_destino_id: fusionDuplicado.destinoId,
+        motivo,
+      });
+      setFusionDuplicado(null);
+      setEditandoDni(false);
+      sileo.success({
+        title: "Fichas unidas",
+        description:
+          "Se migraron inscripciones y datos asociados. Se abre la ficha destino.",
+      });
+      router.replace(`/dashboard/jugadores/${fusionDuplicado.destinoId}`);
+    } catch (err) {
+      sileo.error({
+        title: "No se pudieron unir las fichas",
+        description: isAxiosError(err)
+          ? String(err.response?.data?.error || err.message)
+          : err instanceof Error
+            ? err.message
+            : "Revisá el motivo e intentá de nuevo.",
+      });
+    } finally {
+      setFusionando(false);
     }
   };
 
@@ -932,6 +989,30 @@ export default function PerfilJugadorAdminPage() {
           </div>
         </div>
       </div>
+      <FeedbackModal
+        isOpen={Boolean(fusionDuplicado)}
+        type="warning"
+        title="DNI ya asignado a otra ficha"
+        description={
+          fusionDuplicado
+            ? `El DNI coincide con la ficha de ${fusionDuplicado.etiqueta}. Podés unir esta ficha en la existente: se migran inscripciones, ranking y licencias (si corresponde), y la ficha actual deja de usarse.`
+            : ""
+        }
+        confirmText={fusionando ? "Uniendo..." : "Unir fichas"}
+        cancelText="Cancelar"
+        isLoading={fusionando}
+        showInput
+        inputType="textarea"
+        inputLabel="Motivo (obligatorio)"
+        inputPlaceholder="Ej. duplicado por carga de planilla y alta manual"
+        inputMinLength={8}
+        onClose={() => setFusionDuplicado(null)}
+        onConfirm={(motivo) => {
+          if (!motivo?.trim() || motivo.trim().length < 8) return;
+          setMotivoFusion(motivo.trim());
+          void confirmarFusionFicha(motivo.trim());
+        }}
+      />
       <FeedbackModal
         isOpen={confirmarSuspender}
         type="warning"

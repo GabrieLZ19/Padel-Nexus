@@ -175,6 +175,17 @@ export const PerfilService = {
     return response.data.data;
   },
 
+  async unirFicha(
+    origenId: string,
+    payload: { ficha_destino_id: string; motivo: string },
+  ): Promise<Perfil> {
+    const response = await api.post<ApiResponse<Perfil>>(
+      `/perfil/${origenId}/unir-ficha`,
+      payload,
+    );
+    return response.data.data;
+  },
+
   async getHistorialFicha(jugadorId: string): Promise<
     Array<{
       id: string;

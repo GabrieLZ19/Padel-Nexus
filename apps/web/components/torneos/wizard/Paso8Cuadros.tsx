@@ -226,6 +226,15 @@ export const Paso6Cuadros = ({
           className="w-full sm:max-w-md"
         />
       </div>
+      {!formatoEsEliminatoriaDirecta && (
+        <p className="text-xs text-brand-ayuda leading-relaxed rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+          La validación de cabezas de serie (top del ranking en zonas distintas)
+          se configura en el editor de zonas de abajo: switch &quot;Validación de
+          cabezas de serie&quot;. Con validación OFF podés redistribuir libremente
+          antes de guardar; al generar zonas de nuevo se respeta la última
+          preferencia guardada en el torneo.
+        </p>
+      )}
       {partidos.length === 0 && formatoEsEliminatoriaDirecta && (
           <div className="bg-black/20 p-6 rounded-3xl border border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
