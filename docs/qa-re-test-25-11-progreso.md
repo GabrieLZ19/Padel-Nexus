@@ -5,7 +5,7 @@ Plan anterior (24/11): [qa-re-test-24-11-progreso.md](./qa-re-test-24-11-progres
 
 **Siguiente ítem:** **Fase 2C** — MKT-10, RES-22, RNK-4 (post 28/11).
 
-Última actualización de código: commits `323df9e` … `c5b70e6` en `main` (26/11/2026).
+Última actualización de código: commits `b333f00`, `d687202`, `7c90a96` en `main` (26/11/2026).
 
 ## Fase 1 — Antes del 28/11
 
@@ -64,9 +64,9 @@ Plan anterior (24/11): [qa-re-test-24-11-progreso.md](./qa-re-test-24-11-progres
 | CLI-9 | HECHO | Sedes/canchas compartidas — `cli9ProgramadorEventoSedes.test.ts` |
 | CLI-10 | HECHO | Descanso con «Por definir» — `cli10ProgramadorEventoDescanso.test.ts` |
 | CLI-11 | HECHO | Reparto equilibrado, orden persistente — `cli11ProgramadorEventoOrden.test.ts` |
-| CLI-12 / CLI-13 | HECHO | Capacidad evento, celdas atenuadas, filtro sede — `cli12ProgramadorEventoCapacidad.test.ts` |
-| CLI-14 / CLI-15 | HECHO | Programador maestro siempre en grupo; replicar por pares — `cli14`/`cli15` tests |
-| CLI-1 | HECHO | Planilla: provincia en celda, Centenario, fila Excel en avisos |
+| CLI-12 / CLI-13 | HECHO | `d687202`, `b333f00` — `cli12ProgramadorEventoCapacidad.test.ts`, `cli12ProgramadorEventoUi.test.ts` |
+| CLI-14 / CLI-15 | HECHO | `d687202`, `b333f00` — `cli14ProgramadorEventoListado.test.ts`, `cli15ReplicarPares.test.ts` |
+| CLI-1 | HECHO | `b333f00`, `d687202` — `cli1PlanillaOficial.test.ts`, `cli1ProvinciaPerfil.test.ts` |
 
 ### Bloque 2C — Marketplace, reservas y ranking club — PENDIENTE
 
