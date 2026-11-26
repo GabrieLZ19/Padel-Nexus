@@ -31,6 +31,7 @@ import {
   nombreBaseTorneo,
   nombreTorneoReplicado,
   ordenarTorneosCategoriaEvento,
+  resolverParesReplicar,
 } from "../utils/gruposTorneo";
 import { resolverReglamentoPersistido } from "../utils/reglamentoTorneo";
 import { debeDescalificarPorWoDeZona } from "../utils/walkoverZona";
@@ -1256,18 +1257,12 @@ export class TorneoService {
   static async replicarTorneo(
     id: string,
     opciones: {
-      niveles: string[];
+      niveles?: string[];
       ramas?: string[];
+      pares?: Array<{ nivel: string; rama: string }>;
     },
     adminId?: string,
   ) {
-    const niveles = (opciones.niveles || [])
-      .map((n) => String(n || "").trim())
-      .filter(Boolean);
-    if (niveles.length === 0) {
-      throw new Error("Debés seleccionar al menos un nivel para replicar.");
-    }
-
     const { data: origen, error } = await supabaseAdmin
       .from("torneos")
       .select("*")
@@ -1277,25 +1272,15 @@ export class TorneoService {
     if (error || !origen) throw new Error("Torneo origen no encontrado.");
 
     const ramaOrigen = origen.rama || "Masculina";
-    let ramasDestino = (opciones.ramas || [])
-      .map((r) => String(r || "").trim())
-      .filter(Boolean);
-
-    if (ramasDestino.length === 0) {
-      ramasDestino = [ramaOrigen];
-    }
-
-    const pares: Array<{ rama: string; nivel: string }> = [];
-    for (const rama of ramasDestino) {
-      for (const nivel of niveles) {
-        if (rama === ramaOrigen && nivel === origen.nivel) continue;
-        pares.push({ rama, nivel });
-      }
-    }
+    const pares = resolverParesReplicar(origen, opciones);
 
     if (pares.length === 0) {
+      const conParesExplicitos =
+        Array.isArray(opciones.pares) && opciones.pares.length > 0;
       throw new Error(
-        "No hay combinaciones nuevas para crear (todas coinciden con el torneo origen).",
+        conParesExplicitos
+          ? "No hay combinaciones nuevas para crear. Quitá la categoría original o elegí otros pares."
+          : "Debés seleccionar al menos una combinación nivel y rama para replicar.",
       );
     }
 

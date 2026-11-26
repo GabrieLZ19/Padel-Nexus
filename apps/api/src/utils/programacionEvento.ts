@@ -22,6 +22,7 @@ import type { BoardPartido, ProgramacionBoard } from "../services/programacion.s
 import {
   esModoDescanso,
   minutosDeModoDescanso,
+  sugerirCanchasYHoras,
   type ModoDescanso,
 } from "./programadorReglas";
 import { cargarContextoProgramacion } from "./programacionPartidos";
@@ -713,6 +714,20 @@ export async function issuesCruzadosEvento(
   return issues;
 }
 
+export function sugerenciaCapacidadEvento(input: {
+  totalPartidos: number;
+  duracionMinutos: number;
+  diasCount: number;
+  canchasCount: number;
+}) {
+  return sugerirCanchasYHoras({
+    partidos: input.totalPartidos,
+    duracionMinutos: input.duracionMinutos,
+    jornadas: Math.min(4, Math.max(1, input.diasCount || 1)),
+    canchasActuales: input.canchasCount,
+  });
+}
+
 export async function mergeBoardsEvento(
   grupoId: string,
   meta: EventoProgramacionMeta,
@@ -778,6 +793,12 @@ export async function mergeBoardsEvento(
   const dias = [...diasSet].sort();
   const pendientes = total - asignados;
   const advertencias = issues.filter((i) => i.severity !== "ok").length;
+  const sugerencia = sugerenciaCapacidadEvento({
+    totalPartidos: total,
+    duracionMinutos: Number(ref.duracion_partido_minutos || 90),
+    diasCount: dias.length,
+    canchasCount: canchasMap.size,
+  });
 
   return {
     modo: "evento",
@@ -791,7 +812,7 @@ export async function mergeBoardsEvento(
     duracion_partido_minutos: ref.duracion_partido_minutos,
     descanso_minutos: ref.descanso_minutos,
     descanso_modo: ref.descanso_modo,
-    sugerencia: ref.sugerencia,
+    sugerencia,
     dias,
     canchas: [...canchasMap.values()],
     slots: [...slotsMap.values()].sort((a, b) => {

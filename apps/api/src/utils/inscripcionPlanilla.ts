@@ -139,9 +139,12 @@ export function parseLocalidadProvinciaCelda(valor: unknown): {
   const parts = partesLocalidadProvincia(raw);
 
   if (parts.length >= 2) {
+    const provinciaRaw = parts[parts.length - 1];
+    const provinciaCanon =
+      provinciaCanonicaArgentina(provinciaRaw) ?? provinciaRaw;
     return {
       localidad: parts[0],
-      provincia: parts[parts.length - 1],
+      provincia: provinciaCanon,
     };
   }
   if (parts.length === 1) {
@@ -324,6 +327,11 @@ export function sanitizarFilaPlanillaInscripcion(
   };
 }
 
+/** Número de fila visible (1-indexed, como en Excel). */
+export function etiquetaFilaPlanillaExcel(fila: number): string {
+  return `Fila ${fila}`;
+}
+
 export function agruparFilasEnParejas(
   filas: FilaPlanillaInscripcion[],
 ): Array<{ j1: FilaPlanillaInscripcion; j2?: FilaPlanillaInscripcion }> {
@@ -393,21 +401,32 @@ function resolverProvinciaDesdePlanilla(
   return null;
 }
 
-/** Valor a guardar en `perfiles.lugar_residencia`: prioriza localidad de planilla. */
+/** Valor a guardar en `perfiles.lugar_residencia`: localidad y, si vino en planilla, provincia. */
 function resolverLugarResidenciaDesdePlanilla(
   fila: FilaPlanillaInscripcion,
 ): string | null {
   const localidad = String(fila.localidadResidencia || "")
     .trim()
     .replace(/\s+/g, " ");
-  if (localidad && !esResidenciaPlaceholder(localidad)) return localidad;
-
   const provinciaLoc = String(fila.provinciaResidencia || "")
     .trim()
     .replace(/\s+/g, " ");
+  let provinciaCanon: string | null = null;
   if (provinciaLoc && !esResidenciaPlaceholder(provinciaLoc)) {
-    const canon = provinciaCanonicaArgentina(provinciaLoc);
-    return canon ?? provinciaLoc;
+    provinciaCanon = provinciaCanonicaArgentina(provinciaLoc) ?? provinciaLoc;
+  }
+
+  if (
+    localidad &&
+    !esResidenciaPlaceholder(localidad) &&
+    provinciaCanon
+  ) {
+    return `${localidad}, ${provinciaCanon}`;
+  }
+  if (localidad && !esResidenciaPlaceholder(localidad)) return localidad;
+
+  if (provinciaCanon) {
+    return provinciaCanon;
   }
 
   const asociacion = String(fila.asociacion || "")
@@ -428,6 +447,6 @@ export function advertenciasResidenciaPlanilla(
   if (!loc || esResidenciaPlaceholder(loc)) return [];
   if (resolverProvinciaDesdePlanilla(fila)) return [];
   return [
-    `Fila ${fila.fila}: solo consta localidad "${loc}"; no se pudo inferir provincia. Completar en el perfil del jugador.`,
+    `${etiquetaFilaPlanillaExcel(fila.fila)}: solo consta localidad "${loc}"; no se pudo inferir provincia. Completar en el perfil del jugador.`,
   ];
 }

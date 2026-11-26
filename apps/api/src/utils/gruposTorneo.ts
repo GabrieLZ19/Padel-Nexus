@@ -188,6 +188,51 @@ export function etiquetaCategoriaEventoTorneo(torneo: {
   return String(torneo.nombre || torneo.categoria || "Categoría").trim();
 }
 
+export function resolverParesReplicar(
+  origen: { nivel?: string | null; rama?: string | null },
+  opciones: {
+    niveles?: string[];
+    ramas?: string[];
+    pares?: Array<{ nivel?: string; rama?: string }>;
+  },
+): Array<{ nivel: string; rama: string }> {
+  const nivelOrigen = String(origen.nivel || "").trim();
+  const ramaOrigen = origen.rama || "Masculina";
+
+  if (Array.isArray(opciones.pares) && opciones.pares.length > 0) {
+    const vistos = new Set<string>();
+    const out: Array<{ nivel: string; rama: string }> = [];
+    for (const par of opciones.pares) {
+      const nivel = String(par.nivel || "").trim();
+      const rama = String(par.rama || "").trim();
+      if (!nivel || !rama) continue;
+      if (nivel === nivelOrigen && rama === ramaOrigen) continue;
+      const clave = `${rama}|${nivel}`;
+      if (vistos.has(clave)) continue;
+      vistos.add(clave);
+      out.push({ nivel, rama });
+    }
+    return out;
+  }
+
+  const niveles = (opciones.niveles || [])
+    .map((n) => String(n || "").trim())
+    .filter(Boolean);
+  let ramasDestino = (opciones.ramas || [])
+    .map((r) => String(r || "").trim())
+    .filter(Boolean);
+  if (ramasDestino.length === 0) ramasDestino = [ramaOrigen];
+
+  const pares: Array<{ nivel: string; rama: string }> = [];
+  for (const rama of ramasDestino) {
+    for (const nivel of niveles) {
+      if (rama === ramaOrigen && nivel === nivelOrigen) continue;
+      pares.push({ rama, nivel });
+    }
+  }
+  return pares;
+}
+
 export function ordenarTorneosCategoriaEvento<T extends TorneoCategoriaEvento>(
   torneos: T[],
 ): T[] {

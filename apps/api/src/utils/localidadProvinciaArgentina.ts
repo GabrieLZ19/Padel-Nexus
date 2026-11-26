@@ -8,6 +8,8 @@ const LOCALIDAD_A_PROVINCIA: Record<string, string> = {
   neuquen: "Neuquén",
   "san martin de los andes": "Neuquén",
   zapala: "Neuquén",
+  centenario: "Neuquén",
+  cipolletti: "Río Negro",
   "yerba buena": "Tucumán",
   "san miguel de tucuman": "Tucumán",
   tafí: "Tucumán",

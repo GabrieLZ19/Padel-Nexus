@@ -9,6 +9,7 @@ import {
   normalizarDni,
   esEmailPlaceholderPlanilla,
   sanitizarFilaPlanillaInscripcion,
+  etiquetaFilaPlanillaExcel,
   resolverLugarResidenciaDesdePlanilla,
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
@@ -835,14 +836,14 @@ export class PerfilService {
     const dni = normalizarDni(fila.dni);
     if (!dni || dni.length < 7) {
       throw new Error(
-        `Fila ${fila.fila}: el DNI es obligatorio para importar inscripciones.`,
+        `${etiquetaFilaPlanillaExcel(fila.fila)}: el DNI es obligatorio para importar inscripciones.`,
       );
     }
 
     const { apellido, nombre } = parseNombreCompleto(fila.apellidoNombre);
     if (!apellido && !nombre) {
       throw new Error(
-        `Fila ${fila.fila}: el apellido y nombre son obligatorios.`,
+        `${etiquetaFilaPlanillaExcel(fila.fila)}: el apellido y nombre son obligatorios.`,
       );
     }
 
@@ -899,7 +900,7 @@ export class PerfilService {
 
     if (authError || !authUser.user) {
       throw new Error(
-        `Fila ${fila.fila}: no se pudo crear el jugador (${authError?.message || "error desconocido"}).`,
+        `${etiquetaFilaPlanillaExcel(fila.fila)}: no se pudo crear el jugador (${authError?.message || "error desconocido"}).`,
       );
     }
 
@@ -934,7 +935,7 @@ export class PerfilService {
     if (perfilError || !perfil) {
       await supabaseAdmin.auth.admin.deleteUser(userId);
       throw new Error(
-        `Fila ${fila.fila}: no se pudo guardar el perfil del jugador.`,
+        `${etiquetaFilaPlanillaExcel(fila.fila)}: no se pudo guardar el perfil del jugador.`,
       );
     }
 

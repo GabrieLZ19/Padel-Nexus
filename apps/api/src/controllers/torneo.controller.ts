@@ -308,18 +308,30 @@ export const replicarTorneo = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    const { niveles, ramas } = req.body as {
+    const { niveles, ramas, pares } = req.body as {
       niveles?: string[];
       ramas?: string[];
+      pares?: Array<{ nivel?: string; rama?: string }>;
     };
     const negado = await negarAlcance(req, req.params.id, "editar");
     if (negado) return res.status(403).json({ message: negado });
 
+    const paresNorm =
+      Array.isArray(pares) && pares.length > 0
+        ? pares
+            .map((p) => ({
+              nivel: String(p.nivel || "").trim(),
+              rama: String(p.rama || "").trim(),
+            }))
+            .filter((p) => p.nivel && p.rama)
+        : undefined;
+
     const resultado = await TorneoService.replicarTorneo(
       req.params.id,
       {
-        niveles: Array.isArray(niveles) ? niveles : [],
+        niveles: Array.isArray(niveles) ? niveles : undefined,
         ramas: Array.isArray(ramas) ? ramas : undefined,
+        pares: paresNorm,
       },
       req.user?.id,
     );

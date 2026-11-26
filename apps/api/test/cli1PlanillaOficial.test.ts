@@ -111,7 +111,10 @@ describe("CLI-1 planillas oficiales FAP / clubes", () => {
         localidadResidencia: "Plottier",
         provinciaResidencia: "Neuquén",
       };
-    assert.equal(resolverLugarResidenciaDesdePlanilla(fila), "Plottier");
+    assert.equal(
+      resolverLugarResidenciaDesdePlanilla(fila),
+      "Plottier, Neuquén",
+    );
     assert.equal(resolverProvinciaDesdePlanilla(fila), "Neuquén");
   });
 
@@ -156,11 +159,33 @@ describe("CLI-1 planillas oficiales FAP / clubes", () => {
   });
 
   it("infiere Neuquen desde Cutral Co y Zapala", () => {
-    for (const loc of ["Cutral Co", "Zapala"]) {
+    for (const loc of ["Cutral Co", "Zapala", "Centenario"]) {
       const parsed = parseLocalidadProvinciaCelda(loc);
       assert.equal(parsed.localidad, loc);
       assert.equal(parsed.provincia, "Neuquén");
     }
+  });
+
+  it("Cipolletti | Río Negro persiste localidad y provincia en perfil", () => {
+    assert.deepEqual(parseLocalidadProvinciaCelda("Cipolletti | Río Negro"), {
+      localidad: "Cipolletti",
+      provincia: "Río Negro",
+    });
+    const fila: import("../src/utils/inscripcionPlanilla.ts").FilaPlanillaInscripcion =
+      {
+        fila: 12,
+        apellidoNombre: "Test",
+        dni: "30111222",
+        localidadResidencia: "Cipolletti",
+        provinciaResidencia: "Río Negro",
+      };
+    assert.equal(
+      resolverLugarResidenciaDesdePlanilla(fila),
+      "Cipolletti, Río Negro",
+    );
+    assert.equal(resolverProvinciaDesdePlanilla(fila), "Río Negro");
+    const avisos = advertenciasResidenciaPlanilla(fila);
+    assert.equal(avisos.length, 0);
   });
 
   it("planilla nacional conserva LETRA y ASOCIACIÓN", () => {

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { enrichInscripcionDenominacion } from "../src/utils/denominacionNacional.ts";
-import { provinciaEfectivaDesdePerfil } from "../src/utils/provinciaPerfil.ts";
+import {
+  partesLugarResidenciaPerfil,
+  provinciaEfectivaDesdePerfil,
+} from "../src/utils/provinciaPerfil.ts";
 import { provinciaParaRanking } from "../src/utils/provinciaRanking.ts";
 
 describe("CLI-1 provincia desde localidad en perfil", () => {
@@ -16,6 +19,18 @@ describe("CLI-1 provincia desde localidad en perfil", () => {
     assert.equal(provinciaParaRanking("Neuquén", siglas), "Neuquén");
     assert.equal(provinciaParaRanking("APN", siglas), "Neuquén");
     assert.equal(provinciaParaRanking("Plottier", siglas), "Neuquén");
+  });
+
+  it("provincia explicita en lugar_residencia compuesto (planilla)", () => {
+    assert.deepEqual(partesLugarResidenciaPerfil("Cipolletti, Río Negro"), {
+      localidad: "Cipolletti",
+      provinciaExplicita: "Río Negro",
+    });
+    assert.equal(
+      provinciaEfectivaDesdePerfil("Cipolletti, Río Negro"),
+      "Río Negro",
+    );
+    assert.equal(provinciaEfectivaDesdePerfil("Centenario"), "Neuquén");
   });
 
   it("denominacion nacional usa provincia inferida con localidad en lugar_residencia", () => {

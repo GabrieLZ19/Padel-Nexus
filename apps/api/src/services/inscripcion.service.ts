@@ -1224,8 +1224,8 @@ export class InscripcionService {
         inscripcionesOk++;
       } catch (error: unknown) {
         const filaRef = grupo.j2
-          ? `filas ${grupo.j1.fila}/${grupo.j2.fila}`
-          : `fila ${grupo.j1.fila}`;
+          ? `Filas ${grupo.j1.fila} y ${grupo.j2.fila} de la planilla`
+          : `Fila ${grupo.j1.fila} de la planilla`;
         const msg =
           error instanceof Error ? error.message : "Error desconocido";
         errores.push(`${filaRef}: ${msg}`);
