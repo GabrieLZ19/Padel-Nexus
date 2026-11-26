@@ -1,4 +1,8 @@
-import { FAP_ESTADOS_TORNEO, FAP_REGLAS } from "../constants/fap";
+import {
+  FAP_ESTADOS_PAGO,
+  FAP_ESTADOS_TORNEO,
+  FAP_REGLAS,
+} from "../constants/fap";
 
 export type PerfilElegibilidad = {
   id: string;
@@ -46,7 +50,48 @@ export type TorneoElegibilidad = {
   asociacion_id?: string | null;
   modalidad?: string | null;
   precio_inscripcion?: number | null;
+  es_gratis?: boolean | null;
 };
+
+/** TOR-54: torneo sin cargo de inscripción (flag o precio 0). */
+export function torneoInscripcionSinCosto(torneo: {
+  es_gratis?: boolean | null;
+  precio_inscripcion?: number | null;
+}): boolean {
+  return (
+    torneo.es_gratis === true ||
+    Number(torneo.precio_inscripcion ?? 0) === 0
+  );
+}
+
+/** Estado inicial al crear una inscripción (jugador o admin). */
+export function estadoPagoInicialInscripcion(
+  torneo: {
+    es_gratis?: boolean | null;
+    precio_inscripcion?: number | null;
+  },
+  metodoPago?: string | null,
+): (typeof FAP_ESTADOS_PAGO)[keyof typeof FAP_ESTADOS_PAGO] {
+  if (torneoInscripcionSinCosto(torneo)) {
+    return FAP_ESTADOS_PAGO.CONFIRMADO;
+  }
+  if (metodoPago?.trim()) {
+    return FAP_ESTADOS_PAGO.CONFIRMADO;
+  }
+  return FAP_ESTADOS_PAGO.PENDIENTE;
+}
+
+/** Si el pago pendiente debe bloquear generación de cuadros/zonas. */
+export function inscripcionPendientePagoBloqueaCuadro(
+  estadoPago: string | null | undefined,
+  torneo: {
+    es_gratis?: boolean | null;
+    precio_inscripcion?: number | null;
+  },
+): boolean {
+  if (torneoInscripcionSinCosto(torneo)) return false;
+  return estadoPago !== FAP_ESTADOS_PAGO.CONFIRMADO;
+}
 
 /** Torneo del circuito nacional FAP (alcance o nivel legacy). */
 export function esTorneoNacional(torneo: {

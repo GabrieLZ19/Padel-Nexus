@@ -6,11 +6,26 @@ export type MetodoTokenActivacionPreinscripcion =
   | MetodoVerificacionPreinscripcion
   | "padron_fap";
 
-export function activacionPadronFapDisponible(ficha: {
-  telefono?: string | null;
+/** Ficha aún no activada en la App (planilla / preinscripción). */
+export function cuentaPendienteActivacionApp(perfil: {
+  pendiente_activacion?: boolean | null;
   email?: string | null;
 }): boolean {
-  return metodosVerificacionPreinscripcion(ficha).length === 0;
+  return (
+    Boolean(perfil.pendiente_activacion) ||
+    esEmailPlaceholderPlanilla(perfil.email)
+  );
+}
+
+export function activacionPadronFapDisponible(
+  ficha: {
+    telefono?: string | null;
+    email?: string | null;
+  },
+  opciones?: { tiene_licencia_fap?: boolean },
+): boolean {
+  if (metodosVerificacionPreinscripcion(ficha).length > 0) return false;
+  return opciones?.tiene_licencia_fap === true;
 }
 
 export function soloDigitosTelefono(telefono: string | null | undefined): string {

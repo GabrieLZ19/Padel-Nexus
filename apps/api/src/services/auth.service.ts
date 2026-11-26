@@ -4,8 +4,8 @@ import {
   buildPerfilUpdatePatch,
   normalizeFechaNacimiento,
 } from "../utils/perfilPatch";
-import { esEmailPlaceholderPlanilla } from "../utils/inscripcionPlanilla";
 import { FiscalSesionService } from "./fiscal-sesion.service";
+import { PerfilService } from "./perfil.service";
 
 import { MenoresService } from "./menores.service";
 import { LegalService } from "./legal.service";
@@ -19,6 +19,7 @@ import {
 import { enviarCorreoRecuperacionResend } from "../utils/recuperacionPasswordEmail";
 import type { ResponsableInput } from "./menores.service";
 import {
+  cuentaPendienteActivacionApp,
   metodosVerificacionPreinscripcion,
 } from "../utils/preinscripcionVerificacion";
 import { consumirTokenActivacionPreinscripcion } from "../utils/preinscripcionTokenActivacion";
@@ -176,8 +177,8 @@ export class AuthService {
 
     const cuentaPlanillaPendienteApp =
       preinscripto &&
-      (preinscripto.pendiente_activacion ||
-        esEmailPlaceholderPlanilla(preinscripto.email));
+      (cuentaPendienteActivacionApp(preinscripto) ||
+        (await PerfilService.esFichaPlanillaSinActivar(preinscripto.id)));
 
     if (cuentaPlanillaPendienteApp) {
       const fichaParaMetodos = {

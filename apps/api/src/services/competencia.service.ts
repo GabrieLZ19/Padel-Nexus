@@ -9,6 +9,7 @@ import {
   etiquetaInstitucion,
 } from "../utils/denominacionNacional";
 import { getCapacidadesZonasPreferidas } from "../utils/capacidadesZonas";
+import { inscripcionPendientePagoBloqueaCuadro } from "../utils/inscripcionElegibilidad";
 import {
   aplicarHorarioConservado,
   horariosPorCruce,
@@ -65,7 +66,7 @@ export class CompetenciaService {
     // 1. OBTENER TORNEO Y VALIDAR DÍAS DE COMPETENCIA
     const { data: torneoMeta, error: errTorneo } = await supabaseAdmin
       .from("torneos")
-      .select("reglamento, dias_juego")
+      .select("reglamento, dias_juego, es_gratis, precio_inscripcion")
       .eq("id", torneoId)
       .maybeSingle();
 
@@ -122,8 +123,8 @@ export class CompetenciaService {
       );
     }
 
-    const pendientes = todasInscripciones.filter(
-      (i) => i.estado_pago !== FAP_ESTADOS_PAGO.CONFIRMADO,
+    const pendientes = todasInscripciones.filter((i) =>
+      inscripcionPendientePagoBloqueaCuadro(i.estado_pago, torneoMeta),
     );
     if (pendientes.length > 0) {
       throw new Error(

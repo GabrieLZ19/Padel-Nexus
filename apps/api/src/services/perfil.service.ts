@@ -15,6 +15,7 @@ import {
 } from "../utils/inscripcionPlanilla";
 import {
   activacionPadronFapDisponible,
+  cuentaPendienteActivacionApp,
   coincideEmailPreinscripcion,
   coincideUltimos4Telefono,
   metodosVerificacionPreinscripcion,
@@ -476,7 +477,8 @@ export class PerfilService {
     }
 
     const cuentaPendienteApp =
-      data.pendiente_activacion || esEmailPlaceholderPlanilla(data.email);
+      cuentaPendienteActivacionApp(data) ||
+      (await PerfilService.esFichaPlanillaSinActivar(String(data.id)));
 
     if (!cuentaPendienteApp) {
       return {
@@ -488,7 +490,12 @@ export class PerfilService {
     }
 
     const metodos_disponibles = metodosVerificacionPreinscripcion(data);
-    const padron_fap_disponible = activacionPadronFapDisponible(data);
+    const nroLicencia = await PerfilService.obtenerNroLicenciaPerfil(
+      String(data.id),
+    );
+    const padron_fap_disponible = activacionPadronFapDisponible(data, {
+      tiene_licencia_fap: Boolean(nroLicencia?.trim()),
+    });
 
     return {
       encontrado: true as const,
@@ -524,7 +531,8 @@ export class PerfilService {
     }
 
     const cuentaPendienteApp =
-      data.pendiente_activacion || esEmailPlaceholderPlanilla(data.email);
+      cuentaPendienteActivacionApp(data) ||
+      (await PerfilService.esFichaPlanillaSinActivar(String(data.id)));
 
     if (!cuentaPendienteApp) {
       throw new Error("Este DNI ya tiene una cuenta activa.");
@@ -567,14 +575,36 @@ export class PerfilService {
   }
 
   private static async assertFichaPendienteActivacionPadron(data: {
+    id?: string;
     pendiente_activacion: boolean | null;
     email: string | null;
   }): Promise<void> {
     const cuentaPendiente =
-      data.pendiente_activacion || esEmailPlaceholderPlanilla(data.email);
+      cuentaPendienteActivacionApp(data) ||
+      (data.id
+        ? await PerfilService.esFichaPlanillaSinActivar(String(data.id))
+        : false);
     if (!cuentaPendiente) {
       throw new Error("Este DNI ya tiene una cuenta activa.");
     }
+  }
+
+  /** Planilla con auth creado pero el jugador nunca completó registro/inicio de sesión. */
+  static async esFichaPlanillaSinActivar(perfilId: string): Promise<boolean> {
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(perfilId);
+    if (error || !data.user) return false;
+    const meta = data.user.user_metadata as Record<string, unknown> | undefined;
+    if (meta?.origen !== "planilla_inscripcion") return false;
+    return !data.user.last_sign_in_at;
+  }
+
+  static async puedeEditarFichaProvisoriaAdmin(perfil: {
+    id: string;
+    email?: string | null;
+    pendiente_activacion?: boolean | null;
+  }): Promise<boolean> {
+    if (PerfilService.esFichaProvisoriaAdmin(perfil)) return true;
+    return PerfilService.esFichaPlanillaSinActivar(perfil.id);
   }
 
   private static async obtenerNroLicenciaPerfil(
@@ -607,18 +637,24 @@ export class PerfilService {
 
     await PerfilService.assertFichaPendienteActivacionPadron(data);
 
-    if (!activacionPadronFapDisponible(data)) {
+    const metodosContacto = metodosVerificacionPreinscripcion(data);
+    if (metodosContacto.length > 0) {
       throw new Error(
         "Esta ficha ya tiene teléfono o email para verificar. Usá ese método.",
       );
     }
 
+    const nroEnFicha = await PerfilService.obtenerNroLicenciaPerfil(
+      String(data.id),
+    );
+    if (!nroEnFicha?.trim()) {
+      await registrarIntentoFallidoPreinscripcion(dni);
+      throw new Error("Los datos de verificación no coinciden.");
+    }
+
     const fechaOk = coincideFechaNacimientoPadron(
       data.fecha_nacimiento,
       payload.fecha_nacimiento,
-    );
-    const nroEnFicha = await PerfilService.obtenerNroLicenciaPerfil(
-      String(data.id),
     );
     const licenciaOk = coincidenLicenciasPadron(
       nroEnFicha,
@@ -871,7 +907,12 @@ export class PerfilService {
       }
       if (fila.categoria) patch.categoria_padel = fila.categoria;
       if (fila.fechaNacimiento) patch.fecha_nacimiento = fila.fechaNacimiento;
-      if (existente.pendiente_activacion) patch.pendiente_activacion = false;
+      if (
+        cuentaPendienteActivacionApp(existente) ||
+        esEmailPlaceholderPlanilla(existente.email)
+      ) {
+        patch.pendiente_activacion = true;
+      }
 
       if (Object.keys(patch).length > 0) {
         await supabaseAdmin.from("perfiles").update(patch).eq("id", existente.id);
@@ -893,7 +934,7 @@ export class PerfilService {
         email_confirm: true,
         user_metadata: {
           origen: "planilla_inscripcion",
-          pendiente_activacion: false,
+          pendiente_activacion: true,
           dni,
         },
       });
@@ -925,7 +966,7 @@ export class PerfilService {
           fecha_nacimiento: fila.fechaNacimiento || null,
           sexo: "masculino",
           rol: "usuario",
-          pendiente_activacion: false,
+          pendiente_activacion: true,
         },
         { onConflict: "id" },
       )
@@ -1182,10 +1223,7 @@ export class PerfilService {
     email?: string | null;
     pendiente_activacion?: boolean | null;
   }): boolean {
-    return (
-      Boolean(perfil.pendiente_activacion) ||
-      esEmailPlaceholderPlanilla(perfil.email)
-    );
+    return cuentaPendienteActivacionApp(perfil);
   }
 
   /**
@@ -1219,7 +1257,7 @@ export class PerfilService {
     if (antes.rol !== "usuario") {
       throw new Error("Solo aplica a fichas de jugador.");
     }
-    if (!PerfilService.esFichaProvisoriaAdmin(antes)) {
+    if (!(await PerfilService.puedeEditarFichaProvisoriaAdmin(antes))) {
       throw new Error(
         "La ficha no es provisoria. Usá el flujo de solicitud de cambio del jugador.",
       );
@@ -1301,6 +1339,8 @@ export class PerfilService {
     if (Object.keys(patch).length === 0) {
       throw new Error("No hay cambios para guardar.");
     }
+
+    patch.pendiente_activacion = true;
 
     const { data, error: updateError } = await supabaseAdmin
       .from("perfiles")

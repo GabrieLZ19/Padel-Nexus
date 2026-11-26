@@ -14,7 +14,10 @@ import {
   enrichInscripcionDenominacion,
   etiquetaInstitucion,
 } from "../utils/denominacionNacional";
-import { inscripcionAbiertaPorFechas } from "../utils/inscripcionElegibilidad";
+import {
+  inscripcionAbiertaPorFechas,
+  inscripcionPendientePagoBloqueaCuadro,
+} from "../utils/inscripcionElegibilidad";
 import {
   esNombreDePrueba,
   esTorneoDePrueba,
@@ -1819,7 +1822,7 @@ export class TorneoService {
     const { data: torneo, error: torneoError } = await supabaseAdmin
       .from("torneos")
       .select(
-        "formato, cupos_maximos, fecha, canchas_disponibles, duracion_partido_minutos, hora_inicio_jornada, dias_juego",
+        "formato, cupos_maximos, fecha, canchas_disponibles, duracion_partido_minutos, hora_inicio_jornada, dias_juego, es_gratis, precio_inscripcion",
       )
       .eq("id", id)
       .single();
@@ -1870,8 +1873,8 @@ export class TorneoService {
       throw new Error("Se necesitan al menos 4 inscripciones confirmadas.");
     }
 
-    const pendientes = todasInscripciones.filter(
-      (i) => i.estado_pago !== FAP_ESTADOS_PAGO.CONFIRMADO,
+    const pendientes = todasInscripciones.filter((i) =>
+      inscripcionPendientePagoBloqueaCuadro(i.estado_pago, torneo),
     );
     if (pendientes.length > 0) {
       throw new Error(

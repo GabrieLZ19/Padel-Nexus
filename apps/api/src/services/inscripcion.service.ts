@@ -36,6 +36,7 @@ import {
   assertInscripcionAbierta,
   assertPasoJugadoresEditable,
   assertRama,
+  estadoPagoInicialInscripcion,
   runSyncCheck,
   torneoExigeAfiliacionOrganizadora,
   torneoExigeCarnet,
@@ -163,7 +164,7 @@ export class InscripcionService {
     const { data: torneo, error } = await supabaseAdmin
       .from("torneos")
       .select(
-        "id, fecha, fecha_cierre_inscripcion, nivel, alcance, categoria, rama, validar_edad, cupos_maximos, cupos_actuales, estado, reglas_arbitraje, club_id, asociacion_id, modalidad, precio_inscripcion",
+        "id, fecha, fecha_cierre_inscripcion, nivel, alcance, categoria, rama, validar_edad, cupos_maximos, cupos_actuales, estado, reglas_arbitraje, club_id, asociacion_id, modalidad, precio_inscripcion, es_gratis",
       )
       .eq("id", torneoId)
       .single();
@@ -636,6 +637,7 @@ export class InscripcionService {
       Number(torneo.precio_inscripcion ?? monto),
       plazas,
     );
+    const estadoPagoInicial = estadoPagoInicialInscripcion(torneo);
 
     // 10. INSERCIÓN
     const { data: inscripcionInsertada, error: errInsert } = await supabaseAdmin
@@ -648,7 +650,7 @@ export class InscripcionService {
           jugador1_nombre: jugador1Nombre,
           jugador2_nombre: jugador2Nombre,
           monto: montoFinal,
-          estado_pago: FAP_ESTADOS_PAGO.PENDIENTE,
+          estado_pago: estadoPagoInicial,
           tipo: "Inscripción torneo",
           letra_prioridad: letraPrioridad
             ? String(letraPrioridad).trim().toUpperCase()
@@ -1043,9 +1045,7 @@ export class InscripcionService {
         throw new Error("El torneo ha alcanzado el límite máximo de cupos.");
       }
 
-      const estadoPago = metodoPago
-        ? FAP_ESTADOS_PAGO.CONFIRMADO
-        : FAP_ESTADOS_PAGO.PENDIENTE;
+      const estadoPago = estadoPagoInicialInscripcion(torneo, metodoPago);
       const j1Nombre = formatNombreCompleto(j1.apellido, j1.nombre);
       const j2Nombre = j2 ? formatNombreCompleto(j2.apellido, j2.nombre) : "-";
 
@@ -1092,9 +1092,12 @@ export class InscripcionService {
         .update({ cupos_actuales: (torneo.cupos_actuales || 0) + 1 })
         .eq("id", torneoId);
 
-      if (estadoPago === FAP_ESTADOS_PAGO.CONFIRMADO) {
+      if (
+        estadoPago === FAP_ESTADOS_PAGO.CONFIRMADO &&
+        metodoPago?.trim()
+      ) {
         const origenFee =
-          (metodoPago || "").toLowerCase() === "planilla" ? "planilla" : "manual";
+          metodoPago.toLowerCase() === "planilla" ? "planilla" : "manual";
         await PlatformFeeService.registrarFeeInscripcionOffPlatform(
           inscripcionInsertada.id,
           origenFee,

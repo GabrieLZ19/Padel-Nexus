@@ -24,10 +24,21 @@ function leer(rel: string): string {
 }
 
 describe("ENT-35: activación padrón FAP sin contacto previo", () => {
-  it("habilita padron_fap solo sin métodos teléfono/email", () => {
+  it("habilita padron_fap solo sin métodos teléfono/email y con licencia FAP", () => {
     const sinContacto = { telefono: "", email: "pre@padelnexus.local" };
     assert.deepEqual(metodosVerificacionPreinscripcion(sinContacto), []);
-    assert.equal(activacionPadronFapDisponible(sinContacto), true);
+    assert.equal(
+      activacionPadronFapDisponible(sinContacto, {
+        tiene_licencia_fap: true,
+      }),
+      true,
+    );
+    assert.equal(
+      activacionPadronFapDisponible(sinContacto, {
+        tiene_licencia_fap: false,
+      }),
+      false,
+    );
     assert.equal(
       activacionPadronFapDisponible({
         telefono: "3515551234",
