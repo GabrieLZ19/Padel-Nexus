@@ -3,6 +3,8 @@
 Plan activo: Re-test 24/11 (PDF Dylan, 24/11/2026).  
 Plan en repo: [plan-re-test-24-11-padel-nexus.md](./plan-re-test-24-11-padel-nexus.md).
 
+**Continuación Re-test 25/11:** [plan-re-test-25-11-padel-nexus.md](./plan-re-test-25-11-padel-nexus.md) · [qa-re-test-25-11-progreso.md](./qa-re-test-25-11-progreso.md) (siguiente ítem **MKT-10**).
+
 ## Ola 1 — Seguridad y pagos (FEE) — COMPLETADA
 
 Commits: `fdf72f1` (back), `c300712` (front).
@@ -31,7 +33,7 @@ Commits:
 | TOR-49 | HECHO | `tor49ProgramacionPublicada.test.ts` (caso #21 sáb / #24 dom) |
 | TOR-48 | HECHO | `tor48LlaveZonaHorarios.test.ts` |
 | TOR-22 | HECHO | `tor22ByeMaterializacion.test.ts`, `fapPaseDirectoLlave.test.ts`, `tor22LlaveAltaPareja.test.ts` |
-| TOR-24 | HECHO | `tor24GuardarZonas.test.ts` |
+| TOR-24 | HECHO | `tor24GuardarZonas.test.ts`; refuerzo `323df9e` (hojas finalizadas + auditoría zonas) |
 | CLI-1 | HECHO | `cli1PlanillaOficial.test.ts`, `cli1ProvinciaPerfil.test.ts` |
 
 ### Nota operativa 28/11 (Alta Barda)
@@ -48,7 +50,7 @@ Regresión: `apps/api/test/ola3RankingSitioPublico.test.ts` y `apps/web/test/ola
 | RNK-3 | Hecho | `rnk3RankingRama.test.ts`, `rnk3RankingPublicoRama.test.ts` |
 | RNK-2 / TOR-53 | Hecho | `rnk2Tor53RankingScopes.test.ts`, `rnk2RankingPublicoScopes.test.ts` |
 | PUB-27 | Hecho | `pub27PanelPuestoRanking.test.ts`, `pub27RankingProvincialFiltro.test.ts` |
-| PUB-28 | Hecho (código) | `pub28RankingExclusionQa.test.ts`, `datoPrueba.test.ts` — DNI QA, nombres QA Ensayo/Prueba |
+| PUB-28 | Hecho (código) | `pub28RankingExclusionQa.test.ts`, `datoPrueba.test.ts`; ampliado `323df9e` (DNI 990025/026, sin puntos en torneos prueba) |
 
 **Limpieza Supabase QA (pendiente confirmación de Héctor):** jugadores/torneos `QA Prueba` 18-11 y 24-11, sede `QA Prueba - Sede 18-11`, DNIs 990001xx / 990003xx / 99002401-432. **No ejecutar** sin OK explícito (no tocar torneos Alta Barda).
 
@@ -104,3 +106,7 @@ Regresión: `apps/api/test/ola3RankingSitioPublico.test.ts` y `apps/web/test/ola
 | CLI-3 | HECHO (código Fase 1+2; QA punto 15 manual post 28/11) | `cli3ProgramadorMaestro.test.ts`, `cli3EventoCategoriaColores.test.ts`, [cli3-programador-maestro.md](./cli3-programador-maestro.md) |
 
 **Siguiente en re-test 24/11:** QA manual **CLI-3** checklist punto 15 con evento real (3+ categorías, 5 canchas) cuando Héctor confirme post bloqueantes 28/11.
+
+## Re-test 25/11 — Fase 1 cerrada en código
+
+Entidades/fichas (**ENT-38**, **ENT-39**, **ENT-40**, **ENT-41**) commiteados en `5401c53`, `219266f`, `8a8d35e`, `c5b70e6`. **ENT-36** pendiente. Detalle completo en [qa-re-test-25-11-progreso.md](./qa-re-test-25-11-progreso.md).

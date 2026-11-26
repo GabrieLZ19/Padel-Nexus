@@ -3,7 +3,7 @@
 Plan maestro: [plan-re-test-25-11-padel-nexus.md](./plan-re-test-25-11-padel-nexus.md).  
 Plan anterior (24/11): [qa-re-test-24-11-progreso.md](./qa-re-test-24-11-progreso.md).
 
-**Siguiente ítem:** **CLI-12 / CLI-13** — capacidad evento, celdas atenuadas y filtro por sede (Fase 2B).
+**Siguiente ítem:** **Fase 2C** — MKT-10, RES-22, RNK-4 (post 28/11).
 
 Última actualización de código: commits `323df9e` … `c5b70e6` en `main` (26/11/2026).
 
@@ -57,16 +57,16 @@ Plan anterior (24/11): [qa-re-test-24-11-progreso.md](./qa-re-test-24-11-progres
 | ENT-41 | HECHO | `5401c53`, `c5b70e6` — `ent38a41FichasEntidades.test.ts` |
 | ENT-36 | PENDIENTE | Baja de clubes: historial sin licencia auto sin pagos + contador canchas |
 
-### Bloque 2B — Programador maestro (mejoras) — EN CURSO
+### Bloque 2B — Programador maestro (mejoras) — COMPLETADO
 
 | Código | Estado | Notas |
 |--------|--------|-------|
 | CLI-9 | HECHO | Sedes/canchas compartidas — `cli9ProgramadorEventoSedes.test.ts` |
 | CLI-10 | HECHO | Descanso con «Por definir» — `cli10ProgramadorEventoDescanso.test.ts` |
 | CLI-11 | HECHO | Reparto equilibrado, orden persistente — `cli11ProgramadorEventoOrden.test.ts` |
-| CLI-12 / CLI-13 | **SIGUIENTE** | Capacidad evento, celdas atenuadas, filtro sede |
-| CLI-14 / CLI-15 | PENDIENTE | Listado agrupado y replicación nivel+rama |
-| CLI-1 | PENDIENTE | Ajustes planilla (provincia, Centenario, nº de fila) |
+| CLI-12 / CLI-13 | HECHO | Capacidad evento, celdas atenuadas, filtro sede — `cli12ProgramadorEventoCapacidad.test.ts` |
+| CLI-14 / CLI-15 | HECHO | Programador maestro siempre en grupo; replicar por pares — `cli14`/`cli15` tests |
+| CLI-1 | HECHO | Planilla: provincia en celda, Centenario, fila Excel en avisos |
 
 ### Bloque 2C — Marketplace, reservas y ranking club — PENDIENTE
 

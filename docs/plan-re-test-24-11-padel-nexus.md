@@ -3,6 +3,8 @@
 Copia de trabajo en repo (origen: plan Cursor `plan_re-test_24-11_padel_nexus_35a4afdf`).  
 Seguimiento diario: [qa-re-test-24-11-progreso.md](./qa-re-test-24-11-progreso.md).
 
+**Plan activo post 25/11:** [plan-re-test-25-11-padel-nexus.md](./plan-re-test-25-11-padel-nexus.md) y [qa-re-test-25-11-progreso.md](./qa-re-test-25-11-progreso.md).
+
 ## Metodologia de Ejecucion (Uno por Uno + Tests)
 
 - Cada item se implementa en orden **Database-First -> Backend -> Frontend** cuando aplique.

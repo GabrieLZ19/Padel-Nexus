@@ -12,8 +12,8 @@ Seguimiento: [qa-re-test-25-11-progreso.md](./qa-re-test-25-11-progreso.md).
 | 1 | 1C Padrón/jugadores (ENT-34/37/35) | Completado |
 | 1 | 1D Llaves + ranking QA (TOR-49/22/24, PUB-28) | Completado en código |
 | 2 | 2A Entidades/fichas (ENT-38/39/40/41) | Completado; **ENT-36 pendiente** |
-| 2 | 2B Programador mejoras (CLI-9 … CLI-15, CLI-1) | **Siguiente: CLI-12 / CLI-13** |
-| 2 | 2C MKT-10, RES-22, RNK-4 | Pendiente |
+| 2 | 2B Programador mejoras (CLI-9 … CLI-15, CLI-1) | Completado |
+| 2 | 2C MKT-10, RES-22, RNK-4 | **Siguiente: MKT-10** |
 
 Commits recientes del bloque 1D y 2A: `323df9e`, `5401c53`, `219266f`, `8a8d35e`, `c5b70e6`.
 
@@ -88,9 +88,9 @@ Detalle de archivos y tests: ver commits en [qa-re-test-25-11-progreso.md](./qa-
 20. **CLI-9** — Compartir sedes/canchas del evento entre categorías. **HECHO**
 21. **CLI-10** — Descanso entre categorías con «Por definir». **HECHO**
 22. **CLI-11** — Reparto equilibrado y orden de prioridad persistente. **HECHO**
-23. **CLI-12 / CLI-13** — Capacidad evento, nombre, celdas atenuadas, filtro sede. **SIGUIENTE**
-24. **CLI-14 / CLI-15** — Evento agrupado en listados; replicar por pares nivel+rama.
-25. **CLI-1** — Planilla: provincia en celda, Centenario, nº de fila en avisos.
+23. **CLI-12 / CLI-13** — Capacidad evento, nombre, celdas atenuadas, filtro sede. **HECHO**
+24. **CLI-14 / CLI-15** — Evento agrupado en listados; replicar por pares nivel+rama. **HECHO**
+25. **CLI-1** — Planilla: provincia en celda, Centenario, nº de fila en avisos. **HECHO**
 
 ### Bloque 2C: Marketplace, reservas y ranking club
 
