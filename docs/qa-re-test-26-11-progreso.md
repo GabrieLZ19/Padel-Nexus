@@ -2,7 +2,7 @@
 
 Plan maestro: `.cursor/plans/re-test_26-11_item_por_item_cd026153.plan.md` (o copia en Cursor).
 
-**Siguiente ítem (plan item-por-item):** **Fase 3.2** — CLI-1 y TOR-68 (importador Excel / planillas).
+**Siguiente ítem (plan item-por-item):** **Fase 3.3 resto** — CLI-8/12/14, ENT-43. **Item 18 RES/MKT/PUB:** HECHO — [qa-re-test-26-11-item18-res-mkt-pub.md](./qa-re-test-26-11-item18-res-mkt-pub.md). **Item 17:** [qa-re-test-26-11-item17-cli19-27-29.md](./qa-re-test-26-11-item17-cli19-27-29.md). **Item 16:** [qa-re-test-26-11-item16-cli1-tor68.md](./qa-re-test-26-11-item16-cli1-tor68.md).
 
 **Fase 1 plan re-test 26/11:** cerrada (`2e68302` … `b2ce031`). **Fase 2 (ítems 7–12):** ENT `e4e0d6c`; TOR-22 front `0ea3d57`; CLI-16/TOR-49 back `771be9b`; TOR-24 verificado sin diff. **Fase 3.1 (ítems 13–15):** back `d3fa7f6`, front `dab50a5` (TOR-57, TOR-56/58, TOR-59/60, FEE-22/23). Detalle ítems 1–9: tabla abajo; [qa-re-test-26-11-items-res23-fee21-ent49.md](./qa-re-test-26-11-items-res23-fee21-ent49.md).
 
@@ -22,10 +22,11 @@ Plan maestro: `.cursor/plans/re-test_26-11_item_por_item_cd026153.plan.md` (o co
 | 13 | TOR-57 | HECHO | PUT cabezas-serie-activas + body en generar-zonas (`d3fa7f6`) |
 | 14 | TOR-56/58 | HECHO | `visible_sitio_publico` + UI Paso 1 / Cierre (`d3fa7f6`, `dab50a5`) |
 | 15 | TOR-59/60, FEE-22/23 | HECHO | Texto auditoría, nombres desde perfil, torneos sin costo (`d3fa7f6`, `dab50a5`) |
+| 18 | RES-24/25/26, MKT-11, PUB-31, TOR-69 | HECHO | [qa-re-test-26-11-item18-res-mkt-pub.md](./qa-re-test-26-11-item18-res-mkt-pub.md) |
 
 ## Pendientes (prioridad)
 
 | Prioridad | Items |
 |-----------|--------|
-| Post 28/11 | 16 CLI-1/TOR-68, 17 CLI-19/27/29, 18 RES/MKT/PUB |
+| Post 28/11 | 16 CLI-1/TOR-68 HECHO, 17 CLI-19/27/29 HECHO, 18 RES/MKT/PUB HECHO |
 | Post 28/11 (resto plan) | CLI-8/12/14, ENT-43 |
