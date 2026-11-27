@@ -44,7 +44,10 @@ import {
   asignarFiscalesTorneo,
   habilitarAccesoFiscal,
 } from "../controllers/fiscal.controller";
-import { generarZonas } from "../controllers/competencia.controller";
+import {
+  actualizarCabezasSerieActivas,
+  generarZonas,
+} from "../controllers/competencia.controller";
 import {
   obtenerPosicionesZona,
   resolverSorteoZona,
@@ -235,6 +238,11 @@ router.post(
   "/:id/generar-zonas",
   authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
   generarZonas,
+);
+router.put(
+  "/:id/cabezas-serie-activas",
+  authorize(["superadmin", "admin_federacion", "admin_provincial", "admin_club", "admin"]),
+  actualizarCabezasSerieActivas,
 );
 router.post(
   "/:id/generar-cuadro",

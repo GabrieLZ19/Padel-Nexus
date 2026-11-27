@@ -1,12 +1,34 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { puedeVerTorneoFueraDelSitioPublico } from "../src/utils/accesoTorneoPublico.ts";
-import { resolverEsPruebaTorneo } from "../src/utils/datoPrueba.ts";
+import {
+  esTorneoVisibleEnSitioPublico,
+  resolverEsPruebaTorneo,
+  resolverVisibleSitioPublico,
+} from "../src/utils/datoPrueba.ts";
 
 describe("TOR-44 acceso a torneo no publico para inscriptos", () => {
-  it("marca no visible en sitio publico cuando visible_sitio_publico es false", () => {
-    assert.equal(resolverEsPruebaTorneo("Torneo Club 7ª", false), true);
-    assert.equal(resolverEsPruebaTorneo("Torneo Club 7ª", true), false);
+  it("visible en sitio y es_prueba son independientes (TOR-56)", () => {
+    assert.equal(resolverVisibleSitioPublico("Torneo Club 7ª", false), false);
+    assert.equal(resolverVisibleSitioPublico("Torneo Club 7ª", true), true);
+    assert.equal(resolverEsPruebaTorneo("Torneo Club 7ª", false), false);
+    assert.equal(resolverEsPruebaTorneo("Torneo Club 7ª", true), true);
+    assert.equal(
+      esTorneoVisibleEnSitioPublico({
+        nombre: "Torneo Club 7ª",
+        es_prueba: true,
+        visible_sitio_publico: true,
+      }),
+      true,
+    );
+    assert.equal(
+      esTorneoVisibleEnSitioPublico({
+        nombre: "Torneo Club 7ª",
+        es_prueba: false,
+        visible_sitio_publico: false,
+      }),
+      false,
+    );
   });
 
   it("puedeVerTorneoFueraDelSitioPublico", () => {

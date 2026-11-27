@@ -5,7 +5,7 @@ import { CompetenciaService } from "../services/competencia.service";
 import { supabaseAdmin } from "../config/supabase";
 import sharp from "sharp";
 import { esRolAccesoCrm, esRolAdministrativo } from "../constants/roles";
-import { esTorneoDePrueba } from "../utils/datoPrueba";
+import { esTorneoVisibleEnSitioPublico } from "../utils/datoPrueba";
 import {
   jugadorInscriptoEnTorneo,
   puedeVerTorneoFueraDelSitioPublico,
@@ -176,13 +176,13 @@ export const getCategoriasEventoTorneo = async (
   try {
     const torneoId = req.params.id;
     const data = await TorneoService.obtenerPorId(torneoId);
-    const torneoEsPrueba = esTorneoDePrueba(data);
+    const ocultoEnSitio = !esTorneoVisibleEnSitioPublico(data);
     const esCrm = esRolAccesoCrm(req.user?.rol);
     let inscripto = false;
-    if (!esCrm && torneoEsPrueba && req.user?.id) {
+    if (!esCrm && ocultoEnSitio && req.user?.id) {
       inscripto = await jugadorInscriptoEnTorneo(torneoId, req.user.id);
     }
-    if (!puedeVerTorneoFueraDelSitioPublico(esCrm, torneoEsPrueba, inscripto)) {
+    if (!puedeVerTorneoFueraDelSitioPublico(esCrm, ocultoEnSitio, inscripto)) {
       return res.status(404).json({ message: "Torneo no encontrado." });
     }
     const listado = await TorneoService.listarCategoriasEvento(torneoId, {
@@ -200,13 +200,13 @@ export const getTorneoById = async (
 ): Promise<Response> => {
   try {
     const data = await TorneoService.obtenerPorId(req.params.id);
-    const torneoEsPrueba = esTorneoDePrueba(data);
+    const ocultoEnSitio = !esTorneoVisibleEnSitioPublico(data);
     const esCrm = esRolAccesoCrm(req.user?.rol);
     let inscripto = false;
-    if (!esCrm && torneoEsPrueba && req.user?.id) {
+    if (!esCrm && ocultoEnSitio && req.user?.id) {
       inscripto = await jugadorInscriptoEnTorneo(req.params.id, req.user.id);
     }
-    if (!puedeVerTorneoFueraDelSitioPublico(esCrm, torneoEsPrueba, inscripto)) {
+    if (!puedeVerTorneoFueraDelSitioPublico(esCrm, ocultoEnSitio, inscripto)) {
       return res.status(404).json({ message: "Torneo no encontrado." });
     }
     const cuenta = await AlcanceCuentaService.resolver(req.user);

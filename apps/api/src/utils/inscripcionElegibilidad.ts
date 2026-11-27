@@ -12,6 +12,7 @@ export type PerfilElegibilidad = {
   sexo?: string | null;
   rol?: string | null;
   nombre?: string | null;
+  apellido?: string | null;
 };
 
 export type ContextoElegibilidadNivel = {
@@ -52,6 +53,9 @@ export type TorneoElegibilidad = {
   precio_inscripcion?: number | null;
   es_gratis?: boolean | null;
 };
+
+export const MENSAJE_TORNEO_INSCRIPCION_SIN_COSTO =
+  "Este torneo no tiene costo de inscripción. No hace falta pagar en línea.";
 
 /** TOR-54: torneo sin cargo de inscripción (flag o precio 0). */
 export function torneoInscripcionSinCosto(torneo: {

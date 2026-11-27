@@ -1,15 +1,15 @@
 import { supabaseAdmin } from "../config/supabase";
 
 /**
- * Sitio público: torneos no visibles (`es_prueba`) solo para quien tiene inscripción vigente.
+ * Sitio público: torneos ocultos solo para quien tiene inscripción vigente o CRM.
  */
 export function puedeVerTorneoFueraDelSitioPublico(
   esRolCrm: boolean,
-  torneoEsPrueba: boolean,
+  ocultoEnSitioPublico: boolean,
   inscripto: boolean,
 ): boolean {
   if (esRolCrm) return true;
-  if (!torneoEsPrueba) return true;
+  if (!ocultoEnSitioPublico) return true;
   return inscripto;
 }
 

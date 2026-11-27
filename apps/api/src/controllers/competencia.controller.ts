@@ -32,6 +32,10 @@ export const generarZonas = async (
       req.query?.forzarDestructivo === "true";
     const motivo =
       typeof req.body?.motivo === "string" ? req.body.motivo.trim() : undefined;
+    const cabezasBody =
+      req.body?.cabezas_serie_activas ?? req.body?.validarCabezasSerie;
+    const cabezasSerieActivas =
+      typeof cabezasBody === "boolean" ? cabezasBody : undefined;
     const resultado = await CompetenciaService.generarFaseGrupos(
       torneoId,
       size,
@@ -39,6 +43,7 @@ export const generarZonas = async (
       {
         motivo,
         adminId: req.user?.id,
+        cabezasSerieActivas,
       },
     );
 
@@ -56,5 +61,54 @@ export const generarZonas = async (
       exito: false,
       error: message,
     });
+  }
+};
+
+export const actualizarCabezasSerieActivas = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    const { id: torneoId } = req.params;
+
+    if (!torneoId) {
+      return res.status(400).json({
+        exito: false,
+        error: "El ID del torneo es obligatorio.",
+      });
+    }
+
+    try {
+      await AlcanceCuentaService.exigir(req.user, torneoId, "editar");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "No tenés permiso para esta acción.";
+      return res.status(403).json({ exito: false, error: message });
+    }
+
+    const activasRaw =
+      req.body?.cabezas_serie_activas ?? req.body?.validarCabezasSerie;
+    if (typeof activasRaw !== "boolean") {
+      return res.status(400).json({
+        exito: false,
+        error: "Debés enviar cabezas_serie_activas (boolean).",
+      });
+    }
+
+    await CompetenciaService.persistirCabezasSerieActivas(torneoId, activasRaw);
+
+    return res.status(200).json({
+      exito: true,
+      cabezas_serie_activas: Boolean(activasRaw),
+    });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Error al guardar la preferencia de cabezas de serie.";
+    console.error("[Competencia Error]:", message);
+    return res.status(400).json({ exito: false, error: message });
   }
 };

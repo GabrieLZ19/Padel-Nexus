@@ -21,8 +21,10 @@ import {
 import {
   esNombreDePrueba,
   esTorneoDePrueba,
+  esTorneoVisibleEnSitioPublico,
   normalizarEsPruebaEnActualizacion,
   resolverEsPruebaTorneo,
+  resolverVisibleSitioPublico,
 } from "../utils/datoPrueba";
 import {
   avanzarPartidosInternosZonaCuatro,
@@ -449,7 +451,7 @@ export class TorneoService {
       TorneoService.evaluateDynamicState({ ...torneo }),
     );
     if (filtros?.ocultarPrueba) {
-      filas = filas.filter((torneo) => !esTorneoDePrueba(torneo));
+      filas = filas.filter((torneo) => esTorneoVisibleEnSitioPublico(torneo));
     }
 
     const estadosActivos = estadosActivosTablero();
@@ -629,7 +631,7 @@ export class TorneoService {
     });
 
     if (filtros?.ocultarPrueba) {
-      formatted = formatted.filter((torneo) => !esTorneoDePrueba(torneo));
+      formatted = formatted.filter((torneo) => esTorneoVisibleEnSitioPublico(torneo));
     }
 
     if (!vistaPedida && filtros?.estado) {
@@ -973,7 +975,7 @@ export class TorneoService {
     const { data: actual, error } = await supabaseAdmin
       .from("torneos")
       .select(
-        "id, grupo_id, nombre, nivel, categoria, rama, estado, es_prueba",
+        "id, grupo_id, nombre, nivel, categoria, rama, estado, es_prueba, visible_sitio_publico",
       )
       .eq("id", id)
       .single();
@@ -1011,7 +1013,9 @@ export class TorneoService {
 
     const { data: hermanos, error: hermanosError } = await supabaseAdmin
       .from("torneos")
-      .select("id, nombre, nivel, categoria, rama, estado, es_prueba")
+      .select(
+        "id, nombre, nivel, categoria, rama, estado, es_prueba, visible_sitio_publico",
+      )
       .eq("grupo_id", actual.grupo_id);
 
     if (hermanosError) {
@@ -1020,7 +1024,7 @@ export class TorneoService {
 
     let lista = hermanos || [];
     if (opciones?.ocultarPrueba) {
-      lista = lista.filter((fila) => !fila.es_prueba);
+      lista = lista.filter((fila) => esTorneoVisibleEnSitioPublico(fila));
     }
     if (!lista.some((fila) => fila.id === actual.id)) {
       lista = [...lista, actual];
@@ -1103,26 +1107,20 @@ export class TorneoService {
       .insert([
         {
           nombre: payload.nombre,
+          visible_sitio_publico: (() => {
+            const ext = datos as { visible_sitio_publico?: boolean };
+            return resolverVisibleSitioPublico(
+              payload.nombre,
+              ext.visible_sitio_publico ?? true,
+            );
+          })(),
           es_prueba: (() => {
-            const ext = datos as {
-              es_prueba?: boolean;
-              visible_sitio_publico?: boolean;
-            };
-            if (typeof ext.visible_sitio_publico === "boolean") {
-              return resolverEsPruebaTorneo(
-                payload.nombre,
-                ext.visible_sitio_publico,
-              );
-            }
-            if (typeof ext.es_prueba === "boolean") {
-              return (
-                normalizarEsPruebaEnActualizacion(
-                  payload.nombre,
-                  ext.es_prueba,
-                ) ?? ext.es_prueba
-              );
-            }
-            return resolverEsPruebaTorneo(payload.nombre);
+            const ext = datos as { es_prueba?: boolean };
+            const solicitado = ext.es_prueba ?? false;
+            return (
+              normalizarEsPruebaEnActualizacion(payload.nombre, solicitado) ??
+              resolverEsPruebaTorneo(payload.nombre, solicitado)
+            );
           })(),
           subtitulo: payload.subtitulo,
           club_id: payload.club_id || null,
@@ -1468,6 +1466,7 @@ export class TorneoService {
     "federacion_id",
     "grupo_id",
     "es_prueba",
+    "visible_sitio_publico",
   ]);
 
   public static normalizarAlcance(
@@ -1505,7 +1504,7 @@ export class TorneoService {
     const { data: torneoActual } = await supabaseAdmin
       .from("torneos")
       .select(
-        "estado, fecha, fecha_fin, fecha_cierre_inscripcion, club_id, nombre, es_prueba",
+        "estado, fecha, fecha_fin, fecha_cierre_inscripcion, club_id, nombre, es_prueba, visible_sitio_publico",
       )
       .eq("id", id)
       .single();
@@ -1517,28 +1516,35 @@ export class TorneoService {
       updateData.nombre ?? torneoActual?.nombre ?? "",
     );
     if (
-      updateData.es_prueba !== undefined ||
       (datos as { visible_sitio_publico?: boolean }).visible_sitio_publico !==
-        undefined
+      undefined
     ) {
       const visible = (datos as { visible_sitio_publico?: boolean })
         .visible_sitio_publico;
-      const esPruebaSolicitado =
-        visible !== undefined
-          ? !visible
-          : (updateData.es_prueba as boolean | undefined);
+      updateData.visible_sitio_publico = resolverVisibleSitioPublico(
+        nombreFinal,
+        visible,
+      );
+    }
+
+    if (updateData.es_prueba !== undefined) {
       const normalizado = normalizarEsPruebaEnActualizacion(
         nombreFinal,
-        esPruebaSolicitado,
+        updateData.es_prueba as boolean,
       );
       if (normalizado !== undefined) {
         updateData.es_prueba = normalizado;
       }
     } else if (updateData.nombre !== undefined) {
-      updateData.es_prueba = normalizarEsPruebaEnActualizacion(
-        nombreFinal,
-        torneoActual?.es_prueba ?? false,
-      );
+      if (esNombreDePrueba(nombreFinal)) {
+        updateData.es_prueba = true;
+        updateData.visible_sitio_publico = false;
+      } else {
+        updateData.es_prueba = normalizarEsPruebaEnActualizacion(
+          nombreFinal,
+          torneoActual?.es_prueba ?? false,
+        );
+      }
     }
 
     // admin_club: club_id es el ancla de ownership. Un centro de cómputos

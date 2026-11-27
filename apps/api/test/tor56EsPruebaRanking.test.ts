@@ -15,7 +15,7 @@ describe("TOR-56 es_prueba explícito y aviso en cierre", () => {
         nombre: "Open Oficial",
         es_prueba: true,
       }),
-      "marcado como torneo de prueba (es_prueba)",
+      "marcado como torneo de prueba (sin puntos de ranking)",
     );
     assert.equal(
       motivoExclusionRankingTorneo({
@@ -37,6 +37,6 @@ describe("TOR-56 es_prueba explícito y aviso en cierre", () => {
     );
     assert.match(cierre, /motivoExclusionRankingTorneoUi/);
     assert.match(cierre, /Torneo excluido del ranking oficial/);
-    assert.match(cierre, /torneo de prueba/);
+    assert.match(cierre, /Suma puntos al ranking oficial/);
   });
 });

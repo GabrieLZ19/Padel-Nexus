@@ -1,7 +1,7 @@
 import { esEmailPlaceholderPlanilla } from "./inscripcionPlanilla";
 
 const NOMBRE_TORNEO_PRUEBA =
-  /prue|\bqa\b|\btest\b|testing|\bdemo\b|auditor|^asdf/i;
+  /prue|\bqa\b|\btest\b|testing|\bdemo\b|^asdf/i;
 const EMAIL_PRUEBA = /\.test$|@example\.com$|prueba|demo\d|whapy/i;
 const NOMBRE_JUGADOR_PRUEBA = /whapy/i;
 /** Cuentas y fichas del re-test 24/11 y ensayos explícitos en CRM. */
@@ -74,6 +74,22 @@ export function esTorneoDePrueba(
   return Boolean(torneo.es_prueba) || esNombreDePrueba(torneo.nombre);
 }
 
+export function esTorneoVisibleEnSitioPublico(
+  torneo:
+    | {
+        nombre?: string | null;
+        es_prueba?: boolean | null;
+        visible_sitio_publico?: boolean | null;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!torneo) return false;
+  if (esNombreDePrueba(torneo.nombre)) return false;
+  if (torneo.visible_sitio_publico === false) return false;
+  return true;
+}
+
 /** TOR-56: motivo explícito para exclusion de ranking / avisos en cierre. */
 export function motivoExclusionRankingTorneo(
   torneo:
@@ -83,7 +99,7 @@ export function motivoExclusionRankingTorneo(
 ): string | null {
   if (!torneo) return null;
   if (torneo.es_prueba) {
-    return "marcado como torneo de prueba (es_prueba)";
+    return "marcado como torneo de prueba (sin puntos de ranking)";
   }
   if (esNombreDePrueba(torneo.nombre)) {
     return "nombre de ensayo o QA detectado";
@@ -111,18 +127,23 @@ export function esClubActivoPublico(
   return estado === "activo";
 }
 
-/**
- * Persiste `es_prueba` en torneos. Los nombres de ensayo nunca se publican.
- * visibleSitioPublico=true => es_prueba false (salvo nombre de prueba).
- */
-export function resolverEsPruebaTorneo(
+/** Visibilidad en /torneos; los nombres de ensayo nunca se publican. */
+export function resolverVisibleSitioPublico(
   nombre: string | null | undefined,
   visibleSitioPublico?: boolean | null,
 ): boolean {
+  if (esNombreDePrueba(nombre)) return false;
+  if (visibleSitioPublico === false) return false;
+  return true;
+}
+
+/** Persiste `es_prueba` (exclusión de ranking); independiente del sitio público. */
+export function resolverEsPruebaTorneo(
+  nombre: string | null | undefined,
+  esPruebaExplicito?: boolean | null,
+): boolean {
   if (esNombreDePrueba(nombre)) return true;
-  if (visibleSitioPublico === true) return false;
-  if (visibleSitioPublico === false) return true;
-  return false;
+  return Boolean(esPruebaExplicito);
 }
 
 export function normalizarEsPruebaEnActualizacion(

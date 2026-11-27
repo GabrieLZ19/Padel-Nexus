@@ -19,6 +19,7 @@ describe("datos de prueba del sitio público", () => {
     assert.equal(esNombreDePrueba("Torneo test club QA"), true);
     assert.equal(esNombreDePrueba("Open Demo 16 jugadores"), true);
     assert.equal(esNombreDePrueba("AUDITORIA UX - borrador de prueba"), true);
+    assert.equal(esNombreDePrueba("Copa Auditoría Municipal 2026"), false);
     assert.equal(esNombreDePrueba("asdfadsf"), true);
     assert.equal(esNombreDePrueba("Masters"), false);
     assert.equal(
@@ -29,11 +30,12 @@ describe("datos de prueba del sitio público", () => {
       esTorneoDePrueba({ nombre: "Masters", es_prueba: false }),
       false,
     );
-    assert.equal(resolverEsPruebaTorneo("Torneo Oficial 7ª", true), false);
-    assert.equal(resolverEsPruebaTorneo("QA Prueba Club", true), true);
+    assert.equal(resolverEsPruebaTorneo("Torneo Oficial 7ª", false), false);
+    assert.equal(resolverEsPruebaTorneo("Torneo Oficial 7ª", true), true);
+    assert.equal(resolverEsPruebaTorneo("QA Prueba Club", false), true);
     assert.equal(
       motivoExclusionRankingTorneo({ nombre: "Open", es_prueba: true }),
-      "marcado como torneo de prueba (es_prueba)",
+      "marcado como torneo de prueba (sin puntos de ranking)",
     );
   });
 

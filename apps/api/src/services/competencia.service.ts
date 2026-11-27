@@ -40,6 +40,21 @@ interface Zona {
 }
 
 export class CompetenciaService {
+  static async persistirCabezasSerieActivas(
+    torneoId: string,
+    activas: boolean,
+  ): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from("torneos")
+      .update({ cabezas_serie_activas: Boolean(activas) })
+      .eq("id", torneoId);
+    if (error) {
+      throw new Error(
+        `No se pudo guardar la preferencia de cabezas de serie: ${error.message}`,
+      );
+    }
+  }
+
   /**
    * Genera las zonas y partidos de la fase de grupos basándose en el reglamento FAP.
    */
@@ -47,7 +62,11 @@ export class CompetenciaService {
     torneoId: string,
     _size?: number,
     forzarDestructivo = false,
-    opciones?: { motivo?: string; adminId?: string },
+    opciones?: {
+      motivo?: string;
+      adminId?: string;
+      cabezasSerieActivas?: boolean;
+    },
   ) {
     // Bloquear regeneración si hay resultados y no se forzó el wipe
     if (!forzarDestructivo) {
@@ -116,9 +135,16 @@ export class CompetenciaService {
     }
 
     const reglamento = String(torneoMeta.reglamento || "FAP").toUpperCase();
-    const cabezasSerieActivas =
+    let cabezasSerieActivas =
       (torneoMeta as { cabezas_serie_activas?: boolean }).cabezas_serie_activas !==
       false;
+    if (opciones?.cabezasSerieActivas !== undefined) {
+      cabezasSerieActivas = Boolean(opciones.cabezasSerieActivas);
+      await CompetenciaService.persistirCabezasSerieActivas(
+        torneoId,
+        cabezasSerieActivas,
+      );
+    }
     // FAP/APA: preferir 3; Amateur: preferir 4
     const preferredSize: 3 | 4 = reglamento === "AMATEUR" ? 4 : 3;
 
@@ -1127,11 +1153,10 @@ export class CompetenciaService {
       .filter((t): t is string => Boolean(t))
       .join(" · ") || "Distribución de zonas actualizada.";
 
-    // Persistir preferencia de cabezas de serie en el torneo
-    await supabaseAdmin
-      .from("torneos")
-      .update({ cabezas_serie_activas: Boolean(validarCabezasSerie) })
-      .eq("id", torneoId);
+    await CompetenciaService.persistirCabezasSerieActivas(
+      torneoId,
+      Boolean(validarCabezasSerie),
+    );
 
     // 1. Guardar la nueva distribución de parejas para cada zona
     for (const z of zonas) {

@@ -40,6 +40,8 @@ import {
   jugadorNoPuedeAutoCancelarInscripcionPagada,
   MENSAJE_BAJA_JUGADOR_INSCRIPCION_PAGADA,
   estadoPagoInicialInscripcion,
+  MENSAJE_TORNEO_INSCRIPCION_SIN_COSTO,
+  torneoInscripcionSinCosto,
   runSyncCheck,
   torneoExigeAfiliacionOrganizadora,
   torneoExigeCarnet,
@@ -541,7 +543,9 @@ export class InscripcionService {
     if (jugador2Email) {
       const { data: user2, error: user2Error } = await supabaseAdmin
         .from("perfiles")
-        .select("id, categoria_padel, fecha_nacimiento, sexo, nombre, dni")
+        .select(
+          "id, categoria_padel, fecha_nacimiento, sexo, nombre, apellido, dni",
+        )
         .eq("email", jugador2Email)
         .single();
 
@@ -564,7 +568,9 @@ export class InscripcionService {
     // 4. PERFILES
     const { data: perfilJ1, error: errJ1 } = await supabaseAdmin
       .from("perfiles")
-      .select("id, rol, categoria_padel, nombre, fecha_nacimiento, sexo")
+      .select(
+        "id, rol, categoria_padel, nombre, apellido, fecha_nacimiento, sexo",
+      )
       .eq("id", jugador1Id)
       .single();
 
@@ -642,6 +648,14 @@ export class InscripcionService {
     );
     const estadoPagoInicial = estadoPagoInicialInscripcion(torneo);
 
+    const nombreJ1Persistido = formatNombreCompleto(
+      perfilJ1.apellido,
+      perfilJ1.nombre,
+    );
+    const nombreJ2Persistido = perfilJugador2
+      ? formatNombreCompleto(perfilJugador2.apellido, perfilJugador2.nombre)
+      : "-";
+
     // 10. INSERCIÓN
     const { data: inscripcionInsertada, error: errInsert } = await supabaseAdmin
       .from("inscripciones")
@@ -650,8 +664,8 @@ export class InscripcionService {
           torneo_id: torneoId,
           usuario_id: jugador1Id,
           usuario2_id: jugador2Id,
-          jugador1_nombre: jugador1Nombre,
-          jugador2_nombre: jugador2Nombre,
+          jugador1_nombre: nombreJ1Persistido,
+          jugador2_nombre: nombreJ2Persistido,
           monto: montoFinal,
           estado_pago: estadoPagoInicial,
           tipo: "Inscripción torneo",
@@ -1308,8 +1322,8 @@ export class InscripcionService {
       | null;
     const torneo = Array.isArray(torneoRaw) ? torneoRaw[0] : torneoRaw;
 
-    if (torneo?.es_gratis) {
-      throw new Error("Este torneo no requiere pago.");
+    if (torneo && torneoInscripcionSinCosto(torneo)) {
+      throw new Error(MENSAJE_TORNEO_INSCRIPCION_SIN_COSTO);
     }
 
     const monto =
@@ -1342,6 +1356,44 @@ export class InscripcionService {
   }
 
   static async obtenerEstadoPlazasPago(inscripcionId: string, usuarioId: string) {
+    const { data: fila, error } = await supabaseAdmin
+      .from("inscripciones")
+      .select(
+        "id, usuario_id, usuario2_id, estado_pago, torneos(es_gratis, precio_inscripcion)",
+      )
+      .eq("id", inscripcionId)
+      .maybeSingle();
+
+    if (error || !fila) {
+      throw new Error("Inscripción no encontrada.");
+    }
+
+    const esTitular =
+      fila.usuario_id === usuarioId || fila.usuario2_id === usuarioId;
+    if (!esTitular) {
+      throw new Error("No tenés permiso para consultar esta inscripción.");
+    }
+
+    const torneoRaw = fila.torneos as
+      | { es_gratis?: boolean | null; precio_inscripcion?: number | null }
+      | { es_gratis?: boolean | null; precio_inscripcion?: number | null }[]
+      | null;
+    const torneoMeta = Array.isArray(torneoRaw) ? torneoRaw[0] : torneoRaw;
+    if (torneoMeta && torneoInscripcionSinCosto(torneoMeta)) {
+      return {
+        inscripcion_id: inscripcionId,
+        torneo_sin_costo: true,
+        mensaje: MENSAJE_TORNEO_INSCRIPCION_SIN_COSTO,
+        mi_plaza: 1,
+        precio_por_jugador: 0,
+        plazas: [],
+        plazas_pendientes: [],
+        puede_pagar_mi_plaza: false,
+        puede_pagar_todas: false,
+        puede_pagar_resto: false,
+      };
+    }
+
     const ctx = await InscripcionService.assertUsuarioPuedePagarInscripcion(
       inscripcionId,
       usuarioId,
