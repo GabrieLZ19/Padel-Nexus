@@ -1550,8 +1550,24 @@ export class PerfilService {
       throw new Error("Solo aplica a fichas de jugador.");
     }
 
+    const { assertSinColisionInscripcionesFusionFichas } = await import(
+      "../utils/validarColisionInscripcionesFusionFichas"
+    );
+    await assertSinColisionInscripcionesFusionFichas(origenId, destinoId);
+
     const { fusionarFichasJugador } = await import("../utils/fusionFichasJugador");
     const resumen = await fusionarFichasJugador(origenId, destinoId);
+
+    const { sincronizarNombresInscripcionesJugador } = await import(
+      "../utils/sincronizarNombresInscripcionesJugador"
+    );
+    const syncNombres = await sincronizarNombresInscripcionesJugador(destinoId, {
+      nombre: destino.nombre,
+      apellido: destino.apellido,
+    });
+    const inscripcionesNombresActualizadas =
+      syncNombres.jugador1_actualizadas + syncNombres.jugador2_actualizadas;
+    resumen.inscripciones_nombres_actualizadas = inscripcionesNombresActualizadas;
 
     await supabaseAdmin.from("logs_auditoria").insert({
       usuario_id_admin: actor.id,
@@ -1560,6 +1576,8 @@ export class PerfilService {
       detalles: {
         motivo: motivoLimpio,
         resumen,
+        inscripciones_nombres_actualizadas: inscripcionesNombresActualizadas,
+        sincronizacion_nombres: syncNombres,
         origen: {
           id: origen.id,
           nombre: origen.nombre,

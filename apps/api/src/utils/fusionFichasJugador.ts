@@ -1,15 +1,89 @@
 import { supabaseAdmin } from "../config/supabase";
 import { esEmailPlaceholderPlanilla } from "./inscripcionPlanilla";
+import {
+  cuentaPendienteActivacionApp,
+  emailTieneVerificacion,
+} from "./preinscripcionVerificacion";
 
 export type ResumenFusionFichas = {
   inscripciones_movidas: number;
+  inscripciones_nombres_actualizadas: number;
   rankings_fusionados: number;
   licencias_movidas: number;
   reservas_movidas: number;
   origen_id: string;
   destino_id: string;
   origen_eliminado: boolean;
+  acceso_preservado_desde_origen: boolean;
 };
+
+export function esPerfilFusionadoArchivado(perfil: {
+  nombre?: string | null;
+  apellido?: string | null;
+}): boolean {
+  return (
+    (perfil.nombre || "").trim() === "Fusionado" &&
+    (perfil.apellido || "").trim().toLowerCase() === "archivado"
+  );
+}
+
+type FichaFusionRef = {
+  id: string;
+  email?: string | null;
+  telefono?: string | null;
+  pendiente_activacion?: boolean | null;
+};
+
+function debePreservarAccesoOrigenEnDestino(
+  origen: FichaFusionRef,
+  destino: FichaFusionRef,
+): boolean {
+  return (
+    emailTieneVerificacion(origen.email) &&
+    cuentaPendienteActivacionApp(destino)
+  );
+}
+
+async function preservarAccesoOrigenEnDestino(
+  origen: FichaFusionRef,
+  destinoId: string,
+  destino: FichaFusionRef,
+): Promise<void> {
+  const emailOrigen = String(origen.email || "").trim();
+  if (!emailOrigen || esEmailPlaceholderPlanilla(emailOrigen)) return;
+
+  const telefono =
+    (origen.telefono || "").trim() || (destino.telefono || "").trim() || null;
+
+  const { error: patchPerfil } = await supabaseAdmin
+    .from("perfiles")
+    .update({
+      email: emailOrigen,
+      telefono,
+      pendiente_activacion: false,
+    })
+    .eq("id", destinoId);
+
+  if (patchPerfil) {
+    throw new Error(
+      `No se pudo transferir el acceso a la ficha destino: ${patchPerfil.message}`,
+    );
+  }
+
+  const { error: authUpd } = await supabaseAdmin.auth.admin.updateUserById(
+    destinoId,
+    {
+      email: emailOrigen,
+      email_confirm: true,
+    },
+  );
+  if (authUpd) {
+    console.warn(
+      "Fusión fichas: no se pudo actualizar el email de auth del destino:",
+      authUpd.message,
+    );
+  }
+}
 
 /**
  * ENT-45: migra referencias del perfil origen al destino y retira la ficha origen.
@@ -24,13 +98,37 @@ export async function fusionarFichasJugador(
 
   const resumen: ResumenFusionFichas = {
     inscripciones_movidas: 0,
+    inscripciones_nombres_actualizadas: 0,
     rankings_fusionados: 0,
     licencias_movidas: 0,
     reservas_movidas: 0,
     origen_id: origenId,
     destino_id: destinoId,
     origen_eliminado: false,
+    acceso_preservado_desde_origen: false,
   };
+
+  const { data: perfilOrigen } = await supabaseAdmin
+    .from("perfiles")
+    .select("id, email, telefono, pendiente_activacion")
+    .eq("id", origenId)
+    .maybeSingle();
+  const { data: perfilDestino } = await supabaseAdmin
+    .from("perfiles")
+    .select("id, email, telefono, pendiente_activacion")
+    .eq("id", destinoId)
+    .maybeSingle();
+
+  if (perfilOrigen && perfilDestino) {
+    if (debePreservarAccesoOrigenEnDestino(perfilOrigen, perfilDestino)) {
+      await preservarAccesoOrigenEnDestino(
+        perfilOrigen,
+        destinoId,
+        perfilDestino,
+      );
+      resumen.acceso_preservado_desde_origen = true;
+    }
+  }
 
   const { count: asJ1Prev } = await supabaseAdmin
     .from("inscripciones")
@@ -117,11 +215,15 @@ export async function fusionarFichasJugador(
   if (resErr) throw new Error(resErr.message);
   resumen.reservas_movidas = resMovPrev ?? 0;
 
-  const { data: origen } = await supabaseAdmin
-    .from("perfiles")
-    .select("id, email")
-    .eq("id", origenId)
-    .maybeSingle();
+  const origenEmail =
+    perfilOrigen?.email ??
+    (
+      await supabaseAdmin
+        .from("perfiles")
+        .select("email")
+        .eq("id", origenId)
+        .maybeSingle()
+    ).data?.email;
 
   const { count: restantes } = await supabaseAdmin
     .from("inscripciones")
@@ -134,15 +236,20 @@ export async function fusionarFichasJugador(
     );
   }
 
-  if (origen?.email && esEmailPlaceholderPlanilla(origen.email)) {
+  if (origenEmail && esEmailPlaceholderPlanilla(origenEmail)) {
     await supabaseAdmin.from("perfiles").delete().eq("id", origenId);
     await supabaseAdmin.auth.admin.deleteUser(origenId).catch(() => undefined);
     resumen.origen_eliminado = true;
   } else {
+    await supabaseAdmin.auth.admin
+      .deleteUser(origenId)
+      .catch(() => undefined);
+
     const { error: soft } = await supabaseAdmin
       .from("perfiles")
       .update({
         dni: null,
+        email: `fusionado+${origenId.slice(0, 8)}@padelnexus.local`,
         pendiente_activacion: false,
         nombre: "Fusionado",
         apellido: "archivado",

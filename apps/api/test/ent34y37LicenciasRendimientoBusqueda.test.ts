@@ -67,6 +67,10 @@ describe("ENT-37 búsqueda por tokens", () => {
       "juan",
       "garcía",
     ]);
+    assert.deepEqual(tokenizarBusquedaJugadores("Pérez, Juan"), [
+      "Pérez",
+      "Juan",
+    ]);
   });
 
   it("obtenerLicencias aplica un filtro or por cada token", () => {

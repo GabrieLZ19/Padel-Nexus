@@ -7,6 +7,7 @@ import { normalizarPerfilLicencias } from "../utils/estadoLicencia";
 import {
   orBusquedaContactosAdmin,
   terminoIlikePostgrest,
+  tokenizarBusquedaJugadores,
 } from "../utils/postgrestBusqueda";
 import { presentarPerfilContacto } from "../utils/contactoPresentacion";
 
@@ -24,7 +25,8 @@ export class CrmContactosService {
       supabaseAdmin
         .from("perfiles")
         .select("id", { count: "exact", head: true })
-        .eq("rol", "usuario"),
+        .eq("rol", "usuario")
+        .neq("apellido", "archivado"),
       supabaseAdmin.from("licencias").select("usuario_id"),
     ]);
 
@@ -66,10 +68,14 @@ export class CrmContactosService {
         { count: "exact" },
       )
       .eq("rol", "usuario")
+      .neq("apellido", "archivado")
       .order("created_at", { ascending: false });
 
-    if (search?.trim()) {
-      const quoted = terminoIlikePostgrest(search);
+    const tokensBusqueda = search?.trim()
+      ? tokenizarBusquedaJugadores(search)
+      : [];
+    for (const token of tokensBusqueda) {
+      const quoted = terminoIlikePostgrest(token);
       query = query.or(orBusquedaContactosAdmin(quoted));
     }
 

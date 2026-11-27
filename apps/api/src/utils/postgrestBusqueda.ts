@@ -14,11 +14,14 @@ export function terminoIlikePostgrest(queryRaw: string): string {
 
 const MAX_TOKENS_BUSQUEDA_JUGADOR = 6;
 
-/** ENT-37: cada palabra debe coincidir en nombre, apellido, DNI o nro de licencia. */
+/**
+ * ENT-37 / ENT-49: cada token debe coincidir (AND).
+ * Acepta espacios y coma estilo inscripción (`Apellido, Nombre`).
+ */
 export function tokenizarBusquedaJugadores(search: string): string[] {
   return search
     .trim()
-    .split(/\s+/u)
+    .split(/[\s,]+/u)
     .map((t) => t.trim())
     .filter(Boolean)
     .slice(0, MAX_TOKENS_BUSQUEDA_JUGADOR);
