@@ -342,11 +342,19 @@ export const TorneosService = {
     return response.data;
   },
 
-  async generarZonas(torneoId: string, _size?: number, forzarDestructivo?: boolean) {
+  async generarZonas(
+    torneoId: string,
+    _size?: number,
+    forzarDestructivo?: boolean,
+    motivo?: string,
+  ) {
     // Tamaño de zona siempre auto FAP (preferredSize=3 en backend)
     const response = await api.post(
       `/torneos/${torneoId}/generar-zonas`,
-      { forzarDestructivo: forzarDestructivo === true },
+      {
+        forzarDestructivo: forzarDestructivo === true,
+        ...(motivo && motivo.trim().length >= 8 ? { motivo: motivo.trim() } : {}),
+      },
     );
     return response.data;
   },

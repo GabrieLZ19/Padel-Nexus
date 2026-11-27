@@ -71,7 +71,9 @@ export function SelectorCategoriaEvento({
 
   return (
     <div
-      className={`rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 ${className}`}
+      className={`rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 ${
+        modoPublico ? "relative z-20" : ""
+      } ${className}`}
     >
       {data.evento_nombre ? (
         <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5 truncate">

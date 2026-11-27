@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { esEmailPlaceholderPlanilla } from "@/utils/inscripcionPlanilla";
 import {
   useNumeroPaso,
   usePasosOcultos,
@@ -55,13 +54,10 @@ export const Paso5Cierre = ({
     const ids = new Set<string>();
     for (const ins of inscripciones) {
       if (ins.estado_pago !== "Confirmado") continue;
-      if (esEmailPlaceholderPlanilla(ins.perfiles?.email) && ins.usuario_id) {
+      if (ins.perfiles?.pendiente_activacion && ins.usuario_id) {
         ids.add(ins.usuario_id);
       }
-      if (
-        esEmailPlaceholderPlanilla(ins.perfiles_jugador2?.email) &&
-        ins.usuario2_id
-      ) {
+      if (ins.perfiles_jugador2?.pendiente_activacion && ins.usuario2_id) {
         ids.add(String(ins.usuario2_id));
       }
     }

@@ -313,7 +313,21 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     }
   };
 
+  const programacionPublicada = torneo?.programacion_estado === "publicado";
+
   const handleRegenerarZonas = async () => {
+    if (programacionPublicada) {
+      setFeedbackModal({
+        isOpen: true,
+        type: "warning",
+        title: "Programación publicada",
+        description:
+          "No podés regenerar los cuadros mientras la programación está publicada: se borrarían todos los horarios cargados. Abrí una nueva edición en el programador si necesitás cambiar la grilla.",
+        onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+      });
+      return;
+    }
+
     if (!tieneDiasCompetencia) {
       setFeedbackModal({
         isOpen: true,
@@ -359,10 +373,12 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       return;
     }
 
-    const runGenerate = async (forzar: boolean) => {
+    const yaHayCuadro = zonas.length > 0 || partidos.length > 0;
+
+    const runGenerate = async (forzar: boolean, motivo?: string) => {
       try {
         setLoading(true);
-        await TorneosService.generarZonas(torneoId, undefined, forzar);
+        await TorneosService.generarZonas(torneoId, undefined, forzar, motivo);
         await loadZonas();
         onRefresh?.();
         setFeedbackModal({
@@ -374,14 +390,18 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           onClose: () =>
             setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = error as {
+          response?: { data?: { error?: string } };
+          message?: string;
+        };
         setFeedbackModal({
           isOpen: true,
           type: "error",
           title: "Error al generar zonas",
           description:
-            error.response?.data?.error ||
-            error.message ||
+            err.response?.data?.error ||
+            err.message ||
             "No se pudieron generar las zonas.",
           onClose: () =>
             setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
@@ -391,21 +411,45 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       }
     };
 
-    if (hayResultados && !modificacionNoDestructiva) {
+    const abrirConfirmacionRegeneracion = (
+      forzar: boolean,
+      detalleExtra: string,
+    ) => {
       setFeedbackModal({
         isOpen: true,
         type: "warning",
-        title: "Regeneración destructiva",
-        description:
-          "Se borrarán todos los partidos y resultados del torneo. ¿Confirmás regenerar las zonas?",
-        confirmText: "Sí, regenerar",
+        title: "Regenerar cuadros",
+        description: `Se perderán las zonas editadas manualmente y todos los horarios cargados (los partidos se recrean con nuevos identificadores). ${detalleExtra}`,
+        confirmText: "Regenerar cuadros",
         cancelText: "Cancelar",
-        onConfirm: async () => {
+        showInput: true,
+        inputPlaceholder: "Motivo del cambio (obligatorio)",
+        inputMinLength: 8,
+        onConfirm: async (motivo) => {
+          const texto = motivo?.trim() ?? "";
+          if (texto.length < 8) return;
           setFeedbackModal((prev) => ({ ...prev, isOpen: false }));
-          await runGenerate(true);
+          await runGenerate(forzar, texto);
         },
         onClose: () => setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
       });
+    };
+
+    if (hayResultados && !modificacionNoDestructiva) {
+      abrirConfirmacionRegeneracion(
+        true,
+        "También se borrarán todos los resultados cargados.",
+      );
+      return;
+    }
+
+    if (yaHayCuadro) {
+      abrirConfirmacionRegeneracion(
+        hayResultados,
+        hayResultados
+          ? "Hay resultados cargados: confirmá solo si querés volver a sortear desde cero."
+          : "Confirmá solo si querés volver a sortear las zonas desde cero.",
+      );
       return;
     }
 
@@ -1893,6 +1937,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                 id="btn-regenerar"
                 onClick={handleRegenerarZonas}
                 disabled={
+                  programacionPublicada ||
                   (inscripciones || []).length < 3 ||
                   (inscripciones || []).some(
                     (ins) => ins.estado_pago !== "Confirmado",
@@ -1900,9 +1945,11 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   !tieneDiasCompetencia
                 }
                 title={
-                  !tieneDiasCompetencia
-                    ? "Definí los días de competencia en el Paso 3 (Categorías) para habilitar la generación de cuadros"
-                    : undefined
+                  programacionPublicada
+                    ? "La programación está publicada. Abrí una nueva edición en el programador antes de regenerar cuadros."
+                    : !tieneDiasCompetencia
+                      ? "Definí los días de competencia en el Paso 3 (Categorías) para habilitar la generación de cuadros"
+                      : undefined
                 }
                 className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 hover:bg-white/5 transition-all relative disabled:opacity-40 disabled:cursor-not-allowed ${
                   tourStep === 0 &&

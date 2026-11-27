@@ -1,4 +1,5 @@
 const ETIQUETAS: Record<string, string> = {
+  regenerar_cuadros: "Regenerar cuadros",
   guardar_zonas_completo: "Guardar zonas completo",
   cambio_pareja_llave: "Cambio de pareja",
   alta_pareja_edicion_llave: "Alta de pareja (llave)",

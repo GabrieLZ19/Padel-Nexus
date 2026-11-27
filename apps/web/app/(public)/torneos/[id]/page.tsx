@@ -416,8 +416,13 @@ export default function TorneoDetallePage() {
           </div>
         ) : null}
 
-        <header className="rounded-2xl border border-white/8 bg-[#0f0f0f] p-5 lg:p-7 mb-6 relative overflow-hidden">
-          <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(ellipse_at_top_right,rgba(203,254,1,0.08),transparent_60%)] pointer-events-none" />
+        <header className="rounded-2xl border border-white/8 bg-[#0f0f0f] p-5 lg:p-7 mb-6 relative overflow-visible">
+          <div
+            className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none"
+            aria-hidden
+          >
+            <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(ellipse_at_top_right,rgba(203,254,1,0.08),transparent_60%)]" />
+          </div>
           <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-5">
             <div className="min-w-0 space-y-3">
               <div className="flex flex-wrap items-center gap-2">

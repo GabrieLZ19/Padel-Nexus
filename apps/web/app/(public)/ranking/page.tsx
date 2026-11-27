@@ -293,9 +293,9 @@ export default function RankingPublicPage() {
         </div>
 
         {/* TOOLBAR FLOTANTE */}
-        <div className="bg-brand-card p-3 md:p-4 rounded-3xl border border-brand-white/10 flex flex-col xl:flex-row gap-4 xl:gap-6 items-stretch xl:items-center shadow-2xl mb-12">
+        <div className="bg-brand-card p-3 md:p-4 rounded-3xl border border-brand-white/10 flex flex-col gap-4 shadow-2xl mb-12 min-w-0">
           {/* Buscador */}
-          <div className="relative flex-1">
+          <div className="relative w-full min-w-0">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 size-5" />
             <input
               type="text"
@@ -314,11 +314,9 @@ export default function RankingPublicPage() {
             )}
           </div>
 
-          <div className="hidden xl:block w-px h-10 bg-brand-white/10" />
-
-          <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
+          <div className="flex flex-wrap gap-3 md:gap-4 items-stretch lg:items-center w-full min-w-0">
             {contextos.length > 1 && (
-              <div className="w-full lg:w-72 h-13 min-w-0">
+              <div className="w-full min-w-[12rem] flex-1 basis-56 max-w-full sm:max-w-72 h-13">
                 <CustomDropdown
                   value={contextoActivoId}
                   onChange={(id) => {
@@ -333,7 +331,7 @@ export default function RankingPublicPage() {
                 />
               </div>
             )}
-            <div className="flex bg-brand-black p-1.5 rounded-2xl border border-brand-white/5 h-13 items-center w-full lg:w-auto overflow-x-auto hide-scrollbar">
+            <div className="flex bg-brand-black p-1.5 rounded-2xl border border-brand-white/5 h-13 items-center w-full min-w-0 flex-1 basis-[min(100%,20rem)] sm:w-auto sm:flex-none overflow-x-auto hide-scrollbar">
               {OPCIONES_RAMA_RANKING_PUBLICO.map((opcion) => (
                 <button
                   key={opcion.value}
@@ -351,7 +349,7 @@ export default function RankingPublicPage() {
             </div>
 
             {/* Pestañas de Alcance */}
-            <div className="flex bg-brand-black p-1.5 rounded-2xl border border-brand-white/5 h-13 items-center w-full lg:w-auto overflow-x-auto hide-scrollbar">
+            <div className="flex bg-brand-black p-1.5 rounded-2xl border border-brand-white/5 h-13 items-center w-full min-w-0 flex-1 basis-[min(100%,18rem)] sm:w-auto sm:flex-none overflow-x-auto hide-scrollbar">
               {(["Club", "Provincial", "Nacional"] as const).map((scope) => (
                 <button
                   key={scope}
@@ -368,9 +366,9 @@ export default function RankingPublicPage() {
             </div>
 
             {/* Dropdowns */}
-            <div className="flex gap-3 w-full lg:w-auto z-30">
+            <div className="flex flex-wrap gap-3 w-full min-w-0 basis-full sm:basis-auto z-30">
               {activeScope === "Club" && (
-                <div className="flex-1 lg:w-56 h-13">
+                <div className="min-w-0 flex-1 basis-[min(100%,14rem)] sm:basis-48 sm:max-w-56 h-13">
                   <CustomDropdown
                     value={activeClubId}
                     onChange={(val) => setActiveClubId(val)}
@@ -383,7 +381,7 @@ export default function RankingPublicPage() {
                 </div>
               )}
               {activeScope === "Provincial" && (
-                <div className="flex-1 lg:w-48 h-13">
+                <div className="min-w-0 flex-1 basis-[min(100%,12rem)] sm:basis-48 sm:max-w-48 h-13">
                   <CustomDropdown
                     value={activeProvincia}
                     onChange={(val) => setActiveProvincia(val)}
@@ -392,7 +390,7 @@ export default function RankingPublicPage() {
                   />
                 </div>
               )}
-              <div className="flex-1 lg:w-48 h-13">
+              <div className="min-w-0 flex-1 basis-[min(100%,12rem)] sm:basis-48 sm:max-w-48 h-13">
                 <CustomDropdown
                   value={activeCategory}
                   onChange={(val) => setActiveCategory(val)}

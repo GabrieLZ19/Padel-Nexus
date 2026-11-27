@@ -32,11 +32,12 @@ function boardQuery(
   config: ProgramadorConfig,
   opts?: { incluirDescansoPreview?: boolean },
 ) {
+  if (!opts?.incluirDescansoPreview) {
+    return {};
+  }
   return {
     duracion: config.duracion,
-    ...(opts?.incluirDescansoPreview
-      ? { descansoModo: config.descansoModo }
-      : {}),
+    descansoModo: config.descansoModo,
     ...(config.jornadas ? { jornadas: config.jornadas } : {}),
     // No forzar 08:00: si está vacío, el backend usa la franja/disponibilidad de cada día.
     ...(config.horaInicio ? { horaInicio: config.horaInicio } : {}),
@@ -127,7 +128,7 @@ export function useProgramadorBoard(
         descansoBoard === "entre_inicios_240"
           ? descansoBoard
           : c.descansoModo;
-      return {
+      const nextConfig: ProgramadorConfig = {
         ...c,
         duracion: ([60, 75, 90].includes(data.duracion_partido_minutos)
           ? data.duracion_partido_minutos
@@ -139,6 +140,8 @@ export function useProgramadorBoard(
           ...(data.franjas_por_dia || {}),
         },
       };
+      configRef.current = nextConfig;
+      return nextConfig;
     });
     setActiveDay((prev) => {
       if (prev && data.dias.includes(prev)) return prev;
@@ -226,23 +229,34 @@ export function useProgramadorBoard(
         setBusy(true);
         try {
           if (debePersistir) {
-            const payload = {
-              duracionMinutos: merged.duracion,
-              descansoModo: merged.descansoModo,
-              ...(merged.franjasPorDia && Object.keys(merged.franjasPorDia).length > 0
-                ? { franjasPorDia: merged.franjasPorDia }
-                : {}),
-            };
-            if (grupoId) {
-              await TorneosService.persistirConfigEventoProgramacion(grupoId, payload);
-            } else {
-              await TorneosService.persistirConfigProgramacion(torneoConfigId(), payload);
+            const payload: {
+              duracionMinutos?: number;
+              descansoModo?: ModoDescansoProgramador;
+              franjasPorDia?: ProgramadorConfig["franjasPorDia"];
+            } = {};
+            if (next?.duracion != null) {
+              payload.duracionMinutos = merged.duracion;
             }
+            if (next?.descansoModo != null) {
+              payload.descansoModo = merged.descansoModo;
+            }
+            if (
+              next?.franjasPorDia != null &&
+              merged.franjasPorDia &&
+              Object.keys(merged.franjasPorDia).length > 0
+            ) {
+              payload.franjasPorDia = merged.franjasPorDia;
+            }
+            const data = grupoId
+              ? await TorneosService.persistirConfigEventoProgramacion(grupoId, payload)
+              : await TorneosService.persistirConfigProgramacion(torneoConfigId(), payload);
+            applyBoard(data);
+          } else {
+            const data = await fetchBoard(
+              boardQuery(merged, { incluirDescansoPreview: true }),
+            );
+            applyBoard(data);
           }
-          const data = await fetchBoard(
-            boardQuery(merged, { incluirDescansoPreview: true }),
-          );
-          applyBoard(data);
         } catch {
           sileo.error({ title: "No se pudo actualizar la grilla" });
         } finally {
