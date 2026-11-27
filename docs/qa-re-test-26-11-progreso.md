@@ -2,7 +2,9 @@
 
 Plan maestro: `.cursor/plans/re-test_26-11_item_por_item_cd026153.plan.md` (o copia en Cursor).
 
-**Siguiente ítem:** **Item 10** — CLI-8/12/14, ENT-43, TOR-56.
+**Siguiente ítem (plan item-por-item):** **TOR-22 / TOR-24** — Alta lado B en llave y recálculo de slots al mover zonas.
+
+**Fase 1 plan re-test 26/11:** cerrada (`2e68302` … `b2ce031`). **ENT-46/47/48 y ENT-49:** `e4e0d6c`. Detalle: [qa-re-test-26-11-items-res23-fee21-ent49.md](./qa-re-test-26-11-items-res23-fee21-ent49.md).
 
 ## Completados
 
