@@ -9,6 +9,7 @@ import {
 } from "@/utils/services/perfil";
 import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 import { InscripcionPagoActions } from "@/components/torneos/InscripcionPagoActions";
+import { InscripcionBajaJugador } from "@/components/inscripciones/InscripcionBajaJugador";
 import { inscripcionRequierePagoOnline } from "@/utils/inscripcionPago";
 
 function pagoDe(inscripcion: PanelJugador["inscripciones"][number]) {
@@ -19,6 +20,7 @@ function pagoDe(inscripcion: PanelJugador["inscripciones"][number]) {
 export default function MisTorneosPage() {
   const [panel, setPanel] = useState<PanelJugador | null>(null);
   const [error, setError] = useState("");
+  const [recarga, setRecarga] = useState(0);
 
   useEffect(() => {
     let activo = true;
@@ -32,7 +34,7 @@ export default function MisTorneosPage() {
     return () => {
       activo = false;
     };
-  }, []);
+  }, [recarga]);
 
   return (
     <main className="max-w-3xl mx-auto p-5 md:p-10 space-y-6">
@@ -102,6 +104,14 @@ export default function MisTorneosPage() {
                   compact
                 />
               ) : null}
+              <InscripcionBajaJugador
+                inscripcionId={inscripcion.id}
+                torneoNombre={inscripcion.torneoNombre}
+                sinCosto={inscripcion.sinCosto}
+                estadoPago={inscripcion.estadoPago}
+                estadoTorneo={inscripcion.estadoTorneo}
+                onBajaCompletada={() => setRecarga((n) => n + 1)}
+              />
             </li>
           );
         })}
