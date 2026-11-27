@@ -26,6 +26,15 @@ import {
   marcarCabezasUnicasEnZonas,
   type ParejaPuntosRanking,
 } from "../utils/cabezasSerieZonas";
+import {
+  MSJ_PROGRAMACION_PUBLICADA,
+  ZonasOverrideError,
+  analizarCambiosZonas,
+  aplicarIntercambiosPublicadoEnPartidos,
+  assertInscripcionesSinResultadoEnTorneo,
+  partidoTieneResultadoCargado,
+} from "../utils/zonasOverride";
+import { postProcesoTrasCambioZonas } from "../utils/zonaPostCambio";
 
 interface ParejaRanking {
   inscripcionId: string;
@@ -787,6 +796,18 @@ export class CompetenciaService {
 
     const torneoId = origenGrupo.torneo_id;
 
+    const { data: torneoProg } = await supabaseAdmin
+      .from("torneos")
+      .select("programacion_estado")
+      .eq("id", torneoId)
+      .maybeSingle();
+
+    await assertInscripcionesSinResultadoEnTorneo(torneoId, [inscripcionId]);
+
+    if (String(torneoProg?.programacion_estado || "") === "publicado") {
+      throw new ZonasOverrideError(MSJ_PROGRAMACION_PUBLICADA);
+    }
+
     // 1. Eliminar de la zona original
     const { error: errDel } = await supabaseAdmin
       .from("grupo_parejas")
@@ -817,10 +838,15 @@ export class CompetenciaService {
       grupoDestinoId,
       destinoGrupo.nombre_grupo,
     );
-    const { sincronizarLlaveTrasCambioZonas } = await import(
-      "../utils/playoffAvance"
+
+    const zonasRegeneradas = [
+      origenGrupo.nombre_grupo,
+      destinoGrupo.nombre_grupo,
+    ];
+    const postZonas = await postProcesoTrasCambioZonas(
+      torneoId,
+      zonasRegeneradas,
     );
-    await sincronizarLlaveTrasCambioZonas(torneoId);
 
     // 4. Registrar auditoría
     await supabaseAdmin.from("logs_auditoria").insert({
@@ -831,10 +857,25 @@ export class CompetenciaService {
         grupo_origen: grupoOrigenId,
         grupo_destino: grupoDestinoId,
         motivo: motivo,
+        zonas_regeneradas: zonasRegeneradas,
+        llave_sincronizada: postZonas.llave,
+        zonas_desprogramadas_conflicto_llave:
+          postZonas.zonas_desprogramadas_conflicto_llave,
+        partidos_sin_horario: postZonas.partidos_sin_horario,
+        fixture_reparado: postZonas.fixture_reparado,
       },
     });
 
-    return { exito: true, mensaje: "Pareja movida exitosamente" };
+    return {
+      exito: true,
+      mensaje: "Pareja movida exitosamente",
+      zonas_regeneradas: zonasRegeneradas,
+      fixture_reparado: postZonas.fixture_reparado,
+      llave: postZonas.llave,
+      zonas_desprogramadas_conflicto_llave:
+        postZonas.zonas_desprogramadas_conflicto_llave,
+      partidos_sin_horario: postZonas.partidos_sin_horario,
+    };
   }
 
   /**
@@ -849,23 +890,35 @@ export class CompetenciaService {
     const { data: existentes } = await supabaseAdmin
       .from("partidos")
       .select(
-        "id, equipo_a_id, equipo_b_id, ganador, orden, cancha_asignada, fecha_partido",
+        "id, equipo_a_id, equipo_b_id, ganador, orden, cancha_asignada, fecha_partido, horario_bloqueado, estado_partido, set1_a, set1_b",
       )
       .eq("torneo_id", torneoId)
       .eq("ronda", nombreGrupo);
 
+    const bloqueoPorCruce = new Map<string, boolean>();
     const horariosPrevios = horariosPorCruce(
-      (existentes || []).map((m) => ({
-        equipoAId: m.equipo_a_id,
-        equipoBId: m.equipo_b_id,
-        cancha: m.cancha_asignada,
-        fecha: m.fecha_partido,
-      })),
+      (existentes || []).map((m) => {
+        const clave = [m.equipo_a_id, m.equipo_b_id]
+          .filter(Boolean)
+          .sort()
+          .join("|");
+        if (clave && m.horario_bloqueado) {
+          bloqueoPorCruce.set(clave, true);
+        }
+        return {
+          equipoAId: m.equipo_a_id,
+          equipoBId: m.equipo_b_id,
+          cancha: m.cancha_asignada,
+          fecha: m.fecha_partido,
+        };
+      }),
     );
 
-    const jugados = (existentes || []).filter((m) => m.ganador);
+    const jugados = (existentes || []).filter((m) =>
+      partidoTieneResultadoCargado(m),
+    );
     const pendientesIds = (existentes || [])
-      .filter((m) => !m.ganador)
+      .filter((m) => !partidoTieneResultadoCargado(m))
       .map((m) => m.id);
 
     if (pendientesIds.length > 0) {
@@ -948,9 +1001,17 @@ export class CompetenciaService {
     }
 
     if (partidos.length > 0) {
-      const conHorario = partidos.map((partido) =>
-        aplicarHorarioConservado(partido, horariosPrevios),
-      );
+      const conHorario = partidos.map((partido) => {
+        const conSlot = aplicarHorarioConservado(partido, horariosPrevios);
+        const clave = [conSlot.equipo_a_id, conSlot.equipo_b_id]
+          .filter(Boolean)
+          .sort()
+          .join("|");
+        if (clave && bloqueoPorCruce.get(clave)) {
+          return { ...conSlot, horario_bloqueado: true };
+        }
+        return conSlot;
+      });
       const { data: partidosProgramados } = await supabaseAdmin
         .from("partidos")
         .select("cancha_asignada, fecha_partido")
@@ -1095,15 +1156,56 @@ export class CompetenciaService {
     );
 
     const zonaPorInscripcionAntes = new Map<string, string>();
+    const grupoPorInscripcionAntes = new Map<string, string>();
+    const conteoPorGrupoAntes = new Map<string, number>();
     for (const g of gruposPrevios || []) {
       const nombreZona =
         g.nombre_grupo ||
         zonas.find((z) => z.id === g.id)?.nombre ||
         "Zona";
-      for (const gp of g.grupo_parejas || []) {
-        zonaPorInscripcionAntes.set(String(gp.inscripcion_id), nombreZona);
+      const parejasGrupo = g.grupo_parejas || [];
+      conteoPorGrupoAntes.set(g.id, parejasGrupo.length);
+      for (const gp of parejasGrupo) {
+        const insId = String(gp.inscripcion_id);
+        zonaPorInscripcionAntes.set(insId, nombreZona);
+        grupoPorInscripcionAntes.set(insId, g.id);
       }
     }
+
+    const { data: torneoProgMeta } = await supabaseAdmin
+      .from("torneos")
+      .select(
+        "programacion_estado, duracion_partido_minutos, descanso_minutos, descanso_modo, formato",
+      )
+      .eq("id", torneoId)
+      .maybeSingle();
+
+    const programacionPublicada =
+      String(torneoProgMeta?.programacion_estado || "") === "publicado";
+
+    const analisisCambios = analizarCambiosZonas(
+      zonas,
+      grupoPorInscripcionAntes,
+      conteoPorGrupoAntes,
+    );
+
+    if (analisisCambios.inscripcionesMovidas.length > 0) {
+      await assertInscripcionesSinResultadoEnTorneo(
+        torneoId,
+        analisisCambios.inscripcionesMovidas,
+      );
+    }
+
+    if (
+      programacionPublicada &&
+      analisisCambios.inscripcionesMovidas.length > 0 &&
+      !analisisCambios.esSoloIntercambioSimetrico
+    ) {
+      throw new ZonasOverrideError(MSJ_PROGRAMACION_PUBLICADA);
+    }
+
+    const intercambioPublicado =
+      programacionPublicada && analisisCambios.esSoloIntercambioSimetrico;
 
     const movimientos: string[] = [];
     for (const z of zonas) {
@@ -1191,81 +1293,60 @@ export class CompetenciaService {
     }
 
     const zonasRegeneradas: string[] = [];
-
-    // 2. Regenerar fixture solo en zonas cuya composición cambió
-    for (const z of zonas) {
-      const firmaNueva = firmaParejas(z.parejas.map((p) => p.id));
-      const firmaAnterior = firmaPorGrupoAntes.get(z.id);
-      if (firmaAnterior !== undefined && firmaAnterior === firmaNueva) {
-        continue;
-      }
-      zonasRegeneradas.push(z.nombre);
-      await CompetenciaService.regenerarPartidosDeGrupo(
-        torneoId,
-        z.id,
-        z.nombre,
-      );
-    }
-
-    const {
-      completarPartidosFaltantesTorneo,
-      deduplicarPartidosPendientesTorneo,
-    } = await import("../utils/zonaFixtureRepair");
-    await deduplicarPartidosPendientesTorneo(torneoId);
-    const fixtureReparado =
-      zonasRegeneradas.length > 0
-        ? await completarPartidosFaltantesTorneo(torneoId, zonasRegeneradas)
-        : [];
-
-    const { sincronizarLlaveTrasCambioZonas } = await import(
-      "../utils/playoffAvance"
+    const nombreGrupoPorId = new Map(
+      zonas.map((z) => [z.id, z.nombre] as const),
     );
-    const llave = await sincronizarLlaveTrasCambioZonas(torneoId);
 
-    let zonas_desprogramadas_conflicto_llave: string[] = [];
-    if (zonasRegeneradas.length > 0) {
-      const { data: torneoProg } = await supabaseAdmin
-        .from("torneos")
-        .select(
-          "duracion_partido_minutos, descanso_minutos, descanso_modo, formato",
-        )
-        .eq("id", torneoId)
-        .maybeSingle();
-      if (torneoProg && !esEliminatoriaDirecta(torneoProg.formato)) {
-        const { aplicarDesprogramacionZonaTrasCambioTorneo } = await import(
-          "../utils/programacionZonaLlave"
-        );
-        const { duracionParaFase } = await import("../utils/programacionPartidos");
-        const { esModoDescanso, minutosDeModoDescanso } = await import(
-          "../utils/programadorReglas"
-        );
-        const duracionBase = Number(
-          torneoProg.duracion_partido_minutos || 90,
-        );
-        const modo = esModoDescanso(torneoProg.descanso_modo)
-          ? torneoProg.descanso_modo
-          : undefined;
-        zonas_desprogramadas_conflicto_llave =
-          await aplicarDesprogramacionZonaTrasCambioTorneo(
-            torneoId,
-            zonasRegeneradas,
-            {
-              duracionZonaMinutos: duracionParaFase(duracionBase, "zonas"),
-              descansoMinutos: modo
-                ? minutosDeModoDescanso(modo)
-                : Number(torneoProg.descanso_minutos || 60),
-              descansoModo: modo,
-            },
-          );
-
-        const { programarPartidosZonaPendientes } = await import(
-          "../utils/programacionPartidos"
-        );
-        for (const nombreZona of zonasRegeneradas) {
-          await programarPartidosZonaPendientes(torneoId, nombreZona);
+    // 2. Regenerar fixture o conservar horarios publicados (intercambio simétrico)
+    if (intercambioPublicado) {
+      await aplicarIntercambiosPublicadoEnPartidos(
+        torneoId,
+        analisisCambios.intercambios,
+        nombreGrupoPorId,
+      );
+      for (const ic of analisisCambios.intercambios) {
+        const nombreA = nombreGrupoPorId.get(ic.grupoOrigenA);
+        const nombreB = nombreGrupoPorId.get(ic.grupoOrigenB);
+        if (nombreA && !zonasRegeneradas.includes(nombreA)) {
+          zonasRegeneradas.push(nombreA);
+        }
+        if (nombreB && !zonasRegeneradas.includes(nombreB)) {
+          zonasRegeneradas.push(nombreB);
         }
       }
+    } else {
+      for (const z of zonas) {
+        const firmaNueva = firmaParejas(z.parejas.map((p) => p.id));
+        const firmaAnterior = firmaPorGrupoAntes.get(z.id);
+        if (firmaAnterior !== undefined && firmaAnterior === firmaNueva) {
+          continue;
+        }
+        zonasRegeneradas.push(z.nombre);
+        await CompetenciaService.regenerarPartidosDeGrupo(
+          torneoId,
+          z.id,
+          z.nombre,
+        );
+      }
     }
+
+    const postZonas = intercambioPublicado
+      ? {
+          fixture_reparado: [] as Array<{
+            nombre_grupo: string;
+            insertados: number;
+          }>,
+          llave: null,
+          zonas_desprogramadas_conflicto_llave: [] as string[],
+          partidos_sin_horario: { total: 0, por_zona: [] as Array<{ nombre: string; cantidad: number }> },
+        }
+      : await postProcesoTrasCambioZonas(torneoId, zonasRegeneradas);
+
+    const fixtureReparado = postZonas.fixture_reparado;
+    const llave = postZonas.llave;
+    const zonas_desprogramadas_conflicto_llave =
+      postZonas.zonas_desprogramadas_conflicto_llave;
+    const partidos_sin_horario = postZonas.partidos_sin_horario;
 
     // 3. Registrar auditoría única
     await supabaseAdmin.from("logs_auditoria").insert({
@@ -1296,17 +1377,26 @@ export class CompetenciaService {
         }),
         resoluciones_cabezas_serie: resolucionesCabezasSerie ?? [],
         zonas_desprogramadas_conflicto_llave,
+        intercambio_programacion_publicada: intercambioPublicado,
+        intercambios: intercambioPublicado
+          ? analisisCambios.intercambios
+          : [],
+        partidos_sin_horario,
         llave_sincronizada: llave,
       },
     });
 
     return {
       exito: true,
-      mensaje: "Distribución de zonas guardada exitosamente",
+      mensaje: intercambioPublicado
+        ? "Intercambio de parejas guardado sin modificar horarios publicados."
+        : "Distribución de zonas guardada exitosamente",
       zonas_regeneradas: zonasRegeneradas,
       fixture_reparado: fixtureReparado,
       llave,
       zonas_desprogramadas_conflicto_llave,
+      partidos_sin_horario,
+      intercambio_programacion_publicada: intercambioPublicado,
     };
   }
 

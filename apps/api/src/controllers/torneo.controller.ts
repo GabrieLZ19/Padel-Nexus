@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { TorneoService } from "../services/torneo.service";
 import { listarAuditoriaTorneo } from "../utils/auditoriaTorneo";
 import { CompetenciaService } from "../services/competencia.service";
+import { ZonasOverrideError } from "../utils/zonasOverride";
 import { supabaseAdmin } from "../config/supabase";
 import sharp from "sharp";
 import { esRolAccesoCrm, esRolAdministrativo } from "../constants/roles";
@@ -1011,10 +1012,13 @@ export const moverParejaOverride = async (
       admin_id
     );
     return res.status(200).json(resultado);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const status =
+      error instanceof ZonasOverrideError ? error.statusCode : 400;
+    const msg = error instanceof Error ? error.message : "Error desconocido";
     return res
-      .status(400)
-      .json({ message: "Error al mover pareja", error: error.message });
+      .status(status)
+      .json({ message: "Error al mover pareja", error: msg });
   }
 };
 
@@ -1041,10 +1045,13 @@ export const guardarZonasOverride = async (
         : undefined,
     );
     return res.status(200).json(resultado);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const status =
+      error instanceof ZonasOverrideError ? error.statusCode : 400;
+    const msg = error instanceof Error ? error.message : "Error desconocido";
     return res
-      .status(400)
-      .json({ message: "Error al guardar zonas", error: error.message });
+      .status(status)
+      .json({ message: "Error al guardar zonas", error: msg });
   }
 };
 

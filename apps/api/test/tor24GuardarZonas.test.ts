@@ -152,13 +152,33 @@ describe("TOR-24 guardar zonas y llave", () => {
     );
     assert.match(svc, /firmaPorGrupoAntes/);
     assert.match(svc, /firmaAnterior !== undefined && firmaAnterior === firmaNueva/);
-    assert.match(svc, /sincronizarLlaveTrasCambioZonas/);
+    assert.match(svc, /postProcesoTrasCambioZonas/);
     assert.match(svc, /Pendiente Ganadores/);
     assert.match(svc, /ordenesTrasBorrarPendientes/);
-    assert.match(svc, /completarPartidosFaltantesTorneo/);
     assert.match(svc, /repararFixtureZonasTorneo/);
-    assert.match(svc, /aplicarDesprogramacionZonaTrasCambioTorneo/);
-    assert.match(svc, /programarPartidosZonaPendientes/);
+    const post = readFileSync(
+      path.join(RAIZ, "api/src/utils/zonaPostCambio.ts"),
+      "utf8",
+    );
+    assert.match(post, /sincronizarLlaveTrasCambioZonas/);
+    assert.match(post, /completarPartidosFaltantesTorneo/);
+    assert.match(post, /aplicarDesprogramacionZonaTrasCambioTorneo/);
+    assert.match(post, /programarPartidosZonaPendientes/);
+    assert.match(post, /contarPartidosZonaSinHorario/);
+  });
+
+  it("moverPareja usa el mismo post-proceso que guardarZonas", () => {
+    const svc = readFileSync(
+      path.join(RAIZ, "api/src/services/competencia.service.ts"),
+      "utf8",
+    );
+    const bloque = svc.slice(svc.indexOf("static async moverPareja"));
+    assert.match(bloque, /postProcesoTrasCambioZonas/);
+    assert.match(bloque, /partidos_sin_horario/);
+    assert.doesNotMatch(
+      bloque.slice(0, bloque.indexOf("postProcesoTrasCambioZonas")),
+      /sincronizarLlaveTrasCambioZonas/,
+    );
   });
 
   it("playoffAvance invalida semillas de hoja segun tamano de zona", () => {
