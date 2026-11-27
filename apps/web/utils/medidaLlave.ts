@@ -37,13 +37,15 @@ export function anchoLienzoLlave(columnas: number): number {
 export function zoomAjustadoAlAncho(
   anchoLienzo: number,
   anchoDisponible: number,
+  zoomMinimo: number = MEDIDA_LLAVE.zoomMin,
 ): number {
   if (anchoLienzo <= 0) return 1;
-  if (anchoDisponible <= 0) return MEDIDA_LLAVE.zoomMin;
+  const piso = Math.max(0.1, zoomMinimo);
+  if (anchoDisponible <= 0) return piso;
   const cabe = Math.min(1, anchoDisponible / anchoLienzo);
-  const conPiso = Math.max(MEDIDA_LLAVE.zoomMin, cabe);
+  const conPiso = Math.max(piso, cabe);
   const redondeado = Math.floor(conPiso * 100) / 100;
-  return Math.max(MEDIDA_LLAVE.zoomMin, redondeado);
+  return Math.max(piso, redondeado);
 }
 
 export function resumenColumnasLlave(matchNos: number[]): {

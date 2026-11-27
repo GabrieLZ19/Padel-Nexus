@@ -432,6 +432,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         confirmText: "Regenerar cuadros",
         cancelText: "Cancelar",
         showInput: true,
+        inputLabel: "Motivo",
         inputPlaceholder: "Motivo del cambio (obligatorio)",
         inputMinLength: 8,
         onConfirm: async (motivo) => {

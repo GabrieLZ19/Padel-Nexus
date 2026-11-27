@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
 import { Partido, Torneo } from "@/utils/types/index";
-import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
+import { etiquetaChipCategoriaTorneoPublico } from "@/utils/etiquetaCategoriaEvento";
+import { vistaEstadoTorneoPublico } from "@/utils/estadoTorneoPublico";
 import { textoRectora } from "@/utils/textosRectora";
 import { useSiglaRectora } from "@/utils/useSiglaRectora";
 import InscripcionModal from "@/components/torneos/InscripcionModal";
@@ -328,10 +329,21 @@ export default function TorneoDetallePage() {
   }
 
   const estadoBase = (torneo.estado || "").toLowerCase().trim();
-  const isEnCurso = estadoBase === "en curso";
-  const isProgramado = estadoBase === "programado";
+  const vistaEstadoPublico = vistaEstadoTorneoPublico({
+    estado: torneo.estado,
+    fecha_primer_partido: torneo.fecha_primer_partido,
+  });
+  const isEnCurso = vistaEstadoPublico.mostrarEnVivo;
+  const isProgramado = vistaEstadoPublico.mostrarProgramado;
   const isFinalizado = estadoBase === "finalizado";
   const isAbierto = estadoBase === "inscripción" || estadoBase === "borrador";
+  const etiquetaEstadoPublico = isAbierto
+    ? "Abierto"
+    : estadoBase === "cerrado"
+      ? "Cerrado"
+      : isFinalizado
+        ? "Finalizado"
+        : vistaEstadoPublico.etiqueta;
   const isCierreVencido = !isInscripcionTemporalmenteAbierta(torneo);
   const isIndividual = esModalidadIndividual(torneo.modalidad);
   const hasPremios = torneo.premio_1 || torneo.premio_2 || torneo.premio_3;
@@ -431,10 +443,10 @@ export default function TorneoDetallePage() {
             <div className="min-w-0 space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-black uppercase tracking-widest px-2.5 py-1 rounded-md bg-brand-chartreuse text-brand-black">
-                  {etiquetaNivelYCategoria(torneo.nivel, torneo.categoria) || "Cat."}
+                  {etiquetaChipCategoriaTorneoPublico(torneo) || "Cat."}
                 </span>
                 <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/5 text-gray-400 border border-white/8">
-                  {torneo.estado}
+                  {etiquetaEstadoPublico}
                 </span>
                 {torneo.rama ? (
                   <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/5 text-gray-400 border border-white/8">
@@ -638,7 +650,7 @@ export default function TorneoDetallePage() {
                           {isFinalizado
                             ? " · finalizado"
                             : isProgramado
-                              ? " · programado"
+                              ? ` · ${etiquetaEstadoPublico.toLowerCase()}`
                               : isEnCurso
                                 ? " · en curso"
                                 : ""}

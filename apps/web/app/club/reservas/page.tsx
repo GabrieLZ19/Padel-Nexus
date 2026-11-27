@@ -347,7 +347,19 @@ export default function ClubReservasPage() {
                 : "No hay reservas para esta fecha."}
             </p>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <ul className="md:hidden divide-y divide-white/5">
+              {reservas.map((reserva) => (
+                <li key={reserva.id}>
+                  <TarjetaReservaMovil
+                    reserva={reserva}
+                    hoy={hoy}
+                    onAccion={pedirAccion}
+                  />
+                </li>
+              ))}
+            </ul>
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-white/10 text-[11px] font-bold uppercase tracking-wide text-gray-500">
@@ -372,6 +384,7 @@ export default function ClubReservasPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
       )}
@@ -388,6 +401,102 @@ export default function ClubReservasPage() {
 
       <FeedbackModal {...modal} />
     </div>
+  );
+}
+
+function TarjetaReservaMovil({
+  reserva,
+  hoy,
+  onAccion,
+}: {
+  reserva: ReservaClubFila;
+  hoy: string;
+  onAccion: (reserva: ReservaClubFila, accion: AccionReservaClub) => void;
+}) {
+  const perfil = uno(reserva.perfiles);
+  const turno = uno(reserva.turnos);
+  const cancha = uno(turno?.canchas);
+  const atrasada =
+    reserva.estado_reserva === "pendiente" && reserva.fecha_reserva < hoy;
+  const cerrada =
+    reserva.estado_reserva === "cancelada" || reserva.estado_reserva === "ausente";
+
+  return (
+    <article
+      className={`space-y-3 p-4 ${atrasada ? "bg-amber-500/10" : ""}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-semibold text-brand-white capitalize">
+            {formatFechaCalendario(reserva.fecha_reserva, {
+              weekday: "short",
+              day: "2-digit",
+              month: "2-digit",
+            })}
+          </p>
+          <p className="text-xs text-gray-500">
+            {horaCorta(turno?.hora_inicio)}–{horaCorta(turno?.hora_fin)} ·{" "}
+            {cancha?.nombre || "Cancha"}
+          </p>
+        </div>
+        {atrasada ? (
+          <span className="shrink-0 text-[10px] font-black uppercase text-amber-700">
+            Atrasada
+          </span>
+        ) : null}
+      </div>
+      <div className="text-sm text-gray-300">
+        {[perfil?.apellido, perfil?.nombre].filter(Boolean).join(", ") ||
+          "Jugador"}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <span className="font-bold text-brand-white">
+          $ {Number(turno?.precio || 0).toLocaleString("es-AR")}
+        </span>
+        <span className="font-bold">{etiquetaEstadoReserva(reserva)}</span>
+        <span className="text-gray-500">
+          {etiquetaEstadoPagoReserva(reserva.estado_pago)}
+        </span>
+      </div>
+      {!cerrada ? (
+        <div className="flex flex-wrap items-center gap-1 pt-1">
+          {reserva.estado_reserva === "pendiente" && (
+            <Accion
+              icon={Check}
+              label="Confirmar"
+              onClick={() => onAccion(reserva, "confirmar")}
+            />
+          )}
+          {reserva.estado_pago !== "completado" && (
+            <Accion
+              icon={Banknote}
+              label="Registrar pago"
+              onClick={() => onAccion(reserva, "cobrar")}
+            />
+          )}
+          <Accion
+            icon={UserX}
+            label="Ausente"
+            onClick={() => onAccion(reserva, "ausente")}
+          />
+          {reserva.estado_reserva !== "cancelada" && (
+            <Accion
+              icon={X}
+              label="Cancelar"
+              onClick={() => onAccion(reserva, "cancelar")}
+              peligro
+            />
+          )}
+          {reserva.estado_pago === "reembolso_pendiente" && (
+            <Accion
+              icon={RotateCcw}
+              label="Marcar devuelta"
+              onClick={() => onAccion(reserva, "reembolsar")}
+            />
+          )}
+        </div>
+      ) : null}
+    </article>
   );
 }
 

@@ -540,7 +540,7 @@ export default function GestionInscripcionesPage() {
                       : "bg-[#ff4444]"
               }`}
             />
-            {esGratuito ? "N/A" : ins.estado_pago}
+            {esGratuito ? "Sin costo" : ins.estado_pago}
           </span>
         </div>
         <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
@@ -566,7 +566,9 @@ export default function GestionInscripcionesPage() {
               Monto
             </dt>
             <dd className="font-black text-white">
-              {esGratuito ? "N/A" : `$${Number(ins.monto || 0).toLocaleString("es-AR")}`}
+              {esGratuito
+                ? "Sin costo"
+                : `$${Number(ins.monto || 0).toLocaleString("es-AR")}`}
             </dd>
           </div>
         </dl>
@@ -929,13 +931,15 @@ export default function GestionInscripcionesPage() {
                                     : "bg-[#ff4444]"
                             }`}
                           />
-                          {esGratuito ? "N/A" : ins.estado_pago}
+                          {esGratuito ? "Sin costo" : ins.estado_pago}
                         </div>
                       </td>
 
                       <td className="py-4 px-6 text-[14px] font-bold text-brand-white">
                         {esGratuito ? (
-                          <span className="text-gray-400 font-semibold">N/A</span>
+                          <span className="text-gray-400 font-semibold">
+                            Sin costo
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5">
                             <CreditCard className="size-4 text-gray-500" />$

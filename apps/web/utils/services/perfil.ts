@@ -75,6 +75,8 @@ export type PanelJugador = {
     estadoPago: string | null;
     monto: number;
     sinCosto: boolean;
+    esGratis: boolean;
+    precioInscripcion: number;
   }>;
   resultados: Array<{
     id: string;

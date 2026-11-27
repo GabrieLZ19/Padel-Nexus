@@ -16,9 +16,12 @@ import {
   Building2,
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
-import { vistaEstadoTorneoPublico } from "@/utils/estadoTorneoPublico";
+import {
+  coincideFiltroEstadoPublico,
+  vistaEstadoTorneoPublico,
+} from "@/utils/estadoTorneoPublico";
+import { etiquetaChipCategoriaTorneoPublico } from "@/utils/etiquetaCategoriaEvento";
 import { Torneo } from "@/utils/types";
-import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 import { useProfileStore } from "@/store/useProfileStore";
 import {
   esModalidadIndividual,
@@ -215,9 +218,10 @@ function TorneosContent() {
     const matchesProvincia =
       !activeProvincia || t.clubes?.provincia === activeProvincia;
     const matchesCategory = !activeCategory || t.nivel === activeCategory;
-    const matchesStatus =
-      !activeStatus ||
-      (t.estado || "").toLowerCase() === activeStatus.toLowerCase();
+    const matchesStatus = coincideFiltroEstadoPublico(activeStatus, {
+      estado: t.estado,
+      fecha_primer_partido: t.fecha_primer_partido,
+    });
     const matchesModalidad =
       !activeModalidad ||
       (activeModalidad === MODALIDAD_PAREJAS
@@ -677,6 +681,9 @@ function TorneosContent() {
                     : isFinalizado
                       ? "Finalizado"
                       : vistaPublica.etiqueta;
+                const indicadorEnVivo = isEnCurso;
+                const indicadorProximoProgramado =
+                  !indicadorEnVivo && (isProgramado || labelEstado === "Próximo");
 
                 return (
                   <div
@@ -688,7 +695,7 @@ function TorneosContent() {
                       <div className="flex items-center justify-between gap-2 ">
                         <div className="flex gap-2">
                           <div className="bg-brand-chartreuse text-brand-black text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide">
-                            {etiquetaNivelYCategoria(t.nivel, t.categoria) || "5ª"}
+                            {etiquetaChipCategoriaTorneoPublico(t) || "5ª"}
                           </div>
                           <div className="bg-brand-white/10 text-brand-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                             {labelModalidad(t.modalidad)}
@@ -742,10 +749,30 @@ function TorneosContent() {
                     <div className="flex items-center justify-between ">
                       <div className="flex items-center gap-2 shrink-0">
                         <span
-                          className={`w-2.5 h-2.5 rounded-full ${isAbierto ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" : isFinalizado ? "bg-gray-500" : "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"}`}
+                          className={`w-2.5 h-2.5 rounded-full ${
+                            isAbierto
+                              ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                              : isFinalizado
+                                ? "bg-gray-500"
+                                : indicadorEnVivo
+                                  ? "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+                                  : indicadorProximoProgramado
+                                    ? "bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.45)]"
+                                    : "bg-sky-500"
+                          }`}
                         ></span>
                         <span
-                          className={`text-sm font-bold truncate ${isAbierto ? "text-emerald-400" : isFinalizado ? "text-gray-400" : "text-red-500"}`}
+                          className={`text-sm font-bold truncate ${
+                            isAbierto
+                              ? "text-emerald-400"
+                              : isFinalizado
+                                ? "text-gray-400"
+                                : indicadorEnVivo
+                                  ? "text-red-500"
+                                  : indicadorProximoProgramado
+                                    ? "text-amber-400"
+                                    : "text-sky-400"
+                          }`}
                         >
                           {labelEstado}
                         </span>

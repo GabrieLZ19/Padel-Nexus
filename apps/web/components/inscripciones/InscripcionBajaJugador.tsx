@@ -49,6 +49,9 @@ export function InscripcionBajaJugador({
   }
 
   if (!torneoEditable) {
+    if ((estadoTorneo || "").trim().toLowerCase() === "finalizado") {
+      return null;
+    }
     return (
       <p className="text-xs text-gray-400 rounded-xl border border-white/10 bg-white/5 px-3 py-2 leading-relaxed">
         El cuadro del torneo ya está armado. Para darte de baja, contactá al

@@ -183,8 +183,9 @@ export function FapBracketDiagram({
     const el = scrollRef.current;
     if (!el || !layoutWidthRef.current) return;
     const available = el.clientWidth - 8;
-    setZoom(zoomAjustadoAlAncho(layoutWidthRef.current, available));
-  }, []);
+    const piso = mobile ? Math.max(ZOOM_MIN, 0.42) : ZOOM_MIN;
+    setZoom(zoomAjustadoAlAncho(layoutWidthRef.current, available, piso));
+  }, [mobile]);
 
   const fitWidthFromUser = useCallback(() => {
     zoomTouchedRef.current = true;

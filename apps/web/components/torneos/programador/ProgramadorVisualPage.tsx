@@ -539,9 +539,10 @@ export function ProgramadorVisualPage({
         showInput
         inputLabel="Motivo"
         inputPlaceholder="Motivo del cambio"
+        inputMinLength={8}
         onConfirm={(inputValue) => {
           setConfirmEdicion(false);
-          void nuevaEdicion(inputValue || undefined);
+          void nuevaEdicion(inputValue?.trim());
         }}
       />
 

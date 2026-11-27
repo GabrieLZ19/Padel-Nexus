@@ -708,8 +708,9 @@ export default function PerfilJugadorAdminPage() {
                 </div>
                 {esSuperadmin ? (
                   <p className="text-[10px] text-gray-500 leading-snug">
-                    Solo superadmin. Si el DNI ya existe en otra ficha, el sistema
-                    lo rechazará y lo verás en el historial tras un cambio válido.
+                    Solo superadmin. Si el DNI ya existe en otra ficha, podés unir
+                    esta ficha en la existente desde el aviso de duplicado. Los
+                    cambios válidos quedan en el historial.
                   </p>
                 ) : null}
               </div>

@@ -403,7 +403,7 @@ export default function ProductoDetallePage() {
                 )}
 
                 {/* Stock Indicator */}
-                {producto.tipo === "producto" && (
+                {producto.tipo === "producto" && !tiendaSuspendida && (
                   <span className="text-xs text-gray-400">
                     {producto.stock > 0 ? (
                       <span>

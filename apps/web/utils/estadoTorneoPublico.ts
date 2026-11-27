@@ -1,4 +1,4 @@
-import { fechaHoyArgentina } from "@/utils/fechaArgentina";
+import { fechaHoyArgentina } from "./fechaArgentina.ts";
 
 function diaPrimerPartidoArgentina(
   fechaPrimerPartido?: string | null,
@@ -76,4 +76,29 @@ export function vistaEstadoTorneoPublico(params: {
     mostrarEnVivo: false,
     mostrarProgramado: false,
   };
+}
+
+/** PUB-31: filtros del listado alineados con la etiqueta pública de la tarjeta. */
+export function coincideFiltroEstadoPublico(
+  filtroId: string | null,
+  params: {
+    estado?: string | null;
+    fecha_primer_partido?: string | null;
+    ahora?: Date;
+  },
+): boolean {
+  if (!filtroId) return true;
+  const estadoStr = String(params.estado || "")
+    .trim()
+    .toLowerCase();
+  const filtro = filtroId.trim().toLowerCase();
+  const vista = vistaEstadoTorneoPublico(params);
+
+  if (filtro === "programado") return vista.mostrarProgramado;
+  if (filtro === "en curso") return vista.mostrarEnVivo;
+  if (filtro === "inscripción") {
+    return estadoStr === "inscripción" || estadoStr === "borrador";
+  }
+  if (filtro === "finalizado") return estadoStr === "finalizado";
+  return estadoStr === filtro;
 }

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { CreditCard, Loader2 } from "lucide-react";
 import { sileo } from "sileo";
+import FeedbackModal from "@/components/ui/FeedbackModal";
+import { textoResumenCheckoutMp } from "@/utils/resumenCheckoutMp";
 import {
   InscripcionesService,
   type EstadoPlazasPagoInscripcion,
@@ -41,6 +43,9 @@ export function InscripcionPagoActions({
   );
   const [desgloseMiPlaza, setDesgloseMiPlaza] =
     useState<CheckoutFeeResumen | null>(null);
+  const [confirmMp, setConfirmMp] = useState<{
+    alcance: "mi_plaza" | "todas_pendientes";
+  } | null>(null);
 
   const pendiente = inscripcionRequierePagoOnline({
     esGratis,
@@ -123,7 +128,26 @@ export function InscripcionPagoActions({
       )
     : Number(monto);
 
+  const abrirConfirmacionMp = (alcance: "mi_plaza" | "todas_pendientes") => {
+    setConfirmMp({ alcance });
+  };
+
+  const desgloseAlcance = (
+    alcance: "mi_plaza" | "todas_pendientes",
+  ): CheckoutFeeResumen | null =>
+    alcance === "mi_plaza" ? desgloseMiPlaza : desgloseTodas;
+
+  const montoFallbackAlcance = (
+    alcance: "mi_plaza" | "todas_pendientes",
+  ): number => {
+    if (alcance === "mi_plaza") {
+      return desgloseMiPlaza?.monto ?? precioJugador;
+    }
+    return desgloseTodas?.monto ?? totalPendiente;
+  };
+
   const iniciarMp = async (alcance: "mi_plaza" | "todas_pendientes") => {
+    setConfirmMp(null);
     setProcesando(true);
     try {
       const pref = await InscripcionesService.crearPreferenciaMp(
@@ -197,7 +221,7 @@ export function InscripcionPagoActions({
             <button
               type="button"
               disabled={procesando}
-              onClick={() => void iniciarMp("mi_plaza")}
+              onClick={() => abrirConfirmacionMp("mi_plaza")}
               className={`w-full border border-brand-chartreuse/40 bg-brand-chartreuse/10 disabled:opacity-50 hover:bg-brand-chartreuse/20 text-brand-chartreuse font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer ${
                 compact ? "py-2.5 text-sm" : "py-3 text-sm"
               }`}
@@ -216,13 +240,7 @@ export function InscripcionPagoActions({
             <button
               type="button"
               disabled={procesando}
-              onClick={() =>
-                void iniciarMp(
-                  plazasInfo.puede_pagar_todas
-                    ? "todas_pendientes"
-                    : "todas_pendientes",
-                )
-              }
+              onClick={() => abrirConfirmacionMp("todas_pendientes")}
               className={`w-full bg-brand-chartreuse disabled:opacity-50 hover:opacity-95 text-brand-black font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer ${
                 compact ? "py-2.5 text-sm" : "py-3 text-sm"
               }`}
@@ -244,7 +262,7 @@ export function InscripcionPagoActions({
             <button
               type="button"
               disabled={procesando}
-              onClick={() => void iniciarMp("todas_pendientes")}
+              onClick={() => abrirConfirmacionMp("todas_pendientes")}
               className={`w-full bg-brand-chartreuse disabled:opacity-50 hover:opacity-95 text-brand-black font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer ${
                 compact ? "py-2.5 text-sm" : "py-3.5 text-sm"
               }`}
@@ -261,6 +279,27 @@ export function InscripcionPagoActions({
           ) : null}
         </div>
       )}
+      <FeedbackModal
+        isOpen={Boolean(confirmMp)}
+        onClose={() => setConfirmMp(null)}
+        type="info"
+        title="Confirmar pago con Mercado Pago"
+        description={
+          confirmMp
+            ? `Revisá el importe antes de continuar.\n\n${textoResumenCheckoutMp(
+                desgloseAlcance(confirmMp.alcance),
+                montoFallbackAlcance(confirmMp.alcance),
+              )}`
+            : ""
+        }
+        scrollableDescription
+        confirmText="Ir a Mercado Pago"
+        cancelText="Volver"
+        isLoading={procesando}
+        onConfirm={() => {
+          if (confirmMp) void iniciarMp(confirmMp.alcance);
+        }}
+      />
     </div>
   );
 }

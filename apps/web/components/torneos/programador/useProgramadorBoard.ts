@@ -745,8 +745,17 @@ export function useProgramadorBoard(
       }
       setBusy(true);
       try {
+        const texto = motivo?.trim() ?? "";
+        if (texto.length < 8) {
+          sileo.warning({
+            title: "Motivo requerido",
+            description:
+              "Indicá un motivo de al menos 8 caracteres para abrir una nueva edición.",
+          });
+          return;
+        }
         const data = await TorneosService.nuevaEdicionProgramacion(torneoId, {
-          motivo: motivo || "Nueva edición de programación",
+          motivo: texto,
         });
         applyBoard(data);
         sileo.success({ title: "Edición abierta" });

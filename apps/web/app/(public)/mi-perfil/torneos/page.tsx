@@ -62,7 +62,8 @@ export default function MisTorneosPage() {
       <ul className="space-y-3">
         {panel?.inscripciones.map((inscripcion) => {
           const pendientePago = inscripcionRequierePagoOnline({
-            esGratis: inscripcion.sinCosto,
+            esGratis: inscripcion.esGratis,
+            precioInscripcion: inscripcion.precioInscripcion,
             monto: inscripcion.monto,
             estadoPago: inscripcion.estadoPago,
           });
@@ -100,7 +101,8 @@ export default function MisTorneosPage() {
                   inscripcionId={inscripcion.id}
                   monto={inscripcion.monto}
                   estadoPago={inscripcion.estadoPago}
-                  esGratis={inscripcion.sinCosto}
+                  esGratis={inscripcion.esGratis}
+                  precioInscripcion={inscripcion.precioInscripcion}
                   compact
                 />
               ) : null}
