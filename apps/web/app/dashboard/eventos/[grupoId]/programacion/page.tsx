@@ -14,6 +14,8 @@ export default function DashboardEventoProgramacionPage() {
   const grupoId = params?.grupoId as string;
   const [torneoRef, setTorneoRef] = useState<string>("");
   const [eventoNombre, setEventoNombre] = useState<string | null>(null);
+  const [initialBoard, setInitialBoard] =
+    useState<ProgramacionBoardEvento | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,6 +24,7 @@ export default function DashboardEventoProgramacionPage() {
       .then((board: ProgramacionBoardEvento) => {
         setTorneoRef(board.torneo_referencia_id);
         setEventoNombre(board.evento_nombre);
+        setInitialBoard(board);
       })
       .catch(() => {
         setError("No se pudo cargar el evento o no tiene categorías agrupadas.");
@@ -56,6 +59,7 @@ export default function DashboardEventoProgramacionPage() {
       torneoId={torneoRef}
       grupoId={grupoId}
       tituloEvento={eventoNombre}
+      initialBoard={initialBoard}
       backHref="/dashboard/torneos"
     />
   );

@@ -1360,6 +1360,21 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     return ladoSlotBloqueadoPorMatriz(ref) ? formatFapSide(ref) : null;
   };
 
+  const etiquetaOpcionVaciaSlot = (lado: "a" | "b"): string => {
+    if (!selectedMatchToEdit) return "Vacío / BYE";
+    const tieneEquipo =
+      lado === "a"
+        ? Boolean(selectedMatchToEdit.equipo_a_id)
+        : Boolean(selectedMatchToEdit.equipo_b_id);
+    if (tieneEquipo) return "Vacío / BYE";
+    const esperado = origenLadoLlavePartido(
+      selectedMatchToEdit,
+      lado,
+      matrizPartidoEnEdicion,
+    );
+    return esperado || "Vacío / BYE";
+  };
+
   const cabezasSerieIds = React.useMemo(() => {
     const ids = new Set<string>();
     for (const zona of zonas) {
@@ -1485,13 +1500,21 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       const ladoB = resolverLadoParaGuardarPartido(
         selectedMatchToEdit.equipo_b_id,
       );
+      const semillaFapGuardar =
+        matchEditSemillaFap?.trim() ||
+        (matrizPartidoEnEdicion
+          ? inferirSemillaPaseDirectoEnSpec(matrizPartidoEnEdicion)
+          : null);
+      const altaPaseDirecto = Boolean(ladoA.alta || ladoB.alta);
       await TorneosService.actualizarEquiposPartido(selectedMatchToEdit.id, {
         equipo_a_id: ladoA.equipoId,
         equipo_b_id: ladoB.equipoId,
         motivo: matchEditMotivo.trim(),
         ...(ladoA.alta ? { alta_lado_a: ladoA.alta } : {}),
         ...(ladoB.alta ? { alta_lado_b: ladoB.alta } : {}),
-        ...(matchEditSemillaFap ? { semilla_fap: matchEditSemillaFap } : {}),
+        ...(semillaFapGuardar && (altaPaseDirecto || matchEditSemillaFap)
+          ? { semilla_fap: semillaFapGuardar }
+          : {}),
       });
       descartarPendientesModalLlave();
       setShowMatchEditModal(false);
@@ -2122,8 +2145,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
             </div>
             <div className="text-brand-ayuda text-xs sm:text-sm font-medium">
               {zonas.length} zonas · {totalParejas}{" "}
-              {isIndividual ? "jugadores" : "parejas"} ·{" "}
-              {getClasificanTexto(zonas)}
+              {isIndividual ? "jugadores" : "parejas"}
+              {isEditing && puedeEditarZonas
+                ? null
+                : ` · ${getClasificanTexto(zonas)}`}
             </div>
           </div>
 
@@ -2783,7 +2808,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   value={selectedMatchToEdit.equipo_a_id || ""}
                   onChange={(newId) => applyInscripcionToSlot("a", newId)}
                   options={[
-                    { value: "", label: "Vacío / BYE" },
+                    {
+                      value: "",
+                      label: etiquetaOpcionVaciaSlot("a"),
+                    },
                     ...inscripcionOptions
                       .filter((o) => {
                         if (!o.value) return true;
@@ -2797,7 +2825,11 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                         label: o.label,
                       })),
                   ]}
-                  placeholder="Seleccionar pareja A..."
+                  placeholder={
+                    selectedMatchToEdit.equipo_a_id
+                      ? "Seleccionar pareja A..."
+                      : etiquetaOpcionVaciaSlot("a")
+                  }
                 />
                 )}
               </div>
@@ -2857,7 +2889,10 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   value={selectedMatchToEdit.equipo_b_id || ""}
                   onChange={(newId) => applyInscripcionToSlot("b", newId)}
                   options={[
-                    { value: "", label: "Vacío / BYE" },
+                    {
+                      value: "",
+                      label: etiquetaOpcionVaciaSlot("b"),
+                    },
                     ...inscripcionOptions
                       .filter((o) => {
                         if (!o.value) return true;
@@ -2871,7 +2906,11 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                         label: o.label,
                       })),
                   ]}
-                  placeholder="Seleccionar pareja B..."
+                  placeholder={
+                    selectedMatchToEdit.equipo_b_id
+                      ? "Seleccionar pareja B..."
+                      : etiquetaOpcionVaciaSlot("b")
+                  }
                 />
                 )}
               </div>

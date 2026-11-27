@@ -91,6 +91,10 @@ describe("TOR-22 pase directo en modal de llave", () => {
       puedeUsarAltaParejaEnSlot(spec, null, "a", bloqueado, ctx),
       false,
     );
+    assert.equal(
+      puedeUsarAltaParejaEnSlot(spec, null, "b", bloqueado, ctx),
+      false,
+    );
     assert.equal(slotPermiteAltaPaseDirecto(spec, matrix, 19, "a", null), false);
     assert.equal(slotPermiteAltaPaseDirecto(spec, matrix, 19, "a", "3C"), false);
   });

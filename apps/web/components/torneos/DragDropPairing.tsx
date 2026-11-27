@@ -29,9 +29,10 @@ import { PairDisplay } from "@/components/torneos/PairDisplay";
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import {
   clasificadosPorZona,
+  textoClasificacionZonaCorto,
   textoClasificacionZonas,
 } from "@/utils/clasificacionZonas";
-import { cleanJugadorNombre } from "@/utils/nombrePareja";
+import { cleanJugadorNombre, formatNombrePareja } from "@/utils/nombrePareja";
 import { sileo } from "sileo";
 
 const cleanName = (name?: string | null) => cleanJugadorNombre(name);
@@ -138,6 +139,11 @@ export const SortablePareja = ({
       style={style}
       {...(isEditing ? attributes : {})}
       {...(isEditing ? listeners : {})}
+      title={
+        isEditing
+          ? formatNombrePareja(j1 || pareja.jugador1_nombre, j2 || pareja.jugador2_nombre)
+          : undefined
+      }
       className={`relative flex items-center gap-3 p-3 rounded-2xl transition-all group shadow-md select-none border-2 ${
         isEditing && stats.played > 0
           ? "bg-[#222222] border-white/10 opacity-80 cursor-not-allowed"
@@ -181,8 +187,9 @@ export const SortablePareja = ({
               provincia={pareja.provincia}
               letra_prioridad={pareja.letra_prioridad}
               alcanceNacional={usaDenominacion}
+              forzarNombreCompleto={isEditing}
               showAvatars={false}
-              variant="stacked"
+              variant={isEditing ? "inline" : "stacked"}
               compact
             />
             {institucionLabel === "Pase directo a Semis" ||
@@ -467,7 +474,9 @@ export const DroppableZona = ({
         </h4>
         {!isSiembra && (
           <span className="px-3 py-1 bg-black/40 rounded-full text-xs font-bold text-gray-400 uppercase tracking-wide">
-            {getClasificanTexto([zona])}
+            {isEditing
+              ? textoClasificacionZonaCorto(zona.parejas.length)
+              : getClasificanTexto([zona])}
           </span>
         )}
       </div>

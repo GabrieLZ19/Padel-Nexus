@@ -10,6 +10,14 @@ export function clasificadosPorZona(parejasCount: number): number {
   return 2;
 }
 
+/** TOR-69: rótulo corto en editor de zonas (ej. «4 parejas · 3 clasifican»). */
+export function textoClasificacionZonaCorto(parejasCount: number): string {
+  const n = Math.max(0, parejasCount);
+  if (n === 0) return "Sin parejas";
+  const k = clasificadosPorZona(n);
+  return `${n} ${n === 1 ? "pareja" : "parejas"} · ${k} clasifican`;
+}
+
 export function partidosEsperadosEnZona(parejasCount: number): number {
   if (parejasCount === 4) return 4;
   if (parejasCount === 2) return 1;

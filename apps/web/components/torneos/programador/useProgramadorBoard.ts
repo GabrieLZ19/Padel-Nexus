@@ -63,15 +63,23 @@ function apiErrorMessage(e: unknown, fallback: string): string {
 
 export function useProgramadorBoard(
   torneoId: string,
-  options?: { grupoId?: string; ordenAutoTorneoIds?: string[] },
+  options?: {
+    grupoId?: string;
+    ordenAutoTorneoIds?: string[];
+    /** CLI-27: evita segundo GET si la página ya cargó el board del evento. */
+    initialBoard?: ProgramacionBoard | null;
+  },
 ) {
   const grupoId = options?.grupoId;
+  const initialBoardRef = useRef(options?.initialBoard ?? null);
   const ordenAutoRef = useRef(options?.ordenAutoTorneoIds ?? []);
   useEffect(() => {
     ordenAutoRef.current = options?.ordenAutoTorneoIds ?? [];
   }, [options?.ordenAutoTorneoIds]);
-  const [board, setBoard] = useState<ProgramacionBoard | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [board, setBoard] = useState<ProgramacionBoard | null>(
+    options?.initialBoard ?? null,
+  );
+  const [loading, setLoading] = useState(!options?.initialBoard);
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [config, setConfig] = useState<ProgramadorConfig>({
@@ -174,6 +182,16 @@ export function useProgramadorBoard(
   );
 
   useEffect(() => {
+    if (options?.initialBoard) {
+      initialBoardRef.current = options.initialBoard;
+      configHidratadaRef.current = false;
+      applyBoard(options.initialBoard);
+      setLoading(false);
+      return () => {
+        if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+        if (configTimerRef.current) clearTimeout(configTimerRef.current);
+      };
+    }
     configHidratadaRef.current = false;
     void load();
     return () => {
@@ -182,6 +200,14 @@ export function useProgramadorBoard(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [torneoId, grupoId]);
+
+  useEffect(() => {
+    const next = options?.initialBoard;
+    if (!next || next === initialBoardRef.current) return;
+    initialBoardRef.current = next;
+    applyBoard(next);
+    setLoading(false);
+  }, [options?.initialBoard, applyBoard]);
 
   const scheduleBoardSync = useCallback(() => {
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);

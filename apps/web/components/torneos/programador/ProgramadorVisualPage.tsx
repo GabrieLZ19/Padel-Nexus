@@ -40,6 +40,7 @@ interface Props {
   backHref: string;
   grupoId?: string;
   tituloEvento?: string | null;
+  initialBoard?: ProgramacionBoardEvento | null;
 }
 
 export function ProgramadorVisualPage({
@@ -47,6 +48,7 @@ export function ProgramadorVisualPage({
   backHref,
   grupoId,
   tituloEvento,
+  initialBoard,
 }: Props) {
   const router = useRouter();
   const [filtroTorneoId, setFiltroTorneoId] = useState<string | null>(null);
@@ -75,7 +77,11 @@ export function ProgramadorVisualPage({
     nuevaEdicion,
     issueByPartido,
     partidoEnSlot,
-  } = useProgramadorBoard(torneoId, { grupoId, ordenAutoTorneoIds: ordenAutoIds });
+  } = useProgramadorBoard(torneoId, {
+    grupoId,
+    ordenAutoTorneoIds: ordenAutoIds,
+    initialBoard: initialBoard ?? undefined,
+  });
 
   const boardEvento = useMemo((): ProgramacionBoardEvento | null => {
     if (!board || !grupoId) return null;

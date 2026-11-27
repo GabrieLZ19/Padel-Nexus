@@ -76,6 +76,8 @@ export type PairDisplayProps = {
   emptyLabel?: string;
   /** Lista / tabla: una sola línea expandible */
   variant?: "bracket" | "inline" | "stacked";
+  /** TOR-69: en edición de zonas mostrar nombre + apellido aunque sea nacional. */
+  forzarNombreCompleto?: boolean;
 };
 
 /**
@@ -99,6 +101,7 @@ export function PairDisplay({
   showAvatars = true,
   emptyLabel = POR_DEFINIR,
   variant = "stacked",
+  forzarNombreCompleto = false,
 }: PairDisplayProps) {
   const denomRaw = etiquetaInstitucion({
     denominacion_nacional: denominacion,
@@ -163,7 +166,11 @@ export function PairDisplay({
     </div>
   );
 
-  if (alcanceNacional && (denomTitulo || apellido1 || apellido2)) {
+  if (
+    alcanceNacional &&
+    !forzarNombreCompleto &&
+    (denomTitulo || apellido1 || apellido2)
+  ) {
     return (
       <span
         className={`inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 min-w-0 ${

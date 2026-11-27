@@ -133,36 +133,43 @@ export function puedeUsarAltaParejaEnSlot(
 ): boolean {
   if (ladoClasificadoPaseDirectoProtegido(spec, semillaFap, slot)) return false;
   if (!spec) return true;
-  const semillaPase = inferirSemillaPaseDirectoEnSpec(spec);
-  if (semillaPase && ladoSemillaPaseDirecto(spec) === slot) return false;
-  const ref = slot === "a" ? spec.a : spec.b;
-  const ladoRival = ladoRivalPaseDirecto(spec);
+
   const matrizFap = contexto?.matrix;
   const matchOrden = contexto?.matchOrden;
+  const semilla = (
+    semillaFap?.trim() || inferirSemillaPaseDirectoEnSpec(spec) || ""
+  ).toUpperCase();
+  const tieneHuecoGanador =
+    spec.a.trim().startsWith("W") || spec.b.trim().startsWith("W");
 
-  if (ladoRival === slot && (semillaFap?.trim() || semillaPase)) {
+  if (tieneHuecoGanador) {
     if (matrizFap?.length && matchOrden != null) {
-      return slotPermiteAltaPaseDirecto(
-        spec,
-        matrizFap,
-        matchOrden,
-        slot,
-        semillaFap,
-      );
+      if (semilla && esSemillaPaseDirectoFap(semilla)) {
+        return slotPermiteAltaPaseDirecto(
+          spec,
+          matrizFap,
+          matchOrden,
+          slot,
+          semillaFap,
+        );
+      }
+      return false;
     }
-    return true;
-  }
-  if (refLadoBloqueadoPorMatriz(ref) && !semillaFap?.trim() && !semillaPase)
+    const semillaPase = inferirSemillaPaseDirectoEnSpec(spec);
+    if (
+      semillaPase &&
+      esSemillaPaseDirectoFap(semillaPase) &&
+      ladoRivalPaseDirecto(spec) === slot
+    ) {
+      return true;
+    }
     return false;
-  if (!refLadoBloqueadoPorMatriz(ref)) return true;
-  if (matrizFap?.length && matchOrden != null) {
-    return slotPermiteAltaPaseDirecto(
-      spec,
-      matrizFap,
-      matchOrden,
-      slot,
-      semillaFap,
-    );
   }
-  return Boolean(semillaFap?.trim() || semillaPase);
+
+  const semillaPase = inferirSemillaPaseDirectoEnSpec(spec);
+  if (semillaPase && ladoSemillaPaseDirecto(spec) === slot) return false;
+
+  const ref = slot === "a" ? spec.a : spec.b;
+  if (refLadoBloqueadoPorMatriz(ref)) return false;
+  return true;
 }
