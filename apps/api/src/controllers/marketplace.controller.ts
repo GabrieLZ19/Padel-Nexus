@@ -24,6 +24,13 @@ function parseEntidadRef(req: Request): {
   return { entidad_tipo, entidad_id };
 }
 
+function statusHttpTiendaSuspendidaVenta(message: string): number | null {
+  if (message.includes("no está disponible para nuevas compras")) {
+    return 403;
+  }
+  return null;
+}
+
 export class MarketplaceController {
   static async listarCategorias(req: Request, res: Response) {
     try {
@@ -152,8 +159,11 @@ export class MarketplaceController {
       );
       res.status(201).json(orden);
     } catch (err: any) {
-      const status = err.message.includes("Stock insuficiente") ? 409 : 500;
-      res.status(status).json({ message: err.message });
+      const message = String(err?.message || "Error desconocido");
+      const status =
+        statusHttpTiendaSuspendidaVenta(message) ??
+        (message.includes("Stock insuficiente") ? 409 : 500);
+      res.status(status).json({ message });
     }
   }
 
@@ -169,7 +179,8 @@ export class MarketplaceController {
       res.json(data);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Error desconocido";
-      res.status(400).json({ message });
+      const status = statusHttpTiendaSuspendidaVenta(message) ?? 400;
+      res.status(status).json({ message });
     }
   }
 
@@ -179,7 +190,8 @@ export class MarketplaceController {
       res.json(data);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Error desconocido";
-      res.status(400).json({ message });
+      const status = statusHttpTiendaSuspendidaVenta(message) ?? 400;
+      res.status(status).json({ message });
     }
   }
 
@@ -192,7 +204,9 @@ export class MarketplaceController {
         });
       res.json(preferencia);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      const message = String(err?.message || "Error desconocido");
+      const status = statusHttpTiendaSuspendidaVenta(message) ?? 500;
+      res.status(status).json({ message });
     }
   }
 
@@ -216,6 +230,10 @@ export class MarketplaceController {
       const message = err instanceof Error ? err.message : "Error desconocido";
       if (message.includes("permiso para confirmar")) {
         return res.status(403).json({ message });
+      }
+      const statusSuspendida = statusHttpTiendaSuspendidaVenta(message);
+      if (statusSuspendida) {
+        return res.status(statusSuspendida).json({ message });
       }
       res.status(400).json({ message });
     }

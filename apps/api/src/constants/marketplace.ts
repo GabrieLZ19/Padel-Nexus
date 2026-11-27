@@ -3,6 +3,10 @@ export const MARKETPLACE_ESTADOS_VENDEDOR = {
   SUSPENDIDO: "suspendido",
 } as const;
 
+/** Mensaje base cuando la tienda está suspendida y no admite ventas. */
+export const MARKETPLACE_MENSAJE_TIENDA_SUSPENDIDA_VENTA =
+  "La tienda no está disponible para nuevas compras.";
+
 export const MARKETPLACE_ESTADOS_ORDEN = {
   PENDIENTE: "pendiente",
   PAGADA: "pagada",

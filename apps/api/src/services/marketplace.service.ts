@@ -12,6 +12,7 @@ import {
   MARKETPLACE_AUDIENCIAS_PROMOCION,
   MARKETPLACE_ESTADOS_ORDEN,
   MARKETPLACE_ESTADOS_VENDEDOR,
+  MARKETPLACE_MENSAJE_TIENDA_SUSPENDIDA_VENTA,
   marketplaceOrdenEstadoCobrado,
   puedeAudienciaPromocionPlataforma,
   type AudienciaPromocion,
@@ -346,7 +347,7 @@ export class MarketplaceService {
       .select(
         `
         *,
-        vendedor:marketplace_vendedores!inner(id, usuario_id, nombre_tienda, tipo, descripcion, logo_url, provincia, valoracion_promedio, total_ventas),
+        vendedor:marketplace_vendedores!inner(id, usuario_id, nombre_tienda, tipo, descripcion, logo_url, provincia, valoracion_promedio, total_ventas, estado),
         categoria:marketplace_categorias!inner(id, nombre, slug)
       `,
       )
@@ -371,9 +372,13 @@ export class MarketplaceService {
 
     const vendedorRaw = producto.vendedor as {
       id: string;
+      estado?: string;
       total_ventas?: number;
       [key: string]: unknown;
     };
+    const tienda_suspendida =
+      (vendedorRaw.estado || "").toLowerCase() !==
+      MARKETPLACE_ESTADOS_VENDEDOR.ACTIVO;
     const [ventasCobradasVendedor, ventas_cobradas] = await Promise.all([
       contarOrdenesCobradasPorVendedor(vendedorRaw.id),
       contarUnidadesCobradasPorProducto(productoId),
@@ -382,6 +387,7 @@ export class MarketplaceService {
     return {
       ...producto,
       ventas_cobradas,
+      tienda_suspendida,
       vendedor: {
         ...vendedorRaw,
         total_ventas: ventasCobradasVendedor,
@@ -536,6 +542,36 @@ export class MarketplaceService {
       throw new Error("La tienda de esta entidad está suspendida.");
     }
     return tienda;
+  }
+
+  /** MKT-12: bloquea órdenes y pagos si algún vendedor del carrito no está activo. */
+  private static async assertVendedoresActivosParaVenta(
+    vendedorIds: string[],
+  ): Promise<void> {
+    const unicos = [...new Set(vendedorIds.filter(Boolean))];
+    if (unicos.length === 0) return;
+
+    const { data: vendedores, error } = await supabaseAdmin
+      .from("marketplace_vendedores")
+      .select("id, nombre_tienda, estado")
+      .in("id", unicos);
+
+    if (error) {
+      throw new Error("Error al verificar la tienda.");
+    }
+
+    const porId = new Map((vendedores || []).map((v) => [v.id, v]));
+    for (const id of unicos) {
+      const v = porId.get(id);
+      if (!v || v.estado !== MARKETPLACE_ESTADOS_VENDEDOR.ACTIVO) {
+        const nombre = v?.nombre_tienda?.trim();
+        throw new Error(
+          nombre
+            ? `"${nombre}" no está disponible para nuevas compras.`
+            : MARKETPLACE_MENSAJE_TIENDA_SUSPENDIDA_VENTA,
+        );
+      }
+    }
   }
 
   static async obtenerUltimaSuspensionVendedor(vendedorId: string): Promise<{
@@ -896,6 +932,10 @@ export class MarketplaceService {
       total += producto.precio * item.cantidad;
     }
 
+    await MarketplaceService.assertVendedoresActivosParaVenta(
+      items.map((item) => productosMap.get(item.productoId)!.vendedor_id),
+    );
+
     const ahoraOrden = new Date();
     const { data: orden, error: errOrden } = await supabaseAdmin
       .from("marketplace_ordenes")
@@ -963,6 +1003,7 @@ export class MarketplaceService {
     const productosMap = new Map(productos.map((p) => [p.id, p]));
     let subtotal = 0;
     let vendedorId: string | null = null;
+    const vendedorIds: string[] = [];
 
     for (const item of items) {
       const producto = productosMap.get(item.productoId);
@@ -973,10 +1014,13 @@ export class MarketplaceService {
         throw new Error(`El producto "${producto.nombre}" ya no está disponible.`);
       }
       subtotal += Number(producto.precio) * item.cantidad;
+      vendedorIds.push(producto.vendedor_id);
       if (!vendedorId) {
         vendedorId = producto.vendedor_id;
       }
     }
+
+    await MarketplaceService.assertVendedoresActivosParaVenta(vendedorIds);
 
     return { subtotal, vendedorId };
   }
@@ -1019,9 +1063,14 @@ export class MarketplaceService {
       throw new Error("Orden no encontrada.");
     }
 
+    const itemsOrden = (orden as { items?: Array<{ vendedor_id: string }> })
+      .items;
+    await MarketplaceService.assertVendedoresActivosParaVenta(
+      (itemsOrden || []).map((item) => item.vendedor_id),
+    );
+
     const subtotal = Number(orden.total);
-    const vendedorSample = (orden as { items?: Array<{ vendedor_id: string }> })
-      .items?.[0];
+    const vendedorSample = itemsOrden?.[0];
     const { PlatformFeeService } = await import("./platformFee.service");
     const org = vendedorSample?.vendedor_id
       ? ({
@@ -1137,7 +1186,7 @@ export class MarketplaceService {
         `
         id, total, estado, comprador_id, created_at, retiene_hasta,
         items:marketplace_items_orden(
-          cantidad, precio_unitario,
+          cantidad, precio_unitario, vendedor_id,
           producto:marketplace_productos(id, nombre)
         )
       `,
@@ -1160,6 +1209,13 @@ export class MarketplaceService {
       );
       throw new Error("El plazo de pago de esta orden venció.");
     }
+
+    const vendedoresOrden = (
+      orden as { items?: Array<{ vendedor_id?: string | null }> }
+    ).items;
+    await MarketplaceService.assertVendedoresActivosParaVenta(
+      (vendedoresOrden || []).map((item) => String(item.vendedor_id || "")),
+    );
 
     const ahoraMp = new Date();
     const retieneHastaMp = retencionInicialOrdenDesde(ahoraMp);
@@ -1306,6 +1362,11 @@ export class MarketplaceService {
         items: Array<{ cantidad: number; precio_unitario: number; vendedor_id: string }>;
       }
     ).items;
+
+    await MarketplaceService.assertVendedoresActivosParaVenta(
+      items.map((item) => item.vendedor_id),
+    );
+
     const subtotal = items.reduce(
       (acc, item) => acc + Number(item.precio_unitario) * item.cantidad,
       0,
