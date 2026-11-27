@@ -1047,7 +1047,25 @@ export class MarketplaceService {
     };
   }
 
-  static async previewCheckoutOrden(ordenId: string) {
+  private static async assertCompradorOrden(
+    ordenId: string,
+    compradorId: string,
+  ): Promise<void> {
+    const { data: orden, error } = await supabaseAdmin
+      .from("marketplace_ordenes")
+      .select("comprador_id")
+      .eq("id", ordenId)
+      .maybeSingle();
+    if (error || !orden) {
+      throw new Error("Orden no encontrada.");
+    }
+    if (orden.comprador_id !== compradorId) {
+      throw new Error("No tenés permiso para acceder a esta orden.");
+    }
+  }
+
+  static async previewCheckoutOrden(ordenId: string, compradorId: string) {
+    await MarketplaceService.assertCompradorOrden(ordenId, compradorId);
     const { data: orden, error } = await supabaseAdmin
       .from("marketplace_ordenes")
       .select(
@@ -1177,8 +1195,10 @@ export class MarketplaceService {
 
   static async crearPreferenciaMercadoPago(
     ordenId: string,
+    compradorId: string,
     options?: { mobile?: boolean },
   ) {
+    await MarketplaceService.assertCompradorOrden(ordenId, compradorId);
     await MarketplaceService.expirarOrdenesPendientesVencidas();
     const { data: orden, error: errOrden } = await supabaseAdmin
       .from("marketplace_ordenes")

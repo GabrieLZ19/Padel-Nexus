@@ -186,10 +186,20 @@ export class MarketplaceController {
 
   static async previewCheckoutOrden(req: Request, res: Response) {
     try {
-      const data = await MarketplaceService.previewCheckoutOrden(req.params.id);
+      const compradorId = req.user?.id;
+      if (!compradorId) {
+        return res.status(401).json({ message: "No autenticado." });
+      }
+      const data = await MarketplaceService.previewCheckoutOrden(
+        req.params.id,
+        compradorId,
+      );
       res.json(data);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Error desconocido";
+      if (message.includes("permiso para acceder")) {
+        return res.status(403).json({ message });
+      }
       const status = statusHttpTiendaSuspendidaVenta(message) ?? 400;
       res.status(status).json({ message });
     }
@@ -197,14 +207,23 @@ export class MarketplaceController {
 
   static async pagarOrden(req: Request, res: Response) {
     try {
+      const compradorId = req.user?.id;
+      if (!compradorId) {
+        return res.status(401).json({ message: "No autenticado." });
+      }
       const mobile = (req.get("x-padel-client") || "").toLowerCase() === "mobile";
       const preferencia =
-        await MarketplaceService.crearPreferenciaMercadoPago(req.params.id, {
-          mobile,
-        });
+        await MarketplaceService.crearPreferenciaMercadoPago(
+          req.params.id,
+          compradorId,
+          { mobile },
+        );
       res.json(preferencia);
     } catch (err: any) {
       const message = String(err?.message || "Error desconocido");
+      if (message.includes("permiso para acceder")) {
+        return res.status(403).json({ message });
+      }
       const status = statusHttpTiendaSuspendidaVenta(message) ?? 500;
       res.status(status).json({ message });
     }

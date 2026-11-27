@@ -283,11 +283,13 @@ export class ClubPanelController {
         accion !== "confirmar" &&
         accion !== "cobrar" &&
         accion !== "cancelar" &&
-        accion !== "ausente"
+        accion !== "ausente" &&
+        accion !== "reembolsar"
       ) {
         return res.status(400).json({
           exito: false,
-          error: "La acción tiene que ser confirmar, cobrar, cancelar o ausente.",
+          error:
+            "La acción tiene que ser confirmar, cobrar, cancelar, ausente o reembolsar.",
         });
       }
       const motivo =

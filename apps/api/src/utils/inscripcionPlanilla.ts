@@ -28,6 +28,22 @@ export interface ParsePlanillaResult {
   filas: FilaPlanillaInscripcion[];
 }
 
+export interface OpcionesParsearFilasPlanilla {
+  /** Primera fila Excel que corresponde a `matrix[0]` (desde `!ref` del libro). */
+  filaInicioExcel?: number;
+}
+
+/** Fila Excel 1-index del origen del rango usado (p. ej. `A5:H20` → 5). */
+export function filaInicioExcelDesdeSheetRef(ref?: string | null): number {
+  const raw = String(ref ?? "").trim();
+  if (!raw) return 1;
+  const celdaInicio = raw.split(":")[0] ?? raw;
+  const match = /^[A-Za-z]+(\d+)/.exec(celdaInicio);
+  if (!match) return 1;
+  const n = parseInt(match[1], 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
 /** Quita artefactos OOXML/HTML que a veces filtran desde celdas Excel (`<v>`, etc.). */
 export function sanearValorCeldaPlanilla(valor: unknown): string {
   let s = String(valor ?? "").trim();
@@ -173,7 +189,9 @@ export function esFilaEncabezadoPlanilla(row: string[]): boolean {
 /** Parsea filas crudas (array de arrays) exportadas desde la planilla XLS. */
 export function parsearFilasPlanilla(
   matrix: unknown[][],
+  opciones?: OpcionesParsearFilasPlanilla,
 ): ParsePlanillaResult {
+  const filaInicioExcel = opciones?.filaInicioExcel ?? 1;
   let headerIndex = -1;
   let headerRow: string[] = [];
 
@@ -250,7 +268,7 @@ export function parsearFilasPlanilla(
     }
 
     filas.push({
-      fila: r + 1,
+      fila: filaInicioExcel + r,
       letraOrden: letraRaw || ultimaLetra,
       asociacion: asociacionRaw || ultimaAsociacion,
       apellidoNombre,
@@ -336,6 +354,153 @@ export function sanitizarFilaPlanillaInscripcion(
 /** Número de fila visible (1-indexed, como en Excel). */
 export function etiquetaFilaPlanillaExcel(fila: number): string {
   return `Fila ${fila}`;
+}
+
+/** TOR-68: DNI vacío vs demasiado corto. */
+export function errorDniFilaPlanilla(
+  fila: FilaPlanillaInscripcion,
+): string | null {
+  const dni = normalizarDni(fila.dni);
+  const etiqueta = etiquetaFilaPlanillaExcel(fila.fila);
+  if (!dni) {
+    return `${etiqueta}: el DNI está vacío; completalo en la planilla.`;
+  }
+  if (dni.length < 7) {
+    return `${etiqueta}: el DNI "${dni}" tiene menos de 7 dígitos; corregilo en la planilla.`;
+  }
+  return null;
+}
+
+/** TOR-68: aviso cuando el nombre no sigue «Apellido, Nombre». */
+export function advertenciaNombreSinComaPlanilla(
+  fila: FilaPlanillaInscripcion,
+): string | null {
+  const raw = sanearValorCeldaPlanilla(fila.apellidoNombre);
+  if (!raw || raw.includes(",")) return null;
+  const { apellido, nombre } = parseNombreCompleto(raw);
+  const vista = `${apellido}, ${nombre}`;
+  return `${etiquetaFilaPlanillaExcel(fila.fila)}: el nombre no incluye coma (formato esperado «Apellido, Nombre»). Se interpretará como «${vista}».`;
+}
+
+function mapaDnisDuplicadosPlanilla(
+  filas: FilaPlanillaInscripcion[],
+): Map<string, number[]> {
+  const porDni = new Map<string, number[]>();
+  for (const fila of filas) {
+    const dni = normalizarDni(fila.dni);
+    if (dni.length < 7) continue;
+    const lista = porDni.get(dni) ?? [];
+    lista.push(fila.fila);
+    porDni.set(dni, lista);
+  }
+  return porDni;
+}
+
+export interface ResultadoValidacionPlanilla {
+  errores: string[];
+  advertencias: string[];
+}
+
+/** Validaciones estructurales previas a importar (sin tocar la base de datos). */
+export function validarEstructuraPlanillaAntesImport(
+  filas: FilaPlanillaInscripcion[],
+  individual: boolean,
+): ResultadoValidacionPlanilla {
+  const errores: string[] = [];
+  const advertencias: string[] = [];
+  const dnisDuplicados = mapaDnisDuplicadosPlanilla(filas);
+
+  for (const fila of filas) {
+    const errDni = errorDniFilaPlanilla(fila);
+    if (errDni) errores.push(errDni);
+    const advNombre = advertenciaNombreSinComaPlanilla(fila);
+    if (advNombre) advertencias.push(advNombre);
+    if (!sanearValorCeldaPlanilla(fila.apellidoNombre)) {
+      errores.push(
+        `${etiquetaFilaPlanillaExcel(fila.fila)}: falta apellido y nombre.`,
+      );
+    }
+    const dni = normalizarDni(fila.dni);
+    const filasDup = dnisDuplicados.get(dni);
+    if (dni.length >= 7 && filasDup && filasDup.length > 1) {
+      const otras = filasDup.filter((n) => n !== fila.fila);
+      errores.push(
+        `${etiquetaFilaPlanillaExcel(fila.fila)}: DNI ${dni} repetido (también en fila ${otras.join(", ")}).`,
+      );
+    }
+  }
+
+  if (!individual) {
+    const grupos = agruparFilasEnParejas(filas);
+    const clavesPareja = new Map<string, string[]>();
+
+    for (const grupo of grupos) {
+      if (!grupo.j2) {
+        errores.push(
+          `${etiquetaFilaPlanillaExcel(grupo.j1.fila)}: la pareja quedó incompleta (falta el segundo jugador).`,
+        );
+        continue;
+      }
+      const d1 = normalizarDni(grupo.j1.dni);
+      const d2 = normalizarDni(grupo.j2.dni);
+      if (d1.length < 7 || d2.length < 7) continue;
+      const key = [d1, d2].sort().join("|");
+      const ref = `Filas ${grupo.j1.fila} y ${grupo.j2.fila}`;
+      const lista = clavesPareja.get(key) ?? [];
+      lista.push(ref);
+      clavesPareja.set(key, lista);
+    }
+
+    for (const refs of clavesPareja.values()) {
+      if (refs.length > 1) {
+        errores.push(
+          `Pareja duplicada (${refs.join("; ")}): los mismos dos DNI aparecen más de una vez.`,
+        );
+      }
+    }
+  }
+
+  return { errores, advertencias };
+}
+
+/** Errores de una pareja/fila que impiden resolver fichas (CLI-1 / TOR-68). */
+export function erroresGrupoPlanillaImport(
+  grupo: { j1: FilaPlanillaInscripcion; j2?: FilaPlanillaInscripcion },
+  individual: boolean,
+  filas: FilaPlanillaInscripcion[],
+): string[] {
+  const dnisDuplicados = mapaDnisDuplicadosPlanilla(filas);
+  const out: string[] = [];
+
+  const revisarJugador = (f: FilaPlanillaInscripcion) => {
+    const errDni = errorDniFilaPlanilla(f);
+    if (errDni) out.push(errDni);
+    const dni = normalizarDni(f.dni);
+    const dup = dnisDuplicados.get(dni);
+    if (dni.length >= 7 && dup && dup.length > 1) {
+      const otras = dup.filter((n) => n !== f.fila);
+      out.push(
+        `${etiquetaFilaPlanillaExcel(f.fila)}: DNI ${dni} repetido (también en fila ${otras.join(", ")}).`,
+      );
+    }
+    if (!sanearValorCeldaPlanilla(f.apellidoNombre)) {
+      out.push(
+        `${etiquetaFilaPlanillaExcel(f.fila)}: falta apellido y nombre.`,
+      );
+    }
+  };
+
+  revisarJugador(grupo.j1);
+  if (!individual) {
+    if (grupo.j2) revisarJugador(grupo.j2);
+    else {
+      out.push(
+        `${etiquetaFilaPlanillaExcel(grupo.j1.fila)}: la pareja quedó incompleta (falta el segundo jugador).`,
+      );
+    }
+  }
+
+  return [...new Set(out)];
 }
 
 export function agruparFilasEnParejas(

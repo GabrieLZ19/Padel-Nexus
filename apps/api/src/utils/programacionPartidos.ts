@@ -3007,16 +3007,10 @@ export function validarAsignacionHorarioPartido(
       if (!feeder?.fecha_partido) continue;
       const fp = parseFechaPartidoIso(String(feeder.fecha_partido));
       if (!fp) continue;
-      const minInicio = minInicioDespuesDePartido(
-        fp.fecha,
-        fp.startMin,
-        duracion,
-        descanso,
-        opciones.descansoModo,
-      );
+      const finFeederMin = fp.startMin + duracion;
       if (
-        parsed.fecha < minInicio.fecha ||
-        (parsed.fecha === minInicio.fecha && parsed.startMin < minInicio.startMin)
+        fp.fecha > parsed.fecha ||
+        (fp.fecha === parsed.fecha && parsed.startMin < finFeederMin)
       ) {
         const origenVisible = numeroVisiblePorOrdenInterno(
           depOrden,
@@ -3024,6 +3018,33 @@ export function validarAsignacionHorarioPartido(
           mapaVisible,
         );
         return `Orden de llave inválido: debe jugarse después del partido de origen #${origenVisible}`;
+      }
+      if (
+        fp.fecha === parsed.fecha &&
+        parsed.startMin >= finFeederMin &&
+        (opciones.descansoModo
+          ? evaluarDescansoInsuficiente(
+              opciones.descansoModo,
+              fp.startMin,
+              parsed.startMin,
+              duracion,
+            )
+          : parsed.startMin - finFeederMin < descanso)
+      ) {
+        return opciones.descansoModo
+          ? mensajeDescansoInsuficienteProgramador(
+              opciones.descansoModo,
+              fp.startMin,
+              parsed.startMin,
+              duracion,
+            )
+          : mensajeDescansoInsuficienteProgramador(
+              undefined,
+              fp.startMin,
+              parsed.startMin,
+              duracion,
+              descanso,
+            );
       }
     }
 

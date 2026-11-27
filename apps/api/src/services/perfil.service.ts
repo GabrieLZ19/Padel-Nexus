@@ -10,6 +10,7 @@ import {
   esEmailPlaceholderPlanilla,
   sanitizarFilaPlanillaInscripcion,
   etiquetaFilaPlanillaExcel,
+  errorDniFilaPlanilla,
   resolverLugarResidenciaDesdePlanilla,
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
@@ -869,12 +870,11 @@ export class PerfilService {
     opciones?: OpcionesResolverJugadorPlanilla,
   ) {
     fila = sanitizarFilaPlanillaInscripcion(fila);
-    const dni = normalizarDni(fila.dni);
-    if (!dni || dni.length < 7) {
-      throw new Error(
-        `${etiquetaFilaPlanillaExcel(fila.fila)}: el DNI es obligatorio para importar inscripciones.`,
-      );
+    const errDni = errorDniFilaPlanilla(fila);
+    if (errDni) {
+      throw new Error(errDni);
     }
+    const dni = normalizarDni(fila.dni);
 
     const { apellido, nombre } = parseNombreCompleto(fila.apellidoNombre);
     if (!apellido && !nombre) {

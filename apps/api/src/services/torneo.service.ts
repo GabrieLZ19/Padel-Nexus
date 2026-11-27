@@ -632,6 +632,16 @@ export class TorneoService {
 
     if (filtros?.ocultarPrueba) {
       formatted = formatted.filter((torneo) => esTorneoVisibleEnSitioPublico(torneo));
+      const idsPublicos = formatted
+        .map((t) => t.id)
+        .filter((id): id is string => Boolean(id));
+      const fechasPrimer = await TorneoService.fechasPrimerPartidoPorTorneo(
+        idsPublicos,
+      );
+      formatted = formatted.map((t) => ({
+        ...t,
+        fecha_primer_partido: t.id ? fechasPrimer.get(t.id) ?? null : null,
+      }));
     }
 
     if (!vistaPedida && filtros?.estado) {
@@ -874,6 +884,26 @@ export class TorneoService {
     return { id: grupoId, nombre: limpio };
   }
 
+  private static async fechasPrimerPartidoPorTorneo(
+    ids: string[],
+  ): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    if (!ids.length) return map;
+    const { data, error } = await supabaseAdmin
+      .from("partidos")
+      .select("torneo_id, fecha_partido")
+      .in("torneo_id", ids)
+      .not("fecha_partido", "is", null)
+      .order("fecha_partido", { ascending: true });
+    if (error) return map;
+    for (const fila of data || []) {
+      const torneoId = String(fila.torneo_id || "");
+      if (!torneoId || map.has(torneoId)) continue;
+      map.set(torneoId, String(fila.fecha_partido));
+    }
+    return map;
+  }
+
   private static async torneosConPartidoHoy(ids: string[]): Promise<Set<string>> {
     const encontrados = new Set<string>();
     if (!ids.length) return encontrados;
@@ -965,7 +995,12 @@ export class TorneoService {
       .single();
 
     if (error || !data) throw new Error("Torneo no encontrado.");
-    return TorneoService.evaluateDynamicState(data);
+    const evaluado = TorneoService.evaluateDynamicState(data);
+    const fechas = await TorneoService.fechasPrimerPartidoPorTorneo([id]);
+    return {
+      ...evaluado,
+      fecha_primer_partido: fechas.get(id) ?? null,
+    };
   }
 
   static async listarCategoriasEvento(
@@ -3579,12 +3614,11 @@ export class TorneoService {
     delete dbPayload.motivo;
 
     if (cambiaHorario) {
-      // Traemos el estado de programacion del torneo del partido
       const { data: partido, error: partidoHorarioError } =
         await supabaseAdmin
           .from("partidos")
           .select(
-            "torneo_id, torneos!fk_partidos_torneo(programacion_estado)",
+            "torneo_id, cancha_asignada, fecha_partido, torneos!fk_partidos_torneo(programacion_estado, duracion_partido_minutos, descanso_modo, fecha)",
           )
           .eq("id", partidoId)
           .maybeSingle();
@@ -3594,9 +3628,20 @@ export class TorneoService {
         );
       }
 
+      type TorneoMetaHorario = {
+        programacion_estado?: string;
+        duracion_partido_minutos?: number;
+        descanso_modo?: string;
+        fecha?: string | null;
+      };
+      const torneoRowRaw = partido?.torneos as
+        | TorneoMetaHorario
+        | TorneoMetaHorario[]
+        | null;
+      const torneoMeta: TorneoMetaHorario | null | undefined =
+        Array.isArray(torneoRowRaw) ? torneoRowRaw[0] : torneoRowRaw;
       const programacionEstado =
-        (partido?.torneos as { programacion_estado?: string } | null)
-          ?.programacion_estado || "borrador";
+        torneoMeta?.programacion_estado || "borrador";
 
       if (programacionEstado === "publicado" && !motivo) {
         throw new Error(
@@ -3604,11 +3649,89 @@ export class TorneoService {
         );
       }
 
+      const torneoId = String(partido?.torneo_id || "");
+      const canchaEfectiva = cambiaCancha
+        ? String(dbPayload.cancha_asignada ?? "").trim()
+        : String(partido?.cancha_asignada ?? "").trim();
+      const fechaEfectiva = cambiaFecha
+        ? String(dbPayload.fecha_partido ?? "").trim()
+        : String(partido?.fecha_partido ?? "").trim();
+
+      if (
+        programacionEstado === "publicado" &&
+        torneoId &&
+        canchaEfectiva &&
+        fechaEfectiva
+      ) {
+        const { ProgramacionService } = await import("./programacion.service");
+        const { validarAsignacionHorarioPartido } = await import(
+          "../utils/programacionPartidos"
+        );
+        const { esModoDescanso, minutosDeModoDescanso } = await import(
+          "../utils/programadorReglas"
+        );
+
+        const { data: todosPartidosDb } = await supabaseAdmin
+          .from("partidos")
+          .select(
+            "id, ronda, orden, equipo_a_id, equipo_b_id, estado_partido, cancha_asignada, fecha_partido",
+          )
+          .eq("torneo_id", torneoId);
+
+        const fechaDia = fechaEfectiva.slice(0, 10);
+        const { data: dispDia } = await supabaseAdmin
+          .from("torneo_canchas_disponibilidad")
+          .select("duracion_partido_minutos")
+          .eq("torneo_id", torneoId)
+          .eq("fecha", fechaDia)
+          .not("duracion_partido_minutos", "is", null)
+          .limit(1)
+          .maybeSingle();
+
+        const duracion = Number(
+          dispDia?.duracion_partido_minutos ||
+            torneoMeta?.duracion_partido_minutos ||
+            90,
+        );
+        const descansoModoRaw = torneoMeta?.descanso_modo;
+        const descansoModo = esModoDescanso(descansoModoRaw)
+          ? descansoModoRaw
+          : "tras_fin_60";
+        const descansoMinutos = minutosDeModoDescanso(descansoModo);
+        const feeders = await ProgramacionService.feedersForTorneo(torneoId);
+        const todosProg = (todosPartidosDb || []).map((p) => ({
+          id: p.id,
+          ronda: p.ronda || "",
+          orden: p.orden || undefined,
+          equipo_a_id: p.equipo_a_id,
+          equipo_b_id: p.equipo_b_id,
+          estado_partido: p.estado_partido || "Programado",
+          cancha_asignada: p.cancha_asignada,
+          fecha_partido: p.fecha_partido,
+        }));
+
+        const conflicto = validarAsignacionHorarioPartido(
+          todosProg,
+          partidoId,
+          canchaEfectiva,
+          fechaEfectiva,
+          {
+            duracionMinutos: duracion,
+            duracionZonaMinutos: duracion,
+            descansoMinutos,
+            descansoModo,
+            feedersByMatchNo: feeders,
+            fechaInicio: torneoMeta?.fecha ?? null,
+          },
+        );
+        if (conflicto) {
+          throw new Error(conflicto);
+        }
+      }
+
       if (motivo) {
         dbPayload.horario_motivo_cambio = motivo;
       }
-      // Marcamos el horario como bloqueado para que la reprogramacion
-      // automatica no lo pise.
       if (!Object.prototype.hasOwnProperty.call(dbPayload, "horario_bloqueado")) {
         dbPayload.horario_bloqueado = true;
       }

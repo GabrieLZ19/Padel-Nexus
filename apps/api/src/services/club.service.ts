@@ -1492,7 +1492,7 @@ export class ClubService {
   static async gestionarReservaClub(
     clubId: string,
     reservaId: string,
-    accion: "confirmar" | "cobrar" | "cancelar" | "ausente",
+    accion: "confirmar" | "cobrar" | "cancelar" | "ausente" | "reembolsar",
     opciones?: { motivo_cancelacion?: string | null },
   ) {
     const { data: reserva, error } = await supabaseAdmin
@@ -1539,9 +1539,37 @@ export class ClubService {
       return { id: reservaId, estado_reserva: "ausente", estado_pago: reserva.estado_pago };
     }
 
+    if (accion === "reembolsar") {
+      if (reserva.estado_reserva !== "cancelada") {
+        throw new Error("Solo se marca devuelta una reserva ya cancelada.");
+      }
+      if (reserva.estado_pago !== "reembolso_pendiente") {
+        throw new Error("Esta reserva no tiene un reintegro pendiente.");
+      }
+      const { error: updateError } = await supabaseAdmin
+        .from("reservas")
+        .update({ estado_pago: "reembolsado" })
+        .eq("id", reservaId);
+      if (updateError) throw new Error(updateError.message);
+      return {
+        id: reservaId,
+        estado_reserva: reserva.estado_reserva,
+        estado_pago: "reembolsado",
+      };
+    }
+
     if (accion === "cancelar") {
-      const motivo = String(opciones?.motivo_cancelacion || "").trim() || null;
+      const pago = String(reserva.estado_pago || "").toLowerCase();
+      const eraCobrada = pago === "completado";
+      const motivoRaw = String(opciones?.motivo_cancelacion || "").trim();
+      if (eraCobrada && motivoRaw.length < 8) {
+        throw new Error(
+          "Para cancelar una reserva ya cobrada tenés que indicar un motivo de al menos 8 caracteres.",
+        );
+      }
+      const motivo = motivoRaw || null;
       const ahora = new Date().toISOString();
+      const estadoPagoFinal = eraCobrada ? "reembolso_pendiente" : "cancelado";
 
       const { error: pagosError } = await supabaseAdmin
         .from("pagos")
@@ -1554,7 +1582,7 @@ export class ClubService {
         .from("reservas")
         .update({
           estado_reserva: "cancelada",
-          estado_pago: "cancelado",
+          estado_pago: estadoPagoFinal,
           motivo_cancelacion: motivo,
           cancelada_en: ahora,
           retiene_hasta: null,
@@ -1567,7 +1595,7 @@ export class ClubService {
       return {
         id: reservaId,
         estado_reserva: "cancelada",
-        estado_pago: "cancelado",
+        estado_pago: estadoPagoFinal,
         motivo_cancelacion: motivo,
       };
     }

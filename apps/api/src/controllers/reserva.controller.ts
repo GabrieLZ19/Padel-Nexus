@@ -4,6 +4,7 @@ import { MercadoPagoConfig, Payment } from "mercadopago";
 import { verifyMercadoPagoWebhookSignature } from "../config/mercadopago";
 import { acreditarPagoMercadoPago } from "../services/mercadopagoWebhook.service";
 import { supabaseAdmin } from "../config/supabase";
+import { assertUsuarioPuedeAccederReserva } from "../utils/reservaAcceso";
 
 export const ReservasController = {
   /**
@@ -100,11 +101,24 @@ export const ReservasController = {
   async getReservaPorId(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const usuario_id = req.user?.id;
+      if (!usuario_id) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "No autenticado." });
+      }
+      await assertUsuarioPuedeAccederReserva(id, {
+        userId: usuario_id,
+        rol: req.user?.rol,
+      });
       const data = await ReservaService.obtenerReservaPorId(id);
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Error desconocido";
+      if (message.includes("permiso para acceder")) {
+        return res.status(403).json({ exito: false, error: message });
+      }
       if (message === "RESERVA_PAGO_VENCIDO") {
         return res.status(410).json({
           exito: false,
@@ -219,12 +233,25 @@ export const ReservasController = {
   async previewCheckoutMercadoPago(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const usuario_id = req.user?.id;
+      if (!usuario_id) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "No autenticado." });
+      }
+      await assertUsuarioPuedeAccederReserva(id, {
+        userId: usuario_id,
+        rol: req.user?.rol,
+      });
       const data = await ReservaService.previewCheckoutMercadoPago({
         reservaId: id,
       });
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Error desconocido";
+      if (message.includes("permiso para acceder")) {
+        return res.status(403).json({ exito: false, error: message });
+      }
       return res.status(400).json({ exito: false, error: message });
     }
   },
@@ -252,11 +279,24 @@ export const ReservasController = {
   async crearPreferenciaPago(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const usuario_id = req.user?.id;
+      if (!usuario_id) {
+        return res
+          .status(401)
+          .json({ exito: false, error: "No autenticado." });
+      }
+      await assertUsuarioPuedeAccederReserva(id, {
+        userId: usuario_id,
+        rol: req.user?.rol,
+      });
       const mobile = (req.get("x-padel-client") || "").toLowerCase() === "mobile";
       const data = await ReservaService.crearPreferenciaPago(id, { mobile });
       return res.status(200).json({ exito: true, data });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Error desconocido";
+      if (message.includes("permiso para acceder")) {
+        return res.status(403).json({ exito: false, error: message });
+      }
       return res.status(500).json({ exito: false, error: message });
     }
   },

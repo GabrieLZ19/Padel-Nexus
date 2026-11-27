@@ -59,6 +59,7 @@ import {
 import {
   advertenciasResidenciaPlanilla,
   agruparFilasEnParejas,
+  erroresGrupoPlanillaImport,
   sanitizarFilaPlanillaInscripcion,
   type FilaPlanillaInscripcion,
 } from "../utils/inscripcionPlanilla";
@@ -1225,18 +1226,47 @@ export class InscripcionService {
       }
     }
 
+    const cuposMaximos = torneo.cupos_maximos ?? 32;
+    let cuposConsumidos = torneo.cupos_actuales ?? 0;
+
     for (const grupo of grupos) {
+      const filaRef = grupo.j2
+        ? `Filas ${grupo.j1.fila} y ${grupo.j2.fila} de la planilla`
+        : `Fila ${grupo.j1.fila} de la planilla`;
+
+      const erroresPrevios = erroresGrupoPlanillaImport(
+        grupo,
+        individual,
+        filasLimpias,
+      );
+      if (erroresPrevios.length > 0) {
+        for (const det of erroresPrevios) {
+          errores.push(det);
+        }
+        continue;
+      }
+
+      if (cuposConsumidos >= cuposMaximos) {
+        errores.push(
+          `${filaRef}: el torneo no tiene cupos disponibles (${cuposMaximos} máximo).`,
+        );
+        continue;
+      }
+
+      const fichasCreadasGrupo: string[] = [];
       try {
         const j1 = await PerfilService.resolverJugadorDesdePlanilla(grupo.j1);
-        if (j1.creado) jugadoresCreados++;
-
-        let j2: Awaited<
-          ReturnType<typeof PerfilService.resolverJugadorDesdePlanilla>
-        > | null = null;
+        if (j1.creado) {
+          jugadoresCreados++;
+          fichasCreadasGrupo.push(j1.id);
+        }
 
         if (!individual && grupo.j2) {
-          j2 = await PerfilService.resolverJugadorDesdePlanilla(grupo.j2);
-          if (j2.creado) jugadoresCreados++;
+          const j2 = await PerfilService.resolverJugadorDesdePlanilla(grupo.j2);
+          if (j2.creado) {
+            jugadoresCreados++;
+            fichasCreadasGrupo.push(j2.id);
+          }
         }
 
         await InscripcionService.registrarInscripcionManual({
@@ -1257,10 +1287,9 @@ export class InscripcionService {
         });
 
         inscripcionesOk++;
+        cuposConsumidos++;
       } catch (error: unknown) {
-        const filaRef = grupo.j2
-          ? `Filas ${grupo.j1.fila} y ${grupo.j2.fila} de la planilla`
-          : `Fila ${grupo.j1.fila} de la planilla`;
+        await revertirFichasProvisionalInscripcion(fichasCreadasGrupo);
         const msg =
           error instanceof Error ? error.message : "Error desconocido";
         errores.push(`${filaRef}: ${msg}`);

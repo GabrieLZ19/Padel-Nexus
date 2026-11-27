@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   evaluateProgramacionIssues,
+  validarAsignacionHorarioPartido,
   type PartidoProgramable,
 } from "../src/utils/programacionPartidos.ts";
 import { mensajeDescansoInsuficienteProgramador } from "../src/utils/programadorReglas.ts";
@@ -87,5 +88,41 @@ describe("CLI-19 mensajes de descanso vs orden de llave", () => {
       bad.some((i) => /Descanso insuficiente: hacen falta/.test(i.message)),
     );
     assert.ok(bad.some((i) => /quedan \d+ min/.test(i.message)));
+  });
+
+  it("validarAsignacionHorarioPartido: descanso, no orden de llave genérico", () => {
+    const partidos: PartidoProgramable[] = [
+      {
+        id: "f",
+        ronda: "CUARTOS",
+        orden: 23,
+        equipo_a_id: "a",
+        equipo_b_id: "b",
+        cancha_asignada: "C1",
+        fecha_partido: "2026-12-01T10:00:00-03:00",
+      },
+      {
+        id: "h",
+        ronda: "SEMIS",
+        orden: 25,
+        equipo_a_id: "a",
+        equipo_b_id: "c",
+      },
+    ];
+    const feeders = new Map<number, number[]>([[25, [23]]]);
+    const msg = validarAsignacionHorarioPartido(
+      partidos,
+      "h",
+      "C1",
+      "2026-12-01T11:45:00-03:00",
+      {
+        duracionMinutos: 90,
+        descansoModo: "tras_fin_60",
+        feedersByMatchNo: feeders,
+      },
+    );
+    assert.ok(msg);
+    assert.match(msg, /Descanso insuficiente/);
+    assert.doesNotMatch(msg, /debe jugarse después del partido de origen/);
   });
 });
