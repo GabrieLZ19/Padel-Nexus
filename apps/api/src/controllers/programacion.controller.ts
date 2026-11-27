@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { AlcanceCuentaService } from "../services/alcanceCuenta.service";
 import { ProgramacionService } from "../services/programacion.service";
+import { esModoDescanso } from "../utils/programadorReglas";
 
 async function rechazarSiNoEdita(
   req: Request,
@@ -130,12 +131,7 @@ export const getProgramacionBoard = async (
     const data = await ProgramacionService.getBoard(id, {
       duracionMinutos: Number.isFinite(duracion) ? duracion : undefined,
       descansoMinutos: Number.isFinite(descanso) ? descanso : undefined,
-      descansoModo:
-        descansoModo === "tras_fin_60" ||
-        descansoModo === "tras_fin_120" ||
-        descansoModo === "entre_inicios_240"
-          ? descansoModo
-          : undefined,
+      descansoModo: esModoDescanso(descansoModo) ? descansoModo : undefined,
       jornadas:
         jornadas === 1 || jornadas === 2 || jornadas === 3 || jornadas === 4
           ? jornadas
@@ -409,12 +405,7 @@ export const persistirConfigProgramacion = async (
     const { duracionMinutos, descansoModo } = req.body || {};
     const data = await ProgramacionService.persistirConfigProgramacion(id, {
       duracionMinutos,
-      descansoModo:
-        descansoModo === "tras_fin_60" ||
-        descansoModo === "tras_fin_120" ||
-        descansoModo === "entre_inicios_240"
-          ? descansoModo
-          : undefined,
+      descansoModo: esModoDescanso(descansoModo) ? descansoModo : undefined,
       franjasPorDia:
         typeof req.body?.franjasPorDia === "string"
           ? (() => {

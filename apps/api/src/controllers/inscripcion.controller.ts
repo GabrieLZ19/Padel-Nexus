@@ -26,17 +26,41 @@ export const getAllInscripciones = async (
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
     const cuenta = await AlcanceCuentaService.resolver(req.user);
-    let torneoIds: string[] | undefined;
+    const torneoIdQuery =
+      typeof torneo_id === "string" && torneo_id.trim() ? torneo_id.trim() : undefined;
+    const resumenVacio = {
+      pendientes: 0,
+      confirmadas: 0,
+      rechazadas: 0,
+      recaudacion: 0,
+    };
 
-    if (cuenta.rol === "admin_provincial") {
-      if (!cuenta.provincia) {
-        return res.status(200).json({
-          data: [],
-          total: 0,
-          aviso: cuenta.aviso,
-          resumen: { pendientes: 0, confirmadas: 0, rechazadas: 0, recaudacion: 0 },
+    if (cuenta.aviso && (cuenta.rol === "admin_provincial" || cuenta.rol === "admin_club")) {
+      return res.status(200).json({
+        data: [],
+        total: 0,
+        aviso: cuenta.aviso,
+        resumen: resumenVacio,
+      });
+    }
+
+    const rolSinAlcanceGlobal = !["superadmin", "admin", "admin_federacion"].includes(
+      cuenta.rol,
+    );
+
+    if (torneoIdQuery && rolSinAlcanceGlobal) {
+      const ver = await AlcanceCuentaService.consultar(req.user, torneoIdQuery, "ver");
+      if (!ver.permitido) {
+        return res.status(403).json({
+          message:
+            ver.motivo || "No tenés permiso para ver inscripciones de este torneo.",
         });
       }
+    }
+
+    let torneoIds: string[] | undefined;
+
+    if (!torneoIdQuery && cuenta.rol === "admin_provincial" && cuenta.provincia) {
       const clubIds = await AlcanceCuentaService.idsClubesDeProvincia(cuenta.provincia);
       if (clubIds.length === 0) {
         torneoIds = [];
@@ -48,25 +72,30 @@ export const getAllInscripciones = async (
           .neq("alcance", "Nacional");
         torneoIds = (torneosProvincia || []).map((torneo) => torneo.id as string);
       }
-      if (typeof torneo_id === "string" && torneo_id && !torneoIds.includes(torneo_id)) {
-        return res.status(403).json({ message: "Esa inscripción no es de tu provincia." });
-      }
+    } else if (!torneoIdQuery && cuenta.rol === "admin_club" && cuenta.clubId) {
+      const { data: torneosClub } = await supabaseAdmin
+        .from("torneos")
+        .select("id")
+        .eq("club_id", cuenta.clubId);
+      torneoIds = (torneosClub || []).map((torneo) => torneo.id as string);
+    } else if (!torneoIdQuery && cuenta.rol === "admin_club") {
+      torneoIds = [];
     }
 
     const resultado = await InscripcionService.obtenerInscripcionesPaginadas(
-      torneo_id as string | undefined,
+      torneoIdQuery,
       pageNum,
       limitNum,
       {
         search: typeof search === "string" ? search : undefined,
         estadoPago: typeof estado_pago === "string" ? estado_pago : undefined,
-        torneoIds: torneo_id ? undefined : torneoIds,
+        torneoIds: torneoIdQuery ? undefined : torneoIds,
       },
     );
 
     const resumen = await InscripcionService.obtenerResumenInscripciones(
-      torneo_id as string | undefined,
-      torneo_id ? undefined : torneoIds,
+      torneoIdQuery,
+      torneoIdQuery ? undefined : torneoIds,
     );
 
     return res.status(200).json({ ...resultado, resumen, aviso: cuenta.aviso });

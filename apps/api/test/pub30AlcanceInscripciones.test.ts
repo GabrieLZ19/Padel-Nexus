@@ -8,7 +8,23 @@ import { decidirAlcanceTorneo } from "../src/utils/alcanceCuenta.ts";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-describe("PUB-30 alcance en GET /torneos/:id/inscripciones", () => {
+describe("PUB-30 alcance en listados de inscripciones", () => {
+  it("getAllInscripciones consulta alcance ver cuando hay torneo_id", () => {
+    const ctrl = readFileSync(
+      path.join(RAIZ, "src/controllers/inscripcion.controller.ts"),
+      "utf8",
+    );
+    const bloque = ctrl.match(
+      /export const getAllInscripciones[\s\S]*?export const createInscripcion/,
+    )?.[0];
+    assert.ok(bloque);
+    assert.match(bloque, /AlcanceCuentaService\.resolver/);
+    assert.match(bloque, /consultar\(req\.user, torneoIdQuery, "ver"\)/);
+    assert.match(bloque, /status\(403\)/);
+    assert.match(bloque, /admin_club.*club_id/s);
+    assert.doesNotMatch(bloque, /Esa inscripción no es de tu provincia/);
+  });
+
   it("getInscripcionesByTorneo consulta alcance ver antes de listar", () => {
     const ctrl = readFileSync(
       path.join(RAIZ, "src/controllers/torneo.controller.ts"),
