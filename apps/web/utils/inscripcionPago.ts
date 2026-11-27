@@ -9,7 +9,7 @@ export function inscripcionRequierePagoOnline(params: {
   if (
     torneoInscripcionSinCosto({
       es_gratis: params.esGratis,
-      precio_inscripcion: params.precioInscripcion,
+      precio_inscripcion: params.precioInscripcion ?? 0,
     })
   ) {
     return false;
