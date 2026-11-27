@@ -342,11 +342,22 @@ export const TorneosService = {
     return response.data;
   },
 
+  async actualizarCabezasSerieActivas(
+    torneoId: string,
+    activas: boolean,
+  ): Promise<{ exito: boolean; cabezas_serie_activas: boolean }> {
+    const response = await api.put(`/torneos/${torneoId}/cabezas-serie-activas`, {
+      cabezas_serie_activas: activas,
+    });
+    return response.data as { exito: boolean; cabezas_serie_activas: boolean };
+  },
+
   async generarZonas(
     torneoId: string,
     _size?: number,
     forzarDestructivo?: boolean,
     motivo?: string,
+    cabezasSerieActivas?: boolean,
   ) {
     // Tamaño de zona siempre auto FAP (preferredSize=3 en backend)
     const response = await api.post(
@@ -354,6 +365,9 @@ export const TorneosService = {
       {
         forzarDestructivo: forzarDestructivo === true,
         ...(motivo && motivo.trim().length >= 8 ? { motivo: motivo.trim() } : {}),
+        ...(typeof cabezasSerieActivas === "boolean"
+          ? { cabezas_serie_activas: cabezasSerieActivas }
+          : {}),
       },
     );
     return response.data;

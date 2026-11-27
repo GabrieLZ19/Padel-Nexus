@@ -1,5 +1,8 @@
 import type { Inscripcion, Torneo } from "./types";
 
+export const ETIQUETA_INSCRIPCION_SIN_COSTO =
+  "Inscripción sin costo (sin pago en línea)";
+
 /** TOR-54: torneo sin cargo de inscripción. */
 export function torneoInscripcionSinCosto(
   torneo: Pick<Torneo, "es_gratis" | "precio_inscripcion">,

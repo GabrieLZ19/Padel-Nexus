@@ -275,9 +275,7 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
       const { zonas: data, cabezas_ranking_globales, cabezas_serie_activas } =
         await TorneosService.getZonas(torneoId);
       setCabezasRankingGlobales(new Set(cabezas_ranking_globales));
-      if (!cabezas_serie_activas) {
-        setValidarCabezasSerie(false);
-      }
+      setValidarCabezasSerie(cabezas_serie_activas !== false);
       const formattedZonas: ZonaDrag[] = data.map((grupo: any) => ({
         id: grupo.id,
         nombre: grupo.nombre_grupo,
@@ -378,7 +376,13 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
     const runGenerate = async (forzar: boolean, motivo?: string) => {
       try {
         setLoading(true);
-        await TorneosService.generarZonas(torneoId, undefined, forzar, motivo);
+        await TorneosService.generarZonas(
+          torneoId,
+          undefined,
+          forzar,
+          motivo,
+          validarCabezasSerie,
+        );
         await loadZonas();
         onRefresh?.();
         setFeedbackModal({
@@ -2000,29 +2004,51 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     Validación de cabezas de serie
                   </span>
                   <span className="text-[10px] text-brand-ayuda leading-snug block mt-0.5">
-                    ON: al guardar zonas, bloquea dos parejas del top del ranking
-                    en la misma zona y persiste la preferencia en el torneo. OFF:
-                    libera la distribución (sin esa validación). La preferencia
-                    se recuerda en esta sesión del navegador.
+                    ON: bloquea dos parejas del top del ranking en la misma zona;
+                    la preferencia se guarda en el torneo al cambiar este switch y
+                    al generar cuadros. OFF: libera la distribución y no marca
+                    cabezas de serie al generar.
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => {
-                      const next = !validarCabezasSerie;
-                      setValidarCabezasSerie(next);
-                      if (!next) {
-                        setZonas((prev) =>
-                          prev.map((z) => ({
-                            ...z,
-                            parejas: z.parejas.map((p) => ({
-                              ...p,
-                              cabezaDeSerie: false,
+                      void (async () => {
+                        const previo = validarCabezasSerie;
+                        const next = !previo;
+                        setValidarCabezasSerie(next);
+                        if (!next) {
+                          setZonas((zonasPrev) =>
+                            zonasPrev.map((z) => ({
+                              ...z,
+                              parejas: z.parejas.map((p) => ({
+                                ...p,
+                                cabezaDeSerie: false,
+                              })),
                             })),
-                          })),
-                        );
-                        setResolucionesCabezasSerie([]);
-                      }
+                          );
+                          setResolucionesCabezasSerie([]);
+                        }
+                        try {
+                          await TorneosService.actualizarCabezasSerieActivas(
+                            torneoId,
+                            next,
+                          );
+                        } catch (error: unknown) {
+                          setValidarCabezasSerie(previo);
+                          const err = error as {
+                            response?: { data?: { error?: string } };
+                            message?: string;
+                          };
+                          sileo.error({
+                            title: "No se guardó la preferencia",
+                            description:
+                              err.response?.data?.error ||
+                              err.message ||
+                              "Reintentá en unos segundos.",
+                          });
+                        }
+                      })();
                     }}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${validarCabezasSerie ? "bg-brand-chartreuse" : "bg-gray-600"}`}
                   >

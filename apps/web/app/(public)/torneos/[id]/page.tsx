@@ -43,6 +43,10 @@ import {
 import { etiquetaInstitucion } from "@/utils/denominacionNacional";
 import { esRondaDeZona } from "@/utils/rondasLlave";
 import { SelectorCategoriaEvento } from "@/components/torneos/SelectorCategoriaEvento";
+import {
+  ETIQUETA_INSCRIPCION_SIN_COSTO,
+  torneoInscripcionSinCosto,
+} from "@/utils/torneoInscripcionSinCosto";
 
 export default function TorneoDetallePage() {
   const params = useParams();
@@ -715,10 +719,9 @@ export default function TorneoDetallePage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <CreditCard className="size-3.5 text-brand-chartreuse shrink-0" />
-                    {Number(torneo.precio_inscripcion || 0) > 0 &&
-                    !torneo.es_gratis
-                      ? "Mercado Pago u opción manual"
-                      : "Sin costo de inscripción"}
+                    {torneoInscripcionSinCosto(torneo)
+                      ? ETIQUETA_INSCRIPCION_SIN_COSTO
+                      : "Mercado Pago u opción manual"}
                   </li>
                 </ul>
                 {miInscripcion &&

@@ -579,9 +579,9 @@ export const Paso5Cierre = ({
           </p>
           <p className="text-violet-100/80 leading-relaxed">
             Motivo: {motivoTorneoPrueba}. Los resultados no suman puntos aunque
-            actives la asignación abajo. Para publicar en el sitio y sumar al
-            ranking, desmarcá la bandera de torneo de prueba en el paso Datos del
-            torneo (y evitá nombres de ensayo).
+            actives la asignación abajo. En el Paso 1 (Datos del torneo) marcá
+            «Suma puntos al ranking oficial» y, si querés listarlo en /torneos,
+            «Visible en el sitio público» (evitá nombres de ensayo).
           </p>
         </div>
       ) : null}

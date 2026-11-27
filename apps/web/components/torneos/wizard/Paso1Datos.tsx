@@ -211,6 +211,9 @@ export const Paso1Datos = ({
   const [visibleSitioPublico, setVisibleSitioPublico] = useState(() =>
     torneoVisibleEnSitioPublico(torneo),
   );
+  const [esPruebaRanking, setEsPruebaRanking] = useState(() =>
+    Boolean(torneo.es_prueba),
+  );
 
   const sinEntidadOrganizadora = esAlcanceSinEntidadOrganizadora(editAlcance);
   const organizadorDeshabilitado = sinEntidadOrganizadora;
@@ -319,6 +322,7 @@ export const Paso1Datos = ({
   useEffect(() => {
     if (nombreBloqueaSitioPublico && !prevNombreBloquea.current) {
       setVisibleSitioPublico(false);
+      setEsPruebaRanking(true);
       setFeedbackModal((prev: any) => ({
         ...prev,
         isOpen: true,
@@ -358,6 +362,7 @@ export const Paso1Datos = ({
   // Sincronizar con datos persistidos tras guardar / refrescar torneo
   useEffect(() => {
     setVisibleSitioPublico(torneoVisibleEnSitioPublico(torneo));
+    setEsPruebaRanking(Boolean(torneo.es_prueba));
     setEditAsociacion(reglamentoFromTorneo(torneo, userRole));
     const org = organizadorFromTorneo(torneo);
     if (org) {
@@ -390,6 +395,7 @@ export const Paso1Datos = ({
   }, [
     torneo.id,
     torneo.es_prueba,
+    torneo.visible_sitio_publico,
     torneo.nombre,
     torneo.reglamento,
     torneo.asociacion,
@@ -631,7 +637,7 @@ export const Paso1Datos = ({
         federacion_id: federacionIdFinal,
         formato: editFormato,
         visible_sitio_publico: visibleSitioPublico,
-        es_prueba: nombreBloqueaSitioPublico ? true : !visibleSitioPublico,
+        es_prueba: nombreBloqueaSitioPublico ? true : esPruebaRanking,
         ...( ["borrador", "cerrado"].includes(
           String(torneo.estado || "").toLowerCase(),
         )
@@ -736,6 +742,31 @@ export const Paso1Datos = ({
               {nombreBloqueaSitioPublico ? (
                 <span className="text-xs text-yellow-500/90 font-semibold">
                   {AVISO_NOMBRE_TORNEO_PRUEBA}
+                </span>
+              ) : null}
+            </span>
+          </label>
+        </div>
+        <div className="md:col-span-2">
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              className="mt-1 size-4 rounded border-white/20 bg-brand-input accent-brand-chartreuse cursor-pointer disabled:opacity-40"
+              checked={!esPruebaRanking}
+              disabled={nombreBloqueaSitioPublico || readOnly}
+              onChange={(e) => setEsPruebaRanking(!e.target.checked)}
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-bold text-white">
+                Suma puntos al ranking oficial
+              </span>
+              <span className="text-xs text-gray-400 font-medium">
+                Desmarcá esta opción si es un torneo de prueba: los resultados no
+                otorgan puntos. Es independiente de ocultarlo en el sitio público.
+              </span>
+              {nombreBloqueaSitioPublico ? (
+                <span className="text-xs text-yellow-500/90 font-semibold">
+                  Los nombres de ensayo se tratan siempre como torneo de prueba.
                 </span>
               ) : null}
             </span>

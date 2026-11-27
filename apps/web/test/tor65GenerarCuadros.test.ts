@@ -15,7 +15,10 @@ describe("TOR-65 Generar Cuadros — UI y servicio", () => {
     assert.match(editor, /programacionPublicada/);
     assert.match(editor, /showInput: true/);
     assert.match(editor, /inputMinLength: 8/);
-    assert.match(editor, /generarZonas\(torneoId, undefined, forzar, motivo\)/);
+    assert.match(
+      editor,
+      /generarZonas\([\s\S]*torneoId[\s\S]*forzar[\s\S]*motivo[\s\S]*validarCabezasSerie/,
+    );
   });
 
   it("TorneosService.generarZonas envía motivo en el body", () => {

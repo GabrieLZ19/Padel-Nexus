@@ -14,16 +14,27 @@ describe("TOR-57 alcance validación cabezas de serie", () => {
       "utf8",
     );
     assert.match(paso, /validación de cabezas de serie/i);
-    assert.match(paso, /validación OFF/);
+    assert.match(paso, /antes de la primera/i);
   });
 
-  it("BracketEditor aclara persistencia y alcance al guardar", () => {
+  it("BracketEditor persiste preferencia al cambiar el switch y al generar", () => {
     const editor = fs.readFileSync(
       path.join(RAIZ, "components/torneos/BracketEditor.tsx"),
       "utf8",
     );
-    assert.match(editor, /al guardar zonas/);
-    assert.match(editor, /persiste la preferencia en el torneo/);
+    assert.match(editor, /actualizarCabezasSerieActivas/);
+    assert.match(editor, /guarda en el torneo al cambiar este switch/);
+    assert.match(editor, /generarZonas\([\s\S]*validarCabezasSerie/);
+  });
+
+  it("TorneosService expone actualizarCabezasSerieActivas y body en generarZonas", () => {
+    const svc = fs.readFileSync(
+      path.join(RAIZ, "utils/services/torneos.ts"),
+      "utf8",
+    );
+    assert.match(svc, /async actualizarCabezasSerieActivas/);
+    assert.match(svc, /cabezas-serie-activas/);
+    assert.match(svc, /cabezas_serie_activas: cabezasSerieActivas/);
   });
 
   it("generar zonas respeta cabezas_serie_activas al marcar es_cabeza_serie", () => {

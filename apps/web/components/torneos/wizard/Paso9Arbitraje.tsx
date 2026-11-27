@@ -554,7 +554,7 @@ export const PasoResultados = ({
           ? "Corrección registrada"
           : "Marcador guardado",
         description: scorePayload.motivo?.trim()
-          ? "El cambio quedó en auditoría (Paso 7 Cuadros > pestaña Auditoría)."
+          ? "El cambio quedó en auditoría (Paso 6 Cuadros > pestaña Auditoría)."
           : "El marcador quedó guardado.",
       });
 

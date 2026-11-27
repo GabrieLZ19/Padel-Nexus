@@ -93,7 +93,6 @@ export default function TorneoModal({
         setFormData({
           ...formData,
           visible_sitio_publico: false,
-          es_prueba: true,
         });
         setFeedback((p) => ({ ...p, isOpen: false }));
       },
@@ -435,7 +434,6 @@ export default function TorneoModal({
                         setFormData({
                           ...formData,
                           visible_sitio_publico: true,
-                          es_prueba: false,
                         });
                         return;
                       }

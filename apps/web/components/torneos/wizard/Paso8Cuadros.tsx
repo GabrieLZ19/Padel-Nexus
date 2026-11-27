@@ -230,9 +230,9 @@ export const Paso6Cuadros = ({
         <p className="text-xs text-brand-ayuda leading-relaxed rounded-xl border border-white/10 bg-white/5 px-4 py-3">
           La validación de cabezas de serie (top del ranking en zonas distintas)
           se configura en el editor de zonas de abajo: switch &quot;Validación de
-          cabezas de serie&quot;. Con validación OFF podés redistribuir libremente
-          antes de guardar; al generar zonas de nuevo se respeta la última
-          preferencia guardada en el torneo.
+          cabezas de serie&quot;. Podés ponerla en OFF antes de la primera
+          generación: se guarda en el torneo al cambiar el switch y al pulsar
+          &quot;Generar Cuadros&quot;.
         </p>
       )}
       {partidos.length === 0 && formatoEsEliminatoriaDirecta && (

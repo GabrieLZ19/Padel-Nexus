@@ -2,9 +2,9 @@
 
 Plan maestro: `.cursor/plans/re-test_26-11_item_por_item_cd026153.plan.md` (o copia en Cursor).
 
-**Siguiente ítem (plan item-por-item):** **Fase 3.1** — TOR-57/56/58/59/60, FEE-22/23 (cabezas de serie, textos, nombres en POST inscripciones).
+**Siguiente ítem (plan item-por-item):** **Fase 3.2** — CLI-1 y TOR-68 (importador Excel / planillas).
 
-**Fase 1 plan re-test 26/11:** cerrada (`2e68302` … `b2ce031`). **Fase 2 (ítems 7–12):** ENT `e4e0d6c`; TOR-22 front `0ea3d57`; CLI-16/TOR-49 back `771be9b`; TOR-24 verificado sin diff. Detalle ítems 1–9: tabla abajo; [qa-re-test-26-11-items-res23-fee21-ent49.md](./qa-re-test-26-11-items-res23-fee21-ent49.md).
+**Fase 1 plan re-test 26/11:** cerrada (`2e68302` … `b2ce031`). **Fase 2 (ítems 7–12):** ENT `e4e0d6c`; TOR-22 front `0ea3d57`; CLI-16/TOR-49 back `771be9b`; TOR-24 verificado sin diff. **Fase 3.1 (ítems 13–15):** back `d3fa7f6`, front `379d59c` (TOR-57, TOR-56/58, TOR-59/60, FEE-22/23). Detalle ítems 1–9: tabla abajo; [qa-re-test-26-11-items-res23-fee21-ent49.md](./qa-re-test-26-11-items-res23-fee21-ent49.md).
 
 ## Completados
 
@@ -19,9 +19,13 @@ Plan maestro: `.cursor/plans/re-test_26-11_item_por_item_cd026153.plan.md` (o co
 | 7 | TOR-49/22/24 | HECHO (verificado tests) | [qa-re-test-26-11-item7-tor49-22-24.md](./qa-re-test-26-11-item7-tor49-22-24.md) |
 | 8 | TOR-55/CLI-18/19/57 | HECHO | [qa-re-test-26-11-item8-tor55-cli18-19-57.md](./qa-re-test-26-11-item8-tor55-cli18-19-57.md) |
 | 9 | ENT-45/ENT-36 | HECHO | [qa-re-test-26-11-item9-ent45-ent36.md](./qa-re-test-26-11-item9-ent45-ent36.md) |
+| 13 | TOR-57 | HECHO | PUT cabezas-serie-activas + body en generar-zonas (`d3fa7f6`) |
+| 14 | TOR-56/58 | HECHO | `visible_sitio_publico` + UI Paso 1 / Cierre (`d3fa7f6` + front) |
+| 15 | TOR-59/60, FEE-22/23 | HECHO | Texto auditoría, nombres desde perfil, torneos sin costo (`d3fa7f6` + front) |
 
 ## Pendientes (prioridad)
 
 | Prioridad | Items |
 |-----------|--------|
-| Post 28/11 | 10 CLI-8/12/14, ENT-43, TOR-56 |
+| Post 28/11 | 16 CLI-1/TOR-68, 17 CLI-19/27/29, 18 RES/MKT/PUB |
+| Post 28/11 (resto plan) | CLI-8/12/14, ENT-43 |

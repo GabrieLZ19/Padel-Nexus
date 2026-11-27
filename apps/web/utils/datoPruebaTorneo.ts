@@ -1,6 +1,6 @@
 /** Alineado con apps/api/src/utils/datoPrueba.ts */
 const NOMBRE_TORNEO_PRUEBA =
-  /prue|\bqa\b|\btest\b|testing|\bdemo\b|auditor|^asdf/i;
+  /prue|\bqa\b|\btest\b|testing|\bdemo\b|^asdf/i;
 
 export const AVISO_NOMBRE_TORNEO_PRUEBA =
   "Los nombres de ensayo (QA, prueba, test, testing, demo) no se publican en el sitio público.";
@@ -11,10 +11,11 @@ export function esNombreTorneoDePrueba(nombre?: string | null): boolean {
 
 export function torneoVisibleEnSitioPublico(torneo: {
   nombre?: string | null;
-  es_prueba?: boolean | null;
+  visible_sitio_publico?: boolean | null;
 }): boolean {
   if (esNombreTorneoDePrueba(torneo.nombre)) return false;
-  return torneo.es_prueba === false;
+  if (torneo.visible_sitio_publico === false) return false;
+  return true;
 }
 
 export function motivoExclusionRankingTorneoUi(torneo: {
@@ -22,7 +23,7 @@ export function motivoExclusionRankingTorneoUi(torneo: {
   es_prueba?: boolean | null;
 }): string | null {
   if (torneo.es_prueba) {
-    return "marcado como torneo de prueba (es_prueba)";
+    return "marcado como torneo de prueba (sin puntos de ranking)";
   }
   if (esNombreTorneoDePrueba(torneo.nombre)) {
     return "nombre de ensayo o QA detectado";

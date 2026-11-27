@@ -22,6 +22,6 @@ describe("TOR-5 UI auditoría tras corrección de resultado", () => {
       "utf8",
     );
     assert.match(fuente, /Corrección registrada/);
-    assert.match(fuente, /pestaña Auditoría/);
+    assert.match(fuente, /Paso 6 Cuadros > pestaña Auditoría/);
   });
 });

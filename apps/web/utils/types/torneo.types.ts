@@ -24,8 +24,10 @@ export interface Torneo {
   id: string;
   created_at?: string;
   nombre: string;
-  /** Si es true, el torneo no aparece en el sitio público ni en contadores oficiales. */
+  /** Si es true, el torneo no suma puntos al ranking oficial. */
   es_prueba?: boolean | null;
+  /** Si es false, no aparece en /torneos ni admite inscripción online pública. */
+  visible_sitio_publico?: boolean | null;
   subtitulo?: string | null;
   club_id?: string | null;
   fecha?: string | null;

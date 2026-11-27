@@ -38,6 +38,10 @@ import {
 } from "@/utils/inscripcionMonto";
 import { InscripcionPagoActions } from "@/components/torneos/InscripcionPagoActions";
 import { inscripcionRequierePagoOnline } from "@/utils/inscripcionPago";
+import {
+  ETIQUETA_INSCRIPCION_SIN_COSTO,
+  torneoInscripcionSinCosto,
+} from "@/utils/torneoInscripcionSinCosto";
 import type { Inscripcion } from "@/utils/types";
 
 interface InscripcionModalProps {
@@ -446,9 +450,10 @@ export default function InscripcionModal({
                         ) : null}
                       </div>
                       <p className="text-[10px] text-gray-500 text-right max-w-[9.5rem] leading-snug">
-                        {montoInscripcionTotal > 0 && !torneo.es_gratis
+                        {!torneoInscripcionSinCosto(torneo) &&
+                        montoInscripcionTotal > 0
                           ? "Un solo pago en Mercado Pago (precio por jugador × plazas). Puede incluir cargo por servicio."
-                          : "Sin costo o validación manual por el organizador."}
+                          : ETIQUETA_INSCRIPCION_SIN_COSTO}
                       </p>
                     </div>
                     <button

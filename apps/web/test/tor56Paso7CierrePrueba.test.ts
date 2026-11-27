@@ -12,7 +12,7 @@ describe("TOR-56 aviso de torneo de prueba en cierre", () => {
   it("motivoExclusionRankingTorneoUi alinea con backend", () => {
     assert.equal(
       motivoExclusionRankingTorneoUi({ nombre: "Open", es_prueba: true }),
-      "marcado como torneo de prueba (es_prueba)",
+      "marcado como torneo de prueba (sin puntos de ranking)",
     );
     assert.equal(
       motivoExclusionRankingTorneoUi({
