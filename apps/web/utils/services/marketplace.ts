@@ -129,11 +129,14 @@ export interface Producto {
   total_valoraciones?: number;
   /** Ventas con pago cobrado (alineado a MKT-2). */
   ventas_cobradas?: number;
+  /** MKT-12: la tienda del vendedor está suspendida (enlace directo al producto). */
+  tienda_suspendida?: boolean;
   vendedor: {
     id: string;
     usuario_id?: string;
     nombre_tienda: string;
     tipo: string;
+    estado?: Vendedor["estado"];
     entidad_tipo?: EntidadMarketplaceTipo;
     entidad_id?: string;
     descripcion?: string;

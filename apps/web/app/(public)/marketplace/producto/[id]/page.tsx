@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   Store,
   MessageSquare,
+  TriangleAlert,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -114,6 +115,14 @@ export default function ProductoDetallePage() {
 
   const handleAgregarAlCarrito = () => {
     if (!producto) return;
+    if (tiendaSuspendida) {
+      sileo.warning({
+        title: "Tienda no disponible",
+        description:
+          "Esta tienda está suspendida y no acepta compras por el momento.",
+      });
+      return;
+    }
     agregarItem({
       productoId: producto.id,
       nombre: producto.nombre,
@@ -188,6 +197,9 @@ export default function ProductoDetallePage() {
   const promedioValoraciones = producto.promedio_valoraciones ?? 0;
   const totalValoraciones = producto.total_valoraciones ?? 0;
   const marcaProducto = etiquetaMarcaProducto(producto.marca);
+  const tiendaSuspendida =
+    producto.tienda_suspendida === true ||
+    producto.vendedor.estado === "suspendido";
 
   return (
     <div className="min-h-screen bg-brand-black text-brand-white pb-20">
@@ -346,6 +358,24 @@ export default function ProductoDetallePage() {
 
             {/* ACCIONES DE COMPRA */}
             <div className="border-t border-brand-white/5 pt-6 space-y-4">
+              {tiendaSuspendida && (
+                <div
+                  className="flex gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+                  role="status"
+                >
+                  <TriangleAlert className="size-5 shrink-0 text-amber-400" />
+                  <div>
+                    <p className="font-bold text-amber-50">
+                      Tienda no disponible
+                    </p>
+                    <p className="text-amber-100/90 mt-0.5">
+                      {producto.vendedor.nombre_tienda} está suspendida. No podés
+                      añadir productos al carrito ni completar una compra.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap items-center gap-4">
                 {/* Selector de cantidad (solo productos físicos) */}
                 {producto.tipo === "producto" && (
@@ -392,8 +422,11 @@ export default function ProductoDetallePage() {
               <div className="flex gap-4">
                 <button
                   onClick={handleAgregarAlCarrito}
-                  disabled={producto.tipo === "producto" && producto.stock <= 0}
-                  className="flex-1 bg-brand-chartreuse disabled:bg-gray-700 text-brand-black font-bold text-sm py-4 px-6 rounded-2xl hover:opacity-90 transition-all duration-200 shadow-lg shadow-brand-chartreuse/10 flex items-center justify-center gap-2 cursor-pointer"
+                  disabled={
+                    tiendaSuspendida ||
+                    (producto.tipo === "producto" && producto.stock <= 0)
+                  }
+                  className="flex-1 bg-brand-chartreuse disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed text-brand-black font-bold text-sm py-4 px-6 rounded-2xl hover:opacity-90 transition-all duration-200 shadow-lg shadow-brand-chartreuse/10 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <ShoppingBag className="size-4.5" />
                   <span>Añadir al Carrito</span>
