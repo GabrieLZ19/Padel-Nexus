@@ -426,7 +426,12 @@ export class ReservaService {
       .select()
       .single();
 
-    if (error) throw new Error(`Error al crear la reserva: ${error.message}`);
+    if (error) {
+      if (error.code === "23505") {
+        throw new Error("TURNO_OCUPADO");
+      }
+      throw new Error(`Error al crear la reserva: ${error.message}`);
+    }
     // Devolver detalle completo (turno/cancha/club) para el checkout.
     return this.obtenerReservaPorId(data.id);
   }
