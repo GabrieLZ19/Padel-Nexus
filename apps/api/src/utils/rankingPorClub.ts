@@ -35,6 +35,5 @@ export function alcancePersistidoRankingTorneo(
   alcanceExistente?: string | null,
 ): string {
   if (alcanceExistente) return String(alcanceExistente);
-  if (alcanceRanking === "Local") return "Provincial";
   return alcanceRanking;
 }

@@ -2588,6 +2588,7 @@ export class TorneoService {
         );
         const progLlave = await programarPartidosLlavePendientes(
           partido.torneo_id,
+          { partidoOrigenId: partido.id },
         );
         avisosProgramacionPublicada.push(
           ...progLlave.avisos_programacion_publicada,
@@ -3618,7 +3619,7 @@ export class TorneoService {
         await supabaseAdmin
           .from("partidos")
           .select(
-            "torneo_id, cancha_asignada, fecha_partido, torneos!fk_partidos_torneo(programacion_estado, duracion_partido_minutos, descanso_modo, fecha)",
+            "torneo_id, cancha_asignada, fecha_partido, torneos!fk_partidos_torneo(grupo_id, programacion_estado, duracion_partido_minutos, descanso_modo, fecha)",
           )
           .eq("id", partidoId)
           .maybeSingle();
@@ -3629,6 +3630,7 @@ export class TorneoService {
       }
 
       type TorneoMetaHorario = {
+        grupo_id?: string | null;
         programacion_estado?: string;
         duracion_partido_minutos?: number;
         descanso_modo?: string;
@@ -3726,6 +3728,27 @@ export class TorneoService {
         );
         if (conflicto) {
           throw new Error(conflicto);
+        }
+
+        const grupoId = torneoMeta?.grupo_id
+          ? String(torneoMeta.grupo_id)
+          : "";
+        if (grupoId) {
+          const { validarAsignacionEnEvento } = await import(
+            "../utils/programacionEvento"
+          );
+          const eventoError = await validarAsignacionEnEvento(
+            grupoId,
+            partidoId,
+            canchaEfectiva,
+            fechaEfectiva,
+            torneoId,
+          );
+          if (eventoError) {
+            const err = new Error(eventoError);
+            Object.assign(err, { statusCode: 409 });
+            throw err;
+          }
         }
       }
 

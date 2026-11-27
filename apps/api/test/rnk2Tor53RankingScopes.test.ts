@@ -14,8 +14,8 @@ const RAIZ_API = path.resolve(
 );
 
 describe("RNK-2 / TOR-53 ranking Club y visibilidad provincial", () => {
-  it("torneos Local nuevos persisten alcance Provincial (TOR-53)", () => {
-    assert.equal(alcancePersistidoRankingTorneo("Local"), "Provincial");
+  it("torneos Local nuevos persisten alcance Local (TOR-53)", () => {
+    assert.equal(alcancePersistidoRankingTorneo("Local"), "Local");
     assert.equal(
       alcancePersistidoRankingTorneo("Local", "Provincial"),
       "Provincial",

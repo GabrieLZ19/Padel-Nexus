@@ -65,6 +65,32 @@ describe("TOR-50 rollback y prevalidación alta en llave", () => {
     );
   });
 
+  it("prevalidarAltaEnSlotLlaveFap rechaza alta en Gan. vs 3C sin materialización", () => {
+    const matrix: FapBracketMatch[] = [
+      { matchNo: 16, a: "1A", b: "2B" },
+      { matchNo: 19, a: "W16", b: "3C" },
+    ];
+    const spec = matrix[1];
+    assert.throws(
+      () =>
+        prevalidarAltaEnSlotLlaveFap(
+          spec,
+          19,
+          matrix,
+          null,
+          null,
+          null,
+          null,
+          false,
+          true,
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof LlaveConflictoError);
+        return true;
+      },
+    );
+  });
+
   it("prevalidarAltaEnSlotLlaveFap rechaza alta en lado W* sin materialización", () => {
     const matrix: FapBracketMatch[] = [
       { matchNo: 16, a: "1A", b: "2B" },

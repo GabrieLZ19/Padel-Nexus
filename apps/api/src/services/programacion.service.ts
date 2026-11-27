@@ -347,7 +347,11 @@ export class ProgramacionService {
    */
   static async publicar(
     torneoId: string,
-    opciones: { adminId?: string } = {},
+    opciones: {
+      adminId?: string;
+      /** CLI-27: validación liviana en iteración de evento (merge valida al final). */
+      omitirValidacionBoard?: boolean;
+    } = {},
   ): Promise<{ ok: true; publicada_en: string; estado: string | null }> {
     const { data: partidos } = await supabaseAdmin
       .from("partidos")
@@ -372,12 +376,21 @@ export class ProgramacionService {
       );
     }
 
-    const board = await this.getBoard(torneoId);
-    const conflictosGraves = board.issues.filter((i) => i.severity === "bad");
-    if (conflictosGraves.length) {
-      throw new Error(
-        `No se puede publicar: ${conflictosGraves.length} conflicto(s) grave(s) en horarios (orden de llave, canchas o descanso).`,
-      );
+    if (!opciones.omitirValidacionBoard) {
+      const { data: torneoGrupo } = await supabaseAdmin
+        .from("torneos")
+        .select("grupo_id")
+        .eq("id", torneoId)
+        .maybeSingle();
+      const board = await this.getBoard(torneoId, {
+        omitirCruzadosEnBoardTorneo: Boolean(torneoGrupo?.grupo_id),
+      });
+      const conflictosGraves = board.issues.filter((i) => i.severity === "bad");
+      if (conflictosGraves.length) {
+        throw new Error(
+          `No se puede publicar: ${conflictosGraves.length} conflicto(s) grave(s) en horarios (orden de llave, canchas o descanso).`,
+        );
+      }
     }
 
     const { data: torneo } = await supabaseAdmin
@@ -559,6 +572,8 @@ export class ProgramacionService {
       horaInicio?: string;
       horaFin?: string;
       franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
+      /** CLI-27: en board de evento, issues cruzados solo en mergeBoardsEvento. */
+      omitirCruzadosEnBoardTorneo?: boolean;
     } = {},
   ): Promise<ProgramacionBoard> {
     const [
@@ -778,7 +793,7 @@ export class ProgramacionService {
     });
 
     const grupoId = torneo.grupo_id ? String(torneo.grupo_id) : "";
-    if (grupoId) {
+    if (grupoId && !opciones.omitirCruzadosEnBoardTorneo) {
       const {
         cargarMetaEvento,
         cargarPartidosProgramablesEvento,
@@ -1876,8 +1891,10 @@ export class ProgramacionService {
       descansoModo?: ModoDescanso;
       franjasPorDia?: Record<string, { inicio?: string; fin?: string; duracion?: number }>;
       adminId?: string;
+      /** CLI-27: el programador de evento arma el board una sola vez al final. */
+      omitirBoard?: boolean;
     } = {},
-  ): Promise<ProgramacionBoard> {
+  ): Promise<ProgramacionBoard | null> {
     const { data: torneo } = await supabaseAdmin
       .from("torneos")
       .select("id, programacion_estado")
@@ -1914,6 +1931,7 @@ export class ProgramacionService {
       });
     }
 
+    if (opciones.omitirBoard) return null;
     return this.getBoard(torneoId, {
       duracionMinutos: opciones.duracionMinutos,
       descansoModo: opciones.descansoModo,

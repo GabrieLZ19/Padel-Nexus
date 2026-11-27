@@ -33,7 +33,7 @@ export function proyectarNextTrasAltaPendiente(
   };
 }
 
-export function debeOmitirValidacionMatrizFapAlta(
+export function resolverPlanMaterializacionByeAlta(
   spec: FapBracketMatch,
   matchOrden: number,
   matrix: readonly FapBracketMatch[],
@@ -41,11 +41,10 @@ export function debeOmitirValidacionMatrizFapAlta(
   prevB: string | null,
   nextA: string | null,
   nextB: string | null,
-  altaLado: "a" | "b" | undefined,
+  altaLado: "a" | "b",
   semillaFap?: string,
-): boolean {
-  if (!altaLado) return false;
-  const plan =
+): ReturnType<typeof planificarMaterializacionByeFap> {
+  return (
     planificarMaterializacionByeFap(
       spec,
       matchOrden,
@@ -67,8 +66,35 @@ export function debeOmitirValidacionMatrizFapAlta(
           nextB,
           altaLado,
         )
-      : null);
-  return Boolean(plan);
+      : null)
+  );
+}
+
+export function debeOmitirValidacionMatrizFapAlta(
+  spec: FapBracketMatch,
+  matchOrden: number,
+  matrix: readonly FapBracketMatch[],
+  prevA: string | null,
+  prevB: string | null,
+  nextA: string | null,
+  nextB: string | null,
+  altaLado: "a" | "b" | undefined,
+  semillaFap?: string,
+): boolean {
+  if (!altaLado) return false;
+  return Boolean(
+    resolverPlanMaterializacionByeAlta(
+      spec,
+      matchOrden,
+      matrix,
+      prevA,
+      prevB,
+      nextA,
+      nextB,
+      altaLado,
+      semillaFap,
+    ),
+  );
 }
 
 /**
@@ -100,7 +126,7 @@ export function prevalidarAltaEnSlotLlaveFap(
   const altaLado = hayAltaA ? ("a" as const) : ("b" as const);
 
   if (
-    debeOmitirValidacionMatrizFapAlta(
+    resolverPlanMaterializacionByeAlta(
       spec,
       matchOrden,
       matrix,
@@ -113,6 +139,22 @@ export function prevalidarAltaEnSlotLlaveFap(
     )
   ) {
     return;
+  }
+
+  const refAlta = altaLado === "a" ? spec.a : spec.b;
+  if (ladoEsReservadoGanador(refAlta)) {
+    throw new LlaveConflictoError(
+      mensajeLadoReservadoGanador(
+        altaLado === "a" ? "A" : "B",
+        refAlta,
+        resolverNumeroVisible,
+      ),
+    );
+  }
+  if (ladoEsReservadoGanador(spec.a) || ladoEsReservadoGanador(spec.b)) {
+    throw new LlaveConflictoError(
+      "Este cruce incluye un hueco de ganador (W*). La alta de pareja solo aplica en un pase directo de 1º de zona contra ese hueco; indicá semilla_fap o editá el octavo/cuarto de entrada.",
+    );
   }
 
   validarCambioEquiposConMatrizFap(

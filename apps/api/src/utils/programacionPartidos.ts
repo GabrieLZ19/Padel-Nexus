@@ -2182,6 +2182,25 @@ export interface PartidoLlaveAutoprogramable {
  * tampoco se tocan partidos con horario_bloqueado=true.
  * Solo se autoprograman cruces nuevos sin cancha/hora y se avisa conflicto.
  */
+/** TOR-49: partido guardado + hijos directos en llave (winnerTo). */
+export function idsAlcanceAvisosLlaveTrasResultado(
+  partidoOrigenId: string,
+  partidos: PartidoLlaveAutoprogramable[],
+  feedersByMatchNo: Map<number, number[]>,
+): Set<string> {
+  const ids = new Set<string>([partidoOrigenId]);
+  const origen = partidos.find((p) => String(p.id) === partidoOrigenId);
+  if (!origen) return ids;
+  const orden = Number(origen.orden);
+  if (!Number.isFinite(orden) || orden <= 0) return ids;
+  const dependents = buildDependentsByMatchNo(feedersByMatchNo);
+  for (const hOrden of dependents.get(orden) || []) {
+    const hijo = partidos.find((p) => Number(p.orden) === hOrden);
+    if (hijo?.id) ids.add(String(hijo.id));
+  }
+  return ids;
+}
+
 export function seleccionarPartidosLlaveParaAutoprogramar(
   partidos: PartidoLlaveAutoprogramable[],
   opts: {
@@ -2193,6 +2212,8 @@ export function seleccionarPartidosLlaveParaAutoprogramar(
       ronda?: string | null;
       orden?: number | null;
     }>;
+    /** TOR-49: si está definido, solo emite avisos para estos partidos (post resultado). */
+    limitarAvisosAIds?: Set<string>;
   },
 ): {
   pendientes: PartidoLlaveAutoprogramable[];
@@ -2219,6 +2240,10 @@ export function seleccionarPartidosLlaveParaAutoprogramar(
     if (opts.programacionPublicada) {
       if (partidoYaFinalizado(p)) return false;
       if (opts.violaHorarioPublicado(p)) {
+        const id = String(p.id || "");
+        if (opts.limitarAvisosAIds && !opts.limitarAvisosAIds.has(id)) {
+          return false;
+        }
         const etiqueta = textoPartidoNumerado(p, mapaVisible);
         avisos_programacion_publicada.push(
           `El ${etiqueta} mantiene su horario publicado, pero puede haber conflicto de orden de llave o descanso. Revisalo en el programador (Nueva edición).`,
@@ -2343,6 +2368,10 @@ export function partidoViolaFeederODescansoPublicado(
  */
 export async function programarPartidosLlavePendientes(
   torneoId: string,
+  opciones?: {
+    /** TOR-49: tras guardar resultado, acotar avisos al cruce y su hijo directo. */
+    partidoOrigenId?: string;
+  },
 ): Promise<ResultadoProgramarLlavePendientes> {
   const PLAYOFF = [
     "PRELIMINARES",
@@ -2406,6 +2435,19 @@ export async function programarPartidosLlavePendientes(
 
   const todosProg = (todos || []) as PartidoProgramable[];
 
+  const descansoMinutos = descansoModo
+    ? minutosDeModoDescanso(descansoModo)
+    : undefined;
+
+  let limitarAvisosAIds: Set<string> | undefined;
+  if (programacionPublicada && opciones?.partidoOrigenId) {
+    limitarAvisosAIds = idsAlcanceAvisosLlaveTrasResultado(
+      opciones.partidoOrigenId,
+      partidos,
+      feedersByMatchNo,
+    );
+  }
+
   const { pendientes, avisos_programacion_publicada } =
     seleccionarPartidosLlaveParaAutoprogramar(partidos, {
       programacionPublicada,
@@ -2415,13 +2457,17 @@ export async function programarPartidosLlavePendientes(
           todosProg,
           feedersByMatchNo,
           duracionMinutos,
-          { descansoModo: descansoModo as ModoDescanso | undefined },
+          {
+            descansoMinutos,
+            descansoModo: descansoModo as ModoDescanso | undefined,
+          },
         ),
       partidosNumeracion: todosProg.map((p) => ({
         id: String((p as { id?: string }).id || ""),
         ronda: p.ronda,
         orden: p.orden,
       })).filter((p) => p.id),
+      limitarAvisosAIds,
     });
   if (!pendientes.length) {
     return { updated: 0, avisos_programacion_publicada };

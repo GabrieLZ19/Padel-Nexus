@@ -510,10 +510,13 @@ export const actualizarPartido = async (
     const data = req.body;
     await TorneoService.actualizarPartido(partido_id, data);
     return res.status(200).json({ message: "Partido actualizado con éxito" });
-  } catch (error: any) {
-    return res
-      .status(400)
-      .json({ message: "Error al actualizar el partido", error: error.message });
+  } catch (error: unknown) {
+    const err = error as { statusCode?: number; message?: string };
+    const status = err?.statusCode === 409 ? 409 : 400;
+    return res.status(status).json({
+      message: "Error al actualizar el partido",
+      error: err?.message || "Error desconocido",
+    });
   }
 };
 

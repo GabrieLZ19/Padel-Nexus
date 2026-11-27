@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import { getFapBracketForPairCount } from "../src/utils/fapBracketMatrices.ts";
 import { roundNameForMatchNo } from "../src/utils/fapBracketTypes.ts";
 import { numerosVisiblesDePartidos } from "../src/utils/numerosVisiblesPartido.ts";
 import {
   buildFeedersByMatchNo,
+  idsAlcanceAvisosLlaveTrasResultado,
   partidoViolaFeederODescansoPublicado,
   seleccionarPartidosLlaveParaAutoprogramar,
 } from "../src/utils/programacionPartidos.ts";
@@ -13,7 +17,16 @@ import {
   partidoYaFinalizado,
 } from "../src/utils/programacionZonaLlave.ts";
 
+const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
 describe("TOR-49 falsos positivos horarios publicados", () => {
+  it("procesar resultado pasa partidoOrigenId a programar llave", () => {
+    const svc = readFileSync(
+      path.join(RAIZ, "src/services/torneo.service.ts"),
+      "utf8",
+    );
+    assert.match(svc, /programarPartidosLlavePendientes[\s\S]*partidoOrigenId/);
+  });
   it("partidoYaFinalizado reconoce estado Finalizado", () => {
     assert.equal(partidoYaFinalizado({ estado_partido: "Finalizado" }), true);
     assert.equal(partidoYaFinalizado({ estado_partido: "Programado" }), false);
@@ -425,5 +438,94 @@ describe("TOR-49 falsos positivos horarios publicados", () => {
         partidosNumeracion: todos,
       });
     assert.equal(avisos_programacion_publicada.length, 0);
+  });
+
+  it("alcance avisos: otra rama con violacion mock no avisa tras resultado en octavo", () => {
+    const feeders = new Map<number, number[]>([
+      [59, [57, 58]],
+      [61, [59, 60]],
+    ]);
+    const partidos = [
+      {
+        id: "oct-guardado",
+        ronda: "OCTAVOS",
+        orden: 57,
+        equipo_a_id: "a",
+        equipo_b_id: "b",
+        estado_partido: "Finalizado",
+        cancha_asignada: "C1",
+        fecha_partido: "2026-11-29T10:00:00-03:00",
+      },
+      {
+        id: "oct-otro",
+        ronda: "OCTAVOS",
+        orden: 58,
+        equipo_a_id: "c",
+        equipo_b_id: "d",
+        estado_partido: "Programado",
+        cancha_asignada: "C2",
+        fecha_partido: "2026-11-29T10:00:00-03:00",
+      },
+      {
+        id: "cuarto-hijo",
+        ronda: "CUARTOS",
+        orden: 59,
+        equipo_a_id: "a",
+        equipo_b_id: "x",
+        estado_partido: "Programado",
+        cancha_asignada: "C1",
+        fecha_partido: "2026-11-29T10:05:00-03:00",
+      },
+    ];
+  const alcance = idsAlcanceAvisosLlaveTrasResultado(
+      "oct-guardado",
+      partidos,
+      feeders,
+    );
+    assert.ok(alcance.has("oct-guardado"));
+    assert.ok(alcance.has("cuarto-hijo"));
+    assert.ok(!alcance.has("oct-otro"));
+
+    const { avisos_programacion_publicada } =
+      seleccionarPartidosLlaveParaAutoprogramar(partidos, {
+        programacionPublicada: true,
+        limitarAvisosAIds: alcance,
+        violaHorarioPublicado: () => true,
+      });
+    assert.equal(avisos_programacion_publicada.length, 1);
+    assert.doesNotMatch(avisos_programacion_publicada[0], /oct-otro/i);
+  });
+
+  it("descanso tras_fin_60: 08:00 + 90m + 60m permite inicio 11:00", () => {
+    const feeders = new Map<number, number[]>([[59, [57]]]);
+    const partidos = [
+      {
+        id: "prev",
+        ronda: "OCTAVOS",
+        orden: 57,
+        equipo_a_id: "p1",
+        equipo_b_id: "p2",
+        estado_partido: "Finalizado",
+        cancha_asignada: "C1",
+        fecha_partido: "2026-11-29T08:00:00-03:00",
+      },
+      {
+        id: "next",
+        ronda: "CUARTOS",
+        orden: 59,
+        equipo_a_id: "p1",
+        equipo_b_id: "p9",
+        estado_partido: "Programado",
+        cancha_asignada: "C1",
+        fecha_partido: "2026-11-29T11:00:00-03:00",
+      },
+    ];
+    assert.equal(
+      partidoViolaFeederODescansoPublicado(partidos[1], partidos, feeders, 90, {
+        descansoModo: "tras_fin_60",
+        descansoMinutos: 60,
+      }),
+      false,
+    );
   });
 });

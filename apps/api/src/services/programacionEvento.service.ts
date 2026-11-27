@@ -18,8 +18,12 @@ export class ProgramacionEventoService {
     opciones: Parameters<typeof ProgramacionService.getBoard>[1] = {},
   ): Promise<ProgramacionBoardEvento> {
     const meta = await cargarMetaEvento(grupoId);
+    const boardOpts = {
+      ...opciones,
+      omitirCruzadosEnBoardTorneo: true,
+    };
     const boards = await Promise.all(
-      meta.torneos.map((t) => ProgramacionService.getBoard(t.id, opciones)),
+      meta.torneos.map((t) => ProgramacionService.getBoard(t.id, boardOpts)),
     );
     return await mergeBoardsEvento(grupoId, meta, boards);
   }
@@ -129,7 +133,7 @@ export class ProgramacionEventoService {
     };
 
     for (const soloFase of ["zonas", "llave"] as const) {
-      const eventPartidos = await cargarPartidosProgramablesEvento(grupoId);
+      let eventPartidos = await cargarPartidosProgramablesEvento(grupoId);
       const ocupadosSemilla = buildOcupadosDesdePartidos(
         eventPartidos.filter((p) => p.cancha_asignada && p.fecha_partido),
       );
@@ -140,10 +144,27 @@ export class ProgramacionEventoService {
           ocupadosSemilla,
           omitirBoard: true,
         });
-        const refrescados = await cargarPartidosProgramablesEvento(grupoId);
+        const { data: partidosTorneo } = await supabaseAdmin
+          .from("partidos")
+          .select(
+            "id, torneo_id, ronda, orden, equipo_a_id, equipo_b_id, estado_partido, cancha_asignada, fecha_partido, horario_bloqueado",
+          )
+          .eq("torneo_id", torneoId);
+        const merged = new Map(
+          eventPartidos.map((p) => [String(p.id), p] as const),
+        );
+        for (const row of partidosTorneo || []) {
+          merged.set(String(row.id), {
+            ...row,
+            torneo_id: torneoId,
+            ronda: row.ronda || "",
+            estado_partido: row.estado_partido || "Programado",
+          });
+        }
+        eventPartidos = [...merged.values()];
         ocupadosSemilla.clear();
         for (const key of buildOcupadosDesdePartidos(
-          refrescados.filter((p) => p.cancha_asignada && p.fecha_partido),
+          eventPartidos.filter((p) => p.cancha_asignada && p.fecha_partido),
         )) {
           ocupadosSemilla.add(key);
         }
@@ -185,10 +206,16 @@ export class ProgramacionEventoService {
     } = {},
   ): Promise<ProgramacionBoardEvento> {
     const meta = await cargarMetaEvento(grupoId);
-    for (const t of meta.torneos) {
-      if (t.programacion_estado === "publicado") continue;
-      await ProgramacionService.persistirConfigProgramacion(t.id, opciones);
-    }
+    await Promise.all(
+      meta.torneos
+        .filter((t) => t.programacion_estado !== "publicado")
+        .map((t) =>
+          ProgramacionService.persistirConfigProgramacion(t.id, {
+            ...opciones,
+            omitirBoard: true,
+          }),
+        ),
+    );
     return ProgramacionEventoService.getBoard(grupoId, opciones);
   }
 
@@ -205,9 +232,20 @@ export class ProgramacionEventoService {
           meta.torneos.some((t) => t.id === id),
         )
       : meta.torneos.map((t) => t.id);
+    const publicarVarias = ids.length > 1;
+    if (publicarVarias) {
+      const preBoard = await ProgramacionEventoService.getBoard(grupoId);
+      const conflictosGraves = preBoard.issues.filter((i) => i.severity === "bad");
+      if (conflictosGraves.length) {
+        throw new Error(
+          `No se puede publicar: ${conflictosGraves.length} conflicto(s) grave(s) en horarios del evento (cruces entre categorías, orden de llave o descanso).`,
+        );
+      }
+    }
     for (const torneoId of ids) {
       await ProgramacionService.publicar(torneoId, {
         adminId: payload.adminId,
+        omitirValidacionBoard: publicarVarias,
       });
     }
     return ProgramacionEventoService.getBoard(grupoId);
