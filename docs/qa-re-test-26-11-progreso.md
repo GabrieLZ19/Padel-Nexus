@@ -2,9 +2,9 @@
 
 Plan maestro: `.cursor/plans/re-test_26-11_item_por_item_cd026153.plan.md` (o copia en Cursor).
 
-**Siguiente ítem (plan item-por-item):** **TOR-22 / TOR-24** — Alta lado B en llave y recálculo de slots al mover zonas.
+**Siguiente ítem (plan item-por-item):** **Fase 3.1** — TOR-57/56/58/59/60, FEE-22/23 (cabezas de serie, textos, nombres en POST inscripciones).
 
-**Fase 1 plan re-test 26/11:** cerrada (`2e68302` … `b2ce031`). **ENT-46/47/48 y ENT-49:** `e4e0d6c`. Detalle: [qa-re-test-26-11-items-res23-fee21-ent49.md](./qa-re-test-26-11-items-res23-fee21-ent49.md).
+**Fase 1 plan re-test 26/11:** cerrada (`2e68302` … `b2ce031`). **Fase 2 (ítems 7–12):** ENT `e4e0d6c`; TOR-22 front `0ea3d57`; CLI-16/TOR-49 back `771be9b`; TOR-24 verificado sin diff. Detalle ítems 1–9: tabla abajo; [qa-re-test-26-11-items-res23-fee21-ent49.md](./qa-re-test-26-11-items-res23-fee21-ent49.md).
 
 ## Completados
 

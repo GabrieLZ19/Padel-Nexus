@@ -8,6 +8,7 @@
 ## Cambios
 
 - API: `ProgramacionEventoService.autoAsignar` fuerza `zonas_primero`, `omitirBoard`, dos pasadas (zonas/llave) y refresco de ocupados entre categorías.
+- API (fix 26/11, `771be9b`): `horarioInicialDraftAutoAsignar` / `debePersistirHorarioAutoAsignar` — la pasada `llave` ya no borra horarios de zona en BD.
 - API: `PUT .../programacion/intercambiar` (torneo y grupo evento); validación previa y persistencia con rollback (`programacionIntercambio.ts`).
 - Web: `useProgramadorBoard` usa intercambio atómico; en error restaura estado local y pide board al servidor.
 

@@ -25,10 +25,10 @@ Al cargar resultados de octavos/cuartos con programación ya publicada, Paso Res
 
 No se podía ubicar una pareja nueva en el hueco rival de un pase directo (1A vs W*); la UI ofrecía acciones inválidas sobre el lado del clasificado.
 
-### Solución (ya en repo)
+### Solución
 
-- API: `LlaveAltaParejaService.ejecutarAltaDesdePayload`, rutas `llave/buscar-parejas` y `llave/alta-pareja`; materialización con `planificarMaterializacionByeFap` en edición de llave (`torneo.service.ts`).
-- Web: `BracketEditor` + helpers en `fapPaseDirectoLlave` — alta solo en lado W*, protección del clasificado con `semilla_fap`.
+- API (base previa): `LlaveAltaParejaService`, materialización `planificarMaterializacionByeFap` en `torneo.service.ts`.
+- Web (`0ea3d57`): `slotPermiteAltaPaseDirecto` + matriz FAP en `BracketEditor` — no ofrecer «Alta para lado B» en feeders inválidos (p. ej. `Gan. #16 vs 3C`).
 
 ## TOR-24 — Mover parejas entre zonas y llave FAP
 
