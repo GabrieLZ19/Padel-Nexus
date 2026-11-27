@@ -1369,18 +1369,22 @@ export class ProgramacionService {
       .eq("torneo_id", torneoId);
 
     const partidos = partidosDb || [];
-    const drafts: PartidoProgramable[] = partidos.map((p) => ({
-      id: p.id,
-      ronda: p.ronda || "",
-      orden: p.orden || undefined,
-      equipo_a_id: p.equipo_a_id,
-      equipo_b_id: p.equipo_b_id,
-      estado_partido: p.estado_partido || "Programado",
-      // Solo respetamos bloqueados; el resto se reasigna
-      cancha_asignada: p.horario_bloqueado ? p.cancha_asignada : null,
-      fecha_partido: p.horario_bloqueado ? p.fecha_partido : null,
-      horario_bloqueado: p.horario_bloqueado,
-    }));
+    const { horarioInicialDraftAutoAsignar, debePersistirHorarioAutoAsignar } =
+      await import("../utils/programacionEvento");
+    const drafts: PartidoProgramable[] = partidos.map((p) => {
+      const horario = horarioInicialDraftAutoAsignar(p, opciones.soloFase);
+      return {
+        id: p.id,
+        ronda: p.ronda || "",
+        orden: p.orden || undefined,
+        equipo_a_id: p.equipo_a_id,
+        equipo_b_id: p.equipo_b_id,
+        estado_partido: p.estado_partido || "Programado",
+        cancha_asignada: horario.cancha_asignada,
+        fecha_partido: horario.fecha_partido,
+        horario_bloqueado: p.horario_bloqueado,
+      };
+    });
 
     const { mergeOcupadosSemilla, ocupadosSemillaEventoParaTorneo } =
       await import("../utils/programacionEvento");
@@ -1791,6 +1795,9 @@ export class ProgramacionService {
     await Promise.all(
       partidos.map(async (p) => {
         if (p.horario_bloqueado) return;
+        if (!debePersistirHorarioAutoAsignar(p.ronda, opciones.soloFase)) {
+          return;
+        }
         const draft = drafts.find((d) => d.id === p.id);
         if (!draft) return;
         const payload: Record<string, unknown> = {

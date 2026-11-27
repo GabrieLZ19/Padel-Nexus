@@ -158,6 +158,42 @@ export function mergeOcupadosSemilla(
   return out;
 }
 
+/** CLI-16: al auto-asignar por fases, conservar horarios ya fijados de la otra fase. */
+export function horarioInicialDraftAutoAsignar(
+  partido: {
+    ronda?: string | null;
+    cancha_asignada?: string | null;
+    fecha_partido?: string | null;
+    horario_bloqueado?: boolean | null;
+  },
+  soloFase?: "zonas" | "llave",
+): { cancha_asignada: string | null; fecha_partido: string | null } {
+  if (partido.horario_bloqueado) {
+    return {
+      cancha_asignada: partido.cancha_asignada ?? null,
+      fecha_partido: partido.fecha_partido ?? null,
+    };
+  }
+  const esZona = /^ZONA\s+/i.test(String(partido.ronda || "").trim());
+  if (soloFase === "llave" && esZona) {
+    return {
+      cancha_asignada: partido.cancha_asignada ?? null,
+      fecha_partido: partido.fecha_partido ?? null,
+    };
+  }
+  return { cancha_asignada: null, fecha_partido: null };
+}
+
+export function debePersistirHorarioAutoAsignar(
+  ronda: string | null | undefined,
+  soloFase?: "zonas" | "llave",
+): boolean {
+  const esZona = /^ZONA\s+/i.test(String(ronda || "").trim());
+  if (soloFase === "zonas") return esZona;
+  if (soloFase === "llave") return !esZona;
+  return true;
+}
+
 export async function cargarPartidosProgramablesEvento(
   grupoId: string,
 ): Promise<
