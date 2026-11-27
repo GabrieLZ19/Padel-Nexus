@@ -300,6 +300,9 @@ export function useProgramadorBoard(
           (s) => s.fecha_iso === fechaIso && s.cancha_label === canchaLabel,
         )?.key ?? null;
 
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      setSyncing(true);
+
       if (prev) {
         const partidos = prev.partidos.map((p) => {
           if (p.id === partidoId) {
@@ -337,13 +340,13 @@ export function useProgramadorBoard(
           });
           applyBoard(data);
         } else {
-          await TorneosService.asignarProgramacion(torneoId, {
+          const data = await TorneosService.asignarProgramacion(torneoId, {
             partido_id: partidoId,
             fecha_iso: fechaIso,
             cancha_label: canchaLabel,
             motivo,
           });
-          scheduleBoardSync();
+          applyBoard(data);
         }
       } catch (e: unknown) {
         if (prev) setBoard(prev);
@@ -352,9 +355,11 @@ export function useProgramadorBoard(
           title: "No se pudo asignar",
           description: msg,
         });
+      } finally {
+        setSyncing(false);
       }
     },
-    [isReadOnly, torneoId, grupoId, scheduleBoardSync, applyBoard],
+    [isReadOnly, torneoId, grupoId, applyBoard],
   );
 
   const intercambiarHorarios = useCallback(
@@ -387,6 +392,8 @@ export function useProgramadorBoard(
         destino,
         origen: origen ?? undefined,
       };
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      setSyncing(true);
       try {
         if (grupoId) {
           const data = await TorneosService.intercambiarEventoProgramacion(
@@ -403,23 +410,15 @@ export function useProgramadorBoard(
         }
       } catch (e: unknown) {
         if (prev) setBoard(prev);
-        try {
-          const remoto = await fetchBoard(
-            boardQuery(configRef.current, {
-              incluirDescansoPreview: configHidratadaRef.current,
-            }),
-          );
-          applyBoard(remoto);
-        } catch {
-          /* mantener prev local si el refresh también falla */
-        }
         sileo.error({
           title: "No se pudo intercambiar",
           description: apiErrorMessage(e, "Revisá conflictos de cancha u horario."),
         });
+      } finally {
+        setSyncing(false);
       }
     },
-    [isReadOnly, torneoId, grupoId, applyBoard, fetchBoard],
+    [isReadOnly, torneoId, grupoId, applyBoard],
   );
 
   const asignarLote = useCallback(
@@ -546,6 +545,8 @@ export function useProgramadorBoard(
         });
       }
 
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      setSyncing(true);
       try {
         if (grupoId) {
           const data = await TorneosService.desasignarEventoProgramacion(
@@ -554,18 +555,20 @@ export function useProgramadorBoard(
           );
           applyBoard(data);
         } else {
-          await TorneosService.desasignarProgramacion(torneoId, {
+          const data = await TorneosService.desasignarProgramacion(torneoId, {
             partido_id: partidoId,
             motivo,
           });
-          scheduleBoardSync();
+          applyBoard(data);
         }
       } catch (e: unknown) {
         if (prev && !opts?.silent) setBoard(prev);
         sileo.error({ title: apiErrorMessage(e, "No se pudo desasignar") });
+      } finally {
+        setSyncing(false);
       }
     },
-    [isReadOnly, torneoId, grupoId, scheduleBoardSync, applyBoard],
+    [isReadOnly, torneoId, grupoId, applyBoard],
   );
 
   const limpiar = useCallback(async () => {

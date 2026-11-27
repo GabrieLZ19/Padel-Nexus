@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Check,
   List,
+  RotateCcw,
   UserX,
   X,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import FeedbackModal, { type FeedbackModalProps } from "@/components/ui/Feedback
 import { formatFechaCalendario } from "@/utils/formatFecha";
 import { resumenBloqueoAgenda } from "@/utils/bloqueoDisponibilidad";
 import { esReservaVencidaPorPago } from "@/utils/reservaPlazoPago";
+import { etiquetaEstadoPagoReserva } from "@/utils/etiquetaEstadoPagoReserva";
 
 type VistaReservas = "lista" | "agenda";
 
@@ -55,14 +57,6 @@ const ETIQUETA_RESERVA: Record<string, string> = {
   confirmada: "Confirmada",
   cancelada: "Cancelada",
   ausente: "Ausente",
-};
-
-const ETIQUETA_PAGO: Record<string, string> = {
-  pendiente: "Pago pendiente",
-  pendiente_en_club: "Cobrar en el club",
-  completado: "Pagado",
-  rechazado: "Pago rechazado",
-  cancelado: "Sin cobro",
 };
 
 function etiquetaEstadoReserva(
@@ -154,6 +148,7 @@ export default function ClubReservasPage() {
         cobrar: "Pago registrado",
         cancelar: "Reserva cancelada",
         ausente: "Ausencia marcada",
+        reembolsar: "Reintegro registrado",
       };
       sileo.success({ title: titulos[accion] });
       await cargarReservas();
@@ -194,18 +189,29 @@ export default function ClubReservasPage() {
         type: "warning",
         confirmText: "Marcar ausencia",
       },
+      reembolsar: {
+        title: "Marcar pago devuelto",
+        description: `Confirmás que ${jugador || "el jugador"} recibió el reintegro del turno cancelado.`,
+        type: "success",
+        confirmText: "Marcar devuelta",
+      },
     };
     const texto = textos[accion];
+    const cancelaCobrada =
+      accion === "cancelar" && reserva.estado_pago === "completado";
     setModal({
       isOpen: true,
-      title: texto.title,
-      description: texto.description,
+      title: cancelaCobrada ? "Cancelar reserva cobrada" : texto.title,
+      description: cancelaCobrada
+        ? `La reserva de ${jugador || "este jugador"} ya está pagada. Indicá el motivo (mín. 8 caracteres); quedará como «A devolver».`
+        : texto.description,
       type: texto.type,
       confirmText: texto.confirmText,
       cancelText: "Volver",
       showInput: accion === "cancelar",
-      inputLabel: "Motivo para el jugador",
+      inputLabel: cancelaCobrada ? "Motivo obligatorio para el jugador" : "Motivo para el jugador",
       inputPlaceholder: "Ej.: lluvia, mantenimiento de cancha, doble reserva…",
+      inputMinLength: accion === "cancelar" ? (cancelaCobrada ? 8 : 1) : undefined,
       onClose: () => setModal((prev) => ({ ...prev, isOpen: false })),
       onConfirm: (motivo) => void ejecutar(reserva.id, accion, motivo),
     });
@@ -221,6 +227,8 @@ export default function ClubReservasPage() {
     { value: "pendiente", label: "Pendiente" },
     { value: "completado", label: "Pagado" },
     { value: "rechazado", label: "Rechazado" },
+    { value: "reembolso_pendiente", label: "A devolver" },
+    { value: "reembolsado", label: "Devuelta" },
   ];
 
   return (
@@ -420,7 +428,9 @@ function FilaReserva({
       </td>
       <td className="whitespace-nowrap px-3 py-2 text-xs">
         <span className="font-bold">{etiquetaEstadoReserva(reserva)}</span>
-        <span className="ml-2 text-gray-500">{ETIQUETA_PAGO[reserva.estado_pago] || reserva.estado_pago}</span>
+        <span className="ml-2 text-gray-500">
+          {etiquetaEstadoPagoReserva(reserva.estado_pago)}
+        </span>
       </td>
       <td className="whitespace-nowrap px-3 py-1.5">
         <div className="flex items-center gap-1">
@@ -435,6 +445,13 @@ function FilaReserva({
           )}
           {reserva.estado_reserva !== "cancelada" && (
             <Accion icon={X} label="Cancelar" onClick={() => onAccion(reserva, "cancelar")} peligro />
+          )}
+          {reserva.estado_pago === "reembolso_pendiente" && (
+            <Accion
+              icon={RotateCcw}
+              label="Marcar devuelta"
+              onClick={() => onAccion(reserva, "reembolsar")}
+            />
           )}
         </div>
       </td>

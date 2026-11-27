@@ -37,6 +37,8 @@ export interface Torneo {
   /** Señal operativa del listado: pendiente concreto o horarios sin publicar. */
   pendiente?: string | null;
   tiene_partidos_hoy?: boolean;
+  /** Primer partido programado (ISO), para copy público PUB-31. */
+  fecha_primer_partido?: string | null;
   programacion_estado?: string | null;
   solo_lectura?: boolean;
   puede_cargar_resultados?: boolean;

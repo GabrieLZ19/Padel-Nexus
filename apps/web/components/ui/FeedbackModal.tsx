@@ -25,6 +25,8 @@ export interface FeedbackModalProps {
   onConfirm?: (inputValue?: string, selectValue?: string) => void;
   /** Mínimo de caracteres para habilitar confirmar cuando showInput. */
   inputMinLength?: number;
+  /** Lista larga (p. ej. todos los errores de planilla): scroll y alineación izquierda. */
+  scrollableDescription?: boolean;
 }
 
 export default function FeedbackModal({
@@ -46,6 +48,7 @@ export default function FeedbackModal({
   selectPlaceholder = "Elegí la pareja",
   selectOptions = [],
   inputMinLength = 1,
+  scrollableDescription = false,
 }: FeedbackModalProps) {
   // Guard defensivo: si onClose es undefined, usar noop seguro
   const safeOnClose = onClose || (() => {});
@@ -129,7 +132,7 @@ export default function FeedbackModal({
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className="bg-[#1a1a1a] rounded-4xl border border-white/10 w-full max-w-100 p-8 relative overflow-hidden shadow-2xl text-center"
+            className={`bg-[#1a1a1a] rounded-4xl border border-white/10 w-full p-8 relative overflow-hidden shadow-2xl ${scrollableDescription ? "max-w-lg text-left" : "max-w-100 text-center"}`}
           >
             {/* Botón Cerrar */}
             {!isLoading && (
@@ -154,7 +157,9 @@ export default function FeedbackModal({
             <h3 className="text-2xl font-bold text-white mb-3 tracking-tight">
               {title}
             </h3>
-            <p className="text-gray-400 text-sm mb-8 leading-relaxed px-2">
+            <p
+              className={`text-gray-400 text-sm mb-8 leading-relaxed px-2 whitespace-pre-wrap ${scrollableDescription ? "max-h-60 overflow-y-auto text-left" : ""}`}
+            >
               {description}
             </p>
 

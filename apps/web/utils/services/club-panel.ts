@@ -8,7 +8,12 @@ import {
   CrearBloqueoPayload,
 } from "../types";
 
-export type AccionReservaClub = "confirmar" | "cobrar" | "cancelar" | "ausente";
+export type AccionReservaClub =
+  | "confirmar"
+  | "cobrar"
+  | "cancelar"
+  | "ausente"
+  | "reembolsar";
 
 export interface ReservaClubFila {
   id: string;
@@ -169,9 +174,7 @@ export class ClubPanelService {
   ): Promise<void> {
     await api.post(`/club/mi-club/reservas/${reservaId}/gestionar`, {
       accion,
-      ...(accion === "cancelar" && motivo?.trim()
-        ? { motivo: motivo.trim() }
-        : {}),
+      ...(accion === "cancelar" ? { motivo: motivo?.trim() ?? "" } : {}),
     });
   }
 

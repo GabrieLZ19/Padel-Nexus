@@ -37,6 +37,7 @@ import { formatMontoArs } from "@/utils/formatMonto";
 import { ReservaPlazoPagoBanner } from "@/components/reservas/ReservaPlazoPagoBanner";
 import { descripcionModalCancelarReserva } from "@/utils/politicaCancelacionReserva";
 import { esReservaVencidaPorPago } from "@/utils/reservaPlazoPago";
+import { etiquetaEstadoPagoReserva } from "@/utils/etiquetaEstadoPagoReserva";
 
 interface ReservaUsuario {
   id: string;
@@ -331,6 +332,9 @@ export default function MisReservasPage() {
               reserva.estado_reserva === "cancelada" && !isVencidaPago;
 
             const isPaid = reserva.estado_pago === "completado";
+            const isReembolsoPendiente =
+              reserva.estado_pago === "reembolso_pendiente";
+            const isReembolsado = reserva.estado_pago === "reembolsado";
             const isPagoEnClub =
               !isCancelled && reserva.estado_pago === "pendiente_en_club";
             const isPayPending =
@@ -504,6 +508,18 @@ export default function MisReservasPage() {
                       {isPaid && (
                         <span className="inline-flex items-center gap-1 text-[9px] md:text-[10px] font-black uppercase tracking-wider px-2.5 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-lg">
                           <CheckCircle2 className="w-3.5 h-3.5" /> Pago Aprobado
+                        </span>
+                      )}
+
+                      {(isReembolsoPendiente || isReembolsado) && (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[9px] md:text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border ${
+                            isReembolsado
+                              ? "bg-white/5 text-gray-300 border-white/10"
+                              : "bg-amber-500/10 text-amber-300 border-amber-500/25"
+                          }`}
+                        >
+                          {etiquetaEstadoPagoReserva(reserva.estado_pago)}
                         </span>
                       )}
 

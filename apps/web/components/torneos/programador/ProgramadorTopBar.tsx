@@ -133,9 +133,9 @@ export function ProgramadorTopBar({
               )}
               {estadoLabel}
             </span>
-            {syncing ? (
-              <span className="text-[11px] text-gray-500 animate-pulse">
-                Sync…
+            {syncing || busy ? (
+              <span className="text-[11px] text-brand-chartreuse/80 animate-pulse">
+                Guardando…
               </span>
             ) : null}
           </div>

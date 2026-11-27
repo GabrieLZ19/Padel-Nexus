@@ -29,8 +29,10 @@ import { sileo } from "sileo";
 import {
   descargarPlantillaInscripcion,
   leerPlanillaDesdeArchivo,
+  validarEstructuraPlanillaAntesImport,
 } from "@/utils/inscripcionPlanilla";
 import { importarPlanillaConProgreso } from "@/utils/planillaImportProgress";
+import { descripcionImportacionPlanillaConErrores } from "@/utils/planillaImportErrores";
 import { PlanillaImportProgressBar } from "@/components/inscripciones/PlanillaImportProgressBar";
 import type { PlanillaImportProgressState } from "@/components/inscripciones/PlanillaImportProgressBar";
 import {
@@ -161,6 +163,21 @@ export const Paso4Jugadores = ({
         detail: `${filas.length} fila(s) encontradas`,
       });
 
+      const isIndiv = esModalidadIndividual(torneo.modalidad);
+      const preview = validarEstructuraPlanillaAntesImport(filas, isIndiv);
+      const advertenciasFormato = [
+        ...preview.advertencias,
+        ...(preview.errores.length > 0
+          ? [`Hay ${preview.errores.length} fila(s) con errores que el servidor omitirá o rechazará.`]
+          : []),
+      ];
+      if (advertenciasFormato.length > 0) {
+        sileo.warning({
+          title: "Revisá la planilla",
+          description: advertenciasFormato.join("\n"),
+        });
+      }
+
       const resultado = await importarPlanillaConProgreso({
         torneoId: torneo.id,
         filas,
@@ -169,7 +186,6 @@ export const Paso4Jugadores = ({
       });
 
       triggerRefresh();
-      const isIndiv = esModalidadIndividual(torneo.modalidad);
 
       // Breve instante en 100% para que se vea el cierre.
       await new Promise((r) => setTimeout(r, 450));
@@ -196,7 +212,13 @@ export const Paso4Jugadores = ({
           isOpen: true,
           type: "warning",
           title: "Importación con advertencias",
-          description: `Éxitos: ${resultado.inscripcionesOk}. Perfiles nuevos: ${resultado.jugadoresCreados}. Errores:\n${resultado.errores.slice(0, 5).join("\n")}`,
+          scrollableDescription: true,
+          description: descripcionImportacionPlanillaConErrores({
+            inscripcionesOk: resultado.inscripcionesOk,
+            jugadoresCreados: resultado.jugadoresCreados,
+            errores: resultado.errores,
+            etiquetaUnidad: isIndiv ? "jugadores" : "parejas",
+          }),
         }));
       }
     } catch (err: unknown) {

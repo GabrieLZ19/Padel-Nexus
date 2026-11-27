@@ -296,6 +296,26 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
                 const tieneMarcador = slotsMarcador(p, tercerSetCompleto).some(
                   (s) => s.jugado,
                 );
+                const etiquetaA = parejaA
+                  ? etiquetaParejaVisible({
+                      j1: parejaA.jugador1_nombre,
+                      j2: parejaA.jugador2_nombre,
+                      provincia: parejaA.provincia,
+                      letra: parejaA.letra_prioridad,
+                      denominacion: parejaA.denominacion_nacional,
+                      nacional: esAlcanceNacional(alcance),
+                    }) || POR_DEFINIR
+                  : POR_DEFINIR;
+                const etiquetaB = parejaB
+                  ? etiquetaParejaVisible({
+                      j1: parejaB.jugador1_nombre,
+                      j2: parejaB.jugador2_nombre,
+                      provincia: parejaB.provincia,
+                      letra: parejaB.letra_prioridad,
+                      denominacion: parejaB.denominacion_nacional,
+                      nacional: esAlcanceNacional(alcance),
+                    }) || POR_DEFINIR
+                  : POR_DEFINIR;
                 return (
                   <li
                     key={p.id}
@@ -310,40 +330,24 @@ export const ZonaCard: React.FC<ZonaCardProps> = ({
                     </span>
                     <div className="flex-1 min-w-0 space-y-0.5">
                       <p
+                        title={etiquetaA}
                         className={`text-xs truncate ${
                           isWinnerA
                             ? "text-brand-chartreuse font-bold"
                             : "text-white font-medium"
                         }`}
                       >
-                        {parejaA
-                          ? etiquetaParejaVisible({
-                              j1: parejaA.jugador1_nombre,
-                              j2: parejaA.jugador2_nombre,
-                              provincia: parejaA.provincia,
-                              letra: parejaA.letra_prioridad,
-                              denominacion: parejaA.denominacion_nacional,
-                              nacional: esAlcanceNacional(alcance),
-                            }) || POR_DEFINIR
-                          : POR_DEFINIR}
+                        {etiquetaA}
                       </p>
                       <p
+                        title={etiquetaB}
                         className={`text-xs truncate ${
                           isWinnerB
                             ? "text-brand-chartreuse font-bold"
                             : "text-gray-400"
                         }`}
                       >
-                        {parejaB
-                          ? etiquetaParejaVisible({
-                              j1: parejaB.jugador1_nombre,
-                              j2: parejaB.jugador2_nombre,
-                              provincia: parejaB.provincia,
-                              letra: parejaB.letra_prioridad,
-                              denominacion: parejaB.denominacion_nacional,
-                              nacional: esAlcanceNacional(alcance),
-                            }) || POR_DEFINIR
-                          : POR_DEFINIR}
+                        {etiquetaB}
                       </p>
                     </div>
                     {tieneMarcador ? (

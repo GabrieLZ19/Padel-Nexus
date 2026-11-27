@@ -32,6 +32,20 @@ export interface ParsePlanillaResult {
   filas: FilaPlanillaInscripcion[];
 }
 
+export interface OpcionesParsearFilasPlanilla {
+  filaInicioExcel?: number;
+}
+
+export function filaInicioExcelDesdeSheetRef(ref?: string | null): number {
+  const raw = String(ref ?? "").trim();
+  if (!raw) return 1;
+  const celdaInicio = raw.split(":")[0] ?? raw;
+  const match = /^[A-Za-z]+(\d+)/.exec(celdaInicio);
+  if (!match) return 1;
+  const n = parseInt(match[1], 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
 export function sanearValorCeldaPlanilla(valor: unknown): string {
   let s = String(valor ?? "").trim();
   s = s.replace(/<\/?v\s*>/gi, "");
@@ -155,7 +169,150 @@ export function esFilaEncabezadoPlanilla(row: string[]): boolean {
   return /APELLIDO|NOMBRE/.test(joined) || /PAREJAS/.test(joined);
 }
 
-export function parsearFilasPlanilla(matrix: unknown[][]): ParsePlanillaResult {
+function parseNombreCompleto(apellidoNombre: string): {
+  apellido: string;
+  nombre: string;
+} {
+  const limpio = normalizarTexto(apellidoNombre);
+  if (!limpio) return { apellido: "", nombre: "" };
+  if (limpio.includes(",")) {
+    const [ap, ...rest] = limpio.split(",");
+    return {
+      apellido: normalizarTexto(ap),
+      nombre: normalizarTexto(rest.join(",")),
+    };
+  }
+  const partes = limpio.split(" ");
+  if (partes.length === 1) {
+    return { apellido: partes[0], nombre: partes[0] };
+  }
+  return { apellido: partes[0], nombre: partes.slice(1).join(" ") };
+}
+
+export function etiquetaFilaPlanillaExcel(fila: number): string {
+  return `Fila ${fila}`;
+}
+
+export function errorDniFilaPlanilla(
+  fila: FilaPlanillaInscripcion,
+): string | null {
+  const dni = normalizarDni(fila.dni);
+  const etiqueta = etiquetaFilaPlanillaExcel(fila.fila);
+  if (!dni) {
+    return `${etiqueta}: el DNI está vacío; completalo en la planilla.`;
+  }
+  if (dni.length < 7) {
+    return `${etiqueta}: el DNI "${dni}" tiene menos de 7 dígitos; corregilo en la planilla.`;
+  }
+  return null;
+}
+
+export function advertenciaNombreSinComaPlanilla(
+  fila: FilaPlanillaInscripcion,
+): string | null {
+  const raw = sanearValorCeldaPlanilla(fila.apellidoNombre);
+  if (!raw || raw.includes(",")) return null;
+  const { apellido, nombre } = parseNombreCompleto(raw);
+  const vista = `${apellido}, ${nombre}`;
+  return `${etiquetaFilaPlanillaExcel(fila.fila)}: el nombre no incluye coma (formato esperado «Apellido, Nombre»). Se interpretará como «${vista}».`;
+}
+
+export function agruparFilasEnParejas(
+  filas: FilaPlanillaInscripcion[],
+): Array<{ j1: FilaPlanillaInscripcion; j2?: FilaPlanillaInscripcion }> {
+  const grupos: Array<{
+    j1: FilaPlanillaInscripcion;
+    j2?: FilaPlanillaInscripcion;
+  }> = [];
+  for (let i = 0; i < filas.length; i += 2) {
+    grupos.push({ j1: filas[i], j2: filas[i + 1] });
+  }
+  return grupos;
+}
+
+function mapaDnisDuplicadosPlanilla(
+  filas: FilaPlanillaInscripcion[],
+): Map<string, number[]> {
+  const porDni = new Map<string, number[]>();
+  for (const fila of filas) {
+    const dni = normalizarDni(fila.dni);
+    if (dni.length < 7) continue;
+    const lista = porDni.get(dni) ?? [];
+    lista.push(fila.fila);
+    porDni.set(dni, lista);
+  }
+  return porDni;
+}
+
+export interface ResultadoValidacionPlanilla {
+  errores: string[];
+  advertencias: string[];
+}
+
+export function validarEstructuraPlanillaAntesImport(
+  filas: FilaPlanillaInscripcion[],
+  individual: boolean,
+): ResultadoValidacionPlanilla {
+  const errores: string[] = [];
+  const advertencias: string[] = [];
+  const dnisDuplicados = mapaDnisDuplicadosPlanilla(filas);
+
+  for (const fila of filas) {
+    const errDni = errorDniFilaPlanilla(fila);
+    if (errDni) errores.push(errDni);
+    const advNombre = advertenciaNombreSinComaPlanilla(fila);
+    if (advNombre) advertencias.push(advNombre);
+    if (!sanearValorCeldaPlanilla(fila.apellidoNombre)) {
+      errores.push(
+        `${etiquetaFilaPlanillaExcel(fila.fila)}: falta apellido y nombre.`,
+      );
+    }
+    const dni = normalizarDni(fila.dni);
+    const filasDup = dnisDuplicados.get(dni);
+    if (dni.length >= 7 && filasDup && filasDup.length > 1) {
+      const otras = filasDup.filter((n) => n !== fila.fila);
+      errores.push(
+        `${etiquetaFilaPlanillaExcel(fila.fila)}: DNI ${dni} repetido (también en fila ${otras.join(", ")}).`,
+      );
+    }
+  }
+
+  if (!individual) {
+    const grupos = agruparFilasEnParejas(filas);
+    const clavesPareja = new Map<string, string[]>();
+    for (const grupo of grupos) {
+      if (!grupo.j2) {
+        errores.push(
+          `${etiquetaFilaPlanillaExcel(grupo.j1.fila)}: la pareja quedó incompleta (falta el segundo jugador).`,
+        );
+        continue;
+      }
+      const d1 = normalizarDni(grupo.j1.dni);
+      const d2 = normalizarDni(grupo.j2.dni);
+      if (d1.length < 7 || d2.length < 7) continue;
+      const key = [d1, d2].sort().join("|");
+      const ref = `Filas ${grupo.j1.fila} y ${grupo.j2.fila}`;
+      const lista = clavesPareja.get(key) ?? [];
+      lista.push(ref);
+      clavesPareja.set(key, lista);
+    }
+    for (const refs of clavesPareja.values()) {
+      if (refs.length > 1) {
+        errores.push(
+          `Pareja duplicada (${refs.join("; ")}): los mismos dos DNI aparecen más de una vez.`,
+        );
+      }
+    }
+  }
+
+  return { errores, advertencias };
+}
+
+export function parsearFilasPlanilla(
+  matrix: unknown[][],
+  opciones?: OpcionesParsearFilasPlanilla,
+): ParsePlanillaResult {
+  const filaInicioExcel = opciones?.filaInicioExcel ?? 1;
   let headerIndex = -1;
   let headerRow: string[] = [];
 
@@ -232,7 +389,7 @@ export function parsearFilasPlanilla(matrix: unknown[][]): ParsePlanillaResult {
     }
 
     filas.push({
-      fila: r + 1,
+      fila: filaInicioExcel + r,
       letraOrden: letraRaw || ultimaLetra,
       asociacion: asociacionRaw || ultimaAsociacion,
       apellidoNombre,
@@ -271,13 +428,14 @@ export async function leerPlanillaDesdeArchivo(
   }
 
   const sheet = workbook.Sheets[sheetName];
+  const filaInicioExcel = filaInicioExcelDesdeSheetRef(sheet["!ref"]);
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
     header: 1,
     defval: "",
     raw: true,
   });
 
-  return parsearFilasPlanilla(matrix);
+  return parsearFilasPlanilla(matrix, { filaInicioExcel });
 }
 
 export function urlPlantillaInscripcion(torneo: {

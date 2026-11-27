@@ -35,9 +35,11 @@ import {
   descargarPlantillaInscripcion,
   etiquetaTipoPlanillaInscripcion,
   leerPlanillaDesdeArchivo,
+  validarEstructuraPlanillaAntesImport,
 } from "@/utils/inscripcionPlanilla";
 import { sileo } from "sileo";
 import { importarPlanillaConProgreso } from "@/utils/planillaImportProgress";
+import { descripcionImportacionPlanillaConErrores } from "@/utils/planillaImportErrores";
 import { PlanillaImportProgressBar } from "@/components/inscripciones/PlanillaImportProgressBar";
 import type { PlanillaImportProgressState } from "@/components/inscripciones/PlanillaImportProgressBar";
 import { esModalidadIndividual } from "@/utils/formatFecha";
@@ -152,6 +154,15 @@ export default function GestionInscripcionesPage() {
         detail: `${filas.length} fila(s) encontradas`,
       });
 
+      const isIndiv = esModalidadIndividual(selectedTorneo.modalidad);
+      const preview = validarEstructuraPlanillaAntesImport(filas, isIndiv);
+      if (preview.advertencias.length > 0) {
+        sileo.warning({
+          title: "Revisá la planilla",
+          description: preview.advertencias.join("\n"),
+        });
+      }
+
       const resultado = await importarPlanillaConProgreso({
         torneoId: selectedTorneo.id,
         filas,
@@ -160,7 +171,6 @@ export default function GestionInscripcionesPage() {
       });
 
       setRefreshKey((prev) => prev + 1);
-      const isIndiv = esModalidadIndividual(selectedTorneo.modalidad);
 
       await new Promise((r) => setTimeout(r, 450));
 
@@ -186,7 +196,13 @@ export default function GestionInscripcionesPage() {
           isOpen: true,
           type: "warning",
           title: "Importación con advertencias",
-          description: `Importadas: ${resultado.inscripcionesOk}. Perfiles nuevos: ${resultado.jugadoresCreados}. Errores: ${resultado.errores.length}\n\n${resultado.errores.slice(0, 5).join("\n")}${resultado.errores.length > 5 ? "\n..." : ""}`,
+          scrollableDescription: true,
+          description: descripcionImportacionPlanillaConErrores({
+            inscripcionesOk: resultado.inscripcionesOk,
+            jugadoresCreados: resultado.jugadoresCreados,
+            errores: resultado.errores,
+            etiquetaUnidad: isIndiv ? "jugadores" : "parejas",
+          }),
           onClose: () =>
             setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
         });

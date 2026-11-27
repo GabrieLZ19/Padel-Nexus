@@ -14,6 +14,7 @@ interface Props {
   sugerencia?: string;
   disabled?: boolean;
   syncing?: boolean;
+  busy?: boolean;
   onDayChange: (day: string) => void;
   onChange: (next: Partial<ProgramadorConfig>) => void;
 }
@@ -92,6 +93,7 @@ export function ProgramadorConfigBar({
   sugerencia,
   disabled,
   syncing,
+  busy = false,
   onDayChange,
   onChange,
 }: Props) {
@@ -210,7 +212,7 @@ export function ProgramadorConfigBar({
             {sugerencia}
           </p>
         ) : null}
-        {syncing ? (
+        {syncing || busy ? (
           <span className="text-xs text-brand-chartreuse/80 animate-pulse">
             Guardando…
           </span>

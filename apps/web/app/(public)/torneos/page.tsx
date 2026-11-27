@@ -16,6 +16,7 @@ import {
   Building2,
 } from "lucide-react";
 import { TorneosService } from "@/utils/services/torneos";
+import { vistaEstadoTorneoPublico } from "@/utils/estadoTorneoPublico";
 import { Torneo } from "@/utils/types";
 import { etiquetaNivelYCategoria } from "@/utils/etiquetaCategoria";
 import { useProfileStore } from "@/store/useProfileStore";
@@ -613,10 +614,14 @@ function TorneosContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {sortedTournaments.map((t) => {
                 const estadoStr = (t.estado || "").toLowerCase().trim();
+                const vistaPublica = vistaEstadoTorneoPublico({
+                  estado: t.estado,
+                  fecha_primer_partido: t.fecha_primer_partido,
+                });
                 const isAbierto =
                   estadoStr === "inscripción" || estadoStr === "borrador";
-                const isProgramado = estadoStr === "programado";
-                const isEnCurso = estadoStr === "en curso";
+                const isProgramado = vistaPublica.mostrarProgramado;
+                const isEnCurso = vistaPublica.mostrarEnVivo;
                 const isFinalizado = estadoStr === "finalizado";
                 const isCerrado = estadoStr === "cerrado";
 
@@ -667,15 +672,11 @@ function TorneosContent() {
 
                 const labelEstado = isAbierto
                   ? "Abierto"
-                  : isProgramado
-                    ? "Programado"
-                    : isCerrado
-                      ? "Cerrado"
-                      : isEnCurso
-                        ? "En curso"
-                        : isFinalizado
-                          ? "Finalizado"
-                          : t.estado;
+                  : isCerrado
+                    ? "Cerrado"
+                    : isFinalizado
+                      ? "Finalizado"
+                      : vistaPublica.etiqueta;
 
                 return (
                   <div

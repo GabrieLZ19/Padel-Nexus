@@ -318,6 +318,7 @@ export function ProgramadorVisualPage({
         activeDay={activeDay}
         disabled={isReadOnly || busy}
         syncing={syncing}
+        busy={busy}
         onDayChange={setActiveDay}
         sugerencia={board.sugerencia?.mensaje}
         onChange={(next) => reloadWithConfig(next)}
