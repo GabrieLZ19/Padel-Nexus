@@ -2642,6 +2642,12 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                       matchEditSemillaFap,
                       lado,
                       ladoSlotBloqueadoPorMatriz,
+                      {
+                        matrix: fapMatrixMatches,
+                        matchOrden: selectedMatchToEdit
+                          ? Number(selectedMatchToEdit.orden)
+                          : null,
+                      },
                     ),
                   )
                   .map((lado) => (
@@ -2660,7 +2666,19 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   ))}
               </div>
 
-              {matchEditSemillaFap ? (
+              {matchEditSemillaFap &&
+              (["a", "b"] as const).some((lado) =>
+                puedeUsarAltaParejaEnSlot(
+                  matrizPartidoEnEdicion,
+                  matchEditSemillaFap,
+                  lado,
+                  ladoSlotBloqueadoPorMatriz,
+                  {
+                    matrix: fapMatrixMatches,
+                    matchOrden: Number(selectedMatchToEdit.orden),
+                  },
+                ),
+              ) ? (
                 <p className="text-xs text-sky-200/90 bg-sky-500/10 border border-sky-400/30 rounded-xl px-3 py-2.5">
                   Pase directo de {formatFapSide(matchEditSemillaFap)}: prepará
                   el rival con «Alta para lado A/B» y guardá para crear el cruce
@@ -2786,10 +2804,26 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                     {etiquetaLadoReservado("b")} — se completa al cargar el
                     resultado del partido previo.
                   </p>
-                ) : slotLadoReservadoGanador("b") && matchEditSemillaFap ? (
+                ) : slotLadoReservadoGanador("b") &&
+                  matchEditSemillaFap &&
+                  puedeUsarAltaParejaEnSlot(
+                    matrizPartidoEnEdicion,
+                    matchEditSemillaFap,
+                    "b",
+                    ladoSlotBloqueadoPorMatriz,
+                    {
+                      matrix: fapMatrixMatches,
+                      matchOrden: Number(selectedMatchToEdit.orden),
+                    },
+                  ) ? (
                   <p className="text-sm text-gray-400">
                     {etiquetaLadoReservado("b")} — asigná la pareja nueva con
                     «Alta para lado B» arriba.
+                  </p>
+                ) : slotLadoReservadoGanador("b") && matchEditSemillaFap ? (
+                  <p className="text-sm text-gray-400">
+                    {etiquetaLadoReservado("b")} — se completa al cargar el
+                    resultado del partido previo.
                   </p>
                 ) : (
                 <CustomDropdown
