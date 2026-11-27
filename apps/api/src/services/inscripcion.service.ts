@@ -31,11 +31,14 @@ import {
   usuarioPuedeCancelarInscripcion,
 } from "../utils/inscripcionAutorizacion";
 import {
+  actorEsJugadorPublico,
   assertCategoria,
   assertEdad,
   assertInscripcionAbierta,
   assertPasoJugadoresEditable,
   assertRama,
+  jugadorNoPuedeAutoCancelarInscripcionPagada,
+  MENSAJE_BAJA_JUGADOR_INSCRIPCION_PAGADA,
   estadoPagoInicialInscripcion,
   runSyncCheck,
   torneoExigeAfiliacionOrganizadora,
@@ -866,7 +869,9 @@ export class InscripcionService {
   ) {
     const { data: inscripcion, error: fetchError } = await supabaseAdmin
       .from("inscripciones")
-      .select("torneo_id, usuario_id, usuario2_id")
+      .select(
+        "torneo_id, usuario_id, usuario2_id, estado_pago, monto",
+      )
       .eq("id", id)
       .single();
 
@@ -882,14 +887,27 @@ export class InscripcionService {
       throw new Error("No tenés permiso para cancelar esta inscripción.");
     }
 
-    await PlatformFeeService.anularFeesPorInscripcion(id);
-
     const { data: torneoInscripcion } = await supabaseAdmin
       .from("torneos")
-      .select("estado")
+      .select("estado, es_gratis, precio_inscripcion")
       .eq("id", inscripcion.torneo_id)
       .maybeSingle();
     assertPasoJugadoresEditable(torneoInscripcion || {});
+
+    if (
+      actorEsJugadorPublico(actor, {
+        usuario_id: inscripcion.usuario_id as string | null,
+        usuario2_id: inscripcion.usuario2_id as string | null,
+      }) &&
+      jugadorNoPuedeAutoCancelarInscripcionPagada(
+        inscripcion,
+        torneoInscripcion || {},
+      )
+    ) {
+      throw new Error(MENSAJE_BAJA_JUGADOR_INSCRIPCION_PAGADA);
+    }
+
+    await PlatformFeeService.anularFeesPorInscripcion(id);
 
     // Desvincular de partidos: hay FKs restrictivas en equipo_a/equipo_b/ganador.
     await supabaseAdmin

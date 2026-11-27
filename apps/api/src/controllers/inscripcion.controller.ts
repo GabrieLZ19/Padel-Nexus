@@ -202,7 +202,11 @@ export const deleteInscripcion = async (
       ? 404
       : message.includes("No tenés permiso")
         ? 403
-        : 500;
+        : message.includes("gestionar el reintegro")
+          ? 403
+          : message.includes("No se pueden inscribir ni borrar")
+            ? 409
+            : 500;
     return res.status(status).json({
       message: "Error al cancelar inscripción",
       error: message,

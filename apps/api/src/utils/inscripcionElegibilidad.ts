@@ -81,6 +81,29 @@ export function estadoPagoInicialInscripcion(
   return FAP_ESTADOS_PAGO.PENDIENTE;
 }
 
+export const MENSAJE_BAJA_JUGADOR_INSCRIPCION_PAGADA =
+  "Tu inscripción ya está paga. Para darte de baja y gestionar el reintegro, contactá al club u organizador del torneo.";
+
+/** FEE-21: jugador público no puede auto-baja con pago confirmado en torneo con costo. */
+export function jugadorNoPuedeAutoCancelarInscripcionPagada(
+  inscripcion: { estado_pago?: string | null; monto?: number | null },
+  torneo: { es_gratis?: boolean | null; precio_inscripcion?: number | null },
+): boolean {
+  if (torneoInscripcionSinCosto(torneo)) return false;
+  return (inscripcion.estado_pago || "").trim() === FAP_ESTADOS_PAGO.CONFIRMADO;
+}
+
+export function actorEsJugadorPublico(
+  actor: { id: string; rol?: string | null },
+  inscripcion: { usuario_id: string | null; usuario2_id: string | null },
+): boolean {
+  if ((actor.rol || "usuario").toLowerCase() !== "usuario") return false;
+  return (
+    inscripcion.usuario_id === actor.id ||
+    inscripcion.usuario2_id === actor.id
+  );
+}
+
 /** Si el pago pendiente debe bloquear generación de cuadros/zonas. */
 export function inscripcionPendientePagoBloqueaCuadro(
   estadoPago: string | null | undefined,
