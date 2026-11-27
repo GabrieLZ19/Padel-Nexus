@@ -30,5 +30,6 @@ describe("TOR-56 aviso de torneo de prueba en cierre", () => {
     );
     assert.match(src, /motivoTorneoPrueba/);
     assert.match(src, /Torneo excluido del ranking oficial/);
+    assert.match(src, /inscripcionesPlanillaConfirmadas/);
   });
 });

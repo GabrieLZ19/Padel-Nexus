@@ -22,6 +22,7 @@ import { ProgramacionEntryPanel } from "./programador/ProgramacionEntryPanel";
 import { etiquetaCategoria } from "@/utils/etiquetaCategoria";
 import { textoRectora } from "@/utils/textosRectora";
 import { useSiglaRectora } from "@/utils/useSiglaRectora";
+import { torneoUsaMarcasReglamentoFederacion } from "@/utils/constants/fapApaRules";
 import { ZonaCard } from "./ZonaCard";
 import { PromoverParejaMenores } from "./PromoverParejaMenores";
 import { LlaveAltaParejaPanel } from "./LlaveAltaParejaPanel";
@@ -148,6 +149,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
   setActiveTab,
 }) => {
   const siglaRectora = useSiglaRectora();
+  const usaMarcasFederacion = torneoUsaMarcasReglamentoFederacion(
+    torneo || {},
+  );
   const diasJuego = Array.isArray(torneo?.dias_juego)
     ? torneo.dias_juego.filter(
         (d: any) => typeof d === "string" && d.trim().length > 0,
@@ -389,8 +393,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
           isOpen: true,
           type: "success",
           title: "Zonas Generadas",
-          description:
-            `Las zonas se han generado automáticamente según el ${textoRectora("reglamento", siglaRectora)}.`,
+          description: usaMarcasFederacion
+            ? `Las zonas se han generado automáticamente según el ${textoRectora("reglamento", siglaRectora)}.`
+            : "Las zonas se han generado automáticamente según la configuración del torneo.",
           onClose: () =>
             setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
         });
@@ -2299,7 +2304,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   )
                 ) : usaPlantillaFap ? (
                   <span className="rounded-lg bg-brand-chartreuse/10 border border-brand-chartreuse/20 px-3 py-2 text-brand-chartreuse">
-                    {textoRectora("plantilla", siglaRectora)} · {byesFap > 0 ? `${byesFap} bye(s) a ${targetRoundForByes}` : "sin byes"}
+                    {usaMarcasFederacion
+                      ? `${textoRectora("plantilla", siglaRectora)} · ${byesFap > 0 ? `${byesFap} bye(s) a ${targetRoundForByes}` : "sin byes"}`
+                      : `Cuadro principal · ${fapPairCount ?? inscripciones.length} parejas${byesFap > 0 ? ` · ${byesFap} bye(s)` : ""}`}
                   </span>
                 ) : (
                   puedeEditarLlave &&
@@ -2339,6 +2346,8 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
                   inicioNumeracion={partidosZona.length + 1}
                   pairCount={fapPairCount ?? undefined}
                   alcance={torneo?.alcance}
+                  reglamento={(torneo as { reglamento?: string })?.reglamento}
+                  asociacion={(torneo as { asociacion?: string })?.asociacion}
                   cabezasSerieIds={cabezasSerieIds}
                   interactive={puedeEditarLlave}
                   onMatchClick={(pToEdit, opciones) => {

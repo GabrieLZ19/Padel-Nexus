@@ -16,6 +16,10 @@ import { PairDisplay, esAlcanceNacional } from "@/components/torneos/PairDisplay
 import { POR_DEFINIR } from "@/utils/etiquetaPareja";
 import { textoRectora } from "@/utils/textosRectora";
 import { useSiglaRectora } from "@/utils/useSiglaRectora";
+import {
+  reglamentoTorneo,
+  torneoUsaMarcasReglamentoFederacion,
+} from "@/utils/constants/fapApaRules";
 import { PlayerAvatar } from "@/components/torneos/MatchTeamBox";
 import {
   codigoRondaPorNumeroFap,
@@ -44,6 +48,8 @@ type Props = {
   partidos: Partido[];
   pairCount?: number;
   alcance?: string | null;
+  reglamento?: string | null;
+  asociacion?: string | null;
   cabezasSerieIds?: Set<string>;
   interactive?: boolean;
   onMatchClick?: (
@@ -121,6 +127,8 @@ export function FapBracketDiagram({
   partidos,
   pairCount,
   alcance,
+  reglamento,
+  asociacion,
   cabezasSerieIds,
   interactive = false,
   onMatchClick,
@@ -128,7 +136,14 @@ export function FapBracketDiagram({
   inicioNumeracion = 1,
 }: Props) {
   const siglaRectora = useSiglaRectora();
-  const plantilla = textoRectora("plantilla", siglaRectora);
+  const usaMarcasFederacion = torneoUsaMarcasReglamentoFederacion({
+    reglamento: reglamento ?? reglamentoTorneo({ reglamento, asociacion }),
+    asociacion,
+    alcance,
+  });
+  const plantilla = usaMarcasFederacion
+    ? textoRectora("plantilla", siglaRectora)
+    : "Cuadro principal";
   const scrollRef = useRef<HTMLDivElement>(null);
   const layoutWidthRef = useRef(0);
   const zoomTouchedRef = useRef(false);
@@ -373,7 +388,9 @@ export function FapBracketDiagram({
   if (!layout || matches.length === 0) {
     return (
       <div className="text-center p-10 text-brand-ayuda text-sm border border-dashed border-white/10 rounded-2xl">
-        Sin plantilla FAP para este cuadro.
+        {usaMarcasFederacion
+          ? `Sin plantilla ${siglaRectora} para este cuadro.`
+          : "Sin cuadro principal para este formato."}
       </div>
     );
   }
@@ -402,7 +419,9 @@ export function FapBracketDiagram({
           </span>
           {pairCount != null && (
             <span className="text-xs font-bold text-gray-400 truncate">
-              {pairCount} parejas · orden oficial
+              {usaMarcasFederacion
+                ? `${pairCount} parejas · orden oficial`
+                : `${pairCount} parejas`}
             </span>
           )}
           {fullscreen ? (

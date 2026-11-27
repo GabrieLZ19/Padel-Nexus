@@ -105,6 +105,11 @@ export interface Inscripcion {
   jugador2_nombre?: string | null;
   monto: number;
   estado_pago: "Pendiente" | "Confirmado" | "Rechazado";
+  cancelada?: boolean;
+  cancelada_at?: string | null;
+  motivo_cancelacion?: string | null;
+  estado_reembolso?: "pendiente" | "devuelto" | null;
+  reembolsado_at?: string | null;
   tipo: string;
   letra_prioridad?: string | null;
   provincia?: string | null;

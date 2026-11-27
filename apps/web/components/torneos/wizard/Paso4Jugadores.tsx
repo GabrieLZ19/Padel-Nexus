@@ -30,6 +30,7 @@ import {
   descargarPlantillaInscripcion,
   leerPlanillaDesdeArchivo,
   validarEstructuraPlanillaAntesImport,
+  descripcionConfirmacionImportPlanilla,
 } from "@/utils/inscripcionPlanilla";
 import { importarPlanillaConProgreso } from "@/utils/planillaImportProgress";
 import { descripcionImportacionPlanillaConErrores } from "@/utils/planillaImportErrores";
@@ -165,62 +166,99 @@ export const Paso4Jugadores = ({
 
       const isIndiv = esModalidadIndividual(torneo.modalidad);
       const preview = validarEstructuraPlanillaAntesImport(filas, isIndiv);
-      const advertenciasFormato = [
-        ...preview.advertencias,
-        ...(preview.errores.length > 0
-          ? [`Hay ${preview.errores.length} fila(s) con errores que el servidor omitirá o rechazará.`]
-          : []),
-      ];
-      if (advertenciasFormato.length > 0) {
-        sileo.warning({
-          title: "Revisá la planilla",
-          description: advertenciasFormato.join("\n"),
+
+      const ejecutarImportacion = async () => {
+        const resultado = await importarPlanillaConProgreso({
+          torneoId: torneo.id,
+          filas,
+          modalidad: torneo.modalidad,
+          onProgress: setImportProgress,
         });
-      }
 
-      const resultado = await importarPlanillaConProgreso({
-        torneoId: torneo.id,
-        filas,
-        modalidad: torneo.modalidad,
-        onProgress: setImportProgress,
-      });
+        triggerRefresh();
+        await new Promise((r) => setTimeout(r, 450));
 
-      triggerRefresh();
+        const advertenciasResidencia = resultado.advertenciasResidencia ?? [];
+        if (advertenciasResidencia.length > 0) {
+          sileo.warning({
+            title: "Residencia en planilla",
+            description: advertenciasResidencia.slice(0, 2).join(" "),
+          });
+        }
 
-      // Breve instante en 100% para que se vea el cierre.
-      await new Promise((r) => setTimeout(r, 450));
+        if (resultado.errores.length === 0) {
+          const extraFormato =
+            preview.advertencias.length > 0
+              ? `\n\nAvisos de formato (${preview.advertencias.length}):\n${preview.advertencias.join("\n")}`
+              : "";
+          setFeedbackModal((prev: { isOpen?: boolean }) => ({
+            ...prev,
+            isOpen: true,
+            type: "success",
+            title: "Importación completada",
+            description: `Se importaron ${resultado.inscripcionesOk} ${isIndiv ? "jugadores" : "parejas"}.${resultado.jugadoresCreados > 0 ? ` Se crearon ${resultado.jugadoresCreados} ficha(s) de jugador nuevas con los datos de la planilla.` : ""}${extraFormato}`,
+          }));
+        } else {
+          setFeedbackModal((prev: { isOpen?: boolean }) => ({
+            ...prev,
+            isOpen: true,
+            type: "warning",
+            title: "Importación con advertencias",
+            scrollableDescription: true,
+            description: descripcionImportacionPlanillaConErrores({
+              inscripcionesOk: resultado.inscripcionesOk,
+              jugadoresCreados: resultado.jugadoresCreados,
+              errores: resultado.errores,
+              etiquetaUnidad: isIndiv ? "jugadores" : "parejas",
+              advertenciasFormato: preview.advertencias,
+            }),
+          }));
+        }
+      };
 
-      const advertenciasResidencia = resultado.advertenciasResidencia ?? [];
-      if (advertenciasResidencia.length > 0) {
-        sileo.warning({
-          title: "Residencia en planilla",
-          description: advertenciasResidencia.slice(0, 2).join(" "),
-        });
-      }
-
-      if (resultado.errores.length === 0) {
-        setFeedbackModal((prev: { isOpen?: boolean }) => ({
-          ...prev,
-          isOpen: true,
-          type: "success",
-          title: "Importación completada",
-          description: `Se importaron ${resultado.inscripcionesOk} ${isIndiv ? "jugadores" : "parejas"}.${resultado.jugadoresCreados > 0 ? ` Se crearon ${resultado.jugadoresCreados} ficha(s) de jugador nuevas con los datos de la planilla.` : ""}`,
-        }));
-      } else {
+      if (preview.advertencias.length > 0) {
         setFeedbackModal((prev: { isOpen?: boolean }) => ({
           ...prev,
           isOpen: true,
           type: "warning",
-          title: "Importación con advertencias",
+          title: "Confirmar importación de planilla",
+          description: descripcionConfirmacionImportPlanilla(preview.advertencias),
           scrollableDescription: true,
-          description: descripcionImportacionPlanillaConErrores({
-            inscripcionesOk: resultado.inscripcionesOk,
-            jugadoresCreados: resultado.jugadoresCreados,
-            errores: resultado.errores,
-            etiquetaUnidad: isIndiv ? "jugadores" : "parejas",
-          }),
+          confirmText: "Importar igual",
+          cancelText: "Cancelar",
+          onConfirm: async () => {
+            setFeedbackModal((p: any) => ({ ...p, isLoading: true }));
+            try {
+              await ejecutarImportacion();
+            } catch (err: unknown) {
+              const msg =
+                err instanceof Error ? err.message : "No se pudo importar.";
+              setFeedbackModal((p: any) => ({
+                ...p,
+                isOpen: true,
+                isLoading: false,
+                type: "error",
+                title: "Error al importar",
+                description: msg,
+                onConfirm: undefined,
+                confirmText: undefined,
+                cancelText: undefined,
+              }));
+            } finally {
+              setFeedbackModal((p: any) => ({ ...p, isLoading: false }));
+            }
+          },
+          onClose: () =>
+            setFeedbackModal((p: any) => ({
+              ...p,
+              isOpen: false,
+              isLoading: false,
+            })),
         }));
+        return;
       }
+
+      await ejecutarImportacion();
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "No se pudo procesar la planilla.";
@@ -238,38 +276,57 @@ export const Paso4Jugadores = ({
     }
   };
 
-  const handleEliminarInscripcion = (
-    inscripcionId: string | number,
-    nombre: string,
-  ) => {
-    if (bloqueoAltasBajas) return;
+  const handleEliminarInscripcion = (ins: Inscripcion) => {
+    if (bloqueoAltasBajas || ins.cancelada) return;
+
+    const nombre =
+      [ins.jugador1_nombre, ins.jugador2_nombre]
+        .filter((n) => n && n !== "-")
+        .join(" / ") || "esta pareja";
+    const bajaPagadaAuditable =
+      !gratuito && inscripcionCuentaComoConfirmada(ins);
+
     setFeedbackModal((prev: any) => ({
       ...prev,
       isOpen: true,
       type: "danger",
-      title: "¿Eliminar inscripción?",
-      description: `¿Eliminar la inscripción de ${nombre}? Se liberan los cupos del torneo.`,
-      confirmText: "Eliminar",
+      title: bajaPagadaAuditable ? "¿Dar de baja inscripción pagada?" : "¿Eliminar inscripción?",
+      description: bajaPagadaAuditable
+        ? `Se cancelará la inscripción de ${nombre}, quedará visible para el reintegro del pago y se liberará el cupo.`
+        : `¿Eliminar la inscripción de ${nombre}? Se liberan los cupos del torneo.`,
+      confirmText: bajaPagadaAuditable ? "Confirmar baja" : "Eliminar",
       cancelText: "Cancelar",
       isLoading: false,
-      onConfirm: async () => {
+      showInput: bajaPagadaAuditable,
+      inputMinLength: bajaPagadaAuditable ? 8 : 1,
+      inputLabel: "Motivo",
+      inputPlaceholder: "Motivo de la baja (mín. 8 caracteres)",
+      onConfirm: async (motivoInput?: string) => {
         setFeedbackModal((prevModal: any) => ({
           ...prevModal,
           isLoading: true,
         }));
         try {
-          await InscripcionesService.eliminar(inscripcionId);
+          await InscripcionesService.eliminar(
+            ins.id,
+            bajaPagadaAuditable
+              ? { motivo_cancelacion: motivoInput?.trim() }
+              : undefined,
+          );
           triggerRefresh();
           setFeedbackModal((prevModal: any) => ({
             ...prevModal,
             isOpen: true,
             isLoading: false,
             type: "success",
-            title: "Eliminada",
-            description: "Cupo liberado.",
+            title: bajaPagadaAuditable ? "Baja registrada" : "Eliminada",
+            description: bajaPagadaAuditable
+              ? "Cupo liberado. El reintegro quedó pendiente de marcar como devuelto."
+              : "Cupo liberado.",
             onConfirm: undefined,
             confirmText: undefined,
             cancelText: undefined,
+            showInput: false,
           }));
         } catch (error: unknown) {
           setFeedbackModal((prevModal: any) => ({
@@ -281,6 +338,60 @@ export const Paso4Jugadores = ({
             description: apiErrorMessage(
               error,
               "No se pudo eliminar la inscripción.",
+            ),
+            onConfirm: undefined,
+            confirmText: undefined,
+            cancelText: undefined,
+            showInput: false,
+          }));
+        }
+      },
+    }));
+  };
+
+  const handleMarcarReembolso = (ins: Inscripcion) => {
+    if (ins.estado_reembolso !== "pendiente") return;
+    const nombre =
+      [ins.jugador1_nombre, ins.jugador2_nombre]
+        .filter((n) => n && n !== "-")
+        .join(" / ") || "esta pareja";
+
+    setFeedbackModal((prev: any) => ({
+      ...prev,
+      isOpen: true,
+      type: "warning",
+      title: "¿Marcar reintegro como devuelto?",
+      description: `Confirmá que ya reintegraste el pago de la inscripción de ${nombre}.`,
+      confirmText: "Marcar devuelta",
+      cancelText: "Cancelar",
+      isLoading: false,
+      onConfirm: async () => {
+        setFeedbackModal((prevModal: any) => ({
+          ...prevModal,
+          isLoading: true,
+        }));
+        try {
+          await InscripcionesService.marcarReembolso(ins.id);
+          triggerRefresh();
+          sileo.success({
+            title: "Reintegro registrado",
+            description: "La inscripción quedó marcada como devuelta.",
+          });
+          setFeedbackModal((prevModal: any) => ({
+            ...prevModal,
+            isOpen: false,
+            isLoading: false,
+          }));
+        } catch (error: unknown) {
+          setFeedbackModal((prevModal: any) => ({
+            ...prevModal,
+            isOpen: true,
+            isLoading: false,
+            type: "error",
+            title: "Error",
+            description: apiErrorMessage(
+              error,
+              "No se pudo registrar el reintegro.",
             ),
             onConfirm: undefined,
             confirmText: undefined,
@@ -371,18 +482,25 @@ export const Paso4Jugadores = ({
             <tbody className="divide-y divide-white/5">
               {inscripciones.map((ins) => {
                 const isConfirmed = inscripcionCuentaComoConfirmada(ins);
+                const isCancelada = Boolean(ins.cancelada);
+                const reembolsoPendiente = ins.estado_reembolso === "pendiente";
+                const reembolsoDevuelto = ins.estado_reembolso === "devuelto";
                 return (
                   <tr
                     key={ins.id}
                     className={`hover:bg-white/5 transition-colors ${
-                      isConfirmed ? "bg-green-500/5" : ""
+                      isCancelada
+                        ? "bg-amber-500/5"
+                        : isConfirmed
+                          ? "bg-green-500/5"
+                          : ""
                     }`}
                   >
                     <td className="px-8 py-5 text-center">
                       <input
                         type="checkbox"
                         checked={isConfirmed}
-                        disabled={isConfirmed || readOnly}
+                        disabled={isConfirmed || readOnly || isCancelada}
                         title={readOnly ? (torneo.solo_lectura ? "Modo lectura" : "Torneo finalizado") : undefined}
                         onChange={() => {
                           if (!isConfirmed) {
@@ -439,22 +557,32 @@ export const Paso4Jugadores = ({
                     <td className="px-6 py-5 text-center">
                       <span
                         className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                          isConfirmed
-                            ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                            : "bg-gray-500/10 text-gray-400 border border-gray-500/20"
+                          isCancelada
+                            ? reembolsoPendiente
+                              ? "bg-amber-500/10 text-amber-300 border border-amber-500/25"
+                              : "bg-gray-500/10 text-gray-400 border border-gray-500/20"
+                            : isConfirmed
+                              ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                              : "bg-gray-500/10 text-gray-400 border border-gray-500/20"
                         }`}
                       >
-                        {isConfirmed
-                          ? gratuito
-                            ? "Confirmado"
-                            : modoFederacion
-                              ? "Pagó"
-                              : "Confirmado"
-                          : gratuito
-                            ? "Pendiente de confirmar"
-                            : modoFederacion
-                              ? "No pagó"
-                              : "Pendiente de pago"}
+                        {isCancelada
+                          ? reembolsoPendiente
+                            ? "Cancelada · A devolver"
+                            : reembolsoDevuelto
+                              ? "Cancelada · Devuelto"
+                              : "Cancelada"
+                          : isConfirmed
+                            ? gratuito
+                              ? "Confirmado"
+                              : modoFederacion
+                                ? "Pagó"
+                                : "Confirmado"
+                            : gratuito
+                              ? "Pendiente de confirmar"
+                              : modoFederacion
+                                ? "No pagó"
+                                : "Pendiente de pago"}
                       </span>
                     </td>
                     <td className="px-8 py-5 text-right font-semibold text-sm">
@@ -463,29 +591,33 @@ export const Paso4Jugadores = ({
                         : `$${Number(ins.monto || 0).toLocaleString("es-AR")}`}
                     </td>
                     <td className="px-8 py-5 text-center">
-                      <button
-                        type="button"
-                        disabled={bloqueoAltasBajas}
-                        title={
-                          motivoAltasBajas ||
-                          `Eliminar inscripción de ${ins.jugador1_nombre || "esta pareja"}`
-                        }
-                        aria-label={
-                          motivoAltasBajas ||
-                          `Eliminar inscripción de ${ins.jugador1_nombre || "esta pareja"}`
-                        }
-                        onClick={() =>
-                          handleEliminarInscripcion(
-                            ins.id,
-                            [ins.jugador1_nombre, ins.jugador2_nombre]
-                              .filter((nombre) => nombre && nombre !== "-")
-                              .join(" / ") || "esta pareja",
-                          )
-                        }
-                        className="text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded-lg cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
+                      {reembolsoPendiente ? (
+                        <button
+                          type="button"
+                          disabled={readOnly}
+                          onClick={() => handleMarcarReembolso(ins)}
+                          className="text-amber-300 hover:text-amber-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide hover:bg-amber-500/10 rounded-lg cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Marcar devuelta
+                        </button>
+                      ) : !isCancelada ? (
+                        <button
+                          type="button"
+                          disabled={bloqueoAltasBajas}
+                          title={
+                            motivoAltasBajas ||
+                            `Eliminar inscripción de ${ins.jugador1_nombre || "esta pareja"}`
+                          }
+                          aria-label={
+                            motivoAltasBajas ||
+                            `Eliminar inscripción de ${ins.jugador1_nombre || "esta pareja"}`
+                          }
+                          onClick={() => handleEliminarInscripcion(ins)}
+                          className="text-red-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded-lg cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 );

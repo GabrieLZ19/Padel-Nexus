@@ -22,7 +22,8 @@ export function inscripcionPagoPendienteBloqueaCuadro(
 }
 
 export function inscripcionCuentaComoConfirmada(
-  ins: Pick<Inscripcion, "estado_pago">,
+  ins: Pick<Inscripcion, "estado_pago" | "cancelada">,
 ): boolean {
+  if (ins.cancelada) return false;
   return ins.estado_pago === "Confirmado";
 }

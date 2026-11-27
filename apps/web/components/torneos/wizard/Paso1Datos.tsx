@@ -186,6 +186,18 @@ export const Paso1Datos = ({
   const finRef = useRef<HTMLInputElement>(null);
   const sedeRef = useRef<HTMLDivElement>(null);
   const [editAlcance, setEditAlcance] = useState<string>(() => {
+    const estadoBorrador = /borrador/i.test(String(torneo.estado || ""));
+    const sinReglamentoPersistido =
+      !(torneo as { reglamento?: string }).reglamento &&
+      !(torneo as { asociacion?: string }).asociacion;
+    if (
+      esRolClub(userRole) &&
+      estadoBorrador &&
+      sinReglamentoPersistido &&
+      !torneo.alcance
+    ) {
+      return "Local";
+    }
     const inicial = torneo.alcance || "Provincial";
     // Federación nacional no usa Local/Privado
     if (
@@ -196,9 +208,21 @@ export const Paso1Datos = ({
     }
     return inicial;
   });
-  const [editAsociacion, setEditAsociacion] = useState<string>(() =>
-    reglamentoFromTorneo(torneo, userRole),
-  );
+  const [editAsociacion, setEditAsociacion] = useState<string>(() => {
+    const estadoBorrador = /borrador/i.test(String(torneo.estado || ""));
+    const sinReglamentoPersistido =
+      !(torneo as { reglamento?: string }).reglamento &&
+      !(torneo as { asociacion?: string }).asociacion;
+    if (
+      esRolClub(userRole) &&
+      estadoBorrador &&
+      sinReglamentoPersistido &&
+      puedeUsarReglamentoAmateur(userRole)
+    ) {
+      return "Amateur";
+    }
+    return reglamentoFromTorneo(torneo, userRole);
+  });
   const [asociacionesList, setAsociacionesList] = useState<Asociacion[]>([]);
   const [federacionesList, setFederacionesList] = useState<Federacion[]>([]);
   const [fapFederacionId, setFapFederacionId] = useState<string>("");

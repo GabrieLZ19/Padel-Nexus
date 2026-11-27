@@ -200,8 +200,18 @@ export const InscripcionesService = {
     });
     return response.data;
   },
-  async eliminar(id: string | number): Promise<void> {
-    await api.delete(`/inscripciones/${id}`);
+  async eliminar(
+    id: string | number,
+    opciones?: { motivo_cancelacion?: string },
+  ): Promise<void> {
+    await api.delete(`/inscripciones/${id}`, {
+      data: opciones?.motivo_cancelacion
+        ? { motivo_cancelacion: opciones.motivo_cancelacion }
+        : undefined,
+    });
+  },
+  async marcarReembolso(id: string | number): Promise<void> {
+    await api.patch(`/inscripciones/${id}/reembolsar`);
   },
   async obtenerPlazasPago(
     inscripcionId: string,

@@ -580,6 +580,17 @@ export function resumirCapacidadesZonas(capacidades: number[]): string {
   return parts.join(" + ");
 }
 
+/** TOR-73: copy «Plantilla/Reglamento FAP» solo en torneos federativos oficiales (no club Local/Amateur). */
+export function torneoUsaMarcasReglamentoFederacion(torneo: {
+  reglamento?: string | null;
+  asociacion?: string | null;
+  alcance?: string | null;
+}): boolean {
+  if (reglamentoTorneo(torneo) !== "FAP") return false;
+  const alcance = String(torneo.alcance || "").trim();
+  return !/^(local|privado)$/i.test(alcance);
+}
+
 /** Torneo del circuito federativo: sin método de pago en confirmación manual. */
 export function esTorneoContextoFederacion(
   torneo: {

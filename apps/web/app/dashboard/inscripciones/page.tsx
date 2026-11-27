@@ -36,6 +36,7 @@ import {
   etiquetaTipoPlanillaInscripcion,
   leerPlanillaDesdeArchivo,
   validarEstructuraPlanillaAntesImport,
+  descripcionConfirmacionImportPlanilla,
 } from "@/utils/inscripcionPlanilla";
 import { sileo } from "sileo";
 import { importarPlanillaConProgreso } from "@/utils/planillaImportProgress";
@@ -156,57 +157,93 @@ export default function GestionInscripcionesPage() {
 
       const isIndiv = esModalidadIndividual(selectedTorneo.modalidad);
       const preview = validarEstructuraPlanillaAntesImport(filas, isIndiv);
+
+      const ejecutarImportacion = async () => {
+        const resultado = await importarPlanillaConProgreso({
+          torneoId: selectedTorneo.id,
+          filas,
+          modalidad: selectedTorneo.modalidad,
+          onProgress: setImportProgress,
+        });
+
+        setRefreshKey((prev) => prev + 1);
+        await new Promise((r) => setTimeout(r, 450));
+
+        const advertenciasResidencia = resultado.advertenciasResidencia ?? [];
+        if (advertenciasResidencia.length > 0) {
+          sileo.warning({
+            title: "Residencia en planilla",
+            description: advertenciasResidencia.slice(0, 2).join(" "),
+          });
+        }
+
+        if (resultado.errores.length === 0) {
+          const extraFormato =
+            preview.advertencias.length > 0
+              ? `\n\nAvisos de formato (${preview.advertencias.length}):\n${preview.advertencias.join("\n")}`
+              : "";
+          setFeedbackModal({
+            isOpen: true,
+            type: "success",
+            title: "Importación completada",
+            description: `Se importaron ${resultado.inscripcionesOk} ${isIndiv ? "jugadores" : "parejas"}.${resultado.jugadoresCreados > 0 ? ` Se crearon ${resultado.jugadoresCreados} ficha(s) de jugador nuevas con los datos de la planilla.` : ""}${extraFormato}`,
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        } else {
+          setFeedbackModal({
+            isOpen: true,
+            type: "warning",
+            title: "Importación con advertencias",
+            scrollableDescription: true,
+            description: descripcionImportacionPlanillaConErrores({
+              inscripcionesOk: resultado.inscripcionesOk,
+              jugadoresCreados: resultado.jugadoresCreados,
+              errores: resultado.errores,
+              etiquetaUnidad: isIndiv ? "jugadores" : "parejas",
+              advertenciasFormato: preview.advertencias,
+            }),
+            onClose: () =>
+              setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          });
+        }
+      };
+
       if (preview.advertencias.length > 0) {
-        sileo.warning({
-          title: "Revisá la planilla",
-          description: preview.advertencias.join("\n"),
-        });
-      }
-
-      const resultado = await importarPlanillaConProgreso({
-        torneoId: selectedTorneo.id,
-        filas,
-        modalidad: selectedTorneo.modalidad,
-        onProgress: setImportProgress,
-      });
-
-      setRefreshKey((prev) => prev + 1);
-
-      await new Promise((r) => setTimeout(r, 450));
-
-      const advertenciasResidencia = resultado.advertenciasResidencia ?? [];
-      if (advertenciasResidencia.length > 0) {
-        sileo.warning({
-          title: "Residencia en planilla",
-          description: advertenciasResidencia.slice(0, 2).join(" "),
-        });
-      }
-
-      if (resultado.errores.length === 0) {
-        setFeedbackModal({
-          isOpen: true,
-          type: "success",
-          title: "Importación completada",
-          description: `Se importaron ${resultado.inscripcionesOk} ${isIndiv ? "jugadores" : "parejas"}.${resultado.jugadoresCreados > 0 ? ` Se crearon ${resultado.jugadoresCreados} ficha(s) de jugador nuevas con los datos de la planilla.` : ""}`,
-          onClose: () =>
-            setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
-        });
-      } else {
         setFeedbackModal({
           isOpen: true,
           type: "warning",
-          title: "Importación con advertencias",
+          title: "Confirmar importación de planilla",
+          description: descripcionConfirmacionImportPlanilla(preview.advertencias),
           scrollableDescription: true,
-          description: descripcionImportacionPlanillaConErrores({
-            inscripcionesOk: resultado.inscripcionesOk,
-            jugadoresCreados: resultado.jugadoresCreados,
-            errores: resultado.errores,
-            etiquetaUnidad: isIndiv ? "jugadores" : "parejas",
-          }),
+          confirmText: "Importar igual",
+          cancelText: "Cancelar",
           onClose: () =>
             setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+          onConfirm: async () => {
+            setFeedbackModal((prev) => ({ ...prev, isLoading: true }));
+            try {
+              await ejecutarImportacion();
+            } catch (err: unknown) {
+              const msg =
+                err instanceof Error ? err.message : "No se pudo importar.";
+              setFeedbackModal({
+                isOpen: true,
+                type: "error",
+                title: "Error al importar",
+                description: msg,
+                onClose: () =>
+                  setFeedbackModal((prev) => ({ ...prev, isOpen: false })),
+              });
+            } finally {
+              setFeedbackModal((prev) => ({ ...prev, isLoading: false }));
+            }
+          },
         });
+        return;
       }
+
+      await ejecutarImportacion();
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : "No se pudo procesar la planilla.";

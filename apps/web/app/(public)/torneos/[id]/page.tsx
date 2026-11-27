@@ -656,6 +656,8 @@ export default function TorneoDetallePage() {
                           partidos={partidos}
                           pairCount={fapPairCount ?? undefined}
                           alcance={torneo.alcance}
+                          reglamento={(torneo as { reglamento?: string }).reglamento}
+                          asociacion={(torneo as { asociacion?: string }).asociacion}
                           interactive={false}
                           compact
                         />

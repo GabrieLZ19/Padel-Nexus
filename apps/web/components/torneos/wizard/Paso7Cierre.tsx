@@ -17,6 +17,7 @@ import {
   torneoVinculaRanking,
 } from "@/utils/puntosTorneo";
 import { motivoExclusionRankingTorneoUi } from "@/utils/datoPruebaTorneo";
+import { inscripcionCuentaComoConfirmada } from "@/utils/torneoInscripcionSinCosto";
 
 interface Paso5CierreProps {
   torneo: Torneo;
@@ -46,23 +47,19 @@ export const Paso5Cierre = ({
     ? "players"
     : "fiscales";
   const siglaRectora = useSiglaRectora();
-  const confirmadasCount = inscripciones.filter(
-    (i) => i.estado_pago === "Confirmado",
+  const confirmadasCount = inscripciones.filter((i) =>
+    inscripcionCuentaComoConfirmada(i),
   ).length;
 
-  const jugadoresPlanillaConfirmados = useMemo(() => {
-    const ids = new Set<string>();
-    for (const ins of inscripciones) {
-      if (ins.estado_pago !== "Confirmado") continue;
-      if (ins.perfiles?.pendiente_activacion && ins.usuario_id) {
-        ids.add(ins.usuario_id);
-      }
-      if (ins.perfiles_jugador2?.pendiente_activacion && ins.usuario2_id) {
-        ids.add(String(ins.usuario2_id));
-      }
-    }
-    return ids.size;
-  }, [inscripciones]);
+  const inscripcionesPlanillaConfirmadas = useMemo(
+    () =>
+      inscripciones.filter(
+        (ins) =>
+          inscripcionCuentaComoConfirmada(ins) &&
+          /planilla/i.test(ins.tipo || ""),
+      ).length,
+    [inscripciones],
+  );
   const estadoNorm = (torneo.estado || "").toLowerCase();
   const isOpenState =
     estadoNorm === "inscripción" ||
@@ -326,12 +323,16 @@ export const Paso5Cierre = ({
         </div>
       </div>
 
-      {puntosActivados && jugadoresPlanillaConfirmados > 0 ? (
+      {!motivoTorneoPrueba &&
+      puntosActivados &&
+      inscripcionesPlanillaConfirmadas > 0 ? (
         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-5 py-4 text-sm text-amber-100/90">
           <p className="font-bold text-amber-300 mb-1">
-            {jugadoresPlanillaConfirmados} jugador
-            {jugadoresPlanillaConfirmados === 1 ? "" : "es"} importado
-            {jugadoresPlanillaConfirmados === 1 ? "" : "s"} por planilla
+            {inscripcionesPlanillaConfirmadas}{" "}
+            {inscripcionesPlanillaConfirmadas === 1
+              ? "inscripción importada"
+              : "inscripciones importadas"}{" "}
+            por planilla
           </p>
           <p className="text-amber-100/80 leading-relaxed">
             Sumarán puntos oficiales al cerrar resultados y aparecerán en el
@@ -342,7 +343,9 @@ export const Paso5Cierre = ({
       ) : null}
 
       {/* INFORMACIÓN SOBRE EL RANKING VINCULADO */}
-      <div className="border-t border-white/10 pt-6 space-y-4">
+      <div
+        className={`border-t border-white/10 pt-6 space-y-4 ${motivoTorneoPrueba ? "hidden" : ""}`}
+      >
         <h4 className="text-xs text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1.5">
           <Award className="size-4 text-brand-chartreuse" /> Ranking Vinculado
         </h4>

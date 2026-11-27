@@ -249,6 +249,22 @@ export interface ResultadoValidacionPlanilla {
   advertencias: string[];
 }
 
+/** TOR-68: texto para confirmar importación cuando hay nombres sin coma. */
+export function descripcionConfirmacionImportPlanilla(
+  advertencias: string[],
+): string {
+  const cabecera =
+    advertencias.length === 1
+      ? "Hay 1 fila con nombre sin coma (formato esperado «Apellido, Nombre»)."
+      : `Hay ${advertencias.length} filas con nombres sin coma (formato esperado «Apellido, Nombre»).`;
+  return [
+    cabecera,
+    "Si confirmás, se importará con la interpretación indicada en cada aviso.",
+    "",
+    ...advertencias,
+  ].join("\n");
+}
+
 export function validarEstructuraPlanillaAntesImport(
   filas: FilaPlanillaInscripcion[],
   individual: boolean,
