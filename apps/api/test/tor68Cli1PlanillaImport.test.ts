@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
+
+const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 import {
   advertenciaNombreSinComaPlanilla,
   errorDniFilaPlanilla,
@@ -63,6 +68,40 @@ describe("CLI-1 / TOR-68 importador de planilla", () => {
     assert.equal(dup3011.length, 2);
     assert.equal(dup2899.length, 2);
     assert.ok(errores.length >= 4);
+  });
+
+  it("TOR-68: inscripción pública valida duplicado antes de cupos", () => {
+    const svc = readFileSync(
+      path.join(RAIZ, "src/services/inscripcion.service.ts"),
+      "utf8",
+    );
+    const bloque = svc.slice(
+      svc.indexOf("// 7. DUPLICADOS"),
+      svc.indexOf("// 8. CUPOS"),
+    );
+    assert.match(bloque, /inscripcionesPrevias/);
+    assert.match(bloque, /ya se encuentra inscripto/);
+  });
+
+  it("TOR-68: importar planilla delega cupos al alta (prioriza duplicado)", () => {
+    const svc = readFileSync(
+      path.join(RAIZ, "src/services/inscripcion.service.ts"),
+      "utf8",
+    );
+    const bloque = svc.slice(
+      svc.indexOf("static async importarDesdePlanilla"),
+      svc.indexOf("static async assertUsuarioPuedePagarInscripcion"),
+    );
+    assert.doesNotMatch(bloque, /cuposConsumidos >= cuposMaximos/);
+    assert.match(bloque, /registrarInscripcionManual/);
+  });
+
+  it("TOR-68: inscripciones por planilla usan tipo dedicado", () => {
+    const svc = readFileSync(
+      path.join(RAIZ, "src/services/inscripcion.service.ts"),
+      "utf8",
+    );
+    assert.match(svc, /Inscripción planilla/);
   });
 
   it("erroresGrupoPlanillaImport bloquea pareja incompleta sin tocar fichas", () => {

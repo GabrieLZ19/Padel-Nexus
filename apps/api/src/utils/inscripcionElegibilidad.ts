@@ -88,6 +88,24 @@ export function estadoPagoInicialInscripcion(
 export const MENSAJE_BAJA_JUGADOR_INSCRIPCION_PAGADA =
   "Tu inscripción ya está paga. Para darte de baja y gestionar el reintegro, contactá al club u organizador del torneo.";
 
+/** FEE-24: inscripciones canceladas lógicamente no ocupan cupo ni entran al fixture. */
+export function inscripcionActivaNoCancelada(row: {
+  cancelada?: boolean | null;
+}): boolean {
+  return row.cancelada !== true;
+}
+
+/** FEE-24: baja auditable con reintegro pendiente (organizador, torneo con costo, pago confirmado). */
+export function inscripcionRequiereBajaAuditablePagada(
+  actor: { id: string; rol?: string | null },
+  inscripcion: { usuario_id: string | null; usuario2_id: string | null; estado_pago?: string | null },
+  torneo: { es_gratis?: boolean | null; precio_inscripcion?: number | null },
+): boolean {
+  if (actorEsJugadorPublico(actor, inscripcion)) return false;
+  if (torneoInscripcionSinCosto(torneo)) return false;
+  return (inscripcion.estado_pago || "").trim() === FAP_ESTADOS_PAGO.CONFIRMADO;
+}
+
 /** FEE-21: jugador público no puede auto-baja con pago confirmado en torneo con costo. */
 export function jugadorNoPuedeAutoCancelarInscripcionPagada(
   inscripcion: { estado_pago?: string | null; monto?: number | null },

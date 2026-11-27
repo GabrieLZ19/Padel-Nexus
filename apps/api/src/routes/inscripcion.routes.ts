@@ -4,6 +4,7 @@ import {
   createInscripcion,
   updateEstadoPago,
   deleteInscripcion,
+  reembolsarInscripcion,
   createInscripcionManual,
   importarPlanillaInscripciones,
   getElegibilidadInscripcion,
@@ -56,6 +57,12 @@ router.patch(
   "/:id/pago",
   authorize(ROLES_ADMINISTRATIVOS),
   updateEstadoPago,
+);
+
+router.patch(
+  "/:id/reembolsar",
+  authorize(ROLES_ADMINISTRATIVOS),
+  reembolsarInscripcion,
 );
 
 router.delete("/:id", deleteInscripcion);

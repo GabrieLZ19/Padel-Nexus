@@ -1644,7 +1644,8 @@ export class TorneoService {
       const { count: inscritosCount } = await supabaseAdmin
         .from("inscripciones")
         .select("id", { count: "exact", head: true })
-        .eq("torneo_id", id);
+        .eq("torneo_id", id)
+        .eq("cancelada", false);
 
       const inscritos = inscritosCount || 0;
       if (Number(datos.cupos_maximos) < inscritos) {
@@ -1911,7 +1912,8 @@ export class TorneoService {
     const { data: todasInscripciones, error: inscError } = await supabaseAdmin
       .from("inscripciones")
       .select("id, usuario_id, estado_pago")
-      .eq("torneo_id", id);
+      .eq("torneo_id", id)
+      .eq("cancelada", false);
 
     if (
       inscError ||

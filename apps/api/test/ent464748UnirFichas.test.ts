@@ -47,6 +47,20 @@ describe("ENT-46/47/48 unir fichas", () => {
     assert.equal(new ErrorColisionInscripcionesFusion([]).statusCode, 400);
   });
 
+  it("ENT-48 migración RPC transfiere credenciales auth", () => {
+    const sql = readFileSync(
+      path.join(
+        RAIZ,
+        "../../supabase/migrations/20261127140000_ent48_transferir_auth_fusion.sql",
+      ),
+      "utf8",
+    );
+    assert.match(sql, /transferir_credenciales_auth_fusion/);
+    assert.match(sql, /security definer/i);
+    assert.match(sql, /grant execute[\s\S]*service_role/i);
+    assert.match(sql, /auth\.identities/);
+  });
+
   it("ENT-48 preserva acceso real en destino provisional y archiva origen", () => {
     const fusion = readFileSync(
       path.join(RAIZ, "src/utils/fusionFichasJugador.ts"),
@@ -56,7 +70,8 @@ describe("ENT-46/47/48 unir fichas", () => {
     assert.match(fusion, /acceso_preservado_desde_origen/);
     assert.match(fusion, /emailTieneVerificacion/);
     assert.match(fusion, /cuentaPendienteActivacionApp/);
-    assert.match(fusion, /updateUserById/);
+    assert.match(fusion, /transferir_credenciales_auth_fusion/);
+    assert.doesNotMatch(fusion, /console\.warn/);
     assert.match(fusion, /auth\.admin\.deleteUser\(origenId\)/);
     assert.match(fusion, /Fusionado/);
     assert.match(fusion, /padelnexus\.local/);

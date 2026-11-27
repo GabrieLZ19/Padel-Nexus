@@ -183,7 +183,8 @@ export class CompetenciaService {
         perfiles_jugador2:perfiles!inscripciones_usuario2_id_fkey (lugar_residencia)
       `,
       )
-      .eq("torneo_id", torneoId);
+      .eq("torneo_id", torneoId)
+      .eq("cancelada", false);
 
     if (errInsc || !todasInscripciones || todasInscripciones.length < 3) {
       throw new Error(
@@ -633,7 +634,8 @@ export class CompetenciaService {
       .from("inscripciones")
       .select("id, usuario_id, usuario2_id")
       .eq("torneo_id", torneoId)
-      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
+      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO)
+      .eq("cancelada", false);
 
     let parejasConPuntos: ParejaPuntosRanking[] = [];
     const puntosPorId = new Map<string, number>();
@@ -1058,7 +1060,8 @@ export class CompetenciaService {
         jugador2_nombre
       `)
       .eq("torneo_id", torneoId)
-      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO);
+      .eq("estado_pago", FAP_ESTADOS_PAGO.CONFIRMADO)
+      .eq("cancelada", false);
 
     if (errInsc || !inscripciones?.length) {
       throw new Error(

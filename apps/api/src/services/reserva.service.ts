@@ -679,7 +679,7 @@ export class ReservaService {
 
     const estadoPago =
       reserva.estado_pago === "completado"
-        ? reserva.estado_pago
+        ? "reembolso_pendiente"
         : "cancelado";
 
     const { error } = await supabaseAdmin

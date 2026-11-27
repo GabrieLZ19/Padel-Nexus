@@ -1514,7 +1514,7 @@ export class ClubService {
     if (!cancha || cancha.club_id !== clubId) {
       throw new Error("La reserva no pertenece a este club.");
     }
-    if (reserva.estado_reserva === "cancelada") {
+    if (reserva.estado_reserva === "cancelada" && accion !== "reembolsar") {
       throw new Error("La reserva está cancelada.");
     }
 

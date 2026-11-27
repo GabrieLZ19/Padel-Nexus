@@ -52,8 +52,24 @@ async function preservarAccesoOrigenEnDestino(
   const emailOrigen = String(origen.email || "").trim();
   if (!emailOrigen || esEmailPlaceholderPlanilla(emailOrigen)) return;
 
+  const telefonoDestino = (destino.telefono || "").trim();
   const telefono =
-    (origen.telefono || "").trim() || (destino.telefono || "").trim() || null;
+    telefonoDestino || (origen.telefono || "").trim() || null;
+
+  const { error: rpcError } = await supabaseAdmin.rpc(
+    "transferir_credenciales_auth_fusion",
+    {
+      p_origen_id: origen.id,
+      p_destino_id: destinoId,
+      p_email: emailOrigen,
+    },
+  );
+
+  if (rpcError) {
+    throw new Error(
+      `No se pudo transferir credenciales de acceso: ${rpcError.message}`,
+    );
+  }
 
   const { error: patchPerfil } = await supabaseAdmin
     .from("perfiles")
@@ -67,20 +83,6 @@ async function preservarAccesoOrigenEnDestino(
   if (patchPerfil) {
     throw new Error(
       `No se pudo transferir el acceso a la ficha destino: ${patchPerfil.message}`,
-    );
-  }
-
-  const { error: authUpd } = await supabaseAdmin.auth.admin.updateUserById(
-    destinoId,
-    {
-      email: emailOrigen,
-      email_confirm: true,
-    },
-  );
-  if (authUpd) {
-    console.warn(
-      "Fusión fichas: no se pudo actualizar el email de auth del destino:",
-      authUpd.message,
     );
   }
 }

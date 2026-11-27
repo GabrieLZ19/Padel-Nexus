@@ -216,10 +216,18 @@ export const deleteInscripcion = async (
       return res.status(401).json({ message: "No autorizado." });
     }
 
-    await InscripcionService.cancelarInscripcion(id, {
-      id: usuarioId,
-      rol: req.user?.rol,
-    });
+    const motivoRaw = req.body?.motivo_cancelacion;
+    const motivo_cancelacion =
+      typeof motivoRaw === "string" ? motivoRaw : undefined;
+
+    await InscripcionService.cancelarInscripcion(
+      id,
+      {
+        id: usuarioId,
+        rol: req.user?.rol,
+      },
+      { motivo_cancelacion },
+    );
 
     return res
       .status(200)
@@ -233,11 +241,53 @@ export const deleteInscripcion = async (
         ? 403
         : message.includes("gestionar el reintegro")
           ? 403
+          : message.includes("motivo de al menos 8")
+            ? 400
           : message.includes("No se pueden inscribir ni borrar")
             ? 409
+            : message.includes("ya está cancelada")
+              ? 409
             : 500;
     return res.status(status).json({
       message: "Error al cancelar inscripción",
+      error: message,
+    });
+  }
+};
+
+export const reembolsarInscripcion = async (
+  req: Request,
+  res: Response,
+): Promise<Response | void> => {
+  try {
+    const { id } = req.params;
+    const usuarioId = req.user?.id;
+    if (!usuarioId) {
+      return res.status(401).json({ message: "No autorizado." });
+    }
+
+    const data = await InscripcionService.marcarReembolsoInscripcion(id, {
+      id: usuarioId,
+      rol: req.user?.rol,
+    });
+
+    return res.status(200).json({
+      message: "Reintegro registrado",
+      data,
+    });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Error desconocido";
+    const status = message.includes("no encontrada")
+      ? 404
+      : message.includes("No tenés permiso")
+        ? 403
+        : message.includes("no tiene un reintegro pendiente") ||
+            message.includes("ya cancelada")
+          ? 409
+          : 500;
+    return res.status(status).json({
+      message: "Error al registrar reintegro",
       error: message,
     });
   }

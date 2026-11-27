@@ -38,6 +38,7 @@ import {
   assertPasoJugadoresEditable,
   assertRama,
   jugadorNoPuedeAutoCancelarInscripcionPagada,
+  inscripcionRequiereBajaAuditablePagada,
   MENSAJE_BAJA_JUGADOR_INSCRIPCION_PAGADA,
   estadoPagoInicialInscripcion,
   MENSAJE_TORNEO_INSCRIPCION_SIN_COSTO,
@@ -624,6 +625,7 @@ export class InscripcionService {
       .from("inscripciones")
       .select("id", { count: "exact", head: true })
       .eq("torneo_id", torneoId)
+      .eq("cancelada", false)
       .or(idsAValidar);
 
     if (inscripcionesPrevias && inscripcionesPrevias > 0) {
@@ -878,14 +880,91 @@ export class InscripcionService {
     }
   }
 
+  private static async desvincularInscripcionDePartidos(
+    inscripcionId: string,
+  ): Promise<void> {
+    await supabaseAdmin
+      .from("partidos")
+      .update({ equipo_a_id: null })
+      .eq("equipo_a_id", inscripcionId);
+    await supabaseAdmin
+      .from("partidos")
+      .update({ equipo_b_id: null })
+      .eq("equipo_b_id", inscripcionId);
+    await supabaseAdmin
+      .from("partidos")
+      .update({ ganador: null })
+      .eq("ganador", inscripcionId);
+  }
+
+  private static async decrementarCuposTrasBajaInscripcion(
+    torneoId: string,
+  ): Promise<void> {
+    const { data: torneo } = await supabaseAdmin
+      .from("torneos")
+      .select("cupos_actuales")
+      .eq("id", torneoId)
+      .maybeSingle();
+
+    if (!torneo) return;
+    const actuales = Number(torneo.cupos_actuales ?? 0);
+    await supabaseAdmin
+      .from("torneos")
+      .update({ cupos_actuales: Math.max(0, actuales - 1) })
+      .eq("id", torneoId);
+  }
+
+  private static notificarJugadoresBajaInscripcionAuditable(params: {
+    torneoId: string;
+    inscripcionId: string;
+    nombreTorneo: string;
+    motivo: string;
+    usuarioId?: string | null;
+    usuario2Id?: string | null;
+  }): void {
+    const { torneoId, inscripcionId, nombreTorneo, motivo, usuarioId, usuario2Id } =
+      params;
+    const mensaje = `Tu inscripción a ${nombreTorneo} fue cancelada por el organizador. Motivo: ${motivo}. El reintegro del pago queda pendiente de gestión.`;
+
+    const baseMeta = {
+      tipo: "inscripcion",
+      inscripcion_id: inscripcionId,
+      torneo_id: torneoId,
+    };
+
+    if (usuarioId) {
+      NotificacionService.crearNotificacion({
+        usuario_id: usuarioId,
+        titulo: "Inscripción cancelada",
+        mensaje,
+        tipo: "warning",
+        metadata: baseMeta,
+      }).catch((err) =>
+        console.error("Error al notificar baja de inscripción (J1):", err),
+      );
+    }
+    if (usuario2Id) {
+      NotificacionService.crearNotificacion({
+        usuario_id: usuario2Id,
+        titulo: "Inscripción cancelada",
+        mensaje,
+        tipo: "warning",
+        metadata: baseMeta,
+      }).catch((err) =>
+        console.error("Error al notificar baja de inscripción (J2):", err),
+      );
+    }
+  }
+
   static async cancelarInscripcion(
     id: string,
     actor: { id: string; rol?: string | null },
+    opciones?: { motivo_cancelacion?: string | null },
   ) {
     const { data: inscripcion, error: fetchError } = await supabaseAdmin
       .from("inscripciones")
       .select(
-        "torneo_id, usuario_id, usuario2_id, estado_pago, monto",
+        "torneo_id, usuario_id, usuario2_id, estado_pago, monto, cancelada, jugador1_nombre, jugador2_nombre",
       )
       .eq("id", id)
       .single();
@@ -893,27 +972,30 @@ export class InscripcionService {
     if (fetchError || !inscripcion)
       throw new Error("Inscripción no encontrada.");
 
-    const permitido = await usuarioPuedeCancelarInscripcion(actor, {
+    if (inscripcion.cancelada === true) {
+      throw new Error("La inscripción ya está cancelada.");
+    }
+
+    const camposAutorizacion = {
       usuario_id: inscripcion.usuario_id as string | null,
       usuario2_id: inscripcion.usuario2_id as string | null,
       torneo_id: inscripcion.torneo_id as string,
-    });
+    };
+
+    const permitido = await usuarioPuedeCancelarInscripcion(actor, camposAutorizacion);
     if (!permitido) {
       throw new Error("No tenés permiso para cancelar esta inscripción.");
     }
 
     const { data: torneoInscripcion } = await supabaseAdmin
       .from("torneos")
-      .select("estado, es_gratis, precio_inscripcion")
+      .select("estado, es_gratis, precio_inscripcion, nombre")
       .eq("id", inscripcion.torneo_id)
       .maybeSingle();
     assertPasoJugadoresEditable(torneoInscripcion || {});
 
     if (
-      actorEsJugadorPublico(actor, {
-        usuario_id: inscripcion.usuario_id as string | null,
-        usuario2_id: inscripcion.usuario2_id as string | null,
-      }) &&
+      actorEsJugadorPublico(actor, camposAutorizacion) &&
       jugadorNoPuedeAutoCancelarInscripcionPagada(
         inscripcion,
         torneoInscripcion || {},
@@ -922,21 +1004,59 @@ export class InscripcionService {
       throw new Error(MENSAJE_BAJA_JUGADOR_INSCRIPCION_PAGADA);
     }
 
-    await PlatformFeeService.anularFeesPorInscripcion(id);
+    const bajaAuditable = inscripcionRequiereBajaAuditablePagada(
+      actor,
+      inscripcion,
+      torneoInscripcion || {},
+    );
 
-    // Desvincular de partidos: hay FKs restrictivas en equipo_a/equipo_b/ganador.
-    await supabaseAdmin
-      .from("partidos")
-      .update({ equipo_a_id: null })
-      .eq("equipo_a_id", id);
-    await supabaseAdmin
-      .from("partidos")
-      .update({ equipo_b_id: null })
-      .eq("equipo_b_id", id);
-    await supabaseAdmin
-      .from("partidos")
-      .update({ ganador: null })
-      .eq("ganador", id);
+    if (bajaAuditable) {
+      const motivoRaw = String(opciones?.motivo_cancelacion || "").trim();
+      if (motivoRaw.length < 8) {
+        throw new Error(
+          "Para dar de baja una inscripción pagada tenés que indicar un motivo de al menos 8 caracteres.",
+        );
+      }
+
+      await PlatformFeeService.anularFeesPorInscripcion(id);
+      await InscripcionService.desvincularInscripcionDePartidos(id);
+
+      const ahora = new Date().toISOString();
+      const { error: updateError } = await supabaseAdmin
+        .from("inscripciones")
+        .update({
+          cancelada: true,
+          cancelada_at: ahora,
+          cancelada_por: actor.id,
+          motivo_cancelacion: motivoRaw,
+          estado_reembolso: "pendiente",
+        })
+        .eq("id", id);
+
+      if (updateError) {
+        throw new Error(
+          updateError.message || "Error al registrar la baja de la inscripción.",
+        );
+      }
+
+      await InscripcionService.decrementarCuposTrasBajaInscripcion(
+        inscripcion.torneo_id as string,
+      );
+
+      InscripcionService.notificarJugadoresBajaInscripcionAuditable({
+        torneoId: inscripcion.torneo_id as string,
+        inscripcionId: id,
+        nombreTorneo: torneoInscripcion?.nombre || "el torneo",
+        motivo: motivoRaw,
+        usuarioId: inscripcion.usuario_id as string | null,
+        usuario2Id: inscripcion.usuario2_id as string | null,
+      });
+
+      return;
+    }
+
+    await PlatformFeeService.anularFeesPorInscripcion(id);
+    await InscripcionService.desvincularInscripcionDePartidos(id);
 
     const { error: delError } = await supabaseAdmin
       .from("inscripciones")
@@ -949,19 +1069,61 @@ export class InscripcionService {
       );
     }
 
-    const { data: torneo } = await supabaseAdmin
-      .from("torneos")
-      .select("cupos_actuales")
-      .eq("id", inscripcion.torneo_id)
+    await InscripcionService.decrementarCuposTrasBajaInscripcion(
+      inscripcion.torneo_id as string,
+    );
+  }
+
+  static async marcarReembolsoInscripcion(
+    id: string,
+    actor: { id: string; rol?: string | null },
+  ) {
+    const { data: inscripcion, error: fetchError } = await supabaseAdmin
+      .from("inscripciones")
+      .select("torneo_id, cancelada, estado_reembolso")
+      .eq("id", id)
       .single();
 
-    if (torneo) {
-      const actuales = Number(torneo.cupos_actuales ?? 0);
-      await supabaseAdmin
-        .from("torneos")
-        .update({ cupos_actuales: Math.max(0, actuales - 1) })
-        .eq("id", inscripcion.torneo_id);
+    if (fetchError || !inscripcion) {
+      throw new Error("Inscripción no encontrada.");
     }
+
+    const permitido = await usuarioPuedeActualizarEstadoPagoInscripcion(
+      actor,
+      inscripcion.torneo_id as string,
+    );
+    if (!permitido) {
+      throw new Error(
+        "No tenés permiso para registrar el reintegro de esta inscripción.",
+      );
+    }
+
+    if (inscripcion.cancelada !== true) {
+      throw new Error("Solo se marca devuelta una inscripción ya cancelada.");
+    }
+    if (inscripcion.estado_reembolso !== "pendiente") {
+      throw new Error("Esta inscripción no tiene un reintegro pendiente.");
+    }
+
+    const ahora = new Date().toISOString();
+    const { data, error } = await supabaseAdmin
+      .from("inscripciones")
+      .update({
+        estado_reembolso: "devuelto",
+        reembolsado_at: ahora,
+        reembolsado_por: actor.id,
+      })
+      .eq("id", id)
+      .select("id, cancelada, estado_reembolso, reembolsado_at")
+      .single();
+
+    if (error || !data) {
+      throw new Error(
+        error?.message || "No se pudo registrar el reintegro de la inscripción.",
+      );
+    }
+
+    return data;
   }
 
   /**
@@ -1066,6 +1228,7 @@ export class InscripcionService {
         .from("inscripciones")
         .select("id", { count: "exact", head: true })
         .eq("torneo_id", torneoId)
+        .eq("cancelada", false)
         .or(idsAValidar);
 
       if (inscripcionesPrevias && inscripcionesPrevias > 0) {
@@ -1103,7 +1266,12 @@ export class InscripcionService {
             jugador2_nombre: j2Nombre,
             monto: montoInscripcion,
             estado_pago: estadoPago,
-            tipo: "Inscripción torneo",
+            tipo:
+              String(metodoPago || "")
+                .trim()
+                .toLowerCase() === "planilla"
+                ? "Inscripción planilla"
+                : "Inscripción torneo",
             letra_prioridad: letraPrioridad?.trim().toUpperCase() || null,
           },
         ])
@@ -1243,13 +1411,6 @@ export class InscripcionService {
         for (const det of erroresPrevios) {
           errores.push(det);
         }
-        continue;
-      }
-
-      if (cuposConsumidos >= cuposMaximos) {
-        errores.push(
-          `${filaRef}: el torneo no tiene cupos disponibles (${cuposMaximos} máximo).`,
-        );
         continue;
       }
 

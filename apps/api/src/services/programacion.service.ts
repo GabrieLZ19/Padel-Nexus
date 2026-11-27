@@ -456,7 +456,8 @@ export class ProgramacionService {
       .from("inscripciones")
       .select("id", { count: "exact", head: true })
       .eq("torneo_id", torneoId)
-      .eq("estado_pago", "Confirmado");
+      .eq("estado_pago", "Confirmado")
+      .eq("cancelada", false);
     return count ?? 0;
   }
 
