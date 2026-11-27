@@ -197,7 +197,9 @@ export function etiquetaCategoriaEventoTorneo(torneo: {
   rama?: string | null;
 }): string {
   const nivel = String(torneo.nivel || "").trim();
+  const categoria = String(torneo.categoria || "").trim();
   const rama = ramaCorta(torneo.rama);
+  if (nivel && categoria) return `${nivel} ${categoria}`;
   if (nivel && rama) return `${nivel} ${rama}`;
   if (nivel) return nivel;
   const desdeNombre = nombreBaseTorneo(

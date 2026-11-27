@@ -412,8 +412,21 @@ function duracionPartidoEvento(
   partido: PartidoProgramable & { torneo_id?: string },
   duracionFallback: number,
   duracionPorTorneo?: Map<string, number>,
+  fecha?: string,
+  duracionPorDia?: Record<string, number>,
+  duracionPorDiaPorTorneo?: Map<string, Record<string, number>>,
 ): number {
   const tid = String(partido.torneo_id || "");
+  if (fecha) {
+    const delTorneoDia = tid ? duracionPorDiaPorTorneo?.get(tid)?.[fecha] : undefined;
+    if (delTorneoDia != null && Number.isFinite(delTorneoDia)) {
+      return Math.max(30, delTorneoDia);
+    }
+    const delDia = duracionPorDia?.[fecha];
+    if (delDia != null && Number.isFinite(delDia)) {
+      return Math.max(30, delDia);
+    }
+  }
   const custom = tid ? duracionPorTorneo?.get(tid) : undefined;
   return Math.max(30, custom ?? duracionFallback);
 }
@@ -507,6 +520,8 @@ export function validarSolapesAgendaCompartida(
     descansoModo?: ModoDescanso;
     jugadoresPorPartido?: Map<string, string[]>;
     duracionMinutosPorTorneo?: Map<string, number>;
+    duracionPorDia?: Record<string, number>;
+    duracionPorDiaPorTorneo?: Map<string, Record<string, number>>;
   },
 ): string | null {
   const targetId = String(partidoId);
@@ -514,7 +529,7 @@ export function validarSolapesAgendaCompartida(
   const parsed = parseFechaPartidoIso(fechaIso);
   if (!cancha || !parsed) return "cancha_label y fecha_iso son obligatorios";
 
-  const duracion = Math.max(30, opciones.duracionMinutos || 90);
+  const duracionBase = Math.max(30, opciones.duracionMinutos || 90);
   const descanso = opciones.descansoMinutos ?? 60;
 
   const draft = partidosEvento.map((p) =>
@@ -526,21 +541,47 @@ export function validarSolapesAgendaCompartida(
   const target = draft.find((p) => String(p.id) === targetId);
   if (!target) return "Partido no encontrado";
 
+  const targetTorneoId = String(
+    (target as PartidoProgramable & { torneo_id?: string }).torneo_id || "",
+  );
   const assigned = draft.filter((p) => p.cancha_asignada && p.fecha_partido);
 
   for (const p of assigned) {
     const id = String(p.id || "");
     if (!id || id === targetId) continue;
+    const otroTorneoId = String(
+      (p as PartidoProgramable & { torneo_id?: string }).torneo_id || "",
+    );
+    if (targetTorneoId && otroTorneoId && targetTorneoId === otroTorneoId) {
+      continue;
+    }
     const op = parseFechaPartidoIso(String(p.fecha_partido));
     if (!op) continue;
     const tp = parseFechaPartidoIso(fechaIso);
     if (!tp) continue;
 
+    const duracionTarget = duracionPartidoEvento(
+      target as PartidoProgramable & { torneo_id?: string },
+      duracionBase,
+      opciones.duracionMinutosPorTorneo,
+      tp.fecha,
+      opciones.duracionPorDia,
+      opciones.duracionPorDiaPorTorneo,
+    );
+    const duracionOtro = duracionPartidoEvento(
+      p as PartidoProgramable & { torneo_id?: string },
+      duracionBase,
+      opciones.duracionMinutosPorTorneo,
+      op.fecha,
+      opciones.duracionPorDia,
+      opciones.duracionPorDiaPorTorneo,
+    );
+
     if (
       String(p.cancha_asignada) === cancha &&
       op.fecha === tp.fecha &&
-      op.startMin < tp.startMin + duracion &&
-      tp.startMin < op.startMin + duracion
+      op.startMin < tp.startMin + duracionTarget &&
+      tp.startMin < op.startMin + duracionOtro
     ) {
       return "Cancha ocupada en ese horario (otra categoría del evento)";
     }
@@ -559,13 +600,8 @@ export function validarSolapesAgendaCompartida(
     const common = jugadoresA.some((uid) => jugadoresB.includes(uid));
     if (!common) continue;
 
-    const duracionOtro = duracionPartidoEvento(
-      p as PartidoProgramable & { torneo_id?: string },
-      duracion,
-      opciones.duracionMinutosPorTorneo,
-    );
     const inicioA = tp.startMin;
-    const finA = tp.startMin + duracion;
+    const finA = tp.startMin + duracionTarget;
     const inicioB = op.startMin;
     const finB = op.startMin + duracionOtro;
 
@@ -681,6 +717,11 @@ export function resolverCanchaIdDesdeLabel(
 export async function issuesCruzadosEvento(
   partidosEvento: Array<PartidoProgramable & { torneo_id?: string }>,
   duracionPorTorneo: Map<string, number>,
+  opciones?: {
+    descansoPorTorneo?: Map<string, number>;
+    duracionPorDia?: Record<string, number>;
+    duracionPorDiaPorTorneo?: Map<string, Record<string, number>>;
+  },
 ): Promise<ProgramacionIssue[]> {
   const issues: ProgramacionIssue[] = [];
   const jugadoresPorPartido =
@@ -692,6 +733,7 @@ export async function issuesCruzadosEvento(
     const id = String(p.id || "");
     const torneoId = String(p.torneo_id || "");
     const duracion = duracionPorTorneo.get(torneoId) || 90;
+    const descanso = opciones?.descansoPorTorneo?.get(torneoId) ?? 60;
     const parsed = parseFechaPartidoIso(String(p.fecha_partido));
     if (!parsed || !id) continue;
     const msg = validarSolapesAgendaCompartida(
@@ -701,9 +743,11 @@ export async function issuesCruzadosEvento(
       String(p.fecha_partido),
       {
         duracionMinutos: duracion,
-        descansoMinutos: 60,
+        descansoMinutos: descanso,
         jugadoresPorPartido,
         duracionMinutosPorTorneo: duracionPorTorneo,
+        duracionPorDia: opciones?.duracionPorDia,
+        duracionPorDiaPorTorneo: opciones?.duracionPorDiaPorTorneo,
       },
     );
     if (msg) {
@@ -764,11 +808,42 @@ export async function mergeBoardsEvento(
   }
 
   const duracionMap = new Map(
-    meta.torneos.map((t) => [
-      t.id,
-      Number(t.duracion_partido_minutos || ref.duracion_partido_minutos || 90),
-    ]),
+    meta.torneos.map((t) => {
+      const b = boards.find((x) => x.torneo_id === t.id);
+      return [
+        t.id,
+        Number(
+          b?.duracion_partido_minutos ||
+            t.duracion_partido_minutos ||
+            ref.duracion_partido_minutos ||
+            90,
+        ),
+      ];
+    }),
   );
+  const descansoPorTorneo = new Map<string, number>(
+    meta.torneos.map((t) => {
+      const b = boards.find((x) => x.torneo_id === t.id);
+      if (b && typeof b.descanso_minutos === "number" && Number.isFinite(b.descanso_minutos)) {
+        return [t.id, b.descanso_minutos];
+      }
+      const modo = esModoDescanso(t.descanso_modo) ? t.descanso_modo : "tras_fin_60";
+      return [t.id, minutosDeModoDescanso(modo)];
+    }),
+  );
+  const duracionPorDiaPorTorneo = new Map<string, Record<string, number>>();
+  for (const b of boards) {
+    if (!b.franjas_por_dia) continue;
+    const porDia: Record<string, number> = {};
+    for (const [f, fr] of Object.entries(b.franjas_por_dia)) {
+      if (fr.duracion != null && Number.isFinite(fr.duracion)) {
+        porDia[f] = fr.duracion;
+      }
+    }
+    if (Object.keys(porDia).length > 0) {
+      duracionPorDiaPorTorneo.set(b.torneo_id, porDia);
+    }
+  }
   const progEvento = partidos.map((p) => ({
     id: p.id,
     torneo_id: p.torneo_id,
@@ -780,7 +855,10 @@ export async function mergeBoardsEvento(
     cancha_asignada: p.cancha_asignada,
     fecha_partido: p.fecha_partido,
   }));
-  const cruzados = await issuesCruzadosEvento(progEvento, duracionMap);
+  const cruzados = await issuesCruzadosEvento(progEvento, duracionMap, {
+    descansoPorTorneo,
+    duracionPorDiaPorTorneo,
+  });
   const seen = new Set(issues.map((i) => `${i.partido_id}|${i.message}`));
   for (const i of cruzados) {
     const k = `${i.partido_id}|${i.message}`;
@@ -875,6 +953,20 @@ export function draftIntercambioHorariosEvento(
   });
 }
 
+function duracionPorDiaDesdeDisponibilidad(
+  disponibilidad: DisponibilidadTorneo[],
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const row of disponibilidad) {
+    const fecha = String(row.fecha || "").slice(0, 10);
+    const dur = Number(row.duracion_partido_minutos);
+    if (fecha && Number.isFinite(dur) && dur >= 30 && dur <= 180) {
+      out[fecha] = Math.round(dur);
+    }
+  }
+  return out;
+}
+
 export async function validarAsignacionEnEvento(
   grupoId: string,
   partidoId: string,
@@ -886,7 +978,10 @@ export async function validarAsignacionEnEvento(
   const torneo = meta.torneos.find((t) => t.id === torneoId);
   if (!torneo) return "Torneo no pertenece al evento";
 
-  const partidosEvento = await cargarPartidosProgramablesEvento(grupoId);
+  const [partidosEvento, contextos] = await Promise.all([
+    cargarPartidosProgramablesEvento(grupoId),
+    Promise.all(meta.torneos.map((t) => cargarContextoProgramacion(t.id))),
+  ]);
   const duracion = Number(torneo.duracion_partido_minutos || 90);
   const descansoModo = esModoDescanso(torneo.descanso_modo)
     ? torneo.descanso_modo
@@ -899,6 +994,15 @@ export async function validarAsignacionEnEvento(
       Number(t.duracion_partido_minutos || 90),
     ]),
   );
+  const duracionPorDiaPorTorneo = new Map<string, Record<string, number>>();
+  meta.torneos.forEach((t, idx) => {
+    const porDia = duracionPorDiaDesdeDisponibilidad(
+      contextos[idx]?.disponibilidad || [],
+    );
+    if (Object.keys(porDia).length > 0) {
+      duracionPorDiaPorTorneo.set(t.id, porDia);
+    }
+  });
 
   const solape = validarSolapesAgendaCompartida(
     partidosEvento,
@@ -911,13 +1015,11 @@ export async function validarAsignacionEnEvento(
       descansoModo,
       jugadoresPorPartido,
       duracionMinutosPorTorneo,
+      duracionPorDiaPorTorneo,
     },
   );
   if (solape) return solape;
 
-  const contextos = await Promise.all(
-    meta.torneos.map((t) => cargarContextoProgramacion(t.id)),
-  );
   const canchasBoard = unionDisponibilidad(
     contextos.map((c) => c.disponibilidad),
   ).map((d) => ({
@@ -927,13 +1029,18 @@ export async function validarAsignacionEnEvento(
     club_id: d.club_id,
     cancha_id: d.cancha_id,
   }));
+  const parsedFecha = parseFechaPartidoIso(fechaIso);
+  const duracionSlot =
+    (parsedFecha?.fecha
+      ? duracionPorDiaPorTorneo.get(torneoId)?.[parsedFecha.fecha]
+      : undefined) ?? duracion;
   const resolved = resolverCanchaIdDesdeLabel(canchaLabel, canchasBoard);
   if (resolved) {
     const reserva = await validarContraReservasCancha({
       canchaId: resolved.cancha_id,
       clubId: resolved.club_id,
       fechaIso,
-      duracionMinutos: duracion,
+      duracionMinutos: duracionSlot,
       excluirPartidoId: partidoId,
     });
     if (reserva) return reserva;

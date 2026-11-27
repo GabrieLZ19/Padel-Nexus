@@ -1665,14 +1665,12 @@ export class TorneoService {
           lugar_residencia,
           avatar_url,
           pendiente_activacion,
-          email,
           clubes:clubes!perfiles_club_id_fkey (nombre)
         ),
         perfiles_jugador2:perfiles!fk_inscripciones_usuario2 (
           lugar_residencia,
           avatar_url,
           pendiente_activacion,
-          email,
           clubes:clubes!perfiles_club_id_fkey (nombre)
         )
       `,

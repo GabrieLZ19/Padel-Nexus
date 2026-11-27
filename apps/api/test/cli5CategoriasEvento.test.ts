@@ -28,6 +28,15 @@ describe("CLI-5 categorías del evento", () => {
       }),
       "5a Masc.",
     );
+    assert.equal(
+      etiquetaCategoriaEventoTorneo({
+        nombre: "Alta Barda — 5a Masc.",
+        nivel: "5a",
+        rama: "Masculina",
+        categoria: "Libre",
+      }),
+      "5a Libre",
+    );
   });
 
   it("ordenarTorneosCategoriaEvento agrupa por rama y nivel descendente", () => {

@@ -789,10 +789,24 @@ export class ProgramacionService {
       const duracionMap = new Map(
         meta.torneos.map((t) => [
           t.id,
-          Number(t.duracion_partido_minutos || duracion),
+          t.id === torneoId
+            ? duracion
+            : Number(t.duracion_partido_minutos || duracion),
         ]),
       );
-      const cruzados = await issuesCruzadosEvento(partidosEvento, duracionMap);
+      const descansoPorTorneo = new Map<string, number>(
+        meta.torneos.map((t) => {
+          if (t.id === torneoId) return [t.id, descanso];
+          const modoOtro = esModoDescanso(t.descanso_modo)
+            ? t.descanso_modo
+            : "tras_fin_60";
+          return [t.id, minutosDeModoDescanso(modoOtro)];
+        }),
+      );
+      const cruzados = await issuesCruzadosEvento(partidosEvento, duracionMap, {
+        descansoPorTorneo,
+        duracionPorDia,
+      });
       const idsLocales = new Set(partidos.map((p) => p.id));
       const seenIssues = new Set(
         issues.map((i) => `${i.partido_id}|${i.message}`),

@@ -47,6 +47,7 @@ export class CompetenciaService {
     torneoId: string,
     _size?: number,
     forzarDestructivo = false,
+    opciones?: { motivo?: string; adminId?: string },
   ) {
     // Bloquear regeneración si hay resultados y no se forzó el wipe
     if (!forzarDestructivo) {
@@ -67,7 +68,7 @@ export class CompetenciaService {
     const { data: torneoMeta, error: errTorneo } = await supabaseAdmin
       .from("torneos")
       .select(
-        "reglamento, dias_juego, es_gratis, precio_inscripcion, cabezas_serie_activas",
+        "reglamento, dias_juego, es_gratis, precio_inscripcion, cabezas_serie_activas, programacion_estado",
       )
       .eq("id", torneoId)
       .maybeSingle();
@@ -75,6 +76,33 @@ export class CompetenciaService {
     if (errTorneo || !torneoMeta) {
       throw new Error("Torneo no encontrado.");
     }
+
+    if (String(torneoMeta.programacion_estado || "") === "publicado") {
+      throw new Error(
+        "La programación está publicada. No se pueden regenerar los cuadros ni los horarios cargados.",
+      );
+    }
+
+    const { data: gruposPrevios } = await supabaseAdmin
+      .from("grupos")
+      .select("id")
+      .eq("torneo_id", torneoId)
+      .limit(1);
+    const { data: partidosPrevios } = await supabaseAdmin
+      .from("partidos")
+      .select("id, fecha_partido, cancha_asignada")
+      .eq("torneo_id", torneoId);
+    const esRegeneracion =
+      (gruposPrevios?.length ?? 0) > 0 || (partidosPrevios?.length ?? 0) > 0;
+    const motivoRegeneracion = opciones?.motivo?.trim() ?? "";
+    if (esRegeneracion && motivoRegeneracion.length < 8) {
+      throw new Error(
+        "Para regenerar los cuadros debés indicar un motivo de al menos 8 caracteres.",
+      );
+    }
+    const partidosConHorario =
+      partidosPrevios?.filter((p) => p.fecha_partido || p.cancha_asignada)
+        .length ?? 0;
 
     const diasJuegoRaw = torneoMeta.dias_juego;
     const diasValidos = Array.isArray(diasJuegoRaw)
@@ -482,6 +510,21 @@ export class CompetenciaService {
         programacion_estado: "programado",
       })
       .eq("id", torneoId);
+
+    if (esRegeneracion) {
+      await supabaseAdmin.from("logs_auditoria").insert({
+        usuario_id_admin: opciones?.adminId ?? null,
+        accion: "regenerar_cuadros",
+        entidad_afectada: torneoId,
+        detalles: {
+          motivo: motivoRegeneracion,
+          forzar_destructivo: forzarDestructivo,
+          partidos_borrados: partidosPrevios?.length ?? 0,
+          partidos_con_horario: partidosConHorario,
+          programacion_estado_previo: torneoMeta.programacion_estado ?? null,
+        },
+      });
+    }
 
     return {
       exito: true,

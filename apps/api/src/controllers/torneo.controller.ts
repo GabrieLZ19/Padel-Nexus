@@ -423,10 +423,20 @@ export const getInscripcionesByTorneo = async (
   res: Response,
 ): Promise<Response> => {
   try {
-    const data = await TorneoService.obtenerInscripciones(req.params.id);
+    const torneoId = req.params.id;
+    const ver = await AlcanceCuentaService.consultar(req.user, torneoId, "ver");
+    if (!ver.permitido) {
+      return res.status(403).json({
+        message:
+          ver.motivo || "No tenés permiso para ver las inscripciones de este torneo.",
+      });
+    }
+    const data = await TorneoService.obtenerInscripciones(torneoId);
     return res.status(200).json(data);
   } catch (error: unknown) {
-    return res.status(500).json({ message: "Error al obtener inscripciones" });
+    const msg =
+      error instanceof Error ? error.message : "Error al obtener inscripciones";
+    return res.status(500).json({ message: msg });
   }
 };
 
