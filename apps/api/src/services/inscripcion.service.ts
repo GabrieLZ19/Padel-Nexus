@@ -702,8 +702,8 @@ export class InscripcionService {
       jugador2Nombre!.trim() !== "" &&
       jugador2Nombre !== "-";
     const jugadoresTexto = isPareja
-      ? `${jugador1Nombre || solicitante.nombre} y ${jugador2Nombre}`
-      : `${jugador1Nombre || solicitante.nombre}`;
+      ? `${nombreJ1Persistido} y ${nombreJ2Persistido}`
+      : nombreJ1Persistido;
     const verbo = isPareja ? "se han inscripto" : "se ha inscripto";
 
     const { data: torneoNombreRow } = await supabaseAdmin
@@ -739,7 +739,7 @@ export class InscripcionService {
       NotificacionService.crearNotificacion({
         usuario_id: jugador2Id,
         titulo: "Inscripción recibida",
-        mensaje: `Fuiste inscripto junto a ${jugador1Nombre || "tu pareja"} en ${nombreTorneo}. Estado de pago: pendiente.`,
+        mensaje: `Fuiste inscripto junto a ${nombreJ1Persistido} en ${nombreTorneo}. Estado de pago: pendiente.`,
         tipo: "info",
         metadata: {
           tipo: "inscripcion",

@@ -37,6 +37,15 @@ describe("CLI-5 categorías del evento", () => {
       }),
       "5a Libre",
     );
+    assert.equal(
+      etiquetaCategoriaEventoTorneo({
+        nombre: "Copa X — 7a Damas",
+        nivel: "7a",
+        rama: "Femenina",
+        categoria: "Libres",
+      }),
+      "7a Damas",
+    );
   });
 
   it("ordenarTorneosCategoriaEvento agrupa por rama y nivel descendente", () => {

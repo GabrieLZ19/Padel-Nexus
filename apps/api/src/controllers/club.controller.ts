@@ -487,7 +487,14 @@ export const deleteClub = async (
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Error desconocido";
-    return res.status(500).json({ exito: false, error: message });
+    const statusCode =
+      error &&
+      typeof error === "object" &&
+      "statusCode" in error &&
+      typeof (error as { statusCode?: number }).statusCode === "number"
+        ? (error as { statusCode: number }).statusCode
+        : 500;
+    return res.status(statusCode).json({ exito: false, error: message });
   }
 };
 

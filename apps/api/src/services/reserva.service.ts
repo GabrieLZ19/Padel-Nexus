@@ -7,7 +7,10 @@ import {
   mercadoPagoNotificationUrl,
   resolveMercadoPagoInitPoint,
 } from "../config/mercadopago";
-import { esHorarioReservaPasado } from "../utils/fechaArgentina";
+import {
+  esHorarioReservaPasado,
+  fraseFechaTurnoReserva,
+} from "../utils/fechaArgentina";
 import {
   assertMetodoPagoManualReservaPermitido,
   type ClubMetodosPagoConfig,
@@ -1183,12 +1186,17 @@ export class ReservaService {
       const clubNombre = details.turnos?.canchas?.clubes?.nombre || "Club";
       // @ts-ignore
       const horaInicio = details.turnos?.hora_inicio?.slice(0, 5) || "00:00";
+      const fechaTurno = fraseFechaTurnoReserva(
+        String(details.fecha_reserva || ""),
+        horaInicio,
+      );
+      const montoFmt = `$ ${Number(monto).toLocaleString("es-AR")}`;
 
       if (details.usuario_id) {
         await NotificacionService.crearNotificacion({
           usuario_id: details.usuario_id,
           titulo: "Reserva confirmada — pago en el club",
-          mensaje: `Tu turno en ${canchaNombre} (${clubNombre}) el ${details.fecha_reserva} a las ${horaInicio} Hs quedó confirmado. Aboná $${monto} en el club antes de jugar.`,
+          mensaje: `Tu turno en ${canchaNombre} (${clubNombre}) ${fechaTurno} quedó confirmado. Aboná ${montoFmt} en el club antes de jugar.`,
           tipo: "info",
           metadata: { reserva_id: reservaId },
         });
@@ -1196,7 +1204,7 @@ export class ReservaService {
 
       await NotificacionService.notificarAdmins({
         titulo: "Reserva con cobro pendiente en caja",
-        mensaje: `Turno confirmado con pago en el club ($${monto}) en ${canchaNombre} (${clubNombre}) del ${details.fecha_reserva} a las ${horaInicio} Hs. Registralo con Cobrar cuando recibas el efectivo.`,
+        mensaje: `Turno confirmado con pago en el club (${montoFmt}) en ${canchaNombre} (${clubNombre}) ${fechaTurno}. Registralo con Cobrar cuando recibas el efectivo.`,
         tipo: "info",
         metadata: { reserva_id: reservaId },
       });

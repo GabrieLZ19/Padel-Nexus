@@ -43,7 +43,7 @@ describe("TOR-6 puntos de torneo club en ranking local", () => {
     assert.match(svc, /otorgarPuntosPorPartidoRanking/);
     assert.match(svc, /tablaPuntosDesdeConfig/);
     const otorgar = fuente("apps/api/src/utils/otorgarPuntosPartidoTorneo.ts");
-    assert.match(otorgar, /alcance: rank\?\.alcance \?\? alcanceRanking/);
+    assert.match(otorgar, /alcancePersistidoRankingTorneo/);
     assert.match(otorgar, /onConflict: "usuario_id,categoria"/);
     assert.match(otorgar, /rondaNormalizada\.startsWith\("ZONA"\)/);
   });

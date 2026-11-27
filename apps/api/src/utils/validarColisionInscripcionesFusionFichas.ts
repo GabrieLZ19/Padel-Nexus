@@ -43,6 +43,10 @@ export async function assertSinColisionInscripcionesFusionFichas(
   origenId: string,
   destinoId: string,
 ): Promise<void> {
+  if (origenId === destinoId) {
+    throw new Error("No podés unir una ficha consigo misma.");
+  }
+
   const { data: torneosActivos, error: errTorneos } = await supabaseAdmin
     .from("torneos")
     .select("id, nombre")

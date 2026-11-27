@@ -436,7 +436,15 @@ export const nuevaEdicionProgramacion = async (
     const { id } = req.params;
     const bloqueo = await rechazarSiNoEdita(req, id, res);
     if (bloqueo) return bloqueo;
-    const { motivo } = req.body || {};
+    const motivo = String(req.body?.motivo || "").trim();
+    if (motivo.length < 8) {
+      return res.status(400).json({
+        message:
+          "Debés indicar un motivo de al menos 8 caracteres para abrir una nueva edición.",
+        error:
+          "Debés indicar un motivo de al menos 8 caracteres para abrir una nueva edición.",
+      });
+    }
     const data = await ProgramacionService.abrirNuevaEdicion(id, {
       motivo,
       adminId: req.user?.id,

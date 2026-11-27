@@ -165,9 +165,17 @@ export function horarioInicialDraftAutoAsignar(
     cancha_asignada?: string | null;
     fecha_partido?: string | null;
     horario_bloqueado?: boolean | null;
+    estado_partido?: string | null;
+    ganador?: string | null;
   },
   soloFase?: "zonas" | "llave",
 ): { cancha_asignada: string | null; fecha_partido: string | null } {
+  if (partidoIgnoradoAutoAsignarProgramacion(partido)) {
+    return {
+      cancha_asignada: partido.cancha_asignada ?? null,
+      fecha_partido: partido.fecha_partido ?? null,
+    };
+  }
   if (partido.horario_bloqueado) {
     return {
       cancha_asignada: partido.cancha_asignada ?? null,
@@ -182,6 +190,17 @@ export function horarioInicialDraftAutoAsignar(
     };
   }
   return { cancha_asignada: null, fecha_partido: null };
+}
+
+/** CLI detalle: no reprogramar partidos ya jugados en automático de evento/torneo. */
+export function partidoIgnoradoAutoAsignarProgramacion(partido: {
+  estado_partido?: string | null;
+  ganador?: string | null;
+}): boolean {
+  const estado = String(partido.estado_partido || "")
+    .trim()
+    .toLowerCase();
+  return estado === "finalizado" || Boolean(partido.ganador);
 }
 
 export function debePersistirHorarioAutoAsignar(

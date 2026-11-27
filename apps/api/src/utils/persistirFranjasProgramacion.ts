@@ -67,7 +67,14 @@ export async function persistirFranjasPorDiaTorneo(
       .filter((row) => normalizarFechaProgramacionDia(row.fecha) === fecha)
       .map((row) => row.id);
 
-    if (!ids.length) continue;
+    if (!ids.length) {
+      if (Object.keys(updates).length > 0) {
+        throw new Error(
+          `El día ${fecha} no tiene canchas cargadas en el programador. Agregá sedes o canchas antes de guardar los horarios.`,
+        );
+      }
+      continue;
+    }
 
     const { error } = await supabaseAdmin
       .from("torneo_canchas_disponibilidad")

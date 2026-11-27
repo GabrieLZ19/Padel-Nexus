@@ -93,7 +93,10 @@ describe("TOR-5 corrección de resultado en auditoría", () => {
       "utf8",
     );
     assert.match(svc, /torneos!fk_partidos_torneo\(estado\)/);
-    assert.match(svc, /torneos!fk_partidos_torneo\(programacion_estado\)/);
+    assert.match(
+      svc,
+      /torneos!fk_partidos_torneo\([^)]*programacion_estado/,
+    );
     assert.match(svc, /previoError/);
     assert.match(svc, /partidoHorarioError/);
   });

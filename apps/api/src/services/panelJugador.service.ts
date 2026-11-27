@@ -2,6 +2,7 @@ import { supabaseAdmin } from "../config/supabase";
 import { claveCategoria, normalizarRama } from "../constants/rankings";
 import { esJugadorDePrueba } from "../utils/datoPrueba";
 import { elegirProximoPartido } from "../utils/proximoPartido";
+import { torneoInscripcionSinCosto } from "../utils/inscripcionElegibilidad";
 import { RankingService } from "./ranking.service";
 
 type InscripcionFila = {
@@ -82,6 +83,8 @@ export type PanelJugador = {
     estadoPago: string | null;
     monto: number;
     sinCosto: boolean;
+    esGratis: boolean;
+    precioInscripcion: number;
   }>;
   resultados: Array<{
     id: string;
@@ -157,9 +160,14 @@ export const PanelJugadorService = {
     const inscripcionesPanel = inscripciones.map((inscripcion) => {
       const torneo = uno(inscripcion.torneos);
       const monto = Number(inscripcion.monto || 0);
-      const sinCosto =
-        torneo?.es_gratis === true ||
-        Number(torneo?.precio_inscripcion || 0) === 0;
+      const precioInscripcion = Number(torneo?.precio_inscripcion ?? 0);
+      const esGratis = torneo?.es_gratis === true;
+      const sinCosto = torneo
+        ? torneoInscripcionSinCosto({
+            es_gratis: torneo.es_gratis,
+            precio_inscripcion: torneo.precio_inscripcion,
+          })
+        : monto <= 0;
       return {
         id: inscripcion.id,
         torneoId: torneo?.id || "",
@@ -170,6 +178,8 @@ export const PanelJugadorService = {
         estadoPago: inscripcion.estado_pago,
         monto,
         sinCosto,
+        esGratis,
+        precioInscripcion,
       };
     });
 

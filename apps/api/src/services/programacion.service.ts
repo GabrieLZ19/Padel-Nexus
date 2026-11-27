@@ -1380,13 +1380,16 @@ export class ProgramacionService {
     const { data: partidosDb } = await supabaseAdmin
       .from("partidos")
       .select(
-        "id, ronda, orden, equipo_a_id, equipo_b_id, estado_partido, cancha_asignada, fecha_partido, horario_bloqueado",
+        "id, ronda, orden, equipo_a_id, equipo_b_id, estado_partido, ganador, cancha_asignada, fecha_partido, horario_bloqueado",
       )
       .eq("torneo_id", torneoId);
 
     const partidos = partidosDb || [];
-    const { horarioInicialDraftAutoAsignar, debePersistirHorarioAutoAsignar } =
-      await import("../utils/programacionEvento");
+    const {
+      horarioInicialDraftAutoAsignar,
+      debePersistirHorarioAutoAsignar,
+      partidoIgnoradoAutoAsignarProgramacion,
+    } = await import("../utils/programacionEvento");
     const drafts: PartidoProgramable[] = partidos.map((p) => {
       const horario = horarioInicialDraftAutoAsignar(p, opciones.soloFase);
       return {
@@ -1811,6 +1814,7 @@ export class ProgramacionService {
     await Promise.all(
       partidos.map(async (p) => {
         if (p.horario_bloqueado) return;
+        if (partidoIgnoradoAutoAsignarProgramacion(p)) return;
         if (!debePersistirHorarioAutoAsignar(p.ronda, opciones.soloFase)) {
           return;
         }
@@ -2029,7 +2033,12 @@ export class ProgramacionService {
     if (torneo.programacion_estado !== "publicado") {
       throw new Error("Solo se puede abrir edición si está publicada.");
     }
-    const motivo = opciones.motivo?.trim() || "Nueva edición de programación";
+    const motivo = opciones.motivo?.trim() || "";
+    if (motivo.length < 8) {
+      throw new Error(
+        "Debés indicar un motivo de al menos 8 caracteres para abrir una nueva edición.",
+      );
+    }
 
     const { error } = await supabaseAdmin
       .from("torneos")

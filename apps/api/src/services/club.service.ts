@@ -975,6 +975,20 @@ export class ClubService {
     modo: "eliminado" | "dado_de_baja";
     historial: ResumenHistorialEntidad;
   }> {
+    const { data: club, error: clubError } = await supabaseAdmin
+      .from("clubes")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
+    if (clubError) {
+      throw new Error(`No se pudo verificar el club: ${clubError.message}`);
+    }
+    if (!club) {
+      const err = new Error("Club no encontrado.");
+      Object.assign(err, { statusCode: 404 });
+      throw err;
+    }
+
     const historial = await historialClub(id);
 
     if (!historial.tieneHistorial) {

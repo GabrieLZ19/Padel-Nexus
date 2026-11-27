@@ -1531,6 +1531,33 @@ export class PerfilService {
     if (!motivoLimpio) {
       throw new Error("Debés indicar un motivo para unir las fichas.");
     }
+    if (motivoLimpio.length < 8) {
+      throw new Error("El motivo debe tener al menos 8 caracteres.");
+    }
+
+    if (origenId === destinoId) {
+      throw new Error("No podés unir una ficha consigo misma.");
+    }
+
+    const { data: inscripcionMismaPareja } = await supabaseAdmin
+      .from("inscripciones")
+      .select("id, torneos(nombre)")
+      .eq("cancelada", false)
+      .or(
+        `and(usuario_id.eq.${origenId},usuario2_id.eq.${destinoId}),and(usuario_id.eq.${destinoId},usuario2_id.eq.${origenId})`,
+      )
+      .limit(1)
+      .maybeSingle();
+    if (inscripcionMismaPareja) {
+      const torneoNom =
+        (Array.isArray(inscripcionMismaPareja.torneos)
+          ? inscripcionMismaPareja.torneos[0]?.nombre
+          : (inscripcionMismaPareja.torneos as { nombre?: string } | null)
+              ?.nombre) || "un torneo";
+      throw new Error(
+        `No podés unir estas fichas: son compañeros de pareja en "${torneoNom}".`,
+      );
+    }
 
     const { data: origen } = await supabaseAdmin
       .from("perfiles")

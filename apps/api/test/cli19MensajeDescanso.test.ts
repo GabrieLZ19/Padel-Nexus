@@ -8,15 +8,15 @@ import {
 import { mensajeDescansoInsuficienteProgramador } from "../src/utils/programadorReglas.ts";
 
 describe("CLI-19 mensajes de descanso vs orden de llave", () => {
-  it("mensajeDetalle: hacen falta X min, quedan Y min", () => {
+  it("mensajeDetalle: se exigen X min, hay Y min", () => {
     const msg = mensajeDescansoInsuficienteProgramador(
       "tras_fin_60",
       10 * 60,
       11 * 60 + 45,
       90,
     );
-    assert.match(msg, /hacen falta 45 min/);
-    assert.match(msg, /quedan 15 min/);
+    assert.match(msg, /se exigen 45 min/);
+    assert.match(msg, /hay 15 min/);
   });
 
   it("orden inválido: antes del fin del feeder, no mensaje de descanso", () => {
@@ -85,9 +85,9 @@ describe("CLI-19 mensajes de descanso vs orden de llave", () => {
     });
     const bad = issues.filter((i) => i.partido_id === "h");
     assert.ok(
-      bad.some((i) => /Descanso insuficiente: hacen falta/.test(i.message)),
+      bad.some((i) => /Descanso insuficiente: se exigen/.test(i.message)),
     );
-    assert.ok(bad.some((i) => /quedan \d+ min/.test(i.message)));
+    assert.ok(bad.some((i) => /hay \d+ min/.test(i.message)));
   });
 
   it("validarAsignacionHorarioPartido: descanso, no orden de llave genérico", () => {

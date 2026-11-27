@@ -31,6 +31,34 @@ export function ramaCorta(rama?: string | null): string {
   return "";
 }
 
+/** Familia FAP en columna `categoria` (no confundir con nivel 7ª, 5ª). */
+export function esFamiliaCategoriaFap(categoria?: string | null): boolean {
+  const c = String(categoria || "")
+    .trim()
+    .toLowerCase();
+  return c === "libres" || c === "libre" || c === "menores";
+}
+
+/** PUB-33: rama legible en selector/chip («Damas», «Libre», …). */
+export function etiquetaRamaTorneoEvento(
+  rama?: string | null,
+  categoria?: string | null,
+): string {
+  const r = String(rama || "").toLowerCase();
+  const fam = String(categoria || "")
+    .trim()
+    .toLowerCase();
+  if (r.startsWith("fem") || r.includes("dama")) return "Damas";
+  if (fam === "libres" || fam === "libre") {
+    if (r.startsWith("mas") || r.includes("cab")) return "Libre";
+  }
+  if (r.startsWith("mas") || r.includes("cab")) return "Caballeros";
+  if (r.startsWith("mix")) return "Mixto";
+  const corta = ramaCorta(rama);
+  if (corta) return corta;
+  return String(rama || "").trim();
+}
+
 export function etiquetaRamaGrupo(rama?: string | null): string {
   const r = String(rama || "").toLowerCase();
   if (r.startsWith("fem") || r.includes("dama")) return "Categorías Damas";
@@ -199,6 +227,10 @@ export function etiquetaCategoriaEventoTorneo(torneo: {
   const nivel = String(torneo.nivel || "").trim();
   const categoria = String(torneo.categoria || "").trim();
   const rama = ramaCorta(torneo.rama);
+  if (nivel && esFamiliaCategoriaFap(categoria)) {
+    const parteRama = etiquetaRamaTorneoEvento(torneo.rama, categoria);
+    if (parteRama) return `${nivel} ${parteRama}`;
+  }
   if (nivel && categoria) return `${nivel} ${categoria}`;
   if (nivel && rama) return `${nivel} ${rama}`;
   if (nivel) return nivel;
