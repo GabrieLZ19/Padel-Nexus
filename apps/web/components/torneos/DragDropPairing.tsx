@@ -32,6 +32,7 @@ import {
   textoClasificacionZonas,
 } from "@/utils/clasificacionZonas";
 import { cleanJugadorNombre } from "@/utils/nombrePareja";
+import { sileo } from "sileo";
 
 const cleanName = (name?: string | null) => cleanJugadorNombre(name);
 
@@ -106,7 +107,10 @@ export const SortablePareja = ({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: pareja.id, disabled: !isEditing });
+  } = useSortable({
+    id: pareja.id,
+    disabled: !isEditing || stats.played > 0,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -135,7 +139,9 @@ export const SortablePareja = ({
       {...(isEditing ? attributes : {})}
       {...(isEditing ? listeners : {})}
       className={`relative flex items-center gap-3 p-3 rounded-2xl transition-all group shadow-md select-none border-2 ${
-        isEditing
+        isEditing && stats.played > 0
+          ? "bg-[#222222] border-white/10 opacity-80 cursor-not-allowed"
+          : isEditing
           ? "bg-[#222222] border-transparent hover:border-brand-chartreuse/50 cursor-grab active:cursor-grabbing"
           : isClassified
             ? "bg-emerald-950/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
@@ -651,6 +657,16 @@ export const DragDropPairing: React.FC<DragDropPairingProps> = ({
       findZonaOfPareja(overIdStr) || zonas.find((z) => z.id === overIdStr);
 
     if (!activeZona || !overZona) return;
+
+    const statsActiva = getParejaStatsById(activeIdStr);
+    if (statsActiva.played > 0) {
+      sileo.warning({
+        title: "Pareja con partidos jugados",
+        description:
+          "No podés mover una pareja que ya tiene resultados cargados en la zona.",
+      });
+      return;
+    }
 
     if (activeZona.id !== overZona.id) {
       // Movimiento atómico entre zonas al soltar: evita bucles en onDragOver y modales en medio del arrastre.

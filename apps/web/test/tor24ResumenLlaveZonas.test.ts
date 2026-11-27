@@ -38,4 +38,18 @@ describe("TOR-24 resumen y vista de llave", () => {
     assert.match(texto, /2A/);
     assert.ok(!/\b2B\b/.test(texto));
   });
+
+  it("formatearResumen avisa partidos de zona sin horario", () => {
+    const texto = formatearResumenTrasGuardarZonas(
+      {
+        partidos_sin_horario: {
+          total: 1,
+          por_zona: [{ nombre: "Zona E", cantidad: 1 }],
+        },
+      },
+      [{ nombre: "Zona E", parejas: [{}, {}, {}, {}] }],
+    );
+    assert.match(texto, /sin horario/);
+    assert.match(texto, /Zona E/);
+  });
 });

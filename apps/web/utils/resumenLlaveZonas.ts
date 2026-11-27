@@ -12,6 +12,10 @@ export type ResumenLlaveZonasPayload = {
     semillas_pendientes?: string[];
   };
   fixture_reparado?: Array<{ nombre_grupo: string; insertados: number }>;
+  partidos_sin_horario?: {
+    total: number;
+    por_zona: Array<{ nombre: string; cantidad: number }>;
+  };
 };
 
 export function formatearResumenLlaveZonas(
@@ -55,6 +59,14 @@ export function formatearResumenLlaveZonas(
   }
   if (pendientes.length) {
     partes.push(`Plazas sin clasificado aún: ${pendientes.join(", ")}.`);
+  }
+  if (data.partidos_sin_horario?.total) {
+    const detalle = data.partidos_sin_horario.por_zona
+      .map((z) => `${z.nombre} (${z.cantidad})`)
+      .join(", ");
+    partes.push(
+      `Quedaron ${data.partidos_sin_horario.total} partido(s) de zona sin horario (${detalle}). Revisá el programador.`,
+    );
   }
   return partes.length
     ? partes.join(" ")

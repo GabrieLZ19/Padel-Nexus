@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 import { sileo } from "sileo";
 import FeedbackModal from "@/components/ui/FeedbackModal";
 import { TorneosService } from "@/utils/services/torneos";
+import { formatearResumenLlaveZonas } from "@/utils/resumenLlaveZonas";
 
 type ParejaZona = { id: string; nombre: string };
 type ZonaPanel = { id: string; nombre: string; parejas: ParejaZona[] };
@@ -149,13 +150,25 @@ function ZonaDrop({
   );
 }
 
+function apiErrorMessage(e: unknown, fallback: string): string {
+  if (e && typeof e === "object" && "response" in e) {
+    return String(
+      (e as { response?: { data?: { error?: string } } }).response?.data
+        ?.error || fallback,
+    );
+  }
+  return fallback;
+}
+
 export default function ZonaParejasPanel({
   torneoId,
   readOnly,
+  programacionPublicada,
   onMoved,
 }: {
   torneoId: string;
   readOnly?: boolean;
+  programacionPublicada?: boolean;
   onMoved: () => void;
 }) {
   const [zonas, setZonas] = useState<ZonaPanel[]>([]);
@@ -183,18 +196,29 @@ export default function ZonaParejasPanel({
     if (!movimiento || !motivo?.trim()) return;
     setGuardando(true);
     try {
-      await TorneosService.moverPareja({
+      const resultado = await TorneosService.moverPareja({
         inscripcion_id: movimiento.inscripcionId,
         grupo_origen_id: movimiento.origenId,
         grupo_destino_id: movimiento.destinoId,
         motivo: motivo.trim(),
       });
-      sileo.success({ title: "Pareja movida. Cuadros y horarios actualizados." });
+      const detalle = formatearResumenLlaveZonas(resultado);
+      sileo.success({
+        title: "Pareja movida",
+        description:
+          detalle !==
+          "La disposición de las zonas y los partidos se actualizaron exitosamente."
+            ? detalle
+            : "Cuadros y horarios actualizados.",
+      });
       setMovimiento(null);
       await cargar();
       onMoved();
-    } catch {
-      sileo.error({ title: "No se pudo mover la pareja." });
+    } catch (e) {
+      sileo.error({
+        title: "No se pudo mover la pareja",
+        description: apiErrorMessage(e, "Revisá el motivo o el estado del torneo."),
+      });
     } finally {
       setGuardando(false);
     }
@@ -243,8 +267,9 @@ export default function ZonaParejasPanel({
       {abierto ? (
         <>
           <p className="px-2.5 pb-2 text-xs leading-4 text-gray-400">
-            Arrastrá una pareja a otra zona. El cambio se guarda en los cuadros
-            y conserva el horario de los cruces que siguen iguales.
+            {programacionPublicada
+              ? "Con la programación publicada no podés mover una sola pareja desde acá. Usá el editor de zonas del Paso 6 para intercambiar dos parejas entre zonas."
+              : "Arrastrá una pareja a otra zona. El cambio se guarda en los cuadros y conserva el horario de los cruces que siguen iguales."}
           </p>
           <DndContext sensors={sensors} onDragEnd={onDragEnd}>
             <div className="max-h-36 space-y-2 overflow-auto px-2.5 pb-2">

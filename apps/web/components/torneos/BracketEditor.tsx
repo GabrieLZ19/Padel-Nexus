@@ -874,8 +874,9 @@ export const BracketEditor: React.FC<BracketEditorProps> = ({
         isOpen: true,
         type: "warning",
         title: "Confirmar Distribución",
-        description:
-          "Por favor, indica el motivo por el cual modificaste manualmente la disposición de las zonas. Esto quedará registrado en auditoría y re-generará el fixture correspondiente.",
+        description: programacionPublicada
+          ? "Con la programación publicada solo podés guardar intercambios de a dos parejas entre zonas (misma cantidad de parejas en cada zona). Los horarios y bloqueos se conservan. Indicá el motivo del cambio."
+          : "Por favor, indica el motivo por el cual modificaste manualmente la disposición de las zonas. Esto quedará registrado en auditoría y re-generará el fixture correspondiente.",
         confirmText: "Guardar",
         cancelText: "Cancelar",
         showInput: true,

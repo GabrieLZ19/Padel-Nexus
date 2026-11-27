@@ -2,6 +2,11 @@ import { api } from "../api";
 import { Torneo, FormTorneoState, Partido, GrupoTorneoListado } from "../types";
 import { hydrateTorneoRestrictions } from "../inscripcionElegibilidad";
 import type { VistaTorneoId, VistaTorneoParam } from "../constants/padelConfig";
+import type { ResumenLlaveZonasPayload } from "../resumenLlaveZonas";
+
+export type ResumenGuardarZonasResponse = ResumenLlaveZonasPayload & {
+  intercambio_programacion_publicada?: boolean;
+};
 
 export interface CategoriaEventoItem {
   id: string;
@@ -380,7 +385,10 @@ export const TorneosService = {
     motivo: string;
   }) {
     const response = await api.put(`/torneos/override/mover-pareja`, payload);
-    return response.data;
+    return response.data as ResumenGuardarZonasResponse & {
+      exito: boolean;
+      mensaje: string;
+    };
   },
 
   async guardarZonas(
@@ -400,21 +408,9 @@ export const TorneosService = {
     },
   ) {
     const response = await api.put(`/torneos/${torneoId}/guardar-zonas`, payload);
-    return response.data as {
+    return response.data as ResumenGuardarZonasResponse & {
       exito: boolean;
       mensaje: string;
-      zonas_regeneradas?: string[];
-      fixture_reparado?: Array<{
-        nombre_grupo: string;
-        insertados: number;
-        ordenes: number[];
-      }>;
-      llave?: {
-        semillas_invalidadas: string[];
-        semillas_actualizadas: string[];
-        semillas_pendientes: string[];
-      };
-      zonas_desprogramadas_conflicto_llave?: string[];
     };
   },
 

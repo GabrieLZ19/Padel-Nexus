@@ -355,7 +355,12 @@ export function ProgramadorVisualPage({
             {!grupoId ? (
               <ZonaParejasPanel
                 torneoId={torneoId}
-                readOnly={isReadOnly}
+                readOnly={
+                  isReadOnly || board?.programacion_estado === "publicado"
+                }
+                programacionPublicada={
+                  board?.programacion_estado === "publicado"
+                }
                 onMoved={() => void load()}
               />
             ) : null}
